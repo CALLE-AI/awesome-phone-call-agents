@@ -1,57 +1,43 @@
-"""La CONSIGNE dictée à l'agent CALL-E — trois parties, jamais un monologue.
+"""The BRIEFING dictated to the CALL-E agent — three parts, never a monologue.
 
-CE QUI A MOTIVÉ CE MODULE. Au 5ᵉ essai réel (01/08/2026), l'agent a été
-RAIDE : le propriétaire lui a demandé de répéter, l'agent a répondu « ok,
-votre rendez-vous a été déplacé » et a conclu. La cause est dans ce que
-RingBack lui envoyait — un TEXTE À RÉCITER, variables déjà remplacées.
-Or CALL-E se revendique agent conversationnel : son champ « task » attend
-un OBJECTIF, pas une réplique. Nous parlions à une IA comme à un automate.
+WHAT MOTIVATED THIS MODULE. On the 5th real test (01/08/2026) the agent was
+STIFF: the owner asked it to repeat, the agent answered `ok, your appointment
+has been moved` and wrapped up. The cause lies in what RingBack was sending it
+— a TEXT TO RECITE, with variables already substituted. Yet CALL-E presents
+itself as a conversational agent: its `task` field expects an OBJECTIVE, not a
+line to read. We were talking to an AI as if to a machine.
 
-D'où la décision du propriétaire, mot pour mot :
+Hence the owner's decision, word for word:
 
-    « Je veux effectivement une première présentation type (par contre
-    M. ou Mme il ne comprend pas, faut remplacer par monsieur ou madame).
-    Ensuite il faut qu'il discute naturellement en fonction de la réponse,
-    par contre fixer sur issues : oui, non, autre selon la raison de
-    l'appel. »
+`I do want a standard opening (though M. or Mme it does not understand, they
+must be replaced by monsieur or madame). Then it must talk naturally according
+to the answer, but be pinned to outcomes: yes, no, other, depending on the
+reason for the call.`
 
-La consigne prend donc TROIS PARTIES, et une seule est imposée :
+The briefing therefore takes THREE PARTS, and only one is imposed:
 
-1. LA PRÉSENTATION — le message construit à l'étape 2 (ou récrit à la main
-   par l'utilisateur). C'est le SEUL passage dit mot pour mot ;
-2. L'OBJECTIF ET LE CONTEXTE — en langage naturel : ce qu'on cherche à
-   obtenir, les faits utiles (le rendez-vous actuel, la place proposée, le
-   motif, le lieu, la durée, les consignes) et les CONTRAINTES (jamais
-   d'information médicale, ne pas insister, s'annoncer comme assistant
-   automatique si on le demande, la sortie de secours des fiches). Entre
-   l'ouverture et la conclusion, l'agent DISCUTE LIBREMENT : il peut
-   répéter, reformuler, répondre à une question imprévue ;
-3. LES ISSUES ATTENDUES — fermées : oui / non / autre. Chacune est traduite
-   dans le code que le schéma de résultat impose (voir calle_client :
-   SCHEMA_RESULTAT et SCHEMA_RESULTAT_CASCADE, tous deux « enum » +
-   additionalProperties=False). Le schéma reste donc fermé et vérifiable :
-   c'est lui qui garantit qu'on n'invente rien.
+1. THE OPENING — the message built at step 2 (or rewritten by hand by the user). It is the ONLY passage spoken word for word;
+2. THE OBJECTIVE AND THE CONTEXT — in natural language: what we are trying to obtain, the useful facts (the current appointment, the slot offered, the reason, the place, the length, the instructions) and the CONSTRAINTS (never any medical information, do not insist, say you are an automated assistant if asked, the escape hatch of the discussion sheets). Between the opening and the close, the agent TALKS FREELY: it may repeat, rephrase, answer an unforeseen question;
+3. THE EXPECTED OUTCOMES — closed: yes / no / other. Each is translated into the code the result schema imposes (see calle_client: SCHEMA_RESULTAT and SCHEMA_RESULTAT_CASCADE, both `enum` + additionalProperties=False). The schema therefore stays closed and checkable: it is what guarantees nothing is invented.
 
-Ce module ne dépend d'AUCUN autre module de RingBack (il est importé par
-calle_client comme par assistant) et n'écrit nulle part : il fabrique du
-texte, et rien d'autre. Aucun numéro de téléphone n'y entre jamais — la
-règle est vérifiée par les essais (sans_numero).
+This module depends on NO other RingBack module (it is imported by calle_client
+as well as by assistant) and writes nowhere: it produces text, and nothing
+else. No phone number ever enters it — the rule is checked by the tests
+(sans_numero).
 """
 
 import re
 
-# ---------------------------------------------------------- les civilités
-# LE CONSTAT DU PROPRIÉTAIRE, à l'oreille : « M. » et « Mme » ne sont pas
-# lus correctement par l'agent. On les DÉVELOPPE au moment de construire le
-# texte envoyé — et là seulement. Les fiches clients gardent l'écriture de
-# leur propriétaire : rien n'est réécrit en base, jamais.
-#
-# L'ordre compte : les formes LONGUES d'abord (« MM. » avant « M. »,
-# « Mmes » avant « Mme »), sinon l'alternation prendrait la courte.
-# On ne développe QUE ces abréviations-là : celles des fiches du produit
-# (jeu d'essai : « M. », « Mme ») et celles que le tri alphabétique connaît
-# déjà (generation._CIVILITE : m., mme, mlle, mr, dr), plus « Pr » demandé
-# par le propriétaire. Rien d'autre n'est deviné.
+# ---------------------------------------------------------- the honorifics THE
+# OWNER'S OBSERVATION, by ear: `M.` and `Mme` are not read correctly by the
+# agent. They are EXPANDED when building the text to be sent — and only there.
+# Client records keep their owner's spelling: nothing is rewritten in the
+# database, ever.  Order matters: the LONG forms first (`MM.` before `M.`,
+# `Mmes` before `Mme`), otherwise the alternation would take the short one.
+# ONLY those abbreviations are expanded: the ones in the product's records
+# (sample data set: `M.`, `Mme`) and the ones alphabetical sorting already
+# knows (generation._CIVILITE: m., mme, mlle, mr, dr), plus `Pr` requested by
+# the owner. Nothing else is guessed.
 CIVILITES = (
     ("MM.", "messieurs"),
     ("M.", "monsieur"),
@@ -67,50 +53,47 @@ CIVILITES = (
 
 _DEVELOPPE = dict(CIVILITES)
 
-# L'abréviation doit être suivie d'une espace PUIS d'une lettre : c'est ce
-# qui distingue « M. Dupont » (une civilité) d'un « M. » isolé en fin de
-# phrase. Le point final éventuel (« Mme. ») est absorbé.
+# The abbreviation must be followed by a space THEN a letter: that is what
+# tells `M. Dupont` (an honorific) from a lone `M.` at the end of a sentence.
+# Any trailing dot (`Mme.`) is absorbed.
 _MOTIF_CIVILITE = re.compile(
     r"\b(" + "|".join(re.escape(abrege) for abrege, _ in CIVILITES)
     + r")\.?(?=\s+[^\W\d_])")
 
-# ⚠ « M » TOUT SEUL, SANS POINT. Toutes les autres abréviations s'écrivent
-# sans point (Mme, Mlle, Dr, Pr) et le motif ci-dessus les prend déjà ; « M »
-# et « MM » sont les seules à n'y figurer QUE pointées, donc « M Ludovic »
-# passait à travers — constaté à l'oreille par le propriétaire le 02/08/2026 :
-# l'agent a dit « M Ludovic » pendant tout l'appel.
-#
-# La condition est plus stricte que pour les formes pointées : le mot suivant
-# doit commencer par une MAJUSCULE, comme un nom. « M » suivi d'un mot en
-# minuscule n'est pas développé — trop de risque d'attraper autre chose.
-# Reste un cas que ce motif prend à tort : une initiale (« J M Dupont »
-# deviendrait « J monsieur Dupont »). Il est accepté en connaissance de
-# cause : une fiche de contact porte une civilité bien plus souvent qu'une
-# initiale, et la conséquence se limite à un mot prononcé — jamais à une
-# donnée écrite, puisque la fiche n'est pas touchée.
+# ⚠ `M` ON ITS OWN, WITH NO DOT. All the other abbreviations are written
+# without a dot (Mme, Mlle, Dr, Pr) and the pattern above already takes them;
+# `M` and `MM` are the only ones that appear there ONLY with dots, so `M
+# Ludovic` slipped through — observed by ear by the owner on 02/08/2026: the
+# agent said `M Ludovic` throughout the call.  The condition is stricter than
+# for the dotted forms: the following word must start with a CAPITAL, like a
+# surname. `M` followed by a lower-case word is not expanded — too much risk of
+# catching something else. One case this pattern takes wrongly remains: an
+# initial (`J M Dupont` would become `J monsieur Dupont`). It is accepted
+# knowingly: a contact record carries an honorific far more often than an
+# initial, and the consequence is limited to one spoken word — never to written
+# data, since the record is not touched.
 _MAJUSCULES = "A-ZÀ-ÖØ-Þ"
 _MOTIF_CIVILITE_SANS_POINT = re.compile(
     r"\b(MM|M)(?=\s+[" + _MAJUSCULES + r"])")
 
-# Après quoi une civilité développée reprend sa majuscule (début de texte ou
-# début de phrase) — « Monsieur Dupont a demandé… », pas « monsieur » collé
-# derrière un point.
-# Le deux-points N'EN FAIT PAS PARTIE : en français, ce qui le suit ne prend
-# pas de majuscule (« Personne appelée : monsieur Ludovic »).
+# After which an expanded honorific takes its capital back (start of text or
+# start of sentence) — `Monsieur Dupont a demandé…`, not `monsieur` stuck after
+# a full stop. The colon is NOT part of that: in French, what follows it takes
+# no capital (`Personne appelée : monsieur Ludovic`).
 _FINS_DE_PHRASE = ".!?\n\r"
 _OUVRANTS = " \t «\"'(-–—"
 
 
 def developper_civilites(texte, developpe=None):
-    """« M. Ludovic » devient « monsieur Ludovic » — dans le TEXTE ENVOYÉ.
+    """`M. Ludovic` becomes `monsieur Ludovic` — in the TEXT SENT OUT.
 
-    Appelée au dernier moment, sur la consigne assemblée. La fiche du
-    client, elle, n'est jamais touchée : c'est son écriture à lui.
+    Called at the last moment, on the assembled briefing. The client's record
+    is never touched: that spelling is theirs.
 
-    ⚠ `developpe` VIDE = ON NE DÉVELOPPE RIEN, et c'est voulu hors du
-    français. Le constat qui a créé cette fonction — « M. » et « Mme » mal
-    lus par l'agent — est un constat FRANÇAIS. « Mr Smith » se lit très bien
-    tel quel en anglais, et « monsieur Smith » y serait une faute pure.
+    ⚠ AN EMPTY `developpe` = NOTHING IS EXPANDED, and that is intended outside
+    French. The observation that created this function — `M.` and `Mme` misread
+    by the agent — is a FRENCH observation. `Mr Smith` reads perfectly well as
+    it stands in English, and `monsieur Smith` would be plainly wrong there.
     """
     if not texte:
         return texte
@@ -129,27 +112,26 @@ def developper_civilites(texte, developpe=None):
             return mot[:1].upper() + mot[1:]
         return mot
 
-    # Les formes pointées d'abord : « M. Ludovic » est déjà traité quand la
-    # passe sans point arrive, et « M » n'y trouve donc plus rien à faire.
+    # The dotted forms first: `M. Ludovic` is already handled by the time the
+    # dotless pass arrives, so `M` finds nothing left to do.
     texte = _MOTIF_CIVILITE.sub(remplacer, texte)
     return _MOTIF_CIVILITE_SANS_POINT.sub(remplacer, texte)
 
 
-# ------------------------------------------------------- les deux genres
-# Le champ que l'agent doit renseigner diffère selon le schéma imposé :
-# « outcome » pour un appel de cascade (créneau libéré), « appointment_status »
-# pour tous les autres. Voir calle_client.SCHEMA_RESULTAT(_CASCADE).
+# ------------------------------------------------------- the two genres The
+# field the agent must fill differs according to the imposed schema: `outcome`
+# for a cascade call (freed slot), `appointment_status` for all the others. See
+# calle_client.SCHEMA_RESULTAT(_CASCADE).
 GENRE_CLASSIQUE = "classique"
 GENRE_CASCADE = "cascade"
 
 CHAMP_ISSUE = {GENRE_CLASSIQUE: "appointment_status",
                GENRE_CASCADE: "outcome"}
 
-# Les trois issues, dans l'ordre où l'agent les lit.
-# ⚠ LES QUATRE FINS DE PHRASE D'ISSUE SONT NOMMÉES, et ce n'est pas un
-# rangement : elles étaient écrites au milieu de `texte_issues`, donc
-# intraduisibles sans toucher au code. Nommées, elles se traduisent comme le
-# reste — par le dictionnaire, à la sortie.
+# The three outcomes, in the order the agent reads them. ⚠ THE FOUR OUTCOME
+# SENTENCE ENDINGS ARE NAMED, and that is not tidying: they were written in the
+# middle of `texte_issues`, hence untranslatable without touching the code.
+# Named, they translate like the rest — through the dictionary, at the exit.
 FIN_DATE_OBLIGATOIRE = (", et écris dans « new_datetime » la date convenue "
                         "au format 2026-08-15T14:30")
 FIN_DATE_FACULTATIVE_OU = (" avec la date convenue dans « new_datetime » "
@@ -165,45 +147,40 @@ PREFIXE_OBJECTIF = "Ton objectif : "
 
 ISSUES = ("oui", "non", "autre")
 LIBELLE_ISSUE = {"oui": "OUI", "non": "NON", "autre": "AUTRE"}
-# ⚠ LE SQUELETTE D'UNE ISSUE EST NOMMÉ, LUI AUSSI. Il portait le verbe
-# « rends » écrit en dur au milieu d'une f-string : intraduisible sans toucher
-# au code, et c'est la ligne la plus importante de la consigne — celle qui dit
-# à l'agent quel champ renseigner.
+# ⚠ THE SKELETON OF AN OUTCOME IS NAMED TOO. It carried the verb `rends`
+# hard-written in the middle of an f-string: untranslatable without touching
+# the code, and it is the most important line of the briefing — the one telling
+# the agent which field to fill.
 GABARIT_ISSUE = "- {libelle} — {quand} : rends {champ} = « {code} »"
 
 
 def issue(code, quand, code_sans_date=None, date="vide"):
-    """Une des trois issues fermées.
+    """One of the three closed outcomes.
 
-    code            : la valeur imposée par le schéma (enum) ;
-    quand           : à quel moment l'agent doit choisir celle-là ;
-    code_sans_date  : la valeur de repli quand AUCUNE date précise n'a été
-                      convenue (« rescheduled » devient « to_reschedule ») ;
-    date            : « obligatoire » (l'issue n'a de sens qu'avec une date
-                      dans new_datetime), « facultative » ou « vide ».
+    code : the value imposed by the schema (enum); quand : at what moment the
+    agent must choose this one; code_sans_date : the fallback value when NO
+    precise date was agreed (`rescheduled` becomes `to_reschedule`); date :
+    `obligatoire` (the outcome only makes sense with a date in new_datetime),
+    `facultative` or `vide`.
     """
     return {"code": code, "quand": quand, "code_sans_date": code_sans_date,
             "date": date}
 
 
-# Les issues de repli, quand la consigne est construite SANS fiche de
-# campagne : rappel individuel, file d'appels, essai réel. Elles disent la
-# même chose que les fiches, en plus général.
-#
-# ⚠ ICI, « OUI » RÉCLAME UNE DATE — et il n'en réclamait pas (mesuré le
-# 24/08/2026). Ces appels-là PROPOSENT UN CRÉNEAU précis : « Je vous propose
-# un nouveau créneau le mardi 25 août 2026 à 9 heures : est-ce que cela vous
-# convient ? » Dire oui, c'est prendre CE créneau — et le planificateur doit
-# l'inscrire à l'agenda. Or la consigne disait « laisse new_datetime vide » :
-# l'accord revenait sans date, la vérification la refusait, et RIEN n'était
-# écrit. La personne avait dit oui au téléphone, son rendez-vous ne bougeait
-# pas d'une minute.
-#
-# ⚠ LES FICHES « ✅ Confirmation » ET « 🔔 Rappel de rendez-vous » SONT LE CAS
-# INVERSE : elles ne proposent rien, elles demandent une présence. Leur « oui »
-# garde `date="vide"`, et le produit se contente de passer le rendez-vous
-# « confirmé ». Deux besoins opposés, deux contrats — c'est pourquoi chaque
-# nature déclare le sien plutôt que d'hériter d'une règle unique.
+# The fallback outcomes, when the briefing is built WITHOUT a campaign sheet:
+# single call-back, call queue, real test. They say the same thing as the
+# sheets, only more generally.  ⚠ HERE, `YES` DEMANDS A DATE — and it did not
+# (measured on 24/08/2026). Those calls OFFER A PRECISE SLOT: `I can offer you
+# a new slot on Tuesday 25 August 2026 at 9 o'clock: would that suit you?`
+# Saying yes means taking THAT slot — and the planner must enter it in the
+# calendar. Yet the briefing said `leave new_datetime empty`: the agreement
+# came back with no date, the check refused it, and NOTHING was written. The
+# person had said yes on the phone, and their appointment did not move by a
+# minute.  ⚠ THE `✅ Confirmation` AND `🔔 Rappel de rendez-vous` SHEETS ARE THE
+# OPPOSITE CASE: they offer nothing, they ask for attendance. Their `yes` keeps
+# `date="vide"`, and the product merely moves the appointment to `confirmé`.
+# Two opposite needs, two contracts — which is why each kind declares its own
+# rather than inheriting a single rule.
 ISSUES_DEFAUT = {
     "oui": issue("confirmed", "la personne accepte le créneau que tu proposes",
                  date="obligatoire"),
@@ -227,11 +204,11 @@ ISSUES_DEFAUT_CASCADE = {
 }
 
 
-# ------------------------------------------------------- les contraintes
-# Ce sont les « Règles communes à tous les appels » des fiches de discussion
-# (FICHES_DISCUSSION.md), écrites pour être lues par l'agent. [entreprise]
-# et [plage_rappel] sont remplacés à la construction : une contrainte ne
-# doit JAMAIS tomber faute d'une variable vide.
+# ------------------------------------------------------- the constraints These
+# are the `Rules common to all calls` of the discussion sheets
+# (FICHES_DISCUSSION.md), written to be read by the agent. [entreprise] and
+# [plage_rappel] are substituted at build time: a constraint must NEVER fall
+# over for want of an empty variable.
 CONTRAINTES = (
     "ne donne aucune information médicale, et aucun détail qui ne soit pas "
     "écrit dans « ce que tu sais » ci-dessus ;",
@@ -243,12 +220,12 @@ CONTRAINTES = (
     "peut vous rappeler si vous préférez. » ;",
     "si tu n'as pas la bonne personne : « Toutes mes excuses pour le "
     "dérangement, bonne journée. », et conclus sur AUTRE ;",
-    # ⚠ CETTE RÈGLE PASSE AVANT LA SORTIE DE SECOURS, et pour cause : le
-    # 02/08/2026, la personne a demandé « pouvez-vous me rappeler la date ? »
-    # — la date était écrite dans « ce que tu sais », l'agent venait de la
-    # dire — et il a répondu « je préfère ne pas vous dire de bêtise » puis
-    # raccroché. La sortie de secours se déclenchait sur « une question
-    # imprévue » : autant dire sur toutes. Répéter n'est pas improviser.
+    # ⚠ THIS RULE COMES BEFORE THE ESCAPE HATCH, and with reason: on 02/08/2026
+    # the person asked `could you remind me of the date?` — the date was
+    # written in `what you know`, the agent had just said it — and it answered
+    # `I'd rather not tell you something wrong` and hung up. The escape hatch
+    # triggered on `an unforeseen question`: which is to say, on all of them.
+    # Repeating is not improvising.
     "redire ce que tu sais n'est JAMAIS une raison de passer la main : si on "
     "te demande de répéter la date, l'heure, le lieu, la durée ou le motif, "
     "redis-les simplement, aussi souvent qu'il le faut — ils sont écrits "
@@ -258,12 +235,12 @@ CONTRAINTES = (
     "ne pas vous dire de bêtise : je transmets votre demande à [entreprise], "
     "qui vous rappellera [plage_rappel]. Merci de votre patience, et bonne "
     "journée. » ; conclus alors sur AUTRE, en écrivant sa demande en clair ;",
-    # ⚠ DIS-LE PLUTÔT QUE DE DEVINER (10/08/2026). Sans cette ligne, l'agent
-    # qui ne comprend pas une réponse tranche quand même : il choisit une issue
-    # au hasard, et RingBack l'écrit. La personne, elle, croit avoir été
-    # comprise — et découvre le contraire en se présentant à un rendez-vous qui
-    # n'existe plus. Deux demandes de répétition, puis on passe la main : c'est
-    # ce que fait un humain au téléphone.
+    # ⚠ SAY SO RATHER THAN GUESS (10/08/2026). Without this line, an agent that
+    # does not understand an answer decides anyway: it picks an outcome at
+    # random, and RingBack writes it down. The person, meanwhile, believes they
+    # were understood — and finds out otherwise when turning up for an
+    # appointment that no longer exists. Two requests to repeat, then hand
+    # over: that is what a human does on the phone.
     "si tu ne comprends pas ce qu'on te répond, demande de reformuler UNE "
     "fois ; si tu ne comprends toujours pas, dis-le : « Je n'ai "
     "malheureusement pas bien compris votre réponse. Je préfère qu'un "
@@ -274,8 +251,8 @@ CONTRAINTES = (
     "sur un répondeur, laisse un message court et SANS le motif de l'appel.",
 )
 
-# L'établissement quand son nom n'est pas (encore) réglé : la contrainte
-# reste dicible, et elle ne prétend pas connaître un nom qu'on n'a pas.
+# The establishment when its name is not (yet) configured: the constraint stays
+# speakable, and it does not claim to know a name we do not have.
 ENTREPRISE_INCONNUE = "l'établissement"
 PLAGE_INCONNUE = "pendant nos heures d'ouverture"
 
@@ -291,20 +268,19 @@ TITRE_ISSUES = ("3) LES ISSUES — tu dois conclure sur l'une de ces trois-là, 
                 "et sur aucune autre :")
 
 TITRE_FAITS = "Ce que tu sais, et que tu peux redire ou reformuler :"
-# Le titre disait « Ce que tu n'as pas le droit de faire » alors que la liste
-# a toujours mélangé des interdits et des obligations (« si on te demande si
-# tu es un robot, dis-le »). Sous ce titre, la sortie de secours se lisait
-# comme un devoir : au moindre imprévu, passer la main. Le titre dit
-# maintenant ce que la liste est vraiment.
+# The title said `What you are not allowed to do` while the list has always
+# mixed prohibitions and obligations (`if you are asked whether you are a
+# robot, say so`). Under that title, the escape hatch read as a duty: at the
+# slightest surprise, hand over. The title now says what the list really is.
 TITRE_CONTRAINTES = ("Tes règles — ce que tu dois faire, et ce que tu n'as "
                      "pas le droit de faire :")
 
-# ⚠ LA CONDUITE N'EST PAS UNE CONTRAINTE (16/08/2026). Une contrainte dit ce
-# qu'on ne fait JAMAIS ; une conduite dit dans quel ORDRE mener l'échange —
-# « propose la date la plus proche, puis demande quels jours arrangent… ».
-# Les mélanger noyait la marche à suivre au milieu des interdits, et l'agent
-# lisait une liste de règles là où il attendait un déroulé. Toutes les natures
-# n'en ont pas : le bloc disparaît quand elle est vide.
+# ⚠ CONDUCT IS NOT A CONSTRAINT (16/08/2026). A constraint says what is NEVER
+# done; conduct says in what ORDER to carry the exchange — `offer the nearest
+# date, then ask which days suit…`. Mixing them drowned the procedure in the
+# middle of the prohibitions, and the agent read a list of rules where it
+# expected a sequence. Not every kind has one: the block disappears when it is
+# empty.
 TITRE_CONDUITE = "Comment mener l'échange, dans cet ordre :"
 
 LIBERTE = ("Entre ton ouverture et ta conclusion, discute NATURELLEMENT, en "
@@ -314,28 +290,26 @@ LIBERTE = ("Entre ton ouverture et ta conclusion, discute NATURELLEMENT, en "
            "réponse claire. Avant de raccrocher, récapitule en une phrase "
            "ce qui a été convenu.")
 
-# On ne demande PLUS la durée de l'appel : CALL-E la mesure lui-même et
-# refuse qu'on la lui demande (champ réservé — voir calle_client.
-# CHAMPS_RESERVES). Demander à quelqu'un d'estimer ce qu'une horloge mesure
-# n'aurait de toute façon jamais valu une mesure.
+# The call's length is NO LONGER asked for: CALL-E measures it itself and
+# refuses to be asked (reserved field — see calle_client.CHAMPS_RESERVES).
+# Asking someone to estimate what a clock measures would never have been worth
+# a measurement anyway.
 RAPPEL_CHAMPS = ("Rends aussi « notes » : une ou deux phrases qui résument "
                  "l'échange, et la demande de la personne en clair si tu "
                  "conclus sur AUTRE. N'ajoute aucun autre "
                  "champ : le résultat n'accepte que ceux-là.")
 
-# ⚠ LE 🚫 SE DIT AU TÉLÉPHONE (10/08/2026). Avant, quelqu'un qui demandait à ne
-# plus être appelé n'était pas entendu : rien ne le notait, et il était rappelé
-# à la campagne suivante. C'est un manque de courtoisie autant qu'un manque de
-# conformité.
-#
-# ⚠ CE N'EST PAS UNE ISSUE, et la consigne le dit ainsi : la personne peut
-# refuser ET demander qu'on ne la rappelle plus, ou accepter cette fois et
-# demander qu'on ne la rappelle plus ensuite. L'agent conclut donc TOUJOURS sur
-# l'une des trois issues, et coche ce champ EN PLUS.
-# ⚠ LA QUESTION QUI MANQUAIT (10/08/2026), et seulement en cascade : refuser
-# UNE place ne veut pas dire refuser les suivantes. Sans la poser, RingBack
-# rappelait indéfiniment quelqu'un que ça n'intéresse pas — et sa seule
-# échappatoire était le 🚫, qui coupe aussi les appels sur SES rendez-vous.
+# ⚠ THE 🚫 IS SPOKEN ON THE PHONE (10/08/2026). Before, someone asking not to be
+# called again was not heard: nothing recorded it, and they were called again
+# in the next campaign. That is a lack of courtesy as much as a lack of
+# compliance.  ⚠ IT IS NOT AN OUTCOME, and the briefing says so: the person may
+# refuse AND ask not to be called again, or accept this time and ask not to be
+# called again afterwards. So the agent ALWAYS closes on one of the three
+# outcomes, and ticks that field IN ADDITION. ⚠ THE QUESTION THAT WAS MISSING
+# (10/08/2026), and only in cascade: refusing ONE slot does not mean refusing
+# the next ones. Without asking it, RingBack called back indefinitely someone
+# who was not interested — and their only way out was the 🚫, which also cuts
+# off calls about THEIR OWN appointments.
 RAPPEL_AUTRES_PLACES = (
     "Si la personne DÉCLINE la place, demande-lui avant de conclure : « Voulez-"
     "vous que je vous rappelle si un autre créneau se libère ? » — rends "
@@ -355,76 +329,75 @@ _VARIABLE = re.compile(r"\[[^\]\n]+\]")
 
 
 class Consigne:
-    """Les trois parties de ce qui part dans le champ « task » de CALL-E.
+    """The three parts of what goes into CALL-E's `task` field.
 
-    Les textes portent encore leurs [variables] par contact ([identite],
-    [rdv_existant]…) tant que substituer() n'a pas été appelée : c'est ce
-    qui permet à l'aperçu de l'étape 2 de montrer EXACTEMENT ce qui partira,
-    avec les variables encore visibles là où elles seront remplies.
+    The texts still carry their per-contact [variables] ([identite],
+    [rdv_existant]…) until substituer() has been called: that is what lets the
+    step-2 preview show EXACTLY what will go out, with the variables still
+    visible where they will be filled in.
     """
 
     def __init__(self, presentation, objectif, faits=(), contraintes=None,
                  issues=None, genre=GENRE_CLASSIQUE, entete=ENTETE,
                  conduite=(), dire=None, civilites=None):
-        """`dire` TRADUIT LES PHRASES FIXES DE CE MODULE, et rien d'autre.
+        """`dire` TRANSLATES THIS MODULE'S FIXED SENTENCES, and nothing else.
 
-        ⚠ ON INJECTE LE TRADUCTEUR, ON NE L'IMPORTE PAS. Ce module ne dépend
-        d'AUCUN autre module de RingBack — c'est écrit en tête de fichier et
-        c'est ce qui permet à `calle_client` comme à `assistant` de s'en
-        servir sans se croiser. Aller chercher un dictionnaire ici romprait
-        cette règle pour une commodité. L'appelant, lui, sait déjà quelle
-        langue est choisie : il passe la fonction.
+        ⚠ THE TRANSLATOR IS INJECTED, NOT IMPORTED. This module depends on NO
+        other RingBack module — that is written at the top of the file and it
+        is what lets both `calle_client` and `assistant` use it without getting
+        in each other's way. Fetching a dictionary here would break that rule
+        for a convenience. The caller already knows which language is chosen:
+        it passes the function.
 
-        `dire` vaut l'identité par défaut : sans elle, ce module rend
-        exactement ce qu'il rendait avant, à la lettre.
+        `dire` defaults to the identity: without it, this module returns
+        exactly what it returned before, to the letter.
 
-        `civilites` : le tableau des abréviations à développer (« M. » ->
-        « monsieur »). Vide = on ne développe rien — c'est le bon
-        comportement hors du français, où « Mr Smith » se lit très bien tel
-        quel et où « monsieur Smith » serait une faute.
+        `civilites`: the table of abbreviations to expand (`M.` -> `monsieur`).
+        Empty = nothing is expanded — the right behaviour outside French, where
+        `Mr Smith` reads perfectly well as it stands and `monsieur Smith` would
+        be a mistake.
         """
         self.presentation = presentation or ""
         self.objectif = objectif or ""
         self.faits = list(faits)
         self.dire = dire or (lambda texte: texte)
-        # ⚠ LES CONTRAINTES PAR DÉFAUT SE TRADUISENT ICI (03/09/2026).
-        # L'assistant les traduisait lui-même avant de les passer ; le chemin
-        # de repli — file d'appels, bouton « Rappeler », cascade directe — ne
-        # passe rien, et gardait donc les dix règles en français pendant que
-        # la voix, elle, parlait anglais. Traduire au point de PASSAGE, pas
-        # chez chaque appelant : le prochain appelant ne retombera pas dedans.
+        # ⚠ THE DEFAULT CONSTRAINTS ARE TRANSLATED HERE (03/09/2026). The
+        # assistant used to translate them itself before passing them; the
+        # fallback path — call queue, the `Rappeler` button, direct cascade —
+        # passes nothing, and therefore kept the ten rules in French while the
+        # voice spoke English. Translate at the point of PASSAGE, not in each
+        # caller: the next caller will not fall into it.
         self.contraintes = ([self.dire(ligne) for ligne in CONTRAINTES]
                             if contraintes is None else list(contraintes))
-        # ⚠ LES ISSUES PAR DÉFAUT AUSSI (03/09/2026), même raison que les
-        # contraintes juste au-dessus : l'assistant traduit les siennes avant
-        # de les passer, le chemin de repli n'en passe aucune. Sans cela, les
-        # trois lignes qui disent à l'agent QUAND choisir quelle issue —
-        # les seules qui décident du résultat — restaient en français.
-        # ⚠ QUELLE QUE SOIT LEUR ORIGINE, et c'est voulu : la cascade passe
-        # les siennes explicitement, l'assistant passe les siennes déjà
-        # traduites. Traduire ici couvre les trois cas — et sur un texte déjà
-        # anglais l'opération ne fait rien, puisqu'il n'est pas au
-        # dictionnaire français.
+        # ⚠ THE DEFAULT OUTCOMES TOO (03/09/2026), same reason as the
+        # constraints just above: the assistant translates its own before
+        # passing them, the fallback path passes none. Without this, the three
+        # lines that tell the agent WHEN to choose which outcome — the only
+        # ones that decide the result — stayed in French. ⚠ WHATEVER THEIR
+        # ORIGIN, and that is intended: the cascade passes its own explicitly,
+        # the assistant passes its own already translated. Translating here
+        # covers all three cases — and on text that is already English the
+        # operation does nothing, since it is not in the French dictionary.
         self.issues = {cle: dict(fixee, quand=self.dire(fixee["quand"]))
                        for cle, fixee in (issues or ISSUES_DEFAUT).items()}
         self.genre = genre
         self.entete = entete
-        # Propre à la nature, et souvent vide : voir TITRE_CONDUITE.
+        # Specific to the kind, and often empty: see TITRE_CONDUITE.
         self.conduite = list(conduite or ())
         self.civilites = _DEVELOPPE if civilites is None else civilites
 
     # ------------------------------------------------------- substitution
     def substituer(self, valeurs, presentation=None):
-        """Rend une NOUVELLE consigne, valeurs remplacées, lignes vides ôtées.
+        """Returns a NEW briefing, values substituted, empty lines removed.
 
-        valeurs : {code: texte lisible}. Une ligne de faits dont la variable
-        reste sans valeur DISPARAÎT (on ne dicte jamais un [crochet] vide) ;
-        les contraintes, elles, n'en portent plus aucune.
+        valeurs: {code: readable text}. A fact line whose variable stays
+        without a value DISAPPEARS (an empty [bracket] is never dictated); the
+        constraints, for their part, no longer carry any.
 
-        presentation : le texte d'ouverture déjà finalisé par l'appelant
-        (assistant.finaliser_mission fait ce travail depuis toujours et
-        connaît les types des colonnes) ; à défaut, la substitution simple
-        est appliquée ici aussi.
+        presentation: the opening text already finalised by the caller
+        (assistant.finaliser_mission has always done that work and knows the
+        column types); failing that, the simple substitution is applied here
+        too.
         """
         def remplacer(texte):
             for code, valeur in valeurs.items():
@@ -441,35 +414,35 @@ class Consigne:
             remplacer(self.objectif), faits,
             [remplacer(ligne) for ligne in self.contraintes],
             self.issues, self.genre, remplacer(self.entete),
-            # ⚠ LA CONDUITE GARDE SES LIGNES, MÊME SANS VALEUR. Contrairement
-            # aux faits, on ne la filtre PAS sur les [variables] restantes :
-            # « propose le [creneau_le_plus_proche] » doit rester une étape du
-            # déroulé même quand l'agenda n'a rien à proposer — c'est la ligne
-            # suivante qui dit alors quoi faire. Un déroulé amputé serait pire
-            # qu'un crochet vide.
+            # ⚠ CONDUCT KEEPS ITS LINES, EVEN WITH NO VALUE. Unlike the facts,
+            # it is NOT filtered on remaining [variables]: `offer the
+            # [creneau_le_plus_proche]` must stay a step of the sequence even
+            # when the calendar has nothing to offer — it is the next line that
+            # then says what to do. A truncated sequence would be worse than an
+            # empty bracket.
             [remplacer(ligne) for ligne in self.conduite],
             self.dire, self.civilites)
         return copie
 
     # ------------------------------------------------------------ rendus
     def texte_presentation(self):
-        """La partie ① : le seul passage imposé mot pour mot.
+        """Part ①: the only passage imposed word for word.
 
-        Le texte est repris TEL QUEL (simplement débarrassé de ses espaces
-        de bord) : un message récrit à la main par l'utilisateur — sauts de
-        ligne compris — doit partir exactement comme il l'a écrit.
+        The text is taken AS IT STANDS (simply stripped of its edge spaces): a
+        message rewritten by hand by the user — line breaks included — must go
+        out exactly as they wrote it.
         """
         return "« " + self.presentation.strip() + " »"
 
     def texte_contexte(self):
-        """La partie ② : objectif, faits utiles, contraintes, liberté."""
+        """Part ②: objective, useful facts, constraints, freedom."""
         lignes = [f"{self.dire(PREFIXE_OBJECTIF)}{self.objectif}"]
         if self.faits:
             lignes.append(self.dire(TITRE_FAITS))
             lignes += [f"- {ligne}" for ligne in self.faits]
-        # ⚠ AVANT LES RÈGLES, et numérotée : c'est un déroulé, l'ordre EST
-        # l'information. Sous les règles, elle se serait lue comme un interdit
-        # de plus.
+        # ⚠ BEFORE THE RULES, and numbered: it is a sequence, the ORDER IS the
+        # information. Under the rules it would have read as one more
+        # prohibition.
         if self.conduite:
             lignes.append(self.dire(TITRE_CONDUITE))
             lignes += [f"{rang}. {ligne}"
@@ -480,7 +453,7 @@ class Consigne:
         return "\n".join(lignes)
 
     def texte_issues(self):
-        """La partie ③ : oui / non / autre, et rien d'autre."""
+        """Part ③: yes / no / other, and nothing else."""
         champ = CHAMP_ISSUE[self.genre]
         lignes = []
         for cle in ISSUES:
@@ -505,37 +478,37 @@ class Consigne:
         return "\n".join(lignes)
 
     def texte(self):
-        """LA CONSIGNE COMPLÈTE — exactement ce qui part dans « task ».
+        """THE COMPLETE BRIEFING — exactly what goes into `task`.
 
-        Les civilités sont développées ICI, au dernier moment : c'est le
-        seul endroit où « M. Dupont » devient « monsieur Dupont ».
+        The honorifics are expanded HERE, at the last moment: it is the only
+        place where `M. Dupont` becomes `monsieur Dupont`.
         """
         blocs = [self.dire(self.entete),
                  self.dire(TITRE_PRESENTATION) + "\n"
                  + self.texte_presentation(),
                  self.dire(TITRE_CONTEXTE) + "\n" + self.texte_contexte(),
                  self.dire(TITRE_ISSUES) + "\n" + self.texte_issues()]
-        # Dernier filet : ni [entreprise] ni [plage_rappel] ne doivent sortir
-        # en crochets. Un appelant qui ne les a pas substitués (essai réel,
-        # file d'appels) obtient une phrase vraie plutôt qu'un gabarit.
-        # ⚠ LE REPLI DU NOM D'ENTREPRISE SUIT LA LANGUE, LUI AUSSI. Sans nom
-        # réglé, la consigne dit « l'établissement » — et ce mot partait en
-        # français au milieu d'une consigne anglaise, dans la SORTIE DE
-        # SECOURS, celle qui est dite au téléphone à une personne agacée.
-        # Trouvé le 02/09/2026 en cherchant le français restant sur les pages
-        # RENDUES en anglais : aucune mesure sur les sources ne pouvait le
-        # voir, puisque le mot est substitué à l'affichage.
+        # Last net: neither [entreprise] nor [plage_rappel] may come out in
+        # brackets. A caller that has not substituted them (real test, call
+        # queue) gets a true sentence rather than a template. ⚠ THE
+        # BUSINESS-NAME FALLBACK FOLLOWS THE LANGUAGE TOO. With no name
+        # configured, the briefing says `l'établissement` — and that word went
+        # out in French in the middle of an English briefing, in the ESCAPE
+        # HATCH, the one spoken on the phone to an irritated person. Found on
+        # 02/09/2026 while hunting for leftover French on pages RENDERED in
+        # English: no measure over the sources could have seen it, since the
+        # word is substituted at display time.
         entier = substituer_cadre("\n\n".join(blocs),
                                   self.dire(ENTREPRISE_INCONNUE),
                                   self.dire(PLAGE_INCONNUE))
         return developper_civilites(entier, self.civilites)
 
-    # --------------------------------------------------------- contrôles
+    # --------------------------------------------------------- checks
     def codes_attendus(self):
-        """Tous les codes de résultat que CETTE consigne autorise.
+        """Every result code THIS briefing permits.
 
-        Sert aux essais : ils vérifient que chacun appartient bien à l'enum
-        du schéma imposé — la boucle est ainsi fermée des deux côtés.
+        Used by the tests: they check that each one really belongs to the
+        imposed schema's enum — the loop is thus closed on both sides.
         """
         codes = []
         for cle in ISSUES:
@@ -547,16 +520,15 @@ class Consigne:
 
 
 def entreprise_lisible(nom):
-    """Le nom de l'entreprise, ou de quoi rester dicible sans le connaître."""
+    """The business name, or enough to stay speakable without knowing it."""
     return (nom or "").strip() or ENTREPRISE_INCONNUE
 
 
 def substituer_cadre(texte, entreprise, plage_rappel):
-    """Remplace [entreprise] et [plage_rappel] — jamais laissés en crochets.
+    """Substitutes [entreprise] and [plage_rappel] — never left in brackets.
 
-    Une contrainte de sécurité (la sortie de secours) ne doit pas tomber
-    parce qu'un réglage manque : sans nom d'entreprise, on dit
-    « l'établissement », ce qui est vrai.
+    A safety constraint (the escape hatch) must not fall over because a setting
+    is missing: with no business name, we say `l'établissement`, which is true.
     """
     return (texte.replace("[entreprise]", entreprise_lisible(entreprise))
             .replace("[plage_rappel]", plage_rappel or ""))

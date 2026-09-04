@@ -1,39 +1,34 @@
 # -*- coding: utf-8 -*-
-"""Récolter les phrases de l'interface, sur les VRAIES pages du produit.
+"""Harvest the interface sentences, from the REAL pages of the product.
 
-⚠ CE N'EST PAS UN EXTRACTEUR DE CHAÎNES, ET C'EST TOUT L'INTÉRÊT. Un outil qui
-lirait le code source manquerait les phrases assemblées à l'exécution — mesuré
-sur ce produit : 565 des textes que les essais affirment n'existent nulle part
-tels quels dans les sources. On explore donc le produit comme un visiteur : on
-part de l'accueil, on suit tous les liens internes, et on relève ce qui
-s'affiche vraiment.
+⚠ THIS IS NOT A STRING EXTRACTOR, AND THAT IS THE WHOLE POINT. A tool reading
+the source would miss the sentences assembled at run time — measured on this
+product: 565 of the texts the tests assert exist nowhere in the sources as
+such. So the product is explored like a visitor: start at the home page, follow
+every internal link, and record what is actually displayed.
 
-CE QU'IL FAIT, exactement :
+WHAT IT DOES, exactly:
 
-1. démarre un serveur RingBack sur un port libre, base EN MÉMOIRE, jeu d'essai
-   chargé — jamais la base réelle, jamais le port du produit ;
-2. explore en suivant les liens, en page entière ET en fenêtre (l'en-tête
-   « X-RingBack-Fragment », car le produit répond différemment aux deux) ;
-3. relève les phrases par `langue.phrases_de` ;
-4. dit lesquelles le dictionnaire connaît déjà, et lesquelles manquent.
+1. starts a RingBack server on a free port, IN-MEMORY database, sample data set loaded — never the real database, never the product's port;
+2. explores by following links, both as a full page AND as a window (the `X-RingBack-Fragment` header, because the product answers the two differently);
+3. records the sentences through `langue.phrases_de`;
+4. says which ones the dictionary already knows, and which are missing.
 
-⚠ IL NE PASSE AUCUN APPEL et n'envoie aucun formulaire : il ne fait que des
-GET, et le produit réserve aux POST tout ce qui change quelque chose.
+⚠ IT PLACES NO CALL and submits no form: it only issues GETs, and the product
+reserves POST for everything that changes anything.
 
-⚠ ET C'EST AUSSI SA LIMITE — ELLE A COÛTÉ CHER (01/09/2026). Explorer en GET
-depuis une base VIDE ne montre jamais : un tableau rempli, une fiche de
-campagne, une modale, un message d'erreur (il faut une saisie fautive), un
-avertissement (il faut un état particulier). L'outil annonçait « 96,6 % du
-texte » — c'était vrai de ce qu'il atteignait, et faux du produit : il restait
-1 625 phrases jamais vues, et l'utilisateur les a vues, lui, en s'en servant.
+⚠ AND THAT IS ALSO ITS LIMIT — ONE THAT COST DEARLY (01/09/2026). Exploring by
+GET from an EMPTY database never shows: a filled table, a campaign record, a
+modal, an error message (that needs a faulty input), a warning (that needs a
+particular state). The tool announced `96.6 % of the text` — true of what it
+reached, and false of the product: 1,625 sentences had never been seen, and the
+user saw them himself, by using it.
 
-**Il compte donc maintenant les DEUX** : ce qu'il atteint, et ce que les
-sources contiennent. Un chiffre qui ne peut plus flatter.
+**So it now counts BOTH**: what it reaches, and what the sources contain. A figure that can no longer flatter.
 
-Usage :
-    python outils/recolter_phrases.py                 # le compte rendu
-    python outils/recolter_phrases.py --manquantes    # ce qui reste à traduire
-    python outils/recolter_phrases.py --json fichier  # la récolte entière
+Usage: python outils/recolter_phrases.py # the report python
+outils/recolter_phrases.py --manquantes # what is left to translate python
+outils/recolter_phrases.py --json fichier # the whole harvest
 """
 
 import argparse
@@ -52,18 +47,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ringback import langue, serveur, traductions  # noqa: E402
 
 LIEN = re.compile(r'href="(/[^"#]*)"')
-# Les adresses qui ne rendent pas du texte d'interface : images, exports.
+# The URLs that return no interface text: images, exports.
 SANS_INTERET = re.compile(r"^/(image/|.*\.(png|ico|csv|ics|json)$)")
 PLAFOND = 400
 
 
 def _adresses_du_code():
-    """Les adresses écrites dans le code — les semences de l'exploration.
+    """The URLs written in the code — the seeds of the exploration.
 
-    ⚠ SUIVRE LES LIENS NE SUFFIT PAS. Un écran qu'aucun lien ne désigne (page
-    d'erreur, adresse qu'on tape à la main, fenêtre appelée par un script)
-    resterait invisible, et donc jamais traduit. On sème donc l'exploration
-    avec toutes les adresses que le code déclare, en plus de l'accueil.
+    ⚠ FOLLOWING LINKS IS NOT ENOUGH. A screen no link points to (an error page,
+    a URL typed by hand, a window opened by a script) would stay invisible, and
+    therefore never translated. So the exploration is seeded with every URL the
+    code declares, on top of the home page.
     """
     trouvees = {"/"}
     dossier = os.path.join(os.path.dirname(os.path.dirname(
@@ -77,7 +72,7 @@ def _adresses_du_code():
 
 
 def _explorer(base_url, depart=None):
-    """Toutes les pages atteignables depuis `depart`, en suivant les liens."""
+    """Every page reachable from `depart`, by following the links."""
     a_voir, vues, pages = list(depart or _adresses_du_code()), set(), {}
     while a_voir and len(vues) < PLAFOND:
         chemin = a_voir.pop(0)
@@ -106,7 +101,7 @@ def _explorer(base_url, depart=None):
 
 
 def recolter():
-    """(pages, compteur de phrases) — le produit exploré pour de bon."""
+    """(pages, sentence counter) — the product explored for real."""
     http = serveur.creer_serveur(port=0, chemin_base=":memory:",
                                  appels_reels=False)
     fil = threading.Thread(target=http.serve_forever, daemon=True)
@@ -165,9 +160,9 @@ def principal():
     print(f"  couverture (ce qu'on VOIT à l'écran) : "
           f"{vues_couvertes:,}/{vues:,} = "
           f"{100 * vues_couvertes / vues if vues else 0:.1f} %")
-    # ⚠ ET LE CHIFFRE QUI COMPTE VRAIMENT : sur ce qui est DU TEXTE. Les
-    # marqueurs d'une lettre et les pastilles chiffrées ne se traduisent pas,
-    # et les compter fait mentir la mesure — voir `langue.est_du_texte`.
+    # ⚠ AND THE FIGURE THAT REALLY COUNTS: over what is TEXT. One-letter
+    # markers and numeric badges are not translated, and counting them makes
+    # the measure lie — see `langue.est_du_texte`.
     texte_connu = sum(compteur[p] for p in connues if langue.est_du_texte(p))
     texte_total = sum(compteur[p] for p in compteur if langue.est_du_texte(p))
     print(f"  couverture DU TEXTE (hors symboles et chiffres) : "
@@ -180,8 +175,8 @@ def principal():
             court = phrase if len(phrase) <= 66 else phrase[:63] + "…"
             print(f"   {compteur[phrase]:4d}x  {court!r}")
 
-    # ⚠ ET LE CHIFFRE QUI NE FLATTE PAS : tout ce que les sources écrivent,
-    # y compris ce qu'aucune exploration ne peut atteindre.
+    # ⚠ AND THE FIGURE THAT DOES NOT FLATTER: everything the sources write,
+    # including what no exploration can reach.
     ecrites, absentes = _dans_les_sources(options.langue)
     print()
     print(f"  DANS LES SOURCES (y compris ce qu'on n'atteint pas en "
@@ -195,7 +190,7 @@ def principal():
 
 
 # ---------------------------------------------------------------------------
-# La seconde mesure : les sources
+# The second measure: the sources
 # ---------------------------------------------------------------------------
 _ACCENTS = "éèêëàâäîïôöûùüÿçœÉÈÊËÀÂÄÎÏÔÖÛÙÜÇŒ"
 _MOTS_FR = re.compile(
@@ -208,8 +203,8 @@ _TECHNIQUE = re.compile(
     r"DELETE .*|CREATE .*|PRAGMA .*|[A-Z_]+)$")
 _BALISE = re.compile(r"^</?[a-z]+[^>]*>$", re.IGNORECASE)
 _TROU = re.compile(r"\{[^}]*\}|\[[a-z_]+\]")
-# Les fichiers de DONNÉES : leur texte n'est pas de l'interface, il suit la
-# langue par un autre chemin (jeu_essai.decor) ou n'est pas affiché.
+# The DATA files: their text is not interface text, it follows the language by
+# another path (jeu_essai.decor) or is not displayed at all.
 _HORS_INTERFACE = ("traductions.py", "jeu_essai.py", "agenda_exemple.py",
                    "generation.py", "ics.py")
 
@@ -226,7 +221,8 @@ def _est_du_texte_visible(valeur):
 
 
 def _dans_les_sources(langue_code):
-    """(combien écrites, celles qui manquent) — la mesure qui ne flatte pas."""
+    """(how many written, the ones missing) — the measure that does not flatter.
+    """
     import ast
     table = traductions.table(langue_code)
     motifs = traductions.motifs(langue_code)
@@ -253,21 +249,20 @@ def _dans_les_sources(langue_code):
                     or not isinstance(noeud.value, str)
                     or id(noeud) in docs):
                 continue
-            # ⚠ ON DÉCOUPE AVEC L'OUTIL DU PRODUIT. Une chaîne du code n'est
-            # pas une phrase : c'est souvent un morceau de HTML qui en
-            # contient plusieurs, ou aucune. `langue.phrases_de` rend
-            # exactement les tranches que le traducteur cherchera à
-            # l'exécution — mesurer autre chose, c'est compter des clés qui
-            # n'existeront jamais.
+            # ⚠ THE PRODUCT'S OWN TOOL DOES THE SPLITTING. A string in the code
+            # is not a sentence: it is often a piece of HTML containing
+            # several, or none. `langue.phrases_de` returns exactly the slices
+            # the translator will look for at run time — measuring anything
+            # else means counting keys that will never exist.
             morceaux = list(langue.phrases_de(noeud.value) or [])
             if "<" not in noeud.value:
                 morceaux.append(noeud.value)
             for morceau in morceaux:
                 nu = morceau.strip()
-                # ⚠ ET ON ÉCARTE LES PHRASES À TROUS : « {compte} », «
-                # [identite] » ne paraissent jamais telles quelles à l'écran,
-                # le trou est rempli avant l'affichage. C'est le rôle des
-                # RÈGLES, pas d'une entrée de dictionnaire.
+                # ⚠ AND SENTENCES WITH HOLES ARE SET ASIDE: `{compte}`,
+                # `[identite]` never appear on screen as such, the hole is
+                # filled before display. That is the job of the RULES, not of a
+                # dictionary entry.
                 if _TROU.search(nu) or not _est_du_texte_visible(nu):
                     continue
                 ecrites += 1

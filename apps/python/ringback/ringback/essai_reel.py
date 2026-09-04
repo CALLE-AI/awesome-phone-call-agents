@@ -1,96 +1,59 @@
-"""Essai en conditions RÉELLES : les testeurs, et leur campagne prête.
+"""REAL-CONDITIONS testing: the testers, and their ready campaign.
 
-À QUOI ÇA SERT
+WHAT IT IS FOR
 --------------
-Avant de confier RingBack à de vrais patients, l'opérateur veut l'éprouver
-pour de bon : de vrais appels, passés par l'agent CALL-E, sur des téléphones
-qu'il connaît — le sien, et ceux des personnes qui acceptent de jouer un
-rôle avec lui (un collègue, un ami, le cabinet d'à côté). Chacun joue tour à
-tour une issue : j'accepte, je refuse, je demande une autre date, je veux
-parler à un humain, je ne décroche pas.
+Before entrusting RingBack to real patients, the operator wants to put it through its paces for real: genuine calls, placed by the CALL-E agent, on phones they know — their own, and those of people willing to play a role with them (a colleague, a friend, the practice next door). Each plays one outcome in turn: I accept, I refuse, I ask for another date, I want to speak to a human, I do not pick up.
 
-Pour cela il lui faut PLUSIEURS contacts, avec des identités différentes,
-sur un petit nombre de numéros connus. Or la règle anti-doublon de la grille
-refuse justement deux fois le même numéro — et c'est une bonne règle : elle
-existe pour ne jamais appeler deux fois la même personne.
+For that they need SEVERAL contacts, with different identities, on a small
+number of known numbers. Yet the grid's duplicate rule refuses precisely the
+same number twice — and it is a good rule: it exists so that the same person is
+never called twice.
 
-CE MODULE NE SUPPRIME PAS CETTE RÈGLE, IL LA REND DÉLIBÉRÉE
+THIS MODULE DOES NOT REMOVE THAT RULE, IT MAKES IT DELIBERATE
 -----------------------------------------------------------
-L'opérateur DÉCLARE ses TESTEURS dans ⚙ Réglages : un nom (« moi »,
-« Paul », « le cabinet d'à côté ») et un numéro pour chacun. Ces numéros-là,
-et eux seuls, échappent au refus de doublon (collage, CSV, validation de la
-grille). Tous les autres numéros restent soumis à la règle stricte, sans
-exception. Retirer un testeur lui rend aussitôt la règle stricte ; vider la
-liste la rétablit pour tout le monde.
+The operator DECLARES their TESTERS in ⚙ Réglages: a name (`me`, `Paul`, `the practice next door`) and a number for each. Those numbers, and those alone, escape the duplicate refusal (pasting, CSV, grid validation). Every other number stays subject to the strict rule, without exception. Removing a tester immediately restores the strict rule for them; emptying the list restores it for everyone.
 
-UN SEUL NUMÉRO DÉJÀ RÉGLÉ CONTINUE DE FONCTIONNER. Avant les testeurs, un
-unique numéro était déclarable (réglage « numero_essai »). Il n'est pas
-perdu : s'il est là et qu'aucune liste n'a encore été composée, il devient
-le PREMIER testeur, nommé « moi » — voir `testeurs()`. Rien à refaire, rien
-à retaper.
+A SINGLE ALREADY-CONFIGURED NUMBER GOES ON WORKING. Before the testers, one
+single number could be declared (the `numero_essai` setting). It is not lost:
+if it is there and no list has yet been composed, it becomes the FIRST tester,
+named `me` — see `testeurs()`. Nothing to redo, nothing to retype.
 
-Trois garanties tenues ici :
-1. RIEN N'EST CACHÉ. Tout contact portant l'un des numéros déclarés est
-   marqué 🧪 dans la grille, la fiche de campagne, le planning et
-   👥 Contacts, avec la phrase qui dit pourquoi. Aucune confusion possible
-   avec de vraies données.
-2. LE MASQUAGE RESTE ENTIER. Les numéros des testeurs sont masqués à l'écran
-   comme tous les autres (« +33 6 •• •• 51 ») : le drapeau dit « ceci est un
-   essai », il ne révèle jamais le numéro. La reconnaissance, elle, porte
-   toujours sur les NEUF CHIFFRES significatifs (db.est_numero_essai) et
-   jamais sur le texte masqué — c'est ce qui évite de marquer une vraie
-   personne dont le numéro se masquerait pareil.
-3. AUCUN APPEL NE PART D'ICI. La campagne préparée est créée à l'état
-   « prête », zéro appel passé. Les trois verrous du mode réel (la clé
-   CALLE_API_KEY, l'option --appels-reels, le mot APPELER tapé au clavier)
-   restent entiers et restent les gestes de l'opérateur.
+Three guarantees held here:
+1. NOTHING IS HIDDEN. Every contact carrying one of the declared numbers is marked 🧪 in the grid, the campaign record, the schedule and 👥 Contacts, with the sentence saying why. No possible confusion with real data.
+2. MASKING STAYS WHOLE. Testers' numbers are masked on screen like all the others (`+33 6 •• •• 51`): the flag says `this is a test`, it never reveals the number. Recognition, for its part, always works on the NINE significant digits (db.est_numero_essai) and never on the masked text — that is what avoids marking a real person whose number would mask the same way.
+3. NO CALL GOES OUT FROM HERE. The prepared campaign is created in the `prête` state, zero calls placed. The three locks of real mode (the CALLE_API_KEY key, the --appels-reels option, the word APPELER typed at the keyboard) stay whole and stay the operator's own gestures.
 
-ET UN AUTRE RÉGLAGE, QU'IL NE FAUT PAS CONFONDRE AVEC CELUI-LÀ
+AND ANOTHER SETTING, NOT TO BE CONFUSED WITH THAT ONE
 --------------------------------------------------------------
-Une case « toujours utiliser MON numéro pour les essais en conditions
-réelles » (⚙ Réglages → 🧪 Essais → Jeu d'essai) fait remplacer, au tout
-dernier moment, le numéro COMPOSÉ par celui de l'opérateur. Les deux
-réglages ne font pas du tout la même chose :
+A `always use MY number for real-condition tests` box (⚙ Réglages → 🧪 Essais → Jeu d'essai) replaces, at the very last moment, the DIALLED number by the operator's. The two settings do not do the same thing at all:
 
-    les TESTEURS changent la BASE — des fiches portent leur numéro, sont
-    marquées 🧪 partout et échappent au refus de doublon ;
-    le RENVOI ne change AUCUNE fiche — les contacts gardent leur numéro,
-    et c'est le numéro composé, lui seul, qui est remplacé juste avant
-    l'envoi à l'agent. L'identité, le motif, le rendez-vous : rien ne
-    bouge. C'est ce qui permet d'éprouver une campagne entière, sur de
-    vraies données, sans faire sonner un seul vrai téléphone.
+the TESTERS change the DATABASE — records carry their number, are marked 🧪
+everywhere and escape the duplicate refusal; the REDIRECT changes NO record —
+the contacts keep their number, and it is the dialled number, and it alone,
+that is replaced just before sending to the agent. The identity, the reason,
+the appointment: nothing moves. That is what allows a whole campaign to be
+exercised, on real data, without a single real phone ringing.
 
-Voir CLE_IMPOSER_NUMERO et numero_impose().
+See CLE_IMPOSER_NUMERO and numero_impose().
 
-LES CINQ RÔLES, ET LEURS IDENTITÉS
+THE FIVE ROLES, AND THEIR IDENTITIES
 ----------------------------------
-Cinq rôles à éprouver, un par issue, avec un moyen mnémonique : l'INITIALE
-DU PRÉNOM rappelle le rôle à jouer au téléphone.
+Five roles to exercise, one per outcome, with a memory aid: the FIRST NAME'S INITIAL recalls the role to play on the phone.
 
-    Alice   → j'Accepte le rendez-vous
-    Rémi    → je Refuse / j'annule
-    Diane   → je demande une autre Date
-    Hugo    → je demande à parler à un Humain
-    Nina    → je Ne décroche pas
+Alice → I Accept the appointment Rémi → I Refuse / I cancel Diane → I ask for
+another Date Hugo → I ask to speak to a Human Nina → I do Not pick up
 
-On peut demander PLUS de cinq identités (jusqu'à vingt) : les rôles
-reviennent alors dans le même ordre, avec d'autres prénoms de même initiale
-(Alice, puis Adrien, puis Amélie…). Le rôle reste lisible d'un coup d'œil.
+MORE than five identities can be asked for (up to twenty): the roles then come
+round again in the same order, with other first names sharing the initial
+(Alice, then Adrien, then Amélie…). The role stays readable at a glance.
 
-QUI JOUE QUOI
+WHO PLAYS WHAT
 -------------
-Les rôles sont distribués sur les testeurs déclarés, EN TOURNANT : le 1ᵉʳ
-rôle au 1ᵉʳ testeur, le 2ᵉ au 2ᵉ, et on reboucle. Avec un seul testeur, tout
-retombe sur lui — c'est-à-dire exactement le comportement d'avant. L'écran
-annonce la répartition (« Alice (j'accepte) → Paul ») parce que, dès qu'on
-est plusieurs, il faut pouvoir dire à chacun ce qu'il aura à jouer.
+The roles are dealt out to the declared testers, IN ROTATION: the 1st role to the 1st tester, the 2nd to the 2nd, then round again. With a single tester, everything falls back to them — that is to say, exactly the previous behaviour. The screen announces the distribution (`Alice (I accept) → Paul`) because, as soon as there are several people, each must be told what they will have to play.
 
-CE QUE CE MODULE NE PEUT PAS VÉRIFIER
+WHAT THIS MODULE CANNOT CHECK
 -------------------------------------
-L'issue d'un appel réel dépend de ce que le testeur DIT vraiment au
-téléphone, et de ce que l'agent en comprend. Aucun contrôle automatique ne
-peut en juger : ce sont EUX qui constatent, et c'est précisément l'objet de
-l'essai. Ce module prépare le terrain ; il ne prétend rien sur le résultat.
+The outcome of a real call depends on what the tester actually SAYS on the phone, and on what the agent makes of it. No automatic check can judge that: THEY are the ones who observe, and that is precisely the point of the test. This module prepares the ground; it claims nothing about the result.
 """
 
 import datetime
@@ -101,71 +64,67 @@ from .saisie import SaisieInvalide
 
 journal = logging.getLogger("ringback.essai_reel")
 
-# --------------------------------------------------------- clés de réglage
+# --------------------------------------------------------- setting keys
 CLE_NUMERO_ESSAI = "numero_essai"        # « +33 6 •• •• •• » ; "" = aucun
-# La LISTE des testeurs : [{"nom", "telephone"}]. Réglage AJOUTÉ, jamais
-# substitué : CLE_NUMERO_ESSAI reste écrit (le numéro du premier testeur),
-# si bien qu'un réglage d'avant continue d'être lu et qu'un réglage d'après
-# reste lisible par tout ce qui ne connaît que l'ancien.
+# The LIST of testers: [{"nom", "telephone"}]. A setting ADDED, never
+# substituted: CLE_NUMERO_ESSAI stays written (the first tester's number), so
+# that an older setting goes on being read and a newer one stays readable by
+# anything that only knows the old one.
 CLE_TESTEURS = "testeurs_essai"
-# Le nom donné à un numéro unique repris de l'ancien réglage. Ce n'est pas
-# une donnée devinée : c'est l'étiquette du seul testeur qu'il pouvait
-# désigner — l'opérateur lui-même. Il peut la changer (retirer, ré-ajouter).
+# The name given to a single number carried over from the old setting. It is
+# not a guessed value: it is the label of the only tester it could designate —
+# the operator themselves. They can change it (remove, re-add).
 NOM_PREMIER_TESTEUR = "moi"
 TESTEURS_MAXIMUM = 10
 
-# ------------------------------------- LE RENVOI : composer MON numéro
-# Demande du propriétaire du 10/08/2026 : « Toujours utiliser mon numéro de
-# téléphone pour les essais en condition réel […] on remplace les numéros de
-# téléphone transmis à l'agent par ce numéro de téléphone. L'IDENTITÉ RESTE
-# INCHANGÉE. »
-#
-# ⚠ CE N'EST PAS LA MÊME CHOSE QUE LES TESTEURS ci-dessus, et confondre les
-# deux mènerait droit à un appel chez un vrai client :
-#  · un TESTEUR est déclaré pour qu'un CONTACT PORTE son numéro — la fiche
-#    est créée avec ce numéro, marquée 🧪, et elle échappe au refus de
-#    doublon. La base est modifiée, et l'écran le montre partout ;
-#  · le RENVOI ne touche À AUCUNE FICHE. Les contacts gardent leur propre
-#    numéro ; c'est au tout dernier moment — juste avant l'envoi à l'agent —
-#    que le numéro COMPOSÉ est remplacé par celui-ci. C'est ce qui permet
-#    d'éprouver une campagne entière, sur de vraies données, sans faire
-#    sonner un seul vrai téléphone.
-CLE_IMPOSER_NUMERO = "imposer_numero"   # la case cochée (vrai / faux)
-CLE_NUMERO_IMPOSE = "numero_impose"     # le numéro qui remplace tous les autres
+# ------------------------------------- THE REDIRECT: dial MY number Owner's
+# request of 10/08/2026: `Always use my phone number for real-condition tests
+# […] the phone numbers passed to the agent are replaced by this phone number.
+# THE IDENTITY IS UNCHANGED.`  ⚠ THIS IS NOT THE SAME THING AS THE TESTERS
+# above, and confusing the two would lead straight to a call at a real
+# client's: · a TESTER is declared so that a CONTACT CARRIES their number — the
+# record is created with that number, marked 🧪, and it escapes the duplicate
+# refusal. The database is modified, and the screen shows it everywhere; · the
+# REDIRECT touches NO RECORD. The contacts keep their own number; it is at the
+# very last moment — just before sending to the agent — that the DIALLED number
+# is replaced by this one. That is what allows a whole campaign to be
+# exercised, on real data, without a single real phone ringing.
+CLE_IMPOSER_NUMERO = "imposer_numero"  # the box ticked (true / false)
+CLE_NUMERO_IMPOSE = "numero_impose"  # the number that replaces all the others
 
 MARQUE = "🧪"
 PHRASE_MARQUE = ("Contact d'ESSAI : il porte le numéro d'un testeur déclaré "
                  "dans ⚙ Réglages — c'est VOTRE téléphone, ou celui d'un "
                  "testeur, qui sonnera, pas celui d'un client.")
-# Le badge, écrit UNE fois : la grille, la fiche de campagne, le planning et
-# 👥 Contacts affichent tous exactement le même, avec la même explication.
-# (Aucun guillemet double dans la phrase : elle tient dans l'attribut title.)
+# The badge, written ONCE: the grid, the campaign record, the schedule and 👥
+# Contacts all display exactly the same one, with the same explanation. (No
+# double quote in the sentence: it has to fit inside the title attribute.)
 BADGE_HTML = (f'<span class="badge-essai" title="{PHRASE_MARQUE}">'
               f"{MARQUE} numéro d'essai</span>")
 
 
 def badge(ligne, prefixe=" "):
-    """Le badge 🧪 d'une ligne qui porte un numéro de testeur — sinon "".
+    """The 🧪 badge of a row carrying a tester's number — otherwise "".
 
-    `ligne` est n'importe quel dictionnaire rendu par db.py avec un numéro
-    masqué : client, rendez-vous, contact de campagne, relance. Une ligne
-    d'avant ce drapeau (ou d'une base ouverte sans réglage) n'en a pas :
-    elle ne porte alors aucun badge, ce qui est la vérité.
+    `ligne` is any dictionary returned by db.py with a masked number: client,
+    appointment, campaign contact, follow-up. A row from before this flag (or
+    from a database opened with no setting) has none: it then carries no badge,
+    which is the truth.
     """
     if not (ligne or {}).get("numero_essai"):
         return ""
     return prefixe + BADGE_HTML
 
-# La nature de campagne utilisée par le jeu d'essai « conditions réelles ».
-# « Confirmation de rendez-vous » : tout le monde est appelé (aucun arrêt au
-# premier oui), chaque contact a un rendez-vous à confirmer, et les cinq
-# issues à éprouver y ont toutes un sens.
+# The campaign kind used by the `real conditions` sample data set. `Appointment
+# confirmation`: everybody is called (no stop at the first yes), each contact
+# has an appointment to confirm, and all five outcomes to be exercised make
+# sense there.
 NATURE = "confirmation"
 
-# LES RÔLES À ÉPROUVER, un par issue. Pour chacun : le rôle écrit tel qu'il
-# s'affiche, le motif du rendez-vous (lu par l'agent — il reste plausible
-# pour un cabinet), et des identités fictives DE MÊME INITIALE, dans l'ordre
-# où elles sont servies quand on demande plus de cinq identités.
+# THE ROLES TO EXERCISE, one per outcome. For each: the role written as it is
+# displayed, the appointment's reason (read out by the agent — it stays
+# plausible for a practice), and fictional identities SHARING THE INITIAL, in
+# the order they are served when more than five identities are asked for.
 ROLES = (
     {"role": "j'accepte le rendez-vous proposé", "court": "accepte",
      "motif": "Séance de rééducation",
@@ -195,43 +154,43 @@ ROLES = (
               "Mme Nadia Perreau", "M. Norbert Lemoine")},
 )
 
-# Les CINQ identités d'origine — une par rôle, dans l'ordre des rôles. Elles
-# n'ont pas bougé : c'est ce que produit toujours une campagne d'essai
-# ordinaire (cinq identités).
+# The FIVE original identities — one per role, in role order. They have not
+# moved: this is still what an ordinary test campaign produces (five
+# identities).
 IDENTITES = tuple((role["noms"][0], role["role"], role["motif"])
                   for role in ROLES)
 
-# Combien d'identités on peut demander : au moins autant que de rôles
-# distincts (sinon un rôle ne serait pas éprouvé du tout), au plus ce que le
-# vivier de prénoms permet de nommer sans répéter deux fois la même identité.
+# How many identities may be asked for: at least as many as there are distinct
+# roles (otherwise a role would not be exercised at all), at most what the pool
+# of first names allows to name without repeating the same identity twice.
 IDENTITES_MINIMUM = len(ROLES)
 IDENTITES_MAXIMUM = len(ROLES) * min(len(role["noms"]) for role in ROLES)
 
-# Le coût d'un appel réel chez CALL-E, tel qu'il est annoncé partout
-# ailleurs dans le projet (PROCEDURE-ESSAI-REEL.md, README).
+# The cost of a real call at CALL-E, as announced everywhere else in the
+# project (PROCEDURE-ESSAI-REEL.md, README).
 COUT_APPEL_DOLLARS = 0.05
 
-# Heure de repli quand aucun horaire d'ouverture n'est réglé : le lendemain
-# matin. Ce n'est PAS une préférence devinée — l'écran le dit en toutes
-# lettres et invite à régler les horaires d'ouverture.
+# Fallback time when no opening hours are configured: tomorrow morning. It is
+# NOT a guessed preference — the screen says so in plain words and invites the
+# user to configure the opening hours.
 HEURE_REPLI = 9
 JOURS_REPLI = 1
 
 
 class EssaiImpossible(Exception):
-    """L'essai en conditions réelles ne peut pas être préparé (message français)."""
+    """The real-conditions test cannot be prepared (French message)."""
 
 
-# ------------------------------------------------------- les testeurs
+# ------------------------------------------------------- the testers
 def testeurs(preferences):
-    """La liste des testeurs déclarés : [{"nom", "telephone"}], ou [].
+    """The list of declared testers: [{"nom", "telephone"}], or [].
 
-    LA REPRISE DE L'ANCIEN RÉGLAGE EST ICI, et elle est faite à la LECTURE :
-    tant qu'aucune liste n'a été composée, un numéro unique déjà réglé
-    (CLE_NUMERO_ESSAI, du temps où l'on ne pouvait en déclarer qu'un) est
-    rendu comme PREMIER testeur, nommé « moi ». Rien n'est réécrit au
-    passage : un réglage ancien n'est donc jamais abîmé, et le jour où la
-    liste est composée, c'est elle qui fait foi.
+    CARRYING OVER THE OLD SETTING HAPPENS HERE, and it is done AT READ TIME: as
+    long as no list has been composed, a single already-configured number
+    (CLE_NUMERO_ESSAI, from when only one could be declared) is returned as the
+    FIRST tester, named `me`. Nothing is rewritten along the way: an old
+    setting is therefore never damaged, and the day the list is composed, it is
+    the list that counts.
     """
     liste = preferences.obtenir(CLE_TESTEURS)
     propres = []
@@ -252,27 +211,27 @@ def testeurs(preferences):
 
 
 def numeros_declares(preferences):
-    """Les numéros de tous les testeurs déclarés (liste, éventuellement vide)."""
+    """The numbers of every declared tester (a list, possibly empty)."""
     return [testeur["telephone"] for testeur in testeurs(preferences)]
 
 
 def numero_declare(preferences):
-    """Le numéro du PREMIER testeur, ou "" s'il n'y en a aucun.
+    """The FIRST tester's number, or "" when there is none.
 
-    Gardé sous son nom d'origine : tout ce qui ne connaît qu'un seul numéro
-    d'essai continue de fonctionner, et voit celui du premier testeur.
+    Kept under its original name: everything that knows only a single test
+    number goes on working, and sees the first tester's.
     """
     numeros = numeros_declares(preferences)
     return numeros[0] if numeros else ""
 
 
 def enregistrer_testeurs(preferences, liste):
-    """Écrit la liste des testeurs — et tient l'ancien réglage à jour.
+    """Writes the list of testers — and keeps the old setting up to date.
 
-    L'ancien réglage à numéro unique (CLE_NUMERO_ESSAI) reçoit le numéro du
-    PREMIER testeur, ou "" si la liste est vide. Il n'y a donc jamais deux
-    vérités contradictoires dans le fichier de réglages, et un programme qui
-    ne connaîtrait que l'ancien nom continue de lire quelque chose de juste.
+    The old single-number setting (CLE_NUMERO_ESSAI) receives the FIRST
+    tester's number, or "" when the list is empty. So there are never two
+    contradictory truths in the settings file, and a program that knew only the
+    old name goes on reading something correct.
     """
     propres = [{"nom": testeur["nom"], "telephone": testeur["telephone"]}
                for testeur in liste]
@@ -283,7 +242,7 @@ def enregistrer_testeurs(preferences, liste):
 
 
 def valider_nom_testeur(brut):
-    """Le nom d'un testeur (« moi », « Paul », « le cabinet d'à côté »)."""
+    """A tester's name (`me`, `Paul`, `the practice next door`)."""
     nom = " ".join((brut or "").split())
     if len(nom) < 2:
         raise SaisieInvalide(
@@ -298,11 +257,11 @@ def valider_nom_testeur(brut):
 
 
 def ajouter_testeur(preferences, nom_brut, numero_brut):
-    """Ajoute un testeur ; rend la liste complète. Lève SaisieInvalide.
+    """Adds a tester; returns the complete list. Raises SaisieInvalide.
 
-    Les deux champs sont validés SÉPARÉMENT, et le refus dit lequel est en
-    cause : une saisie refusée doit pouvoir être corrigée là où elle a été
-    faite, sans avoir à tout retaper.
+    The two fields are validated SEPARATELY, and the refusal says which is at
+    fault: refused input must be fixable where it was typed, without having to
+    retype everything.
     """
     liste = testeurs(preferences)
     if len(liste) >= TESTEURS_MAXIMUM:
@@ -327,10 +286,10 @@ def ajouter_testeur(preferences, nom_brut, numero_brut):
 
 
 def retirer_testeur(preferences, rang):
-    """Retire le testeur de ce rang (1 = le premier) ; rend (liste, retiré).
+    """Removes the tester at this rank (1 = the first); returns (list, removed).
 
-    « retiré » est le testeur ôté, ou None si le rang ne désigne personne —
-    l'écran le DIT plutôt que de faire semblant d'avoir agi.
+    `removed` is the tester taken out, or None when the rank designates nobody
+    — the screen SAYS so rather than pretending to have acted.
     """
     liste = testeurs(preferences)
     if not isinstance(rang, int) or rang < 1 or rang > len(liste):
@@ -343,19 +302,19 @@ def retirer_testeur(preferences, rang):
 
 
 
-# ------------------------------------------- le renvoi vers MON numéro
+# ------------------------------------------- the redirect to MY number
 def numero_impose(preferences):
-    """Le numéro qui REMPLACE celui de chaque contact, ou "" — aucun renvoi.
+    """The number that REPLACES each contact's, or "" — no redirect.
 
-    C'est LA fonction que lit le client d'appels réels, à chaque appel. Elle
-    rend "" dès que la case n'est pas cochée : aucun renvoi ne peut donc avoir
-    lieu par accident.
+    This is THE function the real-call client reads, on every call. It returns
+    "" as soon as the box is unticked: no redirect can therefore happen by
+    accident.
 
-    ⚠ ELLE NE VALIDE PAS LE NUMÉRO, exprès. Le contrôle a lieu à
-    l'enregistrement (voir valider_renvoi) ; ici, un numéro illisible est rendu
-    tel quel, et calle_client REFUSE alors l'appel. Se rabattre sur le numéro
-    du contact ferait sonner un vrai téléphone au moment précis où l'écran
-    promet qu'aucun ne sonnera — c'est le seul dénouement inacceptable.
+    ⚠ IT DOES NOT VALIDATE THE NUMBER, on purpose. The check happens at save
+    time (see valider_renvoi); here, an unreadable number is returned as it
+    stands, and calle_client then REFUSES the call. Falling back on the
+    contact's number would ring a real phone at the very moment the screen
+    promises none will ring — the one unacceptable ending.
     """
     if not preferences.obtenir(CLE_IMPOSER_NUMERO):
         return ""
@@ -363,25 +322,21 @@ def numero_impose(preferences):
 
 
 def numero_range(preferences):
-    """Le numéro d'essai enregistré, coché ou non ("" s'il n'y en a pas).
+    """The saved test number, ticked or not ("" when there is none).
 
-    Décocher la case ne l'efface pas : on doit pouvoir arrêter le renvoi, puis
-    le reprendre, sans retaper son propre numéro.
+    Unticking the box does not erase it: it must be possible to stop the
+    redirect, then resume it, without retyping one's own number.
     """
     return (preferences.obtenir(CLE_NUMERO_IMPOSE) or "").strip()
 
 
 def etat_du_renvoi(preferences):
-    """Ce que l'écran doit dire du renvoi, en cinq faits.
+    """What the screen must say about the redirect, in five facts.
 
-    {"coche", "numero", "masque", "actif", "incoherent"} :
-    - actif      : le renvoi AURA lieu (case cochée, numéro composable) ;
-    - incoherent : la case est cochée et le numéro n'est PAS composable. Aucun
-      appel réel ne partira, et l'écran doit le dire au lieu de laisser croire
-      que tout va bien. On n'y arrive qu'en modifiant le fichier de réglages à
-      la main : l'enregistrement, lui, refuse.
-    Le numéro est rendu MASQUÉ comme partout ailleurs : le déclarer ne le rend
-    pas lisible à l'écran.
+    {"coche", "numero", "masque", "actif", "incoherent"}:
+    - actif      : the redirect WILL happen (box ticked, number dialable);
+    - incoherent : the box is ticked and the number is NOT dialable. No real call will go out, and the screen must say so instead of letting the user believe all is well. This can only be reached by editing the settings file by hand: saving refuses it.
+    The number is returned MASKED as everywhere else: declaring it does not make it readable on screen.
     """
     coche = bool(preferences.obtenir(CLE_IMPOSER_NUMERO))
     numero = numero_range(preferences)
@@ -396,17 +351,13 @@ def etat_du_renvoi(preferences):
 
 
 def valider_renvoi(coche, numero_brut, numero_actuel=""):
-    """Contrôle la case et le numéro ; rend (coché ?, numéro). Lève SaisieInvalide.
+    """Checks the box and the number; returns (ticked?, number). Raises
+    SaisieInvalide.
 
-    Trois règles, et chacune vient d'un dénouement à éviter :
-    - un champ VIDE garde le numéro déjà enregistré. Sans cela, décocher puis
-      recocher obligerait à retaper son propre numéro — et le champ est
-      toujours vide, puisqu'un numéro enregistré n'est jamais réaffiché ;
-    - cocher SANS aucun numéro (ni tapé, ni enregistré) est REFUSÉ : RingBack
-      ne saurait pas où renvoyer, et appellerait donc les vrais contacts —
-      exactement ce que la case promet d'empêcher ;
-    - un numéro illisible est refusé même case décochée, pour que la faute de
-      frappe se voie tout de suite et non le jour où l'on cochera.
+    Three rules, each born of an ending to be avoided:
+    - an EMPTY field keeps the number already saved. Without that, unticking then re-ticking would force the user to retype their own number — and the field is always empty, since a saved number is never redisplayed;
+    - ticking WITHOUT any number (neither typed nor saved) is REFUSED: RingBack would not know where to redirect, and would therefore call the real contacts — exactly what the box promises to prevent;
+    - an unreadable number is refused even with the box unticked, so that the typo shows up straight away and not on the day the box is ticked.
     """
     tape = (numero_brut or "").strip()
     numero = saisie.valider_telephone_essai(tape) if tape else (numero_actuel or "")
@@ -419,10 +370,11 @@ def valider_renvoi(coche, numero_brut, numero_actuel=""):
 
 
 def enregistrer_renvoi(preferences, coche, numero_brut):
-    """Écrit le réglage du renvoi ; rend (coché ?, numéro). Lève SaisieInvalide.
+    """Writes the redirect setting; returns (ticked?, number). Raises
+    SaisieInvalide.
 
-    Le journal dit ce qui change SANS jamais écrire le numéro en clair : un
-    fichier de journal se partage plus facilement qu'on ne le croit.
+    The log says what changes WITHOUT ever writing the number in clear: a log
+    file is shared more easily than one thinks.
     """
     coche, numero = valider_renvoi(coche, numero_brut,
                                    numero_range(preferences))
@@ -437,7 +389,8 @@ def enregistrer_renvoi(preferences, coche, numero_brut):
 
 
 def retirer_renvoi(preferences):
-    """Efface le numéro d'essai et arrête le renvoi ; rend le numéro retiré."""
+    """Erases the test number and stops the redirect; returns the number removed.
+    """
     retire = numero_range(preferences)
     preferences.definir(CLE_IMPOSER_NUMERO, False)
     preferences.definir(CLE_NUMERO_IMPOSE, "")
@@ -446,15 +399,15 @@ def retirer_renvoi(preferences):
     return retire
 
 
-# ------------------------------------------------------ le numéro déclaré
+# ------------------------------------------------------ the declared number
 def valider_numero(brut):
-    """Valide le numéro d'essai saisi ; "" (champ vidé) est ACCEPTÉ.
+    """Validates the test number typed in; "" (an emptied field) is ACCEPTED.
 
-    Un champ vidé doit pouvoir effacer le réglage : sans cela, un numéro
-    déclaré une fois ne pourrait plus être retiré depuis la page, et
-    l'écran dirait le contraire de ce qu'il fait. Un numéro non vide passe
-    par le validateur commun (saisie.valider_telephone) : il est stocké
-    exactement comme n'importe quelle autre saisie.
+    An emptied field must be able to erase the setting: without that, a number
+    declared once could no longer be removed from the page, and the screen
+    would say the opposite of what it does. A non-empty number goes through the
+    common validator (saisie.valider_telephone): it is stored exactly like any
+    other input.
     """
     brut = (brut or "").strip()
     if not brut:
@@ -463,27 +416,27 @@ def valider_numero(brut):
 
 
 def est_numero_essai(telephone, preferences):
-    """Ce numéro est-il celui d'un testeur déclaré ? (comparaison par chiffres)"""
+    """Is this number a declared tester's? (compared by digits)"""
     return db.est_numero_essai(telephone, numeros_declares(preferences))
 
 
 def exempte_de_doublon(telephone, numeros_essai):
-    """Ce numéro a-t-il le DROIT d'apparaître plusieurs fois dans une liste ?
+    """Is this number ALLOWED to appear several times in a list?
 
-    Seuls les numéros que l'opérateur a lui-même déclarés dans ⚙ Réglages
-    (ses testeurs) en ont le droit. Aucun numéro déclaré : personne n'est
-    exempté. `numeros_essai` accepte un numéro seul ou la liste complète.
+    Only the numbers the operator has themselves declared in ⚙ Réglages (their
+    testers) have that right. No number declared: nobody is exempt.
+    `numeros_essai` accepts a single number or the complete list.
     """
     return db.est_numero_essai(telephone, numeros_essai)
 
 
-# ------------------------------------------------------ identités et rôles
+# ------------------------------------------------------ identities and roles
 def valider_nombre_identites(brut):
-    """Le nombre d'identités demandé, borné et expliqué. Lève SaisieInvalide.
+    """The number of identities requested, bounded and explained. Raises
+    SaisieInvalide.
 
-    Le plancher n'est pas arbitraire : en dessous du nombre de rôles
-    distincts, un rôle ne serait pas éprouvé du tout — l'essai perdrait ce
-    qu'il vient chercher.
+    The floor is not arbitrary: below the number of distinct roles, one role
+    would not be exercised at all — the test would lose what it came for.
     """
     texte = (brut or "").strip()
     if not texte:
@@ -508,12 +461,12 @@ def valider_nombre_identites(brut):
 
 
 def identites_detaillees(nombre=None):
-    """Les identités à créer, tout ce qu'on en sait, dans l'ordre des rôles.
+    """The identities to create, all we know of them, in role order.
 
-    [{"identite", "role", "court", "dire", "motif"}]. Les rôles reviennent en
-    tournant ; au deuxième tour, c'est un autre prénom de MÊME INITIALE qui
-    porte le rôle (Alice, puis Adrien…) pour que le moyen mnémonique tienne
-    quel que soit le nombre demandé.
+    [{"identite", "role", "court", "dire", "motif"}]. The roles come round in
+    rotation; on the second round it is another first name with the SAME
+    INITIAL that carries the role (Alice, then Adrien…) so the memory aid holds
+    whatever number is asked for.
     """
     if nombre is None:
         nombre = len(IDENTITES)
@@ -528,23 +481,23 @@ def identites_detaillees(nombre=None):
 
 
 def identites(nombre=None):
-    """Les identités à créer : [(nom, rôle, motif)], dans l'ordre des rôles.
+    """The identities to create: [(name, role, reason)], in role order.
 
-    L'écriture d'origine, gardée telle quelle pour tout ce qui n'a besoin
-    que de ces trois-là (voir identites_detaillees pour le reste).
+    The original form, kept as it stands for everything that needs only those
+    three (see identites_detaillees for the rest).
     """
     return [(entree["identite"], entree["role"], entree["motif"])
             for entree in identites_detaillees(nombre)]
 
 
 def repartir(liste_identites, liste_testeurs):
-    """Distribue les rôles sur les testeurs, EN TOURNANT.
+    """Deals the roles out to the testers, IN ROTATION.
 
-    Le 1ᵉʳ rôle au 1ᵉʳ testeur, le 2ᵉ au 2ᵉ, et on reboucle. Avec un seul
-    testeur, tout lui revient : c'est le comportement d'avant, à l'identique.
-    `liste_identites` vient de identites_detaillees (ou de identites : les
-    triplets sont acceptés aussi). Rend [{"rang", "identite", "role",
-    "court", "dire", "motif", "testeur", "telephone"}].
+    The 1st role to the 1st tester, the 2nd to the 2nd, then round again. With
+    a single tester, everything comes back to them: that is the previous
+    behaviour, identically. `liste_identites` comes from identites_detaillees
+    (or from identites: the triples are accepted too). Returns [{"rang",
+    "identite", "role", "court", "dire", "motif", "testeur", "telephone"}].
     """
     if not liste_testeurs:
         return []
@@ -563,10 +516,10 @@ def repartir(liste_identites, liste_testeurs):
 
 
 def prenom(identite):
-    """« Mme Alice Dubreuil » → « Alice » : le prénom porte le mnémonique.
+    """`Mme Alice Dubreuil` → `Alice`: the first name carries the memory aid.
 
-    C'est lui qu'on écrit dans les récapitulatifs courts (« Alice (accepte)
-    → Paul ») parce que c'est son initiale qui rappelle le rôle.
+    It is the one written in the short summaries (`Alice (accepts) → Paul`)
+    because it is its initial that recalls the role.
     """
     morceaux = (identite or "").split()
     if len(morceaux) > 1:
@@ -575,7 +528,7 @@ def prenom(identite):
 
 
 def cout_lisible(nombre):
-    """« 5 appels, soit environ 0,25 $ » — le coût annoncé, jamais deviné."""
+    """`5 calls, about $0.25` — the announced cost, never guessed."""
     total = f"{nombre * COUT_APPEL_DOLLARS:.2f}".replace(".", ",")
     unite = f"{COUT_APPEL_DOLLARS:.2f}".replace(".", ",")
     return (f"{nombre} appel(s), soit environ {total} $ "
@@ -583,11 +536,11 @@ def cout_lisible(nombre):
 
 
 def resume(preferences=None, nombre=None):
-    """De quoi décrire la campagne d'essai AVANT de la créer.
+    """Enough to describe the test campaign BEFORE creating it.
 
-    Sans préférences, on décrit seulement les identités et les rôles (c'est
-    ce dont a besoin un écran qui ne sait pas encore qui sont les testeurs).
-    Avec, on ajoute les testeurs déclarés et la répartition annoncée.
+    Without preferences, only the identities and roles are described (that is
+    what a screen needs when it does not yet know who the testers are). With
+    them, the declared testers and the announced distribution are added.
     """
     choisies = identites_detaillees(nombre)
     info = {"identites": len(choisies), "nature": NATURE,
@@ -601,20 +554,14 @@ def resume(preferences=None, nombre=None):
     return info
 
 
-# ------------------------------------------------- préparation de l'essai
+# ------------------------------------------------- preparing the test
 def _places(base, preferences, maintenant, besoin):
-    """Un horaire par identité — de vraies places libres si on les connaît.
+    """One time slot per identity — genuinely free ones when we know them.
 
-    Deux situations, deux réponses honnêtes (même esprit que
-    horaires.places_a_proposer) :
-    - il y a assez de places réellement libres (ouvert − déjà pris − jours
-      fermés) : on les prend, dans l'ordre ;
-    - il n'y en a pas assez — soit qu'aucun horaire d'ouverture ne soit
-      réglé (RingBack ne connaît alors pas les heures ouvrées et ne les
-      invente pas), soit que l'agenda soit plein : les rendez-vous sont
-      posés demain matin, d'heure en heure, et l'écran DIT que c'est un
-      repli, en nommant les deux causes possibles.
-    Rend (liste d'horaires ISO, repli ?).
+    Two situations, two honest answers (same spirit as horaires.places_a_proposer):
+    - there are enough genuinely free slots (open − already taken − closed days): they are used, in order;
+    - there are not enough — either because no opening hours are configured (RingBack then does not know the working hours and does not invent them), or because the calendar is full: the appointments are placed tomorrow morning, hour by hour, and the screen SAYS it is a fallback, naming both possible causes.
+    Returns (list of ISO times, fallback?).
     """
     libres = horaires.creneaux_libres(base, preferences, tranches=1,
                                       depuis=maintenant, limite=besoin)
@@ -628,26 +575,20 @@ def _places(base, preferences, maintenant, besoin):
 
 
 def preparer(application, maintenant=None, nombre=None):
-    """Prépare la campagne d'essai en conditions réelles ; rend un compte rendu.
+    """Prepares the real-conditions test campaign; returns a report.
 
-    Ce qui est fait, dans cet ordre :
-    1. les TESTEURS déclarés sont relus — sans eux, rien n'est créé et on le
-       DIT (EssaiImpossible) ;
-    2. une identité fictive par rôle est créée, marquée « jeu d'essai » —
-       donc retirable en bloc depuis ⚙ Réglages, comme le jeu d'essai
-       ordinaire, sans jamais toucher aux vraies données. Chaque identité
-       porte le numéro du testeur à qui son rôle échoit (répartition en
-       tournant, voir repartir) ;
-    3. un rendez-vous par identité, sur une place réellement libre ;
-    4. une campagne « Confirmation de rendez-vous » est créée à l'état
-       PRÊTE, avec ces contacts. AUCUN APPEL N'EST PASSÉ : c'est l'opérateur
-       qui démarre, avec ses trois verrous.
+    What is done, in this order:
+    1. the declared TESTERS are read back — without them, nothing is created and we SAY so (EssaiImpossible);
+    2. one fictional identity per role is created, marked `jeu d'essai` — hence removable in one go from ⚙ Réglages, like the ordinary sample data set, without ever touching real data. Each identity carries the number of the tester their role falls to (rotating distribution, see repartir);
+    3. one appointment per identity, on a genuinely free slot;
+    4. an `Appointment confirmation` campaign is created in the READY state, with those contacts. NO CALL IS PLACED: the operator starts it, with their three locks.
 
-    Le brouillon passe par le MÊME chemin que l'assistant en 3 étapes
-    (application.creer_brouillon_assistant puis assistant.creer_campagne_prete) :
-    la campagne obtenue est en tout point celle qu'aurait produite l'écran.
+    The draft goes through the SAME path as the 3-step assistant
+    (application.creer_brouillon_assistant then
+    assistant.creer_campagne_prete): the resulting campaign is in every respect
+    the one the screen would have produced.
 
-    Rend {"campagne_id", "clients", "rendezvous", "repli", "repartition",
+    Returns {"campagne_id", "clients", "rendezvous", "repli", "repartition",
     "testeurs"}.
     """
     from . import assistant           # import tardif : assistant importe db
@@ -699,9 +640,9 @@ def preparer(application, maintenant=None, nombre=None):
     brouillon = application.obtenir_brouillon_assistant(identifiant)
     try:
         brouillon["contacts"] = contacts
-        # La liste est écrite ici, pas tirée d'un critère de base : elle
-        # n'est donc pas reproductible sur un autre créneau, et la recette
-        # le dit (§8.3) plutôt que de laisser croire le contraire.
+        # The list is written here, not drawn from a database criterion: it is
+        # therefore not reproducible on another slot, and the recipe says so
+        # (§8.3) rather than letting the user believe otherwise.
         assistant.noter_apport_recette(brouillon, "essai_reel")
         brouillon["mission"] = assistant.construire_mission(
             NATURE, brouillon["infos"], preferences, brouillon["options"])
@@ -718,11 +659,11 @@ def preparer(application, maintenant=None, nombre=None):
 
 
 def _client_essai(base, nom, telephone):
-    """La fiche du contact d'essai (nom, numéro) ; rend (identifiant, créé ?).
+    """The test contact's record (name, number); returns (id, created?).
 
-    Même prudence que jeu_essai._obtenir_ou_creer_essai : on ne réutilise
-    QUE des fiches déjà marquées « jeu d'essai ». Un vrai client homonyme
-    ne peut donc jamais être embarqué dans le retrait du jeu d'essai.
+    Same caution as jeu_essai._obtenir_ou_creer_essai: ONLY records already
+    marked `jeu d'essai` are reused. A real client with the same name can
+    therefore never be swept up in the removal of the sample data set.
     """
     with base.verrou:
         ligne = base.conn.execute(

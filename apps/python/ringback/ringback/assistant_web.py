@@ -1,52 +1,45 @@
-"""Assistant de campagne — pages web et poste de pilotage (mixin du serveur).
+"""Campaign assistant — web pages and control desk (a server mixin).
 
-Trois étapes (spécification v1.1) :
-① « /assistant »          : les huit cartes de nature, politique d'appel
-                            par défaut affichée sur chaque carte ;
-② « /assistant/message »  : aperçu du prompt VIVANT (JavaScript de la page :
-                            il se met à jour en tapant, sans appel serveur),
-                            informations générales de la nature (⛔ =
-                            obligatoire), options de comportement, champs de
-                            contact (Identité et Téléphone non supprimables,
-                            champs personnalisés ajoutables). Le passage à
-                            l'étape ③ est REFUSÉ côté serveur tant qu'un ⛔
-                            manque — l'aperçu n'est qu'un confort ;
-③ « /assistant/liste »    : la grille dont les colonnes sont les champs de
-                            l'étape ② — remplie par saisie directe, collage,
-                            CSV, agenda ICS ou depuis la base (les briques
-                            saisie.py / ics.py / generation.py sont
-                            RÉUTILISÉES) ; « Valider » crée la campagne en
-                            état « prête » SANS appeler personne.
+Three steps (specification v1.1): ① `/assistant` : the eight kind cards, with
+the default calling policy shown on each card; ② `/assistant/message` : a LIVE
+preview of the prompt (the page's JavaScript: it updates as you type, with no
+server call), the kind's general information (⛔ = mandatory), behaviour
+options, contact fields (Identity and Phone cannot be removed, custom fields
+can be added). Moving on to step ③ is REFUSED server-side as long as a ⛔ is
+missing — the preview is only a convenience; ③ `/assistant/liste` : the grid
+whose columns are the fields of step ② — filled by direct typing, pasting, CSV,
+an ICS calendar or from the database (the saisie.py / ics.py / generation.py
+building blocks are REUSED); `Valider` creates the campaign in the `prête`
+state WITHOUT calling anybody.
 
-Le poste de pilotage (« /campagne?id=N » pour une campagne de l'assistant) :
-états de la spécification (accepté mis en valeur avec l'information clé,
-refusé, à recontacter avec échéance, injoignable (N), à rappeler par un
-humain avec la demande en clair, exclu, épargné), compteurs, et les
-commandes ▶ Démarrer → ⏸ Pause / ⏹ Arrêter qui agissent ENTRE deux appels
-(un appel en cours va à son terme), reprise possible.
+The control desk (`/campagne?id=N` for an assistant campaign): the
+specification's states (accepted, highlighted with the key information;
+refused; to contact again with a due date; unreachable (N); to be called back
+by a human with the request in clear; excluded; spared), counters, and the ▶
+Start → ⏸ Pause / ⏹ Stop commands which act BETWEEN two calls (a call in
+progress runs to its end), with resumption possible.
 
-Ce qui est reporté est affiché « à venir », grisé — jamais simulé :
-l'exécution automatique des relances (elles s'enregistrent et s'affichent ;
-le geste reste le bouton de la page 🔁 Relances).
+What is postponed is shown as `à venir`, greyed out — never simulated: the
+automatic running of follow-ups (they are recorded and displayed; the gesture
+stays the button on the 🔁 Relances page).
 
-▶ Démarrer passe par un GESTE CONSCIENT (§8.1) : le travail est double —
-un rendez-vous pris ou déplacé au téléphone change l'agenda LOCAL de
-RingBack **et** entre au cahier des changements à reporter ailleurs. Les
-créneaux annoncés étant déduits de cet agenda, un agenda périmé fait
-proposer des places déjà prises dans la vraie vie. Le clic sur ▶ ouvre donc
-un panneau — au moment de démarrer, et nulle part ailleurs — qui porte les
-CHIFFRES DU JOUR (rendez-vous connus sur la période, places libres
-calculées, premières places qui seront annoncées, date du dernier import) et
-dit franchement les signes objectifs d'un agenda douteux. Sans le clic de
-confirmation, aucun appel ne part.
+▶ Start goes through a CONSCIOUS GESTURE (§8.1): the work is twofold — an
+appointment booked or moved on the phone changes RingBack's LOCAL calendar
+**and** enters the change log to be carried over elsewhere. Since the slots
+announced are deduced from that calendar, a stale calendar leads to offering
+slots already taken in real life. Clicking ▶ therefore opens a panel — at the
+moment of starting, and nowhere else — carrying THE DAY'S FIGURES (appointments
+known over the period, free slots computed, the first slots that will be
+announced, the date of the last import) and stating frankly the objective signs
+of a doubtful calendar. Without the confirmation click, no call goes out.
 
-Le poste de pilotage porte aussi le CAHIER DES CHANGEMENTS (§8.1) : la
-liste de ce qu'il reste à reporter dans le logiciel de planification de
-l'établissement — lisible à l'écran, copiable d'un geste, exportable en CSV
-généré à la volée (jamais stocké).
+The control desk also carries the CHANGE LOG (§8.1): the list of what remains
+to be carried over into the establishment's scheduling software — readable on
+screen, copyable in one gesture, exportable as a CSV generated on the fly
+(never stored).
 
-Règle de confidentialité inchangée : les numéros restent côté serveur
-(brouillon) et ne sortent que MASQUÉS dans les pages.
+The privacy rule is unchanged: the numbers stay server-side (in the draft) and
+come out only MASKED in the pages.
 """
 
 import datetime
@@ -63,15 +56,15 @@ journal = logging.getLogger("ringback.assistant_web")
 
 
 def _selecteur(nom, choix, retenu, identifiant=None, vide=None, forme=None):
-    """Une liste déroulante — préférée à une pile de boutons radio.
+    """A drop-down list — preferred to a stack of radio buttons.
 
-    `vide` ajoute une entrée « à choisir » en tête : elle sert quand aucun
-    défaut ne doit être imposé (l'ordre d'appel, par exemple).
+    `vide` adds a `to be chosen` entry at the top: it is used when no default
+    must be imposed (the calling order, for instance).
 
-    `forme` rattache le champ à un formulaire par son identifiant, même s'il
-    est écrit AILLEURS dans la page (attribut « form » de HTML). C'est ce qui
-    permet au panneau de la règle de vivre à côté de la grille tout en partant
-    avec elle, quel que soit le bouton cliqué — voir `_corps_regle`.
+    `forme` attaches the field to a form by its id, even when it is written
+    ELSEWHERE in the page (HTML's `form` attribute). That is what lets the rule
+    panel live beside the grid while going out with it, whichever button is
+    clicked — see `_corps_regle`.
     """
     lignes = []
     if vide is not None:
@@ -93,23 +86,23 @@ ETAPES = (("La nature", "/assistant"),
 
 
 def _fil_ariane(courante, identifiant=None, etape3_ouverte=False):
-    """Le fil d'Ariane : trois ronds, un trait d'avancement, noms cliquables.
+    """The breadcrumb trail: three circles, a progress line, clickable names.
 
-    `courante` vaut 1, 2 ou 3. Une étape n'est cliquable que si elle est
-    réellement atteignable : l'étape ② demande un brouillon, l'étape ③
-    demande en plus que les contrôles ⛔ de l'étape ② soient passés une
-    fois (etape3_ouverte) — jamais de lien qui mène à un refus.
+    `courante` is 1, 2 or 3. A step is only clickable when it is genuinely
+    reachable: step ② needs a draft, step ③ needs in addition that step ②'s ⛔
+    checks have passed once (etape3_ouverte) — never a link that leads to a
+    refusal.
     """
     elements = []
     for rang, (nom, chemin) in enumerate(ETAPES, start=1):
         if rang == courante:
-            lien = None                      # on y est déjà
+            lien = None  # we are already there
         elif rang == 1:
             lien = chemin                    # changer de nature : toujours
         elif identifiant and (rang == 2 or etape3_ouverte):
             lien = f"{chemin}?b={urllib.parse.quote(identifiant)}"
         else:
-            lien = None                      # étape pas encore atteignable
+            lien = None  # step not reachable yet
         classe = "fa-etape"
         if rang < courante:
             classe += " fa-faite"
@@ -119,8 +112,8 @@ def _fil_ariane(courante, identifiant=None, etape3_ouverte=False):
             classe += " fa-bloquee"
         interieur = ('<span class="fa-rond"></span>'
                      f'<span class="fa-nom">{rang}. {html.escape(nom)}</span>')
-        # Un identifiant stable par étape (fa-etape-1/2/3) : c'est par lui que
-        # l'écran est désigné sans dépendre de la position dans la page.
+        # A stable id per step (fa-etape-1/2/3): it is by that id the screen is
+        # designated, without depending on its position in the page.
         ident = f' id="fa-etape-{rang}"'
         if lien:
             elements.append(
@@ -137,15 +130,15 @@ def _fil_ariane(courante, identifiant=None, etape3_ouverte=False):
 
 
 def _bascule_mode(mode):
-    """Les deux modes de saisie, côte à côte, en haut du formulaire.
+    """The two input modes, side by side, at the top of the form.
 
-    Deux boutons plutôt qu'un sélecteur : chaque choix ouvre une interface
-    différente (c'est l'exception établie du 28/07/2026), et l'utilisateur
-    voit d'un coup d'œil dans lequel il se trouve.
+    Two buttons rather than a selector: each choice opens a different interface
+    (that is the established exception of 28/07/2026), and the user sees at a
+    glance which one they are in.
 
-    ⚠ La bascule ne recharge RIEN : le mode avancé est déjà dans la page,
-    simplement masqué. Basculer est donc instantané et ne peut rien perdre —
-    y compris une saisie en cours dans un champ du mode avancé.
+    ⚠ The toggle reloads NOTHING: the advanced mode is already in the page,
+    merely hidden. Toggling is therefore instantaneous and can lose nothing —
+    including input in progress in an advanced-mode field.
     """
     boutons = []
     for code, libelle in assistant.MODES_FORMULAIRE.items():
@@ -174,15 +167,15 @@ _EXPLICATION_MODE = {
 
 
 def _script_mode(mode):
-    """La bascule : elle change ce qu'on VOIT, et retient le choix.
+    """The toggle: it changes what you SEE, and remembers the choice.
 
-    Le mode est écrit sur <main> ; la feuille de style fait le reste. Le
-    choix part au serveur en arrière-plan pour être retrouvé à la campagne
-    suivante — mais l'affichage, lui, a déjà basculé : on n'attend pas le
-    réseau pour montrer ce qui est déjà là.
+    The mode is written on <main>; the stylesheet does the rest. The choice
+    goes to the server in the background so it can be found again on the next
+    campaign — but the display has already switched: we do not wait for the
+    network to show what is already there.
 
-    Sans JavaScript, le mode reste celui des Réglages et TOUT est visible en
-    avancé : aucune fonction n'est perdue, seule la bascule immédiate l'est.
+    Without JavaScript, the mode stays the one from the Settings and EVERYTHING
+    is visible in advanced: no function is lost, only the instant toggle is.
     """
     return """<script>
 (function(){
@@ -212,23 +205,22 @@ ONGLETS_ETAPE2 = (("options", "B. Options de comportement"),
 
 
 def _menu_etape2():
-    """Le menu horizontal du mode avancé : B et C, une seule à la fois.
+    """The advanced mode's horizontal menu: B and C, one at a time.
 
-    ⚠ SA DEMANDE DU 15/08/2026 : « le mode avancé fait apparaître un menu
-    horizontal avec l'option B. Options de comportement et l'option C. Aperçu
-    du message. Cliquer fait apparaître l'un ou l'autre des formulaires. »
+    ⚠ HIS REQUEST OF 15/08/2026: `advanced mode brings up a horizontal menu
+    with option B. Behaviour options and option C. Message preview. Clicking
+    shows one or the other of the forms.`
 
-    Les deux blocs s'empilaient : la page devenait longue et il fallait la
-    faire défiler pour atteindre l'aperçu.
+    The two blocks stacked up: the page became long and you had to scroll to
+    reach the preview.
 
-    ⚠ CE SONT DES <button type="button">, jamais des liens ni des boutons de
-    soumission : ce formulaire est celui de l'étape 2, et un bouton sans type
-    l'aurait envoyé au premier clic sur un onglet.
+    ⚠ THEY ARE <button type="button">, never links nor submit buttons: this
+    form is step 2's, and a button with no type would have submitted it on the
+    first click on a tab.
 
-    ⚠ ET LES DEUX PANNEAUX RESTENT DANS LA PAGE, seulement masqués. Ils
-    portent des champs qui doivent partir avec le formulaire même si on ne les
-    a jamais ouverts — c'est la même règle que la bascule simplifié/avancé :
-    « basculer ne perd rien ».
+    ⚠ AND BOTH PANELS STAY IN THE PAGE, merely hidden. They carry fields that
+    must go out with the form even when they were never opened — the same rule
+    as the simplified/advanced toggle: `toggling loses nothing`.
     """
     entrees = "".join(
         f'<button type="button" class="onglet-etape2" id="onglet-{code}" '
@@ -240,12 +232,12 @@ def _menu_etape2():
 
 
 def _script_onglets_etape2():
-    """Le clic qui change de panneau. Sans JavaScript, tout reste visible.
+    """The click that changes panel. Without JavaScript, everything stays visible.
 
-    ⚠ LE REPLI EST « TOUT MONTRER », pas « tout cacher » : les panneaux sont
-    masqués par ce script, jamais par le HTML servi. Un navigateur sans
-    JavaScript affiche donc les deux à la suite — c'est exactement l'écran
-    d'avant, et aucun réglage n'est hors d'atteinte.
+    ⚠ THE FALLBACK IS `SHOW EVERYTHING`, not `hide everything`: the panels are
+    hidden by this script, never by the HTML served. A browser without
+    JavaScript therefore shows both one after the other — that is exactly the
+    earlier screen, and no setting is out of reach.
     """
     return """<script>
 (function(){
@@ -267,11 +259,11 @@ montrer(onglets[0].getAttribute('data-panneau'));
 
 
 def _choix_panneaux(nom, choix, retenu):
-    """Des boutons radio quand chaque choix OUVRE UNE INTERFACE différente.
+    """Radio buttons when each choice OPENS A DIFFERENT INTERFACE.
 
-    C'est l'exception à la règle « un sélecteur plutôt qu'une pile de radios » :
-    ici les voies possibles se voient d'un coup d'œil avant d'en ouvrir une.
-    Pour un simple filtre, on garde le sélecteur.
+    This is the exception to the rule `a selector rather than a stack of
+    radios`: here the possible routes are visible at a glance before one is
+    opened. For a simple filter, the selector is kept.
     """
     boutons = []
     for code, libelle in choix:
@@ -285,15 +277,14 @@ def _choix_panneaux(nom, choix, retenu):
 
 
 def _script_periode(identifiant):
-    """Changer d'année ou de semaine recharge le SEUL panneau des dates.
+    """Changing year or week reloads ONLY the dates panel.
 
-    Les semaines dépendent de l'année (52 ou 53), les jours dépendent de la
-    semaine ET des horaires d'ouverture : c'est le serveur qui sait, pas le
-    navigateur. On va donc lui demander — mais on ne recharge que ce
-    panneau-ci, jamais la page (règle du propriétaire).
+    The weeks depend on the year (52 or 53), the days depend on the week AND
+    the opening hours: it is the server that knows, not the browser. So we ask
+    it — but we reload only this panel, never the page (the owner's rule).
 
-    Sans JavaScript, les listes restent celles du chargement : on choisit
-    quand même sa semaine dans l'année affichée, et le bouton fonctionne.
+    Without JavaScript, the lists stay as they were on loading: you still
+    choose your week within the year displayed, and the button works.
     """
     return """<script>
 (function(){
@@ -320,16 +311,16 @@ panneau.addEventListener('change',function(e){
 
 
 def _script_regle(identifiant):
-    """Changer la source recharge le SEUL panneau de la règle.
+    """Changing the source reloads ONLY the rule panel.
 
-    Pourquoi le serveur et pas le navigateur : c'est lui qui sait quels réglages
-    ont un sens pour la source choisie — la fenêtre « jusqu'où après la place »
-    n'agit que sur les rendez-vous à venir, et les libellés d'ordre changent de
-    sens avec la source. Le navigateur ne peut pas le deviner sans recopier la
-    règle, et deux copies d'une règle finissent toujours par diverger.
+    Why the server and not the browser: it is the server that knows which
+    settings make sense for the chosen source — the `how far after the slot`
+    window only acts on upcoming appointments, and the order labels change
+    meaning with the source. The browser cannot guess that without copying the
+    rule, and two copies of a rule always end up diverging.
 
-    Sans JavaScript, rien n'est perdu : le panneau se recale au clic sur
-    « Enregistrer la règle », qui repasse par le serveur de toute façon.
+    Without JavaScript, nothing is lost: the panel realigns on a click on
+    `Enregistrer la règle`, which goes through the server anyway.
     """
     return """<script>
 (function(){
@@ -354,18 +345,18 @@ panneau.addEventListener('change',function(e){
 
 
 def _script_grille():
-    """La couleur d'une case obligatoire s'éteint dès qu'on la remplit.
+    """A mandatory box's colour goes out as soon as it is filled.
 
-    Deux événements, pas un : « input » couvre la frappe au clavier, et
-    « change » couvre le sélecteur de date d'un champ datetime-local, qui se
-    remplit à la souris sans qu'aucune touche soit pressée. N'écouter que
-    « input » laisserait une date choisie à la souris en rouge.
+    Two events, not one: `input` covers typing on the keyboard, and `change`
+    covers the date picker of a datetime-local field, which fills with the
+    mouse without a key being pressed. Listening only to `input` would leave a
+    mouse-picked date in red.
 
-    Un champ vidé à nouveau se rallume : la couleur dit l'état RÉEL du champ,
-    pas « on y a touché une fois ».
+    A field emptied again lights up once more: the colour says the field's REAL
+    state, not `it was touched once`.
 
-    Sans JavaScript, la couleur reste jusqu'au prochain aller-retour avec le
-    serveur, qui la recalcule. Rien n'est perdu, c'est juste moins vivant.
+    Without JavaScript, the colour stays until the next round trip to the
+    server, which recomputes it. Nothing is lost, it is just less lively.
     """
     return """<script>
 (function(){
@@ -384,13 +375,13 @@ Array.prototype.forEach.call(table.querySelectorAll('input.manque'),
 
 
 def _choix_panneaux_colonnes(nom, gauche, droite, retenu):
-    """Les voies de remplissage rangées en DEUX COLONNES, avec un intertitre.
+    """The filling routes arranged in TWO COLUMNS, with a subheading.
 
-    Demande du propriétaire (02/08/2026) : six voies en une seule pile, cela
-    ne se lit plus. Les deux colonnes répondent à deux questions différentes —
-    « qu'est-ce que j'apporte ? » à gauche, « qu'est-ce que RingBack a
-    déjà ? » à droite. Ce sont toujours des boutons radio (chaque voie ouvre
-    un écran différent : l'exception établie à la règle du sélecteur).
+    Owner's request (02/08/2026): six routes in a single stack can no longer be
+    read. The two columns answer two different questions — `what am I
+    bringing?` on the left, `what does RingBack already have?` on the right.
+    They are still radio buttons (each route opens a different screen: the
+    established exception to the selector rule).
     """
     colonnes = []
     for titre, choix in (gauche, droite):
@@ -400,7 +391,8 @@ def _choix_panneaux_colonnes(nom, gauche, droite, retenu):
 
 
 def _script_panneaux():
-    """N'affiche que le panneau de la voie choisie (sans JavaScript : tout)."""
+    """Shows only the panel of the chosen route (without JavaScript: all of them).
+    """
     return """<script>
 (function(){
 var radios=document.querySelectorAll('.choix-panneaux input[type=radio]');
@@ -417,7 +409,7 @@ bascule();
 
 
 def _case(nom, libelle, cochee, identifiant=None, complement=""):
-    """Une case à cocher : le contrôle AVANT le texte, largeur du contenu."""
+    """A checkbox: the control BEFORE the text, the width of its content."""
     ident = f' id="{identifiant}"' if identifiant else ""
     return (f'<div class="ligne-option"><label class="option">'
             f'<input type="checkbox" name="{nom}" value="1"{ident}'
@@ -426,11 +418,13 @@ def _case(nom, libelle, cochee, identifiant=None, complement=""):
 
 
 class RoutesAssistant:
-    """Mixin de Gestionnaire : les routes de l'assistant et du pilotage."""
+    """A Gestionnaire mixin: the assistant's and the control desk's routes."""
 
     # ------------------------------------------------------------- routage
     def _get_assistant(self, url):
-        """Traite la requête GET si elle vise l'assistant ; rend True alors."""
+        """Handles the GET request when it targets the assistant; returns True
+        then.
+        """
         if url.path == "/assistant":
             self._repondre(self._page_natures())
             return True
@@ -455,31 +449,33 @@ class RoutesAssistant:
             self._servir_cahier_csv(parametres)
             return True
         if url.path == "/campagne/verification-agenda":
-            # Le panneau « l'agenda de RingBack fait foi », demandé par le
-            # clic sur ▶ Démarrer : un MORCEAU de page, calculé à l'instant.
+            # The `RingBack's calendar is the reference` panel, requested by
+            # the click on ▶ Start: a PIECE of page, computed on the spot.
             self._servir_verification_agenda(parametres)
             return True
         if url.path == "/assistant/periode":
-            # Fragment : le SEUL panneau « dates de rendez-vous », recalculé
-            # après un changement d'année ou de semaine.
+            # Fragment: the appointment-dates panel ALONE, recomputed after a
+            # change of year or week.
             self._servir_periode(parametres)
             return True
         if url.path == "/assistant/regle":
-            # Fragment : le SEUL panneau de la règle, recalculé après un
-            # changement de SOURCE — c'est elle qui décide quels réglages ont un
-            # sens (voir _champ_fenetre).
+            # Fragment: the rule panel ALONE, recomputed after a change of
+            # SOURCE — it is the source that decides which settings make sense
+            # (see _champ_fenetre).
             self._servir_regle(parametres)
             return True
         if url.path == "/campagne/vivant":
-            # Les deux zones qui bougent pendant une campagne, et rien
-            # d'autre : c'est ce que la page vient chercher toutes les 1,5 s
-            # au lieu de se recharger entière.
+            # The two zones that move during a campaign, and nothing else: that
+            # is what the page fetches every 1.5 s instead of reloading itself
+            # entirely.
             self._servir_zones_vivantes(parametres)
             return True
         return False
 
     def _post_assistant(self, url, corps):
-        """Traite la requête POST si elle vise l'assistant ; rend True alors."""
+        """Handles the POST request when it targets the assistant; returns True
+        then.
+        """
         if url.path == "/assistant/nature":
             self._traiter_nature(corps)
             return True
@@ -508,23 +504,23 @@ class RoutesAssistant:
             self._traiter_commande(corps, "arret")
             return True
         if url.path == "/campagne/recuperer":
-            # 📥 LIRE le résultat d'appels déjà passés. Ce chemin ne peut
-            # créer aucun appel : il n'appelle que lire_resultat(), qui ne
-            # fait qu'un GET. Les 3 verrous du mode réel gardent la CRÉATION
-            # d'appels, ils ne sont donc pas concernés.
+            # 📥 READ the result of calls already placed. This path cannot
+            # create any call: it only calls lire_resultat(), which does
+            # nothing but a GET. The 3 real-mode locks guard the CREATION of
+            # calls, so they are not concerned.
             self._traiter_recuperation(corps)
             return True
         if url.path == "/campagne/compenser":
             self._traiter_compensation(corps)
             return True
         if url.path == "/suivi/creneau/campagne":
-            # Le MÊME geste, depuis le planning : un trou → la campagne qui
-            # le remplit. Une seule mécanique, deux portes d'entrée (§5).
+            # The SAME gesture, from the schedule: a gap → the campaign that
+            # fills it. One mechanism, two entrance doors (§5).
             self._traiter_compensation(corps)
             return True
         return False
 
-    # ------------------------------------------------------ étape ① natures
+    # ------------------------------------------------------ step ① kinds
     def _page_natures(self, erreur=None):
         bloc_erreur = (f'<div class="erreurs">{html.escape(erreur)}</div>'
                        if erreur else "")
@@ -561,13 +557,13 @@ reste modifiable à l'étape 2.</p>
         return self._rediriger(f"/assistant/message?b={identifiant}")
 
     def _traiter_champs_attendus(self, corps):
-        """Ajoute ou retire une COLONNE, puis revérifie la grille déjà remplie.
+        """Adds or removes a COLUMN, then rechecks the already-filled grid.
 
-        C'est la règle du propriétaire (02/08/2026) : changer les colonnes
-        quand des lignes existent oblige à revérifier ce qui est rempli. On
-        ne jette JAMAIS une valeur : ce qui ne correspond plus à aucune
-        colonne dort dans la fiche du contact et revient si la colonne
-        revient. Seul le manque est signalé.
+        That is the owner's rule (02/08/2026): changing the columns while rows
+        exist forces a recheck of what is filled in. A value is NEVER thrown
+        away: whatever no longer matches any column sleeps in the contact's
+        record and comes back if the column comes back. Only what is missing is
+        flagged.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         identifiant = donnees.get("b", [""])[0]
@@ -603,13 +599,12 @@ reste modifiable à l'étape 2.</p>
                         "utilisable dans le message.")
         elif action.startswith("retirer_champ:"):
             code = action.split(":", 1)[1]
-            # ⚠ CE QUI PROTÈGE UNE COLONNE, C'EST SA PROVENANCE, pas le fait
-            # qu'elle soit obligatoire. L'ancien code refusait de retirer
-            # TOUTE colonne obligatoire — y compris une colonne ajoutée à la
-            # main et cochée ⛔ : le bouton « Retirer » s'affichait et ne
-            # faisait rien. Constaté à l'écran le 02/08/2026. Les colonnes de
-            # la nature, elles, n'ont pas de bouton, et ce contrôle-ci le
-            # confirme côté serveur (un envoi forgé ne passerait pas non plus).
+            # ⚠ WHAT PROTECTS A COLUMN IS ITS ORIGIN, not the fact that it is
+            # mandatory. The old code refused to remove ANY mandatory column —
+            # including one added by hand and ticked ⛔: the `Retirer` button
+            # was displayed and did nothing. Observed on screen on 02/08/2026.
+            # The kind's own columns have no button, and this check confirms it
+            # server-side (a forged submission would not get through either).
             protegees = {champ["code"] for champ
                          in assistant.NATURES[brouillon["nature"]]["champs"]}
             if code in protegees:
@@ -625,27 +620,26 @@ reste modifiable à l'étape 2.</p>
                         "colonne sont conservées : elles reviendront si vous "
                         "la remettez.")
                 brouillon["champs"] = restants
-        # LA REVÉRIFICATION, dans les deux cas — y compris quand le
-        # changement a échoué : elle dit l'état RÉEL de la grille.
+        # THE RECHECK, in both cases — including when the change failed: it
+        # states the grid's REAL state.
         manques = assistant.verifier_grille(brouillon)
         if manques:
             brouillon["erreurs"] = brouillon["erreurs"] + manques
         return self._rediriger(f"/assistant/liste?b={identifiant}")
 
-    # ------------------------------------------------------ étape ② message
+    # ------------------------------------------------------ step ② message
     def _blocs_messages(self, brouillon, ecran=None):
-        """Le message et les erreurs du brouillon — CEUX DE CET ÉCRAN.
+        """The draft's message and errors — THIS SCREEN'S.
 
-        `ecran` vaut « message » (étape ②) ou « liste » (étape ③). Les
-        erreurs portent l'écran qui les a produites : une plainte sur les
-        informations de l'étape ② n'a rien à faire au-dessus de la grille de
-        l'étape ③, et inversement.
+        `ecran` is `message` (step ②) or `liste` (step ③). The errors carry the
+        screen that produced them: a complaint about step ②'s information has
+        no business above step ③'s grid, and the other way round.
 
-        Constaté par le propriétaire le 02/08/2026 : le refus de l'étape ②
-        le suivait quand il naviguait par le fil d'Ariane, longtemps après
-        l'avoir corrigé. Une erreur sans écran (une ancienne, ou une écrite
-        par un code qui n'a pas dit d'où elle venait) reste affichée
-        partout : on préfère un message de trop à un refus muet.
+        Observed by the owner on 02/08/2026: step ②'s refusal followed him as
+        he navigated by the breadcrumb, long after he had fixed it. An error
+        with no screen (an old one, or one written by code that did not say
+        where it came from) stays displayed everywhere: we prefer one message
+        too many to a silent refusal.
         """
         blocs = ""
         if brouillon.get("message"):
@@ -660,31 +654,31 @@ reste modifiable à l'étape 2.</p>
         return blocs
 
     def _apercu_html(self, nature, infos, champs, preferences, options=None):
-        """L'aperçu initial rendu côté serveur (le JavaScript prend le relais).
+        """The initial preview rendered server-side (the JavaScript then takes
+        over).
 
-        Variables d'étape ② non renseignées : en rouge (⛔ bloquant si
-        obligatoires) ; variables PAR CONTACT : en bleu, remplies à l'appel.
-        Les options de comportement entrent dans le calcul : un segment
-        conditionné par une case à cocher n'apparaît que si elle l'est.
+        Step-② variables not filled in: in red (⛔ blocking when mandatory);
+        PER-CONTACT variables: in blue, filled at call time. The behaviour
+        options enter the computation: a segment conditioned by a checkbox only
+        appears when it is ticked.
         """
         texte = assistant.construire_mission(nature, infos, preferences,
                                              options)
         return self._colorer(texte, nature, champs)
 
     def _colorer(self, texte, nature, champs):
-        """Le texte, échappé, avec ses variables encore vides mises en couleur.
+        """The text, escaped, with its still-empty variables coloured.
 
-        Les civilités sont DÉVELOPPÉES ici, comme elles le seront dans la
-        consigne envoyée : l'aperçu montre ce qui sera dit, pas ce qui est
-        écrit dans les fiches (elles, ne changent jamais).
+        The honorifics are EXPANDED here, as they will be in the briefing sent:
+        the preview shows what will be said, not what is written in the records
+        (those never change).
         """
-        # ⚠ L'APERÇU DOIT MENTIR MOINS QUE LE PRODUIT, PAS PLUS (02/09/2026).
-        # Il développait « M. » en « monsieur » quelle que soit la langue,
-        # alors que l'appel ne le fait QU'EN FRANÇAIS — le développement vient
-        # d'un constat fait à l'oreille sur des appels français, et
-        # « monsieur Smith » serait une faute en anglais. L'aperçu annonçait
-        # donc une chose et l'appel en faisait une autre. Il suit maintenant
-        # la même règle que ce qui part.
+        # ⚠ THE PREVIEW MUST LIE LESS THAN THE PRODUCT, NOT MORE (02/09/2026).
+        # It expanded `M.` into `monsieur` whatever the language, while the
+        # call does so ONLY IN FRENCH — the expansion comes from listening to
+        # French calls, and `monsieur Smith` would be a mistake in English. So
+        # the preview announced one thing and the call did another. It now
+        # follows the same rule as what goes out.
         rendu = html.escape(consigne.developper_civilites(
             texte, langue.civilites_de(self._langue(), consigne._DEVELOPPE)))
         libelles = {info["code"]: info["libelle"]
@@ -704,17 +698,16 @@ reste modifiable à l'étape 2.</p>
 
     def _apercu_consigne(self, nature, infos, champs, preferences,
                          options=None, presentation=None, places=()):
-        """LES DEUX AUTRES PARTIES de la consigne, telles qu'elles partiront.
+        """THE TWO OTHER PARTS of the briefing, as they will go out.
 
-        L'aperçu de l'étape 2 a été conçu pour SAVOIR CE QUI SERA DIT. Depuis
-        que la consigne compte trois parties (présentation dite mot pour mot,
-        objectif et contexte discutés librement, issues fermées), n'en
-        montrer qu'une reviendrait à cacher les deux autres. La partie ① a
-        son propre bloc (#apercu, celui qu'on modifie à la main) ; celles-ci
-        sont construites par le MÊME code que l'appel réel
-        (assistant.construire_consigne) — ce qui est montré est ce qui part.
+        Step 2's preview was designed to KNOW WHAT WILL BE SAID. Since the
+        briefing has three parts (an opening spoken word for word, an objective
+        and context discussed freely, closed outcomes), showing only one would
+        amount to hiding the other two. Part ① has its own block (#apercu, the
+        one edited by hand); these are built by the SAME code as the real call
+        (assistant.construire_consigne) — what is shown is what goes out.
 
-        Rend (contexte, issues) en HTML.
+        Returns (context, outcomes) as HTML.
         """
         cadre = assistant.construire_consigne(nature, infos, preferences,
                                               options, champs,
@@ -725,14 +718,14 @@ reste modifiable à l'étape 2.</p>
 
     def _bloc_consigne(self, nature, infos, champs, preferences, options=None,
                        presentation=None, places=()):
-        """Les parties ② et ③ affichées sous la présentation."""
+        """Parts ② and ③ displayed under the opening."""
         contexte, issues = self._apercu_consigne(nature, infos, champs,
                                                  preferences, options,
                                                  presentation, places)
-        # REPLIÉS PAR DÉFAUT (demande du propriétaire, 02/08/2026) : ces deux
-        # parties sont écrites par la nature de la campagne et ne se touchent
-        # qu'exceptionnellement. Dépliées d'office, elles noyaient les deux
-        # champs qu'il faut vraiment remplir. Le titre reste cliquable.
+        # COLLAPSED BY DEFAULT (owner's request, 02/08/2026): those two parts
+        # are written by the campaign's kind and are only touched
+        # exceptionally. Expanded by default, they drowned the two fields that
+        # really must be filled in. The title stays clickable.
         return f"""<details><summary><strong>② Son objectif et son contexte</strong>
 — là, il discute librement</summary>
 <div id="apercu-contexte" class="apercu-mission">{contexte}</div></details>
@@ -746,7 +739,7 @@ Les trois issues, elles, sont fermées — il ne peut en rendre aucune
 autre.</small></p>"""
 
     def _script_apercu(self, nature, infos, champs, preferences):
-        """Le JavaScript de l'aperçu vivant — même règle que le serveur."""
+        """The live preview's JavaScript — the same rule as the server."""
         definition = assistant.NATURES[nature]
         plage = themes.plage_lisible(preferences)
         segments = []
@@ -759,8 +752,8 @@ autre.</small></p>"""
                     entree["si"] = segment["si"]
                 if segment.get("sauf"):
                     entree["sauf"] = segment["sauf"]
-                # Segment conditionné par une OPTION : l'aperçu relit la case
-                # à cocher elle-même, pour dire la vérité sans recharger.
+                # A segment conditioned by an OPTION: the preview reads the
+                # checkbox itself, to tell the truth without reloading.
                 for clef, cible in (("si_option", "si_case"),
                                     ("sauf_option", "sauf_case")):
                     if segment.get(clef):
@@ -776,11 +769,11 @@ autre.</small></p>"""
                                         if c["code"] != "telephone"]
         for champ in champs:
             libelles.setdefault(champ["code"], champ["libelle"])
-        # LA PARTIE ② VIT ELLE AUSSI. Ses lignes de faits sont les mêmes
-        # segments conditionnels que le message (assistant.faits_segments) :
-        # remplir « Lieu » les fait apparaître, décocher une option les fait
-        # disparaître — sans recharger, et sans qu'un second code puisse
-        # diverger de celui du serveur.
+        # PART ② IS ALIVE TOO. Its fact lines are the same conditional segments
+        # as the message (assistant.faits_segments): filling in `Lieu` makes
+        # them appear, unticking an option makes them disappear — without
+        # reloading, and without a second piece of code being able to diverge
+        # from the server's.
         faits = []
         for segment in assistant.faits_segments(nature, champs):
             entree = {"t": segment["texte"]}
@@ -869,16 +862,16 @@ rendu();
 </script>""" % donnees
 
     def _script_options(self):
-        """Le dévoilement en cascade des options de l'étape ②.
+        """The cascading disclosure of step ②'s options.
 
-        ⚠ L'ajout/retrait de colonne N'EST PLUS ICI : il a suivi les colonnes
-        à l'étape ③ (02/08/2026). Il s'y fait par le serveur, et pas dans le
-        navigateur comme avant — parce qu'un changement de colonne oblige
-        désormais à REVÉRIFIER la grille déjà remplie, et que cette
-        vérification, seul le serveur peut la faire honnêtement.
+        ⚠ Adding/removing a column IS NO LONGER HERE: it followed the columns
+        to step ③ (02/08/2026). It happens there through the server, and not in
+        the browser as before — because a column change now forces a RECHECK of
+        the already-filled grid, and only the server can do that check
+        honestly.
 
-        Sans JavaScript, tout reste visible : rien n'est perdu, c'est juste
-        moins agréable.
+        Without JavaScript, everything stays visible: nothing is lost, it is
+        just less pleasant.
         """
         return """<script>
 (function(){
@@ -923,10 +916,10 @@ if(periode&&quand){
 </script>"""
 
     def _champ_info(self, info, valeur, autres=()):
-        """Un champ d'information générale de l'étape ② (type respecté).
+        """A general-information field of step ② (the type is respected).
 
-        `autres` : les valeurs SUPPLÉMENTAIRES d'une information répétable —
-        les créneaux déjà ajoutés, en plus de celui du champ.
+        `autres`: the ADDITIONAL values of a repeatable piece of information —
+        the slots already added, on top of the field's.
         """
         code = info["code"]
         etoile = ' <span class="obligatoire">⚠</span>' if info["obligatoire"] else ""
@@ -952,13 +945,13 @@ if(periode&&quand){
 
     @staticmethod
     def _champs_par_duree(info, valeur, durees, preferences):
-        """La même information, UN CHAMP PAR DURÉE de rendez-vous à replacer.
+        """The same information, ONE FIELD PER LENGTH of appointment to rebook.
 
-        Chaque champ porte l'intitulé de sa durée et le nombre de personnes
-        concernées : c'est ce qui permet de savoir laquelle on corrige. Ils
-        portent TOUS le nom « info_<code> », répété — le serveur les recolle
-        dans l'ordre des durées (`assistant.recomposer_par_duree`), et rien
-        d'indexé ne vient s'ajouter au formulaire.
+        Each field carries the label of its length and the number of people
+        concerned: that is what lets you know which one you are correcting.
+        They ALL carry the name `info_<code>`, repeated — the server glues them
+        back in order of length (`assistant.recomposer_par_duree`), and nothing
+        indexed is added to the form.
         """
         listes = assistant.listes_par_duree(preferences, valeur, durees)
         etoile = (' <span class="obligatoire">⚠</span>'
@@ -976,27 +969,27 @@ if(periode&&quand){
         return "".join(blocs)
 
     def _champ_info_multiple(self, info, libelle, valeur, autres):
-        """UNE information saisie PLUSIEURS fois : le champ, « + », la liste.
+        """ONE piece of information typed SEVERAL times: the field, `+`, the list.
 
-        Demandé par le propriétaire le 03/08/2026 pour les créneaux libérés :
-        un bouton « + » à côté du champ, la liste dessous par ordre
-        chronologique CROISSANT, et une croix par ligne pour retirer.
+        Requested by the owner on 03/08/2026 for freed slots: a `+` button
+        beside the field, the list below in ASCENDING chronological order, and
+        a cross per row to remove.
 
-        ⚠ TOUTES LES LIGNES PORTENT LE MÊME NOM « info_<code> », répété. Rien
-        d'indexé (creneau_1, creneau_2…) : douze essais envoient déjà un
-        « info_creneau_libere » unique, et ils doivent continuer de marcher
-        mot pour mot. Le serveur reçoit N valeurs et les range lui-même.
+        ⚠ ALL THE ROWS CARRY THE SAME NAME `info_<code>`, repeated. Nothing
+        indexed (creneau_1, creneau_2…): twelve tests already send a single
+        `info_creneau_libere`, and they must go on working word for word. The
+        server receives N values and orders them itself.
 
-        ⚠ ÇA MARCHE SANS JAVASCRIPT : le « + » est un vrai bouton d'envoi
-        (action « creneau ») qui range la valeur et revient sur l'étape ②,
-        et chaque croix en est un aussi. Le script, quand il est là, fait la
-        même chose sans aller-retour.
+        ⚠ IT WORKS WITHOUT JAVASCRIPT: the `+` is a real submit button (action
+        `creneau`) that stores the value and comes back to step ②, and each
+        cross is one too. The script, when present, does the same thing without
+        a round trip.
         """
         code = info["code"]
-        # ⚠ LE CHAMP DE SAISIE N'EST PAS LA VALEUR : c'est un champ d'AJOUT,
-        # nommé à part. Toutes les places, la première comprise, vivent dans
-        # la liste. Autrement, taper une nouvelle date par-dessus le champ
-        # aurait effacé la place déjà saisie — sans le dire.
+        # ⚠ THE INPUT FIELD IS NOT THE VALUE: it is an ADD field, named
+        # separately. All the slots, including the first, live in the list.
+        # Otherwise typing a new date over the field would have erased the slot
+        # already entered — without saying so.
         toutes = list(autres)
         if valeur and valeur not in toutes:
             toutes.insert(0, valeur)
@@ -1004,9 +997,9 @@ if(periode&&quand){
         lignes = []
         for rang, horaire in enumerate(toutes):
             lisible = self._creneau_lisible(horaire)
-            # ⚠ LE PREMIER PORTE « id="info_<code>" » : c'est par cet
-            # identifiant que l'aperçu vivant lit la valeur (voir
-            # _script_apercu). Le déplacer casserait l'aperçu en silence.
+            # ⚠ THE FIRST ONE CARRIES `id="info_<code>"`: it is by that id the
+            # live preview reads the value (see _script_apercu). Moving it
+            # would break the preview in silence.
             marque = f' id="info_{code}"' if rang == 0 else ""
             lignes.append(
                 f'<li><input type="hidden"{marque} name="info_{code}" '
@@ -1020,8 +1013,8 @@ if(periode&&quand){
             liste = (f'<ul class="liste-creneaux" id="liste_{code}">'
                      + "".join(lignes) + "</ul>")
         else:
-            # Même vide, l'identifiant doit exister : l'aperçu vivant le
-            # cherche au chargement et ne le retrouverait plus jamais.
+            # Even empty, the id must exist: the live preview looks for it on
+            # loading and would never find it again.
             liste = (f'<input type="hidden" id="info_{code}" name="info_{code}" '
                      f'value="">'
                      f'<p class="sourd" id="liste_{code}"><small>Aucune place '
@@ -1039,7 +1032,7 @@ if(periode&&quand){
 
     @staticmethod
     def _creneau_lisible(horaire):
-        """« mardi 12/08 à 15h00 » — et la valeur brute si elle est illisible."""
+        """`mardi 12/08 à 15h00` — and the raw value when it is unreadable."""
         try:
             quand = datetime.datetime.fromisoformat(horaire)
         except (TypeError, ValueError):
@@ -1048,23 +1041,22 @@ if(periode&&quand){
                 f"à {quand:%Hh%M}")
 
     def _bloc_option_cascade(self, nature, options):
-        """L'option « décaler en cascade » — et seulement où elle fait quelque chose.
+        """The `shift in cascade` option — and only where it does something.
 
-        ⚠ ELLE ÉTAIT OFFERTE AUX CINQ NATURES (14/08/2026, audit croisé). Or
-        elle ne commande qu'un seul mécanisme : ce que devient la place qu'un
-        contact QUITTE. Trois natures n'en libèrent aucune — un rappel, une
-        confirmation et une prise de rendez-vous ne déplacent personne — et la
-        case y était donc inerte : cochée ou non, rien ne changeait. Une case
-        qui ne fait rien est un mensonge d'interface, exactement le
-        raisonnement de l'option d'annulation juste en dessous.
+        ⚠ IT WAS OFFERED TO ALL FIVE KINDS (14/08/2026, cross audit). Yet it
+        commands only one mechanism: what becomes of the slot a contact LEAVES.
+        Three kinds free none — a reminder, a confirmation and a booking move
+        nobody — so the box was inert there: ticked or not, nothing changed. A
+        box that does nothing is an interface lie, exactly the reasoning of the
+        cancellation option just below.
         """
         if nature not in assistant.NATURES_QUI_LIBERENT_UNE_PLACE:
             return ""
-        # ⚠ LE TEXTE A ÉTÉ CORRIGÉ LE 15/08/2026 : il annonçait « avec UNE
-        # SEULE place, RingBack PRÉPARE la même campagne » — ce n'est plus
-        # vrai. Une place ou plusieurs, la place quittée REJOINT la campagne
-        # qui tourne (voir assistant._rendre_la_place). Laisser l'ancienne
-        # phrase aurait fait chercher une campagne « prête » qui ne vient plus.
+        # ⚠ THE TEXT WAS CORRECTED ON 15/08/2026: it announced `with ONE SINGLE
+        # slot, RingBack PREPARES the same campaign` — that is no longer true.
+        # One slot or several, the slot left behind JOINS the running campaign
+        # (see assistant._rendre_la_place). Leaving the old sentence would have
+        # had people looking for a `prête` campaign that no longer comes.
         dernier = self.application.base.dernier_rendezvous_connu()
         return f"""{_case("opt_cascade",
        "<strong>Décaler en cascade</strong> — quand quelqu'un accepte de "
@@ -1100,12 +1092,12 @@ if(periode&&quand){
 </div>"""
 
     def _bloc_option_annulation(self, nature, brouillon):
-        """L'option « proposer une autre date si le contact annule ».
+        """The `offer another date if the contact cancels` option.
 
-        Elle n'apparaît que pour les natures dont le message en dépend
-        (🔔 rappel, ✅ confirmation) : ailleurs, une case qui ne changerait
-        rien serait un mensonge d'interface. Son DÉTAIL — la liste des
-        places libres à annoncer — n'est dévoilé que si elle est cochée.
+        It only appears for the kinds whose message depends on it (🔔 reminder,
+        ✅ confirmation): elsewhere, a box that would change nothing would be an
+        interface lie. Its DETAIL — the list of free slots to announce — is
+        only revealed when it is ticked.
         """
         if not assistant.option_annulation_utile(nature):
             return ""
@@ -1142,35 +1134,33 @@ if(periode&&quand){
         if brouillon is None:
             return None
         preferences = self.application.preferences
-        # ⚠ LE STOCK DE PLACES EST REMIS AU NOMBRE RÉEL DE GENS AVANT D'AFFICHER
-        # (17/08/2026). Sa question, capture à l'appui : « le champ ne propose que
-        # peu de dates libres pour les 11 rendez-vous — est-ce simplement un
-        # problème d'affichage ? » Oui, mais cet affichage est un CHAMP : s'il y
-        # touche, ses dix-neuf dates deviennent la liste définitive. Un champ qui
-        # montre faux invite à figer le faux.
+        # ⚠ THE STOCK OF SLOTS IS RESET TO THE REAL NUMBER OF PEOPLE BEFORE
+        # DISPLAY (17/08/2026). His question, with a screenshot: `the field
+        # only offers a few free dates for the 11 appointments — is it simply a
+        # display problem?` Yes, but that display is a FIELD: if he touches it,
+        # his nineteen dates become the definitive list. A field that shows
+        # something false invites the false to be frozen.
         assistant.rafraichir_stock_du_brouillon(
             self.application.base, preferences, brouillon)
-        # ⚠ « mode_saisie », pas « mode » : plus bas dans cette méthode,
-        # « mode » désigne déjà le mode de RELANCE (délai ou créneau).
+        # ⚠ `mode_saisie`, not `mode`: further down in this method, `mode`
+        # already means the FOLLOW-UP mode (delay or slot).
         mode_saisie = assistant.mode_formulaire(preferences)
         nature = brouillon["nature"]
         definition = assistant.NATURES[nature]
         options = brouillon["options"]
         champs = assistant.champs_campagne(brouillon)
-        # C. L'aperçu vivant. Il montre les TROIS PARTIES de la consigne :
-        # ① la présentation dite mot pour mot (celle qu'on modifie à la
-        # main), ② l'objectif, les faits et les contraintes, ③ les trois
-        # issues fermées. Les deux dernières sortent du même code que l'appel
-        # réel — voir _apercu_consigne.
-        #
-        # Il n'y a plus de cas particulier « zone libre » : la nature
-        # « Personnalisé », seule à n'avoir aucun gabarit, a été retirée le
-        # 03/08/2026. Toutes les natures ont donc un texte de départ, et
-        # « ✎ Modifier le texte à la main » suffit à s'en écarter.
+        # C. The live preview. It shows the THREE PARTS of the briefing: ① the
+        # opening spoken word for word (the one edited by hand), ② the
+        # objective, the facts and the constraints, ③ the three closed
+        # outcomes. The last two come out of the same code as the real call —
+        # see _apercu_consigne.  There is no longer a `free text` special case:
+        # the `Personnalisé` kind, the only one with no template, was removed
+        # on 03/08/2026. Every kind therefore has a starting text, and `✎
+        # Modifier le texte à la main` is enough to depart from it.
         editee = bool(brouillon.get("mission_editee")
                       and brouillon.get("mission"))
-        # Un texte récrit à la main est CELUI QUI PARTIRA : l'aperçu le
-        # montre lui, et non le gabarit qu'il remplace.
+        # A text rewritten by hand is THE ONE THAT WILL GO OUT: the preview
+        # shows that one, not the template it replaces.
         apercu = (self._colorer(brouillon["mission"], nature, champs)
                   if editee
                   else self._apercu_html(nature, brouillon["infos"],
@@ -1182,11 +1172,11 @@ if(periode&&quand){
             contenu_zone = assistant.construire_mission(
                 nature, brouillon["infos"], preferences, options)
             marque_editee = ""
-        # ⚠ CE QUE SON TEXTE NE DIT PLUS (défaut n° 10 du 18/08/2026). Il
-        # remplissait un champ APRÈS avoir retapé le message : la valeur était
-        # enregistrée, l'écran la montrait — et l'agent ne la disait jamais.
-        # On ne réinjecte RIEN dans son texte (« un message récrit à la main
-        # part exactement comme il l'a écrit ») : on le dit, il tranche.
+        # ⚠ WHAT HIS TEXT NO LONGER SAYS (defect no. 10 of 18/08/2026). He
+        # filled in a field AFTER retyping the message: the value was saved,
+        # the screen showed it — and the agent never said it. We reinject
+        # NOTHING into his text (`a message rewritten by hand goes out exactly
+        # as he wrote it`): we say so, he decides.
         perdues = assistant.infos_perdues_par_le_texte(
             nature, brouillon["infos"], preferences, options, contenu_zone)
         bloc_perdues = self._bloc_infos_perdues(perdues)
@@ -1219,17 +1209,16 @@ que toutes les campagnes de cette nature reprennent, se règle dans
             nature, brouillon["infos"], champs, preferences, options,
             presentation=(brouillon.get("mission") if editee else None),
             places=assistant.places_du_brouillon(brouillon))
-        # B. Informations générales. Celles qui sont le DÉTAIL d'une option
-        # (info["sous_option"]) n'apparaissent pas ici : elles sont montrées
-        # sous leur case à cocher, et seulement si elle est cochée.
+        # B. General information. Those that are the DETAIL of an option
+        # (info["sous_option"]) do not appear here: they are shown under their
+        # checkbox, and only when it is ticked.
         deja = [f["horaire"] for f in (brouillon.get("creneaux") or [])]
-        # ⚠ UN CHAMP PAR DURÉE À REPLACER (18/08/2026, sa demande) : « il faut
-        # un champ texte pour les rendez-vous possibles pour toutes les
-        # longueurs de rendez-vous que l'on retrouve dans le déplacement,
-        # 1 créneau, 2 créneaux etc. » Le stock portait bien ses deux listes,
-        # mais collées dans UN champ — impossible d'en corriger une sans
-        # toucher l'autre, et l'intitulé ne disait pas laquelle était laquelle.
-        # Une seule durée : un seul champ, comme avant.
+        # ⚠ ONE FIELD PER LENGTH TO REBOOK (18/08/2026, his request): `we need
+        # a text field for the possible appointments for all the appointment
+        # lengths found in the move, 1 slot, 2 slots and so on.` The stock did
+        # carry its two lists, but glued into ONE field — impossible to correct
+        # one without touching the other, and the label did not say which was
+        # which. A single length: a single field, as before.
         durees = assistant.durees_du_brouillon(self.application.base, brouillon)
         blocs_infos = "".join(
             self._champs_par_duree(info, brouillon["infos"].get(info["code"], ""),
@@ -1310,30 +1299,29 @@ que toutes les campagnes de cette nature reprennent, se règle dans
 imposé, la décision vous revient<br>{_selecteur(
     "ordre", list(assistant.ORDRES_APPEL.items()), brouillon["ordre"],
     vide="— à choisir —")}</label>"""
-        # Les colonnes attendues ont quitté cet écran le 02/08/2026 pour
-        # l'étape ③, puis l'écran tout entier a été RETIRÉ le 09/08/2026
-        # (demande du propriétaire) : la grille montre déjà ses colonnes en
-        # entête, avec leur ⚠, et le collage écrit le format attendu.
-        # ⚠ LES CHAMPS PERSONNALISÉS VOYAGENT QUAND MÊME dans ce formulaire,
-        # en caché : une base existante peut en porter, et l'étape ② renvoie
-        # la liste complète à chaque envoi. Sans cela, un aller-retour par
-        # l'étape ② effacerait une colonne qu'une campagne utilise.
+        # The expected columns left this screen on 02/08/2026 for step ③, then
+        # the whole screen was REMOVED on 09/08/2026 (owner's request): the
+        # grid already shows its columns in the header, with their ⚠, and
+        # pasting states the expected format. ⚠ THE CUSTOM FIELDS TRAVEL ANYWAY
+        # in this form, hidden: an existing database may carry some, and step ②
+        # returns the complete list on every submission. Without that, a round
+        # trip through step ② would erase a column a campaign uses.
         codes_nature = {champ["code"] for champ in definition["champs"]}
         porteurs_champs = "".join(
             '<input type="hidden" name="champ_perso" '
             f'value="{html.escape(champ["libelle"] + "|" + champ["type"] + "|" + ("1" if champ["obligatoire"] else ""), quote=True)}">'
             for champ in champs
             if not (champ["verrouille"] or champ["code"] in codes_nature))
-        # Le texte est déjà écrit par la nature : l'aperçu ne paraît qu'en mode
-        # avancé. (Avant le 03/08/2026 il y avait une exception —
-        # « Personnalisé », sans gabarit, dont la zone de mission était le
-        # SEUL endroit où le message s'écrivait. Cette nature a été retirée,
-        # l'exception avec elle.) Depuis le 15/08/2026 il partage le bloc
-        # « avance » avec les options, sous un menu horizontal — voir
-        # `_menu_etape2` : c'est le bloc entier qui disparaît en simplifié.
-        # Entré ICI directement, la liste déjà remplie (§4 et §5) : on le dit,
-        # avec le compte réel et la recette qui l'a bâtie. Sans cette phrase,
-        # l'opérateur ne saurait pas que l'étape 3 est déjà faite.
+        # The text is already written by the kind: the preview only appears in
+        # advanced mode. (Before 03/08/2026 there was an exception —
+        # `Personnalisé`, with no template, whose mission box was the ONLY
+        # place the message was written. That kind was removed, and the
+        # exception with it.) Since 15/08/2026 it shares the `avance` block
+        # with the options, under a horizontal menu — see `_menu_etape2`: it is
+        # the whole block that disappears in simplified mode. Entered HERE
+        # directly, the list already filled (§4 and §5): we say so, with the
+        # real count and the recipe that built it. Without that sentence, the
+        # operator would not know that step 3 is already done.
         bloc_liste = ""
         if brouillon["contacts"]:
             bloc_liste = (
@@ -1383,16 +1371,15 @@ imposé, la décision vous revient<br>{_selecteur(
                           actif="campagnes", mode=mode_saisie)
 
     def _enregistrer_etape2(self, brouillon, donnees):
-        """Reporte TOUT le formulaire de l'étape ② dans le brouillon."""
+        """Carries the WHOLE step-② form into the draft."""
         definition = assistant.NATURES[brouillon["nature"]]
         for info in definition["infos"]:
             cle = f"info_{info['code']}"
             if info.get("multiple"):
-                # ⚠ TOUTES LES VALEURS, pas seulement la première. La lecture
-                # « donnees[cle][0] » perdait en silence tous les créneaux
-                # sauf un — l'inverse de « une saisie n'est jamais perdue ».
-                # Le champ d'AJOUT est ramassé ici aussi : une date tapée
-                # sans appuyer sur « + » compte quand même.
+                # ⚠ ALL THE VALUES, not only the first. Reading
+                # `donnees[cle][0]` silently lost every slot but one — the
+                # opposite of `input is never lost`. The ADD field is gathered
+                # here too: a date typed without pressing `+` still counts.
                 valeurs = list(donnees.get(cle, []))
                 valeurs += list(donnees.get(f"{info['code']}_ajout", []))
                 brouillon["creneaux"] = assistant.normaliser_creneaux(
@@ -1402,10 +1389,10 @@ imposé, la décision vous revient<br>{_selecteur(
                     if brouillon["creneaux"] else "")
             elif (info.get("reglage") == "creneaux_lisibles"
                   and len(donnees.get(cle, [])) > 1):
-                # ⚠ PLUSIEURS CHAMPS POUR UNE MÊME INFORMATION : un par durée
-                # à replacer. On les recolle dans l'ordre des durées — la
-                # MÊME source que l'affichage, sinon la liste des 40 minutes
-                # repartirait sous l'intitulé des 20.
+                # ⚠ SEVERAL FIELDS FOR ONE PIECE OF INFORMATION: one per length
+                # to rebook. We glue them back in order of length — the SAME
+                # source as the display, otherwise the 40-minute list would
+                # come back under the 20-minute label.
                 brouillon["infos"][info["code"]] = (
                     assistant.recomposer_par_duree(
                         self.application.preferences, donnees[cle],
@@ -1426,8 +1413,8 @@ imposé, la décision vous revient<br>{_selecteur(
         options["liberer_creneau"] = "opt_liberer" in donnees
         options["repondeur_sans_motif"] = "opt_repondeur" in donnees
         options["cascade"] = "opt_cascade" in donnees
-        # Seules les natures concernées portent la case : ailleurs, on ne
-        # touche pas au réglage (une case absente ne vaut pas « décochée »).
+        # Only the kinds concerned carry the box: elsewhere, the setting is not
+        # touched (an absent box does not mean `unticked`).
         if assistant.option_annulation_utile(brouillon["nature"]):
             options[assistant.CLE_REPLACER_ANNULATION] = (
                 "opt_replacer" in donnees)
@@ -1435,9 +1422,9 @@ imposé, la décision vous revient<br>{_selecteur(
                     "relance_creneau_fin", "relance_max", "cascade_jusqu_au"):
             if cle in donnees:
                 options[cle] = donnees[cle][0].strip()
-        # Les champs personnalisés voyagent AVEC le formulaire (un caché par
-        # ligne) : les ajouter ou les retirer ne recharge pas la page, et la
-        # liste complète revient à chaque envoi — on la reconstruit ici.
+        # The custom fields travel WITH the form (one hidden per row): adding
+        # or removing them does not reload the page, and the complete list
+        # comes back on every submission — we rebuild it here.
         personnalises = []
         vus = {champ["code"] for champ in definition["champs"]}
         vus.update({"identite", "telephone"})
@@ -1463,18 +1450,19 @@ imposé, la décision vous revient<br>{_selecteur(
         mission = donnees.get("mission", [""])[0].strip()
         if brouillon["mission_editee"] and mission:
             brouillon["mission"] = mission
-        # La recette retient qu'un message a été récrit à la main : il ne
-        # pourra pas être reconstruit sur un autre créneau sans inventer.
+        # The recipe remembers that a message was rewritten by hand: it cannot
+        # be rebuilt on another slot without inventing.
         brouillon.setdefault("recette", assistant.recette_vide())
         brouillon["recette"]["mission_editee"] = brouillon["mission_editee"]
 
     def _valider_creneaux(self, brouillon, info):
-        """Contrôle CHAQUE place d'une information répétable ; rend les refus.
+        """Checks EACH slot of a repeatable piece of information; returns the
+        refusals.
 
-        ⚠ UNE PLACE REFUSÉE N'EN EMPORTE PAS D'AUTRES. Elle reste dans la
-        liste, telle que tapée, et le message nomme LAQUELLE cloche : jeter
-        les quatre places correctes parce que la cinquième est illisible
-        serait la faute que le produit combat partout ailleurs.
+        ⚠ ONE REFUSED SLOT DOES NOT CARRY OTHERS OFF. It stays in the list,
+        exactly as typed, and the message names WHICH one is wrong: throwing
+        away the four correct slots because the fifth is unreadable would be
+        the very fault the product fights everywhere else.
         """
         erreurs = []
         liste = brouillon.get("creneaux") or []
@@ -1500,7 +1488,7 @@ imposé, la décision vous revient<br>{_selecteur(
         return erreurs
 
     def _valider_etape2(self, brouillon):
-        """Les contrôles RÉELS du passage à l'étape ③ ; rend les erreurs."""
+        """The REAL checks for moving on to step ③; returns the errors."""
         definition = assistant.NATURES[brouillon["nature"]]
         erreurs = []
         for info in definition["infos"]:
@@ -1572,15 +1560,14 @@ imposé, la décision vous revient<br>{_selecteur(
         self._enregistrer_etape2(brouillon, donnees)
         action = donnees.get("action", ["continuer"])[0]
         brouillon["message"] = ""
-        # ⚠ LE « + » ET LES CROIX NE FONT PAS PASSER À L'ÉTAPE ③. Ils
-        # rangent la liste des places et REVIENNENT ici : contrôler la suite
-        # alors qu'on n'a rien demandé afficherait des refus sur un
-        # formulaire qu'on est en train de remplir. Ce sont de vrais boutons
-        # d'envoi, donc ça marche sans JavaScript.
+        # ⚠ THE `+` AND THE CROSSES DO NOT MOVE ON TO STEP ③. They store the
+        # list of slots and COME BACK here: checking what follows when nothing
+        # was asked would display refusals on a form being filled in. They are
+        # real submit buttons, so it works without JavaScript.
         if action == "creneau-ajouter" or action.startswith("creneau-retirer:"):
             if action.startswith("creneau-retirer:"):
-                # La croix porte L'HORAIRE, pas un rang : un rang aurait
-                # désigné une autre place dès que la liste se retrie.
+                # The cross carries THE TIME, not a rank: a rank would have
+                # designated another slot as soon as the list was re-sorted.
                 vise = action.split(":", 1)[1]
                 brouillon["creneaux"] = [
                     fiche for fiche in (brouillon.get("creneaux") or [])
@@ -1592,14 +1579,14 @@ imposé, la décision vous revient<br>{_selecteur(
                             if brouillon["creneaux"] else "")
             brouillon["erreurs"] = []
             return self._rediriger(f"/assistant/message?b={identifiant}")
-        # Ce que cet écran refuse APPARTIENT à cet écran : voir _blocs_messages.
+        # What this screen refuses BELONGS to this screen: see _blocs_messages.
         brouillon["erreurs_ecran"] = "message"
-        # ⚠ « ajouter_champ » et « retirer_champ » NE SONT PLUS TRAITÉS ICI :
-        # les colonnes ont leur écran à l'étape ③, avec la grille qu'elles
-        # décrivent, et leur propre route (_traiter_champs_attendus) — c'est
-        # elle qui revérifie ce qui est déjà rempli. Deux endroits pour la
-        # même action finiraient par diverger : il n'en reste qu'un.
-        # action « continuer » : les contrôles RÉELS, côté serveur.
+        # ⚠ `ajouter_champ` AND `retirer_champ` ARE NO LONGER HANDLED HERE: the
+        # columns have their own screen at step ③, with the grid they describe,
+        # and their own route (_traiter_champs_attendus) — it is that route
+        # which rechecks what is already filled in. Two places for the same
+        # action would end up diverging: only one remains. action `continuer`:
+        # the REAL checks, server-side.
         erreurs = self._valider_etape2(brouillon)
         if erreurs:
             brouillon["erreurs"] = erreurs
@@ -1607,15 +1594,15 @@ imposé, la décision vous revient<br>{_selecteur(
                          len(erreurs))
             return self._rediriger(f"/assistant/message?b={identifiant}")
         brouillon["erreurs"] = []
-        # Le nom de l'entreprise ne se retape pas à chaque campagne : la
-        # première fois qu'il est saisi, il devient le réglage par défaut.
+        # The business name is not retyped for every campaign: the first time
+        # it is entered, it becomes the default setting.
         entreprise = (brouillon["infos"].get("entreprise") or "").strip()
         preferences = self.application.preferences
         if entreprise and not (preferences.obtenir(themes.CLE_ENTREPRISE)
                                or "").strip():
             preferences.definir(themes.CLE_ENTREPRISE, entreprise)
             journal.info("Nom de l'entreprise mémorisé dans les réglages.")
-        # L'étape 3 devient atteignable par le fil d'Ariane, et le reste.
+        # Step 3 becomes reachable through the breadcrumb, and stays so.
         brouillon["etape3_ouverte"] = True
         if not (brouillon["mission_editee"] and brouillon.get("mission")):
             brouillon["mission"] = assistant.construire_mission(
@@ -1623,7 +1610,7 @@ imposé, la décision vous revient<br>{_selecteur(
                 self.application.preferences, brouillon["options"])
         return self._rediriger(f"/assistant/liste?b={identifiant}")
 
-    # ------------------------------------------------------- étape ③ grille
+    # ------------------------------------------------------- step ③ grid
     def _page_liste(self, identifiant):
         brouillon = self.application.obtenir_brouillon_assistant(identifiant)
         if brouillon is None:
@@ -1657,11 +1644,11 @@ imposé, la décision vous revient<br>{_selecteur(
                 "numéro plusieurs fois — le refus de doublon reste entier "
                 'pour tous les autres numéros. <a href="/reglages#numero-essai">'
                 "Modifier ou retirer un testeur</a>.</p>")
-        # LES CASES OBLIGATOIRES VIDES, CALCULÉES À CHAQUE AFFICHAGE — donc
-        # dès l'importation des contacts, sans attendre un refus. C'est la
-        # règle du propriétaire (02/08/2026) : une seule phrase d'erreur, et
-        # la couleur montre où taper. La classe part à la première frappe
-        # (voir _script_grille).
+        # THE EMPTY MANDATORY BOXES, COMPUTED ON EVERY DISPLAY — hence from the
+        # moment contacts are imported, without waiting for a refusal. That is
+        # the owner's rule (02/08/2026): a single error sentence, and the
+        # colour shows where to type. The class goes at the first keystroke
+        # (see _script_grille).
         manquantes = assistant.cellules_manquantes(brouillon)
 
         def marquer(rang, code):
@@ -1669,9 +1656,9 @@ imposé, la décision vous revient<br>{_selecteur(
 
         lignes = []
         for indice, contact in enumerate(contacts, start=1):
-            # Le numéro masqué s'affiche DANS son champ (pas au-dessus : cela
-            # décalerait chaque ligne). Un champ laissé tel quel — il contient
-            # encore des « • » — vaut « inchangé » côté serveur.
+            # The masked number is displayed IN its field (not above: that
+            # would offset every row). A field left as it stands — it still
+            # contains `•` — counts as `unchanged` server-side.
             if contact["telephone"]:
                 valeur_tel = html.escape(
                     db.masquer_telephone(contact["telephone"]), quote=True)
@@ -1707,10 +1694,9 @@ imposé, la décision vous revient<br>{_selecteur(
             grille = (f"<table><tr><th>#</th>{entetes}<th></th></tr>"
                       + "\n".join(lignes) + "</table>")
         else:
-            # ⚠ PLUS DE « CI-DESSOUS » : les voies de remplissage ne sont
-            # plus sous la grille, elles s'ouvrent par « Ajouter des
-            # contacts ». Laisser le mot aurait fait chercher au lecteur
-            # quelque chose qui n'est pas là.
+            # ⚠ NO MORE `BELOW`: the filling routes are no longer under the
+            # grid, they open through `Ajouter des contacts`. Leaving the word
+            # would have had the reader look for something that is not there.
             grille = ('<p class="grille-vide">Aucune personne dans la grille. '
                       "Le bouton <strong>« Ajouter des contacts »</strong> "
                       "ouvre les façons de la remplir : coller une liste, "
@@ -1718,27 +1704,27 @@ imposé, la décision vous revient<br>{_selecteur(
                       "rendez-vous.</p>")
         attendu_collage = assistant.format_collage(champs)
         exemple_ligne = assistant.exemple_collage(champs)
-        # La voie de remplissage choisie est conservée : après une erreur de
-        # collage, on revient sur le collage, pas sur un autre écran.
+        # The chosen filling route is kept: after a pasting error, you come
+        # back to the pasting, not to another screen.
         retenu = brouillon.get("remplissage") or "collage"
-        # ⚠ LA VUE VOYAGE DANS LE BROUILLON. Deux moitiés dans la page, une
-        # seule montrée — et c'est le serveur qui décide laquelle, pour que
-        # le repli sans JavaScript soit entier.
+        # ⚠ THE VIEW TRAVELS IN THE DRAFT. Two halves in the page, only one
+        # shown — and it is the server that decides which, so the no-JavaScript
+        # fallback is complete.
         vue = brouillon.get("vue_liste") or "grille"
-        # ⚠ DEUX BASCULES QUI NE FONT PAS LA MÊME CHOSE. « mode_liste » dit
-        # CE QUI SERA ENVOYÉ (une règle ou une grille) ; « vue_liste » dit
-        # seulement laquelle des deux faces du mode manuel est montrée.
+        # ⚠ TWO TOGGLES THAT DO NOT DO THE SAME THING. `mode_liste` says WHAT
+        # WILL BE SENT (a rule or a grid); `vue_liste` says only which of the
+        # manual mode's two faces is shown.
         automatique = self._liste_automatique(brouillon)
         cache_manuel = " hidden" if automatique else ""
         cache_grille = (" hidden" if automatique or vue != "grille" else "")
         cache_ajout = (" hidden" if automatique or vue != "ajout" else "")
         verbe = ("RÉELS" if self.application.mode_reel else "simulés")
-        # ⚠ PLUS DE BASCULE « SIMPLIFIÉ / AVANCÉ » SUR CET ÉCRAN (09/08/2026).
-        # Elle ne commandait plus qu'une chose, le bloc « Les colonnes
-        # attendues », retiré le même jour : les colonnes se lisent déjà dans
-        # l'entête de la grille, avec leur ⚠, et le collage écrit le format
-        # attendu. Une bascule qui ne bascule rien est un bouton qui ment.
-        # L'étape ②, elle, garde la sienne — elle y cache l'aperçu du message.
+        # ⚠ NO MORE `SIMPLIFIED / ADVANCED` TOGGLE ON THIS SCREEN (09/08/2026).
+        # It commanded only one thing, the `The expected columns` block,
+        # removed the same day: the columns are already readable in the grid's
+        # header, with their ⚠, and pasting states the expected format. A
+        # toggle that toggles nothing is a button that lies. Step ② keeps its
+        # own — it hides the message preview there.
         corps = f"""{self._bandeau()}
 <h1>Nouvelle campagne</h1>
 {_fil_ariane(3, identifiant, True)}
@@ -1846,12 +1832,12 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
                           actif="campagnes")
 
     def _choix_etats_clients(self):
-        """« Tous les clients », puis les états qui appellent une campagne.
+        """`All clients`, then the states that call for a campaign.
 
-        La liste des états n'est pas recopiée ici : elle vient de
-        etats_clients.TRAITEMENT, la même table qui décide, page 👥 Contacts,
-        quel état appelle quelle nature de campagne. Un état ajouté là-bas
-        apparaît ici sans qu'on y touche.
+        The list of states is not copied here: it comes from
+        etats_clients.TRAITEMENT, the same table that decides, on the 👥
+        Contacts page, which state calls for which campaign kind. A state added
+        over there appears here without anyone touching it.
         """
         choix = [(assistant.SOURCE_TOUS_CLIENTS, "Tous les clients")]
         for etat in etats_clients.TRAITEMENT:
@@ -1859,33 +1845,32 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
         return choix
 
     def _bloc_periode_rendezvous(self, identifiant, brouillon):
-        """« Charger selon les dates » : la source, puis la semaine, puis le jour.
+        """`Load by dates`: the source, then the week, then the day.
 
-        Demandé par le propriétaire le 02/08/2026 : « ajouter une option
-        semaine, puis un sélecteur de l'année en cours et un sélecteur des
-        semaines avec la date du .. au .. affiché pour se retrouver
-        facilement, puis une option du jour (parmi les jours ouvrés) avec une
-        option tous ».
+        Requested by the owner on 02/08/2026: `add a week option, then a
+        selector for the current year and a selector for the weeks with the
+        date from .. to .. displayed so you can find your way easily, then an
+        option for the day (among the working days) with an option for all`.
 
-        Les trois sélecteurs sont TOUJOURS visibles : ce panneau est déjà le
-        contenu d'une voie choisie ; y ajouter une case « voulez-vous
-        filtrer ? » ferait l'option d'une option. « Toutes les semaines » et
-        « tous les jours » sont les entrées neutres — rien n'est imposé.
+        The three selectors are ALWAYS visible: this panel is already the
+        content of a chosen route; adding a `do you want to filter?` box to it
+        would make an option of an option. `All weeks` and `all days` are the
+        neutral entries — nothing is imposed.
 
-        Le dernier choix se réaffiche DANS ses champs : après un refus, on
-        corrige au lieu de tout re-choisir.
+        The last choice is redisplayed IN its fields: after a refusal, you
+        correct instead of re-choosing everything.
         """
         retenu = brouillon.get("periode") or {}
         aujourd_hui = datetime.date.today()
         annee = str(retenu.get("annee") or aujourd_hui.year)
         annees = [(str(a), str(a))
                   for a in range(aujourd_hui.year - 1, aujourd_hui.year + 2)]
-        # De la semaine COURANTE à la fin de l'année : on monte une campagne
-        # pour ce qui vient, pas pour janvier dernier.
+        # From the CURRENT week to the end of the year: you set up a campaign
+        # for what is coming, not for last January.
         semaines = horaires.options_semaines(int(annee), aujourd_hui)
         semaine = str(retenu.get("semaine") or "")
-        # Les jours proposés sont ceux de la semaine choisie, et OUVERTS
-        # seulement : un jour fermé n'a aucun rendez-vous à rappeler.
+        # The days offered are those of the chosen week, and OPEN ones only: a
+        # closed day has no appointment to call back about.
         jours = []
         if semaine:
             lundi = horaires.lundi_de_semaine(int(annee), int(semaine))
@@ -1921,15 +1906,15 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
 {_script_periode(identifiant)}"""
 
     def _debut_du_gain(self, brouillon, champs_formulaire):
-        """(date de début, gain en jours) pour le chargement manuel.
+        """(start date, gain in days) for manual loading.
 
-        Le gain se compte à partir de la PREMIÈRE place de la campagne : une
-        personne n'est retenue que si son rendez-vous tombe au moins N jours
-        après elle. Même calcul que `assistant.contacts_de_la_regle` — un seul
-        raisonnement, deux chemins qui s'en servent.
+        The gain is counted from the campaign's FIRST slot: a person is only
+        kept when their appointment falls at least N days after it. The same
+        computation as `assistant.contacts_de_la_regle` — one reasoning, two
+        paths that use it.
 
-        Rend (None, "") quand rien n'est demandé, ou quand la campagne ne
-        propose aucune place.
+        Returns (None, "") when nothing is asked, or when the campaign offers
+        no slot.
         """
         gain = str(champs_formulaire.get("regle_jours") or "").strip()
         if not gain.isdigit():
@@ -1937,8 +1922,8 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
         places = assistant.places_du_brouillon(brouillon)
         if not places:
             return None, ""
-        # Le choix est RETENU dans le brouillon : il se réaffiche, et la
-        # campagne créée le portera comme règle.
+        # The choice is REMEMBERED in the draft: it is redisplayed, and the
+        # campaign created will carry it as its rule.
         regle = dict(brouillon.get("regle_liste") or {})
         regle["jours"] = gain
         regle.setdefault("source", champs_formulaire.get("source", ""))
@@ -1949,22 +1934,21 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
         return debut, gain
 
     def _champ_gain_manuel(self, identifiant):
-        """Le gain minimum, DANS le formulaire de chargement manuel.
+        """The minimum gain, INSIDE the manual loading form.
 
-        ⚠ IL N'EXISTAIT QUE DANS L'AUTRE PANNEAU (14/08/2026). Le champ « au
-        moins N jours » vivait dans le formulaire « Enregistrer la règle », en
-        mode automatique. Le chargement manuel — celui que le propriétaire a
-        employé — ne le portait pas, et n'appliquait donc AUCUN gain : il a
-        chargé 328 personnes dont certaines gagnaient ZÉRO jour, alors qu'il
-        avait choisi « au moins 30 jours » quelques centimètres plus haut, dans
-        un panneau qu'il croyait commun.
+        ⚠ IT EXISTED ONLY IN THE OTHER PANEL (14/08/2026). The `at least N
+        days` field lived in the `Enregistrer la règle` form, in automatic
+        mode. Manual loading — the one the owner used — did not carry it, and
+        therefore applied NO gain: he loaded 328 people, some of whom gained
+        ZERO days, while he had chosen `at least 30 days` a few centimetres
+        higher, in a panel he believed was shared.
 
-        Deux panneaux, deux formulaires, un seul écran : c'est l'écran qui doit
-        s'adapter, pas l'opérateur. Le champ est ici aussi, sous le même nom,
-        et `_traiter_import_grille` l'applique.
+        Two panels, two forms, one screen: it is the screen that must adapt,
+        not the operator. The field is here too, under the same name, and
+        `_traiter_import_grille` applies it.
 
-        Il ne paraît que pour une campagne qui PROPOSE UNE PLACE : sans place,
-        « gagner des jours » ne veut rien dire.
+        It only appears for a campaign that OFFERS A SLOT: with no slot,
+        `gaining days` means nothing.
         """
         brouillon = self.application.obtenir_brouillon_assistant(identifiant)
         if not brouillon or not assistant.places_du_brouillon(brouillon):
@@ -1975,16 +1959,16 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
           "regle_jours", list(assistant.JOURS_APRES), retenu)}</label>"""
 
     def _bloc_reprise_campagne(self, identifiant):
-        """Le filtre « repartir d'une campagne précédente » (étape ③).
+        """The `start again from a previous campaign` filter (step ③).
 
-        Les résultats des campagnes passées sont enregistrés en base : on
-        peut donc rappeler exactement les 📵 injoignables, les ❌ refus, les
-        🙋 « à rappeler par un humain »… d'une campagne donnée. C'est un
-        FILTRE (deux critères combinés), donc deux listes déroulantes — les
-        boutons radio restent réservés aux voies qui ouvrent un écran
-        différent. Le nombre de personnes trouvées s'affiche AVANT l'ajout,
-        et se recalcule tout seul quand on change un critère : seul ce
-        chiffre est rafraîchi, la page ne bouge pas.
+        Past campaigns' results are recorded in the database: you can therefore
+        call back exactly the 📵 unreachable ones, the ❌ refusals, the 🙋 `to be
+        called back by a human`… of a given campaign. It is a FILTER (two
+        criteria combined), hence two drop-down lists — radio buttons stay
+        reserved for routes that open a different screen. The number of people
+        found is displayed BEFORE adding them, and recomputes itself when a
+        criterion changes: only that figure is refreshed, the page does not
+        move.
         """
         reprenables = assistant.campagnes_reprenables(self.application.base)
         if not reprenables:
@@ -1993,8 +1977,8 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
                     "campagne créée.</small></p>")
         choix_campagnes = [(str(cid), libelle) for cid, libelle, _ in reprenables]
         comptes = {str(cid): compte for cid, _, compte in reprenables}
-        # Le dernier filtre utilisé reste affiché DANS ses champs : on
-        # enchaîne « les injoignables, puis les refus » sans tout re-choisir.
+        # The last filter used stays displayed IN its fields: you chain `the
+        # unreachable ones, then the refusals` without re-choosing everything.
         dernier = (self.application.obtenir_brouillon_assistant(identifiant)
                    or {}).get("reprise") or {}
         campagne_retenue = dernier.get("campagne")
@@ -2004,8 +1988,8 @@ enchaîner (les contacts s'ajoutent aux précédents).</small></p>
         if etat_retenu not in assistant.ETATS_REPRISE:
             etat_retenu = "tous"
         total = comptes[campagne_retenue].get(etat_retenu, 0)
-        # Les comptes réels, lus en base, voyagent avec la page : le chiffre
-        # affiché n'est jamais une estimation.
+        # The real counts, read from the database, travel with the page: the
+        # figure displayed is never an estimate.
         donnees = json.dumps(comptes, ensure_ascii=False).replace("</", "<\\/")
         return f"""  <form method="post" action="/assistant/importer">
     <input type="hidden" name="b" value="{html.escape(identifiant)}">
@@ -2047,23 +2031,23 @@ majuscule();
 
     @staticmethod
     def _liste_automatique(brouillon):
-        """Vrai si cette campagne fabrique sa liste par une RÈGLE.
+        """True when this campaign builds its list from a RULE.
 
-        Réservé aux natures qui ont une place à proposer : ailleurs, il n'y
-        a pas de « place en cours » sur laquelle rejouer quoi que ce soit, et
-        une bascule qui ne changerait rien serait un mensonge d'interface.
+        Reserved for the kinds that have a slot to offer: elsewhere there is no
+        `current slot` on which to replay anything, and a toggle that would
+        change nothing would be an interface lie.
         """
         if not assistant.INFO_CRENEAU_PAR_NATURE.get(brouillon["nature"]):
             return False
         return brouillon.get("mode_liste") == "automatique"
 
     def _bascule_liste(self, identifiant, brouillon):
-        """« Automatique / Manuel » — remplace « Simplifié / Avancé » ici.
+        """`Automatic / Manual` — replaces `Simplified / Advanced` here.
 
-        ⚠ CE N'EST PAS LA MÊME MÉCANIQUE, et c'est le point important : la
-        bascule d'affichage ne change que ce qu'on voit et n'envoie rien ;
-        celle-ci change ce qui EST ENVOYÉ au serveur. Les confondre aurait
-        fait partir la grille manuelle ET la règle.
+        ⚠ IT IS NOT THE SAME MECHANISM, and that is the important point: the
+        display toggle only changes what you see and sends nothing; this one
+        changes what IS SENT to the server. Confusing the two would have sent
+        both the manual grid AND the rule.
         """
         automatique = self._liste_automatique(brouillon)
         def bouton(code, libelle, actif):
@@ -2079,27 +2063,27 @@ majuscule();
   {bouton("automatique", "Automatique", automatique)}
   {bouton("manuel", "Manuel", not automatique)}
 </form>"""
-        # ⚠ LA RANGÉE EXISTE MÊME SANS BASCULE. Les natures sans place à
-        # proposer n'ont pas de mode — mais elles ont un « Valider », et le
-        # laisser dans la grille l'aurait mis à deux endroits selon la nature.
-        # Un seul endroit, toujours le même.
+        # ⚠ THE ROW EXISTS EVEN WITH NO TOGGLE. The kinds with no slot to offer
+        # have no mode — but they do have a `Valider`, and leaving it in the
+        # grid would have put it in two places depending on the kind. One
+        # place, always the same.
         valider = self._bouton_valider(brouillon)
         if not modes and not valider:
             return ""
         return f'<div class="rangee-bascule">{modes}{valider}</div>'
 
     def _bouton_valider(self, brouillon):
-        """« Valider — créer la campagne », dans la rangée du mode (09/08/2026).
+        """`Valider — create the campaign`, in the mode row (09/08/2026).
 
-        ⚠ IL RESTE LE BOUTON D'ENVOI DE LA GRILLE. Posé dans un autre
-        formulaire, il aurait perdu les cellules éditées : on corrige un
-        numéro, on clique « Valider », et la correction serait partie à la
-        poubelle. L'attribut HTML « form » le rattache à la grille tout en le
-        montrant ailleurs — aucun JavaScript, le repli reste entier.
+        ⚠ IT REMAINS THE GRID'S SUBMIT BUTTON. Placed in another form, it would
+        have lost the edited cells: you correct a number, click `Valider`, and
+        the correction would have gone in the bin. HTML's `form` attribute
+        attaches it to the grid while showing it elsewhere — no JavaScript, the
+        fallback stays complete.
 
-        ⚠ IL N'APPARAÎT QUE QUAND IL Y A QUELQUE CHOSE À VALIDER : une règle
-        en automatique, au moins une personne en manuel. Un bouton qui ne peut
-        que refuser vaut moins qu'un bouton absent.
+        ⚠ IT ONLY APPEARS WHEN THERE IS SOMETHING TO VALIDATE: a rule in
+        automatic mode, at least one person in manual. A button that can only
+        refuse is worth less than an absent button.
         """
         if self._liste_automatique(brouillon):
             pret = bool(assistant.regle_de_liste(brouillon))
@@ -2112,52 +2096,51 @@ majuscule();
                 "(état « prête », personne n'est appelé)</button>")
 
     def _panneau_automatique(self, identifiant, brouillon):
-        """La RÈGLE : une source datée, et jusqu'où regarder après la place.
+        """THE RULE: a dated source, and how far to look after the slot.
 
-        ⚠ RIEN D'ABSOLU ICI — ni année, ni semaine, ni jour. Une période
-        absolue rendrait la campagne non rejouable : la rejouer sur une
-        autre place donnerait les mêmes personnes, pas celles que la nouvelle
-        place intéresse. La fenêtre part donc TOUJOURS de la place en cours.
+        ⚠ NOTHING ABSOLUTE HERE — no year, no week, no day. An absolute period
+        would make the campaign non-replayable: replaying it on another slot
+        would give the same people, not the ones the new slot interests. So the
+        window ALWAYS starts from the current slot.
         """
         if not self._liste_automatique(brouillon):
             return ""
-        # ⚠ PLEINE LARGEUR, comme la grille du mode manuel (09/08/2026). Une
-        # carte étroite à côté d'un tableau qui prend toute la zone donnait
-        # deux modes de largeurs différentes pour un même écran.
+        # ⚠ FULL WIDTH, like the manual mode's grid (09/08/2026). A narrow card
+        # beside a table taking up the whole area gave two modes of different
+        # widths for one screen.
         return (f'<div class="carte panneau-automatique" id="panneau-regle">'
                 + self._corps_regle(identifiant, brouillon) + "</div>"
                 + _script_regle(identifiant))
 
     def _corps_regle(self, identifiant, brouillon):
-        """L'intérieur du panneau de la règle — rendu seul quand il se recharge.
+        """The inside of the rule panel — rendered alone when it reloads.
 
-        ⚠ SÉPARÉ DU CADRE EXPRÈS : changer la source recharge CE bloc, pas la
-        page (règle du propriétaire). C'est le même découpage que le panneau des
-        dates, et pour la même raison — c'est le serveur qui sait quels réglages
-        ont un sens pour la source choisie, pas le navigateur.
+        ⚠ SEPARATED FROM THE FRAME ON PURPOSE: changing the source reloads THIS
+        block, not the page (the owner's rule). It is the same split as the
+        dates panel, and for the same reason — it is the server that knows
+        which settings make sense for the chosen source, not the browser.
         """
         regle = brouillon.get("regle_liste") or {}
         source = regle.get("source") or assistant.REGLE_LISTE_DEFAUT["source"]
-        # ⚠ SOURCES_REGLE, PAS SOURCES_DATEES (15/08/2026, sa demande) : la
-        # règle dynamique en propose une de moins — « posés, prévus ET
-        # confirmés » est partie d'ici. Elle reste offerte au chargement
-        # MANUEL, où reprendre une journée entière du planning a du sens.
+        # ⚠ SOURCES_REGLE, NOT SOURCES_DATEES (15/08/2026, his request): the
+        # dynamic rule offers one fewer — `booked, scheduled AND confirmed` has
+        # left here. It stays available for MANUAL loading, where taking a
+        # whole day of the schedule makes sense.
         sources = [(code, assistant.SOURCES_BASE[code])
                    for code in assistant.SOURCES_REGLE]
-        # ⚠ PAS DE <form> ICI, ET C'EST LE CŒUR DU DÉFAUT LE PLUS TENACE DE CE
-        # CHANTIER (15/08/2026). Le panneau était un formulaire À PART, avec son
-        # bouton « Enregistrer la règle ». Le bouton « ▶ Valider », lui, soumet
-        # `form-grille` — un AUTRE formulaire, qui ne portait donc ni la source
-        # ni le gain minimum. Résultat : le propriétaire choisissait « au moins
-        # 30 jours », cliquait « Valider », et son choix N'ATTEIGNAIT JAMAIS LE
-        # SERVEUR. Sa campagne partait avec « jours: "" » et appelait des gens
-        # de la semaine suivante. Il l'a signalé quatre fois ; j'ai corrigé deux
-        # autres chemins avant de regarder celui-là.
-        #
-        # Les champs appartiennent maintenant à `form-grille` : quel que soit le
-        # bouton — « Enregistrer la règle », « Enregistrer la grille » ou
-        # « ▶ Valider » — la règle affichée est celle qui part. Un choix visible
-        # à l'écran ne peut plus être perdu par le bouton qu'on préfère.
+        # ⚠ NO <form> HERE, AND IT IS THE HEART OF THIS PROJECT'S MOST STUBBORN
+        # DEFECT (15/08/2026). The panel was a SEPARATE form, with its own
+        # `Enregistrer la règle` button. The `▶ Valider` button, for its part,
+        # submits `form-grille` — ANOTHER form, which therefore carried neither
+        # the source nor the minimum gain. Result: the owner chose `at least 30
+        # days`, clicked `Valider`, and his choice NEVER REACHED THE SERVER.
+        # His campaign went out with `jours: ""` and called people from the
+        # following week. He reported it four times; I fixed two other paths
+        # before looking at that one.  The fields now belong to `form-grille`:
+        # whichever button is used — `Enregistrer la règle`, `Enregistrer la
+        # grille` or `▶ Valider` — the rule displayed is the rule that goes
+        # out. A choice visible on screen can no longer be lost by the button
+        # you happen to prefer.
         return f"""
   <p><strong>La liste se refait à chaque place.</strong> Vous ne choisissez
   pas des personnes, vous choisissez une <strong>règle</strong> : elle est
@@ -2176,32 +2159,32 @@ majuscule();
 
     @staticmethod
     def _champ_fenetre(source, regle):
-        """« Jusqu'où après la place » — SEULEMENT là où elle agit.
+        """`How far after the slot` — ONLY where it acts.
 
-        ⚠ LE DÉFAUT QUE CECI CORRIGE (11/08/2026), constaté par le propriétaire
-        et mesuré : sur les sources sans rendez-vous à venir, la fenêtre ne fait
-        RIEN. Mesuré sur le jeu d'essai, source « annulés, manqués et en
-        attente » : 9 personnes retenues avec « sans limite », 9 avec « 7 jours »,
-        9 avec « 30 », 9 avec « 90 ». Le réglage était donc à l'écran, réglable,
-        et sans effet — ce qui se lit comme un défaut du produit.
+        ⚠ THE DEFECT THIS FIXES (11/08/2026), observed by the owner and
+        measured: on the sources with no upcoming appointment, the window does
+        NOTHING. Measured on the sample data set, source `cancelled, missed and
+        waiting`: 9 people kept with `no limit`, 9 with `7 days`, 9 with `30`,
+        9 with `90`. The setting was therefore on screen, adjustable, and
+        without effect — which reads as a product defect.
 
-        Ce n'est pas la règle qui avait tort : quelqu'un qui n'a PLUS de
-        rendez-vous n'a aucune date à borner, n'importe quelle place l'arrange.
-        C'était l'ÉCRAN qui proposait un réglage inapplicable sans le dire.
+        It was not the rule that was wrong: somebody who NO LONGER has an
+        appointment has no date to bound, any slot suits them. It was the
+        SCREEN offering an inapplicable setting without saying so.
         """
         if source in assistant.SOURCES_A_VENIR:
-            # ⚠ LE LIBELLÉ DIT LE GAIN, PAS LA MÉCANIQUE (11/08/2026). Il disait
-            # « Jusqu'où après la place », ce qui décrivait une borne de
-            # recherche — et il retenait les gens qui gagnaient le MOINS. La
-            # question qu'on se pose vraiment est : à qui cette place sert-elle
-            # assez pour qu'on décroche le téléphone ?
+            # ⚠ THE LABEL STATES THE GAIN, NOT THE MECHANISM (11/08/2026). It
+            # said `How far after the slot`, which described a search bound —
+            # and it kept the people who gained the LEAST. The question you
+            # really ask is: who does this slot serve enough to be worth
+            # picking up the phone for?
             return f"""<label class="champ-option">Combien de temps elle leur
   fait gagner, au minimum<br>{
                 _selecteur("regle_jours", list(assistant.JOURS_APRES),
                            str(regle.get("jours") or ""),
                            forme="form-grille")}</label>"""
-        # La valeur enregistrée voyage quand même, cachée : revenir à une source
-        # datée doit retrouver la fenêtre qu'on y avait réglée, pas zéro.
+        # The saved value travels anyway, hidden: coming back to a dated source
+        # must find the window you had set there, not zero.
         return f"""<input type="hidden" name="regle_jours" form="form-grille"
       value="{html.escape(str(regle.get('jours') or ''))}">
     <p class="champ-option sourd"><small>Ces personnes n'ont
@@ -2211,11 +2194,10 @@ majuscule();
 
     @staticmethod
     def _phrase_interet(source):
-        """La règle de l'intérêt, dite pour la source CHOISIE et pas les autres.
+        """The rule of interest, stated for the CHOSEN source and not the others.
 
-        Deux populations, deux phrases : les afficher toutes les deux à tout le
-        monde faisait lire une explication dont la moitié ne concernait pas la
-        campagne en cours.
+        Two populations, two sentences: showing both to everybody made people
+        read an explanation half of which did not concern the current campaign.
         """
         if source in assistant.SOURCES_A_VENIR:
             return """<p><small><strong>Une place n'intéresse quelqu'un que si
@@ -2232,13 +2214,13 @@ majuscule();
     ▶ Démarrer.</small></p>"""
 
     def _bouton_ajouter_contacts(self, identifiant, vue):
-        """Le bouton qui ouvre — ou referme — les voies de remplissage.
+        """The button that opens — or closes again — the filling routes.
 
-        ⚠ C'EST UN VRAI BOUTON D'ENVOI, dans son propre petit formulaire :
-        sans JavaScript il fonctionne à l'identique. Le produit tient cette
-        règle partout, et c'est elle qui a permis de livrer l'installeur, le
-        calendrier et la sélection de plage sans écrire deux fois chaque
-        geste.
+        ⚠ IT IS A REAL SUBMIT BUTTON, in its own little form: without
+        JavaScript it works identically. The product holds this rule
+        everywhere, and it is what made it possible to deliver the installer,
+        the calendar and the range selection without writing every gesture
+        twice.
         """
         if vue == "ajout":
             libelle, geste = "↩ Revenir à la grille", "grille"
@@ -2254,20 +2236,20 @@ majuscule();
 
     @staticmethod
     def _choix_ordre(brouillon):
-        """L'ordre courant et les choix à montrer — les DEUX écrans le partagent.
+        """The current order and the choices to show — BOTH screens share it.
 
-        ⚠ IL NE PROPOSE PAS QUE DEUX CHOIX QUAND UN TROISIÈME EST EN COURS.
-        Le propriétaire n'en demande que deux (le plus lointain, le plus
-        proche) ; mais si l'étape ② a choisi « alphabétique », le montrer est
-        le seul moyen de ne pas l'écraser au premier envoi.
+        ⚠ IT DOES NOT OFFER ONLY TWO CHOICES WHEN A THIRD IS IN FORCE. The
+        owner asks for only two (the furthest, the nearest); but if step ②
+        chose `alphabetical`, showing it is the only way not to overwrite it on
+        the first submission.
         """
         courant = brouillon.get("ordre") or "liste"
-        # ⚠ PAS DE TRI PAR DATE SANS DATE (14/08/2026, audit croisé). Les deux
-        # ordres proposés trient sur le rendez-vous du contact
-        # (`ordonner_contacts` lit champs_contact()["rdv_existant"]). Une
-        # « prise de rendez-vous » ne porte pas cette colonne : les deux choix
-        # y laissaient l'ordre INCHANGÉ, et la fiche annonçait ensuite un ordre
-        # qui n'avait jamais été appliqué. On n'offre pas un réglage sans effet.
+        # ⚠ NO SORTING BY DATE WITH NO DATE (14/08/2026, cross audit). The two
+        # orders offered sort on the contact's appointment (`ordonner_contacts`
+        # reads champs_contact()["rdv_existant"]). A `booking` campaign does
+        # not carry that column: both choices left the order UNCHANGED there,
+        # and the record then announced an order that had never been applied.
+        # We do not offer a setting with no effect.
         disponibles = (assistant.ORDRES_PAR_DATE
                        if assistant.nature_porte_un_rendezvous(
                            brouillon.get("nature")) else ())
@@ -2278,21 +2260,21 @@ majuscule();
         return courant, choix
 
     def _selecteur_ordre_regle(self, brouillon, source=None):
-        """L'ordre d'appel du mode AUTOMATIQUE (09/08/2026).
+        """The calling order of AUTOMATIC mode (09/08/2026).
 
-        ⚠ IL MANQUAIT, et cela se voyait à l'usage : l'ordre ne se réglait que
-        dans la grille — invisible en automatique. La campagne appelait donc
-        dans l'ordre hérité de l'étape ②, sans qu'on puisse le lire ni le
-        changer. Il part avec le formulaire de la règle, que `_traiter_grille`
-        lit comme tous les autres (le champ s'appelle « ordre », comme dans la
-        grille : un seul nom, un seul endroit qui le relit).
+        ⚠ IT WAS MISSING, and it showed in use: the order could only be set in
+        the grid — invisible in automatic mode. So the campaign called in the
+        order inherited from step ②, with no way to read or change it. It goes
+        out with the rule's form, which `_traiter_grille` reads like all the
+        others (the field is called `ordre`, as in the grid: one name, one
+        place that reads it back).
 
-        ⚠ LE LIBELLÉ SUIT LA SOURCE (11/08/2026). Les deux ordres trient sur la
-        date du rendez-vous du contact — mais sur les sources sans rendez-vous à
-        venir, cette date est celle du rendez-vous PERDU, dans le passé. « Le
-        rendez-vous le plus lointain d'abord » y voulait donc dire « celle qui
-        vient de perdre sa place », ce qui n'est pas du tout la même idée. Le tri
-        n'a pas changé — c'est ce qu'il dit qui devient exact.
+        ⚠ THE LABEL FOLLOWS THE SOURCE (11/08/2026). Both orders sort on the
+        date of the contact's appointment — but on the sources with no upcoming
+        appointment, that date is the date of the LOST appointment, in the
+        past. `The furthest appointment first` therefore meant `the one who has
+        just lost their slot` there, which is not at all the same idea. The
+        sorting has not changed — what it says has become accurate.
         """
         courant, choix = self._choix_ordre(brouillon)
         if source is not None and source not in assistant.SOURCES_A_VENIR:
@@ -2304,16 +2286,16 @@ majuscule();
                        forme="form-grille")}</label>"""
 
     def _choix_ordre_gain(self, brouillon):
-        """Les mêmes ordres, dits en TEMPS GAGNÉ (11/08/2026).
+        """The same orders, stated in TIME GAINED (11/08/2026).
 
-        Question du propriétaire, mot pour mot : « est-ce qu'on sélectionne en
-        premier le rendez-vous le plus dans le futur, ou le premier à partir de
-        la date de début ? ». Les libellés d'avant nommaient la MÉCANIQUE (« le
-        rendez-vous le plus LOINTAIN d'abord ») ; ceux-ci nomment la CONSÉQUENCE,
-        qui est la seule chose qu'on veuille décider.
+        The owner's question, word for word: `do we pick first the appointment
+        furthest in the future, or the first one from the start date?` The
+        earlier labels named the MECHANISM (`the FURTHEST appointment first`);
+        these name the CONSEQUENCE, which is the only thing anybody wants to
+        decide.
 
-        Le tri, lui, ne bouge pas : « le plus lointain d'abord » EST « celle qui
-        gagne le plus ».
+        The sorting itself does not move: `the furthest first` IS `the one who
+        gains the most`.
         """
         courant, choix = self._choix_ordre(brouillon)
         mots = {
@@ -2326,10 +2308,10 @@ majuscule();
                          for code, libelle in choix]
 
     def _choix_ordre_attente(self, brouillon):
-        """Les mêmes ordres, dits pour des gens qui ATTENDENT une place.
+        """The same orders, stated for people WAITING for a slot.
 
-        Même code de tri, autres mots : on trie toujours sur la date du
-        rendez-vous du contact, et pour eux c'est celui qu'ils ont perdu.
+        The same sorting code, other words: we still sort on the date of the
+        contact's appointment, and for them that is the one they lost.
         """
         courant, choix = self._choix_ordre(brouillon)
         mots = {
@@ -2341,16 +2323,16 @@ majuscule();
 
     @staticmethod
     def _champ_plafond(brouillon):
-        """« Au maximum … personnes » — le plafond de contacts à charger.
+        """`At most … people` — the ceiling of contacts to load.
 
-        ⚠ IL PART DANS LE MÊME FORMULAIRE QUE L'ORDRE, et c'est `_traiter_grille`
-        qui le relit : un seul nom de champ (« plafond »), un seul endroit qui le
-        lit. Un champ posé dans un formulaire que personne ne relit aurait été
-        jeté en silence — c'est arrivé au sélecteur d'ordre, et le commentaire de
-        `_selecteur_ordre_grille` en garde la trace.
+        ⚠ IT GOES OUT IN THE SAME FORM AS THE ORDER, and `_traiter_grille`
+        reads it back: one field name (`plafond`), one place that reads it. A
+        field placed in a form nobody reads back would have been thrown away in
+        silence — that happened to the order selector, and
+        `_selecteur_ordre_grille`'s comment keeps the record of it.
 
-        Vide = aucun plafond. Le format attendu est MONTRÉ dans le champ, et le
-        libellé dit ce que le plafond fait : limiter les appels.
+        Empty = no ceiling. The expected format is SHOWN in the field, and the
+        label says what the ceiling does: limit the calls.
         """
         courant = str(brouillon.get("plafond") or "")
         return f"""<label class="champ-option">Au maximum, combien de personnes
@@ -2359,31 +2341,30 @@ majuscule();
   title="Laissez vide pour n'écarter personne"></label>"""
 
     def _selecteur_ordre_grille(self, brouillon):
-        """L'ordre d'appel, AU-DESSUS de la grille (demande du 03/08/2026).
+        """The calling order, ABOVE the grid (request of 03/08/2026).
 
-        ⚠ IL VIT DANS LE MÊME FORMULAIRE QUE LA GRILLE, et c'est
-        `_traiter_grille` qui le lit. Posé ailleurs, il n'aurait été lu par
-        personne : `_enregistrer_etape2` ne tourne que sur l'étape ②, et un
-        « ordre » envoyé avec la grille était jeté EN SILENCE — la grille
-        montrait un ordre, la campagne appelait dans un autre.
+        ⚠ IT LIVES IN THE SAME FORM AS THE GRID, and `_traiter_grille` reads
+        it. Placed elsewhere, nobody would have read it: `_enregistrer_etape2`
+        only runs on step ②, and an `ordre` sent with the grid was thrown away
+        IN SILENCE — the grid showed one order, the campaign called in another.
 
-        ⚠ IL NE PROPOSE PAS QUE DEUX CHOIX QUAND UN TROISIÈME EST EN COURS.
-        Le propriétaire n'en demande que deux (le plus lointain, le plus
-        proche) ; mais si l'étape ② a choisi « alphabétique », le montrer
-        aurait été le seul moyen de ne pas l'écraser au premier envoi.
+        ⚠ IT DOES NOT OFFER ONLY TWO CHOICES WHEN A THIRD IS IN FORCE. The
+        owner asks for only two (the furthest, the nearest); but if step ②
+        chose `alphabetical`, showing it would have been the only way not to
+        overwrite it on the first submission.
         """
-        # ⚠ PAS DEUX SÉLECTEURS D'ORDRE DANS LA PAGE. En automatique
-        # c'est le panneau de la règle qui porte l'ordre ; celui-ci reste
-        # DANS le formulaire de la grille, lequel part aussi quand on clique
-        # « Valider ». Les deux ensemble, la valeur de la grille — la vieille —
-        # écrasait en silence celle qu'on venait de choisir dans le panneau.
+        # ⚠ NOT TWO ORDER SELECTORS IN THE PAGE. In automatic mode it is the
+        # rule panel that carries the order; this one stays INSIDE the grid's
+        # form, which also goes out when `Valider` is clicked. With both
+        # together, the grid's value — the old one — silently overwrote the one
+        # just chosen in the panel.
         if self._liste_automatique(brouillon):
             return ""
         courant, choix = self._choix_ordre(brouillon)
-        # ⚠ LA PHRASE SUIT LA NATURE (14/08/2026, audit croisé). Elle expliquait
-        # l'ordre par « la place qui se libère » — ce qui n'a de sens que sur un
-        # créneau libéré. Sur les quatre autres natures, l'opérateur lisait une
-        # justification qui ne correspondait à rien de ce qu'il faisait.
+        # ⚠ THE SENTENCE FOLLOWS THE KIND (14/08/2026, cross audit). It
+        # explained the order by `the slot that comes free` — which only makes
+        # sense on a freed slot. On the other four kinds, the operator read a
+        # justification matching nothing they were doing.
         pourquoi = ("Le rendez-vous le plus lointain a le plus à gagner à "
                     "avancer sur la place qui se libère."
                     if brouillon.get("nature") == "creneau_libere"
@@ -2401,7 +2382,7 @@ jamais une ligne déjà là : il limite ce que les prochains chargements
 ajoutent.</small></p>"""
 
     def _enregistrer_grille(self, brouillon, donnees):
-        """Reporte les cellules éditées dans le brouillon ; rend les erreurs."""
+        """Carries the edited cells into the draft; returns the errors."""
         erreurs = []
         colonnes = self._colonnes(brouillon)
         for indice, contact in enumerate(brouillon["contacts"], start=1):
@@ -2409,9 +2390,9 @@ ajoutent.</small></p>"""
             if cle_nom in donnees:
                 contact["nom"] = " ".join(donnees[cle_nom][0].split())
             telephone = donnees.get(f"tel_{indice}", [""])[0].strip()
-            # Le champ affiche le numéro MASQUÉ : s'il contient encore des
-            # « • », c'est qu'il n'a pas été retouché — on n'y touche pas non
-            # plus (jamais de numéro reconstruit à partir d'un masque).
+            # The field shows the MASKED number: if it still contains `•`, it
+            # has not been edited — so we do not touch it either (never a
+            # number rebuilt from a mask).
             if telephone and "•" not in telephone:
                 try:
                     contact["telephone"] = saisie.valider_telephone(telephone)
@@ -2437,33 +2418,31 @@ ajoutent.</small></p>"""
         return erreurs
 
     def _numeros_essai(self):
-        """Les numéros des testeurs déclarés dans ⚙ Réglages, ou [] (aucun)."""
+        """The numbers of the testers declared in ⚙ Réglages, or [] (none)."""
         return essai_reel.numeros_declares(self.application.preferences)
 
     def _valider_grille(self, brouillon):
-        """Les contrôles de la validation finale (⛔, doublons, vide).
+        """The final validation's checks (⛔, duplicates, emptiness).
 
-        Le refus de doublon reste ENTIER : deux fois le même numéro, c'est
-        deux appels chez la même personne. Une seule famille d'exceptions,
-        voulue et déclarée par l'opérateur lui-même : les 🧪 numéros de ses
-        TESTEURS (⚙ Réglages) — le sien, et ceux des personnes qui jouent un
-        rôle avec lui (voir essai_reel). Tout autre numéro répété reste
-        refusé, sans exception.
+        The duplicate refusal stays COMPLETE: the same number twice means two
+        calls to the same person. One single family of exceptions, wanted and
+        declared by the operator themselves: the 🧪 numbers of their TESTERS (⚙
+        Réglages) — their own, and those of the people playing a role with them
+        (see essai_reel). Any other repeated number stays refused, without
+        exception.
         """
         erreurs = []
         contacts = brouillon["contacts"]
-        # ⚠ EN AUTOMATIQUE, LA GRILLE EST VIDE PAR CONSTRUCTION. Les personnes
-        # ne sont pas choisies ici : elles sont trouvées par la règle, rejouée
-        # à chaque place. Refuser le vide aurait rendu ce mode inutilisable.
-        # Ce qui est exigé, c'est la RÈGLE — sans elle la campagne
-        # n'appellerait personne.
-        #
-        # ⚠ MAIS ON NE SORT PAS D'ICI POUR AUTANT. La grille peut ne PAS être
-        # vide en automatique : on tape trois personnes en manuel, on bascule,
-        # et elles restent — c'est voulu, une saisie ne se perd jamais. Sortir
-        # tout de suite les faisait partir SANS le refus de doublon et SANS
-        # l'exclusion des « ne plus appeler ». Les contrôles du bas s'appliquent
-        # donc aussi, dès qu'il y a quelqu'un à contrôler.
+        # ⚠ IN AUTOMATIC MODE, THE GRID IS EMPTY BY CONSTRUCTION. The people
+        # are not chosen here: they are found by the rule, replayed at every
+        # slot. Refusing emptiness would have made this mode unusable. What is
+        # required is the RULE — without it the campaign would call nobody.  ⚠
+        # BUT WE DO NOT LEAVE HERE FOR ALL THAT. The grid may NOT be empty in
+        # automatic mode: you type three people in manual, you switch, and they
+        # stay — that is intended, input is never lost. Leaving straight away
+        # sent them out WITHOUT the duplicate refusal and WITHOUT the exclusion
+        # of the `do not call again`. The checks below therefore apply too, as
+        # soon as there is somebody to check.
         if self._liste_automatique(brouillon):
             if not assistant.regle_de_liste(brouillon):
                 erreurs.append("Choisissez la règle qui fabrique la liste, "
@@ -2473,30 +2452,29 @@ ajoutent.</small></p>"""
         elif not contacts:
             erreurs.append("La grille est vide : ajoutez au moins une personne.")
             return erreurs
-        # ⚠ SANS MESSAGE, RIEN NE PART — ET SURTOUT PAS UNE PAGE BLANCHE.
-        # Mesuré le 20/08/2026 en écrivant l'essai du numéro complété : depuis
-        # son planning, la sélection saute DIRECTEMENT à l'étape ③, et le
-        # brouillon arrive avec « mission » à None. Cliquer « Valider » sans
-        # repasser par ② faisait remonter une IntegrityError de SQLite
-        # (« NOT NULL constraint failed: campagnes.mission ») jusqu'au
-        # gestionnaire HTTP : connexion coupée, page blanche, rien à lire.
-        # Un champ obligatoire vide se REFUSE, comme tous les autres ici, en
-        # disant où aller le remplir.
+        # ⚠ WITH NO MESSAGE, NOTHING GOES OUT — AND ABOVE ALL NOT A BLANK PAGE.
+        # Measured on 20/08/2026 while writing the completed-number test: from
+        # his schedule, the selection jumps DIRECTLY to step ③, and the draft
+        # arrives with `mission` at None. Clicking `Valider` without going back
+        # through ② sent an SQLite IntegrityError (`NOT NULL constraint failed:
+        # campagnes.mission`) up to the HTTP handler: connection cut, blank
+        # page, nothing to read. An empty mandatory field is REFUSED, like all
+        # the others here, saying where to go and fill it in.
         if not (brouillon.get("mission") or "").strip():
             erreurs.append("Le message à dire au téléphone est vide : "
                            "revenez à l'étape ② pour l'écrire.")
         if brouillon["politique"] == "unique" and len(contacts) > 1:
             erreurs.append("Cette nature appelle UN SEUL contact : gardez une "
                            f"seule ligne ({len(contacts)} actuellement).")
-        # ⚠ LES CASES VIDES NE FONT QU'UNE SEULE PHRASE. Elles produisaient
-        # une ligne chacune : trente phrases identiques sur dix contacts, et
-        # toujours pas de repère pour savoir où taper. La couleur, dans la
-        # grille, dit maintenant OÙ ; ce message dit QUOI.
+        # ⚠ THE EMPTY BOXES MAKE ONLY ONE SENTENCE. They produced one line
+        # each: thirty identical sentences over ten contacts, and still no
+        # landmark for where to type. The colour, in the grid, now says WHERE;
+        # this message says WHAT.
         if assistant.cellules_manquantes(brouillon):
             erreurs.append(assistant.MESSAGE_CHAMPS_OBLIGATOIRES)
-        # Le doublon, lui, garde sa phrase à lui : ce n'est pas un manque,
-        # c'est un conflit ENTRE deux lignes — colorer une case ne dirait pas
-        # laquelle des deux est en cause.
+        # The duplicate keeps its own sentence: it is not a lack, it is a
+        # conflict BETWEEN two rows — colouring one box would not say which of
+        # the two is at fault.
         numeros_essai = self._numeros_essai()
         vus = {}
         for indice, contact in enumerate(contacts, start=1):
@@ -2523,35 +2501,33 @@ ajoutent.</small></p>"""
         action = donnees.get("action", ["enregistrer"])[0]
         brouillon["message"] = ""
         brouillon["erreurs_ecran"] = "liste"
-        # ⚠ ON RÉORDONNE LA LISTE ELLE-MÊME, JAMAIS SEULEMENT L'AFFICHAGE.
-        # Les cellules sont nommées par POSITION (nom_1, tel_1, c_x_1…) et
-        # relues par la même position : trier au rendu aurait écrit le numéro
-        # corrigé sur la personne restée en position 1. Un numéro sur le
-        # mauvais nom, dans une liste qui sera composée.
-        # ⚠ ET APRÈS `_enregistrer_grille` : celui-ci relit par position, il
-        # doit voir la liste telle qu'elle était affichée.
+        # ⚠ WE REORDER THE LIST ITSELF, NEVER JUST THE DISPLAY. The cells are
+        # named by POSITION (nom_1, tel_1, c_x_1…) and read back by the same
+        # position: sorting at render time would have written the corrected
+        # number onto the person still at position 1. A number on the wrong
+        # name, in a list that will be dialled. ⚠ AND AFTER
+        # `_enregistrer_grille`: that one reads back by position, it must see
+        # the list as it was displayed.
         ordre = donnees.get("ordre", [""])[0]
         if ordre in assistant.ORDRES_APPEL and ordre != brouillon.get("ordre"):
             brouillon["ordre"] = ordre
-        # LE PLAFOND, lu au même endroit que l'ordre. Le champ est un
-        # « number » : vide ou zéro veut dire « aucun plafond », et une valeur
-        # illisible n'écarte personne plutôt que d'écarter au hasard.
+        # THE CEILING, read in the same place as the order. The field is a
+        # `number`: empty or zero means `no ceiling`, and an unreadable value
+        # sets nobody aside rather than setting people aside at random.
         if "plafond" in donnees:
             brut = donnees["plafond"][0].strip()
             brouillon["plafond"] = brut if brut.isdigit() and int(brut) else ""
-        # ⚠ LA RÈGLE AUSSI, ET C'EST LE DÉFAUT LE PLUS COÛTEUX DE TOUT CE
-        # CHANTIER (14/08/2026). Le gain minimum n'était enregistré QUE par le
-        # bouton « Enregistrer la règle ». Choisi dans le sélecteur puis suivi
-        # d'un clic sur « Valider », il était SILENCIEUSEMENT PERDU — et
-        # l'écran continuait d'afficher « au moins 30 jours », puisque c'est le
-        # navigateur qui tient cette valeur. Le propriétaire a donc monté
-        # plusieurs campagnes en croyant avoir demandé un gain de trente jours ;
-        # sa campagne n°33 porte « jours: "" », et elle a appelé des gens de la
-        # même semaine. Il a cherché la cause quatre fois de suite.
-        #
-        # Un champ présent dans le formulaire soumis est PRIS EN COMPTE, quel
-        # que soit le bouton — exactement comme l'ordre et le plafond juste
-        # au-dessus. Un choix visible à l'écran ne doit jamais être ignoré.
+        # ⚠ THE RULE TOO, AND IT IS THE COSTLIEST DEFECT OF THIS WHOLE PROJECT
+        # (14/08/2026). The minimum gain was only saved by the `Enregistrer la
+        # règle` button. Chosen in the selector then followed by a click on
+        # `Valider`, it was SILENTLY LOST — and the screen went on showing `at
+        # least 30 days`, since it is the browser that holds that value. The
+        # owner therefore set up several campaigns believing he had asked for a
+        # thirty-day gain; his campaign no. 33 carries `jours: ""`, and it
+        # called people from the same week. He hunted for the cause four times
+        # in a row.  A field present in the submitted form is TAKEN INTO
+        # ACCOUNT, whichever button is used — exactly like the order and the
+        # ceiling just above. A choice visible on screen must never be ignored.
         source = donnees.get("regle_source", [""])[0]
         if source in assistant.SOURCES_DATEES:
             brouillon["regle_liste"] = {
@@ -2583,8 +2559,8 @@ ajoutent.</small></p>"""
             brouillon["erreurs"] = erreurs
             return self._rediriger(f"/assistant/liste?b={identifiant}")
         if action.startswith("vue:"):
-            # On change de vue, on ne valide rien : afficher des refus sur un
-            # formulaire qu'on vient d'ouvrir n'aurait aucun sens.
+            # We are changing view, we are validating nothing: showing refusals
+            # on a form you have just opened would make no sense.
             brouillon["vue_liste"] = action.split(":", 1)[1]
             brouillon["erreurs"] = []
             return self._rediriger(f"/assistant/liste?b={identifiant}")
@@ -2599,8 +2575,8 @@ ajoutent.</small></p>"""
         elif action == "ligne":
             brouillon["contacts"].append({"nom": "", "telephone": "",
                                           "champs": {}})
-            # Une personne écrite à la main n'a aucun critère derrière elle :
-            # la liste n'est plus reproductible sur un autre créneau (§8.3).
+            # A person written by hand has no criterion behind them: the list
+            # is no longer reproducible on another slot (§8.3).
             assistant.noter_apport_recette(brouillon, "ligne")
             brouillon["message"] = ("Ligne vide ajoutée — remplissez-la puis "
                                     "« Enregistrer la grille ».")
@@ -2639,12 +2615,13 @@ ajoutent.</small></p>"""
         champs = assistant.champs_campagne(brouillon)
         connus = [c["telephone"] for c in brouillon["contacts"]
                   if c["telephone"]]
-        # Les 🧪 numéros des testeurs déclarés : eux seuls peuvent revenir
-        # plusieurs fois (plusieurs identités sur des téléphones connus —
-        # celui de l'opérateur, et ceux des personnes qui jouent avec lui).
+        # The 🧪 numbers of the declared testers: they alone may come back
+        # several times (several identities on known phones — the operator's,
+        # and those of the people playing along with them).
         numeros_essai = self._numeros_essai()
         mode = champs_formulaire.get("mode", "")
-        # On revient sur la voie qui vient de servir (et pas sur une autre).
+        # We come back to the route that has just been used (and not to
+        # another).
         brouillon["remplissage"] = mode or brouillon.get("remplissage")
         nouveaux, erreurs, complements = [], [], []
         try:
@@ -2652,10 +2629,10 @@ ajoutent.</small></p>"""
                 colle = champs_formulaire.get("liste", "")
                 nouveaux, erreurs, refusees = assistant.analyser_collage(
                     colle, champs, connus, numeros_essai)
-                # Une saisie refusée n'est JAMAIS perdue : les lignes qui
-                # n'ont rien donné reviennent telles quelles dans la zone, à
-                # corriger sur place. Celles déjà entrées dans la grille en
-                # disparaissent — sinon un second envoi ferait des doublons.
+                # Refused input is NEVER lost: the rows that produced nothing
+                # come back exactly as they were into the box, to be fixed in
+                # place. Those already entered into the grid disappear from it
+                # — otherwise a second submission would make duplicates.
                 brouillon["collage"] = "\n".join(refusees)
                 if nouveaux:
                     assistant.noter_apport_recette(brouillon, "collage")
@@ -2682,25 +2659,24 @@ ajoutent.</small></p>"""
                                            "numéro — à compléter avant "
                                            "validation")
             elif mode in ("base", "rendezvous"):
-                # « base » est l'ANCIEN nom de cette voie : il reste accepté
-                # pour que les liens et les essais d'avant le 02/08/2026
-                # continuent de marcher. « rendezvous » est le nouveau.
+                # `base` is this route's OLD name: it is still accepted so that
+                # links and tests from before 02/08/2026 go on working.
+                # `rendezvous` is the new one.
                 source = champs_formulaire.get("source", "")
-                # Le filtre de dates est retenu DANS le brouillon : après un
-                # refus, il se réaffiche dans ses champs.
+                # The date filter is remembered IN the draft: after a refusal,
+                # it is redisplayed in its fields.
                 periode = self._periode_choisie(champs_formulaire, brouillon)
                 periode["source"] = source or periode["source"]
                 brouillon["periode"] = periode
                 debut, fin = self._bornes_de_periode(periode)
-                # ⚠ LE GAIN MINIMUM S'APPLIQUE ICI AUSSI (14/08/2026). Il ne
-                # valait que dans le panneau « automatique » : ce chargement-ci
-                # prenait tout le monde, quelle que soit la case « au moins
-                # N jours » cochée juste à côté. Le propriétaire a ainsi chargé
-                # 328 personnes dont certaines gagnaient zéro jour, et il a vu
-                # ses rendez-vous avancer de deux jours au lieu de trente.
-                #
-                # Les deux bornes se combinent : la période dit QUELLE semaine,
-                # le gain dit à partir de QUAND. On garde la plus tardive.
+                # ⚠ THE MINIMUM GAIN APPLIES HERE TOO (14/08/2026). It only
+                # counted in the `automatic` panel: this loading took
+                # everybody, whatever the `at least N days` setting ticked
+                # right beside it. The owner thus loaded 328 people, some of
+                # whom gained zero days, and saw his appointments brought
+                # forward by two days instead of thirty.  The two bounds
+                # combine: the period says WHICH week, the gain says from WHEN.
+                # We keep the later one.
                 debut_gain, gain = self._debut_du_gain(brouillon,
                                                        champs_formulaire)
                 if debut_gain and (not debut or debut_gain > debut):
@@ -2714,32 +2690,32 @@ ajoutent.</small></p>"""
                 if periode.get("semaine"):
                     complements.append("période : "
                                        + assistant.libelle_periode(periode))
-                # La recette retient le CRITÈRE, pas les personnes. Une
-                # période, elle, DÉSIGNE des dates précises : rejouer « la
-                # semaine 48 » sur un autre créneau donnerait les mêmes
-                # personnes, pas celles du nouveau créneau. La campagne est
-                # donc marquée non rejouable — voir noter_apport_recette.
+                # The recipe remembers the CRITERION, not the people. A period,
+                # though, DESIGNATES precise dates: replaying `week 48` on
+                # another slot would give the same people, not those of the new
+                # slot. The campaign is therefore marked non-replayable — see
+                # noter_apport_recette.
                 assistant.noter_apport_recette(
                     brouillon, "ligne" if debut else "base", source=source)
             elif mode == "clients":
-                # Une seule question à l'écran (« quels clients ? »), deux
-                # chemins derrière : toute la base, ou un état particulier —
-                # et ce second chemin est CELUI DE LA PAGE 👥 Contacts, pas
-                # une seconde version qui aurait fini par en diverger.
+                # One single question on screen (`which clients?`), two paths
+                # behind it: the whole database, or a particular state — and
+                # that second path is THE 👥 CONTACTS PAGE'S, not a second
+                # version that would have ended up diverging from it.
                 choix = champs_formulaire.get("etat_client", "")
                 if choix.startswith("etat:"):
                     etat = choix.split(":", 1)[1]
-                    # ⚠ contacts_PAR_etat, pas contacts_DEPUIS_etat : ici on
-                    # charge les clients de cet état, un point c'est tout.
-                    # Les deux conditions de la page 👥 Contacts (la nature
-                    # doit traiter l'état, le client ne doit être dans aucune
-                    # campagne) n'ont pas de sens quand c'est l'opérateur qui
-                    # demande explicitement un état.
+                    # ⚠ contacts_PAR_etat, not contacts_DEPUIS_etat: here we
+                    # load the clients in that state, and that is all. The two
+                    # conditions of the 👥 Contacts page (the kind must handle
+                    # the state, the client must be in no campaign) make no
+                    # sense when it is the operator explicitly asking for a
+                    # state.
                     nouveaux, complements = etats_clients.contacts_par_etat(
                         base, etat, champs, connus,
                         preferences=self.application.preferences)
-                    # La liste est un instantané de l'état d'aujourd'hui :
-                    # elle ne se rejoue pas telle quelle sur un autre créneau.
+                    # The list is a snapshot of today's state: it does not
+                    # replay as it stands on another slot.
                     assistant.noter_apport_recette(brouillon, "ligne")
                 else:
                     nouveaux, complements = assistant.contacts_depuis_base(
@@ -2748,11 +2724,12 @@ ajoutent.</small></p>"""
                         brouillon, "base",
                         source=assistant.SOURCE_TOUS_CLIENTS)
             elif mode == "campagne":
-                # Repartir des RÉSULTATS d'une campagne précédente, filtrés
-                # par état (les injoignables, les refus, les acceptés…).
+                # Starting again from a previous campaign's RESULTS, filtered
+                # by state (the unreachable ones, the refusals, the accepted
+                # ones…).
                 etat = champs_formulaire.get("etat", "tous")
-                # Le filtre choisi est gardé : il se réaffiche DANS ses
-                # champs au retour, pour enchaîner un second état.
+                # The chosen filter is kept: it is redisplayed IN its fields on
+                # return, to chain a second state.
                 brouillon["reprise"] = {
                     "campagne": champs_formulaire.get("campagne", ""),
                     "etat": etat}
@@ -2769,14 +2746,15 @@ ajoutent.</small></p>"""
                 erreurs.append("Source de remplissage inconnue.")
         except saisie.SaisieInvalide as erreur:
             erreurs.append(str(erreur))
-        # ⚠ LE PLAFOND S'APPLIQUE ICI, ET SEULEMENT SUR CE QUI ENTRE. La grille
-        # n'est jamais taillée : une ligne déjà là — tapée à la main, collée,
-        # corrigée — n'est pas retirée par un plafond réglé après coup. Les
-        # présents comptent dans le plafond, ils n'en sont pas victimes.
+        # ⚠ THE CEILING APPLIES HERE, AND ONLY TO WHAT COMES IN. The grid is
+        # never trimmed: a row already there — typed by hand, pasted, corrected
+        # — is not removed by a ceiling set afterwards. Those present count
+        # towards the ceiling, they are not its victims.
         plafond = assistant.plafond_de(brouillon)
-        # ⚠ LE POINT D'AJOUT COMMUN À TOUTES LES VOIES (collage, CSV, agenda,
-        # base, états, campagne précédente) : le filtre des déjà confirmés se
-        # pose ICI, une seule fois, plutôt qu'une fois par voie (20/08/2026).
+        # ⚠ THE ADD POINT COMMON TO EVERY ROUTE (pasting, CSV, calendar,
+        # database, states, previous campaign): the filter for those already
+        # confirmed is applied HERE, once, rather than once per route
+        # (20/08/2026).
         nouveaux, deja_confirmes = assistant.ecarter_les_deja_confirmes(
             self.application.base, brouillon.get("nature"), nouveaux)
         if deja_confirmes:
@@ -2790,16 +2768,16 @@ ajoutent.</small></p>"""
         if hors_plafond:
             complements.append(assistant.raison_plafond(plafond, hors_plafond))
         elif plafond and deja + len(nouveaux) < plafond:
-            # Le plafond n'est pas atteint : on dit d'où vient l'écart plutôt
-            # que de laisser un chiffre inexpliqué (voir manque_au_plafond).
+            # The ceiling is not reached: we say where the shortfall comes from
+            # rather than leave an unexplained figure (see manque_au_plafond).
             complements.append(
                 assistant.manque_au_plafond(plafond, deja + len(nouveaux)))
         brouillon["contacts"].extend(nouveaux)
         brouillon["erreurs"] = erreurs
-        # ⚠ ON REVIENT À LA GRILLE dès que le remplissage a donné quelque
-        # chose : c'est elle qu'on veut relire après avoir ajouté du monde.
-        # En cas de REFUS on reste sur la voie, avec l'erreur et la saisie —
-        # revenir à la grille aurait fait disparaître les deux.
+        # ⚠ WE COME BACK TO THE GRID as soon as the filling has produced
+        # something: it is the grid you want to reread after adding people. On
+        # a REFUSAL we stay on the route, with the error and the input — coming
+        # back to the grid would have made both disappear.
         if nouveaux:
             brouillon["vue_liste"] = "grille"
         message = f"{len(nouveaux)} contact(s) ajouté(s) à la grille."
@@ -2833,22 +2811,21 @@ ajoutent.</small></p>"""
         self.end_headers()
         self.wfile.write(contenu)
 
-    # --------------------------- avant de démarrer : l'agenda de RingBack
-    # POURQUOI CE RAPPEL EXISTE — et pourquoi seulement ICI.
-    # Le travail est double (§8.1) : un rendez-vous pris ou déplacé au
-    # téléphone change l'agenda LOCAL de RingBack **et** entre au cahier des
-    # changements que l'opérateur reporte dans son propre logiciel. Tout le
-    # produit s'appuie donc sur cet agenda : les créneaux annoncés au
-    # téléphone en sont déduits, et un agenda périmé fait proposer des
-    # places déjà prises dans la vraie vie.
-    # Ce rappel n'apparaît QU'AU MOMENT de démarrer, et nulle part ailleurs :
-    # un avertissement qu'on voit partout ne se lit plus nulle part. Pour
-    # qu'il reste lu, il ne pose pas une question creuse — il porte les
-    # CHIFFRES DU JOUR, tirés de la base, et le début de la liste de créneaux
-    # que l'agent va réellement annoncer. Rien n'y est estimé : ce qui
-    # n'existe pas (aucune trace d'import) est dit « inconnu ».
+    # --------------------------- before starting: RingBack's calendar WHY THIS
+    # REMINDER EXISTS — and why only HERE. The work is twofold (§8.1): an
+    # appointment booked or moved on the phone changes RingBack's LOCAL
+    # calendar **and** enters the change log the operator carries over into
+    # their own software. The whole product therefore rests on that calendar:
+    # the slots announced on the phone are deduced from it, and a stale
+    # calendar leads to offering slots already taken in real life. This
+    # reminder appears ONLY AT THE MOMENT of starting, and nowhere else: a
+    # warning you see everywhere is no longer read anywhere. To stay read, it
+    # does not ask a hollow question — it carries THE DAY'S FIGURES, drawn from
+    # the database, and the start of the list of slots the agent will actually
+    # announce. Nothing in it is estimated: what does not exist (no trace of an
+    # import) is stated as `unknown`.
     def _fragment_verification_agenda(self, campagne):
-        """Le panneau de vérification de l'agenda, calculé à l'instant du clic."""
+        """The calendar-check panel, computed at the instant of the click."""
         base = self.application.base
         preferences = self.application.preferences
         contacts = base.contacts_de_campagne(campagne["id"])
@@ -2856,7 +2833,7 @@ ajoutent.</small></p>"""
                                               contacts)
         reprise = campagne["statut"] == "en pause"
         verbe = "RÉELLEMENT" if self.application.mode_reel else "en simulation"
-        # --- les faits, un par ligne, tous tirés de la base ---
+        # --- the facts, one per line, all drawn from the database ---
         lignes = []
         lignes.append(
             f"<li><strong>{faits['a_appeler']}</strong> personne(s) "
@@ -2885,9 +2862,9 @@ ajoutent.</small></p>"""
             f"calculée(s) à cet instant, sur les {faits['horizon']} prochains "
             f"jours{detail_places} — {puise}.</li>")
         if faits["prochaines"]:
-            # La phrase dit exactement ce que ces dates sont : celles que
-            # l'agent va annoncer, ou simplement les premières libres quand
-            # la liste de la campagne a été écrite à la main.
+            # The sentence says exactly what these dates are: the ones the
+            # agent is going to announce, or simply the first free ones when
+            # the campaign's list was written by hand.
             debut_liste = f"<strong>{html.escape(faits['prochaines'])}</strong>"
             if faits["creneaux"] == "calcules":
                 lignes.append(
@@ -2933,7 +2910,7 @@ ajoutent.</small></p>"""
                 f"<strong>{html.escape(themes.date_lisible(trace['quand']))}</strong>"
                 f" — {age} ({html.escape(trace['quoi'])}, "
                 f"{trace['rendezvous']} rendez-vous).</li>")
-        # --- ce que RingBack CONSTATE lui-même, dit franchement ---
+        # --- what RingBack OBSERVES itself, stated frankly ---
         bloc_alertes = ""
         if faits["alertes"]:
             elements = "".join(f"<li>{html.escape(a)}</li>"
@@ -2941,7 +2918,8 @@ ajoutent.</small></p>"""
             bloc_alertes = (
                 '<div class="erreurs"><strong>⚠ Ce que RingBack constate '
                 f"lui-même :</strong><ul>{elements}</ul></div>")
-        # --- le bouton porte ce qu'il engage : le mode et les chiffres ---
+        # --- the button carries what it commits to: the mode and the figures
+        # ---
         if faits["alertes"]:
             libelle = (f"▶ {'Reprendre' if reprise else 'Démarrer'} quand "
                        f"même — appeler {verbe} : {faits['a_appeler']} "
@@ -2952,9 +2930,9 @@ ajoutent.</small></p>"""
                        f"{verbe} : {faits['a_appeler']} personne(s), "
                        f"{faits['places']} place(s) libre(s)")
         titre = ("Avant de reprendre" if reprise else "Avant de démarrer")
-        # tabindex=-1 : à l'ouverture, c'est le PANNEAU qui prend le focus, pas
-        # le bouton — sinon une deuxième frappe sur Entrée lancerait la
-        # campagne sans que rien n'ait été lu. Le geste reste volontaire.
+        # tabindex=-1: on opening, it is the PANEL that takes focus, not the
+        # button — otherwise a second press on Enter would launch the campaign
+        # without anything having been read. The gesture stays deliberate.
         return f"""<div class="verif-agenda" tabindex="-1">
 <h2>🗓 {titre} : les créneaux annoncés sortent de l'agenda de RingBack</h2>
 <p>Au téléphone, l'agent proposera les places libres <strong>déduites de
@@ -2979,7 +2957,8 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
 </div>"""
 
     def _servir_verification_agenda(self, parametres):
-        """Sert le panneau seul (fragment) : l'élément se remplit, pas la page."""
+        """Serves the panel alone (a fragment): the element fills, not the page.
+        """
         try:
             campagne_id = int(parametres.get("id", [""])[0])
         except ValueError:
@@ -2991,11 +2970,11 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
             self._fragment_verification_agenda(campagne))
 
     def _servir_periode(self, parametres):
-        """Sert le panneau « dates de rendez-vous » seul, avec le choix en cours.
+        """Serves the `appointment dates` panel alone, with the current choice.
 
-        Le choix est ENREGISTRÉ dans le brouillon avant d'être rendu : sans
-        cela, changer d'année puis envoyer le formulaire repartirait de
-        l'année du chargement — une saisie perdue en silence.
+        The choice is SAVED into the draft before being rendered: without that,
+        changing year then submitting the form would start again from the year
+        of the loading — input silently lost.
         """
         identifiant = parametres.get("b", [""])[0]
         brouillon = self.application.obtenir_brouillon_assistant(identifiant)
@@ -3009,15 +2988,15 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
             self._bloc_periode_rendezvous(identifiant, brouillon))
 
     def _servir_regle(self, parametres):
-        """Sert le panneau de la règle seul, recalé sur la source choisie.
+        """Serves the rule panel alone, realigned on the chosen source.
 
-        ⚠ CE QUI EST DÉJÀ TAPÉ EST GARDÉ, comme pour le panneau des dates : la
-        source, la fenêtre, l'ordre et le plafond du formulaire sont écrits dans
-        le brouillon AVANT le rendu. Sans cela, changer de source aurait effacé
-        en silence un plafond qu'on venait de saisir.
+        ⚠ WHAT IS ALREADY TYPED IS KEPT, as for the dates panel: the form's
+        source, window, order and ceiling are written into the draft BEFORE
+        rendering. Without that, changing source would have silently erased a
+        ceiling you had just typed in.
 
-        Rien n'est ENREGISTRÉ comme règle pour autant : c'est le bouton
-        « Enregistrer la règle » qui décide, et lui seul.
+        Nothing is SAVED as a rule for all that: it is the `Enregistrer la
+        règle` button that decides, and it alone.
         """
         identifiant = parametres.get("b", [""])[0]
         brouillon = self.application.obtenir_brouillon_assistant(identifiant)
@@ -3042,12 +3021,11 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
 
     @staticmethod
     def _periode_choisie(champs, brouillon):
-        """Le filtre de dates retenu, nettoyé — jamais une valeur inventée.
+        """The date filter kept, cleaned — never an invented value.
 
-        Changer d'année ou de semaine remet à zéro ce qui en dépend : une
-        semaine 53 gardée sur une année qui n'en a que 52, ou un jour gardé
-        d'une autre semaine, désigneraient une période que personne n'a
-        choisie.
+        Changing year or week resets what depends on it: a week 53 kept in a
+        year that has only 52, or a day kept from another week, would designate
+        a period nobody chose.
         """
         avant = brouillon.get("periode") or {}
         retenu = {"source": champs.get("source") or avant.get("source")
@@ -3079,7 +3057,9 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
 
     @staticmethod
     def _bornes_de_periode(periode):
-        """(début, fin) en texte ISO pour ce filtre — (None, None) si aucun."""
+        """(start, end) as ISO text for this filter — (None, None) when there is
+        none.
+        """
         if not periode or not periode.get("semaine"):
             return None, None
         if periode.get("jour"):
@@ -3091,7 +3071,7 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
                                           lundi + datetime.timedelta(days=7))
 
     def _servir_zones_vivantes(self, parametres):
-        """Sert les deux zones vivantes d'une campagne (fragment)."""
+        """Serves a campaign's two live zones (a fragment)."""
         try:
             campagne_id = int(parametres.get("id", [""])[0])
         except ValueError:
@@ -3104,19 +3084,18 @@ Aucun appel ne part tant que vous n'avez pas cliqué.</small></p>
 
     @staticmethod
     def _script_campagne(campagne_id):
-        """Pendant une campagne : les DEUX ZONES se remettent à jour, seules.
+        """During a campaign: the TWO ZONES refresh themselves, alone.
 
-        Trois choses valent d'être dites :
+        Three things are worth saying:
 
-        ① On ne remplace une zone que si elle a VRAIMENT changé. Entre deux
-           appels, la page ne bouge donc pas du tout — plus de clignotement
-           permanent, plus de sélection de texte qui saute sous la souris.
-        ② On s'arrête dès que la campagne n'est plus « en cours ». Le statut
-           voyage sur la zone elle-même : c'est la réponse du serveur qui
-           décide, pas une supposition du navigateur.
-        ③ Sans JavaScript, il ne se passe rien : la page reste celle du
-           chargement, et le bouton ↻ du navigateur fait le travail. Aucune
-           fonction n'est perdue, seule la mise à jour automatique l'est.
+        ① A zone is only replaced when it has REALLY changed. Between two
+        calls, the page therefore does not move at all — no more permanent
+        flickering, no more text selection jumping under the mouse. ② We stop
+        as soon as the campaign is no longer `en cours`. The status travels on
+        the zone itself: it is the server's answer that decides, not a browser
+        assumption. ③ Without JavaScript, nothing happens: the page stays as it
+        was on loading, and the browser's ↻ button does the work. No function
+        is lost, only the automatic refresh is.
         """
         return """<script>
 (function(){
@@ -3146,13 +3125,13 @@ setTimeout(tourner,1500);
 </script>""" % campagne_id
 
     def _script_verification_agenda(self):
-        """Le clic sur ▶ Démarrer demande le panneau AU SERVEUR et remplit le
-        SEUL bloc prévu — la page n'est jamais rechargée, et les chiffres
-        affichés sont ceux de l'instant du clic, pas ceux du chargement.
+        """The click on ▶ Start asks the SERVER for the panel and fills ONLY the
+        block provided — the page is never reloaded, and the figures shown are
+        those of the instant of the click, not those of the loading.
 
-        Sans JavaScript (ou si la demande échoue), le formulaire part
-        normalement : le serveur refuse le démarrage faute de confirmation
-        et renvoie la page AVEC le même panneau ouvert. Le repli est entier.
+        Without JavaScript (or if the request fails), the form goes out
+        normally: the server refuses the start for want of confirmation and
+        returns the page WITH the same panel open. The fallback is complete.
         """
         return """<script>
 (function(){
@@ -3183,26 +3162,26 @@ forme.addEventListener('submit',function(e){
 
     # ------------------------------------------- cahier de changements (§8.1)
     def _bloc_cahier(self, campagne, configuration, contacts):
-        """Le cahier des changements à REPORTER — lisible, copiable, exportable.
+        """The change log to CARRY OVER — readable, copyable, exportable.
 
-        Le vrai livrable d'une campagne. Il est lu depuis la table des
-        changements (une ligne écrite au moment du changement), jamais
-        recalculé depuis les états : c'est ce qui garantit qu'aucun
-        changement ne se perd. Rien n'est affiché qui n'ait été écrit.
+        A campaign's real deliverable. It is read from the changes table (a row
+        written at the moment of the change), never recomputed from the states:
+        that is what guarantees no change is lost. Nothing is displayed that
+        was not written.
         """
         base = self.application.base
         campagne_id = campagne["id"]
         changements = base.changements_de_campagne(campagne_id)
-        # Le bandeau §8.2 : le contact qui a MODIFIÉ son rendez-vous, mis en
-        # avant quand la campagne s'est arrêtée sur son oui.
+        # The §8.2 banner: the contact who MODIFIED their appointment,
+        # highlighted when the campaign stopped on their yes.
         bandeau = ""
         epargnes = sum(1 for c in contacts if c["etat"] == "épargné")
         mis_en_avant = assistant.changement_mis_en_avant(changements)
-        # ⚠ LE MOT AFFICHÉ, PAS LE CODE (14/08/2026, audit croisé). Cette phrase
-        # écrivait « épargné(s) » en clair, à l'endroit même qui explique
-        # l'état : le tableau juste en dessous disait « pas appelé », et la même
-        # page portait donc deux mots pour une seule chose — dont celui que le
-        # propriétaire a dit ne pas comprendre.
+        # ⚠ THE DISPLAYED WORD, NOT THE CODE (14/08/2026, cross audit). This
+        # sentence wrote `épargné(s)` in plain text, in the very place that
+        # explains the state: the table just below said `pas appelé`, so the
+        # same page carried two words for one thing — including the one the
+        # owner said he did not understand.
         mot = assistant.mot_etat("épargné")
         if mis_en_avant is not None and epargnes:
             bandeau = (
@@ -3215,18 +3194,18 @@ forme.addEventListener('submit',function(e){
                 f" La campagne s'est arrêtée là : {epargnes} contact(s) "
                 f"💤 {html.escape(mot)}(s), jamais dérangé(s).</p>")
         elif epargnes:
-            # ⚠ ET IL Y A UN BANDEAU MÊME SANS DÉPLACEMENT (14/08/2026). La
-            # phrase ne s'écrivait que s'il existait une ligne ↔ au cahier :
-            # une campagne conclue par quelqu'un qui n'avait AUCUN ancien
-            # rendez-vous (les gens qui attendent une place) laissait donc ses
-            # « pas appelé » sans un mot d'explication nulle part — la colonne
-            # détail ayant été retirée du tableau, il ne restait rien.
+            # ⚠ AND THERE IS A BANNER EVEN WITH NO MOVE (14/08/2026). The
+            # sentence was only written when a ↔ row existed in the log: a
+            # campaign concluded by somebody who had NO old appointment (the
+            # people waiting for a slot) therefore left its `pas appelé` with
+            # not a word of explanation anywhere — the detail column having
+            # been removed from the table, nothing was left.
             bandeau = (
                 f'<p class="pastille">💤 {epargnes} contact(s) '
                 f"{html.escape(mot)}(s), jamais dérangé(s) — la campagne "
                 "s'est arrêtée avant eux. La raison est écrite sur chaque "
                 "ligne : ouvrez « 🔁 Relances » pour la lire.</p>")
-        # Le maillon de cascade, quand cette campagne en est un.
+        # The cascade link, when this campaign is one.
         marque = configuration.get("cascade") or {}
         bloc_cascade = ""
         if marque:
@@ -3255,10 +3234,10 @@ forme.addEventListener('submit',function(e){
                 f"{resserrement}"
                 ' Aucun appel n\'est parti : c\'est ▶ Démarrer qui décide.</p>')
         if not changements:
-            # ⚠ LE BANDEAU RESTE, MÊME SANS CHANGEMENT (14/08/2026). Une
-            # campagne peut très bien s'arrêter sur un oui SANS rien écrire au
-            # cahier — quelqu'un qui n'avait aucun rendez-vous à déplacer. Sans
-            # cette ligne, ses « pas appelé » n'avaient d'explication nulle part.
+            # ⚠ THE BANNER STAYS, EVEN WITH NO CHANGE (14/08/2026). A campaign
+            # may perfectly well stop on a yes WITHOUT writing anything to the
+            # log — somebody who had no appointment to move. Without this line,
+            # its `pas appelé` had no explanation anywhere.
             return f"""<h2>📋 Le cahier des changements à reporter</h2>
 {bandeau}
 {bloc_cascade}
@@ -3338,9 +3317,12 @@ bouton.addEventListener('click',function(){{
 }})();
 </script>"""
 
-    # ------------------------------- compenser une absence (le seuil de 12 h)
+    # ------------------------------- making up for an absence (the 12-hour
+    # threshold)
     def _campagne_sur_le_creneau(self, creneau):
-        """LA campagne qui porte déjà ce créneau, ou None. Rien n'est créé."""
+        """THE campaign that already carries this slot, or None. Nothing is
+        created.
+        """
         for campagne in self.application.base.lister_campagnes():
             if (campagne["creneau"] or "") == creneau:
                 return campagne
@@ -3348,16 +3330,15 @@ bouton.addEventListener('click',function(){{
 
     @staticmethod
     def _bandeau_regle_jouee(configuration):
-        """Ce que la règle de liste a retenu, et ce qu'elle a écarté.
+        """What the list rule kept, and what it set aside.
 
-        ⚠ POURQUOI CE BANDEAU EXISTE (11/08/2026). Le propriétaire a monté une
-        campagne sur une place libre et n'a vu que cinq personnes « au lieu de
-        beaucoup ». La règle avait raison — une place n'intéresse que ceux dont
-        le rendez-vous est APRÈS elle — mais l'écran ne disait rien des autres.
-        Un compte tout seul se lit comme un défaut ; un compte avec sa raison se
-        lit comme une décision. Rien n'est recalculé ici : on affiche ce que la
-        règle a écrit au moment où elle a été jouée (voir
-        assistant.regenerer_la_liste).
+        ⚠ WHY THIS BANNER EXISTS (11/08/2026). The owner set up a campaign on a
+        free slot and saw only five people `instead of a lot`. The rule was
+        right — a slot only interests those whose appointment is AFTER it — but
+        the screen said nothing about the others. A count on its own reads as a
+        defect; a count with its reason reads as a decision. Nothing is
+        recomputed here: we display what the rule wrote at the moment it was
+        played (see assistant.regenerer_la_liste).
         """
         jouee = configuration.get("regle_jouee") or {}
         notes = jouee.get("notes") or []
@@ -3368,34 +3349,33 @@ bouton.addEventListener('click',function(){{
                 + html.escape(" ; ".join(notes)) + ".</p>")
 
     def _bloc_places_liberees(self, campagne):
-        """Les places qu'une annulation a libérées — et quoi en faire.
+        """The slots a cancellation has freed — and what to do with them.
 
-        LA RÈGLE DU PROPRIÉTAIRE (31/07/2026), tenue à l'écran : un client
-        annule au téléphone ; si son rendez-vous était à plus de N heures
-        (⚙ Réglages, 12 h par défaut), il a été SUPPRIMÉ, sa place est libre
-        et on PROPOSE ici de monter la campagne qui la remplira. En deçà du
-        seuil, il reste « annulé » et l'écran dit pourquoi on ne peut pas
-        organiser le remplacement — l'opérateur garde le lien pour le faire
-        à la main s'il le souhaite.
+        THE OWNER'S RULE (31/07/2026), held on screen: a client cancels on the
+        phone; if their appointment was more than N hours away (⚙ Réglages, 12
+        h by default), it was DELETED, its slot is free and we OFFER here to
+        set up the campaign that will fill it. Below the threshold, it stays
+        `annulé` and the screen says why a replacement cannot be arranged — the
+        operator keeps the link to do it by hand should they wish.
 
-        ⚠ JAMAIS UNE PLACE D'UNE JOURNÉE QU'ON VIDE (17/08/2026). Sa règle est
-        déjà écrite pour les créneaux annoncés au téléphone
-        (`assistant.jours_a_vider`) : « si le praticien n'est pas là ce jour-là,
-        aucune heure de ce jour-là n'est proposable ». Ce panneau ne la tenait
-        pas. Mesuré sur sa journée du 18/08, seuil abaissé : RingBack proposait
-        « 📞 Préparer la campagne créneau libéré » sur le 18/08 à 10h00 et à
-        15h40 — deux places de la journée même que la campagne était en train de
-        vider. On aurait appelé des gens pour leur offrir un rendez-vous un jour
-        où personne n'est là.
+        ⚠ NEVER A SLOT FROM A DAY BEING EMPTIED (17/08/2026). His rule is
+        already written for the slots announced on the phone
+        (`assistant.jours_a_vider`): `if the practitioner is not there that
+        day, no hour of that day is offerable`. This panel did not hold it.
+        Measured on his 18/08 day, with the threshold lowered: RingBack offered
+        `📞 Préparer la campagne créneau libéré` on 18/08 at 10:00 and at 15:40
+        — two slots from the very day the campaign was emptying. We would have
+        called people to offer them an appointment on a day when nobody is
+        there.
 
-        Son seuil de 72 h masquait ce défaut sans le corriger : il empêchait
-        seulement la PROPOSITION, et le lien « le faire quand même à la main »
-        restait là.
+        His 72-hour threshold masked this defect without fixing it: it only
+        prevented the OFFER, and the link `do it by hand anyway` was still
+        there.
 
-        AUCUN APPEL NE PART D'ICI : le bouton ouvre l'assistant, créneau
-        pré-rempli, à l'étape 2. Tout est lu du cahier des changements (les
-        lignes ➖ et ✖ écrites au moment du changement) et de l'état RÉEL du
-        rendez-vous : rien n'est recalculé, rien n'est supposé.
+        NO CALL GOES OUT FROM HERE: the button opens the assistant, slot
+        pre-filled, at step 2. Everything is read from the change log (the ➖
+        and ✖ rows written at the moment of the change) and from the
+        appointment's REAL state: nothing is recomputed, nothing is assumed.
         """
         base = self.application.base
         maintenant = datetime.datetime.now().replace(
@@ -3403,11 +3383,11 @@ bouton.addEventListener('click',function(){{
         jours_vides = assistant.jours_a_vider(base, campagne)
         libres, tardives, vus, sur_jour_vide = [], [], set(), []
         for changement in base.changements_de_campagne(campagne["id"]):
-            # ⚠ LES DEUX GENRES DE RETRAIT (17/08/2026). Le cahier écrivait
-            # « suppression » même quand le rendez-vous restait « annulé » ;
-            # depuis que le genre suit le statut, ce panneau perdrait toutes
-            # les annulations tardives — celles qu'il sert justement à
-            # expliquer — s'il ne lisait que l'un des deux.
+            # ⚠ THE TWO KINDS OF REMOVAL (17/08/2026). The log wrote
+            # `suppression` even when the appointment stayed `annulé`; now that
+            # the kind follows the status, this panel would lose every late
+            # cancellation — the very ones it exists to explain — if it read
+            # only one of the two.
             if changement["genre"] not in assistant.GENRES_QUI_RETIRENT:
                 continue
             if not changement["rendezvous_id"]:
@@ -3416,11 +3396,12 @@ bouton.addEventListener('click',function(){{
             if rdv is None or rdv["id"] in vus:
                 continue
             if rdv["horaire"] < maintenant:
-                continue        # la place est passée : plus rien à remplir
+                continue  # the slot is past: nothing left to fill
             vus.add(rdv["id"])
             if rdv["horaire"][:10] in jours_vides:
-                # La journée entière se vide : cette place n'est pas à remplir,
-                # elle est à laisser vide. On le DIT plutôt que de la taire.
+                # The whole day is being emptied: this slot is not to be
+                # filled, it is to be left empty. We SAY so rather than keep
+                # quiet about it.
                 sur_jour_vide.append(rdv)
                 continue
             if rdv["statut"] == db.STATUT_SUPPRIME:
@@ -3500,16 +3481,15 @@ le créneau déjà rempli, à l'étape 2. C'est vous qui validez, puis qui
 démarrez.</p>"""
 
     def _traiter_compensation(self, corps):
-        """Ouvre l'assistant sur une place libre — sans appeler personne.
+        """Opens the assistant on a free slot — without calling anybody.
 
-        Le geste est un simple raccourci : une campagne 📞 « créneau libéré »
-        dont le créneau est déjà rempli. Rien n'est créé en base tant que
-        l'opérateur n'a pas validé les trois étapes.
+        The gesture is a plain shortcut: a 📞 `créneau libéré` campaign whose
+        slot is already filled in. Nothing is created in the database until the
+        operator has validated the three steps.
 
-        DEUX portes mènent ici, et c'est voulu — une seule mécanique :
-        le récapitulatif d'une campagne (compenser une annulation) et le
-        planning lui-même (§5 : « j'ai un trou, qui peut le prendre ? »).
-        Le champ « depuis » ne sert qu'au journal.
+        TWO doors lead here, and that is intended — one mechanism: a campaign's
+        summary (making up for a cancellation) and the schedule itself (§5: `I
+        have a gap, who can take it?`). The `depuis` field serves only the log.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         creneau = donnees.get("creneau", [""])[0].strip()
@@ -3526,10 +3506,10 @@ démarrez.</p>"""
         return self._rediriger(f"/assistant/message?b={identifiant}")
 
     def _servir_cahier_csv(self, parametres):
-        """Sert le cahier de changements en CSV — généré à la volée, jamais stocké.
+        """Serves the change log as CSV — generated on the fly, never stored.
 
-        Même règle que les deux autres exports du produit : le fichier est
-        construit à la demande et n'est écrit NULLE PART côté serveur.
+        The same rule as the product's two other exports: the file is built on
+        demand and is written NOWHERE server-side.
         """
         try:
             campagne_id = int(parametres.get("id", [""])[0])
@@ -3554,14 +3534,15 @@ démarrez.</p>"""
         self.end_headers()
         self.wfile.write(contenu)
 
-    # ------------------------------- 📥 les appels partis sans leur résultat
+    # ------------------------------- 📥 the calls that went out with no result
     def _bloc_resultats_en_attente(self, campagne_id, contacts):
-        """Le geste « Récupérer les résultats en attente », s'il y a de quoi.
+        """The `Retrieve pending results` gesture, when there is anything to
+        retrieve.
 
-        Rien à récupérer : rien n'est affiché — on ne propose pas un bouton
-        qui ne ferait rien. Sinon, l'écran dit combien d'appels sont partis
-        sans avoir rendu leur résultat, et rappelle EN CLAIR que ce geste ne
-        compose aucun numéro (c'est la question qui vient à l'esprit).
+        Nothing to retrieve: nothing is displayed — we do not offer a button
+        that would do nothing. Otherwise, the screen says how many calls went
+        out without returning their result, and states IN CLEAR that this
+        gesture dials no number (that is the question that comes to mind).
         """
         en_attente = [contact for contact in contacts
                       if contact["etat"] == assistant.ETAT_RESULTAT_INCONNU]
@@ -3589,7 +3570,7 @@ dira et n'écrira rien.</small></p>
 </div>"""
 
     def _bloc_bilan_recuperation(self, comptes):
-        """Ce que le geste de récupération a VRAIMENT fait, ligne par ligne."""
+        """What the retrieval gesture ACTUALLY did, row by row."""
         if not comptes:
             return ('<p class="pastille">'
                     + html.escape(assistant._resume_recuperation([]))
@@ -3601,33 +3582,32 @@ dira et n'écrira rien.</small></p>
                 + html.escape(assistant._resume_recuperation(comptes))
                 + f"</p><ul>{lignes}</ul></div>")
 
-    # ------------------------------------------------------ le détail long
-    # Un détail peut faire plusieurs centaines de caractères : le message
-    # d'une réponse illisible cite la réponse de CALL-E. Étalé dans une
-    # cellule, il déforme le tableau au point de le rendre illisible
-    # (constaté par le propriétaire le 02/08/2026 sur une campagne de cascade).
-    # La cellule montre donc le DÉBUT, et le reste s'ouvre en fenêtre.
-    # RETIRÉ LE 11/08/2026 avec la colonne « Détail » du tableau des contacts :
-    # l'abrègement cliquable (LONGUEUR_DETAIL, _en_lignes, _cellule_detail) n'a
-    # plus rien à rendre — c'était la seule cellule qui s'en servait. Le détail
-    # d'un contact se lit maintenant sur 🔁 Relances (« Voir sa demande… ») et
-    # dans le tableau des 📵 non joints, qui le portent en clair.
+    # ------------------------------------------------------ the long detail A
+    # detail can run to several hundred characters: the message of an
+    # unreadable answer quotes CALL-E's reply. Spread out in a cell, it
+    # distorts the table to the point of making it unreadable (observed by the
+    # owner on 02/08/2026 on a cascade campaign). The cell therefore shows the
+    # BEGINNING, and the rest opens in a window. REMOVED ON 11/08/2026 along
+    # with the contacts table's `Détail` column: the clickable abbreviation
+    # (LONGUEUR_DETAIL, _en_lignes, _cellule_detail) has nothing left to render
+    # — it was the only cell that used it. A contact's detail is now read on 🔁
+    # Relances (`Voir sa demande…`) and in the table of 📵 not-reached contacts,
+    # which carry it in clear.
 
     # ------------------------------------------------- poste de pilotage
     def _page_pilotage(self, campagne, parametres=None, fragment=False):
-        """La fiche d'une campagne de l'assistant : états, compteurs, commandes.
+        """An assistant campaign's record: states, counters, commands.
 
-        `fragment` : ne rendre que les deux zones vivantes, pour le
-        rafraîchissement pendant une campagne. Le MÊME code produit les deux —
-        ce qu'on voit après une mise à jour est mot pour mot ce qu'on aurait
-        vu en rechargeant la page.
+        `fragment`: render only the two live zones, for refreshing during a
+        campaign. The SAME code produces both — what you see after an update is
+        word for word what you would have seen by reloading the page.
         """
         base = self.application.base
         preferences = self.application.preferences
         campagne_id = campagne["id"]
         configuration = assistant.configuration_campagne(campagne)
-        # `fiche_nature` connaît AUSSI les natures retirées : une campagne
-        # d'avant le 03/08/2026 garde son nom et son pictogramme.
+        # `fiche_nature` ALSO knows the removed kinds: a campaign from before
+        # 03/08/2026 keeps its name and its pictogram.
         nature = (assistant.fiche_nature(campagne["nature"])
                   or {"icone": "📣", "nom": campagne["nature"]})
         contacts = base.contacts_de_campagne(campagne_id)
@@ -3659,22 +3639,22 @@ dira et n'écrira rien.</small></p>
         bloc_message = ""
         if fait in messages:
             bloc_message = f'<p class="pastille">{html.escape(messages[fait])}</p>'
-        # 📥 Le bilan du geste de récupération : ce qui a été relu, ce qui ne
-        # l'a pas été, et pourquoi. Gardé côté serveur le temps d'une
-        # redirection (voir _traiter_recuperation) — jamais recalculé.
+        # 📥 The summary of the retrieval gesture: what was reread, what was
+        # not, and why. Kept server-side for the duration of a redirect (see
+        # _traiter_recuperation) — never recomputed.
         bilan = self.application.bilans_recuperation.pop(
             parametres.get("recup", [""])[0], None)
         if bilan is not None:
             bloc_message += self._bloc_bilan_recuperation(bilan)
-        # Campagne née du bouton « Préparer une campagne d'essai réel » :
-        # l'écran dit ce qui a été créé, ce qui ne l'a pas été (aucun appel),
-        # et où lire la marche à suivre.
+        # A campaign born of the `Préparer une campagne d'essai réel` button:
+        # the screen says what was created, what was not (no calls), and where
+        # to read what to do next.
         if parametres.get("essai_reel", [""])[0] == "prete":
             repli = parametres.get("repli", ["0"])[0] == "1"
-            # Le repli n'a qu'une cause visible — « pas assez de places libres
-            # à proposer » — et deux origines possibles : aucun horaire
-            # d'ouverture réglé, ou un agenda déjà plein. On dit les deux
-            # plutôt que d'en deviner une.
+            # The fallback has only one visible cause — `not enough free slots
+            # to offer` — and two possible origins: no opening hours
+            # configured, or an already full calendar. We state both rather
+            # than guess one.
             precision = (" Faute d'assez de places libres (horaires "
                          "d'ouverture non réglés, ou agenda déjà plein), les "
                          "rendez-vous ont été posés DEMAIN MATIN, d'heure en "
@@ -3682,8 +3662,8 @@ dira et n'écrira rien.</small></p>
                          "voulez de vraies places." if repli else
                          " Les rendez-vous ont été posés sur vos premières "
                          "places réellement libres.")
-            # Combien de testeurs se partagent les rôles : l'écran le dit,
-            # parce que la suite (prévenir chacun de son rôle) en dépend.
+            # How many testers share the roles: the screen says so, because
+            # what comes next (telling each of them their role) depends on it.
             brut_testeurs = parametres.get("testeurs", ["1"])[0]
             nb_testeurs = int(brut_testeurs) if brut_testeurs.isdigit() else 1
             if nb_testeurs > 1:
@@ -3709,19 +3689,19 @@ dira et n'écrira rien.</small></p>
         classe_statut = {"prête": "st-prevu", "en cours": "st-manque",
                          "en pause": "st-deplace", "terminée": "st-confirme",
                          "arrêtée": "st-ignore"}.get(statut, "")
-        # POURQUOI la campagne s'est arrêtée toute seule. Écrit seulement
-        # quand c'est une panne de NOTRE côté (clé refusée, service en panne,
-        # crédit épuisé) : le texte dit ce qui n'a pas eu lieu et quoi faire.
-        # Une pause demandée à la main n'a pas de raison — et n'affiche rien.
+        # WHY the campaign stopped by itself. Written only when it is a failure
+        # on OUR side (key refused, service down, credit exhausted): the text
+        # says what did not happen and what to do. A pause requested by hand
+        # has no reason — and displays nothing.
         if statut == "en pause" and campagne.get("raison_pause"):
             bloc_message += (
                 '<p class="erreurs">⛔ Campagne mise en pause toute seule : '
                 f'{html.escape(campagne["raison_pause"])}</p>')
-        # L'HEURE FORCÉE SE DIT, elle ne se devine pas. Une campagne qui tourne
-        # hors des heures permises est une exception assumée : elle doit se
-        # lire sur sa fiche, aujourd'hui comme dans trois semaines. Et la
-        # phrase se tait d'elle-même en appels réels — parce que le garde-fou,
-        # lui, s'y applique de nouveau (voir assistant.heure_forcee).
+        # A FORCED HOUR IS STATED, it is not guessed. A campaign running
+        # outside the permitted hours is an acknowledged exception: it must be
+        # readable on its record, today as in three weeks' time. And the
+        # sentence falls silent by itself in real calls — because the guard
+        # applies again there (see assistant.heure_forcee).
         if assistant.heure_forcee(configuration, self.application.mode_reel):
             bloc_message += (
                 '<p class="pastille">Heure forcée : cette campagne a le droit '
@@ -3730,22 +3710,23 @@ dira et n'écrira rien.</small></p>
                 "qu'elle est <strong>simulée</strong> — aucun téléphone ne "
                 "sonne. En appels réels, le garde-fou de politesse "
                 "s'appliquerait de nouveau.</p>")
-        # 📥 LES APPELS DÉJÀ PARTIS DONT LE RÉSULTAT MANQUE. Le bloc n'existe
-        # que s'il y en a : on ne propose pas un geste qui n'aurait rien à
-        # faire. Il dit noir sur blanc qu'aucun numéro ne sera composé.
+        # 📥 THE CALLS ALREADY GONE OUT WHOSE RESULT IS MISSING. The block only
+        # exists when there are any: we do not offer a gesture that would have
+        # nothing to do. It states in black and white that no number will be
+        # dialled.
         bloc_message += self._bloc_resultats_en_attente(campagne_id, contacts)
-        # Les commandes selon l'état — la pause/l'arrêt agissent entre deux appels.
+        # The commands according to the state — pause/stop act between two
+        # calls.
         verbe = "RÉELLEMENT" if self.application.mode_reel else "en simulation"
         commandes = []
         if statut == "prête":
-            # ⚠ ET LE GESTE INVERSE, ABSENT JUSQU'AU 21/08/2026 : fermer une
-            # campagne préparée qu'on ne lancera pas. Sans lui, la seule façon
-            # de s'en débarrasser était de la DÉMARRER puis de la clore —
-            # c'est-à-dire faire sonner des téléphones pour rien.
-            #
-            # CE QUE CELA A COÛTÉ, mesuré dans sa base : 125 contacts dormaient
-            # dans sept campagnes « prête » des 15 et 17/08, dont les
-            # rendez-vous avaient disparu depuis. Il n'avait aucun geste.
+            # ⚠ AND THE OPPOSITE GESTURE, ABSENT UNTIL 21/08/2026: closing a
+            # prepared campaign you will not launch. Without it, the only way
+            # to get rid of one was to START it then close it — that is, to
+            # make phones ring for nothing.  WHAT THAT COST, measured in his
+            # database: 125 contacts were sleeping in seven `prête` campaigns
+            # from 15 and 17/08, whose appointments had since disappeared. He
+            # had no gesture at all.
             commandes.append(f"""<form method="post" action="/campagne/demarrer" style="display:inline"
  id="form-demarrer" data-verification="/campagne/verification-agenda?id={campagne_id}">
   <input type="hidden" name="campagne" value="{campagne_id}">
@@ -3779,10 +3760,10 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
   <button class="danger">⏹ Arrêter</button>
 </form>""")
         bloc_commandes = "<p>" + "\n".join(commandes) + "</p>" if commandes else ""
-        # Le rappel « l'agenda de RingBack fait foi » : vide tant qu'on n'a
-        # pas cliqué ▶ (le clic le demande au serveur), déjà rempli quand le
-        # démarrage vient d'être refusé faute de confirmation — c'est le
-        # repli sans JavaScript, et rien n'est perdu au passage.
+        # The `RingBack's calendar is the reference` reminder: empty until ▶
+        # has been clicked (the click asks the server for it), already filled
+        # when the start has just been refused for want of confirmation — that
+        # is the no-JavaScript fallback, and nothing is lost along the way.
         bloc_verification = ""
         if statut in ("prête", "en pause"):
             ouvert = fait == "agenda_a_verifier"
@@ -3791,18 +3772,15 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
             bloc_verification = (
                 f'<div id="verification-agenda"{"" if ouvert else " hidden"}>'
                 f"{contenu}</div>" + self._script_verification_agenda())
-        # ⚠ SEULS LES ÉTATS QUI CONCERNENT QUELQU'UN (30/08/2026, sa demande :
-        # « que les résumés ne s'affichent que lorsqu'il y a au moins un contact
-        # concerné »). Ils étaient TOUS affichés — c'était une décision, « la
-        # vue d'ensemble honnête » : montrer les dix états pour qu'on sache
-        # qu'ils existent. À l'usage, une campagne terminée alignait dix
-        # pastilles dont huit à zéro, et il fallait les lire toutes pour
-        # trouver les deux qui disent quelque chose.
-        #
-        # ⚠ CE QU'ON PERD, ET C'EST ASSUMÉ : la liste des états possibles ne se
-        # découvre plus ici. Elle reste entière sur 👥 Contacts et dans la fiche
-        # de chaque personne — cet écran-ci dit ce qui S'EST PASSÉ, pas ce qui
-        # aurait pu.
+        # ⚠ ONLY THE STATES THAT CONCERN SOMEBODY (30/08/2026, his request:
+        # `let the summaries be displayed only when at least one contact is
+        # concerned`). They were ALL displayed — it was a decision, `the honest
+        # overview`: show the ten states so people know they exist. In use, a
+        # finished campaign lined up ten badges, eight of them at zero, and you
+        # had to read them all to find the two that say something.  ⚠ WHAT IS
+        # LOST, AND IT IS ACCEPTED: the list of possible states is no longer
+        # discovered here. It stays complete on 👥 Contacts and in each person's
+        # record — this screen says what HAPPENED, not what might have.
         compteurs = []
         for etat, (icone, classe) in assistant.ETATS.items():
             nombre = sum(1 for c in contacts if c["etat"] == etat)
@@ -3813,9 +3791,8 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
             compteurs.append(
                 f'<span class="pastille {classe}">{icone} '
                 f"{html.escape(assistant.mot_etat(etat))} : {nombre}</span>")
-        # ⚠ PAS DE LIGNE VIDE : une campagne sans aucun contact n'a rien à
-        # résumer, et un paragraphe vide laisse un blanc que personne ne
-        # s'explique.
+        # ⚠ NO EMPTY LINE: a campaign with no contact at all has nothing to
+        # summarise, and an empty paragraph leaves a blank nobody can explain.
         bloc_compteurs = ('<p style="display:flex;gap:.4rem;flex-wrap:wrap">'
                           + " ".join(compteurs) + "</p>") if compteurs else ""
         exclus = sum(1 for c in contacts if c["etat"] == "exclu")
@@ -3824,10 +3801,10 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
             bandeau_exclus = (f'<p class="erreurs">🚫 {exclus} contact(s) '
                               "exclu(s) — jamais composé(s) — "
                               '<a href="/clients">gérer depuis 👥 Contacts</a>.</p>')
-        # ⚠ LA COLONNE « DÉTAIL » N'EXISTE PLUS DANS CE TABLEAU (sa décision du
-        # 11/08). Sans ce bandeau, une personne qui a refusé l'agent devenait
-        # une pastille 🙋 de plus, indistinguable de celles que l'agent n'a pas
-        # su conclure — et rien ne disait qu'il y a un appel à passer soi-même.
+        # ⚠ THE `DÉTAIL` COLUMN NO LONGER EXISTS IN THIS TABLE (his decision of
+        # 11/08). Without this banner, a person who refused the agent became
+        # one more 🙋 badge, indistinguishable from those the agent could not
+        # conclude with — and nothing said there was a call to make yourself.
         refus_agent = sum(1 for c in contacts
                           if db.refus_de_l_agent(c["detail"]))
         if refus_agent:
@@ -3837,32 +3814,31 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
                 "elles attendent qu'un <strong>humain</strong> les rappelle : "
                 '<a href="/relances?vue=humains">🔁 Relances</a>.</p>')
         bandeau_exclus += self._bandeau_regle_jouee(configuration)
-        # LA COLONNE « PROCHAIN RDV » (demande du propriétaire, 11/08/2026) :
-        # l'agenda de chaque contact, lu EN UNE SEULE PASSE plutôt qu'une
-        # requête par ligne — cette page se rafraîchit toutes les 1,5 s pendant
-        # une campagne, et cinquante requêtes par rafraîchissement pour afficher
-        # cinquante dates n'auraient rien apporté.
-        #
-        # ⚠ « PROCHAIN » EST LU DANS L'AGENDA, PAS DANS LA COLONNE FIGÉE DU
-        # CONTACT. Le rendez-vous que la campagne a recopié à sa création
-        # (« rdv_existant ») date du jour où la liste a été bâtie : après un
-        # appel qui déplace ou annule, il ne dit plus la vérité. Ici on montre
-        # ce que l'agenda dit MAINTENANT — c'est tout l'intérêt de la colonne,
-        # et c'est aussi pourquoi elle se vide quand un rendez-vous est annulé.
+        # THE `PROCHAIN RDV` COLUMN (owner's request, 11/08/2026): each
+        # contact's calendar, read IN A SINGLE PASS rather than one query per
+        # row — this page refreshes every 1.5 s during a campaign, and fifty
+        # queries per refresh to display fifty dates would have brought
+        # nothing.  ⚠ `NEXT` IS READ FROM THE CALENDAR, NOT FROM THE CONTACT'S
+        # FROZEN COLUMN. The appointment the campaign copied at its creation
+        # (`rdv_existant`) dates from the day the list was built: after a call
+        # that moves or cancels, it no longer tells the truth. Here we show
+        # what the calendar says NOW — that is the whole point of the column,
+        # and it is also why it empties when an appointment is cancelled.
         agendas = base.etat_rendezvous_par_client()
-        # ⚠ CE QUE LA CAMPAGNE A FAIT AU RENDEZ-VOUS, lu en une seule passe
-        # (21/08/2026, son signalement : « les états ne sont pas alignés sur la
-        # situation réelle »). Sur sa campagne n° 119, trois personnes
-        # portaient « 📞 le client rappellera » et un TIRET dans la colonne des
-        # rendez-vous — alors que leur rendez-vous venait d'être ANNULÉ. Un
-        # tiret se lit « on ne sait pas » ; ici on savait, et on le taisait.
+        # ⚠ WHAT THE CAMPAIGN DID TO THE APPOINTMENT, read in a single pass
+        # (21/08/2026, his report: `the states are not aligned with the real
+        # situation`). On his campaign no. 119, three people carried `📞 le
+        # client rappellera` and a DASH in the appointments column — while
+        # their appointment had just been CANCELLED. A dash reads as `we do not
+        # know`; here we knew, and we kept quiet about it.
         sorts = {}
         for changement in base.changements_de_campagne(campagne_id):
             if changement["genre"] not in assistant.GENRES_QUI_RETIRENT:
                 continue
             if changement["contact_id"]:
                 sorts[changement["contact_id"]] = changement["ancienne_date"]
-        # L'ordre d'affichage = l'ordre d'appel choisi ; position des « à appeler ».
+        # The display order = the chosen calling order; the position of the `à
+        # appeler` ones.
         ordonnes = assistant.ordonner_contacts(
             contacts, configuration["ordre"], campagne.get("creneau"))
         lignes = []
@@ -3890,18 +3866,19 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
                     f"<pre>{html.escape(appel['transcription'])}</pre></details>")
             heure_dernier = (themes.date_lisible(
                 db.heure_locale(appels[-1]["cree_le"])) if appels else "—")
-            # Le prochain rendez-vous de CE contact, au format jj/mm/aaaa hh:mm.
-            # Un contact sans fiche client — une campagne d'avant la colonne
-            # `client_id` — n'a pas d'agenda à lire : la case reste vide plutôt
-            # que de montrer la date figée de la campagne, qui a pu changer.
+            # THIS contact's next appointment, in dd/mm/yyyy hh:mm format. A
+            # contact with no client record — a campaign from before the
+            # `client_id` column — has no calendar to read: the box stays empty
+            # rather than showing the campaign's frozen date, which may have
+            # changed.
             prochain = (agendas.get(contact.get("client_id")) or {}).get(
                 "prochain") or {}
             prochain_rdv = assistant.date_chiffree(prochain.get("horaire"))
             if not prochain_rdv and contact["id"] in sorts:
-                # ⚠ ON DIT CE QU'ON A FAIT. La campagne a retiré ce
-                # rendez-vous : le taire derrière un tiret laissait croire à un
-                # écart entre les tableaux — le cahier annonçait trois
-                # annulations, la liste n'en montrait aucune.
+                # ⚠ WE SAY WHAT WE DID. The campaign removed this appointment:
+                # hiding it behind a dash suggested a discrepancy between the
+                # tables — the log announced three cancellations, the list
+                # showed none.
                 quand = assistant.date_chiffree(sorts[contact["id"]])
                 prochain_rdv = (
                     '<span class="pastille st-annule">✖ annulé</span>'
@@ -3915,11 +3892,11 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
   <td>{len(appels)}<br><small>{heure_dernier}</small></td>
   <td>{''.join(transcriptions) or '—'}</td>
 </tr>""")
-        # ⚠ UNE LISTE VIDE DOIT DIRE POURQUOI. Une campagne AUTOMATIQUE
-        # fabrique sa liste par une règle : quand celle-ci n'a trouvé
-        # personne, « Aucun contact » laissait croire à un oubli de saisie, et
-        # le ▶ Démarrer se serait terminé sans un seul appel sans qu'on
-        # comprenne. On nomme la règle, et on dit qu'elle sera rejouée.
+        # ⚠ AN EMPTY LIST MUST SAY WHY. An AUTOMATIC campaign builds its list
+        # from a rule: when the rule found nobody, `Aucun contact` suggested
+        # somebody had forgotten to type them in, and ▶ Start would have ended
+        # with not a single call and no explanation. We name the rule, and we
+        # say it will be replayed.
         regle = assistant.regle_de_liste(configuration)
         regle_vide = ""
         if regle and not lignes:
@@ -3933,22 +3910,21 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
                 "suivante peut très bien intéresser quelqu'un. Pour choisir "
                 "les personnes vous-même, créez une campagne en mode "
                 "<strong>Manuel</strong>.")
-        # ⚠ LA COLONNE « DÉTAIL » EST RETIRÉE DE CE TABLEAU (11/08/2026), et
-        # avec elle la position dans l'ordre d'appel. Décision du propriétaire,
-        # redite : « je t'ai demandé de supprimer la position, pas de la mettre
-        # dans une autre colonne ». La première tentative la glissait sous la
-        # pastille d'état — c'était la déplacer, pas la retirer.
-        #
-        # OÙ LE DÉTAIL SE LIT ENCORE, car il n'est pas perdu : sur 🔁 Relances,
-        # « Voir sa demande… » l'ouvre en fenêtre pour les contacts qui
-        # attendent un humain (voir serveur._lien_demande), et le tableau des
-        # 📵 non joints le porte en clair. Ce sont les deux écrans faits pour ça.
+        # ⚠ THE `DÉTAIL` COLUMN IS REMOVED FROM THIS TABLE (11/08/2026), and
+        # with it the position in the calling order. The owner's decision,
+        # restated: `I asked you to remove the position, not to put it in
+        # another column`. The first attempt slipped it under the state badge —
+        # that was moving it, not removing it.  WHERE THE DETAIL IS STILL READ,
+        # since it is not lost: on 🔁 Relances, `Voir sa demande…` opens it in a
+        # window for the contacts waiting for a human (see
+        # serveur._lien_demande), and the table of 📵 not-reached contacts
+        # carries it in clear. Those are the two screens made for it.
         tableau = ("<table><tr><th>Ordre</th><th>Contact</th><th>Téléphone</th>"
                    "<th>État</th><th>Son rendez-vous</th><th>Tentatives<br>"
                    "<small>dernier appel</small></th><th>Transcription</th></tr>"
                    + "\n".join(lignes) + "</table>") if lignes else \
             f"<p>Aucun contact dans cette campagne.{regle_vide}</p>"
-        # En-tête : mission et paramètres dépliables.
+        # Header: the mission and the parameters, expandable.
         options = configuration["options"]
         infos = configuration["infos"]
         lignes_infos = "".join(
@@ -3971,9 +3947,9 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
         interdit = assistant.periode_interdite(preferences)
         texte_interdit = (f"{interdit[0]} → {interdit[1]}" if interdit
                           else "aucune")
-        # Le créneau de la campagne : celui de la nature « créneau libéré »,
-        # ou celui qu'un maillon de cascade a repris d'une place libérée. Il
-        # n'apparaît que s'il existe — jamais de ligne vide.
+        # The campaign's slot: that of the `créneau libéré` kind, or the one a
+        # cascade link took over from a freed slot. It only appears when it
+        # exists — never an empty line.
         ligne_creneau = ""
         if campagne["creneau"]:
             ligne_creneau = ("<li>Créneau de la campagne : <strong>"
@@ -3997,52 +3973,50 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
         note_relances = ""
         if any(r["statut"] == "planifiée" for r in relances):
             dues = len(base.relances_dues())
-            # ⚠ « ÉCHÉANCES DANS LE TABLEAU » DEVENAIT FAUX (11/08/2026) : la
-            # colonne « Détail » les portait, et elle est retirée. La phrase dit
-            # donc où elles se lisent vraiment — un écran qui renvoie à une
-            # colonne disparue est pire qu'un écran muet.
+            # ⚠ `DUE DATES IN THE TABLE` HAD BECOME FALSE (11/08/2026): the
+            # `Détail` column carried them, and it has been removed. So the
+            # sentence says where they are really read — a screen pointing to a
+            # column that has disappeared is worse than a silent screen.
             note_relances = (
                 '<p><small>🔁 Des relances sont programmées. Leurs échéances se '
                 "lisent sur la page des relances. L'exécution automatique est "
                 '<span class="badge-a-venir">à venir</span> : le geste reste '
                 f'le bouton de la page <a href="/relances">🔁 Relances</a>'
                 f"{' — ' + str(dues) + ' due(s) maintenant' if dues else ''}.</small></p>")
-        # LES DEUX ZONES QUI VIVENT PENDANT UNE CAMPAGNE. Tout ce qui change
-        # d'un appel à l'autre est dedans ; tout ce qui ne change pas (la
-        # mission, les paramètres) est DEHORS. C'est ce qui permet de remettre
-        # à jour ces zones-là seulement, au lieu de recharger la page entière
-        # toutes les 1,5 s — ce que faisait RingBack jusqu'au 02/08/2026, avec
-        # un écran qui clignotait sans arrêt, les blocs dépliés qui se
-        # refermaient et la position de lecture perdue à chaque fois.
+        # THE TWO ZONES THAT LIVE DURING A CAMPAIGN. Everything that changes
+        # from one call to the next is inside; everything that does not change
+        # (the mission, the parameters) is OUTSIDE. That is what makes it
+        # possible to refresh just those zones, instead of reloading the whole
+        # page every 1.5 s — which is what RingBack did until 02/08/2026, with
+        # a screen flickering endlessly, the expanded blocks closing again and
+        # the reading position lost every time.
         etat = f"""{bloc_message}
 <h1>{html.escape(campagne['nom'])}</h1>
 <p>{nature['icone']} <strong>{html.escape(nature['nom'])}</strong>
 <span class="pastille {classe_statut}">{html.escape(statut)}</span></p>"""
-        # ⚠ CE QU'IL VIENT VOIR EN PREMIER, C'EST SA LISTE (30/08/2026, sa
-        # demande). Trois tableaux se succédaient, et celui qu'il regarde
-        # pendant qu'une campagne tourne — les personnes, une par une —
-        # arrivait en TROISIÈME. Les deux autres ne parlent pas des appels en
-        # cours : ils disent ce qu'il faudra REPORTER ailleurs, et les places
-        # qu'une annulation a libérées. On les lit après, pas pendant.
-        #
-        # ⚠ RIEN N'EST RETIRÉ, tout est REPLIÉ. Ces deux tableaux portent des
-        # gestes (copier le cahier, monter une campagne sur une place libérée)
-        # et des faits qu'on ne doit pas perdre : les cacher pour de bon
-        # rejouerait le défaut du 21/08, quand un onglet retiré a emporté son
-        # seul bouton avec lui. Un `details` les garde à un clic — et il marche
-        # sans JavaScript, comme les autres replis de cette page.
-        # ⚠ L'ALLURE D'UN LIEN, et c'est la classe que le produit a déjà
-        # (`repli-geste`, la même que « Saisie manuelle des créneaux ») : il a
-        # demandé « un lien "voir les détails" », pas un bouton de plus. Le
-        # balisage recopie `serveur._replie` — `assistant_web` ne peut pas
-        # l'importer, c'est `serveur` qui importe `assistant_web` et non
-        # l'inverse. La CLASSE, elle, reste la seule vérité sur l'apparence.
-        #
-        # ⚠ TOUJOURS LÀ, MÊME SUR UNE CAMPAGNE NEUVE. Le cahier ne rend jamais
-        # une chaîne vide : sans changement, il écrit « rien n'a encore bougé
-        # dans le planning à cause de cette campagne » — et c'est justement ce
-        # qu'on veut pouvoir vérifier. Un repli qui apparaît et disparaît selon
-        # l'avancement serait un écran qui change de forme sous les yeux.
+        # ⚠ WHAT HE COMES TO SEE FIRST IS HIS LIST (30/08/2026, his request).
+        # Three tables followed one another, and the one he looks at while a
+        # campaign is running — the people, one by one — came THIRD. The other
+        # two do not talk about the calls in progress: they say what will have
+        # to be CARRIED OVER elsewhere, and which slots a cancellation has
+        # freed. You read them afterwards, not during.  ⚠ NOTHING IS REMOVED,
+        # everything is COLLAPSED. Those two tables carry gestures (copy the
+        # log, set up a campaign on a freed slot) and facts that must not be
+        # lost: hiding them for good would replay the defect of 21/08, when a
+        # removed tab carried off its only button with it. A `details` keeps
+        # them one click away — and it works without JavaScript, like the
+        # page's other collapsibles. ⚠ THE LOOK OF A LINK, and it is the class
+        # the product already has (`repli-geste`, the same as `Saisie manuelle
+        # des créneaux`): he asked for `a "see the details" link`, not one more
+        # button. The markup copies `serveur._replie` — `assistant_web` cannot
+        # import it, since it is `serveur` that imports `assistant_web` and not
+        # the reverse. The CLASS, though, stays the only truth about
+        # appearance.  ⚠ ALWAYS THERE, EVEN ON A BRAND-NEW CAMPAIGN. The log
+        # never returns an empty string: with no change, it writes `nothing has
+        # yet moved in the schedule because of this campaign` — and that is
+        # precisely what you want to be able to check. A collapsible appearing
+        # and disappearing depending on progress would be a screen changing
+        # shape before your eyes.
         details = f"""<details class="repli-geste">
 <summary>Voir les détails</summary>
 <div class="repli-contenu">
@@ -4057,14 +4031,14 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
 {tableau}
 {note_relances}
 {details}"""
-        # La mission et les paramètres s'affichent ENTRE les deux zones, à
-        # leur place habituelle — mais DEHORS : ce sont des blocs dépliables,
-        # et un bloc qu'on vient d'ouvrir ne doit pas se refermer parce qu'un
-        # appel s'est terminé ailleurs.
-        # ⚠ ET CE QUE LA MISSION NE DIT PAS (défaut n° 10 du 18/08/2026).
-        # L'avertissement existe aussi à l'étape 2 — mais il quitte cet
-        # écran-là sans y revenir : c'est ICI, devant ▶ Démarrer, qu'il faut
-        # qu'il le voie. Même règle, même calcul, deux endroits où il regarde.
+        # The mission and the parameters are displayed BETWEEN the two zones,
+        # in their usual place — but OUTSIDE: they are expandable blocks, and a
+        # block you have just opened must not close because a call finished
+        # elsewhere. ⚠ AND WHAT THE MISSION DOES NOT SAY (defect no. 10 of
+        # 18/08/2026). The warning also exists at step 2 — but he leaves that
+        # screen without coming back to it: it is HERE, in front of ▶ Start,
+        # that he must see it. The same rule, the same computation, two places
+        # where he looks.
         perdues = assistant.infos_perdues_par_le_texte(
             campagne["nature"], configuration["infos"],
             self.application.preferences, configuration["options"],
@@ -4084,17 +4058,18 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
 
     @staticmethod
     def _bloc_infos_perdues(perdues, ou="Votre texte"):
-        """L'avertissement « ce que le message ne dit pas » — "" s'il dit tout.
+        """The `what the message does not say` warning — "" when it says
+        everything.
 
-        ⚠ UNE SEULE FORMULATION, DEUX ÉCRANS : l'étape 2 et la fiche de la
-        campagne. Il quitte l'étape 2 sans y revenir — c'est devant ▶ Démarrer
-        qu'il faut qu'il le voie —, mais deux textes écrits séparément auraient
-        fini par ne plus dire la même chose.
+        ⚠ ONE WORDING, TWO SCREENS: step 2 and the campaign's record. He leaves
+        step 2 without coming back to it — it is in front of ▶ Start that he
+        must see it —, but two texts written separately would have ended up no
+        longer saying the same thing.
 
-        ⚠ LA PHRASE TIENT SUR UNE LIGNE dans le source. Ma première version la
-        coupait pour la lisibilité du code : le retour à la ligne partait dans
-        la page, et la phrase n'existait plus comme telle — ni pour un essai,
-        ni pour qui cherche ces mots dans l'écran.
+        ⚠ THE SENTENCE FITS ON ONE LINE in the source. My first version broke
+        it for the code's readability: the line break went out into the page,
+        and the sentence no longer existed as such — neither for a test, nor
+        for anyone searching for those words on screen.
         """
         if not perdues:
             return ""
@@ -4116,17 +4091,18 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
 
     @staticmethod
     def _zones_vivantes(statut, etat, suite, entre=""):
-        """Les deux zones qui se remettent à jour — et ce qui les sépare.
+        """The two zones that refresh — and what separates them.
 
-        Le fragment servi au rafraîchissement ne porte QUE les deux zones :
-        ce qui les sépare à l'écran n'a pas bougé, et n'a donc pas à voyager.
+        The fragment served for the refresh carries ONLY the two zones: what
+        separates them on screen has not moved, and therefore does not have to
+        travel.
         """
         return (f'<div id="campagne-etat" data-statut="{html.escape(statut)}">'
                 f"{etat}</div>"
                 + entre
                 + f'<div id="campagne-suite">{suite}</div>')
 
-    # ----------------------------------------------------- les commandes
+    # ----------------------------------------------------- the commands
     def _traiter_demarrage(self, corps):
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
@@ -4139,18 +4115,16 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
             return self._erreur(404, "Campagne introuvable.")
         if campagne["statut"] not in ("prête", "en pause"):
             return self._rediriger(f"/campagne?id={campagne_id}&fait=pas_en_cours")
-        # Plage d'appel autorisée ET période interdite : la même
-        # vérification que sur les quatre autres portes, jamais dupliquée.
-        #
-        # ⚠ SEULE CETTE PORTE-CI PROPOSE DE FORCER, ET SEULEMENT EN SIMULATION
-        # (13/08/2026). Le geste est rejoué à l'identique — mêmes champs, plus
-        # « forcer_horaire » — et c'est `_refus_hors_plage` qui décide, pas ce
-        # formulaire : en appels réels, le champ est ignoré.
-        #
-        # ⚠ ET LE GESTE NE SE REDEMANDE PAS À CHAQUE REPRISE : une campagne
-        # déjà marquée « heure forcée » repart sans repasser par le bouton.
-        # Sans cela, mettre en pause puis reprendre à 22 h aurait redemandé la
-        # même autorisation, sur la même campagne, pour la même raison.
+        # The permitted calling window AND the forbidden period: the same check
+        # as on the four other doors, never duplicated.  ⚠ ONLY THIS DOOR
+        # OFFERS TO FORCE, AND ONLY IN SIMULATION (13/08/2026). The gesture is
+        # replayed identically — the same fields, plus `forcer_horaire` — and
+        # it is `_refus_hors_plage` that decides, not this form: in real calls,
+        # the field is ignored.  ⚠ AND THE GESTURE IS NOT ASKED FOR AGAIN AT
+        # EVERY RESUMPTION: a campaign already marked `heure forcée` starts
+        # again without going back through the button. Without that, pausing
+        # then resuming at 10 pm would have asked for the same authorisation
+        # again, on the same campaign, for the same reason.
         forcer = (donnees.get("forcer_horaire", [""])[0] == "1"
                   or assistant.heure_forcee(
                       assistant.configuration_campagne(campagne),
@@ -4160,23 +4134,24 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
         if self._refus_hors_plage(forcer=forcer, rejeu=rejeu):
             return
         if forcer and not self.application.mode_reel:
-            # Écrit sur la campagne : le fil revérifie la plage ENTRE CHAQUE
-            # appel, et sans cette trace il s'arrêterait au contact suivant.
+            # Written on the campaign: the thread rechecks the window BETWEEN
+            # EACH call, and without this trace it would stop at the next
+            # contact.
             assistant.noter_heure_forcee(base, campagne_id)
         try:
-            # Le même « forcer » qu'au-dessus : le planificateur revérifie le
-            # moment, et c'est LUI qui refuse de lever quoi que ce soit pour un
-            # client d'appels réel — la garantie ne tient pas à ce formulaire.
+            # The same `force` as above: the planner rechecks the moment, and
+            # it is IT that refuses to lift anything for a real call client —
+            # the guarantee does not rest on this form.
             self.application.planif.verifier_garde_fous(
                 hors_plage_permis=forcer)
         except planificateur.GardeFou as erreur:
             return self._erreur(403, str(erreur))
-        # Le geste conscient : les créneaux annoncés au téléphone sortent de
-        # l'agenda de RingBack, et un agenda périmé fait proposer des places
-        # déjà prises ailleurs. Sans cette confirmation-là, RIEN ne part —
-        # la page revient avec les chiffres du jour, pas avec une question
-        # creuse. (Placé APRÈS les verrous existants : un refus de plage ou
-        # de garde-fou reste prioritaire et inchangé.)
+        # The conscious gesture: the slots announced on the phone come out of
+        # RingBack's calendar, and a stale calendar leads to offering slots
+        # already taken elsewhere. Without that confirmation, NOTHING goes out
+        # — the page comes back with the day's figures, not with a hollow
+        # question. (Placed AFTER the existing locks: a window or guard refusal
+        # stays higher priority and unchanged.)
         if donnees.get("agenda_verifie", [""])[0] != "1":
             journal.info("Démarrage de la campagne n°%d suspendu : l'état de "
                          "l'agenda n'a pas encore été confirmé", campagne_id)
@@ -4210,11 +4185,11 @@ appel en cours va à son terme — on ne raccroche pas au nez d'un client.</smal
         return self._rediriger(f"/campagne?id={campagne_id}&fait={fait}")
 
     def _traiter_recuperation(self, corps):
-        """📥 Va LIRE chez CALL-E le résultat des appels déjà passés.
+        """📥 Goes and READS at CALL-E the result of calls already placed.
 
-        AUCUN APPEL NE PART D'ICI : le seul appel possible dans ce chemin est
-        assistant.recuperer_resultats_en_attente, qui ne sait faire qu'une
-        LECTURE (GET /v1/calls/{id}) — pas une création.
+        NO CALL GOES OUT FROM HERE: the only call possible on this path is
+        assistant.recuperer_resultats_en_attente, which can only do a READ (GET
+        /v1/calls/{id}) — not a creation.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:

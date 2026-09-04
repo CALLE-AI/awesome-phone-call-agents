@@ -1,186 +1,44 @@
-"""Interface web (bibliothèque standard) — port 8770, en français.
+"""Web interface (standard library) — port 8770, in French.
 
-Habillage commun : bannière (logo SVG + nom + sous-titre), navigation en
-onglets (📣 Campagnes · 🔁 Relances · 📅 Rendez-vous · 👥 Contacts ·
-⚙ Réglages), mode clair ET sombre (bascule ☾/☀, détection du système,
-choix mémorisé en localStorage), pastilles de statut colorées (prévu bleu,
-manqué orange, confirmé vert, annulé rouge, ignoré et supprimé gris,
-déplacé violet), badge 🚫 pour les clients « Ne plus appeler ».
+Common chrome: a banner (SVG logo + name + subtitle), tab navigation (📣
+Campagnes · 🔁 Relances · 📅 Rendez-vous · 👥 Contacts · ⚙ Réglages), light AND
+dark mode (a ☾/☀ toggle, system detection, the choice remembered in
+localStorage), coloured status badges (scheduled blue, missed orange, confirmed
+green, cancelled red, ignored and deleted grey, moved purple), a 🚫 badge for
+`Ne plus appeler` clients.
 
-Le MODÈLE : des thèmes de travail instanciés en CAMPAGNES (liste importée
-à l'instant + paramètres + appels rattachés), et des RELANCES programmées
-pour tout appel non abouti — jamais lancées seules, toujours par un geste.
+The MODEL: work themes instantiated as CAMPAIGNS (a list imported at that
+moment + parameters + attached calls), and FOLLOW-UPS scheduled for every call
+that does not conclude — never launched on their own, always by a gesture.
 
-Écrans :
-- « / »              : accueil « Campagnes » — gros bouton « ➕ Nouvelle
-                       campagne » qui mène au SEUL parcours de création,
-                       l'assistant en 3 étapes (« /assistant » : nature →
-                       message → personnes, voir assistant_web.py), liste des
-                       campagnes avec leur avancement (appelés / aboutis /
-                       relances) ; « /campagne/nouvelle » n'est plus qu'une
-                       redirection vers l'assistant (anciens marque-pages) ;
-- « /campagne »      : fiche d'une campagne (contacts, issues, relances,
-                       transcriptions, clôture manuelle) ; pour une campagne
-                       de l'assistant, le POSTE DE PILOTAGE — où ▶ Démarrer
-                       ouvre d'abord le rappel « les créneaux annoncés
-                       sortent de l'agenda de RingBack », avec les chiffres
-                       du jour (GET « /campagne/verification-agenda », un
-                       fragment : seul ce bloc se remplit) ;
-- « /relances »      : les relances programmées — les DUES en évidence,
-                       bouton « Lancer les relances dues » (geste humain,
-                       mêmes verrous que partout), reporter / annuler ;
-- « /suivi »         : le PLANNING de la semaine — même découpage que la
-                       semaine type (⚙ Réglages), tranches libres en VERT
-                       (la même variable CSS que le calendrier des
-                       réglages), rendez-vous posés dessus en TUILES ; un
-                       rendez-vous de N tranches consécutives donne UNE
-                       tuile de hauteur N (rowspan), jamais N cases.
-                       Navigation : sélecteur de semaine + sélecteur
-                       d'année + champ date + ◀ / ▶, et « ⏭ Prochain
-                       créneau disponible » qui avance de trou en trou (sa
-                       position vit dans un champ caché). RÈGLE : tout
-                       bouton de navigation AUTRE que le champ date remet
-                       ce champ à vide. Un clic sur une tuile ou sur une
-                       tranche libre ouvre une MODALE (clic extérieur ou
-                       Échap pour fermer) — GET « /suivi/planning » rend la
-                       zone du planning, GET « /suivi/detail » le contenu
-                       de la modale, tous deux en FRAGMENTS (la page n'est
-                       jamais rechargée).
-                       LA PORTE 📅 DU §5, les trois gestes : un clic sur une
-                       tranche LIBRE propose « ➕ Créer la campagne
-                       📞 Créneau libéré sur cette place » (POST
-                       « /suivi/creneau/campagne » — la même mécanique que
-                       la compensation d'annulation, jamais une seconde) ;
-                       un clic sur un RENDEZ-VOUS propose ses deux gestes,
-                       « 📆 Déplacer » (POST « /suivi/detail/deplacer » →
-                       campagne « Déplacement » sur CE rendez-vous) et
-                       « ✖ Annuler » (POST « /suivi/detail/annuler », en
-                       DEUX temps : la règle est d'abord ANNONCÉE, puis
-                       appliquée — c'est horaires.decision_annulation qui
-                       tranche « supprimé » / « annulé », jamais ce
-                       fichier). Une place libérée mène en un clic à la
-                       campagne qui la remplira. AUCUN APPEL ne part de ces
-                       gestes. Dessous, les DEUX listes
-                       inchangées : « À rappeler (manqués) » (règle du
-                       manqué appliquée au chargement, bouton « Rappeler »
-                       individuel, bouton « Vider la liste » qui passe tous
-                       les manqués en « ignoré ») et « Rendez-vous à
-                       venir » ;
-- « /tous »          : TOUS les rendez-vous avec leur statut — un « ignoré »
-                       se rétablit ici (POST « /retablir ») ;
-- « /rappel?rdv=N »  : préparation du rappel individuel — sélecteur
-                       « Thème de l'appel » (① manqué ② confirmation
-                       ③ déplacement ④ créneau libéré ⑤ personnalisé),
-                       mission pré-remplie MODIFIABLE, variables substituées
-                       ([entreprise], [client], [date_rdv],
-                       [créneaux_disponibles], [plage_rappel]) ;
-- POST « /rappeler » : déclenche l'appel de CE rendez-vous (mission du
-                       thème choisi) puis redirige vers sa fiche ; REFUSÉ
-                       hors de la plage horaire autorisée ;
-- « /clients »       : le POSTE DE TRAVAIL DES ÉTATS — chaque client avec
-                       tout ce que la base sait de lui, son nombre de
-                       rendez-vous (un rendez-vous long compte pour UN),
-                       ses DEUX états (agenda et conversation, voir
-                       etats_clients.py), les campagnes EN COURS qui le
-                       concernent avec l'état qui l'y a fait entrer, et ce
-                       qu'il reste à faire. Trois filtres — recherche par
-                       nom (accents et casse ignorés), sélecteur d'état,
-                       case « non traité » (§3 de
-                       CAS_DE_FIGURE_CAMPAGNES.md) — qui rechargent la
-                       SEULE liste (GET « /clients/liste », fragment).
-                       LA PORTE 👥 DU §4 : dès que « non traité » est coché
-                       et que la sélection n'est pas vide, un bouton coloré
-                       « ➕ Créer la campagne « … » — N client(s)
-                       concerné(s) » apparaît DANS ce fragment (il naît et
-                       meurt avec le filtre, sans rechargement). La nature
-                       est DÉDUITE de l'état par etats_clients.TRAITEMENT ;
-                       quand la sélection mêle des états traités par des
-                       campagnes différentes, il y a UN BOUTON PAR NATURE,
-                       chacun avec son compte (décision du propriétaire du
-                       31/07/2026) — jamais de bouton grisé. Les états
-                       qu'aucune campagne ne traite ne donnent aucun bouton
-                       et disent pourquoi. POST « /clients/campagne » ouvre
-                       l'assistant À L'ÉTAPE 2, liste déjà remplie, et la
-                       RECETTE garde le critère (mode « etat ») : AUCUN
-                       APPEL n'en part ;
-                       Bouton « Ne plus appeler » (exclu de la file, des
-                       cascades et des listes générées, badge 🚫 partout,
-                       réversible) et « Supprimer… » (page de confirmation
-                       OBLIGATOIRE avant : client + rendez-vous, jamais en
-                       un clic) ;
-- « /clients/fiche » : la fiche d'un client — son dossier et le FORMULAIRE
-                       d'édition (nom, numéro, indicateur 🚫), POST
-                       « /clients/modifier » ; le numéro n'y est JAMAIS
-                       réaffiché en clair : le champ reste vide, et le
-                       laisser vide garde le numéro tel quel ;
-- « /reglages »      : nom de l'entreprise, plage horaire d'appel autorisée,
-                       HORAIRES D'OUVERTURE (durée moyenne d'un rendez-vous
-                       = le pas des tranches, calendrier de la semaine type
-                       au glisser-relâché, repli « jour + début + fin » sans
-                       JavaScript), JOURS FERMÉS exceptionnels (avec les
-                       jours fériés français PROPOSÉS, jamais ajoutés
-                       d'office) et les créneaux à proposer, désormais
-                       CALCULÉS (ouvert − déjà pris − fermé) avec ajout à la
-                       main possible — le tout dans donnees/preferences.json ;
-                       POST « /reglages/pas | /reglages/semaine |
-                       /reglages/jour-ferme », GET « /reglages/creneaux »
-                       (fragments : le calendrier et la liste des créneaux se
-                       rechargent SEULS, jamais la page). Porte aussi les
-                       🧪 TESTEURS DE L'ESSAI RÉEL (module essai_reel) : un
-                       nom et un numéro par personne qui accepte de jouer un
-                       rôle (l'opérateur, un collègue, un ami). Seuls CES
-                       numéros échappent au refus de doublon ; ils restent
-                       masqués à l'écran, et tout contact qui les porte est
-                       marqué 🧪 partout. POST « /reglages/testeur »
-                       (ajout/retrait), GET « /reglages/testeurs » et
-                       « /reglages/campagne-essai » (fragments : la liste et
-                       l'aperçu « qui joue quoi » se rechargent SEULS).
-                       GET/POST « /reglages/essai-reel » PRÉPARE une
-                       campagne d'essai (état « prête », AUCUN appel) dont
-                       les rôles sont RÉPARTIS entre les testeurs, en
-                       tournant ; sans testeur déclaré, l'écran le dit et ne
-                       crée rien ;
-- « /rendezvous »    : fiche du rendez-vous, résultat structuré +
-                       transcription, DURÉE (en tranches), DÉPLACEMENT (seuls
-                       les créneaux assez longs sont proposés ; le refus dit
-                       ce qui manque) et ANNULATION (qui libère ses tranches) ;
-                       POST « /rendezvous/duree | /rendezvous/deplacer |
-                       /rendezvous/annuler » ;
-- « /ajouter »       : formulaire d'ajout (client + rendez-vous) + imports
-                       CSV (nom;telephone;date_heure;motif) et agenda ICS ;
-- POST « /importer | /importer-ics » ;
-- « /sans-numero »   : rendez-vous importés sans téléphone, à compléter
-                       (POST « /completer-numero ») ;
-- « /file »          : file d'appels — « Tout rappeler » met en file tous les
-                       manqués (sauf « Ne plus appeler »), chaque appel en
-                       attente s'annule d'un bouton, « Vider la file » les
-                       annule TOUS d'un coup, « Exécuter la file » les passe
-                       (thème + mission modifiable, [client]/[date_rdv]
-                       substitués PAR appel) et affiche les issues ;
-- POST « /file/tout-rappeler | /file/annuler | /file/annuler-tout |
-         /file/executer » ;
-- « /cascade »       : cascade « premier oui » — liste collée Nom;Téléphone,
-                       mission, créneau libéré ; POST « /cascade/executer »
-                       appelle UNE personne à la fois, dans l'ordre, et
-                       s'ARRÊTE au premier oui ; « /cascade/resultat »
-                       montre qui a été appelé (issue + transcription) et
-                       qui a été épargné. POST « /cascade/generer » remplit
-                       la zone de collage DEPUIS la base (source + ordre au
-                       choix EXPLICITE — aucun ordre imposé par défaut ; le
-                       dernier choix est mémorisé dans donnees/preferences.json) ;
-                       POST « /cascade/csv » télécharge la liste en CSV
-                       (numéros en clair par nature, généré à la volée,
-                       JAMAIS écrit côté serveur).
+Screens:
+- `/`              : the `Campagnes` home page — a big `➕ Nouvelle campagne` button leading to the ONLY creation journey, the 3-step assistant (`/assistant`: kind → message → people, see assistant_web.py), a list of campaigns with their progress (called / concluded / follow-ups); `/campagne/nouvelle` is now only a redirect to the assistant (for old bookmarks);
+- `/campagne`      : a campaign's record (contacts, outcomes, follow-ups, transcripts, manual closure); for an assistant campaign, the CONTROL DESK — where ▶ Start first opens the reminder `the slots announced come out of RingBack's calendar`, with the day's figures (GET `/campagne/verification-agenda`, a fragment: only that block fills);
+- `/relances`      : the scheduled follow-ups — the DUE ones highlighted, a `Lancer les relances dues` button (a human gesture, the same locks as everywhere), postpone / cancel;
+- `/suivi`         : the week's SCHEDULE — the same division as the typical week (⚙ Réglages), free slots in GREEN (the same CSS variable as the settings calendar), appointments laid over them as TILES; an appointment of N consecutive slots gives ONE tile of height N (rowspan), never N cells. Navigation: a week selector + a year selector + a date field + ◀ / ▶, and `⏭ Prochain créneau disponible` which advances gap by gap (its position lives in a hidden field). RULE: any navigation button OTHER than the date field clears that field. A click on a tile or on a free slot opens a MODAL (an outside click or Esc closes it) — GET `/suivi/planning` renders the schedule zone, GET `/suivi/detail` the modal's content, both as FRAGMENTS (the page is never reloaded). THE 📅 DOOR OF §5, the three gestures: a click on a FREE slot offers `➕ Créer la campagne 📞 Créneau libéré sur cette place` (POST `/suivi/creneau/campagne` — the same mechanism as making up for a cancellation, never a second one); a click on an APPOINTMENT offers its two gestures, `📆 Déplacer` (POST `/suivi/detail/deplacer` → a `Déplacement` campaign on THAT appointment) and `✖ Annuler` (POST `/suivi/detail/annuler`, in TWO stages: the rule is ANNOUNCED first, then applied — it is horaires.decision_annulation that decides `supprimé` / `annulé`, never this file). A freed slot leads in one click to the campaign that will fill it. NO CALL goes out from those gestures. Below, the TWO unchanged lists: `À rappeler (manqués)` (the missed rule applied at load time, an individual `Rappeler` button, a `Vider la liste` button that moves every missed one to `ignoré`) and `Rendez-vous à venir`;
+- `/tous`          : ALL the appointments with their status — an `ignoré` is restored here (POST `/retablir`);
+- `/rappel?rdv=N`  : preparing a single call-back — a `Thème de l'appel` selector (① missed ② confirmation ③ move ④ freed slot ⑤ custom), an EDITABLE pre-filled mission, substituted variables ([entreprise], [client], [date_rdv], [créneaux_disponibles], [plage_rappel]);
+- POST `/rappeler` : triggers the call for THAT appointment (the chosen theme's mission) then redirects to its record; REFUSED outside the permitted calling window;
+- `/clients`       : the STATES WORKSTATION — every client with everything the database knows about them, their number of appointments (a long appointment counts as ONE), their TWO states (calendar and conversation, see etats_clients.py), the RUNNING campaigns that concern them with the state that brought them in, and what remains to be done. Three filters — name search (accents and case ignored), a state selector, a `non traité` box (§3 of CAS_DE_FIGURE_CAMPAGNES.md) — which reload ONLY the list (GET `/clients/liste`, a fragment). THE 👥 DOOR OF §4: as soon as `non traité` is ticked and the selection is not empty, a coloured button `➕ Créer la campagne « … » — N client(s) concerné(s)` appears WITHIN that fragment (it is born and dies with the filter, with no reload). The kind is DEDUCED from the state by etats_clients.TRAITEMENT; when the selection mixes states handled by different campaigns, there is ONE BUTTON PER KIND, each with its own count (owner's decision of 31/07/2026) — never a greyed-out button. The states no campaign handles give no button and say why. POST `/clients/campagne` opens the assistant AT STEP 2, list already filled, and the RECIPE keeps the criterion (mode `etat`): NO CALL goes out from it; a `Ne plus appeler` button (excluded from the queue, the cascades and the generated lists, a 🚫 badge everywhere, reversible) and `Supprimer…` (a MANDATORY confirmation page first: client + appointments, never in one click);
+- `/clients/fiche` : a client's record — their file and the edit FORM (name, number, 🚫 flag), POST `/clients/modifier`; the number is NEVER redisplayed there in clear: the field stays empty, and leaving it empty keeps the number as it is;
+- `/reglages`      : the business name, the permitted calling window, the OPENING HOURS (the average length of an appointment = the slot step, a drag-and-release typical-week calendar, a `day + start + end` fallback without JavaScript), exceptional CLOSED DAYS (with the French public holidays OFFERED, never added by default) and the slots to offer, now COMPUTED (open − already taken − closed) with manual addition possible — all in donnees/preferences.json; POST `/reglages/pas | /reglages/semaine | /reglages/jour-ferme`, GET `/reglages/creneaux` (fragments: the calendar and the slot list reload ON THEIR OWN, never the page). It also carries the 🧪 REAL-TEST TESTERS (module essai_reel): a name and a number per person who agrees to play a role (the operator, a colleague, a friend). Only THOSE numbers escape the duplicate refusal; they stay masked on screen, and every contact carrying them is marked 🧪 everywhere. POST `/reglages/testeur` (add/remove), GET `/reglages/testeurs` and `/reglages/campagne-essai` (fragments: the list and the `who plays what` preview reload ON THEIR OWN). GET/POST `/reglages/essai-reel` PREPARES a test campaign (state `prête`, NO calls) whose roles are DEALT OUT among the testers, in rotation; with no tester declared, the screen says so and creates nothing;
+- `/rendezvous`    : an appointment's record, structured result + transcript, LENGTH (in slots), MOVE (only slots long enough are offered; the refusal says what is missing) and CANCELLATION (which frees its slots); POST `/rendezvous/duree | /rendezvous/deplacer | /rendezvous/annuler`;
+- `/ajouter`       : the add form (client + appointment) + CSV (nom;telephone;date_heure;motif) and ICS calendar imports;
+- POST `/importer | /importer-ics`;
+- `/sans-numero`   : appointments imported with no phone, to be completed (POST `/completer-numero`);
+- `/file`          : the call queue — `Tout rappeler` queues every missed one (except `Ne plus appeler`), each pending call cancels with a button, `Vider la file` cancels them ALL at once, `Exécuter la file` places them (theme + editable mission, [client]/[date_rdv] substituted PER call) and shows the outcomes;
+- POST `/file/tout-rappeler | /file/annuler | /file/annuler-tout | /file/executer`;
+- `/cascade`       : the `first yes` cascade — a pasted Nom;Téléphone list, a mission, a freed slot; POST `/cascade/executer` calls ONE person at a time, in order, and STOPS at the first yes; `/cascade/resultat` shows who was called (outcome + transcript) and who was spared. POST `/cascade/generer` fills the paste area FROM the database (source + order EXPLICITLY chosen — no order imposed by default; the last choice is remembered in donnees/preferences.json); POST `/cascade/csv` downloads the list as CSV (numbers in clear by nature, generated on the fly, NEVER written server-side).
 
-Les anciens parcours directs (« /cascade », « /file ») restent utilisables
-mais sont RATTACHÉS au modèle campagne : chaque exécution y crée sa
-campagne (thème « créneau libéré » ou « rappel d'appels manqués »), avec
-les relances qui en découlent — rien n'est dupliqué.
+The old direct journeys (`/cascade`, `/file`) remain usable but are ATTACHED to
+the campaign model: every run there creates its own campaign (theme `créneau
+libéré` or `rappel d'appels manqués`), with the follow-ups that flow from it —
+nothing is duplicated.
 
-La base vit sur disque (donnees/ringback.db), créée au premier lancement ;
-les données de démonstration ne sont insérées que si elle est vide.
-Par défaut tout est SIMULÉ ; le mode réel exige les trois verrous (clé
-CALLE_API_KEY + option --appels-reels + confirmation tapée au lancement).
+The database lives on disk (donnees/ringback.db), created at first launch; the
+demonstration data is only inserted when it is empty. By default everything is
+SIMULATED; real mode requires the three locks (the CALLE_API_KEY key + the
+--appels-reels option + a confirmation typed at launch).
 """
 
 import argparse
@@ -205,14 +63,12 @@ journal = logging.getLogger("ringback.serveur")
 
 PORT = 8770
 DOSSIER_APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Les SEULS fichiers binaires du produit : deux fonds de page (un par thème)
-# et l'icône du site en deux tailles. Voir preparer_images.py, qui les
-# fabrique. Ils sont servis par RingBack lui-même — rien n'est chargé depuis
-# Internet, la règle « aucune ressource externe » tient toujours.
-#
-# ⚠ C'est une LISTE BLANCHE, avec son type de contenu : un nom absent d'ici
-# n'atteint jamais le disque. Servir « ce que le client demande » depuis un
-# dossier, c'est ouvrir la porte à « ../../ ».
+# The product's ONLY binary files: two page backgrounds (one per theme) and the
+# site icon in two sizes. See preparer_images.py, which builds them. They are
+# served by RingBack itself — nothing is loaded from the Internet, the `no
+# external resources` rule still holds.  ⚠ It is a WHITELIST, with its content
+# type: a name absent from here never reaches the disk. Serving `whatever the
+# client asks for` from a directory means opening the door to `../../`.
 DOSSIER_IMAGES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               "images")
 IMAGES_SERVIES = {
@@ -230,10 +86,10 @@ ETIQUETTES = {
     "to_reschedule": "À reprogrammer",
 }
 
-# Pastille colorée par statut de rendez-vous (Lot interface) : prévu bleu,
-# manqué orange, confirmé vert, annulé rouge, ignoré ET SUPPRIMÉ gris,
-# déplacé violet. « supprimé » n'apparaît que dans les deux archives (🗂 Tous
-# les rendez-vous, fiche du contact) : ailleurs, il n'existe plus.
+# A coloured badge per appointment status (interface batch): scheduled blue,
+# missed orange, confirmed green, cancelled red, ignored AND DELETED grey,
+# moved purple. `supprimé` appears only in the two archives (🗂 Tous les
+# rendez-vous, the contact's record): elsewhere, it no longer exists.
 CLASSES_STATUT = {
     "prévu": "st-prevu",
     "manqué": "st-manque",
@@ -244,23 +100,24 @@ CLASSES_STATUT = {
     db.STATUT_SUPPRIME: "st-ignore",
 }
 
-# Les statuts qu'un humain pose lui-même sur un rendez-vous (édition en
-# modale). « déplacé » n'y figure pas : c'est le planificateur qui l'écrit
-# quand un appel convient d'une autre date — il reste proposé si le
-# rendez-vous le porte déjà, pour ne jamais le changer dans le dos.
+# The statuses a human sets on an appointment themselves (modal editing).
+# `déplacé` is not among them: it is the planner that writes it when a call
+# agrees another date — it stays offered when the appointment already carries
+# it, so it is never changed behind the user's back.
 STATUTS_MODIFIABLES = ("prévu", "confirmé", "manqué", "annulé", "ignoré",
                        db.STATUT_SUPPRIME)
 
-# LE RETRAIT D'UN RENDEZ-VOUS — deux mots, un seul geste légal à la fois.
-# Règle du propriétaire : « annulé c'est pour les dates passées, sinon on
-# supprime le rendez-vous ». L'écran ne propose donc que celui des deux qui
-# correspond à la DATE du rendez-vous ; l'autre n'apparaît pas, parce qu'il
-# n'est pas un choix possible. Le serveur, lui, accepte les deux et les
-# ramène à la règle (horaires.decision_annulation) : un formulaire ancien ou
-# recopié ne peut pas contourner la règle en douce.
+# REMOVING AN APPOINTMENT — two words, only one legal gesture at a time. The
+# owner's rule: `annulé is for past dates, otherwise we delete the
+# appointment`. So the screen offers only the one of the two that matches the
+# appointment's DATE; the other does not appear, because it is not a possible
+# choice. The server, for its part, accepts both and brings them back to the
+# rule (horaires.decision_annulation): an old or copied form cannot slip past
+# the rule.
 STATUTS_RETRAIT = ("annulé", db.STATUT_SUPPRIME)
 
-# Les statuts qui OCCUPENT une place au planning (les autres l'ont rendue).
+# The statuses that OCCUPY a slot in the schedule (the others have given it
+# back).
 STATUTS_OCCUPANTS = ("prévu", "confirmé")
 
 ETIQUETTES_CASCADE = {
@@ -275,14 +132,13 @@ ETIQUETTES_STATUT_CASCADE = {
     "en cours": "en cours",
     "pourvue": "créneau pourvu",
     "épuisée": "liste épuisée, créneau non pourvu",
-    # « interrompue » n'est PAS « épuisée » : la liste n'a pas été essayée,
-    # elle a été stoppée par une panne de notre côté (clé refusée, service
-    # en panne). Confondre les deux ferait croire que personne n'a voulu du
-    # créneau alors que personne n'a été appelé.
+    # `interrompue` is NOT `épuisée`: the list was not tried, it was stopped by
+    # a failure on our side (key refused, service down). Confusing the two
+    # would suggest nobody wanted the slot when in fact nobody was called.
     "interrompue": "interrompue — panne de notre côté, liste non essayée",
 }
 
-# Pastilles des statuts de campagne et des états de contact.
+# Badges for campaign statuses and contact states.
 CLASSES_STATUT_CAMPAGNE = {
     "prête": "st-prevu",
     "en cours": "st-manque",
@@ -300,9 +156,9 @@ CLASSES_ETAT_CONTACT = {
     "abandonné": "st-ignore",
 }
 
-# Thème clair par défaut + thème sombre via [data-theme="dark"] (bascule ☾/☀,
-# détection du système, mémorisée en localStorage) — variables CSS inspirées
-# du tableau de bord Takumi.
+# A light theme by default + a dark theme through [data-theme="dark"] (a ☾/☀
+# toggle, system detection, remembered in localStorage) — CSS variables
+# inspired by the Takumi dashboard.
 STYLE = """
 :root {
   --fond:#f2f5f9; --carte:#ffffff; --texte:#1c242c; --sourd:#5b6b7a;
@@ -1282,7 +1138,7 @@ footer { max-width: 64rem; margin: 0 auto; padding: 0 1rem 1.5rem;
 }
 """
 
-# Logo : combiné téléphonique entouré d'une flèche de rappel (SVG en ligne).
+# Logo: a handset ringed by a call-back arrow (inline SVG).
 LOGO_SVG = """<svg class="logo" viewBox="0 0 24 24" width="38" height="38" role="img" aria-label="Logo RingBack">
 <path d="M21 12a9 9 0 1 1-3.5-7.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
 <path d="M22.6 1.9l-.7 5.3-4.6-2.7z" fill="currentColor"/>
@@ -1292,9 +1148,9 @@ LOGO_SVG = """<svg class="logo" viewBox="0 0 24 24" width="38" height="38" role=
 # ---------------------------------------------------------------------------
 
 
-# Navigation en onglets (code, chemin, libellé) — l'onglet actif est souligné.
-# Les campagnes SONT l'accueil : la base n'est plus le centre, l'événement
-# l'est. L'ancien suivi des rendez-vous reste accessible (📅 Rendez-vous).
+# Tab navigation (code, path, label) — the active tab is underlined. The
+# campaigns ARE the home page: the database is no longer the centre, the event
+# is. The old appointment tracking stays reachable (📅 Rendez-vous).
 ONGLETS = (
     ("campagnes", "/", "📣 Campagnes"),
     ("relances", "/relances", "🔁 Relances"),
@@ -1303,9 +1159,9 @@ ONGLETS = (
     ("reglages", "/reglages", "⚙ Réglages"),
 )
 
-# Bascule clair/sombre : détection du système au premier chargement, choix
-# mémorisé (localStorage « rb-theme ») — le petit script de <head> évite un
-# éclair de mauvais thème avant le rendu.
+# Light/dark toggle: system detection on first load, the choice remembered
+# (localStorage `rb-theme`) — the small script in <head> avoids a flash of the
+# wrong theme before rendering.
 SCRIPT_THEME_TETE = """<script>
 (function(){var R=document.documentElement,s=null;
 try{s=localStorage.getItem('rb-theme')}catch(e){}
@@ -1314,28 +1170,22 @@ else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches){R
 else{R.dataset.theme='light'}})();
 </script>"""
 
-# LE CALENDRIER DE LA SEMAINE TYPE, et plus généralement tout élément qui se
-# recharge SEUL après un geste.
-#
-# ⚠ Écrit en DÉLÉGATION AU DOCUMENT, et c'est le point important. L'ancienne
-# version cherchait « #calendrier » au chargement de la page : un calendrier
-# arrivé PLUS TARD par innerHTML — celui de l'installeur — n'était donc relié
-# à rien, et le glisser-relâché ne faisait rien du tout. Constaté le
-# 03/08/2026. Une écoute posée une fois sur le document marche pour les deux,
-# aujourd'hui et pour tout élément qu'on ajoutera ensuite.
-#
-# Deux mécaniques, une seule écoute :
-#  · le GESTE : on appuie sur une tranche, on glisse, on relâche — toute la
-#    période bascule (ouverte si elle ne l'était pas entièrement, fermée
-#    sinon). La zone dit elle-même où renvoyer le résultat (data-calendrier) ;
-#  · le FORMULAIRE de repli (jour + début + fin, la durée d'un rendez-vous,
-#    un jour fermé) : s'il porte « data-fragment-cible », il part en arrière-
-#    plan avec « fragment=1 » et sa réponse remplit CET élément. Sans cette
-#    interception, le formulaire naviguait vers la page des réglages — ce qui,
-#    dans l'installeur, remplaçait la fenêtre par une page entière.
-#
-# Sans JavaScript, rien de tout cela ne s'applique : les formulaires partent
-# normalement et reviennent sur la page des réglages. Le repli tient.
+# THE TYPICAL-WEEK CALENDAR, and more generally any element that reloads ON ITS
+# OWN after a gesture.  ⚠ Written as DELEGATION TO THE DOCUMENT, and that is
+# the important point. The old version looked for `#calendrier` at page load: a
+# calendar arriving LATER through innerHTML — the installer's — was therefore
+# wired to nothing, and drag-and-release did nothing at all. Observed on
+# 03/08/2026. A listener placed once on the document works for both, today and
+# for any element added later.  Two mechanisms, one listener: · the GESTURE:
+# you press on a slot, drag, release — the whole period toggles (opened when it
+# was not entirely open, closed otherwise). The zone itself says where to send
+# the result (data-calendrier); · the fallback FORM (day + start + end, an
+# appointment's length, a closed day): when it carries `data-fragment-cible`,
+# it goes out in the background with `fragment=1` and its answer fills THAT
+# element. Without that interception, the form navigated to the settings page —
+# which, inside the installer, replaced the window with a full page.  Without
+# JavaScript, none of that applies: the forms go out normally and come back to
+# the settings page. The fallback holds.
 SCRIPT_FRAGMENTS = """<script>
 (function(){
 if(!window.fetch){return}
@@ -1423,11 +1273,11 @@ document.addEventListener('submit',function(e){
 })();
 </script>"""
 
-# Les 🧪 TESTEURS de l'essai réel : ajouter ou retirer un testeur recharge le
-# SEUL bloc concerné (la liste), puis le SEUL aperçu « qui joue quoi » — la
-# page, elle, n'est jamais rechargée. Changer le nombre d'identités demandé
-# recharge le même aperçu. Sans JavaScript, les mêmes formulaires partent
-# normalement et reviennent sur la page des réglages : rien n'est perdu.
+# The 🧪 real-test TESTERS: adding or removing a tester reloads ONLY the block
+# concerned (the list), then ONLY the `who plays what` preview — the page
+# itself is never reloaded. Changing the number of identities requested reloads
+# the same preview. Without JavaScript, the same forms go out normally and come
+# back to the settings page: nothing is lost.
 SCRIPT_TESTEURS = """<script>
 (function(){
 var zone=document.getElementById('bloc-testeurs');
@@ -1459,9 +1309,9 @@ document.addEventListener('change',function(e){
 </script>"""
 
 
-# Le RENVOI d'essai : enregistrer ou retirer recharge le SEUL bloc concerné.
-# Sans JavaScript, le même formulaire part normalement et revient sur la page
-# des réglages, à l'ancre du bloc — rien n'est perdu.
+# The test REDIRECT: saving or removing reloads ONLY the block concerned.
+# Without JavaScript, the same form goes out normally and comes back to the
+# settings page, at the block's anchor — nothing is lost.
 SCRIPT_RENVOI_ESSAI = """<script>
 (function(){
 var zone=document.getElementById('bloc-renvoi-essai');
@@ -1481,25 +1331,21 @@ zone.addEventListener('submit',function(e){
 })();
 </script>"""
 
-# La MODALE, commune à tout le site : on demande son contenu au serveur (il
-# vient donc de la base, jamais d'un texte recopié dans la page), et elle se
-# ferme au clic à l'extérieur comme à la touche Échap. Sans JavaScript, les
-# mêmes liens mènent à la page correspondante : rien n'est perdu.
-#
-# ON ÉDITE DANS LA MODALE, jamais en changeant de page. Un formulaire marqué
-# « data-modale-envoi » part par ce même mécanisme, et le serveur répond
-# l'une de deux choses, dites par l'en-tête X-RingBack-Cible :
-#   - « modale » : la saisie a été refusée — la modale revient telle quelle,
-#     avec l'erreur ET les valeurs tapées (rien n'est perdu) ;
-#   - un identifiant d'élément : c'est enregistré — SEUL cet élément se
-#     remplit à nouveau (la tuile du planning, la ligne du client), la modale
-#     se ferme, et la page n'est JAMAIS rechargée.
-#
-# Un troisième cas existe : la modale RESTE ouverte (elle propose la suite du
-# geste) alors que la page derrière elle a changé. Elle porte alors un
-# « data-rafraichir » (l'élément) et un « data-rafraichir-url » (d'où le
-# reprendre) : cet élément-là se remplit à nouveau, seul, sans fermer la
-# fenêtre ni recharger la page.
+# The MODAL, common to the whole site: its content is asked of the server (so
+# it comes from the database, never from text copied into the page), and it
+# closes on an outside click as on the Esc key. Without JavaScript, the same
+# links lead to the corresponding page: nothing is lost.  WE EDIT IN THE MODAL,
+# never by changing page. A form marked `data-modale-envoi` goes out through
+# that same mechanism, and the server answers one of two things, stated by the
+# X-RingBack-Cible header: - `modale`: the input was refused — the modal comes
+# back as it was, with the error AND the values typed (nothing is lost); - an
+# element's id: it is saved — ONLY that element is filled again (the schedule's
+# tile, the client's row), the modal closes, and the page is NEVER reloaded.  A
+# third case exists: the modal STAYS open (it offers the next step of the
+# gesture) while the page behind it has changed. It then carries a
+# `data-rafraichir` (the element) and a `data-rafraichir-url` (where to fetch
+# it from): that element alone is filled again, without closing the window or
+# reloading the page.
 SCRIPT_MODALE = """<script>
 (function(){
 var fond=document.getElementById('fond-modale');
@@ -1697,10 +1543,10 @@ document.addEventListener('keydown',function(e){
 })();
 </script>"""
 
-# Le PLANNING de la semaine : la navigation, la modale et le bouton
-# « prochain créneau disponible » rechargent la SEULE zone du planning —
-# jamais la page. Règle du propriétaire tenue à la lettre : tout bouton de
-# navigation AUTRE que le champ date remet ce champ à vide.
+# The week's SCHEDULE: the navigation, the modal and the `next available slot`
+# button reload ONLY the schedule zone — never the page. The owner's rule held
+# to the letter: any navigation button OTHER than the date field clears that
+# field.
 SCRIPT_PLANNING = """<script>
 (function(){
 var zone=document.getElementById('planning');
@@ -1856,10 +1702,10 @@ document.addEventListener('keyup',function(e){
 })();
 </script>"""
 
-# Les filtres de 👥 Contacts rechargent la SEULE liste (jamais la page), et
-# le formulaire reste soumissible sans JavaScript. Un clic sur un client
-# ouvre son DOSSIER EN MODALE (édition comprise) ; sans JavaScript, le même
-# lien mène à sa fiche pleine page — le repli reste entier.
+# The 👥 Contacts filters reload ONLY the list (never the page), and the form
+# stays submittable without JavaScript. A click on a client opens their FILE IN
+# A MODAL (editing included); without JavaScript, the same link leads to their
+# full-page record — the fallback stays complete.
 SCRIPT_CLIENTS = """<script>
 (function(){
 var formulaire=document.getElementById('filtres-clients');
@@ -1921,10 +1767,10 @@ majTheme();
 
 
 def _analyser_multipart(type_contenu, corps):
-    """Champs + premier fichier d'un envoi multipart/form-data (stdlib email).
+    """Fields + the first file of a multipart/form-data submission (stdlib email).
 
-    Rend (champs, octets_du_fichier) — champs = {nom: texte} pour les
-    parties sans nom de fichier ; le fichier vaut None s'il n'y en a pas.
+    Returns (fields, file_bytes) — fields = {name: text} for the parts with no
+    filename; the file is None when there is none.
     """
     message = email.message_from_bytes(
         b"Content-Type: " + type_contenu.encode("latin-1") + b"\r\n"
@@ -1951,11 +1797,11 @@ def _extraire_fichier(type_contenu, corps):
 
 
 def _fichier_nomme(type_contenu, corps):
-    """(nom du fichier, octets) — le NOM importe pour choisir le lecteur.
+    """(filename, bytes) — the NAME matters for choosing the reader.
 
-    L'installeur accepte un agenda `.ics` ou une liste `.csv` par le même
-    bouton : sans le nom, impossible de savoir lequel des deux lecteurs
-    appeler. Rend ("", None) s'il n'y a pas de fichier.
+    The installer accepts an `.ics` calendar or a `.csv` list through the same
+    button: without the name, there is no way to know which of the two readers
+    to call. Returns ("", None) when there is no file.
     """
     message = email.message_from_bytes(
         b"Content-Type: " + type_contenu.encode("latin-1") + b"\r\n"
@@ -1971,12 +1817,12 @@ def _fichier_nomme(type_contenu, corps):
 
 
 def _version_du_code():
-    """La date du fichier de code le plus récent, figée au démarrage.
+    """The date of the most recent code file, frozen at start-up.
 
-    Affichée dans le pied de page : un serveur resté ouvert continue de
-    servir le code qu'il a chargé, et rien à l'écran ne le disait — d'où des
-    « je n'ai pas la dernière version » impossibles à voir. Cette date-là
-    répond à la question d'un coup d'œil.
+    Displayed in the footer: a server left open goes on serving the code it
+    loaded, and nothing on screen said so — hence `I do not have the latest
+    version` situations impossible to see. That date answers the question at a
+    glance.
     """
     dossier = os.path.dirname(os.path.abspath(__file__))
     recent = 0.0
@@ -1992,25 +1838,19 @@ VERSION_CODE = _version_du_code()
 
 
 def _reglages_en_sections(parties):
-    """Les Réglages en ACCORDÉON À DEUX NIVEAUX, la vue à droite.
+    """The Settings as a TWO-LEVEL ACCORDION, the view on the right.
 
-    `parties` : [(code, libellé, [(code_sous, libellé_sous, contenu), …]), …].
+    `parties`: [(code, label, [(sub_code, sub_label, content), …]), …].
 
-    Demande du propriétaire (02/08/2026, second lot) : le menu de gauche ne
-    liste plus des pages, il DÉPLIE. On clique un intitulé, ses sous-parties
-    apparaissent ; en ouvrir une autre replie la précédente — la convention
-    d'un accordéon, et ce que le propriétaire a demandé mot pour mot.
+    Owner's request (02/08/2026, second batch): the left menu no longer lists
+    pages, it UNFOLDS. You click a heading, its sub-parts appear; opening
+    another folds the previous one — the convention of an accordion, and what
+    the owner asked for word for word.
 
-    Trois propriétés qui comptent :
-    - les liens d'ancre existants (« /reglages#jeu-essai », « #creneaux »,
-      « #numero-essai », « #discours ») MÈNENT toujours au bon endroit : les
-      codes de sous-partie SONT ces ancres, et le script ouvre la partie qui
-      les contient ;
-    - l'enveloppe de partie garde `id="section-<code>"`, comme au premier
-      lot : ce qui désignait une section la désigne encore ;
-    - sans JavaScript, TOUT reste affiché, l'une sous l'autre. Le menu
-      devient une table des matières. Rien n'est perdu — c'est pour cela
-      qu'aucun `hidden` n'est écrit ici : seul le script replie.
+    Three properties that matter:
+    - the existing anchor links (`/reglages#jeu-essai`, `#creneaux`, `#numero-essai`, `#discours`) still LEAD to the right place: the sub-part codes ARE those anchors, and the script opens the part containing them;
+    - the part's wrapper keeps `id="section-<code>"`, as in the first batch: what designated a section still designates it;
+    - without JavaScript, EVERYTHING stays displayed, one under the other. The menu becomes a table of contents. Nothing is lost — that is why no `hidden` is written here: only the script folds.
     """
     menu, panneaux = [], []
     for code, libelle, sous_parties in parties:
@@ -2031,9 +1871,9 @@ def _reglages_en_sections(parties):
             for sous, _, contenu in sous_parties)
         panneaux.append(f'<div class="partie-reglages" id="section-{code}" '
                         f'data-section="{code}">{contenus}</div>')
-    # L'invite est écrite MASQUÉE : sans JavaScript tout est déjà affiché, et
-    # inviter à choisir une rubrique n'aurait aucun sens. C'est le script qui
-    # la montre, au moment où il replie tout.
+    # The prompt is written HIDDEN: without JavaScript everything is already
+    # displayed, and inviting the user to choose a section would make no sense.
+    # It is the script that shows it, at the moment it folds everything.
     invite = ('<p class="invite-reglages" hidden>Choisissez une rubrique dans '
               "le menu pour l'ouvrir.</p>")
     return ('<div class="reglages-deux-parts">'
@@ -2130,19 +1970,19 @@ if(!depuisAncre()&&!ouvrir('identite')){
 
 
 def _bouton_langue(langue_code):
-    """La bascule FR/EN de la bannière — un bouton, pas un menu.
+    """The banner's FR/EN toggle — a button, not a menu.
 
-    ⚠ VISIBLE SUR TOUTES LES PAGES, ET C'EST L'OBJET. Un testeur anglophone
-    qui ouvre le produit tombe sur du français : s'il doit deviner qu'un
-    réglage existe et aller le chercher dans ⚙ Réglages, il ne le trouvera
-    pas. Le geste est donc à côté du thème, là où l'œil le cherche.
+    ⚠ VISIBLE ON EVERY PAGE, AND THAT IS THE POINT. An English-speaking tester
+    opening the product lands on French: if they have to guess that a setting
+    exists and go and find it in ⚙ Réglages, they will not find it. So the
+    gesture sits beside the theme, where the eye looks for it.
 
-    ⚠ ET IL MARCHE SANS JAVASCRIPT, comme tout le reste du produit : c'est un
-    vrai formulaire, qui poste et qui redirige.
+    ⚠ AND IT WORKS WITHOUT JAVASCRIPT, like everything else in the product: it
+    is a real form, which posts and redirects.
 
-    Le bouton porte l'AUTRE langue — ce qu'on obtient en cliquant, jamais ce
-    qu'on a déjà. Un bouton qui affiche l'état courant se lit à l'envers une
-    fois sur deux.
+    The button carries the OTHER language — what you get by clicking, never
+    what you already have. A button showing the current state reads backwards
+    half the time.
     """
     autre = (langue.ANGLAIS if langue.langue_valide(langue_code)
              == langue.FRANCAIS else langue.FRANCAIS)
@@ -2157,14 +1997,14 @@ def _bouton_langue(langue_code):
 
 def _gabarit(titre, corps, mode_reel=False, actif=None, mode=None,
              langue_code=langue.LANGUE_PAR_DEFAUT):
-    """L'ossature de toute page.
+    """The skeleton of every page.
 
-    ⚠ `langue_code` N'EST PAS UNE TRADUCTION, c'est une DÉCLARATION. Le
-    corps reste écrit en français ici ; il sera traduit à la sortie, dans
-    `_repondre`. Mais l'attribut `lang` de <html>, lui, doit être juste dès
-    la fabrication : c'est lui que lisent les lecteurs d'écran et les
-    correcteurs orthographiques du navigateur, et il vit dans une balise,
-    là où la traduction de sortie ne va délibérément jamais.
+    ⚠ `langue_code` IS NOT A TRANSLATION, it is a DECLARATION. The body is
+    still written in French here; it will be translated on the way out, in
+    `_repondre`. But <html>'s `lang` attribute must be right from the moment
+    the page is built: it is what screen readers and the browser's
+    spell-checkers read, and it lives in a tag, where the exit translation
+    deliberately never goes.
     """
     if mode_reel:
         pied = "RingBack — MODE RÉEL : les appels partent vraiment ; numéros toujours masqués à l'écran."
@@ -2211,48 +2051,49 @@ def _gabarit(titre, corps, mode_reel=False, actif=None, mode=None,
 </html>"""
 
 
-# L'avertissement des deux imports, mot pour mot celui du propriétaire
-# (10/08/2026). Écrit UNE fois : les deux formulaires le portent, et la page de
-# repli comme la fenêtre montrent le même texte.
+# The warning on both imports, word for word the owner's (10/08/2026). Written
+# ONCE: both forms carry it, and the fallback page and the window show the same
+# text.
 AVERTISSEMENT_IMPORT = (
     "Attention notez que les rendez-vous importés remplacent les rendez-vous "
     "de votre agenda s'ils sont sur le même créneau horaire.")
 
-# Le « ? » qui dévoile une aide, replié par défaut (demande du propriétaire,
-# 10/08/2026 : « trop d'information perd les utilisateurs »).
-#
-# ⚠ UN <details>, PAS UNE MODALE NI DU JAVASCRIPT. Il marche sans script, il
-# garde l'explication À CÔTÉ de ce qu'elle explique, et il est REPLIÉ : l'écran
-# va droit au but, et l'explication attend qu'on la demande.
+# The `?` that reveals a help note, collapsed by default (owner's request,
+# 10/08/2026: `too much information loses users`).  ⚠ A <details>, NOT A MODAL
+# AND NOT JAVASCRIPT. It works without a script, it keeps the explanation NEXT
+# TO what it explains, and it is COLLAPSED: the screen goes straight to the
+# point, and the explanation waits to be asked for.
 def _aide(titre, contenu, ouvert=False):
-    """Un « ? » cliquable qui dévoile `contenu`. `titre` est son infobulle."""
+    """A clickable `?` revealing `contenu`. `titre` is its tooltip."""
     return (f'<details class="aide"{" open" if ouvert else ""}>'
             f'<summary title="{html.escape(titre, quote=True)}">'
             f'<span aria-hidden="true">?</span>'
-            # Le « ? » seul ne dit pas de quoi il parle : le titre est répété
-            # pour les lecteurs d'écran, avec la classe que le produit a déjà.
+            # The `?` on its own does not say what it is about: the title is
+            # repeated for screen readers, with the class the product already
+            # has.
             f'<span class="sr-seulement">{html.escape(titre)}</span></summary>'
             f'<div class="aide-contenu">{contenu}</div></details>')
 
 
-# Un intitulé cliquable qui dévoile un GESTE (un formulaire, une liste), là où
-# `_aide` dévoile une explication. Même mécanique — un <details> replié, qui
-# marche sans JavaScript — mais l'intitulé se lit : « Saisie manuelle des
-# créneaux » doit se trouver sans avoir à survoler un rond.
+# A clickable heading revealing a GESTURE (a form, a list), where `_aide`
+# reveals an explanation. The same mechanism — a collapsed <details> that works
+# without JavaScript — but the heading is readable: `Saisie manuelle des
+# créneaux` must be findable without hovering over a circle.
 def _replie(libelle, contenu, ouvert=False):
-    """Un <details> replié dont le résumé porte `libelle`, en clair."""
+    """A collapsed <details> whose summary carries `libelle`, in plain words.
+    """
     return (f'<details class="repli-geste"{" open" if ouvert else ""}>'
             f"<summary>{html.escape(libelle)}</summary>"
             f'<div class="repli-contenu">{contenu}</div></details>')
 
 
 def _lien_demande(contact):
-    """« Voir sa demande » — le texte s'ouvre en fenêtre, il n'étale plus.
+    """`Voir sa demande` — the text opens in a window, it no longer sprawls.
 
-    La demande d'un client fait souvent plusieurs lignes : étalée dans une
-    cellule, elle déformait le tableau (même défaut que la colonne « Détail »
-    d'une campagne, corrigé le même jour). Sans demande enregistrée, on le
-    dit et il n'y a rien à cliquer — un lien vers du vide est un lien mort.
+    A client's request often runs to several lines: spread out in a cell, it
+    distorted the table (the same defect as a campaign's `Détail` column, fixed
+    the same day). With no request recorded, we say so and there is nothing to
+    click — a link to emptiness is a dead link.
     """
     if not (contact.get("detail") or "").strip():
         return '<span class="sourd">aucune demande enregistrée</span>'
@@ -2260,44 +2101,45 @@ def _lien_demande(contact):
             f'data-modale="/relances/demande?contact={contact["id"]}" '
             'title="Ouvrir la demande de cette personne, en clair">'
             "Voir sa demande…</a>")
-    # ⚠ CE QUI SE VOIT SANS CLIQUER (20/08/2026). Sa liste en compte plus de
-    # neuf cents : ouvrir chaque fenêtre pour savoir à qui l'on a affaire n'est
-    # pas un geste tenable. Et ces deux familles ne se traitent pas pareil —
-    # « ce que l'agent n'a pas su conclure » se reprend là où la conversation
-    # s'est arrêtée ; un refus d'agent, lui, n'a jamais eu de conversation.
-    # Le lien reste : le repère dit LEQUEL, la fenêtre dit QUOI.
+    # ⚠ WHAT IS VISIBLE WITHOUT CLICKING (20/08/2026). His list has more than
+    # nine hundred: opening each window to know who you are dealing with is not
+    # a sustainable gesture. And these two families are not handled the same
+    # way — `what the agent could not conclude` is picked up where the
+    # conversation stopped; an agent refusal, on the other hand, never had a
+    # conversation. The link stays: the marker says WHICH, the window says
+    # WHAT.
     if db.refus_de_l_agent(contact.get("detail")):
         return ('<strong>🚫 a refusé l\'agent</strong><br><small>'
                 + lien + "</small>")
     return lien
 
 
-# Les TYPES de rappel, dans l'ordre du menu : code, pictogramme, libellé.
-# Le premier de la liste n'est pas l'arrivée par défaut — c'est « humains »
-# qui l'est (demande du propriétaire) : ce sont les seuls qui ne partiront
-# jamais sans un geste, donc les seuls que personne d'autre ne traitera.
+# The TYPES of call-back, in menu order: code, pictogram, label. The first in
+# the list is not the default landing — `humains` is (owner's request): they
+# are the only ones that will never go out without a gesture, hence the only
+# ones nobody else will handle.
 VUES_RELANCES = (
     ("humains", "🙋", "Rappels par un humain"),
     ("dues", "⏰", "Relances dues"),
     ("a_venir", "🕓", "Relances à venir"),
-    # ⚠ « PLAFOND ATTEINT » NE DISAIT PAS DE QUOI (21/08/2026, sa
-    # remarque) : il a compris « limite de crédit CALL-E ». Le libellé
-    # nomme maintenant le réglage exact, celui de l'étape ② — le code
-    # « bloques » ne bouge pas, une base existante s'y réfère.
+    # ⚠ `PLAFOND ATTEINT` DID NOT SAY OF WHAT (21/08/2026, his remark): he
+    # understood it as `CALL-E credit limit`. The label now names the exact
+    # setting, step ②'s — the `bloques` code does not change, an existing
+    # database refers to it.
     ("bloques", "📵", "Non joints — maximum de rappels atteint"),
-    # ⚠ « DEMANDES DÉJÀ TRAITÉES » A ÉTÉ RETIRÉE (21/08/2026, sa demande).
-    # Elle gardait, dans un cinquième onglet, ce qu'il venait justement de
-    # sortir de sa liste de travail. Le geste « ✔ C'est fait » reste : il
-    # marque le contact et le fait disparaître de 🙋 — c'est tout ce qu'on lui
-    # demande. La donnée, elle, n'est pas effacée (`contacts_campagne.traite_le`
-    # garde la date), et la fiche de la campagne continue de tout montrer.
+    # ⚠ `DEMANDES DÉJÀ TRAITÉES` WAS REMOVED (21/08/2026, his request). It
+    # kept, in a fifth tab, what he had just taken out of his work list. The `✔
+    # C'est fait` gesture stays: it marks the contact and makes them disappear
+    # from 🙋 — that is all that is asked of it. The data is not erased
+    # (`contacts_campagne.traite_le` keeps the date), and the campaign's record
+    # goes on showing everything.
 )
 VUE_RELANCES_DEFAUT = "humains"
 
-# ⚠ LA PHRASE DU FILTRE SANS RÉSULTAT, distincte de celle d'une famille vide
-# (21/08/2026). Les deux se ressemblent à l'écran et ne disent pas du tout la
-# même chose : l'une parle du travail qui reste, l'autre de ce qu'on vient de
-# taper.
+# ⚠ THE SENTENCE FOR A FILTER WITH NO RESULT, distinct from that of an empty
+# family (21/08/2026). The two look alike on screen and do not say the same
+# thing at all: one is about the work remaining, the other about what you have
+# just typed.
 SANS_RESULTAT = ('<p class="vide-famille">Aucun résultat pour ce filtre — '
                  "cette liste n'est pas vide pour autant : retirez le filtre "
                  "pour la revoir en entier.</p>")
@@ -2305,20 +2147,21 @@ CODES_VUES_RELANCES = tuple(code for code, _, _ in VUES_RELANCES)
 
 
 def _vue_relances(demandee):
-    """Le type demandé, ou celui d'arrivée si l'adresse dit n'importe quoi."""
+    """The type requested, or the landing one when the URL says anything at all.
+    """
     return demandee if demandee in CODES_VUES_RELANCES else VUE_RELANCES_DEFAUT
 
 
 def _menu_relances(comptes, actif):
-    """Le menu des types de rappel — chacun avec SON nombre, zéro compris.
+    """The call-back types menu — each with ITS count, zero included.
 
-    Il remplace le paragraphe d'introduction, qui disait la même chose à
-    tout le monde quel que soit l'état de la liste. Un type à zéro reste
-    dans le menu : c'est ainsi qu'on apprend qu'il n'y a rien, et le clic
-    mène à une liste vide qui garde son titre et son explication.
+    It replaces the introductory paragraph, which said the same thing to
+    everybody whatever the state of the list. A type at zero stays in the menu:
+    that is how you learn there is nothing, and the click leads to an empty
+    list that keeps its title and its explanation.
 
-    Ce sont de VRAIS liens (`?vue=…`) : sans JavaScript ils rechargent la
-    page sur le bon panneau, avec JavaScript le script bascule sur place.
+    They are REAL links (`?vue=…`): without JavaScript they reload the page on
+    the right panel, with JavaScript the script switches in place.
     """
     liens = []
     for code, emoji, libelle in VUES_RELANCES:
@@ -2332,17 +2175,17 @@ def _menu_relances(comptes, actif):
 
 
 def _panneau_relance(code, titre, explication, contenu, actif):
-    """Un type de rappel : son titre, sa phrase, et sa liste (vide ou non).
+    """One call-back type: its title, its sentence, and its list (empty or not).
 
-    Tous les panneaux sont rendus ; seul celui du lien actif n'est pas
-    `hidden`. Le masquage est fait ICI, côté serveur : la page reste juste
-    même sans JavaScript, et le script n'a plus qu'à déplacer l'attribut.
+    Every panel is rendered; only the active link's is not `hidden`. The hiding
+    is done HERE, server-side: the page stays correct even without JavaScript,
+    and the script only has to move the attribute.
     """
-    # ⚠ L'EXPLICATION PASSE DERRIÈRE UN « ? » (21/08/2026, sa demande). Elle
-    # s'étalait sous chaque titre : deux paragraphes à relire à chaque visite,
-    # au-dessus de la liste qu'il vient consulter. Elle reste à un clic — et
-    # c'est le « ? » du produit (`_aide`), celui qu'il connaît déjà des autres
-    # écrans, pas un nouveau geste à apprendre.
+    # ⚠ THE EXPLANATION MOVES BEHIND A `?` (21/08/2026, his request). It
+    # sprawled under each title: two paragraphs to reread on every visit, above
+    # the list he came to consult. It stays one click away — and it is the
+    # product's `?` (`_aide`), the one he already knows from the other screens,
+    # not a new gesture to learn.
     cache = "" if code == actif else " hidden"
     sans_balise = re.sub(r"<[^>]+>", "", titre)
     return (f'<section class="panneau-relance" id="panneau-{code}"{cache}>'
@@ -2351,10 +2194,10 @@ def _panneau_relance(code, titre, explication, contenu, actif):
 
 
 def _rien_a_rappeler(programmees, bloques, humains):
-    """LA phrase quand il n'y a rien — dite une fois, pas cinq.
+    """THE sentence when there is nothing — said once, not five times.
 
-    Le menu montre déjà cinq zéros ; ce qu'il ne dit pas, c'est que
-    l'ensemble est vide et qu'il n'y a donc rien à aller voir ailleurs.
+    The menu already shows five zeros; what it does not say is that the whole
+    thing is empty and that there is therefore nothing to go and see elsewhere.
     """
     if programmees or bloques or humains:
         return ""
@@ -2363,17 +2206,14 @@ def _rien_a_rappeler(programmees, bloques, humains):
             "aucun rappel par un humain en attente.</p>")
 
 
-# L'INSTALLEUR : sa propre machinerie, à part de SCRIPT_MODALE.
-#
-# Pourquoi à part. La fenêtre commune sait envoyer un formulaire en
-# « urlencoded » et se fermer ; l'installeur, lui, doit RESTER ouvert d'une
-# page à l'autre, garder son fil d'Ariane à jour, et surtout envoyer un
-# FICHIER (l'agenda .ics) — ce que la fenêtre commune ne sait pas faire.
-# Tordre l'une pour l'autre aurait fragilisé les deux.
-#
-# Le contrat est simple : chaque envoi rend le fragment de la page SUIVANTE
-# (ou la même page avec ses erreurs), et le fragment remplace le contenu de
-# la fenêtre. Le serveur décide de tout ; le script ne fait que transporter.
+# THE INSTALLER: its own machinery, separate from SCRIPT_MODALE.  Why separate.
+# The common window can send a form as `urlencoded` and close itself; the
+# installer, though, must STAY open from one page to the next, keep its
+# breadcrumb up to date, and above all send a FILE (the .ics calendar) — which
+# the common window cannot do. Bending one to fit the other would have weakened
+# both.  The contract is simple: every submission returns the NEXT page's
+# fragment (or the same page with its errors), and the fragment replaces the
+# window's content. The server decides everything; the script only carries.
 SCRIPT_INSTALLATION = """<script>
 (function(){
 var fond=document.getElementById('fond-installeur');
@@ -2489,10 +2329,10 @@ observateur.observe(fond,{childList:true,subtree:true});
 </script>"""
 
 
-# La bascule d'un type à l'autre : on déplace l'attribut `hidden` et la
-# classe du lien actif, on ne recharge pas la page (règle du propriétaire :
-# « recharger un élément, pas la page »). L'adresse suit tout de même, pour
-# qu'un rafraîchissement ou un signet retombe sur le même type.
+# Switching from one type to another: we move the `hidden` attribute and the
+# active link's class, we do not reload the page (the owner's rule: `reload an
+# element, not the page`). The URL follows all the same, so that a refresh or a
+# bookmark lands on the same type.
 SCRIPT_RELANCES = """<script>
 (function(){
 var menu=document.querySelector('.menu-familles');
@@ -2521,18 +2361,17 @@ menu.addEventListener('click',function(e){
 
 
 def _nombre_cliquable(combien, client_id, detail, titre, vide="0"):
-    """Un nombre qui ouvre le détail en fenêtre — ou rien à cliquer si zéro.
+    """A number that opens the detail in a window — or nothing to click when zero.
 
-    Deux colonnes du tableau 👥 Contacts tenaient sur six lignes de haut à
-    force d'étaler leur contenu. Elles montrent maintenant un NOMBRE ; le
-    reste s'ouvre au clic (demande du propriétaire, 02/08/2026).
+    Two columns of the 👥 Contacts table stood six lines tall from spreading out
+    their content. They now show a NUMBER; the rest opens on click (owner's
+    request, 02/08/2026).
 
-    C'est un lien, pas un bouton : sans JavaScript il mène à la fiche pleine
-    page, qui porte déjà les deux contenus. Le repli est donc entier sans
-    qu'on ait une seule ligne à écrire pour lui.
+    It is a link, not a button: without JavaScript it leads to the full-page
+    record, which already carries both contents. So the fallback is complete
+    without a single line written for it.
 
-    Zéro n'est PAS cliquable : un lien qui ouvre une fenêtre vide est un
-    lien mort.
+    Zero is NOT clickable: a link that opens an empty window is a dead link.
     """
     if not combien:
         return f'<span class="sourd">{html.escape(vide)}</span>'
@@ -2550,8 +2389,9 @@ def _date_lisible(iso):
 
 
 def _entier(valeurs, defaut):
-    """Le premier paramètre d'URL lu comme entier, ou `defaut` s'il est
-    absent ou illisible — une adresse tapée à la main ne casse jamais l'écran."""
+    """The first URL parameter read as an integer, or `defaut` when it is absent
+    or unreadable — a hand-typed URL never breaks the screen.
+    """
     try:
         return int((valeurs or [""])[0])
     except (TypeError, ValueError, IndexError):
@@ -2559,15 +2399,15 @@ def _entier(valeurs, defaut):
 
 
 def _nature_conservee(ligne):
-    """Le thème LISIBLE d'une campagne, tel qu'il est conservé en base.
+    """A campaign's READABLE theme, as it is stored in the database.
 
-    `ligne` est une relance ou un contact rendu par la base : sa colonne
-    « campagne_theme » porte le thème historique ou la nature de l'assistant.
-    Un code inconnu s'affiche tel quel — jamais un libellé inventé.
+    `ligne` is a follow-up or a contact returned by the database: its
+    `campagne_theme` column carries the historic theme or the assistant's kind.
+    An unknown code is displayed as it stands — never an invented label.
     """
     code = (ligne.get("campagne_theme") or ligne.get("campagne_nature") or "")
-    # Les thèmes ET les natures RETIRÉS sont reconnus : une campagne déjà en
-    # base ne doit jamais s'afficher sous un code brut.
+    # The REMOVED themes AND kinds are recognised: a campaign already in the
+    # database must never display under a raw code.
     if code in campagnes.THEMES_CAMPAGNE or code in campagnes.THEMES_RETIRES:
         return campagnes.libelle_theme(code)
     fiche = assistant.fiche_nature(code)
@@ -2577,7 +2417,8 @@ def _nature_conservee(ligne):
 
 
 def _date_jour_lisible(iso):
-    """« 2026-08-15 » devient « samedi 15/08/2026 » (jour fermé, férié…)."""
+    """`2026-08-15` becomes `samedi 15/08/2026` (closed day, public holiday…).
+    """
     try:
         jour = datetime.date.fromisoformat(iso)
     except (TypeError, ValueError):
@@ -2586,76 +2427,76 @@ def _date_jour_lisible(iso):
 
 
 class Application:
-    """État partagé : base de données + planificateur (simulé par défaut).
+    """Shared state: database + planner (simulated by default).
 
-    appels_reels=True n'est atteint QUE par principal(), après les trois
-    verrous : clé CALLE_API_KEY présente (sinon AppelReel refuse de se
-    construire), option --appels-reels (qui lève dry_run), et confirmation
-    tapée au clavier (qui autorise confirmer_appels_reels()). Aucun de ces
-    verrous n'est contournable depuis l'interface web.
+    appels_reels=True is only reached by principal(), after the three locks:
+    the CALLE_API_KEY key present (otherwise AppelReel refuses to construct
+    itself), the --appels-reels option (which lifts dry_run), and a
+    confirmation typed at the keyboard (which authorises
+    confirmer_appels_reels()). None of those locks can be bypassed from the web
+    interface.
     """
 
     def __init__(self, chemin_base=":memory:", appels_reels=False):
         self.base = db.Base(chemin_base)
         self.mode_reel = appels_reels
-        # Brouillons de l'assistant en 3 étapes (nature + message + grille) :
-        # gardés CÔTÉ SERVEUR pour que les numéros collés ne soient JAMAIS
-        # ré-émis dans les pages (règle de masquage) — perdus au redémarrage,
-        # sans gravité.
+        # The 3-step assistant's drafts (kind + message + grid): kept
+        # SERVER-SIDE so that pasted numbers are NEVER re-emitted into the
+        # pages (the masking rule) — lost on restart, harmlessly.
         self.brouillons_assistant = {}
         self._brouillon_assistant_suivant = 1
-        # Le serveur répond à plusieurs pages en même temps (voir ServeurWeb) :
-        # deux ouvertures d'assistant simultanées ne doivent pas se voir
-        # attribuer le MÊME numéro de brouillon, ni se marcher dessus pendant
-        # le petit ménage des vieux brouillons.
+        # The server answers several pages at once (see ServeurWeb): two
+        # assistants opened simultaneously must not be given the SAME draft
+        # number, nor tread on each other during the little clean-up of old
+        # drafts.
         self._verrou_brouillons = threading.Lock()
-        # Bilans du geste 📥 « Récupérer les résultats en attente », gardés
-        # CÔTÉ SERVEUR le temps d'une redirection (jeton -> comptes rendus).
-        # Ils portent des noms de personnes : ils ne transitent donc pas par
-        # l'adresse de la page, comme les brouillons de l'assistant.
+        # Summaries of the 📥 `Récupérer les résultats en attente` gesture, kept
+        # SERVER-SIDE for the duration of a redirect (token -> reports). They
+        # carry people's names: so they do not travel through the page's URL,
+        # like the assistant's drafts.
         self.bilans_recuperation = {}
         self._jeton_recuperation = 0
-        # « Configurer plus tard » : EN MÉMOIRE, jamais sur le disque. Cette
-        # réponse vaut pour la session en cours ; l'installeur revient au
-        # prochain démarrage tant qu'il n'a pas été mené à son terme. L'écrire
-        # sur le disque le ferait disparaître pour de bon sur un simple
-        # « pas maintenant » — ce n'est pas ce que ces mots veulent dire.
+        # `Configure later`: IN MEMORY, never on disk. That answer holds for
+        # the current session; the installer comes back at the next start-up as
+        # long as it has not been carried through. Writing it to disk would
+        # make it disappear for good on a mere `not now` — which is not what
+        # those words mean.
         self.installation_reportee = False
-        # Exécutions de campagne en cours : campagne_id -> {"commande": ...}.
-        # La commande (pause / arret) est relue par le fil d'exécution ENTRE
-        # deux appels — un appel en cours va toujours à son terme.
+        # Campaign runs in progress: campagne_id -> {"commande": …}. The
+        # command (pause / stop) is read back by the execution thread BETWEEN
+        # two calls — a call in progress always runs to its end.
         self.executions = {}
         self._verrou_executions = threading.Lock()
-        # Préférences (ex. dernier ordre de cascade choisi) : petit fichier
-        # JSON à côté de la base ; en mémoire seulement pour les tests.
+        # Preferences (e.g. the last cascade order chosen): a small JSON file
+        # beside the database; in memory only for the tests.
         self.preferences = generation.Preferences(
             chemin_preferences(chemin_base))
         campagnes.reprendre_ancien_plafond_de_relances(self.preferences)
         campagnes.reprendre_ancienne_politique_de_deplacement(self.preferences)
-        # Les 🧪 numéros des testeurs déclarés sont confiés à la base : c'est
-        # elle qui masque les numéros, donc elle seule peut dire « cette
-        # ligne-là est un essai » sans jamais révéler le numéro (voir
-        # db.est_numero_essai). Un réglage d'avant, à numéro unique, est repris
-        # comme PREMIER testeur : rien à retaper (voir essai_reel.testeurs).
+        # The 🧪 numbers of the declared testers are handed to the database: it
+        # is the database that masks numbers, so it alone can say `that row is
+        # a test` without ever revealing the number (see db.est_numero_essai).
+        # An older single-number setting is taken over as the FIRST tester:
+        # nothing to retype (see essai_reel.testeurs).
         self.base.definir_numeros_essai(
             essai_reel.numeros_declares(self.preferences))
-        # Les réglages sont confiés au planificateur : ils lui servent à
-        # tenir la plage d'appel + la période interdite sur TOUTES les
-        # portes, et à refuser une date convenue au téléphone qui ne tient
-        # pas dans les horaires d'ouverture.
+        # The settings are handed to the planner: it uses them to hold the
+        # calling window + the forbidden period on ALL the doors, and to refuse
+        # a date agreed on the phone that does not fit within the opening
+        # hours.
         if appels_reels:
-            # Les délais d'attente viennent des RÉGLAGES (⚙ Réglages) : ce
-            # sont ceux d'une vraie conversation, pas ceux d'une simulation.
-            client = calle_client.AppelReel(  # verrou 1 : la clé, ou refus net
-                # ⚠ UNE FONCTION, PAS UNE VALEUR. Le client est construit une
-                # seule fois, ici ; passer le numéro lu maintenant ferait
-                # qu'une case cochée en cours de session n'aurait aucun effet,
-                # alors que l'écran annoncerait le contraire.
+            # The timeouts come from the SETTINGS (⚙ Réglages): they are those
+            # of a real conversation, not those of a simulation.
+            client = calle_client.AppelReel(  # lock 1: the key, or a clean refusal
+                # ⚠ A FUNCTION, NOT A VALUE. The client is built only once,
+                # here; passing the number read now would mean a box ticked
+                # during the session had no effect, while the screen announced
+                # the opposite.
                 numero_impose=lambda: essai_reel.numero_impose(self.preferences),
-                # ⚠ LA LANGUE AUSSI EST UNE FONCTION, ET POUR LA MÊME RAISON.
-                # La consigne suit la langue choisie à l'instant de l'appel :
-                # si la voix, elle, restait figée sur celle du démarrage,
-                # l'agent lirait de l'anglais avec une prosodie française.
+                # ⚠ THE LANGUAGE IS A FUNCTION TOO, AND FOR THE SAME REASON.
+                # The briefing follows the language chosen at the instant of
+                # the call: if the voice stayed frozen on the one from
+                # start-up, the agent would read English with a French prosody.
                 langue_appel=lambda: langue.de_preferences(self.preferences),
                 **calle_client.delais_regles(self.preferences))
             self.planif = planificateur.Planificateur(
@@ -2666,40 +2507,37 @@ class Application:
             self.planif = planificateur.Planificateur(
                 self.base, client, preferences=self.preferences)
 
-    # ------------------------------------- assistant en 3 étapes (nature…)
+    # ------------------------------------- the 3-step assistant (kind…)
     def creer_brouillon_assistant(self, nature, infos_initiales=None):
-        """Ouvre un brouillon de l'assistant ; rend son identifiant (texte).
+        """Opens an assistant draft; returns its id (as text).
 
-        Les valeurs par défaut viennent des RÉGLAGES (entreprise, créneaux,
-        relances) — jamais de valeur inventée : un réglage absent laisse le
-        champ vide, visible et à remplir.
-        infos_initiales : des valeurs d'étape 2 déjà connues (par exemple le
-        créneau qu'une annulation vient de libérer). Elles PRÉ-REMPLISSENT
-        les champs, qui restent tous modifiables — l'assistant s'ouvre
-        normalement, rien n'est décidé à la place de l'opérateur.
+        The default values come from the SETTINGS (business, slots, follow-ups)
+        — never an invented value: an absent setting leaves the field empty,
+        visible and to be filled in. infos_initiales: step-2 values already
+        known (for instance the slot a cancellation has just freed). They
+        PRE-FILL the fields, which all stay editable — the assistant opens
+        normally, nothing is decided in the operator's place.
         """
         definition = assistant.NATURES[nature]
         infos, infos_auto = {}, {}
         for info in definition["infos"]:
             valeur = ""
-            # CALCULÉES : ouvert − déjà pris − jours fermés, plus les créneaux
-            # ajoutés à la main. La valeur reste modifiable ; infos_auto retient
-            # qu'elle vient du calcul, pour pouvoir la réadapter à la durée du
-            # client au moment de l'appel.
-            # ⚠ PAR LE POINT DE PASSAGE UNIQUE, ET PAR RÉGLAGE : le stock d'une
-            # nature qui NÉGOCIE n'est pas la date que le message nomme. Les
-            # deux se calculaient ici, chacune à sa façon, et le
-            # rafraîchissement de l'étape 2 les confondait ensuite — voir
-            # assistant.valeur_calculee_info, seul endroit qui décide
-            # désormais, pour les trois chemins.
-            #
-            # ⚠ SANS `a_deplacer` ICI, ET C'EST VOULU : ce pré-remplissage a
-            # lieu à l'OUVERTURE du brouillon, avant l'étape 3 — la liste des
-            # gens n'existe pas encore, il n'y a donc rien à compter.
-            # L'aperçu montre le stock court ; celui de l'APPEL est recalculé
-            # à chaque contact, avec le nombre réel de rendez-vous restant à
-            # déplacer (voir assistant.creneaux_adaptes_au_contact). Compter
-            # ici aurait demandé d'inventer un nombre.
+            # COMPUTED: open − already taken − closed days, plus the slots
+            # added by hand. The value stays editable; infos_auto remembers
+            # that it comes from the computation, so it can be readapted to the
+            # client's length at call time. ⚠ THROUGH THE SINGLE CHECKPOINT,
+            # AND PER SETTING: the stock of a kind that NEGOTIATES is not the
+            # date the message names. Both were computed here, each in its own
+            # way, and step 2's refresh then confused them — see
+            # assistant.valeur_calculee_info, the only place that decides now,
+            # for all three paths.  ⚠ WITHOUT `a_deplacer` HERE, AND THAT IS
+            # INTENDED: this pre-filling happens when the draft is OPENED,
+            # before step 3 — the list of people does not exist yet, so there
+            # is nothing to count. The preview shows the short stock; the
+            # CALL's is recomputed for each contact, with the real number of
+            # appointments left to move (see
+            # assistant.creneaux_adaptes_au_contact). Counting here would have
+            # meant inventing a number.
             calculee = assistant.valeur_calculee_info(
                 self.base, self.preferences, nature, info["reglage"])
             if calculee is not None:
@@ -2711,11 +2549,11 @@ class Application:
                 valeur = infos_initiales[info["code"]]
                 infos_auto.pop(info["code"], None)
             infos[info["code"]] = valeur
-        # ⚠ RIEN N'EST ÉCRIT ICI. Les valeurs livrées vivent dans
-        # assistant.OPTIONS_LIVREES et les relances générales dans
-        # assistant.relances_generales — les deux lues par comportement_regle,
-        # que l'écran des Réglages appelle aussi. Une seule vérité, donc les
-        # deux écrans montrent la même chose.
+        # ⚠ NOTHING IS WRITTEN HERE. The shipped values live in
+        # assistant.OPTIONS_LIVREES and the general follow-ups in
+        # assistant.relances_generales — both read by comportement_regle, which
+        # the Settings screen also calls. One truth, so both screens show the
+        # same thing.
         options, politique, ordre = assistant.comportement_regle(
             nature, self.preferences)
         with self._verrou_brouillons:
@@ -2725,28 +2563,27 @@ class Application:
                 "nature": nature, "infos": infos, "infos_auto": infos_auto,
                 "options": options,
                 "politique": politique,
-                # Ordre d'appel : celui de la nature (ancienneté pour un
-                # créneau libéré, proximité du rendez-vous pour un rappel),
-                # ou celui réglé pour elle, ou l'ordre de la liste — voir
+                # Calling order: the kind's (oldest first for a freed slot,
+                # nearest appointment for a reminder), or the one configured
+                # for it, or the list's order — see
                 # assistant.comportement_regle.
                 "ordre": ordre,
                 "champs": [dict(champ) for champ in definition["champs"]],
                 "mission": None, "mission_editee": False,
-                # La RECETTE : d'où viennent les personnes de la grille. Elle
-                # permet de REJOUER la campagne sur un autre créneau (§8.3).
+                # The RECIPE: where the grid's people come from. It makes it
+                # possible to REPLAY the campaign on another slot (§8.3).
                 "recette": assistant.recette_vide(),
-                # La LISTE des créneaux à pourvoir (03/08/2026). Vide ici :
-                # elle se remplit à l'étape ② pour « créneau libéré », et
-                # d'un coup quand on sélectionne une plage du planning.
+                # The LIST of slots to fill (03/08/2026). Empty here: it fills
+                # at step ② for `créneau libéré`, and all at once when a range
+                # of the schedule is selected.
                 "creneaux": [],
-                # ⚠ AUTOMATIQUE PAR DÉFAUT, ET AVEC SA RÈGLE (09/08/2026).
-                # Le mode dit ce qui sera ENVOYÉ : une règle rejouée à chaque
-                # place, ou la grille. Le défaut ne vaut que pour les natures
-                # qui ont une place à proposer — ailleurs il n'y a rien sur
-                # quoi rejouer, et prétendre le contraire serait un mensonge
-                # d'interface. La règle est posée D'OFFICE : un mode
-                # automatique sans règle aurait laissé créer une campagne qui
-                # n'appelle personne.
+                # ⚠ AUTOMATIC BY DEFAULT, AND WITH ITS RULE (09/08/2026). The
+                # mode says what will be SENT: a rule replayed at every slot,
+                # or the grid. The default only applies to the kinds that have
+                # a slot to offer — elsewhere there is nothing to replay on,
+                # and pretending otherwise would be an interface lie. The rule
+                # is set BY DEFAULT: an automatic mode with no rule would have
+                # allowed a campaign to be created that calls nobody.
                 "mode_liste": ("automatique"
                                if assistant.INFO_CRENEAU_PAR_NATURE.get(nature)
                                else "manuel"),
@@ -2754,7 +2591,7 @@ class Application:
                                 if assistant.INFO_CRENEAU_PAR_NATURE.get(nature)
                                 else {}),
                 "contacts": [], "erreurs": [], "message": ""}
-            while len(self.brouillons_assistant) > 20:  # petit ménage
+            while len(self.brouillons_assistant) > 20:  # a little clean-up
                 self.brouillons_assistant.pop(
                     next(iter(self.brouillons_assistant)))
         return identifiant
@@ -2762,51 +2599,51 @@ class Application:
     def obtenir_brouillon_assistant(self, identifiant):
         return self.brouillons_assistant.get(identifiant or "")
 
-    # -------------------------- 📥 bilan de « récupérer les résultats »
+    # -------------------------- 📥 the summary of `retrieve the results`
     def retenir_bilan_recuperation(self, comptes):
-        """Garde un compte rendu de récupération ; rend son jeton d'accès."""
+        """Keeps a retrieval report; returns its access token."""
         with self._verrou_brouillons:
             self._jeton_recuperation += 1
             jeton = str(self._jeton_recuperation)
             self.bilans_recuperation[jeton] = comptes
-            while len(self.bilans_recuperation) > 20:      # petit ménage
+            while len(self.bilans_recuperation) > 20:  # a little clean-up
                 self.bilans_recuperation.pop(
                     next(iter(self.bilans_recuperation)))
         return jeton
 
     # ------------------------------ 📥 compte rendu d'un import d'agenda
     def retenir_bilan_import(self, bilan):
-        """Garde le compte rendu d'un import ; rend son jeton d'accès.
+        """Keeps an import's report; returns its access token.
 
-        ⚠ MÊME CHEMIN QUE LES BILANS DE RÉCUPÉRATION, et pour la même raison :
-        ce compte rendu NOMME les personnes dont le rendez-vous a été déplacé.
-        Un nom n'a rien à faire dans une adresse de page — elle s'affiche, elle
-        se copie, elle reste dans l'historique du navigateur.
+        ⚠ THE SAME PATH AS THE RETRIEVAL SUMMARIES, and for the same reason:
+        this report NAMES the people whose appointment was moved. A name has no
+        business in a page's URL — it is displayed, it is copied, it stays in
+        the browser's history.
         """
         with self._verrou_brouillons:
             self._jeton_recuperation += 1
             jeton = "i" + str(self._jeton_recuperation)
             self.bilans_recuperation[jeton] = bilan
-            while len(self.bilans_recuperation) > 20:      # petit ménage
+            while len(self.bilans_recuperation) > 20:  # a little clean-up
                 self.bilans_recuperation.pop(
                     next(iter(self.bilans_recuperation)))
         return jeton
 
-    # --------------------------------------------- exécution d'une campagne
+    # --------------------------------------------- running a campaign
     def demarrer_execution(self, campagne_id):
-        """Lance le fil d'exécution d'une campagne « prête » ou « en pause ».
+        """Launches the execution thread of a `prête` or `en pause` campaign.
 
-        Rend True si le fil part, False si une exécution est déjà en cours.
-        Le statut passe « en cours » AVANT le premier appel, pour que la
-        page reflète l'état réel dès la redirection.
+        Returns True when the thread starts, False when a run is already under
+        way. The status becomes `en cours` BEFORE the first call, so the page
+        reflects the real state from the redirect onwards.
         """
         with self._verrou_executions:
             if campagne_id in self.executions:
                 return False
             self.executions[campagne_id] = {"commande": None}
-        # La raison d'une pause SUBIE (panne de notre côté) est effacée au
-        # redémarrage : on reprend pour de bon, l'écran ne garde pas une
-        # explication périmée sous les yeux.
+        # The reason for an ENDURED pause (a failure on our side) is erased at
+        # restart: we resume for real, the screen does not keep a stale
+        # explanation in front of the user.
         self.base.definir_raison_pause_campagne(campagne_id, None)
         self.base.changer_statut_campagne(campagne_id, "en cours")
         fil = threading.Thread(target=assistant.executer_campagne,
@@ -2815,12 +2652,15 @@ class Application:
         return True
 
     def commande_execution(self, campagne_id):
-        """La commande demandée (« pause » / « arret ») — relue entre deux appels."""
+        """The command requested (`pause` / `arret`) — read back between two
+        calls.
+        """
         entree = self.executions.get(campagne_id)
         return entree["commande"] if entree else None
 
     def demander_commande(self, campagne_id, commande):
-        """Enregistre la demande de pause/arrêt ; rend True si un fil tourne."""
+        """Records the pause/stop request; returns True when a thread is running.
+        """
         with self._verrou_executions:
             entree = self.executions.get(campagne_id)
             if entree is None:
@@ -2833,20 +2673,20 @@ class Application:
             self.executions.pop(campagne_id, None)
 
     def peupler_demo(self):
-        """Données de démonstration — numéros 100 % fictifs."""
+        """Demonstration data — 100 % fictional numbers."""
         if self.base.compter_clients():
             return
         maintenant = datetime.datetime.now().replace(second=0, microsecond=0)
-        # ⚠ LA LISTE EST DANS `jeu_essai` DEPUIS LE 13/08/2026, pas ici : trois
-        # de ces quatre noms existent aussi dans le jeu d'essai sous un AUTRE
-        # numéro, et l'agenda d'exemple doit pouvoir les éviter. Deux listes
-        # d'identités dans deux fichiers qui s'ignorent, c'est exactement ce
-        # qui a produit la dérive — voir jeu_essai.PREMIERS_CONTACTS.
-        # ⚠ DANS LA LANGUE DÉJÀ CHOISIE, s'il y en a une. Les réglages et la
-        # base sont deux fichiers distincts : quelqu'un qui a mis l'interface
-        # en anglais puis repart d'une base neuve doit retrouver un décor
-        # anglais. Sur une première installation, la langue vaut le français
-        # et rien ne change.
+        # ⚠ THE LIST HAS BEEN IN `jeu_essai` SINCE 13/08/2026, not here: three
+        # of those four names also exist in the sample data set under a
+        # DIFFERENT number, and the sample calendar must be able to avoid them.
+        # Two lists of identities in two files that ignore each other is
+        # exactly what produced the drift — see jeu_essai.PREMIERS_CONTACTS. ⚠
+        # IN THE LANGUAGE ALREADY CHOSEN, when there is one. The settings and
+        # the database are two distinct files: somebody who set the interface
+        # to English then starts from a fresh database must find an English
+        # setting again. On a first installation, the language is French and
+        # nothing changes.
         _, _, premiers, _ = jeu_essai.decor(
             langue.de_preferences(self.preferences))
         for nom, telephone, jours, heure, minute, motif in premiers:
@@ -2857,11 +2697,11 @@ class Application:
                 client_id, horaire.isoformat(timespec="minutes"), motif, statut="manqué")
 
     def rappeler(self, rendezvous_id, mission=None):
-        """Programme puis exécute immédiatement le rappel de CE rendez-vous.
+        """Schedules then immediately places the call-back for THIS appointment.
 
-        Seul l'appel tout juste programmé part : les appels déjà en file
-        d'attente (page « File d'appels ») ne sont pas touchés. mission :
-        texte facultatif choisi au lancement (thème d'appel).
+        Only the call just scheduled goes out: the calls already in the queue
+        (the `File d'appels` page) are not touched. mission: optional text
+        chosen at launch (a call theme).
         """
         appel_id = self.planif.programmer(rendezvous_id)  # ValueError si inconnu
         self.planif.executer(seulement=appel_id, mission=mission)
@@ -2869,33 +2709,33 @@ class Application:
 
 
 class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
-    application = None  # injectée par creer_serveur()
+    application = None  # injected by creer_serveur()
 
     # ------------------------------------------------------------------ routes
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         if self._get_assistant(url):
-            return  # route de l'assistant en 3 étapes, déjà traitée
+            return  # the 3-step assistant's route, already handled
         if url.path == "/":
             return self._repondre(self._page_campagnes(
                 urllib.parse.parse_qs(url.query)))
         if url.path.startswith("/image/"):
             return self._servir_image(url.path[len("/image/"):])
         if url.path == "/installation":
-            # Fragment : UNE page de l'installeur. C'est aussi l'adresse
-            # qu'on ouvre à la main pour reprendre la configuration.
+            # Fragment: ONE page of the installer. It is also the URL you open
+            # by hand to resume the configuration.
             parametres = urllib.parse.parse_qs(url.query)
             return self._repondre_fragment(
                 self._page_installeur(parametres.get("page", [""])[0]))
         if url.path == "/suivi":
             return self._repondre(self._page_suivi(urllib.parse.parse_qs(url.query)))
         if url.path == "/suivi/planning":
-            # Fragment : la navigation de semaine, le « prochain créneau » et
-            # les filtres rechargent CETTE zone, jamais la page entière.
+            # Fragment: the week navigation, the `next slot` and the filters
+            # reload THIS zone, never the whole page.
             return self._repondre_fragment(
                 self._zone_planning(urllib.parse.parse_qs(url.query)))
         if url.path == "/suivi/detail":
-            # Fragment : le contenu de la modale (rendez-vous ou créneau libre).
+            # Fragment: the modal's content (an appointment or a free slot).
             return self._repondre_fragment(
                 self._modale_planning(urllib.parse.parse_qs(url.query)))
         if url.path == "/campagne":
@@ -2909,17 +2749,17 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 return self._erreur(404, "Campagne introuvable.")
             return self._repondre(page)
         if url.path == "/campagne/nouvelle":
-            # Un SEUL parcours de création : l'assistant en 3 étapes. Cette
-            # ancienne adresse survit pour les marque-pages, en redirection.
+            # ONE single creation journey: the 3-step assistant. This old URL
+            # survives for bookmarks, as a redirect.
             return self._rediriger("/assistant")
         if url.path == "/suivi/plage":
-            # Le MENU d'une plage sélectionnée. Un GET ne crée rien.
-            # ⚠ C'EST `_modale_plage` QUI RÉPOND : fenêtre au glissé, PAGE
-            # entière quand la demande n'en vient pas (repli « Sans glisser »,
-            # navigateur sans JavaScript). Voir `_reponse_plage`.
+            # The MENU of a selected range. A GET creates nothing. ⚠ IT IS
+            # `_modale_plage` THAT ANSWERS: a window on a drag, a full PAGE
+            # when the request does not come from one (the `Sans glisser`
+            # fallback, a browser without JavaScript). See `_reponse_plage`.
             return self._modale_plage(urllib.parse.parse_qs(url.query))
         if url.path == "/campagnes/effacer":
-            # La CONFIRMATION, jamais la suppression : un GET n'efface rien.
+            # The CONFIRMATION, never the deletion: a GET erases nothing.
             code = urllib.parse.parse_qs(url.query).get("groupe", [""])[0]
             return self._repondre(self._modale_effacer_liste(code))
         if url.path == "/relances":
@@ -2931,13 +2771,13 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._repondre(
                 self._page_clients(urllib.parse.parse_qs(url.query)))
         if url.path == "/clients/liste":
-            # Fragment : les filtres rechargent la SEULE liste des contacts.
+            # Fragment: the filters reload ONLY the contacts list.
             return self._repondre_fragment(
                 self._liste_clients(urllib.parse.parse_qs(url.query)))
         if url.path == "/clients/detail":
-            # Fragment : le DOSSIER d'un client en modale (édition comprise).
-            # C'est le chemin normal ; /clients/fiche reste le repli sans
-            # JavaScript, et le lien de la liste y mène toujours.
+            # Fragment: a client's FILE in a modal (editing included). That is
+            # the normal path; /clients/fiche remains the no-JavaScript
+            # fallback, and the list's link still leads there.
             parametres = urllib.parse.parse_qs(url.query)
             try:
                 client_id = int(parametres.get("id", [""])[0])
@@ -2949,8 +2789,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._repondre_fragment(modale)
         if url.path in ("/clients/detail-rendezvous",
                         "/clients/detail-campagnes"):
-            # Fragments : le DÉTAIL d'une des deux colonnes réduites à un
-            # nombre. Même contrôle et même forme que /clients/detail.
+            # Fragments: the DETAIL of one of the two columns reduced to a
+            # number. The same check and the same shape as /clients/detail.
             parametres = urllib.parse.parse_qs(url.query)
             try:
                 client_id = int(parametres.get("id", [""])[0])
@@ -2964,7 +2804,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 return self._erreur(404, "Client introuvable.")
             return self._repondre_fragment(modale)
         if url.path == "/relances/demande":
-            # Fragment : LA DEMANDE d'un contact « à rappeler par un humain ».
+            # Fragment: THE REQUEST of a contact `à rappeler par un humain`.
             parametres = urllib.parse.parse_qs(url.query)
             try:
                 contact_id = int(parametres.get("contact", [""])[0])
@@ -2975,7 +2815,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 return self._erreur(404, "Contact introuvable.")
             return self._repondre_fragment(modale)
         if url.path == "/clients/ligne":
-            # Fragment : la SEULE ligne d'un client (rafraîchie après édition).
+            # Fragment: ONE client's row (refreshed after editing).
             parametres = urllib.parse.parse_qs(url.query)
             try:
                 client_id = int(parametres.get("id", [""])[0])
@@ -3017,10 +2857,10 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._repondre(self._modale_ajout(
                 urllib.parse.parse_qs(url.query)))
         if url.path == "/reglages/agenda-exemple.ics":
-            # ⚠ FABRIQUÉ ICI, À CHAQUE DEMANDE. Rien n'est écrit sur le disque :
-            # un fichier rangé vieillirait comme les trois exemples livrés.
-            # ⚠ ET AVEC LES RÉGLAGES : les rendez-vous tombent dans les heures
-            # d'ouverture réelles, au pas réel, jamais un samedi fermé.
+            # ⚠ BUILT HERE, ON EVERY REQUEST. Nothing is written to disk: a
+            # stored file would age like the three shipped samples. ⚠ AND WITH
+            # THE SETTINGS: the appointments fall within the real opening
+            # hours, at the real step, never on a closed Saturday.
             texte = agenda_exemple.agenda_ics(
                 preferences=self.application.preferences)
             journal.info("Agenda d'exemple engendré : %d événement(s) — "
@@ -3037,18 +2877,18 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._repondre(self._page_confirmer_essai_reel(
                 nombre_brut=parametres.get("nombre", [""])[0]))
         if url.path == "/reglages/testeurs":
-            # Fragment : la liste des testeurs se recharge SEULE après un
-            # ajout ou un retrait (jamais la page).
+            # Fragment: the testers list reloads ON ITS OWN after an addition
+            # or a removal (never the page).
             return self._repondre_fragment(self._bloc_testeurs())
         if url.path == "/reglages/campagne-essai":
-            # Fragment : l'aperçu « qui joue quoi » se recharge SEUL quand la
-            # liste des testeurs change, ou le nombre d'identités demandé.
+            # Fragment: the `who plays what` preview reloads ON ITS OWN when
+            # the testers list changes, or the number of identities requested.
             parametres = urllib.parse.parse_qs(url.query)
             return self._repondre_fragment(self._bloc_essai_reel(
                 parametres.get("nombre", [""])[0]))
         if url.path == "/reglages/creneaux":
-            # Fragment : la liste des créneaux proposables se recharge SEULE
-            # après un glisser-relâché sur le calendrier (jamais la page).
+            # Fragment: the list of offerable slots reloads ON ITS OWN after a
+            # drag-and-release on the calendar (never the page).
             return self._repondre_fragment(self._bloc_creneaux())
         if url.path == "/rappel":
             parametres = urllib.parse.parse_qs(url.query)
@@ -3095,15 +2935,15 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         taille = int(self.headers.get("Content-Length", 0))
         corps = self.rfile.read(taille)
         if self._post_assistant(url, corps):
-            return  # route de l'assistant en 3 étapes, déjà traitée
+            return  # the 3-step assistant's route, already handled
         if url.path == "/langue":
             return self._traiter_langue(corps)
         if url.path == "/campagne/clore":
             return self._traiter_cloture_campagne(corps)
         if url.path == "/suivi/plage/creneau-libere":
             return self._traiter_plage_creneau_libere(corps)
-        # Les trois campagnes qu'une plage DE RENDEZ-VOUS ouvre (10/08/2026).
-        # Une route par nature, pour que l'adresse dise ce qu'elle fait.
+        # The three campaigns an APPOINTMENT range opens (10/08/2026). One
+        # route per kind, so that the URL says what it does.
         for nature, _, _ in self.CAMPAGNES_DE_PLAGE:
             if url.path == f"/suivi/plage/{nature.replace('_', '-')}":
                 return self._campagne_depuis_plage(corps, nature)
@@ -3226,11 +3066,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     # --------------------------------------------------------------- actions
     def _mission_choisie(self, donnees):
-        """La mission envoyée par le formulaire (thème d'appel), ou None.
+        """The mission sent by the form (a call theme), or None.
 
-        Priorité au texte de la zone (pré-rempli PUIS éventuellement modifié
-        par l'utilisateur) ; à défaut, le gabarit du thème choisi ; à défaut
-        (POST direct sans champ), None = consigne standard historique.
+        Priority to the box's text (pre-filled THEN possibly edited by the
+        user); failing that, the chosen theme's template; failing that (a
+        direct POST with no field), None = the historic standard briefing.
         """
         mission = " ".join(donnees.get("mission", [""])[0].split())
         if mission:
@@ -3242,40 +3082,41 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return None
 
     def _creneaux_lisibles(self, tranches=1):
-        """Les créneaux à proposer, en français — CALCULÉS puis complétés.
+        """The slots to offer, in French — COMPUTED then completed.
 
-        Ouvert (semaine type) − déjà pris (rendez-vous) − jours fermés, plus
-        les créneaux ajoutés à la main. C'est la source unique de
-        [créneaux_disponibles] pour les rappels, la file et les cascades.
+        Open (typical week) − already taken (appointments) − closed days, plus
+        the slots added by hand. It is the single source of
+        [créneaux_disponibles] for the call-backs, the queue and the cascades.
         """
         return horaires.creneaux_lisibles(self.application.base,
                                           self.application.preferences,
                                           tranches=tranches)
 
     def _refus_hors_plage(self, forcer=False, rejeu=None):
-        """Le garde-fou de politesse, tenu sur les CINQ portes d'appel.
+        """The politeness guard, held on all FIVE calling doors.
 
-        Deux règles, une seule vérification — c'est ce qui garantit qu'elles
-        valent partout : la PLAGE d'appel autorisée, et la PÉRIODE INTERDITE
-        (décision du propriétaire : elle vaut pour tout, sans dérogation,
-        même pour un geste individuel). Envoie la page 403 en français et
-        rend True si l'appel est refusé ; rend False sinon.
+        Two rules, one single check — that is what guarantees they hold
+        everywhere: the permitted calling WINDOW, and the FORBIDDEN PERIOD
+        (owner's decision: it applies to everything, without exemption, even to
+        an individual gesture). Sends the 403 page in French and returns True
+        when the call is refused; returns False otherwise.
 
-        `forcer` : le geste « je force malgré l'heure » a été fait. Il ne lève
-        QUE la plage horaire, et SEULEMENT EN SIMULATION — voir
-        assistant.CLE_HORAIRE_FORCE. En appels réels il est ignoré, et ce n'est
-        pas une politesse de façade : c'est ici que la décision se prend, pas
-        dans le formulaire qui l'a demandée.
+        `forcer`: the `I force it despite the hour` gesture was made. It lifts
+        ONLY the time window, and ONLY IN SIMULATION — see
+        assistant.CLE_HORAIRE_FORCE. In real calls it is ignored, and that is
+        not a token politeness: the decision is taken here, not in the form
+        that asked for it.
 
-        `rejeu` : les champs à renvoyer si l'utilisateur veut forcer. Fournis,
-        et en simulation, et si l'heure est le SEUL obstacle, la page de refus
-        porte alors le bouton qui rejoue le même geste. Absents (les quatre
-        autres portes), la page de refus est celle d'avant, à la lettre.
+        `rejeu`: the fields to send back should the user want to force.
+        Supplied, and in simulation, and when the hour is the ONLY obstacle,
+        the refusal page then carries the button that replays the same gesture.
+        Absent (the four other doors), the refusal page is the previous one, to
+        the letter.
         """
         preferences = self.application.preferences
         simulation = not self.application.mode_reel
-        # La période interdite d'abord : elle ne se force jamais, et le dire
-        # AVANT évite de proposer un bouton qui ne débloquerait rien.
+        # The forbidden period first: it can never be forced, and saying so
+        # BEFOREHAND avoids offering a button that would unblock nothing.
         message = assistant.dans_periode_interdite(preferences)
         tardif = themes.hors_plage(preferences)
         levable = message is None and tardif is not None and simulation
@@ -3291,17 +3132,17 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return True
 
     def _erreur_heure(self, message, rejeu):
-        """La page de refus « hors plage » AVEC le bouton qui force — simulation.
+        """The `outside the window` refusal page WITH the button that forces —
+        simulation.
 
-        ⚠ POURQUOI CE BOUTON EXISTE (13/08/2026). Le propriétaire essaie son
-        produit le soir : le garde-fou de politesse lui refusait la campagne
-        alors qu'aucun téléphone ne sonne en simulation. Le garde-fou protège
-        des gens ; en simulation il n'y a personne à protéger, et il ne faisait
-        qu'empêcher d'essayer.
+        ⚠ WHY THAT BUTTON EXISTS (13/08/2026). The owner tries his product in
+        the evening: the politeness guard refused him the campaign although no
+        phone rings in simulation. The guard protects people; in simulation
+        there is nobody to protect, and it was only preventing him from trying.
 
-        `rejeu` rejoue le geste refusé À L'IDENTIQUE, avec un champ de plus :
-        rien n'est deviné ni reconstruit, et l'écran qui suit est celui qu'il
-        aurait eu à l'heure permise.
+        `rejeu` replays the refused gesture IDENTICALLY, with one extra field:
+        nothing is guessed or rebuilt, and the screen that follows is the one
+        he would have had at a permitted hour.
         """
         champs = "".join(
             f'<input type="hidden" name="{html.escape(str(nom))}" '
@@ -3327,27 +3168,28 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self._repondre(self._page("Erreur", corps), 403)
 
     def _panne_de_notre_cote(self, panne):
-        """La page d'une panne DE NOTRE CÔTÉ — celle qui dit ce qui n'a PAS eu lieu.
+        """The page for a failure ON OUR SIDE — the one that says what did NOT
+        happen.
 
-        Pas un « échec technique » anonyme : le message porte ce qui s'est
-        passé, que personne n'a été appelé, qu'aucun crédit n'a été
-        consommé, et quoi faire (voir calle_client.EchecDeNotreCote). Le
-        code 503 dit la vérité de la situation : le service n'a pas pu
-        rendre le service, et ce n'est pas la faute de qui on appelait.
+        Not an anonymous `technical failure`: the message carries what
+        happened, that nobody was called, that no credit was consumed, and what
+        to do (see calle_client.EchecDeNotreCote). The 503 code states the
+        truth of the situation: the service could not deliver, and it is not
+        the fault of the person being called.
         """
         journal.error("Appel interrompu — %s", panne)
-        # LE TITRE DOIT ÊTRE VRAI. « Aucun appel n'est parti » est juste
-        # quand la demande a été refusée avant de partir — et FAUX quand le
-        # téléphone a sonné. Deux cas où il a sonné : le résultat n'est pas
-        # encore connu, ou il est arrivé et RingBack n'a pas su le lire.
+        # THE TITLE MUST BE TRUE. `No call went out` is right when the request
+        # was refused before going out — and FALSE when the phone rang. Two
+        # cases where it rang: the result is not yet known, or it arrived and
+        # RingBack could not read it.
         brut = ""
         if isinstance(panne, calle_client.ResultatInvalide):
             titre = "Réponse illisible"
             entete = ("<h1>🙋 L'appel a eu lieu — RingBack n'a pas su lire "
                       "la réponse</h1>")
             if panne.reponse_brute:
-                # ③ NE PLUS ÊTRE AVEUGLE : la réponse, sous les yeux, tout
-                # de suite. C'est ce qui manquait le 01/08/2026.
+                # ③ NO LONGER BEING BLIND: the answer, in front of you,
+                # straight away. That is what was missing on 01/08/2026.
                 brut = ("<h2>Ce que CALL-E a répondu, mot pour mot</h2>"
                         f"<pre>{html.escape(panne.reponse_brute)}</pre>")
         elif isinstance(panne, calle_client.ResultatEnAttente):
@@ -3357,10 +3199,10 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         else:
             titre = "Appel impossible"
             entete = "<h1>⛔ Aucun appel n'est parti</h1>"
-        # LA CITATION, DANS SON PROPRE BLOC, quelle que soit la panne. Le
-        # 02/08/2026 le message promettait « lisez la réponse citée ci-dessus »
-        # et rien n'était cité : la citation est ce qui nomme le champ refusé,
-        # elle mérite d'être lisible, pas noyée dans un paragraphe.
+        # THE QUOTATION, IN ITS OWN BLOCK, whatever the failure. On 02/08/2026
+        # the message promised `read the answer quoted above` and nothing was
+        # quoted: the quotation is what names the refused field, it deserves to
+        # be readable, not drowned in a paragraph.
         texte = str(panne)
         if not brut and getattr(panne, "reponse_brute", ""):
             texte = panne.message(citer=False)
@@ -3380,17 +3222,17 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _traiter_langue(self, corps):
-        """Change la langue de l'interface, et REVIENT SUR LA PAGE QUITTÉE.
+        """Changes the interface language, and COMES BACK TO THE PAGE LEFT BEHIND.
 
-        ⚠ LE RETOUR EST LA MOITIÉ DU GESTE. Basculer en anglais et se
-        retrouver sur l'accueil ferait perdre l'écran qu'on était en train de
-        lire — un testeur au milieu d'une campagne ne retrouverait pas où il
-        en était. On revient donc d'où l'on vient.
+        ⚠ THE RETURN IS HALF THE GESTURE. Switching to English and landing on
+        the home page would lose the screen you were reading — a tester in the
+        middle of a campaign would not find their place again. So we come back
+        where we came from.
 
-        ⚠ MAIS ON NE SUIT PAS N'IMPORTE QUELLE ADRESSE. Le « Referer » est
-        envoyé par le navigateur : une page extérieure pourrait y écrire ce
-        qu'elle veut. On n'en garde donc que le CHEMIN, et seulement s'il
-        commence par « / » sans être « // » (qui désigne un autre site).
+        ⚠ BUT WE DO NOT FOLLOW JUST ANY URL. The `Referer` is sent by the
+        browser: an outside page could write whatever it likes there. So we
+        keep only its PATH, and only when it starts with `/` without being `//`
+        (which designates another site).
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         choisie = langue.langue_valide(donnees.get("vers", [""])[0])
@@ -3398,7 +3240,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(self._retour_sur_place())
 
     def _retour_sur_place(self, defaut="/"):
-        """Le chemin de la page d'où vient la demande, ou `defaut`."""
+        """The path of the page the request comes from, or `defaut`."""
         venue = self.headers.get("Referer") or ""
         chemin = urllib.parse.urlparse(venue).path
         if not chemin.startswith("/") or chemin.startswith("//"):
@@ -3407,7 +3249,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return f"{chemin}?{requete}" if requete else chemin
 
     def _traiter_cloture_campagne(self, corps):
-        """Clôture manuelle d'une campagne : ses relances sont annulées."""
+        """Manual closure of a campaign: its follow-ups are cancelled."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             campagne_id = int(donnees.get("campagne", [""])[0])
@@ -3420,10 +3262,10 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     # ----------------------------------------------------------- relances
     def _traiter_execution_relances(self):
-        """Le GESTE HUMAIN « Lancer les relances dues » — jamais automatique.
+        """The HUMAN GESTURE `Lancer les relances dues` — never automatic.
 
-        Les mêmes verrous que partout : plage horaire d'abord, puis les
-        trois verrous d'appels réels du planificateur.
+        The same locks as everywhere: the time window first, then the planner's
+        three real-call locks.
         """
         if self._refus_hors_plage():
             return
@@ -3436,7 +3278,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._repondre(self._page_resultat_relances(comptes_rendus))
 
     def _traiter_report_relance(self, corps):
-        """Reporte une relance à une nouvelle échéance (modifiable, toujours)."""
+        """Postpones a follow-up to a new due date (always editable)."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         vue = _vue_relances(donnees.get("vue", [""])[0])
         try:
@@ -3455,7 +3297,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(f"/relances?vue={vue}&fait=reportee")
 
     def _traiter_annulation_relance(self, corps):
-        """Annule une relance planifiée (la chaîne de ce contact s'arrête là)."""
+        """Cancels a scheduled follow-up (that contact's chain stops there)."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         vue = _vue_relances(donnees.get("vue", [""])[0])
         try:
@@ -3481,14 +3323,14 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         try:
             self.application.rappeler(rdv_id, mission=self._mission_choisie(donnees))
         except calle_client.EchecDeNotreCote as panne:
-            # L'appel n'a pas eu lieu et il est resté en file : rien n'est
-            # écrit sur ce rendez-vous, l'écran dit pourquoi.
+            # The call did not take place and stayed in the queue: nothing is
+            # written about that appointment, the screen says why.
             return self._panne_de_notre_cote(panne)
         except planificateur.ClientExclu as erreur:
             return self._erreur(403, str(erreur))
         except planificateur.GardeFou as erreur:
-            # Ceinture et bretelles : les mêmes verrous, relus au plus près
-            # de l'appel (plage, période interdite, appels réels).
+            # Belt and braces: the same locks, read back as close to the call
+            # as possible (window, forbidden period, real calls).
             return self._erreur(403, str(erreur))
         except ValueError:
             return self._erreur(404, "Rendez-vous introuvable.")
@@ -3498,9 +3340,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     @staticmethod
     def _rappel_souhaite_valide(donnees):
-        """Le champ optionnel « rappel souhaité » validé, ou None si vide.
+        """The optional `call-back wanted` field validated, or None when empty.
 
-        Lève SaisieInvalide (message français) si la date est illisible.
+        Raises SaisieInvalide (French message) when the date is unreadable.
         """
         brut = donnees.get("rappel_souhaite", [""])[0].strip()
         if not brut:
@@ -3514,9 +3356,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
         if "forcer" in donnees:
-            # « Ajouter quand même » après le signal de doublon : le client
-            # existe déjà, on repart de son identifiant — le numéro de
-            # téléphone ne refait JAMAIS le trajet dans la page.
+            # `Add anyway` after the duplicate warning: the client already
+            # exists, so we start again from their id — the phone number NEVER
+            # makes the trip through the page again.
             try:
                 client_id = int(donnees.get("forcer", [""])[0])
             except ValueError:
@@ -3544,11 +3386,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         except saisie.SaisieInvalide as erreur:
             erreurs.append(str(erreur))
         if erreurs:
-            # Le formulaire est ré-affiché avec les messages ; le numéro,
-            # lui, n'est jamais renvoyé dans la page (règle de masquage).
+            # The form is redisplayed with the messages; the number, though, is
+            # never sent back into the page (the masking rule).
             return self._repondre(self._page_ajout(valeurs=champs, erreurs=erreurs))
-        # Garde-fou doublon : même client + même horaire déjà en base ->
-        # on SIGNALE au lieu de créer un double en silence.
+        # Duplicate guard: the same client + the same time already in the
+        # database -> we FLAG it instead of silently creating a double.
         existant = base.rendezvous_identique(
             propres["nom"], propres["telephone"], propres["date_heure"])
         if existant is not None:
@@ -3556,7 +3398,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         client_id = base.obtenir_ou_creer_client(propres["nom"], propres["telephone"])
         rdv_id = base.ajouter_rendezvous(client_id, propres["date_heure"],
                                          propres["motif"], rappel_souhaite=rappel)
-        base.marquer_manques_echus()  # un horaire déjà passé devient « manqué »
+        base.marquer_manques_echus()  # a time already past becomes `manqué`
         return self._repondre(self._page_confirmation_ajout(rdv_id))
 
     def _traiter_import(self, corps):
@@ -3575,21 +3417,24 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         except saisie.SaisieInvalide as erreur:
             return self._erreur(400, str(erreur))
         self.application.base.marquer_manques_echus()
-        # Quand l'agenda a-t-il été alimenté pour la dernière fois ? C'est le
-        # fait le plus utile du rappel affiché avant de démarrer une
-        # campagne — encore faut-il l'avoir noté au moment où ça arrive.
+        # When was the calendar last fed? It is the most useful fact of the
+        # reminder shown before starting a campaign — provided it was recorded
+        # at the moment it happened.
         horaires.noter_import_agenda(self.application.preferences,
                                      "fichier CSV", importes)
-        # ⚠ ON REVIENT SUR L'AGENDA (10/08/2026, demande du propriétaire) : un
-        # import se fait POUR remplir le planning, et c'est le planning qu'on
-        # veut voir ensuite. Le compte rendu s'affiche en tête, pas ailleurs.
+        # ⚠ WE COME BACK TO THE CALENDAR (10/08/2026, owner's request): an
+        # import is done IN ORDER TO fill the schedule, and it is the schedule
+        # you want to see afterwards. The report appears at the top, not
+        # elsewhere.
         bilan.update({"quoi": "fichier CSV", "importes": importes,
                       "erreurs": erreurs})
         jeton = self.application.retenir_bilan_import(bilan)
         return self._rediriger(f"/suivi?import={jeton}")
 
     def _traiter_import_ics(self, corps):
-        """Import d'un agenda ICS : rendez-vous créés SANS numéro, à compléter."""
+        """Importing an ICS calendar: appointments created WITH NO number, to be
+        completed.
+        """
         type_contenu = self.headers.get("Content-Type", "")
         if not type_contenu.startswith("multipart/form-data"):
             return self._erreur(400, "Envoi invalide : un fichier ICS est attendu.")
@@ -3599,7 +3444,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         remplacer_tout = champs.get("remplacer_tout") == "1"
         bilan = {}
         try:
-            texte = saisie.decoder_csv(octets)  # même décodage tolérant que le CSV
+            texte = saisie.decoder_csv(octets)  # the same tolerant decoding as the CSV
             importes, erreurs = ics.importer_ics(
                 self.application.base, texte, self.application.preferences,
                 remplacer_tout=remplacer_tout, bilan=bilan)
@@ -3614,7 +3459,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(f"/suivi?import={jeton}")
 
     def _traiter_completer_numero(self, corps):
-        """Renseigne le numéro d'un client importé sans téléphone."""
+        """Fills in the number of a client imported with no phone."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             client_id = int(donnees.get("client", [""])[0])
@@ -3632,7 +3477,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _traiter_cascade(self, corps):
-        """Valide la saisie puis lance la cascade « premier oui » (séquentielle)."""
+        """Validates the input then launches the `first yes` cascade (sequential).
+        """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         liste = donnees.get("liste", [""])[0]
         mission = " ".join(donnees.get("mission", [""])[0].split())
@@ -3647,8 +3493,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         except saisie.SaisieInvalide as erreur:
             erreurs.append(f"Créneau proposé : {erreur}")
         if erreurs:
-            # La liste (qui contient des numéros en clair) n'est jamais
-            # renvoyée dans la page — même prudence que le formulaire d'ajout.
+            # The list (which contains numbers in clear) is never sent back
+            # into the page — the same caution as the add form.
             return self._repondre(self._page_cascade(
                 erreurs=erreurs, mission=mission, creneau=creneau_brut))
         if self._refus_hors_plage():
@@ -3657,16 +3503,15 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             cascade_id = self.application.planif.executer_cascade(
                 personnes, mission, creneau)
         except calle_client.EchecDeNotreCote as panne:
-            # Cascade interrompue par une panne de NOTRE côté : aucune
-            # campagne n'est créée, donc aucune relance n'est armée pour des
-            # gens que personne n'a appelés.
+            # A cascade interrupted by a failure on OUR side: no campaign is
+            # created, so no follow-up is armed for people nobody called.
             return self._panne_de_notre_cote(panne)
         except planificateur.GardeFou as erreur:
             return self._erreur(403, str(erreur))
-        # Rattachement au modèle campagne : ce parcours direct crée SA
-        # campagne (thème « créneau libéré ») — relances comprises si le
-        # créneau n'est pas pourvu. Rien n'est dupliqué : la cascade reste
-        # la mécanique, la campagne en est le dossier.
+        # Attachment to the campaign model: this direct journey creates ITS
+        # campaign (theme `créneau libéré`) — follow-ups included when the slot
+        # is not filled. Nothing is duplicated: the cascade stays the
+        # mechanism, the campaign is its file.
         cascade = self.application.base.obtenir_cascade(cascade_id)
         campagnes.campagne_depuis_cascade(
             self.application.base, self.application.preferences, cascade_id,
@@ -3677,7 +3522,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     @staticmethod
     def _champs_cascade(corps):
-        """Les champs du formulaire cascade, tels que postés."""
+        """The cascade form's fields, as posted."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         return {"liste": donnees.get("liste", [""])[0],
                 "mission": donnees.get("mission", [""])[0],
@@ -3686,14 +3531,14 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 "ordre": donnees.get("ordre", [""])[0]}
 
     def _generer_personnes(self, champs):
-        """Valide source/ordre/créneau puis génère ; rend (personnes, exclus).
+        """Validates source/order/slot then generates; returns (people, excluded).
 
-        Lève SaisieInvalide (messages français) si la saisie est fautive.
-        Le dernier choix (source + ordre) est mémorisé après un succès.
+        Raises SaisieInvalide (French messages) when the input is faulty. The
+        last choice (source + order) is remembered after a success.
         """
         creneau = None
-        # Le créneau n'est validé que si l'ordre en a besoin (proximité) ;
-        # son absence est signalée en français par generation.generer().
+        # The slot is only validated when the order needs it (proximity); its
+        # absence is reported in French by generation.generer().
         if champs["ordre"] == "proximite" and champs["creneau"].strip():
             creneau = saisie.valider_horaire(champs["creneau"])
         personnes, exclus = generation.generer(
@@ -3703,12 +3548,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return personnes, exclus
 
     def _traiter_generation(self, corps):
-        """Remplit la zone de collage depuis la base (source + ordre choisis).
+        """Fills the paste area from the database (chosen source + order).
 
-        Contrairement aux erreurs de LANCEMENT (qui effacent la liste par
-        prudence), les erreurs de génération conservent la zone de collage :
-        son contenu vient de l'utilisateur lui-même ou d'une génération
-        précédente qu'il est en train d'affiner.
+        Unlike LAUNCH errors (which clear the list out of caution), generation
+        errors keep the paste area: its content comes from the user themselves
+        or from an earlier generation they are refining.
         """
         champs = self._champs_cascade(corps)
         try:
@@ -3732,13 +3576,13 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             message=message, exclus=exclus))
 
     def _traiter_csv(self, corps):
-        """Sert la liste en CSV (nom;telephone) — généré à la volée.
+        """Serves the list as CSV (nom;telephone) — generated on the fly.
 
-        Si la zone de collage contient une liste, c'est ELLE qui part (y
-        compris un réordonnancement fait à la main) ; sinon la liste est
-        générée depuis la source et l'ordre choisis. Le fichier contient
-        les numéros EN CLAIR par nature (c'est son but, annoncé sur la
-        page) et n'est JAMAIS écrit côté serveur.
+        When the paste area contains a list, it is THAT one that goes out
+        (including a reordering done by hand); otherwise the list is generated
+        from the chosen source and order. The file contains the numbers IN
+        CLEAR by nature (that is its purpose, announced on the page) and is
+        NEVER written server-side.
         """
         champs = self._champs_cascade(corps)
         if champs["liste"].strip():
@@ -3756,7 +3600,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                     erreurs=[str(erreur)], mission=champs["mission"],
                     creneau=champs["creneau"], liste=champs["liste"],
                     source=champs["source"], ordre=champs["ordre"]))
-        contenu = generation.en_csv(personnes).encode("utf-8-sig")  # BOM pour Excel
+        contenu = generation.en_csv(personnes).encode("utf-8-sig")  # a BOM for Excel
         nom_fichier = datetime.date.today().strftime("liste_rappel_%Y%m%d.csv")
         journal.info("Export CSV de la liste de cascade : %d personne(s) "
                      "(fichier %s, servi à la volée)", len(personnes), nom_fichier)
@@ -3769,12 +3613,12 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.wfile.write(contenu)
 
     def _repondre_fichier(self, contenu, type_contenu, nom_fichier):
-        """Sert un fichier à télécharger, engendré à la volée.
+        """Serves a file for download, generated on the fly.
 
-        ⚠ RIEN N'EST ÉCRIT SUR LE DISQUE. Le produit tient cette règle pour
-        l'export CSV des numéros en clair ; l'agenda d'exemple la suit, pour une
-        autre raison — un fichier rangé vieillirait, et c'est exactement ce
-        qu'on cherche à éviter.
+        ⚠ NOTHING IS WRITTEN TO DISK. The product holds this rule for the CSV
+        export of numbers in clear; the sample calendar follows it for another
+        reason — a stored file would age, and that is exactly what we are
+        trying to avoid.
         """
         self.send_response(200)
         self.send_header("Content-Type", type_contenu)
@@ -3785,7 +3629,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.wfile.write(contenu)
 
     def _traiter_tout_rappeler(self):
-        """Met en file tous les rendez-vous manqués (sans doublon), puis /file."""
+        """Queues every missed appointment (no duplicates), then /file."""
         self.application.base.marquer_manques_echus()
         crees = self.application.planif.programmer_tous_les_manques()
         self.send_response(303)
@@ -3793,7 +3637,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _traiter_annulation_file(self, corps):
-        """Retire un appel de la file AVANT exécution, puis retour à /file."""
+        """Removes a call from the queue BEFORE execution, then back to /file.
+        """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             appel_id = int(donnees.get("appel", [""])[0])
@@ -3805,38 +3650,38 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _traiter_annulation_totale_file(self):
-        """« Vider la file » : annule TOUS les appels en attente, puis /file."""
+        """`Vider la file`: cancels ALL pending calls, then /file."""
         annules = self.application.planif.annuler_tout()
         self.send_response(303)
         self.send_header("Location", f"/file?vide={annules}")
         self.end_headers()
 
     def _traiter_execution_file(self, corps):
-        """Exécute toute la file puis affiche les issues appel par appel.
+        """Runs the whole queue then shows the outcomes call by call.
 
-        Le formulaire porte le thème d'appel choisi et sa mission (modifiable) ;
-        hors de la plage horaire autorisée, le lancement est refusé.
+        The form carries the chosen call theme and its (editable) mission;
+        outside the permitted calling window, the launch is refused.
         """
         if self._refus_hors_plage():
             return
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         mission = self._mission_choisie(donnees)
         planif = self.application.planif
-        # Identifiants notés AVANT l'exécution : la page de résultats montre
-        # aussi les éventuels échecs, que executer() ne renvoie pas.
+        # Ids noted BEFORE the run: the results page also shows any failures,
+        # which executer() does not return.
         a_traiter = [entree["appel_id"] for entree in planif.file]
         try:
             planif.executer(mission=mission)
         except calle_client.EchecDeNotreCote as panne:
-            # La file n'est PAS vidée : les appels non passés y sont restés,
-            # tels quels. Aucune campagne n'est créée pour des appels qui
-            # n'ont pas eu lieu.
+            # The queue is NOT emptied: the calls not placed stayed in it, as
+            # they were. No campaign is created for calls that did not take
+            # place.
             return self._panne_de_notre_cote(panne)
         except planificateur.GardeFou as erreur:
             return self._erreur(403, str(erreur))
-        # Rattachement au modèle campagne : cette exécution en lot devient
-        # une campagne « rappel d'appels manqués » — les appels non aboutis
-        # y reçoivent leur relance programmée.
+        # Attachment to the campaign model: this batch run becomes a `rappel
+        # d'appels manqués` campaign — the calls that do not conclude receive
+        # their scheduled follow-up there.
         campagne_id = campagnes.campagne_depuis_file(
             self.application.base, self.application.preferences, a_traiter,
             mission or "Consigne standard du rappel de rendez-vous manqué")
@@ -3844,14 +3689,14 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             self._page_resultat_execution(a_traiter, campagne_id))
 
     def _traiter_ignorer_tout(self):
-        """« Vider la liste » : tous les manqués passent « ignoré » (réversible)."""
+        """`Vider la liste`: every missed one becomes `ignoré` (reversible)."""
         ignores = self.application.base.ignorer_tous_les_manques()
         self.send_response(303)
         self.send_header("Location", f"/suivi?ignores={ignores}")
         self.end_headers()
 
     def _traiter_retablir(self, corps):
-        """Rend un rendez-vous « ignoré » à la liste « À rappeler »."""
+        """Returns an `ignoré` appointment to the `À rappeler` list."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             rdv_id = int(donnees.get("rdv", [""])[0])
@@ -3865,12 +3710,12 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------------- clients
     def _traiter_propositions(self, corps):
-        """Rend (ou retire) à un contact les propositions de créneau libéré.
+        """Gives back (or removes) freed-slot offers to a contact.
 
-        Le pendant de `_traiter_ne_plus_appeler` pour le drapeau plus doux.
-        « valeur=1 » LÈVE le refus (le bouton s'appelle « Proposer de nouveau
-        des créneaux ») : l'écran ne montre ce bouton que quand le refus est
-        posé, et il n'y a donc qu'un sens de geste possible.
+        The counterpart of `_traiter_ne_plus_appeler` for the gentler flag.
+        `valeur=1` LIFTS the refusal (the button is called `Proposer de nouveau
+        des créneaux`): the screen only shows that button when the refusal is
+        set, so there is only one possible direction of gesture.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
@@ -3883,7 +3728,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(f"/clients/fiche?id={client_id}&fait=1")
 
     def _traiter_ne_plus_appeler(self, corps):
-        """Pose ou lève le drapeau « Ne plus appeler » d'un client (réversible)."""
+        """Sets or lifts a client's `Ne plus appeler` flag (reversible)."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             client_id = int(donnees.get("client", [""])[0])
@@ -3895,8 +3740,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._erreur(404, "Client introuvable.")
         base.definir_ne_plus_appeler(client_id, bool(valeur))
         if valeur:
-            # Un client qu'on ne doit plus appeler sort aussi de la file
-            # d'attente s'il y était déjà (annulation propre, traçée).
+            # A client we must no longer call also leaves the queue when they
+            # were already in it (a clean, recorded cancellation).
             for entree in list(self.application.planif.file):
                 rdv = base.obtenir_rendezvous(entree["rendezvous_id"])
                 if rdv and rdv["client_id"] == client_id:
@@ -3907,12 +3752,12 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _lire_modification_client(self, donnees):
-        """Lit et VALIDE une modification de client (nom, numéro, 🚫).
+        """Reads and VALIDATES a client modification (name, number, 🚫).
 
-        Rend (client, propres, valeurs_tapées, erreurs) — client vaut None
-        si l'identifiant est absent ou inconnu. Cette lecture est commune à
-        la fiche pleine page et à la modale : une seule règle, un seul
-        message d'erreur, quel que soit l'écran.
+        Returns (client, clean values, typed values, errors) — client is None
+        when the id is absent or unknown. This reading is shared by the
+        full-page record and the modal: one rule, one error message, whatever
+        the screen.
         """
         try:
             client_id = int(donnees.get("client", [""])[0])
@@ -3940,28 +3785,29 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return client, propres, valeurs, erreurs
 
     def _appliquer_modification_client(self, client, propres):
-        """Écrit la modification validée d'un client (et purge la file si 🚫)."""
+        """Writes a client's validated modification (and purges the queue on 🚫).
+        """
         base = self.application.base
         base.modifier_client(client["id"], nom=propres["nom"],
                              telephone=propres["telephone"])
         if bool(client["ne_plus_appeler"]) != propres["exclure"]:
             base.definir_ne_plus_appeler(client["id"], propres["exclure"])
             if propres["exclure"]:
-                # Même règle qu'ailleurs : un client qu'on ne doit plus
-                # appeler sort aussi de la file d'attente s'il y était.
+                # The same rule as everywhere: a client we must no longer call
+                # also leaves the queue when they were in it.
                 for entree in list(self.application.planif.file):
                     rdv = base.obtenir_rendezvous(entree["rendezvous_id"])
                     if rdv and rdv["client_id"] == client["id"]:
                         self.application.planif.annuler(entree["appel_id"])
 
     def _traiter_modification_client(self, corps):
-        """Enregistre la fiche d'un client depuis la fiche PLEINE PAGE.
+        """Saves a client's record from the FULL-PAGE record.
 
-        C'est le repli sans JavaScript : le chemin normal passe désormais par
-        la modale (/clients/detail/enregistrer). Une saisie refusée n'est
-        JAMAIS perdue : elle revient dans son champ avec le message qui dit
-        ce qui cloche. Le champ « téléphone » laissé vide garde le numéro
-        actuel — il n'est jamais réaffiché en clair.
+        That is the no-JavaScript fallback: the normal path now goes through
+        the modal (/clients/detail/enregistrer). Refused input is NEVER lost:
+        it comes back in its field with the message saying what is wrong. The
+        `téléphone` field left empty keeps the current number — it is never
+        redisplayed in clear.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         client, propres, valeurs, erreurs = self._lire_modification_client(donnees)
@@ -3969,19 +3815,19 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._erreur(400 if "invalide" in erreurs[0] else 404,
                                 erreurs[0])
         if erreurs:
-            # Même convention que partout : la page revient avec le message
-            # et la saisie fautive dans son champ (jamais une page d'erreur).
+            # The same convention as everywhere: the page comes back with the
+            # message and the faulty input in its field (never an error page).
             return self._repondre(
                 self._page_fiche_client(client["id"], valeurs, erreurs))
         self._appliquer_modification_client(client, propres)
         return self._rediriger("/clients?marque=modifie")
 
     def _traiter_enregistrement_client(self, corps):
-        """Enregistre la fiche d'un client DEPUIS LA MODALE.
+        """Saves a client's record FROM THE MODAL.
 
-        Réponse : soit la modale telle quelle avec l'erreur et la saisie
-        conservée, soit — c'est enregistré — la SEULE ligne de ce client,
-        que la liste remet en place sans se recharger.
+        The answer: either the modal as it was with the error and the input
+        preserved, or — it is saved — ONLY that client's row, which the list
+        puts back in place without reloading.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         client, propres, valeurs, erreurs = self._lire_modification_client(donnees)
@@ -3998,21 +3844,20 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                                                self.application.preferences)
         fiche = next((f for f in fiches if f["client"]["id"] == client["id"]),
                      None)
-        if fiche is None:                      # supprimé entre-temps
+        if fiche is None:  # deleted in the meantime
             return self._repondre_cible("", f"client-{client['id']}")
         return self._repondre_cible(self._cellules_client(fiche),
                                     f"client-{client['id']}")
 
     def _traiter_enregistrement_rendezvous(self, corps):
-        """Enregistre un rendez-vous MODIFIÉ DANS LA MODALE du planning.
+        """Saves an appointment MODIFIED IN THE SCHEDULE'S MODAL.
 
-        Motif, date et heure, durée, statut. La règle de place est celle du
-        déplacement, à la lettre : un rendez-vous de N tranches ne peut pas
-        aller là où il n'y a pas N tranches libres d'affilée — et elle n'est
-        vérifiée que si la place CHANGE (modifier le seul motif d'un
-        rendez-vous déjà posé ne peut donc pas être refusé). Réponse : soit
-        la modale avec l'erreur et la saisie conservée, soit le planning
-        seul, remis en place sur la même semaine.
+        Reason, date and time, length, status. The slot rule is the move's, to
+        the letter: an appointment of N slots cannot go where there are not N
+        consecutive free slots — and it is only checked when the SLOT CHANGES
+        (so editing only the reason of an already placed appointment cannot be
+        refused). The answer: either the modal with the error and the input
+        preserved, or the schedule alone, put back on the same week.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -4052,9 +3897,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                            "dans la liste ("
                            + ", ".join(STATUTS_MODIFIABLES) + ").")
         if not erreurs and statut in STATUTS_RETRAIT:
-            # LA RÈGLE, tenue côté serveur aussi : « annulé » pour une date
-            # passée, « supprimé » pour une date à venir. Ce que le
-            # formulaire a envoyé ne peut pas la contourner.
+            # THE RULE, held server-side too: `annulé` for a past date,
+            # `supprimé` for an upcoming one. What the form sent cannot get
+            # round it.
             statut = horaires.decision_annulation(
                 preferences, horaire or rdv["horaire"])["statut"]
         if not erreurs and statut in STATUTS_OCCUPANTS:
@@ -4084,7 +3929,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._repondre_cible(self._zone_planning(parametres), "planning")
 
     def _traiter_rappel_humain(self, corps):
-        """Marque « c'est fait » (ou le défait) sur un rappel par un humain."""
+        """Marks `done` (or undoes it) on a human call-back."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             contact_id = int(donnees.get("contact", [""])[0])
@@ -4098,11 +3943,12 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             f"/relances?vue={vue}&fait={'traite' if traite else 'repris'}")
 
     def _traiter_suppression_client(self, corps):
-        """Supprime le client ET ses rendez-vous — APRÈS la page de confirmation.
+        """Deletes the client AND their appointments — AFTER the confirmation
+        page.
 
-        Le POST ne part que du bouton « Supprimer définitivement » de la
-        page de confirmation (champ « confirmer » posé par elle) : jamais
-        de suppression en un clic.
+        The POST only comes from the `Supprimer définitivement` button on the
+        confirmation page (a `confirmer` field placed by it): never a deletion
+        in one click.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
@@ -4115,10 +3961,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         base = self.application.base
         if base.obtenir_client(client_id) is None:
             return self._erreur(404, "Client introuvable.")
-        # La file d'attente est purgée d'abord : plus rien à composer pour lui.
+        # The queue is purged first: nothing left to dial for them.
         self.application.planif.purger_rendezvous(base.rendezvous_du_client(client_id))
-        # Puis les relances encore armées sont DÉSARMÉES (le compte est
-        # affiché) ; les contacts et les appels déjà passés, eux, restent.
+        # Then the still-armed follow-ups are DISARMED (the count is
+        # displayed); the contacts and the calls already placed, though,
+        # remain.
         desarmees = base.desarmer_contacts_du_client(client_id)
         supprimes = base.supprimer_client(client_id)
         self.send_response(303)
@@ -4126,9 +3973,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             "Location", f"/clients?supprime={supprimes}&desarmees={desarmees}")
         self.end_headers()
 
-    # --------------------------------------------------------------- réglages
+    # --------------------------------------------------------------- settings
     def _traiter_reglages(self, corps):
-        """La page ⚙ Réglages enregistre, puis revient sur elle-même."""
+        """The ⚙ Réglages page saves, then comes back to itself."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"),
                                         keep_blank_values=True)
         erreurs = self._appliquer_reglages(donnees)
@@ -4139,26 +3986,26 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _appliquer_reglages(self, donnees):
-        """Écrit les réglages reçus ; rend la liste des refus (vide = fait).
+        """Writes the settings received; returns the list of refusals (empty =
+        done).
 
-        Séparé de la réponse HTTP à dessein : l'installeur du premier
-        lancement fait remplir EXACTEMENT ces formulaires, et doit donc
-        écrire par le même chemin — sinon les deux écrans finiraient par ne
-        plus valider la même chose.
+        Separated from the HTTP answer on purpose: the first-run installer has
+        EXACTLY these forms filled in, and must therefore write through the
+        same path — otherwise the two screens would end up validating different
+        things.
 
-        keep_blank_values, chez l'appelant : un champ VIDÉ à l'écran doit
-        pouvoir EFFACER le réglage. Sans cela, la période interdite, une
-        fois posée, ne pouvait plus être retirée depuis la page — le
-        formulaire disait le contraire de ce qu'il faisait.
+        keep_blank_values, at the caller: a field EMPTIED on screen must be
+        able to ERASE the setting. Without that, the forbidden period, once
+        set, could no longer be removed from the page — the form said the
+        opposite of what it did.
         """
-        # ⚠ ABSENT ≠ VIDE. Depuis que les réglages sont découpés en
-        # sous-parties (02/08/2026), chaque sous-formulaire n'envoie QUE ses
-        # champs. Un champ absent laisse donc son réglage intact ; un champ
-        # présent et vide, lui, efface — c'est le droit d'effacer, qui doit
-        # rester. Sans cette distinction, enregistrer les relances effacerait
-        # le nom de l'entreprise et ferait échouer la validation de la plage
-        # horaire (« heure de début illisible » sur un formulaire qui ne la
-        # contient même pas).
+        # ⚠ ABSENT ≠ EMPTY. Since the settings were split into sub-parts
+        # (02/08/2026), each sub-form sends ONLY its own fields. A field that
+        # is absent therefore leaves its setting intact; a field present and
+        # empty erases — that is the right to erase, which must remain. Without
+        # that distinction, saving the follow-ups would erase the business name
+        # and make the time-window validation fail (`unreadable start time` on
+        # a form that does not even contain it).
         entreprise = donnees.get("entreprise", [None])[0]
         if entreprise is not None:
             entreprise = " ".join(entreprise.split())
@@ -4178,7 +4025,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             if not erreurs and debut >= fin:
                 erreurs.append("Plage horaire : l'heure de début doit précéder "
                                "l'heure de fin.")
-        # Les champs relance sont optionnels (compatibilité) : vides = inchangés.
+        # The follow-up fields are optional (compatibility): empty = unchanged.
         delai_valide = maximum_valide = None
         if relance_delai:
             if relance_delai.isdigit() and 0 <= int(relance_delai) <= 168:
@@ -4193,9 +4040,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             else:
                 erreurs.append("Relances : le maximum de tentatives doit être "
                                f"entre 0 et 9 (reçu « {relance_max} »).")
-        # Période interdite (optionnelle — les deux bornes, ou aucune) et
-        # relance par défaut (délai OU créneau de rappel). Un champ absent du
-        # formulaire (anciens tests, autres écrans) laisse le réglage intact.
+        # The forbidden period (optional — both bounds, or neither) and the
+        # default follow-up (a delay OR a call-back window). A field absent
+        # from the form (old tests, other screens) leaves the setting intact.
         interdit_debut = donnees.get("interdit_debut", [None])[0]
         interdit_fin = donnees.get("interdit_fin", [None])[0]
         interdit_a_ecrire = None
@@ -4212,9 +4059,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                                "(attendu HH:MM, ex. 20:00 → 08:00).")
             else:
                 interdit_a_ecrire = (interdit_debut, interdit_fin)
-        # ⏱ LES DÉLAIS D'UN VRAI APPEL. Absents du formulaire (anciens
-        # écrans, essais) : les réglages restent intacts. Ils ne touchent QUE
-        # les appels réels — la simulation garde ses délais courts.
+        # ⏱ THE TIMINGS OF A REAL CALL. Absent from the form (old screens,
+        # tests): the settings stay intact. They only touch real calls — the
+        # simulation keeps its short timings.
         delais_a_ecrire = {}
         for cle in calle_client.BORNES_DELAIS:
             brut = donnees.get(cle, [None])[0]
@@ -4224,8 +4071,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 delais_a_ecrire[cle] = calle_client.valider_delai(cle, brut)
             except ValueError as erreur:
                 erreurs.append(f"⏱ {erreur}")
-        # Le seuil de remplacement (12 h par défaut) : absent du formulaire
-        # (anciens écrans, essais), le réglage reste intact.
+        # The replacement threshold (12 h by default): absent from the form
+        # (old screens, tests), the setting stays intact.
         seuil_brut = donnees.get("seuil_remplacement", [None])[0]
         seuil_valide = None
         if seuil_brut is not None:
@@ -4233,14 +4080,13 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
                 seuil_valide = horaires.valider_seuil_remplacement(seuil_brut)
             except ValueError as erreur:
                 erreurs.append(str(erreur))
-        # Le 🧪 numéro d'essai (optionnel). Absent du formulaire (anciens
-        # écrans, essais) : le réglage reste intact. Présent mais VIDE : il
-        # est effacé, et la règle stricte du doublon revient pour tout le
-        # monde — c'est ce que promet le libellé du champ.
-        # Le champ affiche le numéro MASQUÉ (règle de masquage, sans
-        # exception) : s'il contient encore des « • », c'est qu'il n'a pas
-        # été retouché — on n'y touche pas non plus. Même convention que la
-        # colonne Téléphone de la grille (assistant_web).
+        # The 🧪 test number (optional). Absent from the form (old screens,
+        # tests): the setting stays intact. Present but EMPTY: it is erased,
+        # and the strict duplicate rule comes back for everybody — which is
+        # what the field's label promises. The field displays the MASKED number
+        # (the masking rule, without exception): if it still contains `•`, it
+        # has not been edited — so we do not touch it either. The same
+        # convention as the grid's Téléphone column (assistant_web).
         numero_brut = donnees.get("numero_essai", [None])[0]
         numero_a_ecrire = None
         if numero_brut is not None and "•" not in numero_brut:
@@ -4283,9 +4129,9 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         if delais_a_ecrire:
             for cle, valeur in delais_a_ecrire.items():
                 preferences.definir(cle, valeur)
-            # Le client d'appels DÉJÀ construit prend les nouveaux délais tout
-            # de suite : sans cela, l'écran afficherait un réglage que le
-            # produit n'appliquerait qu'au prochain démarrage.
+            # The ALREADY BUILT call client takes the new timings straight
+            # away: without that, the screen would show a setting the product
+            # would only apply at the next start-up.
             client = getattr(self.application.planif, "client_appels", None)
             if hasattr(client, "appliquer_delais"):
                 client.appliquer_delais(
@@ -4303,10 +4149,10 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             preferences.definir(assistant.CLE_RELANCE_CRENEAU_FIN,
                                 creneau_a_ecrire[1])
         if numero_a_ecrire is not None:
-            # Le champ à numéro unique désigne le PREMIER testeur : un numéro
-            # le remplace (son nom est gardé), un champ vidé le retire. Les
-            # autres testeurs, s'il y en a, ne bougent pas — c'est la liste
-            # (⚙ Réglages → 🧪 Testeurs) qui les gère un par un.
+            # The single-number field designates the FIRST tester: a number
+            # replaces them (their name is kept), an emptied field removes
+            # them. The other testers, if any, do not move — it is the list (⚙
+            # Réglages → 🧪 Testeurs) that manages them one by one.
             liste = essai_reel.testeurs(preferences)
             if numero_a_ecrire:
                 if liste:
@@ -4318,8 +4164,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             elif liste:
                 liste = liste[1:]
             essai_reel.enregistrer_testeurs(preferences, liste)
-            # La base marque 🧪 les lignes de ces numéros : elle doit connaître
-            # le nouveau réglage TOUT DE SUITE, sans redémarrer le serveur.
+            # The database marks those numbers' rows 🧪: it must know the new
+            # setting AT ONCE, without restarting the server.
             self.application.base.definir_numeros_essai(
                 essai_reel.numeros_declares(preferences))
             journal.info("Numéro d'essai %s",
@@ -4328,7 +4174,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return []
 
     def _traiter_creneau_ajouter(self, corps):
-        """Ajoute un créneau disponible (proposé par les thèmes ② ③ ④)."""
+        """Adds an available slot (offered by themes ② ③ ④)."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
             creneau = saisie.valider_horaire(donnees.get("creneau", [""])[0])
@@ -4345,7 +4191,7 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         self.end_headers()
 
     def _traiter_creneau_retirer(self, corps):
-        """Retire un créneau de la liste des disponibilités."""
+        """Removes a slot from the availability list."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         creneau = donnees.get("creneau", [""])[0]
         preferences = self.application.preferences
@@ -4358,13 +4204,13 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     # --------------------------------------------- horaires d'ouverture
     def _traiter_pas(self, corps):
-        """Enregistre la durée moyenne d'un rendez-vous (le PAS des tranches).
+        """Saves the average length of an appointment (the SLOT step).
 
-        Deux chemins, un seul traitement — comme pour la semaine type :
-        « fragment=1 » renvoie le BLOC des horaires, redessiné avec le
-        nouveau pas (et son refus s'affiche dedans) ; sans lui, on revient
-        sur la page des réglages. C'est ce qui permet à l'installeur de
-        régler le pas sans que sa fenêtre se fasse remplacer par une page.
+        Two paths, one handling — as for the typical week: `fragment=1` returns
+        the hours BLOCK, redrawn with the new step (and its refusal is shown
+        inside it); without it, we come back to the settings page. That is what
+        lets the installer set the step without its window being replaced by a
+        page.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         fragment = donnees.get("fragment", [""])[0] == "1"
@@ -4381,13 +4227,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger("/reglages?fait=1#horaires")
 
     def _traiter_semaine(self, corps):
-        """Ouvre, ferme ou BASCULE une période de la semaine type.
+        """Opens, closes or TOGGLES a period of the typical week.
 
-        Deux chemins, un seul traitement :
-        - le glisser-relâché envoie « fragment=1 » et reçoit le calendrier
-          remis à jour — seul CET élément se recharge, jamais la page ;
-        - le repli sans JavaScript (jour + heure de début + heure de fin +
-          bouton « Ouvrir » ou « Fermer ») revient sur la page des réglages.
+        Two paths, one handling:
+        - drag-and-release sends `fragment=1` and receives the updated calendar — only THAT element reloads, never the page;
+        - the no-JavaScript fallback (day + start time + end time + an `Ouvrir` or `Fermer` button) comes back to the settings page.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         fragment = donnees.get("fragment", [""])[0] == "1"
@@ -4418,18 +4262,18 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             except ValueError as erreur:
                 erreurs.append(str(erreur))
         if fragment:
-            # Le geste a été fait à la souris : on renvoie l'élément, pas la
-            # page — et l'erreur éventuelle s'affiche DANS cet élément.
+            # The gesture was made with the mouse: we return the element, not
+            # the page — and any error is displayed INSIDE that element.
             return self._repondre_fragment(self._calendrier_semaine(erreurs))
         if erreurs:
             return self._repondre(self._page_reglages(erreurs=erreurs))
         return self._rediriger("/reglages?fait=1#horaires")
 
     def _traiter_jour_ferme(self, corps):
-        """Déclare ou retire un jour fermé exceptionnel (geste de l'utilisateur).
+        """Declares or removes an exceptional closed day (the user's gesture).
 
-        Les jours fériés proposés à l'écran passent par ICI : RingBack ne
-        les ajoute jamais tout seul, c'est toujours un clic humain.
+        The public holidays offered on screen go through HERE: RingBack never
+        adds them by itself, it is always a human click.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         preferences = self.application.preferences
@@ -4454,9 +4298,10 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
             return self._repondre(self._page_reglages(erreurs=[refus]))
         return self._rediriger("/reglages?fait=1#jours-fermes")
 
-    # ------------------------------------------ durée, déplacement, annulation
+    # ------------------------------------------ length, move, cancellation
     def _traiter_duree_rendezvous(self, corps):
-        """Change la durée d'un rendez-vous (en minutes, multiple du pas)."""
+        """Changes an appointment's length (in minutes, a multiple of the step).
+        """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
         preferences = self.application.preferences
@@ -4480,11 +4325,11 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(f"/rendezvous?id={rdv_id}&duree=ok")
 
     def _traiter_deplacement(self, corps):
-        """Déplace un rendez-vous — REFUS EXPLICITE s'il n'y tient pas.
+        """Moves an appointment — an EXPLICIT REFUSAL when it does not fit.
 
-        La règle, à la lettre : un rendez-vous de N tranches ne peut pas
-        être replacé là où il y a moins de N tranches libres consécutives.
-        Le refus dit ce qui manque, et la saisie n'est pas perdue.
+        The rule, to the letter: an appointment of N slots cannot be rebooked
+        where there are fewer than N consecutive free slots. The refusal says
+        what is missing, and the input is not lost.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -4518,13 +4363,13 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         return self._rediriger(f"/rendezvous?id={rdv_id}&deplace=ok")
 
     def _traiter_annulation_rendezvous(self, corps):
-        """Retire un rendez-vous : ses N tranches redeviennent libres.
+        """Removes an appointment: its N slots become free again.
 
-        LA RÈGLE DU PROPRIÉTAIRE, ici comme partout : un rendez-vous DÉJÀ
-        PASSÉ reste « annulé » (le statut d'histoire) ; un rendez-vous à
-        venir est SUPPRIMÉ — il n'apparaît plus nulle part et sa place est
-        rendue. C'est horaires.decision_annulation qui tranche, pas ce
-        code-ci : une seule règle, un seul endroit.
+        THE OWNER'S RULE, here as everywhere: an appointment ALREADY PAST stays
+        `annulé` (the history status); an upcoming appointment is DELETED — it
+        appears nowhere any more and its slot is given back. It is
+        horaires.decision_annulation that decides, not this code: one rule, one
+        place.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -4547,15 +4392,15 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------------- pages
     def _page_campagnes(self, parametres=None):
-        """L'accueil : les campagnes en cours et passées, et le gros bouton.
+        """The home page: the running and past campaigns, and the big button.
 
-        Une campagne = un thème de travail + la liste de l'instant + les
-        appels rattachés. L'avancement montre appelés / aboutis / relances.
+        A campaign = a work theme + the list of the moment + the attached
+        calls. The progress shows called / concluded / follow-ups.
 
-        C'est aussi l'écran qui ouvre l'INSTALLEUR au premier lancement (ou
-        sur demande, avec « ?installation=1 ») : l'accueil est le seul
-        endroit où l'on arrive forcément, et l'installeur doit s'imposer là
-        plutôt que sur une page où l'on est venu faire autre chose.
+        It is also the screen that opens the INSTALLER on first launch (or on
+        demand, with `?installation=1`): the home page is the only place you
+        necessarily arrive at, and the installer must impose itself there
+        rather than on a page you came to for something else.
         """
         parametres = parametres or {}
         base = self.application.base
@@ -4577,8 +4422,8 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
         def _ligne(campagne):
             classe = CLASSES_STATUT_CAMPAGNE.get(campagne["statut"], "")
             if campagne.get("nature"):
-                # Les natures retirées comprises : la liste des campagnes ne
-                # doit jamais afficher une ligne anonyme.
+                # The removed kinds included: the campaign list must never
+                # display an anonymous row.
                 nature = assistant.fiche_nature(campagne["nature"]) or {}
                 theme = (f"{nature.get('icone', '')} "
                          f"{nature.get('nom', campagne['nature'])}").strip()
@@ -4603,41 +4448,39 @@ class Gestionnaire(assistant_web.RoutesAssistant, BaseHTTPRequestHandler):
 </tr>"""
 
         sections = []
-        # ⚠ SA DEMANDE DU 21/08/2026 : « sur la page d'accueil il faut afficher
-        # simplement un texte (N campagnes déjà envoyées) et lorsqu'on clique
-        # dessus on affiche la liste, donc c'est caché par défaut ».
-        #
-        # Mesuré dans sa base : 113 campagnes passées, et RIEN d'autre à
-        # l'écran. Ce qu'il vient de préparer ou de lancer — ce sur quoi il
-        # travaille — était noyé sous cent treize lignes d'archives.
-        #
-        # Les deux premiers groupes restent DÉPLIÉS : « en cours » et « prêtes »
-        # sont son travail du moment, les replier reviendrait à les cacher.
+        # ⚠ HIS REQUEST OF 21/08/2026: `on the home page we should simply show
+        # a text (N campaigns already sent) and clicking on it shows the list,
+        # so it is hidden by default`.  Measured in his database: 113 past
+        # campaigns, and NOTHING else on screen. What he had just prepared or
+        # launched — what he is working on — was drowned under one hundred and
+        # thirteen rows of archive.  The first two groups stay UNFOLDED: `en
+        # cours` and `prêtes` are his current work, folding them would amount
+        # to hiding them.
         ayant_appele = base.campagnes_ayant_appele()
         for code, titre, liste in self._groupes_campagnes():
             if not liste:
                 continue
-            # ⚠ « Effacer la liste » DÉTRUIT DE L'HISTORIQUE : c'est le seul
-            # geste du produit dans ce cas. Il passe donc par une fenêtre de
-            # confirmation qui compte d'abord ce qui partirait — et le lien
-            # reste un vrai lien, qui mène à la même confirmation en page
-            # entière si le JavaScript ne répond pas.
+            # ⚠ `Effacer la liste` DESTROYS HISTORY: it is the product's only
+            # gesture that does. So it goes through a confirmation window that
+            # first counts what would go — and the link stays a real link,
+            # leading to the same confirmation as a full page should the
+            # JavaScript not answer.
             adresse = f"/campagnes/effacer?groupe={code}"
             effacer = (f'<a class="bouton secondaire" href="{adresse}" '
                        f'data-modale="{adresse}">Effacer la liste</a>')
             tableau = self._tableau_campagnes(_ligne, liste)
             if code == "terminees":
-                # ⚠ LES CINQ DERNIÈRES SE LISENT D'EMBLÉE (21/08/2026, sa
-                # demande). Tout replier avait un défaut : la page ne montrait
-                # plus RIEN de ce qui vient de se passer. Ce qu'il veut voir en
-                # arrivant, c'est le travail récent ; ce qu'il veut ranger,
-                # c'est l'archive.
+                # ⚠ THE LAST FIVE ARE READABLE STRAIGHT AWAY (21/08/2026, his
+                # request). Folding everything had a drawback: the page no
+                # longer showed ANYTHING of what has just happened. What he
+                # wants to see on arriving is the recent work; what he wants
+                # tidied away is the archive.
                 apercu = liste[:self.APERCU_PASSEES]
                 entete = (f'<div class="entete-liste">'
                           f'<h2>{html.escape(titre)} ({len(liste)})</h2></div>')
                 if len(liste) <= self.APERCU_PASSEES:
-                    # ⚠ PAS DE DÉPLIANT QUAND IL N'Y A RIEN À REPLIER : un
-                    # bouton qui ouvre ce qu'on voit déjà est un faux geste.
+                    # ⚠ NO EXPANDER WHEN THERE IS NOTHING TO FOLD: a button
+                    # that opens what you can already see is a fake gesture.
                     sections.append(entete + effacer + tableau)
                     continue
                 sections.append(
@@ -4675,26 +4518,27 @@ c'est toujours un geste humain.</small></p>
 {self._bloc_installeur(parametres)}"""
         return self._page("Campagnes", corps, actif="campagnes")
 
-    # Les trois listes de la page 📣 Campagnes, avec leur code d'adresse.
-    # ⚠ UN SEUL ENDROIT : la page les affiche et « Effacer la liste » les
-    # relit. Deux découpages auraient fini par ne plus désigner les mêmes
-    # campagnes, et le bouton aurait effacé autre chose que ce qui est écrit
-    # au-dessus de lui.
+    # The three lists of the 📣 Campagnes page, with their URL code. ⚠ ONE
+    # SINGLE PLACE: the page displays them and `Effacer la liste` reads them
+    # back. Two divisions would have ended up designating different campaigns,
+    # and the button would have erased something other than what is written
+    # above it.
     GROUPES_CAMPAGNES = (
         ("en-cours", "En cours", ("en cours", "en pause")),
         ("pretes", "Prêtes — personne n'est appelé avant ▶ Démarrer",
          ("prête",)),
-        ("terminees", "Terminées", None),      # None = tout le reste
+        ("terminees", "Terminées", None),  # None = all the rest
     )
 
-    # Combien de campagnes passées se lisent SANS déplier. Cinq : assez pour
-    # voir ce qui vient de se passer, assez peu pour que la page reste courte.
+    # How many past campaigns are readable WITHOUT unfolding. Five: enough to
+    # see what has just happened, few enough for the page to stay short.
     APERCU_PASSEES = 5
 
     @staticmethod
     def _tableau_campagnes(ligne_de, liste):
-        """Le tableau des campagnes — un seul endroit, deux emplois : l'aperçu
-        des cinq dernières et la liste complète du dépliant."""
+        """The campaigns table — one place, two uses: the preview of the last five
+        and the expander's complete list.
+        """
         return ("<table><tr><th>Campagne</th><th>Nature / thème</th>"
                 "<th>Statut</th><th>Avancement</th></tr>"
                 + "\n".join(ligne_de(campagne) for campagne in liste)
@@ -4702,12 +4546,12 @@ c'est toujours un geste humain.</small></p>
 
     @staticmethod
     def _resume_campagnes_passees(liste, ayant_appele):
-        """« N campagnes déjà envoyées » — et ce qui n'a PAS été envoyé.
+        """`N campagnes déjà envoyées` — and what was NOT sent.
 
-        ⚠ LE MOT « ENVOYÉE » DOIT RESTER VRAI. Une campagne close sans avoir
-        appelé n'a rien envoyé du tout : la compter avec les autres aurait
-        gonflé un chiffre qu'il lit comme un travail fait. Sa base en portait
-        sept le jour de la demande.
+        ⚠ THE WORD `SENT` MUST STAY TRUE. A campaign closed without having
+        called has sent nothing at all: counting it with the others would have
+        inflated a figure he reads as work done. His database carried seven of
+        them on the day of the request.
         """
         envoyees = sum(1 for c in liste if c["id"] in ayant_appele)
         muettes = len(liste) - envoyees
@@ -4720,7 +4564,7 @@ c'est toujours un geste humain.</small></p>
         return "📤 " + " — ".join(morceaux) if morceaux else "📤 Campagnes passées"
 
     def _groupes_campagnes(self):
-        """[(code, titre, [campagnes])] — les trois listes, dans l'ordre."""
+        """[(code, title, [campaigns])] — the three lists, in order."""
         toutes = self.application.base.lister_campagnes()
         nommes = {statut for _, _, statuts in self.GROUPES_CAMPAGNES
                   if statuts for statut in statuts}
@@ -4734,24 +4578,25 @@ c'est toujours un geste humain.</small></p>
         return groupes
 
     def _groupe_campagnes(self, code):
-        """(titre, [campagnes]) pour ce code, ou (None, []) s'il est inconnu."""
+        """(title, [campaigns]) for this code, or (None, []) when it is unknown.
+        """
         for existant, titre, liste in self._groupes_campagnes():
             if existant == code:
                 return titre, liste
         return None, []
 
     def _campagnes_qui_tournent(self, liste):
-        """Celles dont un fil d'exécution tourne EN CE MOMENT.
+        """Those whose execution thread is running RIGHT NOW.
 
-        Effacer une campagne pendant qu'elle appelle retirerait les lignes
-        sous son propre fil. On refuse, et on dit laquelle.
+        Erasing a campaign while it is calling would pull the rows out from
+        under its own thread. We refuse, and we say which one.
         """
         with self.application._verrou_executions:
             en_vol = set(self.application.executions)
         return [c for c in liste if c["id"] in en_vol]
 
     def _modale_effacer_liste(self, code, erreur=""):
-        """La confirmation : ce qui partirait, compté avant d'effacer."""
+        """The confirmation: what would go, counted before erasing."""
         titre, liste = self._groupe_campagnes(code)
         if titre is None:
             return self._modale("Liste introuvable",
@@ -4808,7 +4653,7 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
 </form>""")
 
     def _traiter_effacer_liste(self, corps):
-        """Efface une liste entière — après la confirmation, jamais avant."""
+        """Erases a whole list — after the confirmation, never before."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         code = donnees.get("groupe", [""])[0]
         titre, liste = self._groupe_campagnes(code)
@@ -4817,8 +4662,8 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
         if not liste:
             return self._rediriger("/")
         if self._campagnes_qui_tournent(liste):
-            # La confirmation le disait déjà ; une campagne a pu démarrer
-            # entre-temps. On ne touche à rien et on le redit.
+            # The confirmation already said so; a campaign may have started in
+            # the meantime. We touch nothing and we say it again.
             return self._repondre(self._modale_effacer_liste(code), 409)
         releve = self.application.base.supprimer_campagnes(
             [c["id"] for c in liste])
@@ -4826,12 +4671,12 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
             f"/?efface={releve['campagnes']}&contacts={releve['contacts']}")
 
     def _bloc_installeur(self, parametres):
-        """La fenêtre de l'installeur, ouverte ou en réserve.
+        """The installer's window, open or in reserve.
 
-        Elle est TOUJOURS dans la page (avec son script) : sans cela, le
-        lien « Reprendre la configuration » des Réglages n'aurait rien à
-        ouvrir. Ce qui change, c'est l'attribut `hidden` — posé par le
-        serveur, donc juste même sans JavaScript.
+        It is ALWAYS in the page (with its script): without that, the Settings'
+        `Reprendre la configuration` link would have nothing to open. What
+        changes is the `hidden` attribute — set by the server, hence correct
+        even without JavaScript.
         """
         demande = parametres.get("installation", [""])[0] == "1"
         ouvrir = demande or self._installation_a_faire()
@@ -4841,13 +4686,13 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
                 f"{contenu}</div>{SCRIPT_INSTALLATION}")
 
     def _page_campagne(self, campagne_id, parametres=None):
-        """La fiche d'une campagne : contacts, issues, relances, clôture."""
+        """A campaign's record: contacts, outcomes, follow-ups, closure."""
         base = self.application.base
         campagne = base.obtenir_campagne(campagne_id)
         if campagne is None:
             return None
         if campagne.get("nature"):
-            # Campagne de l'assistant en 3 étapes : son poste de pilotage.
+            # A 3-step assistant campaign: its control desk.
             return self._page_pilotage(campagne, parametres)
         contacts = base.contacts_de_campagne(campagne_id)
         relances = base.relances_de_campagne(campagne_id)
@@ -4905,15 +4750,14 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
             details.append(f'<a href="/cascade/resultat?id={campagne["cascade_id"]}">'
                            "Voir le déroulé de la cascade rattachée</a>")
         bloc_details = "<br>".join(details)
-        # ⚠ ON PEUT AUSSI CLORE UNE CAMPAGNE « PRÊTE » (21/08/2026, sa demande
-        # « clos ces campagnes »). Le bouton ne s'affichait que sur une campagne
-        # EN COURS : une campagne préparée puis abandonnée ne pouvait donc pas
-        # être fermée — il aurait fallu la DÉMARRER pour pouvoir la clore, ce
-        # qui aurait fait sonner des téléphones pour rien.
-        #
-        # CE QUE CELA A COÛTÉ, mesuré dans sa base : 125 contacts dormaient dans
-        # sept campagnes « prête » du 15 et 17/08, dont les rendez-vous avaient
-        # disparu depuis. Il n'avait aucun geste pour s'en débarrasser.
+        # ⚠ A `PRÊTE` CAMPAIGN CAN ALSO BE CLOSED (21/08/2026, his request
+        # `close these campaigns`). The button was only shown on a RUNNING
+        # campaign: a campaign prepared then abandoned could therefore not be
+        # closed — it would have had to be STARTED in order to be closed, which
+        # would have made phones ring for nothing.  WHAT THAT COST, measured in
+        # his database: 125 contacts were sleeping in seven `prête` campaigns
+        # from 15 and 17/08, whose appointments had since disappeared. He had
+        # no gesture to get rid of them.
         bouton_clore = ""
         if campagne["statut"] in ("en cours", "prête"):
             prete = campagne["statut"] == "prête"
@@ -4943,25 +4787,18 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
         return self._page(campagne["nom"], corps, actif="campagnes")
 
     def _page_relances(self, parametres=None, erreurs=None):
-        """La page « 🔁 Relances » : un MENU des types de rappel, un panneau.
+        """The `🔁 Relances` page: a MENU of call-back types, one panel.
 
-        Le principe, tel que le propriétaire le dit : si une personne n'a pas
-        pu être jointe et qu'il faut la rappeler, elle apparaît ICI. Cinq
-        types, qui ne se traitent pas pareil :
+        The principle, as the owner puts it: if a person could not be reached
+        and must be called back, they appear HERE. Five types, which are not
+        handled the same way:
 
-        - 🙋 **rappels par un humain** — la sortie de secours des fiches de
-          discussion, avec la demande du contact EN CLAIR. Ceux-là ne sont
-          JAMAIS appelés automatiquement ; c'est le type d'arrivée, parce
-          que personne d'autre que l'utilisateur ne les traitera ;
-        - ⏰ **relances dues** et 🕓 **relances à venir** — ce que le système
-          a programmé lui-même (pas de réponse, échec technique, déplacement
-          non conclu). Chacune conserve le thème de sa campagne ;
-        - 📵 **non joints, plafond atteint** — la chaîne s'est arrêtée pour
-          eux ; ils n'ont pas été joints, les effacer reviendrait à les
-          perdre ;
+        - 🙋 **human call-backs** — the escape hatch of the discussion sheets, with the contact's request IN CLEAR. Those are NEVER called automatically; it is the landing type, because nobody but the user will handle them;
+        - ⏰ **due follow-ups** and 🕓 **upcoming follow-ups** — what the system scheduled itself (no answer, technical failure, a move not concluded). Each keeps its campaign's theme;
+        - 📵 **not reached, ceiling reached** — the chain stopped for them; they were not reached, and erasing them would amount to losing them;
 
-        Quel que soit le type, la règle ne change pas : aucune relance ne
-        part toute seule, c'est toujours un geste humain qui la déclenche.
+        Whatever the type, the rule does not change: no follow-up goes out on
+        its own, it is always a human gesture that triggers it.
         """
         parametres = parametres or {}
         base = self.application.base
@@ -5001,18 +4838,17 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
         humains = base.contacts_rappel_humain()
         delai, maximum = campagnes.parametres_relance(
             self.application.preferences)
-        # ⚠ CE CHIFFRE MÉLANGEAIT DEUX CHOSES OPPOSÉES. Il additionnait les
-        # relances PROGRAMMÉES et les personnes pour qui plus rien ne partira
-        # (plafond atteint). « 6 rappels automatiques » alors qu'aucun rappel
-        # n'était programmé — le propriétaire a demandé le 02/08/2026 ce que
-        # cela voulait dire, et il avait raison : cela ne voulait rien dire.
-        # Deux chiffres, deux réalités.
+        # ⚠ THAT FIGURE MIXED TWO OPPOSITE THINGS. It added up the SCHEDULED
+        # follow-ups and the people for whom nothing more will go out (ceiling
+        # reached). `6 automatic call-backs` when no call-back was scheduled —
+        # the owner asked on 02/08/2026 what that meant, and he was right: it
+        # meant nothing. Two figures, two realities.
         programmees = len(dues) + len(a_venir)
 
         def _tableau(relances_affichees, en_evidence, famille):
-            # Chaque geste emporte le type qu'on regardait : reporter une
-            # relance due ne doit pas ramener sur un autre panneau, sans quoi
-            # on perd sa place à chaque clic.
+            # Every gesture carries along the type you were looking at:
+            # postponing a due follow-up must not take you back to another
+            # panel, otherwise you lose your place at every click.
             lignes = []
             for relance in relances_affichees:
                 lignes.append(f"""<tr>
@@ -5039,39 +4875,39 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
             return ("<table><tr><th>Campagne (thème conservé)</th><th>Contact</th>"
                     "<th>Motif</th><th>Tentative</th><th>Échéance</th><th></th></tr>"
                     + "\n".join(lignes) + "</table>")
-        # ⚠ LE MENU REMPLACE LE PARAGRAPHE D'INTRODUCTION (demande du
-        # propriétaire, 02/08/2026). Chaque type porte SON nombre, zéro
-        # compris — c'est ainsi qu'on apprend qu'un type est vide, sans que
-        # cinq blocs vides occupent l'écran. On clique, on voit sa liste :
-        # soit le tableau, soit une liste vide qui garde titre et explication.
+        # ⚠ THE MENU REPLACES THE INTRODUCTORY PARAGRAPH (owner's request,
+        # 02/08/2026). Each type carries ITS count, zero included — that is how
+        # you learn a type is empty, without five empty blocks taking up the
+        # screen. You click, you see its list: either the table, or an empty
+        # list that keeps its title and explanation.
         vue = _vue_relances(parametres.get("vue", [""])[0])
-        # ⚠ 905 LIGNES SUR UN ÉCRAN — son défaut n° 13 du 18/08/2026. La liste
-        # des rappels par un humain se servait ENTIÈRE : mesuré dans sa base,
-        # 905 lignes d'un coup, sans page, sans tri, sans moyen de voir d'où
-        # elles viennent. Une liste qu'on ne peut pas parcourir n'est pas une
-        # liste de travail, c'est un mur — et elle finit ignorée.
-        #
-        # Ce sont des DEMANDES DE PERSONNES : on n'en efface aucune et on n'en
-        # solde aucune à leur place. On rend la liste parcourable, et on dit
-        # d'où vient la masse — c'est ce qui permet de décider.
+        # ⚠ 905 ROWS ON ONE SCREEN — his defect no. 13 of 18/08/2026. The human
+        # call-back list was served WHOLE: measured in his database, 905 rows
+        # at once, with no pages, no sorting, no way to see where they came
+        # from. A list you cannot walk through is not a work list, it is a wall
+        # — and it ends up ignored.  These are PEOPLE'S REQUESTS: we erase none
+        # and we settle none in their place. We make the list walkable, and we
+        # say where the mass comes from — that is what makes it possible to
+        # decide.
         def tranche(famille, elements, quoi):
-            """(en-tête, ce qu'on affiche) pour une partie.
+            """(header, what is displayed) for one part.
 
-            ⚠ ON FILTRE D'ABORD, ON PAGINE ENSUITE — jamais l'inverse. Paginer
-            puis filtrer aurait cherché dans les vingt-cinq lignes affichées :
-            une recherche qui ne fouille que la page en cours ne cherche rien.
+            ⚠ WE FILTER FIRST, WE PAGINATE SECOND — never the other way round.
+            Paginating then filtering would have searched within the
+            twenty-five rows displayed: a search that only digs through the
+            current page digs through nothing.
             """
             retenus = self._retenir_relances(parametres, elements)
             visibles, page, pages = self._tranche_relances(
                 parametres, famille, retenus)
             entete = self._compte_relances(len(retenus), len(elements), quoi,
                                            parametres)
-            # ⚠ « AUCUN RÉSULTAT » N'EST PAS « CETTE LISTE EST VIDE ». Sans
-            # cette distinction, filtrer sur un nom absent des 📵 non joints
-            # affichait « Personne n'a atteint son maximum de rappels » — alors
-            # qu'ils sont trente-neuf. Un écran qui ment sur ce qu'il contient
-            # est pire qu'un écran qui se tait.
-            # L'ORDRE QUI SE LIT : filtrer → ce que ça donne → les pages.
+            # ⚠ `NO RESULT` IS NOT `THIS LIST IS EMPTY`. Without that
+            # distinction, filtering on a name absent from the 📵 not-reached
+            # showed `Nobody has reached their maximum number of reminders` —
+            # while there are thirty-nine of them. A screen that lies about
+            # what it contains is worse than a screen that says nothing. THE
+            # ORDER THAT READS: filter → what it gives → the pages.
             return (self._formulaire_relances(parametres, famille)
                     + entete
                     + self._navigation_relances(famille, page, pages,
@@ -5088,17 +4924,19 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
                                                         "personne(s)")
 
         def contenu(vide_par_le_filtre, tableau):
-            """Le tableau, ou la phrase qui dit que c'est le FILTRE qui vide."""
+            """The table, or the sentence saying it is the FILTER that empties it.
+            """
             return SANS_RESULTAT if vide_par_le_filtre else tableau
         reglages = (f"<p><small>Réglages actuels : délai par défaut +{delai} h "
                     f"ouvrée(s) dans la plage d'appel, {maximum} tentative(s) "
                     'maximum — <a href="/reglages">⚙ modifier</a>.</small></p>')
         if dues:
             verbe = "RÉELLEMENT" if self.application.mode_reel else "en simulation"
-            # ⚠ LE BOUTON LANCE TOUTES LES DUES, PAS LA PAGE AFFICHÉE — et il le
-            # dit avec le total. Une pagination change ce qu'on VOIT, jamais ce
-            # qu'un geste fait : croire n'en lancer que vingt-cinq et en lancer
-            # cent serait le pire des malentendus.
+            # ⚠ THE BUTTON LAUNCHES ALL THE DUE ONES, NOT THE PAGE DISPLAYED —
+            # and it says so with the total. Pagination changes what you SEE,
+            # never what a gesture does: believing you are launching only
+            # twenty-five and launching a hundred would be the worst of
+            # misunderstandings.
             contenu_dues = (nav_dues
                             + contenu(vide_d,
                                       _tableau(dues_visibles, True, "dues"))
@@ -5117,9 +4955,9 @@ TRACE du travail qui part, jamais son résultat dans votre agenda.</p>
         panneaux = "".join([
             _panneau_relance(
                 "humains", f"🙋 Rappels par un humain ({len(humains)})",
-                # ⚠ DEUX ORIGINES DEPUIS LE 20/08/2026, et le texte les dit
-                # toutes les deux : une seule phrase laissait croire que les
-                # 🚫 étaient arrivés là par erreur.
+                # ⚠ TWO ORIGINS SINCE 20/08/2026, and the text states both: a
+                # single sentence suggested the 🚫 had ended up there by
+                # mistake.
                 "<p>Deux façons d'arriver ici. <strong>Ce que l'agent n'a pas "
                 "pu conclure</strong> : le contact demande quelque chose "
                 "qu'une machine ne tranche pas. Et <strong>ceux qui ont "
@@ -5175,13 +5013,13 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
         return self._page("Relances", corps, actif="relances")
 
     def _tableau_bloques(self, bloques, maximum):
-        """📵 Les non joints : on a rappelé le maximum de fois réglé.
+        """📵 Those not reached: we called back the configured maximum number of
+        times.
 
-        ⚠ LE MOT « PLAFOND » EST PARTI D'ICI (21/08/2026). Il désignait le
-        « Nombre maximal de rappels » de l'étape ②, mais le produit
-        l'employait AUSSI pour « Au maximum, combien de personnes » de
-        l'étape ③ — deux réglages sans rapport sous un seul mot. Il a lu
-        « limite de crédit CALL-E », qui est encore un troisième sens.
+        ⚠ THE WORD `PLAFOND` HAS LEFT HERE (21/08/2026). It designated step ②'s
+        `Maximum number of reminders`, but the product ALSO used it for step
+        ③'s `At most, how many people` — two unrelated settings under one word.
+        He read it as `CALL-E credit limit`, which is yet a third meaning.
         """
         if not bloques:
             return ('<p class="vide-famille">Personne n\'a atteint son '
@@ -5206,11 +5044,11 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                   "③).</small></p>")
 
     def _modale_demande(self, contact_id):
-        """Ce que la personne a demandé, mot pour mot, en fenêtre.
+        """What the person asked for, word for word, in a window.
 
-        Le texte vient de la fin de son appel : il n'est ni reformulé, ni
-        résumé. On y ajoute seulement de quoi savoir de qui et de quelle
-        campagne il s'agit.
+        The text comes from the end of their call: it is neither rephrased nor
+        summarised. We only add enough to know who and which campaign it is
+        about.
         """
         contacts = (self.application.base.contacts_rappel_humain()
                     + self.application.base.contacts_rappel_humain(traites=True))
@@ -5226,48 +5064,46 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
         return self._modale(f"Sa demande — {html.escape(contact['nom'])}",
                             corps)
 
-    # ⚠ « ☎ À CONTACTER À LA MAIN » A ÉTÉ RETIRÉ le 10/08/2026, à la demande
-    # du propriétaire (il l'avait demandé la veille : c'est son écran, et
-    # c'est lui qui juge de ce qu'il y lit). Les deux sources qu'il
-    # réunissait restent lisibles : 🔁 Relances (§ humains) porte les contacts
-    # qu'une campagne n'a pas pu conclure, et le drapeau 🔔 « rappel
-    # souhaité » s'affiche partout où le contact apparaît.
+    # ⚠ `☎ À CONTACTER À LA MAIN` WAS REMOVED on 10/08/2026, at the owner's
+    # request (he had asked for it the day before: it is his screen, and it is
+    # he who judges what he reads there). The two sources it brought together
+    # stay readable: 🔁 Relances (§ humans) carries the contacts a campaign
+    # could not conclude, and the 🔔 `call-back wanted` flag is shown wherever
+    # the contact appears.
 
-    # ⚠ LA MÊME PAGINATION QUE 👥 CONTACTS (21/08/2026, sa demande : « exactement
-    # la même chose que dans la page Contacts. Il y a une pagination pour chaque
-    # partie qui contient des contacts »). Mêmes tailles, même défaut, mêmes
-    # quatre boutons ≪ ‹ › ≫ désactivés aux extrémités : deux écrans qui font le
-    # même geste doivent le faire de la même façon, sans quoi il faut réapprendre
-    # à chaque page.
-    #
-    # ⚠ ET UNE PAGE PAR PARTIE, PAS UNE POUR TOUTES. Les cinq familles vivent
-    # dans la même page (une seule est visible, les autres portent `hidden`) :
-    # un unique paramètre « page » aurait fait sauter les quatre autres au même
-    # numéro dès qu'on tourne une page. Chaque partie a donc le sien —
-    # « page_humains », « page_dues »… — et elles ne se marchent pas dessus.
+    # ⚠ THE SAME PAGINATION AS 👥 CONTACTS (21/08/2026, his request: `exactly
+    # the same thing as on the Contacts page. There is pagination for each part
+    # that contains contacts`). The same sizes, the same default, the same four
+    # ≪ ‹ › ≫ buttons disabled at the ends: two screens doing the same gesture
+    # must do it the same way, otherwise it has to be relearned on every page.
+    # ⚠ AND ONE PAGE PER PART, NOT ONE FOR ALL. The five families live in the
+    # same page (only one is visible, the others carry `hidden`): a single
+    # `page` parameter would have made the other four jump to the same number
+    # as soon as you turned a page. So each part has its own — `page_humains`,
+    # `page_dues`… — and they do not tread on each other.
     PAR_PAGE_CHOIX_RELANCES = (10, 25, 50, 100, 0)
-    # ⚠ DIX, PAS VINGT-CINQ (21/08/2026, sa demande) — et c'est le seul écart
-    # avec 👥 Contacts, voulu : une ligne de rappel porte une demande à LIRE
-    # (« sa demande, en clair »), pas une fiche à survoler. Vingt-cinq
-    # paragraphes d'un coup ne se lisent pas.
+    # ⚠ TEN, NOT TWENTY-FIVE (21/08/2026, his request) — and it is the only
+    # difference from 👥 Contacts, deliberately: a call-back row carries a
+    # request to be READ (`their request, in clear`), not a record to be
+    # skimmed. Twenty-five paragraphs at once do not get read.
     PAR_PAGE_DEFAUT_RELANCES = 10
 
     def _filtres_relances(self, parametres):
-        """(recherche, interdits demandés) — les mêmes deux filtres qu'ici."""
+        """(search, forbidden requested) — the same two filters as here."""
         return ((parametres.get("recherche", [""])[0] or "").strip(),
                 parametres.get("interdit", [""])[0] == "interdits")
 
     def _retenir_relances(self, parametres, elements):
-        """Applique la recherche et le filtre 🚫 — la MÊME règle que 👥 Contacts.
+        """Applies the search and the 🚫 filter — the SAME rule as 👥 Contacts.
 
-        ⚠ SA REMARQUE DU 21/08/2026 : « tu as oublié toute la partie filtre ».
-        Il avait raison : je n'avais porté que « Combien par page ». Retrouver
-        quelqu'un parmi 917 rappels étalés sur 37 pages sans recherche, c'est
-        exactement le mur que la pagination devait abattre.
+        ⚠ HIS REMARK OF 21/08/2026: `you forgot the whole filter part`. He was
+        right: I had only carried over `How many per page`. Finding somebody
+        among 917 call-backs spread over 37 pages with no search is exactly the
+        wall pagination was meant to bring down.
 
-        ⚠ LE NUMÉRO N'EST PAS COMPARÉ ICI, et c'est la règle du produit : les
-        lignes d'affichage ne portent que le masque. La base rend des
-        IDENTIFIANTS (`clients_par_chiffres`) ; on ne fait que les reconnaître.
+        ⚠ THE NUMBER IS NOT COMPARED HERE, and that is the product's rule: the
+        display rows carry only the mask. The database returns IDENTIFIERS
+        (`clients_par_chiffres`); all we do is recognise them.
         """
         recherche, interdit = self._filtres_relances(parametres)
         if not recherche and not interdit:
@@ -5278,8 +5114,8 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
         interdits = base.clients_interdits() if interdit else set()
         retenus = []
         for element in elements:
-            # Une relance nomme son contact « contact_nom » ; un rappel humain
-            # le nomme « nom ». Les deux voyagent dans cette même liste.
+            # A follow-up names its contact `contact_nom`; a human call-back
+            # names them `nom`. Both travel in that same list.
             nom = element.get("contact_nom") or element.get("nom") or ""
             client = element.get("client_id")
             if recherche and not (cherche in etats_clients._sans_accents(nom)
@@ -5292,7 +5128,7 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 
     @staticmethod
     def _compte_relances(retenus, total, quoi, parametres):
-        """« N sur M — aucun filtre » — la ligne de 👥 Contacts, mot pour mot."""
+        """`N of M — no filter` — the 👥 Contacts line, word for word."""
         rappel = []
         recherche = (parametres.get("recherche", [""])[0] or "").strip()
         if recherche:
@@ -5305,14 +5141,14 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                 + ".</p>")
 
     def _par_page_relances(self, parametres):
-        """Combien de lignes par page — 0 veut dire « toutes »."""
+        """How many rows per page — 0 means `all of them`."""
         taille = _entier(parametres.get("par_page"),
                          self.PAR_PAGE_DEFAUT_RELANCES)
         return (taille if taille in self.PAR_PAGE_CHOIX_RELANCES
                 else self.PAR_PAGE_DEFAUT_RELANCES)
 
     def _tranche_relances(self, parametres, famille, elements):
-        """(ce qu'on affiche, page, nombre de pages) pour CETTE partie."""
+        """(what is displayed, page, number of pages) for THIS part."""
         taille = self._par_page_relances(parametres)
         if not taille:
             return list(elements), 1, 1
@@ -5323,14 +5159,14 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 
     @staticmethod
     def _navigation_relances(famille, page, pages, combien, total, quoi):
-        """« ≪ ‹ page 2 sur 7 › ≫ » — les mêmes quatre boutons que 👥 Contacts.
+        """`≪ ‹ page 2 of 7 › ≫` — the same four buttons as 👥 Contacts.
 
-        ⚠ ILS PORTENT « name=page_<famille> » et appartiennent au formulaire de
-        la page : sans JavaScript, cliquer l'envoie en GET avec ce numéro, et la
-        liste se recharge — exactement comme sur 👥 Contacts.
+        ⚠ THEY CARRY `name=page_<family>` and belong to the page's form:
+        without JavaScript, clicking sends it as a GET with that number, and
+        the list reloads — exactly as on 👥 Contacts.
 
-        ⚠ ET ILS SONT DÉSACTIVÉS AUX EXTRÉMITÉS, jamais masqués : un bouton qui
-        disparaît fait douter de l'endroit où l'on est.
+        ⚠ AND THEY ARE DISABLED AT THE ENDS, never hidden: a button that
+        disappears makes you doubt where you are.
         """
         if pages <= 1:
             return ""
@@ -5351,21 +5187,21 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 </p>"""
 
     def _formulaire_relances(self, parametres, famille):
-        """La barre de filtres de CETTE partie — juste au-dessus de sa liste.
+        """THIS part's filter bar — right above its list.
 
-        ⚠ SA DEMANDE DU 21/08/2026 : « je veux que les filtres soient juste
-        au-dessus de la pagination, pas au-dessus d'un texte, sinon c'est trop
-        compliqué à comprendre pour l'utilisateur ».
+        ⚠ HIS REQUEST OF 21/08/2026: `I want the filters to be right above the
+        pagination, not above a text, otherwise it is too complicated for the
+        user to understand`.
 
-        Elle était posée EN TÊTE DE PAGE, séparée de la liste qu'elle filtre par
-        le titre de la famille et deux paragraphes d'explication : rien ne disait
-        sur quoi elle agissait. Elle vit maintenant DANS la partie, collée à son
-        compte et à sa pagination — on lit « filtrer », puis « N sur M », puis
-        les pages, puis la liste.
+        It was placed AT THE TOP OF THE PAGE, separated from the list it
+        filters by the family's title and two paragraphs of explanation:
+        nothing said what it acted on. It now lives INSIDE the part, next to
+        its count and its pagination — you read `filter`, then `N of M`, then
+        the pages, then the list.
 
-        ⚠ UN IDENTIFIANT PAR PARTIE, et c'est obligatoire : cinq formulaires
-        portant le même `id` seraient du HTML invalide, et les boutons de page
-        des quatre dernières parties se rattacheraient tous au premier.
+        ⚠ ONE ID PER PART, and it is compulsory: five forms carrying the same
+        `id` would be invalid HTML, and the page buttons of the last four parts
+        would all attach to the first.
         """
         courant = self._par_page_relances(parametres)
         tailles = "".join(
@@ -5373,22 +5209,21 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
             f'{" selected" if taille == courant else ""}>'
             f'{"tous" if taille == 0 else taille} par page</option>'
             for taille in self.PAR_PAGE_CHOIX_RELANCES)
-        # ⚠ LA MÊME CLASSE QUE 👥 CONTACTS (« filtres ») : elle porte déjà la
-        # mise en page de cette barre, et en inventer une seconde aurait fait
-        # deux barres qui se ressemblent sans être pareilles.
+        # ⚠ THE SAME CLASS AS 👥 CONTACTS (`filtres`): it already carries this
+        # bar's layout, and inventing a second one would have made two bars
+        # that look alike without being the same.
         recherche, interdit = self._filtres_relances(parametres)
-        # ⚠ NI « ÉTAT » NI « NON TRAITÉ » ICI, et c'est délibéré. Sur 👥 Contacts
-        # ces deux filtres découpent une liste unique ; sur 🔁 Relances, ce
-        # découpage EST déjà le menu des cinq familles (🙋 · ⏰ · 🕓 · 📵 · ✅).
-        # Les remettre en sélecteur aurait posé deux commandes qui disent la
-        # même chose que le menu juste au-dessus — et qui pourraient le
-        # contredire.
+        # ⚠ NEITHER `STATE` NOR `UNHANDLED` HERE, and that is deliberate. On 👥
+        # Contacts those two filters divide a single list; on 🔁 Relances, that
+        # division IS already the menu of five families (🙋 · ⏰ · 🕓 · 📵 · ✅).
+        # Putting them back as selectors would have placed two controls saying
+        # the same thing as the menu just above — and that could contradict it.
         return f"""<form method="get" action="/relances"
       id="filtres-relances-{famille}" class="filtres">
   <input type="hidden" name="vue" value="{html.escape(famille)}">
   <label>Rechercher un contact — nom ou numéro<br>
     <input type="search" name="recherche" value="{html.escape(recherche)}"
-           placeholder="Lefèvre, ou 0600000042"></label>
+           placeholder="Lefèvre, ou 0639985042"></label>
   <label>Contact par l'agent<br>
     <select name="interdit">
       <option value=""{" selected" if not interdit else ""}>tous</option>
@@ -5402,13 +5237,13 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 
     @staticmethod
     def _origine_des_humains(humains):
-        """D'OÙ VIENT LA MASSE : le compte par campagne, du plus gros au plus petit.
+        """WHERE THE MASS COMES FROM: the count per campaign, largest first.
 
-        ⚠ CE N'EST PAS UN ORNEMENT. Sur sa base, 905 rappels en attente
-        venaient de quelques campagnes seulement — des campagnes qui avaient
-        échoué en bloc pour une raison technique, pas 905 personnes ayant
-        chacune demandé quelque chose. Sans ce compte, la liste ressemble à 905
-        problèmes distincts ; avec lui, on voit les trois qu'elle contient.
+        ⚠ THIS IS NOT AN ORNAMENT. In his database, 905 pending call-backs came
+        from only a few campaigns — campaigns that had failed en masse for a
+        technical reason, not 905 people each having asked for something.
+        Without that count, the list looks like 905 distinct problems; with it,
+        you see the three it contains.
         """
         if len(humains) < 2:
             return ""
@@ -5430,12 +5265,12 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                 f"<ul>{lignes}{reste}</ul></details>")
 
     def _tableau_rappels_humains(self, humains):
-        """🙋 Les contacts « à rappeler par un humain » — jamais appelés seuls.
+        """🙋 The `à rappeler par un humain` contacts — never called alone.
 
-        La demande du contact n'est pas reprise dans la cellule : elle s'ouvre
-        en fenêtre (elle fait souvent plusieurs lignes et déformait le
-        tableau). Rien n'est reformulé ni inventé, et le geste « c'est fait »
-        les sort de la liste sans rien effacer.
+        The contact's request is not repeated in the cell: it opens in a window
+        (it often runs to several lines and distorted the table). Nothing is
+        rephrased or invented, and the `done` gesture takes them out of the
+        list without erasing anything.
         """
         if not humains:
             return ('<p class="vide-famille">Aucun rappel par un humain en '
@@ -5460,16 +5295,16 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                 "<th>Tentatives</th><th></th></tr>" + lignes + "</table>")
 
     def _page_resultat_relances(self, comptes_rendus):
-        """Le compte rendu du geste « Lancer les relances dues »."""
+        """The report of the `Lancer les relances dues` gesture."""
         lignes = []
         panne = next((c["panne"] for c in comptes_rendus if c.get("panne")), "")
         for compte_rendu in comptes_rendus:
             issue = campagnes.ETIQUETTES_ISSUE.get(compte_rendu["issue"],
                                                    compte_rendu["issue"] or "—")
             if compte_rendu.get("panne"):
-                # Panne DE NOTRE CÔTÉ : cette relance n'a PAS été jouée, elle
-                # reste planifiée. On l'écrit, plutôt que de la faire passer
-                # pour une tentative.
+                # A failure ON OUR SIDE: this follow-up was NOT played, it
+                # stays scheduled. We write that, rather than pass it off as an
+                # attempt.
                 suite = ("Relance NON jouée — toujours planifiée, aucune "
                          "tentative comptée")
             else:
@@ -5502,37 +5337,33 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
         return self._page("Relances exécutées", corps, actif="relances")
 
     def _page_suivi(self, parametres=None):
-        # Règle du manqué appliquée au chargement : un rendez-vous « prévu »
-        # dont l'horaire est passé bascule en « manqué » avant l'affichage.
+        # The missed rule applied at load time: a `prévu` appointment whose
+        # time has passed becomes `manqué` before display.
         self.application.base.marquer_manques_echus()
         parametres = parametres or {}
-        # ⚠ LA SECTION « 📞 À rappeler (manqués) » A ÉTÉ RETIRÉE le 10/08/2026,
-        # à la demande du propriétaire. Un rendez-vous manqué reste entièrement
-        # lisible dans 🗂 Tous les rendez-vous, avec sa pastille — et les
-        # campagnes sont désormais la voie pour rappeler du monde. Le message
-        # « n rendez-vous passé(s) en ignoré » partait avec elle : il n'avait
-        # plus de bouton pour le déclencher.
+        # ⚠ THE `📞 À rappeler (manqués)` SECTION WAS REMOVED on 10/08/2026, at
+        # the owner's request. A missed appointment stays entirely readable in
+        # 🗂 Tous les rendez-vous, with its badge — and campaigns are now the
+        # way to call people back. The `n appointment(s) moved to ignored`
+        # message went with it: it no longer had a button to trigger it.
         bloc_message = self._compte_rendu_import(
             parametres.get("import", [""])[0])
-        # Section « à venir » : chaque saisie est visible IMMÉDIATEMENT ici,
-        # et elle y RESTE tant qu'elle TIENT. Les deux règles du
-        # propriétaire, qui se complètent :
-        # - « ce n'est pas un contact qui disparaît, mais une ligne qui
-        #   évolue » : un rendez-vous confirmé au téléphone ne s'escamote
-        #   pas — il change de pastille, à sa place, dans la même ligne ;
-        # - correction du 31/07/2026 : un rendez-vous ANNULÉ, lui, n'existe
-        #   plus — il n'a rien à faire dans « à venir ». Il reste lisible
-        #   dans « Tous les rendez-vous » et sur la fiche du contact.
-        # ⚠ TROIS BLOCS RETIRÉS LE 10/08/2026, à la demande du propriétaire :
-        # « ☎ À contacter à la main », « 📅 Rendez-vous à venir » et le repli
-        # « Sans glisser ». La page ne porte plus que le planning et le geste
-        # d'import — c'est un planning, pas un tableau de bord.
-        #
-        # Où ça se retrouve : les personnes à contacter à la main sont dans
-        # 🔁 Relances (§ humains), qui les portait déjà ; les rendez-vous à
-        # venir sont dans 🗂 Tous les rendez-vous, dont le lien RESTE juste
-        # en dessous — sans lui, plus aucune liste de rendez-vous ne serait
-        # atteignable depuis cette page.
+        # The `upcoming` section: every entry is visible IMMEDIATELY here, and
+        # it STAYS there as long as it HOLDS. The owner's two rules, which
+        # complement each other: - `it is not a contact that disappears, but a
+        # row that evolves`: an appointment confirmed on the phone does not
+        # vanish — it changes badge, in place, in the same row; - correction of
+        # 31/07/2026: a CANCELLED appointment, on the other hand, no longer
+        # exists — it has no business in `à venir`. It stays readable in `Tous
+        # les rendez-vous` and on the contact's record. ⚠ THREE BLOCKS REMOVED
+        # ON 10/08/2026, at the owner's request: `☎ À contacter à la main`, `📅
+        # Rendez-vous à venir` and the `Sans glisser` fallback. The page now
+        # carries only the schedule and the import gesture — it is a schedule,
+        # not a dashboard.  Where they are found again: the people to contact
+        # by hand are in 🔁 Relances (§ humans), which already carried them; the
+        # upcoming appointments are in 🗂 Tous les rendez-vous, whose link
+        # REMAINS just below — without it, no list of appointments would be
+        # reachable from this page any more.
         sans_numero = self.application.base.rendezvous_sans_numero()
         lien_sans_numero = ""
         if sans_numero:
@@ -5551,18 +5382,16 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 
     # ------------------------------------------------------------- planning
     def _zone_planning(self, parametres=None):
-        """Le FRAGMENT « planning » : la barre de navigation ET la grille.
+        """The `planning` FRAGMENT: the navigation bar AND the grid.
 
-        Tout est dans le même morceau, parce que naviguer change les deux :
-        la semaine affichée et la position des sélecteurs. C'est CETTE zone
-        que la page recharge — jamais la page entière.
+        Everything is in the same piece, because navigating changes both: the
+        week displayed and the position of the selectors. It is THAT zone the
+        page reloads — never the whole page.
 
-        Les règles de navigation, à la lettre :
-        - le champ date mène directement à la semaine de cette date ;
-        - **tout autre bouton de navigation REMET LE CHAMP DATE À VIDE** ;
-        - « ⏭ Prochain créneau disponible » avance de trou en trou (il
-          garde sa position dans un champ caché), et cette position repart
-          de zéro dès qu'on navigue autrement.
+        The navigation rules, to the letter:
+        - the date field leads straight to that date's week;
+        - **any other navigation button CLEARS THE DATE FIELD**;
+        - `⏭ Prochain créneau disponible` advances gap by gap (it keeps its position in a hidden field), and that position resets as soon as you navigate any other way.
         """
         parametres = parametres or {}
         base = self.application.base
@@ -5585,7 +5414,7 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                         horaires.valider_date(date_saisie))
                     lundi = horaires.lundi_de(jour)
                 except ValueError as erreur:
-                    erreur_date = str(erreur)   # la saisie refusée reste affichée
+                    erreur_date = str(erreur)  # refused input stays displayed
             rang = 0
         elif aller == "precedent":
             lundi, date_saisie, rang = lundi - datetime.timedelta(days=7), "", 0
@@ -5617,7 +5446,7 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
                            f"{horaires.HORIZON_JOURS} prochains jours : tout "
                            "est pris, fermé, ou la semaine type est vide "
                            "(⚙ Réglages).")
-        else:               # les sélecteurs « semaine » / « année »
+        else:  # the `week` / `year` selectors
             date_saisie, rang = "", 0
         annee, numero = horaires.semaine_iso(lundi)
         return self._barre_planning(lundi, annee, numero, date_saisie, rang,
@@ -5627,23 +5456,23 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
             self._repli_plage(annee, numero)
 
     def _repli_plage(self, annee, numero):
-        """Choisir une plage SANS glisser — REPLIÉ derrière son intitulé.
+        """Choosing a range WITHOUT dragging — COLLAPSED behind its heading.
 
-        ⚠ IL SERT DEUX CAS D'UN COUP. D'abord sans JavaScript, comme partout
-        dans le produit. Ensuite AU DOIGT : le glisser n'existe qu'à la souris
-        dans tout RingBack (aucun touchstart, aucun pointerdown), donc sur
-        téléphone la sélection sur la grille n'existe pas. Ce formulaire, lui,
-        marche partout.
+        ⚠ IT SERVES TWO CASES AT ONCE. First without JavaScript, as everywhere
+        in the product. Then BY FINGER: dragging only exists with a mouse
+        throughout RingBack (no touchstart, no pointerdown), so on a phone
+        selection on the grid does not exist. This form, on the other hand,
+        works everywhere.
 
-        ⚠ RETIRÉ LE 10/08/2026, REMIS LE MÊME JOUR — replié. Il encombrait la
-        page ; le supprimer coupait le seul chemin sans souris. Un <details>
-        règle les deux : l'écran ne porte qu'un intitulé, et le dévoilement ne
-        demande AUCUN script — c'est ce qui compte, puisque l'appareil qui en a
-        besoin est justement celui où le glisser manque.
+        ⚠ REMOVED ON 10/08/2026, PUT BACK THE SAME DAY — collapsed. It
+        cluttered the page; deleting it cut the only mouse-free path. A
+        <details> settles both: the screen carries only a heading, and the
+        disclosure needs NO script — which is what matters, since the device
+        that needs it is precisely the one where dragging is missing.
 
-        ⚠ L'ANNÉE ET LA SEMAINE VOYAGENT AVEC. La fenêtre de plage s'en sert
-        pour composer ses campagnes : sans elles, le retour au planning
-        perdrait la semaine affichée.
+        ⚠ THE YEAR AND THE WEEK TRAVEL WITH IT. The range window uses them to
+        build its campaigns: without them, the return to the schedule would
+        lose the week displayed.
         """
         formulaire = f"""<form method="get" action="/suivi/plage" class="carte repli-plage">
   <input type="hidden" name="annee" value="{annee}">
@@ -5668,7 +5497,7 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 
     def _barre_planning(self, lundi, annee, numero, date_saisie, rang,
                         erreur_date, message, annee_courante):
-        """La barre de navigation du planning (sélecteurs, date, flèches)."""
+        """The schedule's navigation bar (selectors, date, arrows)."""
         annees = sorted({annee_courante - 2, annee_courante - 1, annee_courante,
                          annee_courante + 1, annee_courante + 2, annee})
         options_annees = "".join(
@@ -5713,11 +5542,11 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
 {bloc_message}"""
 
     def _grille_planning(self, lundi, cible=None):
-        """La grille de la semaine : tranches libres en vert, tuiles dessus.
+        """The week's grid: free slots in green, tiles laid over them.
 
-        Le découpage est EXACTEMENT celui de la semaine type des réglages.
-        Un rendez-vous de plusieurs tranches consécutives donne UNE tuile
-        (rowspan), jamais une case par tranche.
+        The division is EXACTLY that of the settings' typical week. An
+        appointment of several consecutive slots gives ONE tile (rowspan),
+        never one cell per slot.
         """
         base = self.application.base
         preferences = self.application.preferences
@@ -5728,25 +5557,21 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
             return ('<p class="erreurs">Aucune heure à afficher : la semaine '
                     'type est vide. Ouvrez des heures dans <a href="/reglages'
                     '#horaires">⚙ Réglages</a>.</p>')
-        # ⚠ CHOISIR UNE JOURNÉE ENTIÈRE D'UN CLIC — son défaut n° 9 du
-        # 18/08/2026. Mesuré sur une fenêtre de 1280 × 720 : la colonne d'un
-        # jour, de 08h00 à 18h40, fait environ 830 pixels pour 720 visibles. Le
-        # glissé ne fait pas défiler la page tout seul : le geste que le
-        # produit revendique — « vider une journée entière » — était donc
-        # IMPOSSIBLE d'un seul glissé sur son écran.
-        #
-        # Deux échappatoires existaient, aucune évidente : Ctrl + glissé cumule
-        # plusieurs zones (mais Ctrl + molette agrandit la page dans le
-        # navigateur), et le repli « Sans glisser » demande de taper quatre
-        # valeurs. L'en-tête du jour, lui, est déjà là, et il désigne
-        # exactement la journée.
-        #
-        # ⚠ UN VRAI LIEN, PAS UNE ÉCOUTE : sans JavaScript — donc au doigt, sur
-        # téléphone, où le glissé n'existe pas du tout — il mène à la même
-        # plage, en page entière (voir `_reponse_plage`). Avec JavaScript,
-        # `data-modale` ouvre la fenêtre latérale, comme un clic sur une case.
-        # L'année et la semaine sont dans le lien pour le repli ; la fenêtre,
-        # elle, les ajoute elle-même depuis la grille affichée.
+        # ⚠ CHOOSING A WHOLE DAY IN ONE CLICK — his defect no. 9 of 18/08/2026.
+        # Measured on a 1280 × 720 window: a day's column, from 08:00 to 18:40,
+        # is about 830 pixels for 720 visible. Dragging does not scroll the
+        # page by itself: the gesture the product claims — `empty a whole day`
+        # — was therefore IMPOSSIBLE with a single drag on his screen.  Two
+        # ways round existed, neither obvious: Ctrl + drag accumulates several
+        # zones (but Ctrl + wheel zooms the page in the browser), and the `Sans
+        # glisser` fallback asks for four values to be typed. The day's header,
+        # though, is already there, and it designates exactly that day.  ⚠ A
+        # REAL LINK, NOT A LISTENER: without JavaScript — hence by finger, on a
+        # phone, where dragging does not exist at all — it leads to the same
+        # range, as a full page (see `_reponse_plage`). With JavaScript,
+        # `data-modale` opens the side window, like a click on a cell. The year
+        # and the week are in the link for the fallback; the window adds them
+        # itself from the grid displayed.
         annee_iso, semaine_iso, _ = lundi.isocalendar()
         premiere = grille["minutes"][0]
         derniere = grille["minutes"][-1]
@@ -5779,7 +5604,7 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
             for jour in grille["jours"]:
                 cellule = jour["cellules"][index]
                 if cellule["type"] == "couverte":
-                    continue        # avalée par la tuile qui la surplombe
+                    continue  # swallowed by the tile above it
                 if cellule["type"] == "tuile":
                     cellules.append(self._case_tuile(cellule, pas))
                 else:
@@ -5799,11 +5624,11 @@ annulée(s) — le détail de chaque chaîne est sur la fiche de sa campagne.</s
             superposes = ('<div class="erreurs"><strong>Rendez-vous superposés '
                           "(ils ne tiennent pas dans la grille, rien n'est "
                           f"caché) :</strong><ul>{elements}</ul></div>")
-        # LE BOUTON DE SEMAINE, aligné à droite du titre (demande du
-        # propriétaire, 02/08/2026). Il n'ouvre PAS une campagne : il ouvre
-        # une fenêtre qui demande d'abord qui contacter — toute la semaine,
-        # ou des jours choisis. Il n'apparaît que s'il y a quelque chose à
-        # rappeler : proposer de rappeler une semaine vide serait creux.
+        # THE WEEK BUTTON, aligned to the right of the title (owner's request,
+        # 02/08/2026). It does NOT open a campaign: it opens a window that
+        # first asks who to contact — the whole week, or chosen days. It only
+        # appears when there is something to call back about: offering to call
+        # back an empty week would be hollow.
         bouton_rappel = ""
         if poses:
             bouton_rappel = (
@@ -5834,23 +5659,23 @@ n'apparaît donc pas ici mais dans la liste ci-dessous.</p>
 {self._bloc_sorties_du_planning(lundi, dimanche)}"""
 
     def _bloc_sorties_du_planning(self, lundi, dimanche):
-        """CE QUI A QUITTÉ LE PLANNING CETTE SEMAINE — et pourquoi.
+        """WHAT LEFT THE SCHEDULE THIS WEEK — and why.
 
-        ⚠ SON SIGNALEMENT DU 20/08/2026 : « la troisième a disparu, elle n'est
-        plus présente dans le calendrier de la page rendez-vous ». Elle n'avait
-        pas disparu : son rendez-vous était ANNULÉ, elle l'avait demandé pendant
-        l'appel. Mais la grille ne montre que ce qui OCCUPE une place, et la
-        page n'offrait AUCUN autre endroit où le retrouver.
+        ⚠ HIS REPORT OF 20/08/2026: `the third one has disappeared, it is no
+        longer in the calendar on the appointments page`. She had not
+        disappeared: her appointment was CANCELLED, she had asked for it during
+        the call. But the grid only shows what OCCUPIES a slot, and the page
+        offered NO other place to find it.
 
-        ⚠ ET LA LÉGENDE LE PROMETTAIT DÉJÀ — « il n'apparaît donc pas ici mais
-        dans les listes ci-dessous » — alors qu'il n'y avait aucune liste en
-        dessous. Une promesse d'écran non tenue coûte plus cher qu'un silence :
-        elle l'a envoyé chercher, et il n'a rien trouvé.
+        ⚠ AND THE CAPTION ALREADY PROMISED IT — `it therefore does not appear
+        here but in the lists below` — when there was no list below. A screen
+        promise not kept costs more than silence: it sent him looking, and he
+        found nothing.
 
-        ⚠ REPLIÉE, ET LE COMPTE DEHORS. Mesuré sur sa base : 312 rendez-vous
-        hors planning pour la seule semaine du 17/08 (l'empilement de ses
-        essais). Dépliée d'office, elle noierait la grille ; cachée sans
-        compte, elle ne dirait pas qu'il y a quelque chose à voir.
+        ⚠ COLLAPSED, WITH THE COUNT OUTSIDE. Measured in his database: 312
+        off-schedule appointments for the week of 17/08 alone (the pile-up of
+        his tests). Unfolded by default, it would drown the grid; hidden with
+        no count, it would not say there is something to see.
         """
         base = self.application.base
         fin = dimanche + datetime.timedelta(days=1)
@@ -5884,31 +5709,33 @@ l'a fait sortir.</p>
 </details>"""
 
     def _case_tuile(self, cellule, pas):
-        """UNE tuile pour UN rendez-vous, même s'il occupe plusieurs tranches."""
+        """ONE tile for ONE appointment, even when it occupies several slots.
+        """
         rdv = cellule["rdv"]
         classe = CLASSES_STATUT.get(rdv["statut"], "")
         debut, fin = cellule["debut"], cellule["fin"]
         infobulle = (f'{rdv["nom"]} — {rdv["motif"]} — de {debut:%Hh%M} à '
                      f'{fin:%Hh%M} ({horaires.tranches_lisibles(cellule["tranches"], pas)})')
         alerte = " ⚠" if cellule["tronquee"] else ""
-        # ⚠ LA COCHE DES CONFIRMÉS (demande du propriétaire, 11/08/2026). La
-        # tuile portait la couleur du statut, et la couleur seule ne dit rien à
-        # qui ne la connaît pas — c'est la règle du produit : « la couleur ne
-        # porte jamais seule ». La coche se voit ; et le MOT « confirmé » est
-        # dans l'infobulle, parce qu'un pictogramme ne remplace pas un mot.
+        # ⚠ THE TICK ON CONFIRMED ONES (owner's request, 11/08/2026). The tile
+        # carried the status's colour, and colour alone says nothing to
+        # somebody who does not know it — it is the product's rule: `colour
+        # never carries on its own`. The tick is visible; and the WORD
+        # `confirmé` is in the tooltip, because a pictogram does not replace a
+        # word.
         confirme = ""
         if rdv["statut"] == "confirmé":
             confirme = '<span class="coche-confirme" aria-hidden="true">✅</span>'
             infobulle += " — confirmé"
-        # La tuile est minuscule : le badge complet n'y tiendrait pas. Le 🧪
-        # est donc collé au nom, et l'infobulle dit en toutes lettres
-        # pourquoi (la modale, elle, porte le badge entier).
+        # The tile is tiny: the full badge would not fit. So the 🧪 is stuck to
+        # the name, and the tooltip says in plain words why (the modal, for its
+        # part, carries the whole badge).
         if rdv.get("numero_essai"):
             alerte += f" {essai_reel.MARQUE}"
             infobulle += " — " + essai_reel.PHRASE_MARQUE
-        # « data-quand » : l'horaire de la case, en ISO. C'est par lui que le
-        # glisser calcule la plage sélectionnée — jamais par une position à
-        # l'écran, qui changerait au premier retri.
+        # `data-quand`: the cell's time, in ISO. It is by that value that the
+        # drag computes the selected range — never by a position on screen,
+        # which would change at the first re-sort.
         return (f'<td class="tuile" rowspan="{cellule["hauteur"]}" '
                 f'data-quand="{debut.isoformat(timespec="minutes")}" '
                 f'data-contenu="rendezvous" '
@@ -5919,7 +5746,7 @@ l'a fait sortir.</p>
                 f'<span class="tuile-heure"> {debut:%Hh%M}</span></a></td>')
 
     def _case_libre(self, cellule, jour, minute, pas, cible=None):
-        """Une case libre (verte) ou fermée — la couleur ne porte jamais seule."""
+        """A free (green) or closed cell — colour never carries on its own."""
         debut = cellule["debut"]
         classes = ["libre"] if cellule["type"] == "libre" else ["ferme"]
         if cellule.get("revolue"):
@@ -5940,10 +5767,10 @@ l'a fait sortir.</p>
         if ouvrable:
             ouverture = ('data-modale="/suivi/detail?creneau='
                          f'{urllib.parse.quote(debut.isoformat(timespec="minutes"))}" ')
-        # « data-contenu » dit ce que la case porte, en un mot : c'est ce que
-        # le menu de plage compte pour proposer une campagne plutôt qu'une
-        # autre. « libre » ne vaut que pour une place RÉELLEMENT proposable :
-        # une place déjà passée ne se propose pas.
+        # `data-contenu` says what the cell carries, in one word: it is what
+        # the range menu counts to offer one campaign rather than another.
+        # `libre` only applies to a GENUINELY offerable slot: a slot already
+        # past is not offered.
         contenu = "libre" if ouvrable else "rien"
         return (f'<td class="{" ".join(classes)}" {ouverture}'
                 f'data-quand="{debut.isoformat(timespec="minutes")}" '
@@ -5951,35 +5778,29 @@ l'a fait sortir.</p>
                 f'title="{html.escape(infobulle)}">'
                 f'<span class="lecture-seule">{etat}</span></td>')
 
-    # ============================ SÉLECTIONNER UNE PLAGE DU PLANNING
-    # Demande du propriétaire du 03/08/2026 : on glisse sur la grille des
-    # rendez-vous, et au relâché un menu propose ce qu'on peut faire de la
-    # plage choisie.
-    #
-    # ⚠ LA PLAGE EST UN RECTANGLE JOURS × HEURES depuis le 09/08/2026 — « du
-    # lundi au mercredi, de 9h00 à 10h15 ». C'était une PÉRIODE continue : le
-    # même geste ramassait alors les après-midi et les nuits entre les deux
-    # bouts, et la demande était impossible à exprimer.
-    #
-    # ⚠ LES TROIS VOIES DISENT LA MÊME CHOSE, et c'est la condition pour que
-    # ce sens tienne : le glissé, le formulaire de repli sans JavaScript et
-    # cette lecture-ci. Le commentaire d'origine avertissait déjà que « deux
-    # sens pour un même geste finissent toujours par se contredire ».
-    #
-    # ⚠ LA DERNIÈRE CASE EST COMPRISE. On relâche SUR une case : elle est
-    # prise. Le formulaire de repli le dit noir sur blanc, sinon les deux
-    # voies donneraient deux plages différentes pour la même saisie.
-    #
-    # Une zone = (jour de début, jour de fin, heure de début, heure de fin).
-    # Plusieurs zones = un Ctrl + glissé répété.
+    # ============================ SELECTING A RANGE OF THE SCHEDULE Owner's
+    # request of 03/08/2026: you drag over the appointments grid, and on
+    # release a menu offers what can be done with the chosen range.  ⚠ THE
+    # RANGE IS A DAYS × HOURS RECTANGLE since 09/08/2026 — `from Monday to
+    # Wednesday, from 9:00 to 10:15`. It was a continuous PERIOD: the same
+    # gesture then swept up the afternoons and nights between the two ends, and
+    # the request was impossible to express.  ⚠ THE THREE ROUTES SAY THE SAME
+    # THING, and that is the condition for this meaning to hold: the drag, the
+    # no-JavaScript fallback form and this reading. The original comment
+    # already warned that `two meanings for one gesture always end up
+    # contradicting each other`.  ⚠ THE LAST CELL IS INCLUDED. You release ON a
+    # cell: it is taken. The fallback form says so in black and white,
+    # otherwise the two routes would give two different ranges for the same
+    # input.  One zone = (start day, end day, start time, end time). Several
+    # zones = a repeated Ctrl + drag.
     ZONES_MAX = 20
 
     @staticmethod
     def _lire_zone(texte):
-        """« 2026-08-10|2026-08-12|09:00|10:15 » → (date, date, time, time).
+        """`2026-08-10|2026-08-12|09:00|10:15` → (date, date, time, time).
 
-        Rend None si quoi que ce soit est illisible : une zone à moitié
-        comprise vaudrait moins que pas de zone du tout.
+        Returns None when anything at all is unreadable: a half-understood zone
+        would be worth less than no zone at all.
         """
         morceaux = [part.strip() for part in (texte or "").split("|")]
         if len(morceaux) != 4 or not all(morceaux):
@@ -5991,8 +5812,8 @@ l'a fait sortir.</p>
             heure2 = datetime.time.fromisoformat(morceaux[3])
         except ValueError:
             return None
-        # On glisse dans les quatre sens : le coin d'arrivée peut être avant
-        # celui de départ, sur l'un des deux axes ou sur les deux.
+        # You drag in all four directions: the arrival corner may be before the
+        # start one, on either axis or on both.
         if jour2 < jour1:
             jour1, jour2 = jour2, jour1
         if heure2 < heure1:
@@ -6000,12 +5821,11 @@ l'a fait sortir.</p>
         return (jour1, jour2, heure1, heure2)
 
     def _zones_de_plage(self, parametres):
-        """Les rectangles demandés, dans l'ordre, sans doublon.
+        """The rectangles requested, in order, without duplicates.
 
-        Deux écritures, une seule signification : « zone=j1|j2|h1|h2 » répété
-        (ce qu'envoie le glissé), ou les quatre champs séparés du formulaire
-        de repli — celui-ci n'a pas de JavaScript pour les assembler, et il
-        doit marcher sans.
+        Two spellings, one meaning: `zone=j1|j2|h1|h2` repeated (what the drag
+        sends), or the fallback form's four separate fields — that one has no
+        JavaScript to assemble them, and it must work without.
         """
         zones = []
         for brut in parametres.get("zone", [])[:self.ZONES_MAX]:
@@ -6021,17 +5841,18 @@ l'a fait sortir.</p>
         return [zone] if zone else []
 
     def _inventaire_plage(self, zones):
-        """Ce que contiennent ces rectangles : (places libres, rendez-vous).
+        """What those rectangles contain: (free slots, appointments).
 
-        ⚠ AUCUNE NOUVELLE MÉCANIQUE : les places libres viennent de
-        `horaires.tranches_libres_du_jour`, qui est déjà LA source du produit
-        (ouvert − déjà pris − jours fermés), et les rendez-vous de
-        `base.rendezvous_de_periode`, source du planning. Un second calcul
-        aurait fini par ne plus dire la même chose que la grille affichée.
+        ⚠ NO NEW MECHANISM: the free slots come from
+        `horaires.tranches_libres_du_jour`, which is already THE product's
+        source (open − already taken − closed days), and the appointments from
+        `base.rendezvous_de_periode`, the schedule's source. A second
+        computation would have ended up no longer saying the same thing as the
+        grid displayed.
 
-        ⚠ ON DÉDOUBLONNE : deux zones peuvent se chevaucher (rien ne l'interdit
-        au Ctrl + glissé), et compter deux fois la même place ferait annoncer
-        « 8 places » là où il y en a 5.
+        ⚠ WE DE-DUPLICATE: two zones can overlap (nothing forbids it with Ctrl
+        + drag), and counting the same slot twice would announce `8 slots`
+        where there are 5.
         """
         base = self.application.base
         preferences = self.application.preferences
@@ -6042,32 +5863,29 @@ l'a fait sortir.</p>
             while jour <= jour2:
                 for tranche in horaires.tranches_libres_du_jour(
                         base, preferences, jour):
-                    # Une place déjà passée ne se propose pas : elle est
-                    # visible sur la grille, mais grisée et non cliquable.
+                    # A slot already past is not offered: it is visible on the
+                    # grid, but greyed out and not clickable.
                     if (heure1 <= tranche.time() <= heure2
                             and tranche > maintenant):
                         places.add(tranche)
                 debut = datetime.datetime.combine(jour, heure1)
                 fin = (datetime.datetime.combine(jour, heure2)
                        + datetime.timedelta(minutes=1))
-                # ⚠ LES MÊMES STATUTS QUE LA GRILLE, ET C'EST TOUT L'ENJEU
-                # (17/08/2026). L'appel était fait SANS filtre : il ramassait
-                # donc aussi les « supprimé », « annulé » et « déplacé » — des
-                # lignes que le planning ne montre PAS.
-                #
-                # MESURÉ DANS SA BASE : un rectangle d'une journée (07/09, de
-                # 8 h à 19 h) montrait 13 rendez-vous à l'écran et en chargeait
-                # 89 dans la campagne, dont 76 « supprimé ». Il sélectionnait
-                # une demi-journée et se retrouvait avec « plein de contacts »
-                # qu'il n'avait jamais vus. Les fantômes venaient de ses
-                # réimports d'agenda : chaque import remplace le rendez-vous du
-                # même créneau et laisse l'ancien en « supprimé ».
-                #
-                # Le pavé au-dessus de cette fonction promettait déjà « la
-                # source du planning » — la fonction était bien la bonne, le
-                # FILTRE manquait. `horaires.STATUTS_OCCUPANTS` est ce que la
-                # grille demande (`horaires.grille_semaine`) : un seul endroit
-                # décide, les deux écrans disent la même chose.
+                # ⚠ THE SAME STATUSES AS THE GRID, AND THAT IS THE WHOLE POINT
+                # (17/08/2026). The call was made WITH no filter: so it also
+                # swept up the `supprimé`, `annulé` and `déplacé` ones — rows
+                # the schedule does NOT show.  MEASURED IN HIS DATABASE: a
+                # one-day rectangle (07/09, from 8am to 7pm) showed 13
+                # appointments on screen and loaded 89 into the campaign, 76 of
+                # them `supprimé`. He selected half a day and found himself
+                # with `loads of contacts` he had never seen. The ghosts came
+                # from his calendar re-imports: each import replaces the
+                # appointment in the same slot and leaves the old one as
+                # `supprimé`.  The block above this function already promised
+                # `the schedule's source` — the function was indeed the right
+                # one, the FILTER was missing. `horaires.STATUTS_OCCUPANTS` is
+                # what the grid asks for (`horaires.grille_semaine`): one place
+                # decides, and both screens say the same thing.
                 for rdv in base.rendezvous_de_periode(
                         debut.isoformat(timespec="minutes"),
                         fin.isoformat(timespec="minutes"),
@@ -6080,10 +5898,10 @@ l'a fait sortir.</p>
 
     @staticmethod
     def _zone_lisible(zone):
-        """« du lundi 10/08 au mercredi 12/08, de 09h00 à 10h15 »."""
+        """`from Monday 10/08 to Wednesday 12/08, from 09:00 to 10:15`."""
         jour1, jour2, heure1, heure2 = zone
-        # Une zone d'UNE SEULE case — un Ctrl + clic — disait « de 09h00 à
-        # 09h00 ». Exact, et illisible.
+        # A zone of ONE SINGLE cell — a Ctrl + click — said `from 09:00 to
+        # 09:00`. Accurate, and unreadable.
         heures = (f"à {heure1:%Hh%M}" if heure1 == heure2
                   else f"de {heure1:%Hh%M} à {heure2:%Hh%M}")
         if jour1 == jour2:
@@ -6094,7 +5912,7 @@ l'a fait sortir.</p>
                 f"{heures}")
 
     def _plage_lisible(self, zones):
-        """Les zones, en toutes lettres — la couleur ne porte jamais seule."""
+        """The zones, spelled out — colour never carries on its own."""
         if len(zones) == 1:
             return self._zone_lisible(zones[0])
         return (f"sur {len(zones)} zones — "
@@ -6102,11 +5920,11 @@ l'a fait sortir.</p>
 
     @staticmethod
     def _retour_planning(parametres):
-        """L'adresse du planning à REVENIR, sur la semaine d'où l'on vient.
+        """The schedule URL to COME BACK to, on the week you came from.
 
-        L'année et la semaine voyagent déjà avec chaque plage (voir
-        `_repli_plage`) : le retour retombe donc sur la grille qu'il regardait,
-        pas sur la semaine courante.
+        The year and the week already travel with every range (see
+        `_repli_plage`): so the return lands on the grid he was looking at, not
+        on the current week.
         """
         annee = (parametres.get("annee", [""])[0] or "").strip()
         semaine = (parametres.get("semaine", [""])[0] or "").strip()
@@ -6115,25 +5933,26 @@ l'a fait sortir.</p>
         return "/suivi"
 
     def _reponse_plage(self, titre, corps, parametres, code=200):
-        """LA réponse d'une plage — fenêtre si on vient de la fenêtre, PAGE sinon.
+        """THE answer for a range — a window when you come from the window, a PAGE
+        otherwise.
 
-        ⚠ LA RÈGLE EXISTAIT DÉJÀ AILLEURS, elle manquait ICI. `_erreur` répond
-        une page entière avec « ← Retour aux rendez-vous », et
-        `_page_sans_numero` fait pareil : dans tout le produit, un refus laisse
-        un chemin. Les quatre réponses de plage, elles, renvoyaient une fenêtre
-        NUE, quel que soit le demandeur.
+        ⚠ THE RULE ALREADY EXISTED ELSEWHERE, it was missing HERE. `_erreur`
+        answers with a full page carrying `← Retour aux rendez-vous`, and
+        `_page_sans_numero` does the same: throughout the product, a refusal
+        leaves a way out. The four range answers, though, returned a BARE
+        window, whoever the requester was.
 
-        CE QUE ÇA A COÛTÉ, le 17/08/2026 : ses trois formulaires de plage sont
-        de vrais envois de formulaire (pas des envois de fenêtre — ils n'ont
-        pas `data-modale-envoi`), et le refus « aucun numéro utilisable »
-        arrivait donc en pleine page : fond blanc, aucun lien, aucun menu, et
-        un bouton « Fermer ✕ » qui ne pouvait rien fermer puisqu'il n'y avait
-        plus de page dessous. C'est l'écran sur lequel il est resté bloqué.
-        Le même chemin sert le repli « Sans glisser », qui est le SEUL moyen de
-        choisir une plage sans souris — donc au doigt, sur téléphone.
+        WHAT THAT COST, on 17/08/2026: his three range forms are real form
+        submissions (not window submissions — they have no
+        `data-modale-envoi`), and the refusal `no usable number` therefore
+        arrived as a full page: a white background, no link, no menu, and a
+        `Fermer ✕` button that could close nothing since there was no page
+        underneath any more. That is the screen he got stuck on. The same path
+        serves the `Sans glisser` fallback, which is the ONLY way to choose a
+        range without a mouse — hence by finger, on a phone.
 
-        Un seul endroit décide, pour les quatre réponses : le panneau de plage
-        et ses trois refus.
+        One place decides, for all four answers: the range panel and its three
+        refusals.
         """
         if self._depuis_modale():
             return self._repondre(
@@ -6146,15 +5965,15 @@ l'a fait sortir.</p>
         return self._repondre(page, code)
 
     def _modale_plage(self, parametres):
-        """LE MENU LATÉRAL d'une plage sélectionnée.
+        """THE SIDE MENU of a selected range.
 
-        ⚠ C'EST LA FENÊTRE QUI EXISTE DÉJÀ, posée sur le côté par le style.
-        Elle apporte gratuitement ce qu'un volet neuf aurait fallu réécrire :
-        fermeture au clic extérieur, sur la croix et à Échap, role=dialog, et
-        le renvoi d'un refus avec les valeurs tapées.
+        ⚠ IT IS THE WINDOW THAT ALREADY EXISTS, placed at the side by the
+        styling. It brings for free what a new panel would have had to rewrite:
+        closing on an outside click, on the cross and on Esc, role=dialog, and
+        returning a refusal with the typed values.
 
-        Sans JavaScript — ou au doigt, par le repli « Sans glisser » — la même
-        chose arrive en PAGE entière : voir `_reponse_plage`.
+        Without JavaScript — or by finger, through the `Sans glisser` fallback
+        — the same thing arrives as a full PAGE: see `_reponse_plage`.
         """
         zones = self._zones_de_plage(parametres)
         if not zones:
@@ -6166,23 +5985,22 @@ l'a fait sortir.</p>
                                        "heure à telle heure).</p>",
                                        parametres)
         places, rendezvous = self._inventaire_plage(zones)
-        # Ce que la plage contient, dit en chiffres AVANT de proposer quoi que
-        # ce soit : on ne propose pas une campagne sans dire sur quoi.
-        #
-        # ⚠ ET C'EST TOUT CE QUI RESTE EN TEXTE (demande du propriétaire,
-        # 10/08/2026) : plus de liste des places, plus d'explication sous
-        # chaque bouton, plus de rappel « personne n'est appelé ». Quatre
-        # libellés qui disent où l'on va, et rien de plus — c'est l'assistant
-        # qui explique, à l'étape suivante, en contexte.
+        # What the range contains, stated in figures BEFORE anything is
+        # offered: we do not offer a campaign without saying what it is about.
+        # ⚠ AND THAT IS ALL THE TEXT THAT REMAINS (owner's request,
+        # 10/08/2026): no more list of slots, no more explanation under each
+        # button, no more `nobody is called` reminder. Four labels saying where
+        # you are going, and nothing more — it is the assistant that explains,
+        # at the next step, in context.
         compte = (f"<p><strong>{len(places)} place(s) libre(s)</strong> et "
                   f"<strong>{len(rendezvous)} rendez-vous</strong> "
                   f"{html.escape(self._plage_lisible(zones))}.</p>")
-        # ⚠ QUI NE SERA PAS APPELÉ, DIT ICI (défaut n° 7 du 18/08/2026). Cette
-        # fenêtre annonçait un nombre de rendez-vous et se taisait sur ceux
-        # qu'aucune campagne ne pourra joindre : il choisissait sa campagne
-        # sans le savoir, et ne l'apprenait qu'à l'écran suivant. Le tri est
-        # celui-là même que la campagne appliquera — voir
-        # `_trier_les_rendezvous` : les deux écrans ne peuvent pas diverger.
+        # ⚠ WHO WILL NOT BE CALLED, STATED HERE (defect no. 7 of 18/08/2026).
+        # This window announced a number of appointments and stayed silent
+        # about those no campaign will be able to reach: he chose his campaign
+        # without knowing, and only found out at the next screen. The sorting
+        # is the very one the campaign will apply — see
+        # `_trier_les_rendezvous`: the two screens cannot diverge.
         _, a_completer, stop, doublons = self._trier_les_rendezvous(
             [rdv["id"] for rdv in rendezvous])
         compte += self._ligne_ecartes(a_completer, stop, doublons)
@@ -6200,20 +6018,20 @@ l'a fait sortir.</p>
   <button>📞 Campagne pour remplir les créneaux libres</button>
 </form>"""
         else:
-            # Le bouton ne DISPARAÎT pas en silence : une ligne dit pourquoi.
+            # The button does not DISAPPEAR in silence: a line says why.
             bloc_libre = ('<p class="sourd"><small>📞 Aucune place libre à '
                           "venir dans cette plage.</small></p>")
-        # ⚠ LES TROIS CAMPAGNES DE RENDEZ-VOUS (10/08/2026). Elles n'existent
-        # que si la plage en contient : sans rendez-vous, on le dit au lieu de
-        # montrer trois boutons qui refuseraient.
+        # ⚠ THE THREE APPOINTMENT CAMPAIGNS (10/08/2026). They only exist when
+        # the range contains any: with no appointment, we say so instead of
+        # showing three buttons that would refuse.
         if rendezvous:
             caches_rdv = "".join(
                 f'<input type="hidden" name="rdv" value="{rdv["id"]}">'
                 for rdv in rendezvous)
-            # ⚠ LA SEMAINE VOYAGE AVEC LES TROIS, comme avec « créneau libéré »
-            # juste au-dessus. Sans elle, un refus ne savait pas sur quelle
-            # semaine renvoyer et retombait sur la semaine courante — celle
-            # qu'il regardait était perdue.
+            # ⚠ THE WEEK TRAVELS WITH ALL THREE, as with `créneau libéré` just
+            # above. Without it, a refusal did not know which week to send you
+            # back to and fell back on the current week — the one he was
+            # looking at was lost.
             semaine_cachee = f"""
   <input type="hidden" name="annee"
          value="{html.escape(parametres.get("annee", [""])[0])}">
@@ -6237,18 +6055,16 @@ l'a fait sortir.</p>
 
     @staticmethod
     def _creneau_lisible_serveur(quand):
-        """« mercredi 12/08 à 09h00 » — pour une plage lue à l'écran."""
+        """`mercredi 12/08 à 09h00` — for a range read on screen."""
         return (f"{horaires.JOURS[quand.weekday()]} {quand:%d/%m} "
                 f"à {quand:%Hh%M}")
 
-    # Les trois campagnes qu'une plage de rendez-vous peut ouvrir. Le code est
-    # la nature de l'assistant ; le reste n'est que ce qui s'affiche.
-    #
-    # ⚠ PLUS D'EXPLICATION SOUS LES BOUTONS (demande du propriétaire,
-    # 10/08/2026) : « D'une manière générale fais attention car tu as tendance
-    # à mettre beaucoup d'information. Trop d'information perd les
-    # utilisateurs. » Le libellé dit ce que fait le bouton ; ce que fait la
-    # campagne, l'assistant le montre à l'étape suivante, en contexte.
+    # The three campaigns an appointment range can open. The code is the
+    # assistant's kind; the rest is only what is displayed.  ⚠ NO MORE
+    # EXPLANATION UNDER THE BUTTONS (owner's request, 10/08/2026): `Generally
+    # speaking be careful, because you tend to put a lot of information. Too
+    # much information loses users.` The label says what the button does; what
+    # the campaign does, the assistant shows at the next step, in context.
     CAMPAGNES_DE_PLAGE = (
         ("deplacement", "📆", "Campagne pour déplacer les rendez-vous"),
         ("rappel_rdv", "🔔", "Campagne pour rappeler les rendez-vous"),
@@ -6256,28 +6072,26 @@ l'a fait sortir.</p>
     )
 
     def _trier_les_rendezvous(self, identifiants):
-        """Ce que la plage donne : (retenus, à compléter, 🚫 exclus, doublons).
+        """What the range gives: (kept, to be completed, 🚫 excluded, duplicates).
 
-        - `retenus` : [(rendez-vous, téléphone)] — le téléphone peut être VIDE.
-        - `a_completer` : {client: nom} de ceux dont le numéro manque.
-        - `stop` : {client: nom} de ceux marqués 🚫 « Ne plus appeler ».
-        - `doublons` : combien de rendez-vous ne donnent pas un contact de plus,
-          leur numéro étant déjà pris — comptés par LIGNE, eux.
+        - `retenus`: [(appointment, phone)] — the phone may be EMPTY.
+        - `a_completer`: {client: name} of those whose number is missing.
+        - `stop`: {client: name} of those marked 🚫 `Ne plus appeler`.
+        - `doublons`: how many appointments do not add one more contact, their number being already taken — those are counted by ROW.
 
-        ⚠ UNE PERSONNE SANS NUMÉRO ENTRE DANS LA LISTE (18/08/2026, sa
-        demande). Elle en était ÉCARTÉE avant même la grille : il sélectionnait
-        quatre rendez-vous sur son planning et n'en retrouvait que trois à
-        l'étape 3, sans pouvoir rien y faire. Or la grille sait justement
-        corriger un numéro en tapant, et elle REFUSE de se valider tant qu'une
-        case obligatoire est vide : c'est l'endroit prévu pour ça. Écarter en
-        amont, c'était lui retirer le seul geste qui règle le problème.
+        ⚠ A PERSON WITH NO NUMBER ENTERS THE LIST (18/08/2026, his request).
+        They were EXCLUDED before the grid even: he selected four appointments
+        on his schedule and found only three at step 3, with nothing he could
+        do about it. Yet the grid is precisely what can correct a number by
+        typing, and it REFUSES to validate as long as a mandatory box is empty:
+        that is the place provided for it. Excluding upstream meant taking away
+        the one gesture that solves the problem.
 
-        ⚠ ET LES 🚫 SONT COMPTÉS ICI AUSSI. Ils sont exclus plus loin, à la
-        création de la campagne (`creer_campagne_prete`), et personne ne le
-        disait avant : sur sa matinée du 20/08, deux personnes sur trois
-        étaient 🚫 et la campagne n'appelait qu'un seul contact — il a conclu
-        que le déplacement ne marchait pas. Trois raisons d'écarter quelqu'un,
-        il n'en voyait aucune.
+        ⚠ AND THE 🚫 ARE COUNTED HERE TOO. They are excluded later, when the
+        campaign is created (`creer_campagne_prete`), and nobody said so
+        before: on his morning of 20/08, two people out of three were 🚫 and the
+        campaign called only one contact — he concluded that the move did not
+        work. Three reasons to set somebody aside, and he saw none of them.
         """
         base = self.application.base
         retenus, a_completer, stop, doublons, vus = [], {}, {}, 0, set()
@@ -6289,9 +6103,9 @@ l'a fait sortir.</p>
             if rdv.get("ne_plus_appeler"):
                 stop[rdv["client_id"]] = rdv["nom"]
             if not telephone:
-                # Une personne, une ligne : une plage peut porter DEUX
-                # rendez-vous de la même, et deux lignes à compléter pour une
-                # seule fiche seraient deux fois le même travail.
+                # One person, one row: a range may carry TWO appointments for
+                # the same person, and two rows to complete for a single record
+                # would be the same work twice.
                 if rdv["client_id"] in a_completer:
                     continue
                 a_completer[rdv["client_id"]] = rdv["nom"]
@@ -6306,16 +6120,17 @@ l'a fait sortir.</p>
 
     @staticmethod
     def _ligne_ecartes(a_completer, stop, doublons):
-        """Ce qui n'ira pas droit aux appels — ou "" s'il n'y a rien à dire.
+        """What will not go straight to calls — or "" when there is nothing to
+        say.
 
-        ⚠ LES TROIS RAISONS, PAS DEUX. Un rendez-vous de la plage peut ne pas
-        donner un appel pour trois motifs, et ils n'appellent pas le même
-        geste : le numéro MANQUE (à taper dans la grille), la personne est
-        🚫 « Ne plus appeler » (rien à faire, sinon lever le drapeau), ou son
-        numéro est déjà dans la liste (une seule personne sera appelée). N'en
-        annoncer que deux, c'est laisser le troisième surprendre — c'est ce
-        qui lui a fait croire, le 18/08/2026, que le déplacement ne marchait
-        pas.
+        ⚠ THE THREE REASONS, NOT TWO. An appointment in the range may fail to
+        produce a call for three reasons, and they do not call for the same
+        gesture: the number is MISSING (to be typed into the grid), the person
+        is 🚫 `Ne plus appeler` (nothing to do, other than lift the flag), or
+        their number is already in the list (only one person will be called).
+        Announcing only two means letting the third take you by surprise —
+        which is what made him believe, on 18/08/2026, that the move did not
+        work.
         """
         def _noms(gens):
             noms = sorted(gens.values())
@@ -6334,11 +6149,11 @@ l'a fait sortir.</p>
                  "numéros sont à compléter dans la grille de l'étape 3")
                 + f" — {_noms(a_completer)}")
         if stop:
-            # ⚠ LE TEXTE SUIT L'ÉTAT (20/08/2026). « Elle ne sera pas appelée »
-            # était devenu à moitié faux : l'agent ne l'appelle pas, mais elle
-            # ne disparaît plus pour autant — elle attend qu'un humain la
-            # rappelle. Le laisser tel quel lui aurait fait croire que ces
-            # personnes étaient perdues, alors qu'elles l'attendent dans
+            # ⚠ THE TEXT FOLLOWS THE STATE (20/08/2026). `They will not be
+            # called` had become half false: the agent does not call them, but
+            # they no longer disappear for all that — they are waiting for a
+            # human to call them back. Leaving it as it was would have made him
+            # believe those people were lost, when they are waiting for him in
             # 🔁 Relances.
             combien = len(stop)
             morceaux.append(
@@ -6363,12 +6178,12 @@ l'a fait sortir.</p>
                   "</small></p>")
 
     def _campagne_depuis_plage(self, corps, nature):
-        """PLUSIEURS personnes, celles des rendez-vous de la plage.
+        """SEVERAL people, those of the range's appointments.
 
-        ⚠ MÊMES REFUS QUE PARTOUT AILLEURS : un contact sans numéro ne peut
-        pas être appelé, et deux fois le même numéro serait deux appels chez la
-        même personne. On les ÉCARTE en les comptant, et l'écran le dit — les
-        taire aurait fait croire à une liste complète.
+        ⚠ THE SAME REFUSALS AS EVERYWHERE ELSE: a contact with no number cannot
+        be called, and the same number twice would be two calls to the same
+        person. We SET THEM ASIDE while counting them, and the screen says so —
+        keeping quiet would have suggested a complete list.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -6387,18 +6202,20 @@ l'a fait sortir.</p>
         brouillon = self.application.obtenir_brouillon_assistant(identifiant)
         codes = {champ["code"]
                  for champ in assistant.champs_campagne(brouillon)}
-        # ⚠ LES SANS-NUMÉRO SE COMPTENT PAR PERSONNE (14/08/2026, audit croisé).
-        # Une plage du planning peut contenir DEUX rendez-vous de la même
-        # personne : le compteur en annonçait deux, et l'écran disait donc
-        # « 2 rendez-vous sans numéro » là où une seule fiche était à compléter.
-        # Les doublons, eux, se comptent bien par ligne : c'est le nombre de
-        # rendez-vous de la plage qui ne donnent pas un contact de plus.
+        # ⚠ THOSE WITH NO NUMBER ARE COUNTED PER PERSON (14/08/2026, cross
+        # audit). A schedule range may contain TWO appointments for the same
+        # person: the counter announced two, and the screen therefore said `2
+        # appointments with no number` where a single record was to be
+        # completed. Duplicates, for their part, are indeed counted by row: it
+        # is the number of appointments in the range that do not add one more
+        # contact.
         retenus, a_completer, stop, doublons = self._trier_les_rendezvous(
             identifiants)
-        # ⚠ SA DEMANDE DU 20/08/2026 : sur une CONFIRMATION, un rendez-vous
-        # déjà confirmé n'entre pas — le rappeler pour confirmer n'apporterait
-        # rien. Le filtre est celui du produit (`ecarter_les_deja_confirmes`),
-        # appliqué ici sur les rendez-vous de la plage.
+        # ⚠ HIS REQUEST OF 20/08/2026: on a CONFIRMATION, an appointment
+        # already confirmed does not enter — calling back to confirm would
+        # bring nothing. The filter is the product's
+        # (`ecarter_les_deja_confirmes`), applied here to the range's
+        # appointments.
         deja_confirmes = 0
         if nature == "confirmation":
             gardes = []
@@ -6418,21 +6235,22 @@ l'a fait sortir.</p>
             contacts.append({"nom": rdv["nom"], "telephone": telephone,
                              "champs": valeurs, "rendezvous_id": rdv["id"]})
         if not contacts:
-            # Plus aucun rendez-vous lisible : ceux de la plage ont disparu
-            # entre la sélection et le clic (fiche supprimée, réimport).
+            # No readable appointment left: those of the range have disappeared
+            # between the selection and the click (record deleted, re-import).
             return self._reponse_plage(
                 "Plus aucun rendez-vous",
                 "<p>Les rendez-vous de cette plage n'existent plus. "
                 "Recommencez votre sélection sur le planning.</p>",
                 donnees, 409)
         brouillon["contacts"] = contacts
-        # ⚠ « planning » : la liste vient d'une plage choisie à la main, donc
-        # elle n'est pas rejouable sur un autre créneau — la recette le dit au
-        # lieu d'inventer une liste au maillon suivant.
+        # ⚠ `planning`: the list comes from a range chosen by hand, so it is
+        # not replayable on another slot — the recipe says so instead of
+        # inventing a list at the next link.
         assistant.noter_apport_recette(brouillon, "planning")
-        # ⚠ CE QUI RESTE À FAIRE, ET CE QUI EST ÉCARTÉ — dit ici aussi, avec
-        # les MÊMES mots que la fenêtre de plage : il traverse les deux écrans
-        # à la suite, et deux comptes différents lui feraient chercher l'erreur.
+        # ⚠ WHAT REMAINS TO BE DONE, AND WHAT IS SET ASIDE — said here too,
+        # with the SAME words as the range window: he goes through the two
+        # screens one after the other, and two different counts would send him
+        # hunting for the mistake.
         precisions = []
         if a_completer:
             precisions.append(
@@ -6457,11 +6275,11 @@ l'a fait sortir.</p>
         return self._rediriger(f"/assistant/message?b={identifiant}")
 
     def _traiter_plage_creneau_libere(self, corps):
-        """Ouvre l'assistant sur une campagne « créneau libéré » multi-places.
+        """Opens the assistant on a multi-slot `créneau libéré` campaign.
 
-        ⚠ ON N'APPELLE PERSONNE et on ne crée AUCUNE campagne ici : on ouvre
-        un brouillon d'assistant, avec les places déjà posées. L'opérateur
-        traverse les trois étapes comme d'habitude — c'est lui qui décide.
+        ⚠ WE CALL NOBODY and we create NO campaign here: we open an assistant
+        draft, with the slots already placed. The operator goes through the
+        three steps as usual — it is they who decide.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         places = assistant.normaliser_creneaux(donnees.get("creneau", []))
@@ -6480,11 +6298,11 @@ l'a fait sortir.</p>
         return self._rediriger(f"/assistant/message?b={identifiant}")
 
     def _jours_avec_rendezvous(self, lundi):
-        """[(date, libellé, nombre)] des jours de la semaine qui ont du monde.
+        """[(date, label, count)] of the week's days that have people.
 
-        Même source que le compte affiché dans l'entête (la grille de la
-        semaine) : deux sources donneraient deux chiffres qui se
-        contrediraient à l'écran.
+        The same source as the count shown in the header (the week's grid): two
+        sources would give two figures that would contradict each other on
+        screen.
         """
         grille = horaires.grille_semaine(self.application.base,
                                          self.application.preferences, lundi)
@@ -6499,15 +6317,15 @@ l'a fait sortir.</p>
         return jours
 
     def _modale_rappel_semaine(self, parametres):
-        """« Créer une campagne de rappel pour… » — toute la semaine, ou des jours.
+        """`Créer une campagne de rappel pour…` — the whole week, or some days.
 
-        Demandé par le propriétaire le 02/08/2026. Deux temps, côté serveur :
-        on demande d'abord QUI contacter ; la liste des jours n'apparaît
-        qu'après avoir choisi « des jours précis » — sans quoi ce serait
-        montrer les options d'une option.
+        Requested by the owner on 02/08/2026. Two stages, server-side: we ask
+        first WHO to contact; the list of days only appears after `specific
+        days` has been chosen — otherwise it would be showing the options of an
+        option.
 
-        Aucun appel n'est passé ici : le bouton final ouvre l'assistant à
-        l'étape ②, la liste déjà remplie.
+        No call is placed here: the final button opens the assistant at step ②,
+        the list already filled.
         """
         brut = parametres.get("lundi", [""])[0]
         try:
@@ -6555,13 +6373,12 @@ l'a fait sortir.</p>
 </form>""")
 
     def _traiter_rappel_semaine(self, corps):
-        """La campagne 🔔 de rappel bâtie sur une semaine ou des jours choisis.
+        """The 🔔 reminder campaign built on a week or on chosen days.
 
-        La liste est constituée MAINTENANT, sur la période choisie : ce sont
-        ces personnes-là qui seront appelées (règle du propriétaire). Les
-        clients sans numéro et les 🚫 « ne plus appeler » sont écartés et
-        comptés par la même brique que partout ailleurs — aucune règle n'est
-        réécrite ici.
+        The list is composed NOW, over the chosen period: those are the people
+        who will be called (the owner's rule). Clients with no number and the 🚫
+        `ne plus appeler` are set aside and counted by the same building block
+        as everywhere else — no rule is rewritten here.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         try:
@@ -6582,9 +6399,9 @@ l'a fait sortir.</p>
                          "revenez à « toute la semaine ».")
             periodes = [(jour, jour + datetime.timedelta(days=1))
                         for jour in sorted(jours)]
-            # ⚠ PAS de « %A » : il suit la langue du système et écrivait
-            # « Monday 03/08 » sur cette machine. Les noms de jours du
-            # produit sont dans horaires.JOURS, en français, une fois.
+            # ⚠ NO `%A`: it follows the system's language and wrote `Monday
+            # 03/08` on this machine. The product's day names are in
+            # horaires.JOURS, in French, once.
             quoi = ", ".join(
                 f"{horaires.JOURS[jour.weekday()]} {jour:%d/%m}"
                 for jour in sorted(jours))
@@ -6594,19 +6411,19 @@ l'a fait sortir.</p>
         base = self.application.base
         contacts = []
         vus = set()
-        # ⚠ LES ÉCARTÉS SE COMPTENT PAR PERSONNE, PAS PAR JOUR (14/08/2026).
-        # Cette boucle appelle la reprise UNE FOIS PAR JOUR coché et
-        # additionnait les comptes : quelqu'un qui a un rendez-vous le lundi ET
-        # le vendredi était compté deux fois, alors que la liste, elle, le
-        # dédoublonnait — l'écran se contredisait tout seul. Les ensembles se
-        # réunissent d'un jour à l'autre, et le compte vient de leur taille.
+        # ⚠ THOSE SET ASIDE ARE COUNTED PER PERSON, NOT PER DAY (14/08/2026).
+        # This loop calls the resumption ONCE PER TICKED DAY and added the
+        # counts up: somebody with an appointment on Monday AND on Friday was
+        # counted twice, while the list itself de-duplicated them — the screen
+        # contradicted itself. The sets are merged from one day to the next,
+        # and the count comes from their size.
         ecartes = {}
         for debut, fin in periodes:
             bornes = horaires.bornes_de_periode(debut, fin)
-            # « poses » : prévus ET confirmés — exactement ce que l'entête du
-            # planning compte, et ce que la fenêtre annonce jour par jour.
-            # Deux sources différentes donneraient deux chiffres qui se
-            # contredisent, et c'est ce qui rendait cette campagne vide.
+            # `poses`: scheduled AND confirmed — exactly what the schedule's
+            # header counts, and what the window announces day by day. Two
+            # different sources would give two figures that contradict each
+            # other, and that is what made this campaign empty.
             lot, _, _ = campagnes.contacts_depuis_rendezvous(
                 base, "poses", bornes[0], bornes[1], ecartes=ecartes)
             for contact in lot:
@@ -6635,9 +6452,9 @@ l'a fait sortir.</p>
                     valeurs["motif"] = rdv["motif"]
             contact["champs"] = valeurs
         brouillon["contacts"] = contacts
-        # Une période DÉSIGNE des dates : rejouer cette liste sur un autre
-        # créneau ramènerait les mêmes personnes, pas celles du nouveau.
-        # La campagne est donc marquée « choisie à la main ».
+        # A period DESIGNATES dates: replaying this list on another slot would
+        # bring back the same people, not those of the new one. So the campaign
+        # is marked `chosen by hand`.
         assistant.noter_apport_recette(brouillon, "planning")
         details = [f"{len(contacts)} personne(s) à rappeler pour {quoi}"]
         if sans_numero:
@@ -6651,13 +6468,13 @@ l'a fait sortir.</p>
 
     def _modale_planning(self, parametres, valeurs=None, erreurs=None,
                          message=""):
-        """Le contenu de la MODALE : détail d'un rendez-vous, ou d'un créneau.
+        """The MODAL's content: an appointment's detail, or a slot's.
 
-        Rendu en fragment (sans habillage) : la page ne bouge pas, seule la
-        modale se remplit. Le numéro y est MASQUÉ comme partout. Le détail
-        et l'ÉDITION sont dans la même modale : on ne change jamais d'écran
-        pour modifier un rendez-vous. `valeurs`/`erreurs` ramènent une saisie
-        refusée dans ses champs, avec ce qui cloche écrit en toutes lettres.
+        Rendered as a fragment (with no chrome): the page does not move, only
+        the modal fills. The number is MASKED there as everywhere. The detail
+        and the EDITING are in the same modal: we never change screen to modify
+        an appointment. `valeurs`/`erreurs` bring refused input back into its
+        fields, with what is wrong written in plain words.
         """
         base = self.application.base
         preferences = self.application.preferences
@@ -6721,13 +6538,13 @@ libre de tout rendez-vous, un jour qui n'est pas fermé.</p>
         return self._modale("🟩 Créneau libre", corps)
 
     def _bloc_campagne_creneau(self, debut, disponibles, pas):
-        """§5, geste 1 — « j'ai un trou, qui peut le prendre ? ».
+        """§5, gesture 1 — `I have a gap, who can take it?`.
 
-        Un clic sur une place libre (ou sur la suite de places libres qui
-        commence là) monte une campagne 📞 « Créneau libéré » SUR CETTE
-        PLACE. Le bouton ouvre l'assistant, créneau déjà rempli, à l'étape 2 :
-        aucun appel ne part d'ici. Si une campagne porte DÉJÀ ce créneau, on
-        le dit et on y mène — jamais deux campagnes pour la même place.
+        A click on a free slot (or on the run of free slots starting there)
+        sets up a 📞 `Créneau libéré` campaign ON THAT SLOT. The button opens
+        the assistant, slot already filled, at step 2: no call goes out from
+        here. When a campaign ALREADY carries that slot, we say so and lead you
+        to it — never two campaigns for the same slot.
         """
         creneau = debut.isoformat(timespec="minutes")
         deja = self._campagne_sur_le_creneau(creneau)
@@ -6750,16 +6567,11 @@ bouton ouvre l'assistant à l'étape 2, créneau déjà rempli :
 d'affilée à partir d'ici.</p>"""
 
     def _gestes_rendezvous(self, rdv, parametres):
-        """§5, gestes 2 et 3 — DÉPLACER et ANNULER, depuis le planning.
+        """§5, gestures 2 and 3 — MOVE and CANCEL, from the schedule.
 
-        Deux boutons, deux chemins bien distincts :
-        - **Déplacer** ouvre une campagne 📆 « Déplacement » sur CE
-          rendez-vous — l'assistant, à l'étape 2, contact déjà en liste ;
-        - **Annuler** applique LA RÈGLE DU PROPRIÉTAIRE — et rien d'autre :
-          `horaires.decision_annulation` tranche entre « supprimé » (à venir,
-          au-delà du seuil) et « annulé » (passé, ou en deçà du seuil). Le
-          premier clic ne fait qu'ANNONCER ce qui va se passer ; c'est le
-          second qui écrit. Aucun appel ne part d'aucun des deux.
+        Two buttons, two clearly distinct paths:
+        - **Déplacer** opens a 📆 `Déplacement` campaign on THAT appointment — the assistant, at step 2, contact already in the list;
+        - **Annuler** applies THE OWNER'S RULE — and nothing else: `horaires.decision_annulation` decides between `supprimé` (upcoming, beyond the threshold) and `annulé` (past, or within the threshold). The first click only ANNOUNCES what is going to happen; it is the second that writes. No call goes out from either.
         """
         if rdv["statut"] not in STATUTS_OCCUPANTS:
             return ('<p class="mini">Ce rendez-vous ne prend aucune place au '
@@ -6787,11 +6599,12 @@ d'affilée à partir d'ici.</p>"""
 </div>"""
 
     def _modale_annulation(self, rdv, parametres):
-        """Ce que l'annulation VA faire — annoncé AVANT d'écrire quoi que ce soit.
+        """What the cancellation IS GOING TO DO — announced BEFORE anything is
+        written.
 
-        Le texte n'est pas rédigé ici : il vient mot pour mot de
-        `horaires.decision_annulation`, la règle du propriétaire tenue en un
-        seul endroit. On ne fait que la montrer avant de l'appliquer.
+        The text is not composed here: it comes word for word from
+        `horaires.decision_annulation`, the owner's rule held in one single
+        place. All we do is show it before applying it.
         """
         preferences = self.application.preferences
         pas = horaires.pas_minutes(preferences)
@@ -6832,11 +6645,11 @@ rendez-vous exactement comme il est.</p>"""
         return self._modale("✖ Annuler ce rendez-vous", corps)
 
     def _modale_apres_annulation(self, rdv, decision, parametres):
-        """Ce que l'annulation A FAIT — et la campagne qu'elle rend possible.
+        """What the cancellation HAS DONE — and the campaign it makes possible.
 
-        C'est le maillon qui manquait à la boucle du §5 : annuler libère,
-        et la place libérée mène en UN CLIC à la campagne qui la remplira.
-        La règle n'est pas récrite ici, `decision` vient de
+        It is the link that was missing from §5's loop: cancelling frees, and
+        the freed slot leads in ONE CLICK to the campaign that will fill it.
+        The rule is not rewritten here, `decision` comes from
         `horaires.decision_annulation`.
         """
         preferences = self.application.preferences
@@ -6868,9 +6681,10 @@ l'assistant, il n'appelle personne.</p>
   <input type="hidden" name="depuis" value="annulation-tardive">
   <button class="secondaire">📞 Préparer quand même la campagne</button>
 </form></details>"""
-        # Le planning derrière la fenêtre se remet à jour tout seul : la tuile
-        # disparaît, la place repasse en vert. Un ÉLÉMENT est rechargé, jamais
-        # la page (et sans JavaScript, l'envoi ordinaire ramène la fiche).
+        # The schedule behind the window refreshes itself: the tile disappears,
+        # the slot turns green again. An ELEMENT is reloaded, never the page
+        # (and without JavaScript, the ordinary submission brings back the
+        # record).
         annee = parametres.get("annee", [""])[0]
         semaine = parametres.get("semaine", [""])[0]
         requete = urllib.parse.urlencode({"annee": annee, "semaine": semaine})
@@ -6884,13 +6698,13 @@ nouveau libres.</p>
         return self._modale("✖ Rendez-vous retiré", corps)
 
     def _traiter_annulation_modale(self, corps):
-        """Annuler un rendez-vous DEPUIS LE PLANNING — en deux temps.
+        """Cancels an appointment FROM THE SCHEDULE — in two stages.
 
-        « demander » montre ce que la règle va faire ; « confirmer »
-        l'applique. La règle elle-même n'est pas récrite : c'est
-        `horaires.decision_annulation` qui tranche, comme partout ailleurs
-        dans le produit. Sans JavaScript, on retombe sur la fiche du
-        rendez-vous, où le même geste existe déjà.
+        `demander` shows what the rule is going to do; `confirmer` applies it.
+        The rule itself is not rewritten: it is `horaires.decision_annulation`
+        that decides, as everywhere else in the product. Without JavaScript, we
+        fall back on the appointment's record, where the same gesture already
+        exists.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -6923,7 +6737,7 @@ nouveau libres.</p>
             self._modale_apres_annulation(rdv, decision, parametres), "modale")
 
     def _traiter_deplacement_campagne(self, corps):
-        """📅 → campagne 📆 « Déplacement » sur CE rendez-vous. AUCUN APPEL."""
+        """📅 → a 📆 `Déplacement` campaign on THAT appointment. NO CALLS."""
         return self._campagne_depuis_rendezvous(
             corps, "deplacement",
             "Le rendez-vous à déplacer : {qui}, {quand} — {motif}. Les "
@@ -6931,31 +6745,28 @@ nouveau libres.</p>
             "libres.")
 
     def _traiter_rappel_campagne(self, corps):
-        """📅 → campagne 🔔 « Rappel de rendez-vous » sur CE rendez-vous.
+        """📅 → a 🔔 `Rappel de rendez-vous` campaign on THAT appointment.
 
-        Demandé par le propriétaire le 02/08/2026 : « depuis le calendrier,
-        en cliquant sur un rendez-vous, on doit pouvoir créer une campagne de
-        rappel avec ce client spécifiquement ». Même chemin que le
-        déplacement, autre nature — et AUCUN appel n'est passé : l'assistant
-        s'ouvre à l'étape ②, liste déjà remplie, et il reste trois
-        validations avant qu'un téléphone sonne.
+        Requested by the owner on 02/08/2026: `from the calendar, by clicking
+        on an appointment, we should be able to create a reminder campaign with
+        that client specifically`. The same path as the move, another kind —
+        and NO call is placed: the assistant opens at step ②, list already
+        filled, and there are three validations left before a phone rings.
         """
         return self._campagne_depuis_rendezvous(
             corps, "rappel_rdv",
             "Le rendez-vous à rappeler : {qui}, {quand} — {motif}.")
 
     def _campagne_depuis_rendezvous(self, corps, nature, gabarit_message):
-        """UNE personne, celle du rendez-vous désigné — le tronc commun.
+        """ONE person, that of the designated appointment — the common trunk.
 
-        Le déplacement et le rappel ne diffèrent que par la nature et la
-        phrase affichée : deux copies de cette fonction auraient fini par
-        diverger, et c'est justement ici que se trouvent les trois refus qui
-        comptent (identifiant illisible, rendez-vous disparu, client sans
-        numéro).
+        The move and the reminder differ only by the kind and the sentence
+        displayed: two copies of this function would have ended up diverging,
+        and it is precisely here that the three refusals that matter live
+        (unreadable id, appointment gone, client with no number).
 
-        Sa recette n'a aucun critère à rejouer — elle est marquée « choisie à
-        la main », et l'écran le dit plutôt que d'inventer une liste au
-        maillon suivant.
+        Its recipe has no criterion to replay — it is marked `chosen by hand`,
+        and the screen says so rather than inventing a list at the next link.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         base = self.application.base
@@ -6994,12 +6805,12 @@ nouveau libres.</p>
 
     def _formulaire_rendezvous(self, rdv, parametres, valeurs=None,
                                erreurs=None, message=""):
-        """Le formulaire d'ÉDITION d'un rendez-vous, DANS la modale.
+        """The appointment EDIT form, INSIDE the modal.
 
-        Motif, date et heure, durée, statut — les quatre choses qu'on change
-        à la main. Chaque valeur existante s'affiche DANS son champ ; une
-        saisie refusée y revient telle qu'elle a été tapée, avec l'erreur.
-        Le statut est un SÉLECTEUR (aucun choix n'ouvre un autre écran).
+        Reason, date and time, length, status — the four things you change by
+        hand. Every existing value is displayed IN its field; refused input
+        comes back there exactly as it was typed, with the error. The status is
+        a SELECTOR (no choice opens another screen).
         """
         pas = horaires.pas_minutes(self.application.preferences)
         valeurs = valeurs or {}
@@ -7008,14 +6819,14 @@ nouveau libres.</p>
         duree = valeurs.get("duree",
                             str(horaires.duree_tranches(rdv) * pas))
         statut = valeurs.get("statut", rdv["statut"])
-        # Le geste de RETRAIT dépend de la date : « annulé » derrière nous,
-        # « supprimé » devant nous. On ne propose que celui qui a un sens.
+        # The REMOVAL gesture depends on the date: `annulé` behind us,
+        # `supprimé` ahead of us. We only offer the one that makes sense.
         decision = horaires.decision_annulation(self.application.preferences,
                                                 horaire)
         choix = [code for code in STATUTS_MODIFIABLES
                  if code not in STATUTS_RETRAIT or code == decision["statut"]]
         if rdv["statut"] not in choix:
-            choix.append(rdv["statut"])   # « déplacé » : jamais changé dans le dos
+            choix.append(rdv["statut"])  # `déplacé`: never changed behind the user's back
         options = "".join(
             f'<option value="{html.escape(code)}"'
             f'{" selected" if code == statut else ""}>{html.escape(code)}</option>'
@@ -7032,9 +6843,9 @@ nouveau libres.</p>
                             f"<ul>{elements}</ul></div>")
         bloc_message = (f'<p class="pastille st-confirme">{html.escape(message)}</p>'
                         if message else "")
-        # La semaine affichée voyage avec le formulaire : après
-        # enregistrement, c'est CETTE semaine du planning qui se remet en
-        # place — l'écran ne saute pas ailleurs.
+        # The week displayed travels with the form: after saving, it is THAT
+        # week of the schedule that is put back in place — the screen does not
+        # jump elsewhere.
         annee = parametres.get("annee", [""])[0]
         semaine = parametres.get("semaine", [""])[0]
         return f"""{bloc_erreurs}{bloc_message}
@@ -7061,11 +6872,11 @@ nouveau libres.</p>
 
     @staticmethod
     def _modale(titre, corps, classe=""):
-        """L'enveloppe commune des modales (fermeture au clic extérieur/Échap).
+        """The common wrapper of the modals (closing on an outside click / Esc).
 
-        `classe` : une classe de PLUS, pour un habillage particulier — le menu
-        de plage du planning s'en sert pour se poser sur le côté. La mécanique,
-        elle, reste la même partout : une seule fenêtre dans le produit.
+        `classe`: one EXTRA class, for a particular styling — the schedule's
+        range menu uses it to sit at the side. The mechanism itself stays the
+        same everywhere: one single window in the product.
         """
         return f"""<div class="modale{classe}" role="dialog" aria-modal="true"
      aria-label="{html.escape(titre)}">
@@ -7076,7 +6887,7 @@ nouveau libres.</p>
 </div>"""
 
     def _page_tous(self, parametres=None):
-        """TOUS les rendez-vous, du plus récent au plus ancien — rien ne se perd."""
+        """ALL the appointments, most recent to oldest — nothing is lost."""
         self.application.base.marquer_manques_echus()
         parametres = parametres or {}
         message = ""
@@ -7090,10 +6901,10 @@ nouveau libres.</p>
         for rdv in self.application.base.tous_les_rendezvous():
             telephone = (html.escape(rdv["telephone_masque"])
                          if rdv["telephone_masque"] else "<em>aucun numéro</em>")
-            # ⚠ LE LIEN VERS LA CAMPAGNE D'ORIGINE EST ICI depuis le
-            # 10/08/2026. Il ne vivait que dans « 📅 Rendez-vous à venir », qui
-            # a été retirée : cette page est devenue la SEULE liste des
-            # rendez-vous, et « d'où vient celui-là ? » doit pouvoir s'y lire.
+            # ⚠ THE LINK TO THE ORIGIN CAMPAIGN IS HERE since 10/08/2026. It
+            # lived only in `📅 Rendez-vous à venir`, which was removed: this
+            # page has become the ONLY list of appointments, and `where does
+            # that one come from?` must be readable in it.
             actions = (self._lien_campagne(rdv["id"])
                        + f'<a href="/rendezvous?id={rdv["id"]}">Voir la fiche</a>')
             if rdv["statut"] == "ignoré":
@@ -7125,18 +6936,17 @@ Un rendez-vous « ignoré » (liste vidée) se rétablit ici d'un bouton.</p>
 
     def _selecteur_theme(self, selection, mission=None, nom_client=None,
                          date_rdv=None, note_par_appel=False, note_creneau=False):
-        """Le bloc « Thème de l'appel » : sélecteur + mission pré-remplie.
+        """The `Thème de l'appel` block: a selector + a pre-filled mission.
 
-        Les gabarits, nourris par les réglages, sont embarqués dans la page :
-        changer de thème remplit la zone SANS appel serveur, et la zone
-        reste librement modifiable — c'est CE texte qui sera lu. Sans
-        JavaScript, le serveur applique le gabarit du thème choisi quand la
-        zone arrive vide.
+        The templates, fed by the settings, are embedded in the page: changing
+        theme fills the box WITHOUT a server call, and the box stays freely
+        editable — it is THAT text that will be read. Without JavaScript, the
+        server applies the chosen theme's template when the box arrives empty.
         """
         preferences = self.application.preferences
-        # Les créneaux proposés sont CALCULÉS (ouvert − pris − fermé), plus
-        # ceux ajoutés à la main : c'est cette liste qui remplace
-        # [créneaux_disponibles] dans les gabarits.
+        # The slots offered are COMPUTED (open − taken − closed), plus the ones
+        # added by hand: it is that list which replaces [créneaux_disponibles]
+        # in the templates.
         creneaux_calcules = self._creneaux_lisibles()
         gabarits = {code: themes.preremplir(code, preferences, nom_client,
                                             date_rdv, creneaux_calcules)
@@ -7180,7 +6990,7 @@ Un rendez-vous « ignoré » (liste vidée) se rétablit ici d'un bouton.</p>
   </script>"""
 
     def _page_file(self, parametres):
-        """La file d'appels : mise en file groupée, annulation, exécution, bilan."""
+        """The call queue: bulk queueing, cancellation, execution, summary."""
         self.application.base.marquer_manques_echus()
         message = ""
         try:
@@ -7226,13 +7036,12 @@ Un rendez-vous « ignoré » (liste vidée) se rétablit ici d'un bouton.</p>
             tableau_file = ("<table><tr><th>Appel</th><th>Contact</th><th>Téléphone</th>"
                             "<th>Horaire manqué</th><th>Motif</th><th></th></tr>"
                             + "\n".join(lignes) + "</table>")
-            # ⚠ LA PHRASE ENTIÈRE, PAS UN MOT GLISSÉ DEDANS (02/09/2026).
-            # Elle s'écrivait « passer {verbe} les N appel(s) », le mot
-            # variable inséré APRÈS le verbe. En français ça marche ; en
-            # anglais l'ordre des mots est l'inverse, et aucune entrée de
-            # dictionnaire ne peut le réparer — on obtenait « place REALLY
-            # the 3 calls ». On construit donc les DEUX phrases en entier :
-            # chacune se traduit comme une phrase, avec sa propre grammaire.
+            # ⚠ THE WHOLE SENTENCE, NOT A WORD SLIPPED INTO IT (02/09/2026). It
+            # was written `passer {verbe} les N appel(s)`, the variable word
+            # inserted AFTER the verb. In French that works; in English the
+            # word order is the reverse, and no dictionary entry can repair it
+            # — you got `place REALLY the 3 calls`. So we build BOTH sentences
+            # in full: each is translated as a sentence, with its own grammar.
             if self.application.mode_reel:
                 libelle_execution = (
                     f"Exécuter la file — passer RÉELLEMENT "
@@ -7271,7 +7080,7 @@ guidé.</small></p>
         return self._page("File d'appels", corps, actif="campagnes")
 
     def _page_resultat_execution(self, appels_traites, campagne_id=None):
-        """Résultats de l'exécution de la file, appel par appel + bilan."""
+        """The results of the queue run, call by call + a summary."""
         base = self.application.base
         lignes = []
         for appel_id in appels_traites:
@@ -7317,11 +7126,11 @@ guidé.</small></p>
         return self._page("Exécution terminée", corps, actif="campagnes")
 
     def _page_preparer_rappel(self, rdv_id):
-        """Préparation d'un rappel individuel : thème + mission modifiable.
+        """Preparing a single call-back: a theme + an editable mission.
 
-        Rend None si le rendez-vous n'existe pas. Un client marqué « Ne
-        plus appeler » est bloqué ICI aussi (ceinture et bretelles : le
-        planificateur refuserait de toute façon).
+        Returns None when the appointment does not exist. A client marked `Ne
+        plus appeler` is blocked HERE too (belt and braces: the planner would
+        refuse anyway).
         """
         rdv = self.application.base.obtenir_rendezvous(rdv_id)
         if rdv is None:
@@ -7350,11 +7159,12 @@ Rendez-vous : {self._cellule_horaire(rdv)} — {html.escape(rdv['motif'])}
         return self._page("Préparer le rappel", corps, actif="suivi")
 
     def _page_clients(self, parametres=None):
-        """La page « Clients » : le poste de travail des ÉTATS.
+        """The `Clients` page: the STATES workstation.
 
-        Chaque client y porte ses DEUX états (agenda et conversation), le
-        nombre de ses rendez-vous, les campagnes en cours qui le traitent, et
-        ce qu'il reste à faire. Les filtres rechargent la SEULE liste.
+        Every client carries their TWO states there (calendar and
+        conversation), their number of appointments, the running campaigns
+        handling them, and what remains to be done. The filters reload ONLY the
+        list.
         """
         parametres = parametres or {}
         message = ""
@@ -7423,21 +7233,21 @@ réversible. « Supprimer… » passe TOUJOURS par une page de
 confirmation.</small></p>"""
         return self._page("Contacts", corps, actif="clients")
 
-    # Combien de contacts par page. « 0 » = tous — l'écran l'écrit « tous »,
-    # parce qu'un « 0 par page » se lirait comme « aucun ».
+    # How many contacts per page. `0` = all — the screen writes `tous`, because
+    # a `0 per page` would read as `none`.
     PAR_PAGE_CHOIX = (10, 25, 50, 100, 0)
     PAR_PAGE_DEFAUT = 25
 
     @staticmethod
     def _navigation_pages(page, pages, combien, total):
-        """« ≪ ‹ page 2 sur 7 › ≫ » — quatre vrais boutons d'envoi.
+        """`≪ ‹ page 2 of 7 › ≫` — four real submit buttons.
 
-        ⚠ ILS PORTENT « name=page » : sans JavaScript, cliquer envoie le
-        formulaire des filtres avec ce numéro, et la liste se recharge comme
-        d'habitude. Le script, lui, emporte le bouton cliqué.
+        ⚠ THEY CARRY `name=page`: without JavaScript, clicking sends the
+        filters form with that number, and the list reloads as usual. The
+        script, for its part, carries along the button clicked.
 
-        ⚠ ET ILS SONT DÉSACTIVÉS AUX EXTRÉMITÉS, jamais masqués : un bouton qui
-        disparaît fait douter de l'endroit où l'on est.
+        ⚠ AND THEY ARE DISABLED AT THE ENDS, never hidden: a button that
+        disappears makes you doubt where you are.
         """
         if pages <= 1:
             return ""
@@ -7457,12 +7267,12 @@ confirmation.</small></p>"""
 </p>"""
 
     def _champs_filtres_clients(self, parametres):
-        """Les trois filtres : recherche par nom, état, et « non traité ».
+        """The three filters: name search, state, and `non traité`.
 
-        UN SEUL sélecteur pour l'état (agenda et conversation dans deux
-        groupes) — pas une pile de boutons radio, puisqu'aucun choix
-        n'ouvre un écran différent. La case « non traité » garde son
-        contrôle AVANT le texte et ne prend pas toute la largeur.
+        ONE SINGLE selector for the state (calendar and conversation in two
+        groups) — not a stack of radio buttons, since no choice opens a
+        different screen. The `non traité` box keeps its control BEFORE the
+        text and does not take the full width.
         """
         recherche = parametres.get("recherche", [""])[0]
         etat = parametres.get("etat", [""])[0]
@@ -7491,7 +7301,7 @@ confirmation.</small></p>"""
             for taille in self.PAR_PAGE_CHOIX)
         return f"""<label>Rechercher un contact — nom ou numéro<br>
     <input type="search" name="recherche" value="{html.escape(recherche)}"
-           placeholder="Lefèvre, ou 0600000042"></label>
+           placeholder="Lefèvre, ou 0639985042"></label>
   <label>Contact par l'agent<br>
     <select name="interdit">
       <option value=""{" selected" if not interdit else ""}>tous</option>
@@ -7512,7 +7322,8 @@ confirmation.</small></p>"""
            {"checked" if non_traite else ""}> non traité</label>"""
 
     def _liste_clients(self, parametres=None, fiches=None):
-        """Le FRAGMENT « liste des contacts » — c'est LUI que les filtres rechargent."""
+        """The `contacts list` FRAGMENT — it is THAT which the filters reload.
+        """
         parametres = parametres or {}
         if fiches is None:
             fiches = etats_clients.tableau_clients(self.application.base,
@@ -7540,14 +7351,14 @@ confirmation.</small></p>"""
                   + ".</p>")
         creation = self._boutons_creation_campagne(retenues, etat, recherche,
                                                    non_traite)
-        # ⚠ LA PAGE EST BORNÉE PAR LE RÉSULTAT, pas par ce qu'on a demandé :
-        # un numéro de page hérité d'un filtre plus large aurait montré une
-        # liste vide, comme si le filtre ne trouvait personne.
+        # ⚠ THE PAGE IS BOUNDED BY THE RESULT, not by what was asked for: a
+        # page number inherited from a broader filter would have shown an empty
+        # list, as though the filter found nobody.
         par_page = _entier(parametres.get("par_page"), self.PAR_PAGE_DEFAUT)
         if par_page not in self.PAR_PAGE_CHOIX:
             par_page = self.PAR_PAGE_DEFAUT
         pages = 1 if not par_page else max(
-            1, -(-len(retenues) // par_page))     # division qui arrondit en haut
+            1, -(-len(retenues) // par_page))  # division rounding up
         page = min(max(_entier(parametres.get("page"), 1), 1), pages)
         if par_page:
             visibles = retenues[(page - 1) * par_page:page * par_page]
@@ -7569,22 +7380,18 @@ confirmation.</small></p>"""
         return creation + entete + navigation + tableau + navigation
 
     def _boutons_creation_campagne(self, retenues, etat, recherche, non_traite):
-        """§4 — « ➕ Créer la campagne … — N clients concernés ».
+        """§4 — `➕ Créer la campagne … — N clients concernés`.
 
-        Règle d'apparition, mot pour mot : le filtre porte sur un état à
-        traiter, l'option « non traité » est cochée, la sélection n'est pas
-        vide. La NATURE n'est pas choisie ici : elle est déduite de l'état
-        par `etats_clients.TRAITEMENT` (la table du §3, jamais recopiée).
+        The appearance rule, word for word: the filter is on a state to be
+        handled, the `non traité` option is ticked, the selection is not empty.
+        The KIND is not chosen here: it is deduced from the state by
+        `etats_clients.TRAITEMENT` (the §3 table, never copied).
 
-        Décision du propriétaire (31/07/2026) : quand la sélection mêle des
-        états traités par des campagnes différentes, on montre UN BOUTON PAR
-        NATURE, chacun avec son propre compte — jamais un bouton grisé qui
-        laisserait deviner. Les états qu'aucune campagne ne traite ne
-        donnent aucun bouton, mais disent pourquoi (§6) : sans cette phrase,
-        l'absence de bouton ressemblerait à un oubli.
-
-        Ce bloc fait partie du FRAGMENT de liste : il apparaît et disparaît
-        avec le filtre, sans que la page soit rechargée.
+        Owner's decision (31/07/2026): when the selection mixes states handled
+        by different campaigns, we show ONE BUTTON PER KIND, each with its own
+        count — never a greyed-out button leaving the user to guess. The states
+        no campaign handles give no button, but say why (§6): without that
+        sentence, the absence of a button would look like an oversight.
         """
         if not non_traite or not retenues:
             return ""
@@ -7597,9 +7404,9 @@ confirmation.</small></p>"""
             infobulle = (f"Depuis l'état : {etats}. Ouvre l'assistant à "
                          "l'étape 2, la liste déjà remplie — aucun appel "
                          "n'est passé.")
-            # Le libellé du bouton tient sur UNE ligne à dessein : c'est ce
-            # que l'écran lit, et ce que les essais cherchent — un retour à
-            # la ligne dans le texte du bouton en ferait deux morceaux.
+            # The button's label fits on ONE line on purpose: it is what the
+            # screen reads, and what the tests look for — a line break in the
+            # button's text would make it two pieces.
             boutons.append(
                 '<form method="post" action="/clients/campagne">'
                 '<input type="hidden" name="nature" '
@@ -7626,13 +7433,12 @@ confirmation.</small></p>"""
         return bloc
 
     def _traiter_campagne_depuis_etat(self, corps):
-        """👥 → l'assistant à l'ÉTAPE 2, liste déjà remplie. AUCUN APPEL.
+        """👥 → the assistant at STEP 2, list already filled. NO CALLS.
 
-        Le geste du §4 : la nature vient de l'état filtré, la liste vient du
-        même filtre, et la RECETTE garde le critère (mode « etat ») pour que
-        la campagne reste rejouable — c'est ce qui fait marcher la cascade.
-        Rien n'est créé en base tant que les trois étapes ne sont pas
-        validées.
+        The §4 gesture: the kind comes from the filtered state, the list comes
+        from the same filter, and the RECIPE keeps the criterion (mode `etat`)
+        so the campaign stays replayable — that is what makes the cascade work.
+        Nothing is created in the database until the three steps are validated.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         nature = donnees.get("nature", [""])[0]
@@ -7659,12 +7465,12 @@ confirmation.</small></p>"""
                      "prendre ces clients entre-temps). Revenez à 👥 Contacts, "
                      "le compte y sera à jour.")
         brouillon["contacts"] = contacts
-        # La recette retient le CRITÈRE, pas les personnes (§8.3).
+        # The recipe remembers the CRITERION, not the people (§8.3).
         assistant.noter_apport_recette(brouillon, "etat", etat=etat,
                                        nature=nature, recherche=recherche)
-        # La phrase « liste déjà remplie » est écrite par l'étape 2 elle-même
-        # (une seule fois, à partir de la recette) : ici on ne garde que ce
-        # qu'elle ne dit pas — les écartés, comptés.
+        # The `list already filled` sentence is written by step 2 itself (once,
+        # from the recipe): here we keep only what it does not say — those set
+        # aside, counted.
         if complements:
             brouillon["message"] = " ; ".join(complements) + "."
         journal.info("👥 Contacts → assistant : brouillon ouvert à l'étape 2 "
@@ -7673,16 +7479,17 @@ confirmation.</small></p>"""
         return self._rediriger(f"/assistant/message?b={identifiant}")
 
     def _ligne_client(self, fiche):
-        """Une ligne du tableau des clients, avec son identifiant d'élément.
+        """One row of the clients table, with its element id.
 
-        C'est CETTE ligne — et elle seule — qui se remplit à nouveau après
-        une modification dans la modale : jamais la liste, jamais la page.
+        It is THAT row — and it alone — that is filled again after a change in
+        the modal: never the list, never the page.
         """
         return (f'<tr id="client-{fiche["client"]["id"]}">'
                 + self._cellules_client(fiche) + "</tr>")
 
     def _cellules_client(self, fiche):
-        """Le CONTENU d'une ligne client : tout ce que la base sait de lui."""
+        """The CONTENT of a client row: everything the database knows about them.
+        """
         client = fiche["client"]
         resume = fiche["resume"]
         telephone = (html.escape(client["telephone_masque"])
@@ -7699,10 +7506,11 @@ confirmation.</small></p>"""
     <input type="hidden" name="valeur" value="1">
     <button class="secondaire" title="Exclut ce client de la file, des cascades et des listes (réversible)">Ne plus appeler</button>
   </form>"""
-        # ⚠ LE DRAPEAU PLUS DOUX, et il se dit à part du 🚫 : la personne reste
-        # appelable pour SES rendez-vous, elle refuse seulement qu'on lui
-        # propose des places libérées. Les confondre à l'écran, c'est croire
-        # qu'on a coupé le téléphone à quelqu'un qui ne l'a pas demandé.
+        # ⚠ THE GENTLER FLAG, and it is stated separately from the 🚫: the
+        # person is still callable about THEIR OWN appointments, they only
+        # refuse to be offered freed slots. Confusing the two on screen means
+        # believing you have cut off the phone to somebody who did not ask for
+        # it.
         if client["plus_de_proposition"]:
             bascule += f"""<p class="pastille st-ignore">🔇 Ne veut plus qu'on lui
   propose de créneau libéré — demandé au téléphone. Elle reste appelable pour
@@ -7716,18 +7524,18 @@ confirmation.</small></p>"""
                         'd\'essai — donnée fictive, retirable depuis les '
                         'réglages">🧪 jeu d\'essai</span>'
                         if client["jeu_essai"] else "")
-        # Le 🧪 numéro d'essai est un AUTRE marquage que le jeu d'essai : une
-        # fiche peut porter les deux (une identité d'essai réel), ou l'un
-        # sans l'autre (un vrai client à qui on aurait donné ce numéro).
+        # The 🧪 test number is a DIFFERENT marking from the sample data set: a
+        # record may carry both (a real-test identity), or one without the
+        # other (a real client who happened to be given that number).
         marque_essai += essai_reel.badge(client, "<br>")
         badge_stop = ('<br><span class="badge-stop">🚫 ne plus appeler</span>'
                       if client["ne_plus_appeler"] else "")
-        # ⚠ UN NOMBRE, PAS UN DÉTAIL (demande du propriétaire, 02/08/2026) :
-        # ces deux colonnes étalaient prochain/dernier/compteurs et la liste
-        # complète des campagnes, ce qui donnait des lignes de six lignes de
-        # haut. Le nombre suffit à l'écran ; le détail s'ouvre en fenêtre.
-        # Le lien mène TOUJOURS à la fiche pleine page : sans JavaScript, le
-        # repli est entier, et cette fiche montre déjà les deux contenus.
+        # ⚠ A NUMBER, NOT A DETAIL (owner's request, 02/08/2026): those two
+        # columns spread out next/last/counters and the complete list of
+        # campaigns, which gave rows six lines tall. The number is enough on
+        # screen; the detail opens in a window. The link ALWAYS leads to the
+        # full-page record: without JavaScript the fallback is complete, and
+        # that record already shows both contents.
         colonne_rdv = _nombre_cliquable(
             client["nb_rendezvous"], client["id"], "detail-rendezvous",
             "Voir tous ses rendez-vous")
@@ -7760,18 +7568,18 @@ confirmation.</small></p>"""
             else:
                 marque = '<span class="pastille st-manque">⚠ non traité</span>'
             a_faire.append(f"{html.escape(besoin['action'])} {marque}")
-        # Un état qui ne débouche sur AUCUNE campagne dit POURQUOI : sans
-        # cela, « 📞 le client rappellera » se confondrait avec « 🔄 à
-        # reprogrammer », alors que les deux sont exactement inverses.
+        # A state leading to NO campaign says WHY: without that, `📞 le client
+        # rappellera` would be confused with `🔄 à reprogrammer`, when the two
+        # are exactly opposite.
         if fiche.get("sans_campagne"):
             a_faire.append('<span class="pastille st-ignore">📞 il reprend '
                            "contact lui-même</span><br><small>"
                            + html.escape(fiche["sans_campagne"]) + "</small>")
         if not a_faire:
             a_faire = ['<span class="sourd">rien à faire</span>']
-        # Le lien mène TOUJOURS à la fiche pleine page (le repli sans
-        # JavaScript reste entier) ; quand JavaScript est là, c'est la
-        # MODALE qui s'ouvre et l'écran ne change pas.
+        # The link ALWAYS leads to the full-page record (the no-JavaScript
+        # fallback stays complete); when JavaScript is there, it is the MODAL
+        # that opens and the screen does not change.
         return f"""
   <td><a href="/clients/fiche?id={client['id']}"
         data-modale="/clients/detail?id={client['id']}"
@@ -7787,11 +7595,11 @@ confirmation.</small></p>"""
       <a href="/clients/supprimer?id={client['id']}">Supprimer…</a></td>"""
 
     def _page_fiche_client(self, client_id, valeurs=None, erreurs=None):
-        """La fiche d'un client : son dossier ET le formulaire d'édition.
+        """A client's record: their file AND the edit form.
 
-        Rend None si le client n'existe pas. Le numéro n'est JAMAIS
-        réaffiché en clair (même ici) : le champ reste vide, et le laisser
-        vide garde le numéro tel quel — c'est dit à l'écran.
+        Returns None when the client does not exist. The number is NEVER
+        redisplayed in clear (even here): the field stays empty, and leaving it
+        empty keeps the number as it is — that is said on screen.
         """
         base = self.application.base
         client = base.obtenir_client(client_id)
@@ -7843,19 +7651,19 @@ pour <strong>un</strong> rendez-vous.</small></p>
 
     @staticmethod
     def _champs_client(client, nom, telephone, coche):
-        """Les trois champs modifiables d'un client — la MÊME chose dans la
-        modale et dans la fiche pleine page, écrites une seule fois.
+        """A client's three editable fields — the SAME thing in the modal and in
+        the full-page record, written once.
 
-        Le numéro fait exception à la règle « la valeur existante s'affiche
-        DANS son champ » : le masquage prime, alors le champ reste vide, le
-        numéro masqué est rappelé juste à côté, et l'écran dit que le laisser
-        vide garde le numéro. La case 🚫 garde son contrôle AVANT le texte et
-        ne prend jamais toute la largeur.
+        The number is the exception to the rule `the existing value is
+        displayed IN its field`: masking wins, so the field stays empty, the
+        masked number is recalled right beside it, and the screen says that
+        leaving it empty keeps the number. The 🚫 box keeps its control BEFORE
+        the text and never takes the full width.
         """
         return f"""  <label>Nom du contact (deux caractères minimum)<br>
     <input name="nom" value="{html.escape(nom)}" required></label>
   <label>Numéro de téléphone — format attendu : 10 chiffres commençant par 0,
-    ou +33 suivi de 9 chiffres (exemple fictif : +33 6 00 00 00 42)<br>
+    ou +33 suivi de 9 chiffres (exemple fictif : +33 6 39 98 50 42)<br>
     <input name="telephone" value="{html.escape(telephone)}"
            placeholder="laisser vide pour garder le numéro actuel"></label>
   <p class="ligne-option"><small>Numéro actuel :
@@ -7868,11 +7676,11 @@ pour <strong>un</strong> rendez-vous.</small></p>
            {"checked" if coche else ""}> 🚫 ne plus appeler</label></p>"""
 
     def _modale_client(self, client_id, valeurs=None, erreurs=None):
-        """Le DOSSIER d'un client en modale : ses états ET son édition.
+        """A client's FILE in a modal: their states AND their editing.
 
-        C'est le chemin normal depuis 👥 Contacts — on ne quitte pas l'écran
-        pour modifier quelqu'un. Rend None si le client n'existe plus. La
-        fiche pleine page (/clients/fiche) reste le repli sans JavaScript.
+        That is the normal path from 👥 Contacts — you do not leave the screen
+        to modify somebody. Returns None when the client no longer exists. The
+        full-page record (/clients/fiche) remains the no-JavaScript fallback.
         """
         base = self.application.base
         client = base.obtenir_client(client_id)
@@ -7911,16 +7719,17 @@ pour <strong>un</strong> rendez-vous.</small></p>
         return self._modale(f"👥 {html.escape(client['nom'])}", corps)
 
     def _fiche_de(self, client_id):
-        """La fiche calculée d'UN client, ou None s'il n'existe plus."""
+        """ONE client's computed record, or None when they no longer exist."""
         fiches = etats_clients.tableau_clients(self.application.base,
                                                self.application.preferences)
         return next((f for f in fiches if f["client"]["id"] == client_id), None)
 
     def _modale_campagnes_client(self, client_id):
-        """Les campagnes qui contiennent ce client — le détail sorti du tableau.
+        """The campaigns containing this client — the detail taken out of the
+        table.
 
-        Il tenait dans une cellule et faisait six lignes de haut par client.
-        Il est ici, entier, au clic sur le nombre.
+        It fitted into a cell and made rows six lines tall per client. It is
+        here, in full, on a click on the number.
         """
         fiche = self._fiche_de(client_id)
         if fiche is None:
@@ -7945,11 +7754,11 @@ pour <strong>un</strong> rendez-vous.</small></p>
         return self._modale(f"Campagnes — {html.escape(nom)}", corps)
 
     def _modale_rendezvous_client(self, client_id):
-        """Tous ses rendez-vous, du plus récent au plus ancien.
+        """All their appointments, most recent to oldest.
 
-        La colonne ne montre plus que leur nombre ; le détail (prochain,
-        dernier, statuts) est ici, et il est même plus complet qu'avant :
-        c'est la liste elle-même, pas un résumé.
+        The column now shows only their number; the detail (next, last,
+        statuses) is here, and it is even more complete than before: it is the
+        list itself, not a summary.
         """
         base = self.application.base
         client = base.obtenir_client(client_id)
@@ -7977,7 +7786,7 @@ pour <strong>un</strong> rendez-vous.</small></p>
             f"Rendez-vous — {html.escape(client['nom'])}", corps)
 
     def _resume_etats_client(self, fiche):
-        """Les deux états d'un client, ses campagnes en cours et ses besoins."""
+        """A client's two states, their running campaigns and their needs."""
         if fiche is None:
             return ""
         campagnes_lisibles = "".join(
@@ -8007,7 +7816,7 @@ pour <strong>un</strong> rendez-vous.</small></p>
             + "</li>" for besoin in fiche["besoins"])
         bloc_besoins = (f"<p>Ce qu'il reste à faire :</p><ul>{besoins}</ul>"
                         if besoins else "<p>Rien à faire pour lui.</p>")
-        # Pourquoi rien n'est à faire, quand l'état l'explique lui-même.
+        # Why there is nothing to do, when the state explains it itself.
         if fiche.get("sans_campagne"):
             bloc_besoins += ('<p class="pastille st-ignore">📞 '
                              + html.escape(fiche["sans_campagne"]) + "</p>")
@@ -8021,7 +7830,7 @@ pour <strong>un</strong> rendez-vous.</small></p>
 {bloc_besoins}"""
 
     def _page_confirmer_suppression(self, client_id):
-        """La page de confirmation AVANT suppression — jamais en un clic."""
+        """The confirmation page BEFORE deletion — never in one click."""
         client = self.application.base.obtenir_client(client_id)
         if client is None:
             return None
@@ -8047,25 +7856,23 @@ Rendez-vous qui seront supprimés avec lui :
     def _formulaires_appels(self, action="/reglages/enregistrer",
                             bouton="Enregistrer", icones=True,
                             id_formulaire=""):
-        """Les CINQ formulaires de « 📞 Appels », rendus une seule fois.
+        """The FIVE `📞 Appels` forms, rendered once.
 
-        Ils servent à DEUX écrans : la page ⚙ Réglages, et l'installeur du
-        premier lancement — qui fait remplir exactement les mêmes réglages.
-        Les dupliquer aurait garanti qu'ils divergent ; ils sont donc écrits
-        ici, avec leur adresse d'envoi et leur libellé de bouton en
-        paramètre.
+        They serve TWO screens: the ⚙ Réglages page, and the first-run
+        installer — which has exactly the same settings filled in. Duplicating
+        them would have guaranteed they diverge; so they are written here, with
+        their submission URL and their button label as parameters.
 
-        `bouton` vide = AUCUN bouton d'envoi : l'installeur n'en a plus, son
-        pied fixe soumet le formulaire par son identifiant (03/08/2026).
-        `icones` = False retire le pictogramme des titres, pour l'installeur
-        seulement. `id_formulaire` nomme le formulaire pour que ce pied puisse
-        le viser.
+        An empty `bouton` = NO submit button: the installer no longer has one,
+        its fixed footer submits the form by its id (03/08/2026). `icones` =
+        False removes the pictogram from the titles, for the installer only.
+        `id_formulaire` names the form so that footer can target it.
 
-        Rend un dictionnaire {code de sous-partie: HTML}.
+        Returns a dictionary {sub-part code: HTML}.
         """
         preferences = self.application.preferences
         def picto(signe):
-            """Le pictogramme du titre, ou rien du tout."""
+            """The title's pictogram, or nothing at all."""
             return f"{signe} " if icones else ""
         ouvre = (f'<form method="post" action="{action}" class="carte"'
                  + (f' id="{id_formulaire}"' if id_formulaire else "") + ">")
@@ -8084,10 +7891,10 @@ Rendez-vous qui seront supprimés avec lui :
             assistant.CLE_RELANCE_CRENEAU_FIN) or ""
         seuil_remplacement = horaires.seuil_remplacement(preferences)
         delais = calle_client.delais_regles(preferences)
-        # ⚠ CINQ SOUS-PARTIES, CINQ FORMULAIRES. Chacun n'envoie que SES
-        # champs, et _traiter_reglages ne touche qu'aux réglages reçus
-        # (absent = inchangé). Un formulaire unique de cent lignes forçait à
-        # traverser six sujets sans rapport pour en corriger un.
+        # ⚠ FIVE SUB-PARTS, FIVE FORMS. Each sends only ITS fields, and
+        # _traiter_reglages only touches the settings received (absent =
+        # unchanged). A single hundred-line form forced you to cross six
+        # unrelated subjects to correct one.
         sous_identite = f"""<h2 id="identite">{picto("🏷")}Identité de l'établissement</h2>
 {ouvre}
   <label>Nom de l'entreprise — remplace [entreprise] dans les missions<br>
@@ -8221,12 +8028,11 @@ Rendez-vous qui seront supprimés avec lui :
                 "delais": sous_delais}
 
     def _page_reglages(self, parametres=None, erreurs=None):
-        """La page « ⚙ Réglages » : entreprise, créneaux, plage d'appel.
+        """The `⚙ Réglages` page: business, slots, calling window.
 
-        Ces réglages nourrissent les gabarits de mission ([entreprise],
-        [créneaux_disponibles], [plage_rappel]) et le garde-fou de plage
-        horaire. Stockés dans donnees/preferences.json, comme le dernier
-        choix d'ordre de cascade.
+        These settings feed the mission templates ([entreprise],
+        [créneaux_disponibles], [plage_rappel]) and the time-window guard.
+        Stored in donnees/preferences.json, like the last cascade order chosen.
         """
         parametres = parametres or {}
         preferences = self.application.preferences
@@ -8318,10 +8124,10 @@ c'est le même produit, présenté autrement.</p>
     ("calle", "🔌 CALL-E", [
         ("calle", "La clé et les verrous", self._bloc_calle())]),
     ("essai", "🧪 Essais", [
-        # ⚠ L'AGENDA D'EXEMPLE EST DANS « Jeu d'essai » (15/08/2026, sa
-        # demande). Les deux fabriquent la même chose — de quoi essayer sans
-        # toucher aux vraies données — et les séparer obligeait à chercher
-        # dans deux sous-parties ce qui se fait d'un même geste.
+        # ⚠ THE SAMPLE CALENDAR IS IN `Jeu d'essai` (15/08/2026, his request).
+        # Both build the same thing — enough to try things without touching
+        # real data — and separating them meant hunting through two sub-parts
+        # for what is done with a single gesture.
         ("jeu-essai", "Jeu d'essai", self._bloc_jeu_essai()),
         ("renvoi-essai", "Toujours mon numéro", self._section_renvoi_essai()),
         ("numero-essai", "Testeurs", self._section_testeurs()),
@@ -8346,20 +8152,20 @@ bascule();
         return self._page("Réglages", corps, actif="reglages")
 
     def _bloc_calle(self, message="", refus="", retour=""):
-        """La partie « 🔌 CALL-E » : l'état de la clé, le champ, et c'est tout.
+        """The `🔌 CALL-E` part: the key's state, the field, and that is all.
 
-        ⚠ REFAITE LE 10/08/2026, sur demande du propriétaire : « toute
-        l'histoire des trois verrous on supprime, ce qu'on veut ici c'est la clé
-        et c'est tout ». La liste des trois verrous, les paragraphes sur le
-        stockage, l'adresse de l'API et ses variables d'environnement : tout
-        cela a quitté l'écran pour la procédure repliée.
+        ⚠ REDONE ON 10/08/2026, at the owner's request: `the whole three-locks
+        story, we remove it, what we want here is the key and that is all`. The
+        list of the three locks, the paragraphs about storage, the API address
+        and its environment variables: all of that has left the screen for the
+        collapsed procedure.
 
-        ⚠ LES VERROUS EUX-MÊMES N'ONT PAS BOUGÉ. C'est leur RÉCIT qui part. Ce
-        qu'il faut faire pour que les appels partent vraiment est la DERNIÈRE
-        étape de la procédure — là où on en a besoin, et nulle part ailleurs.
+        ⚠ THE LOCKS THEMSELVES HAVE NOT MOVED. It is their TELLING that goes.
+        What must be done for the calls to really go out is the LAST step of
+        the procedure — where it is needed, and nowhere else.
         """
         etat = calle_client.etat_de_la_cle()
-        # ① L'état, en une ligne. Trois cas, et pas un de plus.
+        # ① The state, in one line. Three cases, and not one more.
         if not etat["presente"]:
             pastille = ("<p>Aucune clé enregistrée — les appels sont "
                         "<strong>simulés</strong>.</p>")
@@ -8371,12 +8177,12 @@ bascule();
             pastille = ('<p class="pastille">✅ Clé enregistrée '
                         f'({html.escape(etat["description"])}), fournie par '
                         f'{html.escape(etat["source"])}.</p>')
-        # ⚠ LA CLÉ RANGÉE QUI NE SERT PAS (03/09/2026). La variable
-        # d'environnement gagne contre le fichier — c'est voulu — mais rien
-        # ne le disait : coller une clé ici pouvait n'avoir AUCUN effet,
-        # l'écran affichant tranquillement « clé enregistrée ». Le jour où une
-        # campagne s'arrête sur un refus, on recolle sa clé, on relance, et on
-        # obtient le même refus sans comprendre.
+        # ⚠ THE STORED KEY THAT IS NOT USED (03/09/2026). The environment
+        # variable beats the file — that is intended — but nothing said so:
+        # pasting a key here could have NO effect, while the screen calmly
+        # displayed `key saved`. The day a campaign stops on a refusal, you
+        # re-paste your key, restart, and get the same refusal without
+        # understanding.
         if etat.get("ignoree"):
             pastille += (
                 '<div class="erreurs"><strong>⚠ La clé enregistrée ici n\'est '
@@ -8402,9 +8208,9 @@ bascule();
 </form>"""
         url = (os.environ.get(calle_client.AppelReel.VARIABLE_URL)
                or calle_client.AppelReel.URL_DEFAUT)
-        # ② LA PROCÉDURE, repliée. « Lien et démarche de bout en bout », dit la
-        # demande : les étapes vont donc jusqu'au lancement en mode réel — sans
-        # elle, on aurait une clé et rien qui part.
+        # ② THE PROCEDURE, collapsed. `A link and an end-to-end walkthrough`,
+        # says the request: the steps therefore go all the way to launching in
+        # real mode — without that, you would have a key and nothing going out.
         procedure = _aide("Comment obtenir une clé CALL-E ?", f"""<ol>
   <li>Créez un compte sur <code>heycall-e.com</code>.</li>
   <li>Ouvrez le tableau de bord <code>dashboard.heycall-e.com</code>,
@@ -8440,17 +8246,17 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
 {retrait}"""
 
     def _traiter_cle_calle(self, corps):
-        """Range la clé collée — après contrôle de forme, jamais avant.
+        """Stores the pasted key — after the shape check, never before.
 
-        ⚠ LE REFUS NE CITE JAMAIS LA CLÉ : `valider_forme_cle` la décrit. Une
-        clé fausse recopiée dans un message d'erreur finirait dans une capture
-        d'écran ou un rapport de bogue.
+        ⚠ THE REFUSAL NEVER QUOTES THE KEY: `valider_forme_cle` describes it. A
+        wrong key copied into an error message would end up in a screenshot or
+        a bug report.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         brut = donnees.get("cle", [""])[0]
-        # ⚠ ON REVIENT OÙ L'ON ÉTAIT. Le même formulaire sert dans ⚙ Réglages
-        # et dans l'installeur : renvoyer toujours aux Réglages faisait SORTIR
-        # du parcours de configuration, au milieu.
+        # ⚠ WE COME BACK WHERE WE WERE. The same form serves in ⚙ Réglages and
+        # in the installer: always sending the user back to the Settings meant
+        # LEAVING the configuration journey, in the middle.
         retour = donnees.get("retour", [""])[0]
         if not brut.strip():
             return self._refus_cle(
@@ -8464,10 +8270,10 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
         return self._rediriger("/reglages?fait=cle#calle")
 
     def _refus_cle(self, raison, retour):
-        """Le refus, sur l'écran d'où venait la saisie — jamais sur l'autre.
+        """The refusal, on the screen the input came from — never on the other.
 
-        Chacun des deux écrans a déjà sa façon d'afficher un refus : on
-        emprunte la sienne, au lieu d'en inventer une troisième.
+        Each of the two screens already has its own way of showing a refusal:
+        we borrow theirs, instead of inventing a third.
         """
         if retour:
             return self._repondre(
@@ -8475,7 +8281,7 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
         return self._repondre(self._page_reglages(erreurs=[raison]), 400)
 
     def _traiter_retrait_cle_calle(self, corps):
-        """Supprime le fichier de clé. La variable, elle, n'est pas touchée."""
+        """Deletes the key file. The variable, for its part, is not touched."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         calle_client.retirer_cle()
         retour = donnees.get("retour", [""])[0]
@@ -8485,7 +8291,7 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
         return self._rediriger("/reglages?fait=cle-retiree#calle")
 
     def _traiter_discours(self, corps):
-        """La page ⚙ Réglages enregistre les textes d'ouverture."""
+        """The ⚙ Réglages page saves the opening texts."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         erreurs = self._appliquer_discours(donnees)
         if erreurs:
@@ -8493,16 +8299,16 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
         return self._rediriger("/reglages?fait=1#discours")
 
     def _appliquer_discours(self, donnees):
-        """Écrit les textes d'ouverture reçus ; rend la liste des refus.
+        """Writes the opening texts received; returns the list of refusals.
 
-        Un texte qui contient un NUMÉRO DE TÉLÉPHONE est refusé : ce texte
-        part mot pour mot à l'agent, et un numéro dicté au téléphone est
-        exactement ce que le produit s'interdit partout ailleurs. Le refus
-        cite la nature en cause, et RIEN n'est enregistré — la saisie
-        revient telle qu'elle a été tapée.
+        A text containing a PHONE NUMBER is refused: that text goes to the
+        agent word for word, and a number dictated on the phone is exactly what
+        the product forbids itself everywhere else. The refusal names the kind
+        at fault, and NOTHING is saved — the input comes back exactly as it was
+        typed.
 
-        Séparé de la réponse HTTP pour que l'installeur du premier
-        lancement écrive par le MÊME chemin que la page ⚙ Réglages.
+        Separated from the HTTP answer so that the first-run installer writes
+        through the SAME path as the ⚙ Réglages page.
         """
         fautifs, a_ecrire = [], {}
         for nature, definition in assistant.NATURES.items():
@@ -8524,9 +8330,9 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
                      len(a_ecrire))
         return []
 
-    # Les options réglables par nature, avec leur libellé d'écran. L'ordre
-    # est celui du formulaire de campagne : on retrouve les mêmes mots au
-    # même endroit, ce qui évite d'avoir à traduire mentalement.
+    # The options configurable per kind, with their screen label. The order is
+    # the campaign form's: you find the same words in the same place, which
+    # saves having to translate mentally.
     LIBELLES_COMPORTEMENT = (
         ("recontacter", "🔁 Recontacter si non joignable"),
         ("liberer_creneau",
@@ -8537,15 +8343,15 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
     )
 
     def _sous_options_relance(self, nature, options):
-        """Le détail des relances — montré seulement si « Recontacter » l'est.
+        """The follow-up detail — shown only when `Recontacter` is.
 
-        Les mêmes quatre réglages que le formulaire de campagne, aux mêmes
-        mots : quand rappeler, le délai OU le créneau, et le plafond. Sans
-        eux, cocher « Recontacter » ici ne réglait rien de ce qui compte.
+        The same four settings as the campaign form, in the same words: when to
+        call back, the delay OR the window, and the ceiling. Without them,
+        ticking `Recontacter` here settled none of what matters.
 
-        Les valeurs de départ sont celles des réglages GÉNÉRAUX (⚙ Réglages →
-        📞 Appels → Relances) : ce n'est pas une seconde source, c'est la
-        même, qu'une nature peut ensuite décaler pour elle seule.
+        The starting values are those of the GENERAL settings (⚙ Réglages → 📞
+        Appels → Relances): it is not a second source, it is the same one,
+        which a kind can then shift for itself alone.
         """
         mode = options.get("relance_mode") or "delai"
         prefixe = f"regl_{nature}"
@@ -8577,15 +8383,15 @@ viser un autre serveur que celui de CALL-E.</small></p>""")
 </div>"""
 
     def _script_comportement(self):
-        """Le dévoilement en cascade des écrans « options par nature ».
+        """The cascading disclosure of the `options per kind` screens.
 
-        Un écran par nature, donc des identifiants préfixés par la nature :
-        sans cela, huit blocs porteraient le même nom et le premier
-        répondrait pour tous. Le script travaille par PAIRES (la case et son
-        bloc), ce qui le rend indifférent au nombre de natures.
+        One screen per kind, hence ids prefixed by the kind: without that,
+        eight blocks would carry the same name and the first would answer for
+        all. The script works in PAIRS (the box and its block), which makes it
+        indifferent to the number of kinds.
 
-        Sans JavaScript, tout reste visible : on voit le détail des relances
-        même décoché — moins agréable, jamais bloquant.
+        Without JavaScript, everything stays visible: you see the follow-up
+        detail even unticked — less pleasant, never blocking.
         """
         return """<script>
 (function(){
@@ -8612,19 +8418,15 @@ bascule();
 </script>"""
 
     def _sous_parties_comportement(self):
-        """Les valeurs par défaut des options, NATURE PAR NATURE.
+        """The options' default values, KIND BY KIND.
 
-        Demandé par le propriétaire le 02/08/2026 : « on aura dans le menu
-        vertical Option de comportement, qui déplie les différents types de
-        campagne et lorsqu'on clique on a les options par défaut ».
+        Requested by the owner on 02/08/2026: `in the vertical menu we will
+        have Behaviour options, which unfolds the different campaign types and
+        when you click you get the default options`.
 
-        Deux règles tenues ici :
-        - on ne propose QUE les options qui existent pour la nature (la
-          politique d'appel seulement si elle est modifiable, la question
-          d'annulation seulement pour les natures dont le message en dépend).
-          Proposer une option muette serait un mensonge d'interface ;
-        - le réglage ne touche QUE les campagnes à venir, et l'écran le dit :
-          une campagne créée fige ses options dans sa configuration.
+        Two rules held here:
+        - we only offer the options that exist for the kind (the calling policy only when it is editable, the cancellation question only for the kinds whose message depends on it). Offering a mute option would be an interface lie;
+        - the setting only touches FUTURE campaigns, and the screen says so: a campaign once created freezes its options in its configuration.
         """
         return [(f"comportement-{nature}", assistant.NATURES[nature]["nom"],
                  self._formulaire_comportement(nature))
@@ -8634,18 +8436,18 @@ bascule();
                                  action="/reglages/comportement",
                                  bouton="Enregistrer ces options",
                                  extra="", icone=True, id_formulaire=""):
-        """Les options par défaut d'UNE nature — le même formulaire partout.
+        """ONE kind's default options — the same form everywhere.
 
-        Il sert à la page ⚙ Réglages et à l'installeur du premier lancement.
-        `extra` reçoit ce que l'installeur ajoute au pied du formulaire
-        (« Recharger les valeurs par défaut », « Charger la même
-        configuration ») : ces gestes n'ont de sens qu'en installation, et
-        les faire vivre ici plutôt qu'ailleurs garde le formulaire entier.
+        It serves the ⚙ Réglages page and the first-run installer. `extra`
+        receives what the installer adds at the foot of the form (`Recharger
+        les valeurs par défaut`, `Charger la même configuration`): those
+        gestures only make sense during installation, and having them live here
+        rather than elsewhere keeps the form whole.
         """
         preferences = self.application.preferences
         definition = assistant.NATURES[nature]
-        # Dans l'installeur : ni pictogramme au titre, ni bouton d'envoi —
-        # c'est son pied fixe qui soumet, par l'identifiant du formulaire.
+        # In the installer: no pictogram on the title, no submit button — its
+        # fixed footer submits, by the form's id.
         signe = f"{definition['icone']} " if icone else ""
         marque = f' id="{id_formulaire}"' if id_formulaire else ""
         envoi = f"<button>{bouton}</button>" if bouton else ""
@@ -8655,12 +8457,12 @@ bascule();
             cases = []
             for cle, libelle in self.LIBELLES_COMPORTEMENT:
                 coche = " checked" if options.get(cle) else ""
-                # `data-revele` : dans l'INSTALLEUR, le formulaire arrive par
-                # innerHTML — son propre script ne s'exécuterait pas. La case
-                # dit donc elle-même quel bloc elle ouvre, et l'écoute posée
-                # une fois sur la fenêtre suffit. Sur la page ⚙ Réglages,
-                # c'est _script_comportement qui s'en charge, par les
-                # identifiants : les deux voies mènent au même endroit.
+                # `data-revele`: in the INSTALLER, the form arrives through
+                # innerHTML — its own script would not run. So the box says
+                # itself which block it opens, and the listener placed once on
+                # the window is enough. On the ⚙ Réglages page,
+                # _script_comportement handles it, by ids: both routes lead to
+                # the same place.
                 revele = (f' data-revele="regl_{nature}_bloc"'
                           if cle == "recontacter" else "")
                 cases.append(
@@ -8668,11 +8470,11 @@ bascule();
                     f'<input type="checkbox" name="{cle}" value="1"{coche} '
                     f'id="regl_{nature}_{cle}"{revele}>'
                     f"<span>{libelle}</span></label></div>")
-                # ⚠ LES OPTIONS D'UNE OPTION suivent leur case, et pas
-                # ailleurs : « Recontacter » sans son délai ni son plafond
-                # était un réglage à moitié réglable — signalé par le
-                # propriétaire le 02/08/2026. Elles ne s'affichent que si la
-                # case est cochée (règle du dévoilement en cascade).
+                # ⚠ THE OPTIONS OF AN OPTION follow their box, and nowhere
+                # else: `Recontacter` without its delay or its ceiling was a
+                # half-configurable setting — reported by the owner on
+                # 02/08/2026. They are only shown when the box is ticked (the
+                # cascading-disclosure rule).
                 if cle == "recontacter":
                     cases.append(self._sous_options_relance(nature, options))
             if assistant.option_annulation_utile(nature):
@@ -8718,7 +8520,7 @@ bascule();
 </form>{extra}"""
 
     def _traiter_comportement(self, corps):
-        """La page ⚙ Réglages enregistre les options d'une nature."""
+        """The ⚙ Réglages page saves one kind's options."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         nature = donnees.get("nature", [""])[0]
         if nature not in assistant.NATURES:
@@ -8729,15 +8531,15 @@ bascule();
         return self._rediriger(f"/reglages?fait=1#comportement-{nature}")
 
     def _appliquer_comportement(self, nature, donnees):
-        """Écrit les options d'UNE nature ; rend la liste des refus.
+        """Writes ONE kind's options; returns the list of refusals.
 
-        Une seule nature par envoi (le formulaire porte son code) : sans
-        cela, une case décochée sur l'écran d'une nature effacerait les
-        options de toutes les autres — une case à cocher absente d'un envoi
-        veut dire « décochée », et il faut savoir de QUI on parle.
+        One kind per submission (the form carries its code): without that, a
+        box unticked on one kind's screen would erase every other kind's
+        options — a checkbox absent from a submission means `unticked`, and you
+        have to know WHO you are talking about.
 
-        Séparé de la réponse HTTP pour que l'installeur du premier
-        lancement écrive par le MÊME chemin que la page ⚙ Réglages.
+        Separated from the HTTP answer so that the first-run installer writes
+        through the SAME path as the ⚙ Réglages page.
         """
         definition = assistant.NATURES[nature]
         regle = {cle: (cle in donnees)
@@ -8745,8 +8547,8 @@ bascule();
         if assistant.option_annulation_utile(nature):
             regle[assistant.CLE_REPLACER_ANNULATION] = (
                 assistant.CLE_REPLACER_ANNULATION in donnees)
-        # Le détail des relances : refusé s'il est incohérent, plutôt
-        # qu'enregistré et découvert plus tard au visage d'un contact.
+        # The follow-up detail: refused when it is inconsistent, rather than
+        # saved and discovered later in a contact's face.
         erreurs = []
         mode = donnees.get("relance_mode", [""])[0]
         if mode in ("delai", "creneau"):
@@ -8776,21 +8578,18 @@ bascule();
         else:
             regle["relance_creneau_debut"] = debut
             regle["relance_creneau_fin"] = fin
-        # ⚠ ON N'ENREGISTRE QUE CE QUI S'ÉCARTE DU DÉFAUT DE LA NATURE
-        # (16/08/2026). L'écran enregistre TOUT le bloc, quel que soit le champ
-        # qu'on venait modifier : régler ses relances figeait donc aussi la
-        # politique et l'ordre AFFICHÉS, c'est-à-dire les défauts d'alors.
-        #
-        # MESURÉ DANS SON FICHIER : le réglage du déplacement portait
-        # « politique: premier_oui », écrit en même temps que son créneau de
-        # rappel 12h-14h. Le jour où la §8.2 a été corrigée — le déplacement
-        # appelle tout le monde — ce réglage a continué d'imposer l'ancienne
-        # règle. Il a donc revu sa campagne s'arrêter au premier contact APRÈS
-        # la correction, et mon correctif lui était invisible.
-        #
-        # Une valeur ÉGALE au défaut n'est jamais un choix : c'est le défaut.
-        # Ne pas l'écrire laisse le défaut de la nature vivre ; un écart voulu,
-        # lui, reste enregistré et respecté.
+        # ⚠ WE ONLY SAVE WHAT DIFFERS FROM THE KIND'S DEFAULT (16/08/2026). The
+        # screen saves the WHOLE block, whichever field was being edited:
+        # setting his follow-ups therefore also froze the policy and the order
+        # DISPLAYED, that is, the defaults of the time.  MEASURED IN HIS FILE:
+        # the move's setting carried `politique: premier_oui`, written at the
+        # same time as his 12-2pm call-back window. The day §8.2 was corrected
+        # — a move calls everybody — that setting went on imposing the old
+        # rule. So he watched his campaign stop at the first contact AFTER the
+        # fix, and my fix was invisible to him.  A value EQUAL to the default
+        # is never a choice: it is the default. Not writing it lets the kind's
+        # default live; a deliberate difference, on the other hand, stays saved
+        # and respected.
         politique = donnees.get("politique", [""])[0]
         if definition["politique_modifiable"] and politique in assistant.POLITIQUES:
             if politique == definition["politique"]:
@@ -8812,21 +8611,20 @@ bascule();
         return []
 
     def _sous_parties_discours(self):
-        """UNE SOUS-PARTIE PAR NATURE, avec les TROIS parties de la consigne.
+        """ONE SUB-PART PER KIND, with the THREE parts of the briefing.
 
-        Demandé par le propriétaire le 02/08/2026, puis complété le même
-        jour : « on ne retrouve pas tous les éléments de discours de
-        l'agent ». Il manquait en effet l'objectif/contexte et les issues —
-        seule l'ouverture était montrée, alors que ce sont bien trois parties
-        qui partent à l'agent.
+        Requested by the owner on 02/08/2026, then completed the same day: `we
+        do not find all the elements of the agent's speech`. Indeed, the
+        objective/context and the outcomes were missing — only the opening was
+        shown, while it is three parts that go to the agent.
 
-        Ce qui se RÈGLE ici : l'ouverture, le seul passage récité mot pour
-        mot. Ce qui se LIT : les deux autres, écrites par la nature de la
-        campagne et par ses options — elles sont rendues par le MÊME code que
-        l'appel réel, donc ce qu'on lit est ce qui partira.
+        What is CONFIGURED here: the opening, the only passage recited word for
+        word. What is READ: the other two, written by the campaign's kind and
+        by its options — they are rendered by the SAME code as the real call,
+        so what you read is what will go out.
 
-        Zone vidée = on revient au texte livré avec le produit ; il n'y a pas
-        d'autre geste à connaître pour annuler.
+        An emptied box = you go back to the text shipped with the product;
+        there is no other gesture to learn in order to undo.
         """
         return [(f"discours-{nature}", assistant.NATURES[nature]["nom"],
                  self._formulaire_discours(nature))
@@ -8835,16 +8633,15 @@ bascule();
     def _formulaire_discours(self, nature, action="/reglages/discours",
                              bouton="Enregistrer ce discours", extra="",
                              icone=True, id_formulaire=""):
-        """Le discours d'UNE nature — le même formulaire sur les deux écrans.
+        """ONE kind's speech — the same form on both screens.
 
-        `extra` reçoit le pied propre à l'installeur (« Recharger les
-        valeurs par défaut »). Voir `_formulaire_comportement` : même raison,
-        même forme.
+        `extra` receives the installer's own footer (`Recharger les valeurs par
+        défaut`). See `_formulaire_comportement`: same reason, same shape.
         """
         preferences = self.application.preferences
         definition = assistant.NATURES[nature]
-        # Même règle que pour les options : l'installeur n'a plus de bouton
-        # dans ses formulaires, son pied fixe s'en charge.
+        # The same rule as for the options: the installer no longer has a
+        # button in its forms, its fixed footer takes care of it.
         signe = f"{definition['icone']} " if icone else ""
         marque = f' id="{id_formulaire}"' if id_formulaire else ""
         envoi = f"<button>{bouton}</button>" if bouton else ""
@@ -8853,10 +8650,10 @@ bascule();
                      or "").strip()
             etat = ("<strong>ouverture modifiée</strong>" if ecrit
                     else "ouverture livrée avec le produit")
-            # Les colonnes et les options RÉELLES de cette nature : sans
-            # elles, l'aperçu montrerait un discours que le produit n'enverra
-            # jamais (les phrases conditionnées par une option tomberaient,
-            # ou les DEUX branches d'une condition s'afficheraient).
+            # This kind's REAL columns and options: without them, the preview
+            # would show a speech the product will never send (the sentences
+            # conditioned by an option would drop out, or BOTH branches of a
+            # condition would be shown).
             champs = assistant.champs_campagne(
                 {"champs": list(definition["champs"])})
             options, _, _ = assistant.comportement_regle(nature, preferences)
@@ -8895,30 +8692,27 @@ campagne et par ses ⚙ options de comportement — elles se lisent ici, elles
 ne se tapent pas. Une campagne peut encore récrire son ouverture pour elle
 seule (étape ②, mode avancé).</small></p>"""
 
-    # ============================================================ INSTALLEUR
-    # L'installeur du PREMIER LANCEMENT. Il ne demande rien de nouveau : il
-    # fait remplir les MÊMES réglages que ⚙ Réglages, une page à la fois,
-    # dans un ordre qui a un sens — et il dit où l'on en est.
-    #
-    # Deux règles tenues d'un bout à l'autre :
-    #  · les formulaires sont les VRAIS (`_formulaires_appels`,
-    #    `_formulaire_comportement`, `_formulaire_discours`, le calendrier) —
-    #    aucune copie, donc aucune divergence possible ;
-    #  · l'écriture passe par les MÊMES fonctions que les Réglages
-    #    (`_appliquer_reglages`, `_appliquer_comportement`,
-    #    `_appliquer_discours`) : ce qui est refusé ici l'est là-bas, mot
-    #    pour mot.
+    # ============================================================ INSTALLER
+    # The FIRST-RUN installer. It asks for nothing new: it has the SAME
+    # settings filled in as ⚙ Réglages, one page at a time, in an order that
+    # makes sense — and it says where you are.  Two rules held throughout: ·
+    # the forms are the REAL ones (`_formulaires_appels`,
+    # `_formulaire_comportement`, `_formulaire_discours`, the calendar) — no
+    # copy, so no possible divergence; · the writing goes through the SAME
+    # functions as the Settings (`_appliquer_reglages`,
+    # `_appliquer_comportement`, `_appliquer_discours`): what is refused here
+    # is refused there, word for word.
 
     def _servir_image(self, nom):
-        """Sert un des quatre fichiers déclarés — et rien d'autre.
+        """Serves one of the four declared files — and nothing else.
 
-        Le type de contenu vient de la LISTE, pas du nom demandé : c'est ce
-        qui garantit qu'un fichier ne peut pas être servi sous une étiquette
-        qu'il n'a pas. Tout nom absent de la liste est un 404, sans même
-        toucher au disque.
+        The content type comes from the LIST, not from the name requested: that
+        is what guarantees a file cannot be served under a label it does not
+        have. Any name absent from the list is a 404, without even touching the
+        disk.
 
-        Le cache est LONG : ces images ne changent pas d'une session à
-        l'autre, et le navigateur ne doit pas les redemander à chaque page.
+        The cache is LONG: these images do not change from one session to the
+        next, and the browser must not ask for them again on every page.
         """
         type_contenu = IMAGES_SERVIES.get(nom)
         if type_contenu is None:
@@ -8937,29 +8731,29 @@ seule (étape ②, mode avancé).</small></p>"""
         self.wfile.write(octets)
 
     def _natures_installeur(self):
-        """Les natures créables, dans l'ordre, telles que l'installeur les voit."""
+        """The creatable kinds, in order, as the installer sees them."""
         return [(code, fiche["icone"], fiche["nom"])
                 for code, fiche in assistant.NATURES.items()]
 
     def _installation_a_faire(self):
-        """Faut-il ouvrir l'installeur en arrivant sur l'accueil ?
+        """Should the installer be opened on arriving at the home page?
 
-        Non si l'installation a été menée à son terme ; non non plus si l'on
-        a répondu « configurer plus tard » depuis le démarrage du serveur —
-        cette réponse-là ne s'écrit PAS sur le disque, exprès : elle vaut
-        pour la session en cours, et l'installeur revient au lancement
-        suivant tant qu'il n'a pas été terminé.
+        No when the installation was carried through; no either when `configure
+        later` was answered since the server started — that answer is NOT
+        written to disk, on purpose: it holds for the current session, and the
+        installer comes back at the next launch as long as it has not been
+        finished.
         """
         if getattr(self.application, "installation_reportee", False):
             return False
         return not installation.terminee(self.application.preferences)
 
     def _bouton_arbre(self, code_page, libelle, faite, actif):
-        """Un lien du menu : sa marque, puis son libellé.
+        """One menu link: its mark, then its label.
 
-        La croix et la coche portent le SIGNE, pas seulement la couleur :
-        « ✗ » et « ✓ » se lisent aussi quand on distingue mal le rouge du
-        vert, et un lecteur d'écran les annonce.
+        The cross and the tick carry the SIGN, not only the colour: `✗` and `✓`
+        are readable even when red and green are hard to tell apart, and a
+        screen reader announces them.
         """
         marque = ("faite", "✓", "terminé") if faite else (
             "a-faire", "✗", "à configurer")
@@ -8971,17 +8765,15 @@ seule (étape ②, mode avancé).</small></p>"""
                 f"{html.escape(libelle)}</button>")
 
     def _barre_installeur(self, page):
-        """LE BANDEAU DES SECTIONS : horizontal, en haut, comme à l'origine.
+        """THE SECTIONS BAR: horizontal, at the top, as originally.
 
-        Quatre entrées côte à côte. « Comportement de l'agent IA » n'emmène
-        nulle part par elle-même : elle DÉROULE un panneau vertical qui se
-        pose PAR-DESSUS le contenu — il ne pousse donc rien, et la fenêtre
-        garde sa hauteur.
+        Four entries side by side. `Comportement de l'agent IA` leads nowhere
+        by itself: it UNROLLS a vertical panel that sits OVER the content — so
+        it pushes nothing, and the window keeps its height.
 
-        ⚠ Ce bandeau a repris la place des puces d'origine (demande du
-        propriétaire du 03/08/2026, croquis à l'appui). Il est passé entre
-        temps par une colonne de gauche puis par une liste déroulante du
-        navigateur : ni l'une ni l'autre n'était ce qu'il voulait.
+        ⚠ This bar took the place of the original bullets (owner's request of
+        03/08/2026, with a sketch). It went through a left-hand column and then
+        a browser drop-down in the meantime: neither was what he wanted.
         """
         preferences = self.application.preferences
         natures = self._natures_installeur()
@@ -9020,10 +8812,10 @@ seule (étape ②, mode avancé).</small></p>"""
                 'configuration">' + "".join(entrees) + "</nav>")
 
     def _sous_pages_installeur(self, partie, page):
-        """Les pages d'une section, en retrait sous elle dans le menu.
+        """A section's pages, indented under it in the menu.
 
-        Vide quand la section n'a qu'une page : un retrait qui répète le
-        libellé du dessus n'apprend rien.
+        Empty when the section has only one page: an indentation repeating the
+        label above it teaches nothing.
         """
         preferences = self.application.preferences
         natures = self._natures_installeur()
@@ -9040,12 +8832,12 @@ seule (étape ②, mode avancé).</small></p>"""
     ID_FORMULAIRE_PAGE = "formulaire-page"
 
     def _page_a_un_formulaire(self, page):
-        """Vrai si cette page porte UN formulaire principal à enregistrer.
+        """True when this page carries ONE main form to be saved.
 
-        Les pages « horaires », « jours fermés », « charger l'agenda » et
-        « CALL-E » n'en ont pas : leurs gestes s'enregistrent seuls, au fil de
-        l'eau. Pour CALL-E, c'est même essentiel — le pied ne doit pas
-        soumettre un champ de clé VIDE et effacer ce qui est déjà rangé.
+        The `horaires`, `jours fermés`, `charger l'agenda` and `CALL-E` pages
+        do not: their gestures save themselves, as they go. For CALL-E it is
+        even essential — the footer must not submit an EMPTY key field and
+        erase what is already stored.
         """
         if page in ("identite", "appel", "relances", "remplacement", "delais"):
             return True
@@ -9053,17 +8845,17 @@ seule (étape ②, mode avancé).</small></p>"""
                    for code, _, _ in self._natures_installeur())
 
     def _pied_installeur(self, page, libelle="Passer à la suite"):
-        """LE PIED FIXE de la fenêtre : les deux gestes et l'avancement.
+        """THE WINDOW'S FIXED FOOTER: the two gestures and the progress.
 
-        ⚠ IL VIT HORS DE LA ZONE QUI DÉFILE (03/08/2026). Il était au bas du
-        contenu : sur une page longue il fallait dérouler pour le trouver, et
-        il changeait de place à chaque page. Il est désormais collé en bas de
-        la fenêtre, et seul le milieu défile.
+        ⚠ IT LIVES OUTSIDE THE SCROLLING AREA (03/08/2026). It was at the
+        bottom of the content: on a long page you had to scroll to find it, and
+        it moved from page to page. It is now fixed at the bottom of the
+        window, and only the middle scrolls.
 
-        ⚠ Les formulaires de l'installeur n'ont PLUS de bouton « Valider et
-        continuer » : c'est ce pied qui les soumet, par l'attribut « form »
-        qui vise leur identifiant. Une page sans formulaire principal se
-        contente de se marquer faite et de passer à la suivante.
+        ⚠ The installer's forms no longer have a `Valider et continuer` button:
+        it is that footer that submits them, through the `form` attribute
+        targeting their id. A page with no main form simply marks itself done
+        and moves to the next.
         """
         preferences = self.application.preferences
         natures = self._natures_installeur()
@@ -9089,7 +8881,7 @@ seule (étape ②, mode avancé).</small></p>"""
 </div>"""
 
     def _page_installeur(self, page=None, erreurs=None, message=""):
-        """La fenêtre entière de l'installeur, pour la page demandée."""
+        """The installer's whole window, for the page requested."""
         natures = self._natures_installeur()
         page = installation.page_valide(page or "", natures)
         bloc_erreurs = ""
@@ -9100,16 +8892,14 @@ seule (étape ②, mode avancé).</small></p>"""
         bloc_message = f'<p class="pastille">{html.escape(message)}</p>' \
             if message else ""
         corps = self._contenu_installeur(page)
-        # ⚠ L'ACCUEIL N'A AUCUNE NAVIGATION. Ni arbre, ni liste de pages :
-        # elles apparaissent quand la configuration démarre (demande du
-        # propriétaire du 03/08/2026). On ne propose pas de se déplacer dans
-        # un parcours qu'on n'a pas encore commencé.
-        # ⚠ DEUX PAGES S'AJUSTENT À LEUR CONTENU : l'accueil et la fin. Elles
-        # ne portent pas de formulaire, seulement un texte court et un
-        # bouton — la hauteur imposée leur laissait un tiers d'écran vide
-        # (demande du propriétaire du 03/08/2026). Les pages de configuration,
-        # elles, gardent leur hauteur constante : c'est entre elles qu'on
-        # navigue, et c'est là que le saut se voyait.
+        # ⚠ THE HOME PAGE HAS NO NAVIGATION. No tree, no page list: they appear
+        # when the configuration starts (owner's request of 03/08/2026). We do
+        # not offer to move about in a journey that has not begun. ⚠ TWO PAGES
+        # FIT THEIR CONTENT: the home page and the end. They carry no form,
+        # only a short text and a button — the imposed height left them a third
+        # of a screen empty (owner's request of 03/08/2026). The configuration
+        # pages, for their part, keep a constant height: it is between them
+        # that you navigate, and that is where the jump showed.
         libre = " installeur-libre" if page in ("bienvenue", "fin") else ""
         pied = "" if page in ("bienvenue", "fin") else self._pied_installeur(page)
         if page == "bienvenue":
@@ -9119,8 +8909,8 @@ seule (étape ②, mode avancé).</small></p>"""
             barre = self._barre_installeur(page)
             pages = self._sous_pages_installeur(
                 installation.partie_de(page, natures), page)
-            # Une section d'une seule page (« Terminer ») n'a pas de menu de
-            # pages : la page occupe alors toute la largeur.
+            # A section with a single page (`Terminer`) has no page menu: the
+            # page then takes the full width.
             vue = (f'<div class="installeur-deux-parts">{pages}'
                    f'<div class="page-installeur">{corps}</div></div>'
                    if pages else
@@ -9135,25 +8925,25 @@ seule (étape ②, mode avancé).</small></p>"""
 </div>"""
 
     def _contenu_installeur(self, page):
-        """Le contenu d'UNE page — c'est ici que les cas se distinguent."""
+        """The content of ONE page — it is here that the cases differ."""
         natures = self._natures_installeur()
         if page == "bienvenue":
             return self._installeur_bienvenue()
         if page == "fin":
             return self._installeur_fin()
-        # ⚠ LE CODE DE PAGE VOYAGE DANS L'ADRESSE, pas dans un champ caché :
-        # les formulaires rendus ici sont ceux des ⚙ Réglages, tels quels, et
-        # rien ne peut être glissé DEDANS sans les recopier. L'adresse d'envoi,
-        # elle, est déjà un paramètre.
+        # ⚠ THE PAGE CODE TRAVELS IN THE URL, not in a hidden field: the forms
+        # rendered here are the ⚙ Réglages ones, as they stand, and nothing can
+        # be slipped INSIDE them without copying them. The submission URL, for
+        # its part, is already a parameter.
         formulaires = self._formulaires_appels(
             action=f"/installation/valider?page={page}", bouton="",
             icones=False, id_formulaire=self.ID_FORMULAIRE_PAGE)
         if page in formulaires:
             return formulaires[page]
-        # ⚠ MÊMES IDENTIFIANTS que dans les ⚙ Réglages (« bloc-horaires »,
-        # « bloc-jours-fermes ») : ce sont les VRAIS formulaires, et c'est par
-        # ces noms qu'ils désignent l'élément à recharger. Les renommer ici
-        # revenait à couper le glisser-relâché et les deux boutons.
+        # ⚠ THE SAME IDS as in ⚙ Réglages (`bloc-horaires`,
+        # `bloc-jours-fermes`): these are the REAL forms, and it is by those
+        # names that they designate the element to reload. Renaming them here
+        # amounted to cutting off drag-and-release and the two buttons.
         if page == "horaires":
             return f"""<h2>Vos horaires d'ouverture</h2>
 <p>Ce sont eux qui décident des places que l'agent peut proposer au
@@ -9179,11 +8969,11 @@ dessus.</p>
         return "<p>Page inconnue.</p>"
 
     def _installeur_calle(self):
-        """La page « Connexion à CALL-E » — le MÊME bloc que les Réglages.
+        """The `Connexion à CALL-E` page — the SAME block as the Settings.
 
-        ⚠ PAS UNE COPIE. Deux écrans qui décriraient la clé chacun à sa façon
-        auraient fini par se contredire — et c'est le genre de contradiction
-        qu'on ne voit qu'au moment d'appeler pour de vrai.
+        ⚠ NOT A COPY. Two screens each describing the key in their own way
+        would have ended up contradicting each other — and it is the kind of
+        contradiction you only see at the moment of calling for real.
         """
         return f"""<h2>Connexion à CALL-E</h2>
 <p>La clé de CALL-E, et rien d'autre. Sans elle, tout l'écran fonctionne : les
@@ -9193,7 +8983,7 @@ appels sont <strong>simulés</strong>.</p>
 elle vous attendra dans ⚙ Réglages → 🔌 CALL-E.</small></p>"""
 
     def _installeur_bienvenue(self):
-        """La première page : à quoi servent ces réglages, et pourquoi ici."""
+        """The first page: what these settings are for, and why here."""
         return """<h2>Bienvenue dans RingBack</h2>
 <p>Avant la première campagne, quelques réglages. Ce ne sont pas des
 formalités : <strong>ce sont eux que chaque campagne reprendra</strong>, à
@@ -9225,22 +9015,21 @@ sa création comme pendant ses appels.</p>
 </div>"""
 
     def _installeur_comportement(self, nature, page):
-        """Les options d'une nature + les deux gestes propres à l'installeur.
+        """One kind's options + the two gestures specific to the installer.
 
-        « Recharger les valeurs par défaut » remet les options livrées avec
-        le produit. « Charger la même configuration » recopie celles d'une
-        AUTRE campagne — pour les options de comportement seulement : un
-        discours se recopie mal d'une situation à l'autre, il parle d'autre
-        chose.
+        `Recharger les valeurs par défaut` restores the options shipped with
+        the product. `Charger la même configuration` copies those of ANOTHER
+        campaign — for the behaviour options only: a speech copies badly from
+        one situation to another, it talks about something else.
         """
         autres = [(code, f"{fiche['icone']} {fiche['nom']}")
                   for code, fiche in assistant.NATURES.items()
                   if code != nature]
         copie = ""
         if autres:
-            # ⚠ LE BOUTON EST À CÔTÉ DU SÉLECTEUR, pas dessous (03/08/2026) :
-            # le geste est « prendre CELLE-CI », les deux morceaux ne se
-            # lisent pas l'un sans l'autre.
+            # ⚠ THE BUTTON IS BESIDE THE SELECTOR, not below it (03/08/2026):
+            # the gesture is `take THIS one`, and the two pieces do not read
+            # without each other.
             copie = f"""<form method="post" action="/installation/copier" class="carte">
   <input type="hidden" name="page" value="{page}">
   <input type="hidden" name="nature" value="{nature}">
@@ -9269,7 +9058,7 @@ sa création comme pendant ses appels.</p>
                 + copie + defauts)
 
     def _installeur_discours(self, nature, page):
-        """Le discours d'une nature, avec son retour aux valeurs livrées."""
+        """One kind's speech, with its return to the shipped values."""
         defauts = f"""<form method="post" action="/installation/defauts" class="carte">
   <input type="hidden" name="page" value="{page}">
   <input type="hidden" name="nature" value="{nature}">
@@ -9285,7 +9074,8 @@ sa création comme pendant ses appels.</p>
                 + defauts)
 
     def _installeur_import(self):
-        """Charger un agenda : les formats acceptés, comment faire, le bouton."""
+        """Loading a calendar: the accepted formats, how to do it, the button.
+        """
         return """<h2>Charger votre agenda</h2>
 <p>RingBack a besoin de connaître vos rendez-vous : c'est ce qui lui permet
 de savoir quelles places sont <strong>libres</strong>, et de ne jamais en
@@ -9322,7 +9112,7 @@ rendez-vous peuvent aussi se saisir un par un, ou se coller plus tard.</small></
 """
 
     def _installeur_fin(self):
-        """La dernière page : ce qui est réglé, et le bouton qui referme."""
+        """The last page: what is configured, and the button that closes it."""
         preferences = self.application.preferences
         natures = self._natures_installeur()
         faites, total = installation.progression(preferences, natures)
@@ -9345,18 +9135,18 @@ charger la liste des personnes, appuyer sur ▶ Démarrer. RingBack appelle,
 <p><small>Cette fenêtre ne se rouvrira plus toute seule. Pour refaire la
 configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
 
-    # -------------------------------------------------- les gestes reçus
+    # -------------------------------------------------- the gestures received
     def _installeur_repondre(self, page, erreurs=None, message=""):
-        """Renvoie la fenêtre — c'est la SEULE forme de réponse de l'installeur."""
+        """Returns the window — it is the installer's ONLY form of answer."""
         return self._repondre(
             self._page_installeur(page, erreurs=erreurs, message=message))
 
     def _installeur_suivante(self, page):
-        """La page d'après, ou la page de fin quand il n'y en a plus."""
+        """The next page, or the end page when there is none left."""
         return installation.suivante(page, self._natures_installeur()) or "fin"
 
     def _traiter_installation_valider(self, corps, demande=""):
-        """Valide une page : on écrit, on note, on passe à la suivante."""
+        """Validates a page: we write, we record, we move to the next."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"),
                                         keep_blank_values=True)
         natures = self._natures_installeur()
@@ -9378,12 +9168,11 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
         return self._installeur_repondre(self._installeur_suivante(page))
 
     def _traiter_installation_marquer(self, corps):
-        """Note la page comme faite SANS rien écrire, et passe à la suivante.
+        """Marks the page as done WITHOUT writing anything, and moves to the next.
 
-        Sert aux pages dont les formulaires enregistrent déjà par eux-mêmes
-        (le calendrier des horaires, les jours fermés) et à « Passer à la
-        suite » : la page a été vue et voulue, c'est tout ce que la coche
-        prétend dire.
+        Used by the pages whose forms already save by themselves (the hours
+        calendar, the closed days) and by `Passer à la suite`: the page was
+        seen and wanted, which is all the tick claims to say.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         natures = self._natures_installeur()
@@ -9392,7 +9181,7 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
         return self._installeur_repondre(self._installeur_suivante(page))
 
     def _traiter_installation_copier(self, corps):
-        """Recopie les options de comportement d'une AUTRE campagne."""
+        """Copies ANOTHER campaign's behaviour options."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         natures = self._natures_installeur()
         page = installation.page_valide(donnees.get("page", [""])[0], natures)
@@ -9405,23 +9194,23 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
                 "Choisissez la campagne dont vous voulez reprendre les "
                 "options."])
         preferences = self.application.preferences
-        # On recopie ce qui est RÉELLEMENT en vigueur pour la source (ses
-        # réglages, ou les défauts si elle n'a rien de propre) : sinon
-        # « charger la même configuration » ne chargerait rien quand la
-        # source n'a jamais été enregistrée.
+        # We copy what is REALLY in force for the source (its settings, or the
+        # defaults when it has none of its own): otherwise `load the same
+        # configuration` would load nothing when the source had never been
+        # saved.
         options, politique, ordre = assistant.comportement_regle(
             source, preferences)
         regle = dict(options)
-        # La politique d'appel ne se recopie que si la nature d'arrivée sait
-        # la changer — l'imposer à une nature qui n'en veut pas serait un
-        # réglage qui ne s'applique jamais.
+        # The calling policy is only copied when the destination kind can
+        # change it — imposing it on a kind that does not want it would be a
+        # setting that never applies.
         if assistant.NATURES[nature]["politique_modifiable"]:
             regle["politique"] = politique
         if ordre:
             regle["ordre"] = ordre
-        # Une option qui n'existe pas pour la nature d'arrivée est écartée :
-        # la question d'annulation ne veut rien dire hors des natures dont
-        # le message en dépend.
+        # An option that does not exist for the destination kind is set aside:
+        # the cancellation question means nothing outside the kinds whose
+        # message depends on it.
         if not assistant.option_annulation_utile(nature):
             regle.pop(assistant.CLE_REPLACER_ANNULATION, None)
         preferences.definir(assistant.cle_comportement(nature), regle)
@@ -9432,7 +9221,7 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
                           "Relisez-les avant de valider.")
 
     def _traiter_installation_defauts(self, corps):
-        """Remet les valeurs livrées avec le produit, pour CETTE page."""
+        """Restores the values shipped with the product, for THIS page."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         natures = self._natures_installeur()
         page = installation.page_valide(donnees.get("page", [""])[0], natures)
@@ -9442,8 +9231,9 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
             return self._erreur(400, "Nature de campagne inconnue.")
         preferences = self.application.preferences
         if quoi == "discours":
-            # Vide = le texte livré s'applique. C'est déjà la convention du
-            # champ ; le bouton ne fait que l'exécuter sans faire chercher.
+            # Empty = the shipped text applies. That is already the field's
+            # convention; the button merely carries it out without making you
+            # hunt.
             preferences.definir(assistant.cle_discours(nature), "")
             message = "Discours revenu au texte livré avec le produit."
         else:
@@ -9452,11 +9242,11 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
         return self._installeur_repondre(page, message=message)
 
     def _traiter_installation_agenda(self, corps_brut):
-        """Charge le fichier d'agenda envoyé depuis l'installeur.
+        """Loads the calendar file sent from the installer.
 
-        Le même code que les imports de la page 📅 Rendez-vous — c'est
-        important : un fichier accepté ici doit l'être là-bas, et le compte
-        rendu doit dire la même chose.
+        The same code as the 📅 Rendez-vous page's imports — and that matters: a
+        file accepted here must be accepted there, and the report must say the
+        same thing.
         """
         page = "import"
         type_contenu = self.headers.get("Content-Type", "")
@@ -9471,7 +9261,7 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
         preferences = self.application.preferences
         ics_demande = nom.lower().endswith(".ics")
         try:
-            texte = saisie.decoder_csv(octets)   # même décodage pour les deux
+            texte = saisie.decoder_csv(octets)  # the same decoding for both
             if ics_demande:
                 importes, refuses = ics.importer_ics(base, texte, preferences)
             else:
@@ -9484,9 +9274,9 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
             preferences, "agenda ICS" if ics_demande else "fichier CSV",
             importes)
         installation.marquer_faite(preferences, page)
-        # ⚠ Les deux importeurs rendent « importés » sous deux formes : un
-        # NOMBRE pour l'un, une LISTE pour l'autre. On compte sans supposer —
-        # supposer, ici, plantait la page (constaté à l'exercice, 03/08/2026).
+        # ⚠ The two importers return `imported` in two shapes: a NUMBER for
+        # one, a LIST for the other. We count without assuming — assuming,
+        # here, crashed the page (observed in use, 03/08/2026).
         combien = importes if isinstance(importes, int) else len(importes)
         detail = ""
         if refuses:
@@ -9498,25 +9288,26 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
                     f"ajouté(s).{detail}")
 
     def _traiter_installation_plus_tard(self):
-        """« Configurer plus tard » : pour cette session seulement."""
+        """`Configure later`: for this session only."""
         self.application.installation_reportee = True
         journal.info("Installation reportée — elle reviendra au prochain "
                      "démarrage.")
         return self._repondre("")
 
     def _traiter_installation_terminer(self):
-        """« Démarrer avec RingBack » : l'installeur ne s'ouvrira plus seul."""
+        """`Démarrer avec RingBack`: the installer will no longer open by itself.
+        """
         installation.marquer_terminee(self.application.preferences)
         journal.info("Installation terminée.")
         return self._repondre("")
 
     def _traiter_installation_rouvrir(self):
-        """« Réinitialiser l'installeur », depuis ⚙ Réglages → 🧪 Essais.
+        """`Réinitialiser l'installeur`, from ⚙ Réglages → 🧪 Essais.
 
-        On revient sur les RÉGLAGES, pas sur l'installeur : le bouton dit
-        qu'il réinitialise une variable, il ne dit pas qu'il lance le
-        parcours. C'est l'actualisation de l'accueil qui le fera — et
-        l'écran l'annonce en une phrase.
+        We come back to the SETTINGS, not to the installer: the button says it
+        resets a setting, it does not say it starts the journey. It is
+        refreshing the home page that will do that — and the screen announces
+        it in one sentence.
         """
         installation.rouvrir(self.application.preferences)
         self.application.installation_reportee = False
@@ -9526,22 +9317,22 @@ configuration : ⚙ Réglages → Refaire la configuration.</small></p>"""
 
     # ---------------------------------------------- horaires d'ouverture
     def _bloc_horaires(self, erreurs=None, avec_duree=True, icone=True):
-        """La section « Horaires d'ouverture » : le pas + la semaine type.
+        """The `Horaires d'ouverture` section: the step + the typical week.
 
-        Le calendrier vit dans un élément qui se recharge SEUL après chaque
-        geste (jamais la page entière) ; le repli sans JavaScript est un
-        formulaire jour + début + fin, toujours affiché sous le calendrier.
+        The calendar lives in an element that reloads ON ITS OWN after each
+        gesture (never the whole page); the no-JavaScript fallback is a day +
+        start + end form, always displayed under the calendar.
 
-        `erreurs` : un refus s'affiche DANS le bloc, là où le geste a eu
-        lieu — et non sur une page qui remplacerait l'écran.
+        `erreurs`: a refusal is shown INSIDE the block, where the gesture
+        happened — and not on a page that would replace the screen.
 
-        `avec_duree` : l'installeur ne montre PAS la durée moyenne d'un
-        rendez-vous. Le propriétaire a fait retirer son bouton le
-        03/08/2026 ; un champ sans bouton ne pouvant plus s'enregistrer,
-        c'est la carte entière qui part. La durée garde sa valeur d'origine
-        et se règle dans ⚙ Réglages, où le bouton demeure.
+        `avec_duree`: the installer does NOT show the average length of an
+        appointment. The owner had its button removed on 03/08/2026; since a
+        field with no button can no longer be saved, the whole card goes. The
+        length keeps its original value and is configured in ⚙ Réglages, where
+        the button remains.
 
-        `icone` : les titres de l'installeur n'en portent pas.
+        `icone`: the installer's titles carry none.
         """
         preferences = self.application.preferences
         pas = horaires.pas_minutes(preferences)
@@ -9593,11 +9384,11 @@ ouverte pour la refermer.</p>
 </form>"""
 
     def _calendrier_semaine(self, erreurs=None):
-        """Le calendrier de la semaine type — le FRAGMENT rechargé sur place.
+        """The typical-week calendar — the FRAGMENT reloaded in place.
 
-        Chaque cellule est une tranche : ouverte (colorée) ou fermée. Aucune
-        heure n'est cachée : l'amplitude affichée s'élargit d'elle-même si
-        une ouverture déborde de la plage 7h–20h.
+        Each cell is a slot: open (coloured) or closed. No hour is hidden: the
+        span displayed widens by itself when an opening overflows the 7am–8pm
+        range.
         """
         preferences = self.application.preferences
         pas = horaires.pas_minutes(preferences)
@@ -9641,9 +9432,10 @@ ouverte pour la refermer.</p>
 </table>"""
 
     def _bloc_jours_fermes(self, erreurs=None):
-        """La section « 📕 Jours fermés exceptionnels » + les fériés PROPOSÉS.
+        """The `📕 Jours fermés exceptionnels` section + the public holidays
+        OFFERED.
 
-        `erreurs` : un refus s'affiche DANS le bloc — voir `_bloc_horaires`.
+        `erreurs`: a refusal is shown INSIDE the block — see `_bloc_horaires`.
         """
         preferences = self.application.preferences
         bloc_refus = ""
@@ -9707,17 +9499,17 @@ décision, jour par jour — certains cabinets travaillent le 11 novembre.</p>
 {tableau_feries}"""
 
     def _bloc_creneaux(self):
-        """Le FRAGMENT « créneaux à proposer » : calculés + ajoutés à la main."""
+        """The `slots to offer` FRAGMENT: computed + added by hand."""
         base = self.application.base
         preferences = self.application.preferences
         pas = horaires.pas_minutes(preferences)
-        # On n'affiche que les 24 premiers créneaux CALCULÉS (la liste peut
-        # être longue), mais TOUS ceux ajoutés à la main : une saisie ne doit
-        # jamais disparaître de l'écran qui l'a reçue.
-        # `avec_les_passes` : cet écran est le SEUL à les demander. Un créneau
-        # manuel dont l'heure est passée n'est plus proposé au téléphone, mais
-        # il reste ici — visible, marqué, et surtout RETIRABLE. Sans cela, une
-        # saisie devenue gênante serait invisible et impossible à effacer.
+        # We only show the first 24 COMPUTED slots (the list can be long), but
+        # ALL those added by hand: input must never disappear from the screen
+        # that received it. `avec_les_passes`: this screen is the ONLY one that
+        # asks for them. A manual slot whose time has passed is no longer
+        # offered on the phone, but it stays here — visible, marked, and above
+        # all REMOVABLE. Without that, an input that had become inconvenient
+        # would be invisible and impossible to erase.
         retenus, calcules = [], 0
         for entree in horaires.creneaux_proposables(base, preferences,
                                                     avec_les_passes=True):
@@ -9743,15 +9535,15 @@ décision, jour par jour — certains cabinets travaillent le 11 novembre.</p>
                           "occupe déjà cette tranche — il reste proposé parce "
                           "que vous l'avez ajouté à la main.</small>")
             if entree.get("passe"):
-                # Le mot d'abord, pas seulement le pictogramme : cette ligne
-                # doit se comprendre sans lire l'icône.
+                # The word first, not only the pictogram: this line must be
+                # understandable without reading the icon.
                 alerte += ('<br><small class="var-manquante">⚠ heure passée — '
                            "ce créneau n'est plus proposé au téléphone. Votre "
                            "saisie reste ici : à vous de la retirer.</small>")
             elif entree.get("aujourdhui"):
-                # DEUX RAISONS DIFFÉRENTES, DEUX PHRASES : « c'est aujourd'hui »
-                # ne se corrige pas comme « l'heure est passée ». Sa règle du
-                # 17/08/2026 : rien n'est proposé le jour même.
+                # TWO DIFFERENT REASONS, TWO SENTENCES: `it is today` is not
+                # fixed the way `the time has passed` is. His rule of
+                # 17/08/2026: nothing is offered on the same day.
                 alerte += ('<br><small class="var-manquante">⚠ c\'est '
                            "aujourd'hui — RingBack ne propose jamais le jour "
                            "même, seulement à partir de demain. Votre saisie "
@@ -9784,17 +9576,17 @@ longues.</small></p>
 </form>"""
 
     def _bloc_jeu_essai(self):
-        """La sous-partie 🧪 « Jeu d'essai » : l'état, le geste, et un « ? ».
+        """The 🧪 `Jeu d'essai` sub-part: the state, the gesture, and a `?`.
 
-        ⚠ TROIS PARTIES LÀ OÙ IL Y EN AVAIT UNE (10/08/2026, demande du
-        propriétaire) : le jeu d'essai, l'agenda d'exemple, et le renvoi vers
-        son propre numéro. Chacune porte son « ? » — « simple, clair,
-        compréhensible, suffisant », et le détail attend qu'on le demande.
+        ⚠ THREE PARTS WHERE THERE WAS ONE (10/08/2026, owner's request): the
+        sample data set, the sample calendar, and the redirect to his own
+        number. Each carries its `?` — `simple, clear, understandable,
+        sufficient`, with the detail waiting to be asked for.
 
-        ⚠ AUCUN CHIFFRE DANS LE TEXTE. Les comptes (contacts, rendez-vous,
-        passés, à venir…) sont partis dans l'aide : ils décrivaient un contenu
-        qu'on découvre de toute façon en le chargeant, et ils faisaient un
-        paragraphe là où une phrase suffit.
+        ⚠ NO FIGURES IN THE TEXT. The counts (contacts, appointments, past,
+        upcoming…) moved into the help: they described a content you discover
+        anyway by loading it, and they made a paragraph where a sentence is
+        enough.
         """
         info = jeu_essai.resume(
             self._langue())
@@ -9810,12 +9602,12 @@ fonctionner chaque situation sans attendre qu'elle arrive chez vous.</p>
 audiovisuelles : ils ne sont attribués à personne, et ne peuvent donc ni appeler
 ni être appelés. Un essai ne peut pas sonner chez un inconnu.</p>""")
         if jeu_essai.est_charge(base):
-            # ⚠ DIRE QUAND LA DÉMONSTRATION A GRANDI (11/08/2026). Le jeu d'essai
-            # est chargé UNE FOIS, à la création de la base ; quand le produit
-            # l'enrichit, l'écran continuait d'annoncer « Chargé » et l'ancien
-            # contenu restait. Le propriétaire a cherché pendant trois essais
-            # pourquoi une campagne ne trouvait que huit personnes : sa base
-            # datait d'avant. Le compte attendu est écrit à côté du compte réel.
+            # ⚠ SAY WHEN THE DEMONSTRATION HAS GROWN (11/08/2026). The sample
+            # data set is loaded ONCE, when the database is created; when the
+            # product enriches it, the screen went on announcing `Chargé` and
+            # the old content stayed. The owner spent three attempts wondering
+            # why a campaign found only eight people: his database predated it.
+            # The expected count is written beside the real count.
             en_base = base.compter_clients_jeu_essai()
             manque = ""
             if en_base < len(jeu_essai.CLIENTS):
@@ -9849,33 +9641,34 @@ essayer RingBack sans toucher à vos vraies données.</p>
 {self._bloc_agenda_exemple()}"""
 
     def _bloc_agenda_exemple(self):
-        """La sous-partie « Agenda d'exemple » : le bouton, et un « ? ».
+        """The `Agenda d'exemple` sub-part: the button, and a `?`.
 
-        ⚠ LES CHIFFRES SONT CALCULÉS, jamais recopiés — et calculés AVEC LES
-        RÉGLAGES, les mêmes que le fichier téléchargé. Ils ne paraissent que
-        dans l'aide : « ce que cela charge comme données », dit la demande.
+        ⚠ THE FIGURES ARE COMPUTED, never copied — and computed WITH THE
+        SETTINGS, the same ones as the downloaded file. They only appear in the
+        help: `what that loads as data`, says the request.
         """
         preferences = self.application.preferences
         detail = agenda_exemple.plan(preferences=preferences)
         exemple = agenda_exemple.rendezvous(preferences=preferences)
         nombre = len(exemple)
         jours = len({debut.date() for debut, *_ in exemple})
-        # L'ÉTENDUE, calculée elle aussi : c'est ce qui a changé le 11/08/2026,
-        # et c'est ce qui permet d'éprouver la fenêtre « jusqu'à 90 jours après »
-        # de la règle de liste. L'annoncer sans la mesurer serait la deviner.
+        # THE SPAN, computed too: it is what changed on 11/08/2026, and it is
+        # what makes it possible to exercise the list rule's `up to 90 days
+        # after` window. Announcing it without measuring it would be guessing
+        # it.
         aujourd_hui = datetime.date.today()
         etendue = (max(debut.date() for debut, *_ in exemple)
                    - aujourd_hui).days if exemple else 0
         avec = sum(1 for r in exemple if r[4])
-        # Les DEUX langues : une fiche chargée en anglais reste une fiche de
-        # démonstration, et le compte ne doit pas changer avec la langue.
+        # BOTH languages: a record loaded in English is still a demonstration
+        # record, and the count must not change with the language.
         noms_connus = jeu_essai.noms_du_jeu()
         connus = sum(1 for r in exemple if r[2] in noms_connus)
         sans = nombre - avec - connus
-        # ⚠ LE REPLI SE DIT. Sans horaires d'ouverture réglés, RingBack ne
-        # connaît pas les heures ouvrées du cabinet : il n'en invente pas, il
-        # prend des plages d'exemple — et l'écran l'annonce, sinon on croirait
-        # que le fichier suit un agenda qu'on n'a pas rempli.
+        # ⚠ THE FALLBACK IS STATED. With no opening hours configured, RingBack
+        # does not know the practice's working hours: it does not invent them,
+        # it takes sample ranges — and the screen announces it, otherwise you
+        # would think the file follows a calendar you never filled in.
         if detail["repli"]:
             calage = ("""<p class="bandeau">Aucun horaire d'ouverture n'est
 réglé : le fichier prend des plages d'exemple (9h-12h30 et 14h-18h30, du lundi
@@ -9904,10 +9697,10 @@ le jour où vous le téléchargez. Trois autres agendas sont livrés en fichier
 (<code>exemple_agenda.ics</code>, <code>…_realiste.ics</code>,
 <code>…_outlook.ics</code>) pour éprouver des formats d'export ; ceux-là portent
 des dates figées.</p>""")
-        # ⚠ UN NIVEAU EN DESSOUS : ce bloc vit maintenant DANS « Jeu d'essai »
-        # (15/08/2026, sa demande), qui porte déjà le <h2> de la sous-partie.
-        # Deux <h2> l'un dans l'autre auraient menti sur la hiérarchie de la
-        # page — et le menu des Réglages se construit sur ces niveaux.
+        # ⚠ ONE LEVEL DOWN: this block now lives INSIDE `Jeu d'essai`
+        # (15/08/2026, his request), which already carries the sub-part's <h2>.
+        # Two <h2> inside each other would have lied about the page's hierarchy
+        # — and the Settings menu is built on those levels.
         return f"""<h3 id="agenda-exemple">📅 Un agenda d'exemple à importer{aide}</h3>
 <p>Un fichier d'agenda fabriqué à l'instant, calé sur vos heures d'ouverture, à
 importer pour remplir le planning.</p>
@@ -9917,14 +9710,13 @@ importer pour remplir le planning.</p>
 </form>"""
 
     def _section_renvoi_essai(self):
-        """La sous-partie « Toujours composer MON numéro » : la case, et un « ? ».
+        """The `Toujours composer MON numéro` sub-part: the box, and a `?`.
 
-        ⚠ L'AIDE NE PORTE QUE LE PREMIER PARAGRAPHE (10/08/2026, demande du
-        propriétaire : « le reste est superflu »). Ce qui est parti : la
-        comparaison avec les testeurs, le rappel que le renvoi n'ouvre aucun
-        verrou, et l'avertissement disant que les résultats sont quand même
-        écrits sur les fiches. Ce dernier reste écrit dans
-        PROCEDURE-ESSAI-REEL.md et dans le README.
+        ⚠ THE HELP CARRIES ONLY THE FIRST PARAGRAPH (10/08/2026, owner's
+        request: `the rest is superfluous`). What went: the comparison with the
+        testers, the reminder that the redirect opens no lock, and the warning
+        saying the results are still written onto the records. That last one
+        stays written in PROCEDURE-ESSAI-REEL.md and in the README.
         """
         aide = _aide("Que fait ce renvoi ?", """<p>Cochée, cette case fait
 <strong>remplacer le numéro de chaque contact</strong> par le vôtre, au tout
@@ -9937,12 +9729,12 @@ eue.</p>""")
         return f"""<h2 id="renvoi-essai">📵 Toujours composer MON numéro{aide}</h2>
 <div id="bloc-renvoi-essai">{self._bloc_renvoi_essai()}</div>"""
 
-    # ------------------------------------------ essai en conditions réelles
+    # ------------------------------------------ real-conditions testing
     def _section_testeurs(self):
-        """La section 🧪 « Testeurs de l'essai réel » : le texte + l'élément.
+        """The 🧪 `Testeurs de l'essai réel` section: the text + the element.
 
-        La liste elle-même vit dans un élément qui se recharge SEUL à chaque
-        ajout ou retrait (jamais la page) — voir _bloc_testeurs.
+        The list itself lives in an element that reloads ON ITS OWN at every
+        addition or removal (never the page) — see _bloc_testeurs.
         """
         return f"""<h2 id="numero-essai">🧪 Testeurs de l'essai réel</h2>
 <p><strong>À ne renseigner que pour un essai.</strong> RingBack refuse
@@ -9964,12 +9756,12 @@ retirez-le et ajoutez-le à nouveau.</small></p>
 <div id="bloc-testeurs">{self._bloc_testeurs()}</div>"""
 
     def _bloc_testeurs(self, erreurs=(), nom_saisi="", numero_saisi=""):
-        """Le FRAGMENT « testeurs déclarés » : la liste + le formulaire d'ajout.
+        """The `declared testers` FRAGMENT: the list + the add form.
 
-        Une saisie refusée n'est jamais perdue : le nom et le numéro tapés
-        reviennent dans leurs champs. Le numéro revient MASQUÉ dans un seul
-        cas — quand il est déjà déclaré, donc déjà connu de RingBack : il n'y
-        a alors rien à récupérer, et le masquage prime.
+        Refused input is never lost: the name and number typed come back into
+        their fields. The number comes back MASKED in one case only — when it
+        is already declared, hence already known to RingBack: there is then
+        nothing to recover, and masking wins.
         """
         preferences = self.application.preferences
         liste = essai_reel.testeurs(preferences)
@@ -9991,9 +9783,9 @@ retirez-le et ajoutez-le à nouveau.</small></p>
                        "<th>Son téléphone</th><th></th></tr>"
                        + lignes + "</table>")
         else:
-            # Cette phrase est celle que cherche l'œil de l'utilisateur ET
-            # celle que vérifient les essais : rien n'est déclaré, la règle
-            # stricte du doublon vaut pour tout le monde.
+            # This sentence is the one the user's eye looks for AND the one the
+            # tests check: nothing is declared, the strict duplicate rule
+            # applies to everybody.
             tableau = ('<p class="bandeau">Aucun numéro d\'essai déclaré : '
                        "la règle stricte du doublon s'applique à tout le "
                        "monde, sans exception. Ajoutez au moins un testeur "
@@ -10026,13 +9818,11 @@ retirez-le et ajoutez-le à nouveau.</small></p>
 {ajout}"""
 
     def _traiter_testeur(self, corps):
-        """Ajoute ou retire UN testeur — l'élément se recharge, pas la page.
+        """Adds or removes ONE tester — the element reloads, not the page.
 
-        Deux chemins, un seul traitement, comme pour la semaine type :
-        - avec JavaScript, « fragment=1 » est envoyé et le bloc des testeurs
-          revient seul, erreurs comprises ;
-        - sans JavaScript, on repart sur la page des réglages, à l'ancre du
-          bloc — rien n'est perdu, c'est simplement moins fluide.
+        Two paths, one handling, as for the typical week:
+        - with JavaScript, `fragment=1` is sent and the testers block comes back alone, errors included;
+        - without JavaScript, we go back to the settings page, at the block's anchor — nothing is lost, it is simply less smooth.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         fragment = donnees.get("fragment", [""])[0] == "1"
@@ -10057,18 +9847,18 @@ retirez-le et ajoutez-le à nouveau.</small></p>
                 nom_saisi, numero_saisi = "", ""
             except saisie.SaisieInvalide as erreur:
                 erreurs.append(str(erreur))
-                # Le numéro déjà déclaré est déjà connu de RingBack : il
-                # revient MASQUÉ, il n'y a rien à récupérer. Un numéro
-                # illisible, lui, revient tel quel — sinon la faute de frappe
-                # serait invisible et la saisie, perdue.
+                # A number already declared is already known to RingBack: it
+                # comes back MASKED, there is nothing to recover. An unreadable
+                # number, by contrast, comes back as it stands — otherwise the
+                # typo would be invisible and the input lost.
                 try:
                     propre = saisie.valider_telephone(numero_saisi)
                 except saisie.SaisieInvalide:
                     propre = ""
                 if propre and essai_reel.est_numero_essai(propre, preferences):
                     numero_saisi = db.masquer_telephone(propre)
-        # La base marque 🧪 les lignes de ces numéros : elle doit connaître la
-        # nouvelle liste TOUT DE SUITE, sans redémarrer le serveur.
+        # The database marks those numbers' rows 🧪: it must know the new list
+        # AT ONCE, without restarting the server.
         self.application.base.definir_numeros_essai(
             essai_reel.numeros_declares(preferences))
         if fragment:
@@ -10079,23 +9869,24 @@ retirez-le et ajoutez-le à nouveau.</small></p>
         return self._rediriger("/reglages?fait=1#numero-essai")
 
     def _bloc_renvoi_essai(self, erreurs=(), numero_saisi="", coche=None):
-        """Le FRAGMENT « toujours composer MON numéro » : l'état, puis les gestes.
+        """The `toujours composer MON numéro` FRAGMENT: the state, then the
+        gestures.
 
-        ⚠ LE CHAMP EST TOUJOURS VIDE quand un numéro est enregistré, et le
-        numéro enregistré est affiché MASQUÉ à côté. C'est la règle du produit,
-        tenue ici comme partout : un numéro ne se réaffiche pas en clair, même
-        le sien — un écran finit toujours par être photographié. Pour le
-        changer, on en tape un autre ; pour l'effacer, il y a un bouton.
+        ⚠ THE FIELD IS ALWAYS EMPTY when a number is saved, and the saved
+        number is displayed MASKED beside it. That is the product's rule, held
+        here as everywhere: a number is not redisplayed in clear, not even your
+        own — a screen always ends up being photographed. To change it, you
+        type another; to erase it, there is a button.
 
-        Une saisie REFUSÉE, elle, revient telle quelle : une faute de frappe
-        invisible serait impossible à corriger, et « 06 39 98 00 0 » n'est de
-        toute façon pas un numéro à protéger.
+        REFUSED input, on the other hand, comes back as it stands: an invisible
+        typo would be impossible to fix, and `06 39 98 00 0` is not a number
+        worth protecting anyway.
 
-        ⚠ LE NUMÉRO D'EXEMPLE DU PLACEHOLDER EST À PART (06 39 98 00 00) : il
-        vient des racines que l'Arcep réserve à la fiction, comme partout dans
-        le produit, et il est choisi pour ne ressembler à AUCUN numéro qu'on
-        enregistrerait vraiment. Sinon il s'afficherait à l'endroit même où l'on
-        vérifie qu'un numéro enregistré ne se réaffiche jamais.
+        ⚠ THE PLACEHOLDER'S EXAMPLE NUMBER IS SEPARATE (06 39 98 00 00): it
+        comes from the roots Arcep reserves for fiction, as everywhere in the
+        product, and it is chosen to look like NO number anybody would really
+        save. Otherwise it would be displayed in the very place where we check
+        that a saved number is never redisplayed.
         """
         preferences = self.application.preferences
         etat = essai_reel.etat_du_renvoi(preferences)
@@ -10107,9 +9898,9 @@ retirez-le et ajoutez-le à nouveau.</small></p>
                         f"vers {html.escape(etat['masque'])}. Aucun contact ne "
                         "sera appelé sur son propre numéro.</p>")
         elif etat["incoherent"]:
-            # On n'arrive ici qu'en modifiant donnees/preferences.json à la
-            # main : l'enregistrement refuse un numéro illisible. L'écran le
-            # dit quand même, parce que le mode réel, lui, refusera d'appeler.
+            # You only get here by editing donnees/preferences.json by hand:
+            # saving refuses an unreadable number. The screen says so all the
+            # same, because real mode will refuse to call.
             pastille = ('<div class="erreurs"><strong>La case est cochée, mais '
                         "le numéro enregistré n'est pas un numéro.</strong> "
                         "En mode réel, RingBack REFUSERA tout appel : il "
@@ -10155,11 +9946,11 @@ retirez-le et ajoutez-le à nouveau.</small></p>
 {retrait}"""
 
     def _traiter_renvoi_essai(self, corps):
-        """Enregistre (ou retire) le renvoi — l'élément se recharge, pas la page.
+        """Saves (or removes) the redirect — the element reloads, not the page.
 
-        Deux chemins, un seul traitement, comme pour les testeurs : avec
-        JavaScript le bloc revient seul (« fragment=1 »), sans JavaScript on
-        repart sur la page des réglages, à l'ancre du bloc.
+        Two paths, one handling, as for the testers: with JavaScript the block
+        comes back alone (`fragment=1`), without JavaScript we go back to the
+        settings page, at the block's anchor.
         """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         fragment = donnees.get("fragment", [""])[0] == "1"
@@ -10173,8 +9964,8 @@ retirez-le et ajoutez-le à nouveau.</small></p>
             numero_saisi = donnees.get("numero", [""])[0]
             try:
                 essai_reel.enregistrer_renvoi(preferences, coche, numero_saisi)
-                # Enregistré : le champ repart VIDE, le numéro ne se réaffiche
-                # pas (il est décrit, masqué, par le bloc).
+                # Saved: the field starts EMPTY again, the number is not
+                # redisplayed (it is described, masked, by the block).
                 numero_saisi, coche = "", None
             except saisie.SaisieInvalide as erreur:
                 erreurs.append(str(erreur))
@@ -10182,13 +9973,13 @@ retirez-le et ajoutez-le à nouveau.</small></p>
             return self._repondre_fragment(
                 self._bloc_renvoi_essai(erreurs, numero_saisi, coche))
         if erreurs:
-            # 400, comme le refus de la clé CALL-E : le réglage n'a PAS été
-            # enregistré, et le code de la réponse doit le dire aussi.
+            # 400, like the CALL-E key refusal: the setting was NOT saved, and
+            # the answer's code must say so too.
             return self._repondre(self._page_reglages(erreurs=erreurs), 400)
         return self._rediriger("/reglages?fait=1#renvoi-essai")
 
     def _tableau_repartition(self, repartition):
-        """« Qui joue quoi » : une ligne par appel, dans l'ordre des appels."""
+        """`Who plays what`: one row per call, in call order."""
         lignes = "".join(f"""<tr>
   <td>{part['rang']}</td>
   <td>{html.escape(part['identite'])}</td>
@@ -10201,14 +9992,14 @@ retirez-le et ajoutez-le à nouveau.</small></p>
                 "<th>Son téléphone</th></tr>" + lignes + "</table>")
 
     def _bloc_essai_reel(self, nombre_brut=""):
-        """Le FRAGMENT 🧪 « Essai en conditions réelles » des réglages.
+        """The settings' 🧪 `Essai en conditions réelles` FRAGMENT.
 
-        Il annonce QUI devra jouer QUOI (la répartition des rôles sur les
-        testeurs déclarés), ce que ça coûtera, et porte le bouton qui PRÉPARE
-        (et rien de plus) la campagne d'essai. Aucun appel n'en part : la
-        campagne est créée « prête », c'est l'opérateur qui la démarre, avec
-        ses trois verrous. Sans testeur déclaré, le bouton le DIT et ne fait
-        rien — jamais un bouton qui échoue en silence.
+        It announces WHO will have to play WHAT (the roles dealt out among the
+        declared testers), what it will cost, and carries the button that
+        PREPARES (and no more) the test campaign. No call goes out from it: the
+        campaign is created `prête`, and it is the operator who starts it, with
+        their three locks. With no tester declared, the button SAYS so and does
+        nothing — never a button that fails in silence.
         """
         preferences = self.application.preferences
         erreurs = []
@@ -10216,17 +10007,17 @@ retirez-le et ajoutez-le à nouveau.</small></p>
             nombre = essai_reel.valider_nombre_identites(nombre_brut)
             valeur_nombre = str(nombre)
         except saisie.SaisieInvalide as erreur:
-            # Saisie refusée jamais perdue : le nombre tapé revient dans son
-            # champ, et l'aperçu montre en attendant le nombre par défaut.
+            # Refused input never lost: the number typed comes back into its
+            # field, and the preview shows the default number in the meantime.
             erreurs.append(str(erreur))
             nombre = len(essai_reel.IDENTITES)
             valeur_nombre = (nombre_brut or "").strip()
         info = essai_reel.resume(preferences, nombre)
         liste = info["testeurs"]
-        # ⚠ CE BLOC RÉPOND À LA QUESTION « QUI VA SONNER ? » à l'endroit où
-        # l'on prépare des appels. Les testeurs disent quels NUMÉROS portent
-        # les fiches ; le renvoi, lui, peut faire que ce ne soient pas eux qui
-        # sonnent. Les deux réglages se lisent donc ensemble, ou pas du tout.
+        # ⚠ THIS BLOCK ANSWERS THE QUESTION `WHOSE PHONE WILL RING?` in the
+        # place where calls are prepared. The testers say which NUMBERS the
+        # records carry; the redirect, though, may mean they are not the ones
+        # that ring. So the two settings are read together, or not at all.
         renvoi = essai_reel.etat_du_renvoi(preferences)
         renvoi_dit = ""
         if renvoi["actif"]:
@@ -10299,7 +10090,7 @@ elles se retirent en bloc avec « Retirer le jeu d'essai » ci-dessus, sans
 jamais toucher à vos vraies données.</small></p>"""
 
     def _page_confirmer_essai_reel(self, erreur="", nombre_brut=""):
-        """La page de confirmation AVANT de préparer l'essai en conditions réelles."""
+        """The confirmation page BEFORE preparing the real-conditions test."""
         preferences = self.application.preferences
         liste = essai_reel.testeurs(preferences)
         message = erreur
@@ -10364,7 +10155,7 @@ réel consomme un crédit.</p></div>
                           actif="reglages")
 
     def _traiter_essai_reel(self, corps):
-        """Prépare la campagne d'essai réel — après la page de confirmation."""
+        """Prepares the real-test campaign — after the confirmation page."""
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         if donnees.get("confirmer", [""])[0] != "oui":
             return self._erreur(400, "Action non confirmée.")
@@ -10384,7 +10175,8 @@ réel consomme un crédit.</p></div>
             f"&testeurs={len(bilan['testeurs'])}")
 
     def _page_confirmer_jeu_essai(self, action):
-        """La page de confirmation AVANT de charger ou de retirer le jeu d'essai."""
+        """The confirmation page BEFORE loading or removing the sample data set.
+        """
         base = self.application.base
         info = jeu_essai.resume(
             self._langue())
@@ -10440,22 +10232,23 @@ de réponse, autre date, à rappeler par un humain).</p>
         return self._page("Charger un jeu d'essai ?", corps, actif="reglages")
 
     def _traiter_jeu_essai(self, corps):
-        """Charge ou retire le jeu d'essai — après la page de confirmation."""
+        """Loads or removes the sample data set — after the confirmation page.
+        """
         donnees = urllib.parse.parse_qs(corps.decode("utf-8"))
         if donnees.get("confirmer", [""])[0] != "oui":
             return self._erreur(400, "Action non confirmée.")
         action = donnees.get("action", [""])[0]
         base = self.application.base
         if action == "charger":
-            # ⚠ DANS LA LANGUE DE L'ÉCRAN. Un testeur anglophone qui charge
-            # le jeu d'essai doit recevoir un décor anglais : c'est le geste
-            # par lequel il découvre le produit.
+            # ⚠ IN THE SCREEN'S LANGUAGE. An English-speaking tester who loads
+            # the sample data set must receive an English setting: it is the
+            # gesture by which they discover the product.
             clients, rdv = jeu_essai.charger(
                 base, langue_code=self._langue())
             return self._rediriger(f"/reglages?essai=charge&clients={clients}"
                                    f"&rdv={rdv}#jeu-essai")
         if action == "retirer":
-            # Désarmé d'abord (pour pouvoir DIRE combien), puis retiré.
+            # Disarmed first (so we can SAY how many), then removed.
             desarmees = base.desarmer_jeu_essai()
             clients, rdv = jeu_essai.retirer(base)
             return self._rediriger(f"/reglages?essai=retire&clients={clients}"
@@ -10464,7 +10257,7 @@ de réponse, autre date, à rappeler par un humain).</p>
                                  "(attendu « charger » ou « retirer »).")
 
     def _tableau_bilan(self):
-        """Petit tableau récapitulatif des issues de tous les appels passés."""
+        """A small summary table of the outcomes of every call placed."""
         bilan = self.application.base.bilan_issues()
         return f"""<table>
 <tr><th>Confirmés</th><th>Déplacés (autre date)</th><th>Annulés (par le client)</th><th>À reprogrammer</th><th>Échecs</th></tr>
@@ -10473,11 +10266,11 @@ de réponse, autre date, à rappeler par un humain).</p>
 </table>"""
 
     def _formulaires_import(self):
-        """Les DEUX imports : CSV et agenda ICS. Écrits une fois, servis deux.
+        """The TWO imports: CSV and ICS calendar. Written once, served twice.
 
-        ⚠ LA PAGE « /ajouter » ET LA FENÊTRE MONTRENT LE MÊME TEXTE. Deux
-        rédactions du même formulaire finissent toujours par se contredire, et
-        c'est au moment d'importer qu'on s'en aperçoit.
+        ⚠ THE `/ajouter` PAGE AND THE WINDOW SHOW THE SAME TEXT. Two wordings
+        of the same form always end up contradicting each other, and it is at
+        the moment of importing that you find out.
         """
         return f"""<p class="bandeau">⚠ {html.escape(AVERTISSEMENT_IMPORT)}</p>
 <h2>Importer un fichier CSV</h2>
@@ -10508,16 +10301,17 @@ inventé.</small></p>
 </form>"""
 
     def _modale_import(self):
-        """La fenêtre « ＋ Importer votre agenda » : les deux imports, rien d'autre."""
+        """The `＋ Importer votre agenda` window: the two imports, nothing else.
+        """
         return self._modale("＋ Importer votre agenda",
                             self._formulaires_import())
 
     def _formulaire_ajout_main(self, valeurs=None, erreurs=(), cible="/ajouter"):
-        """Le formulaire d'ajout à la main. Servi par la page ET par la fenêtre.
+        """The manual add form. Served by the page AND by the window.
 
-        `cible` : où il poste. La page garde « /ajouter » ; la fenêtre poste au
-        même endroit — c'est le MÊME traitement, donc les mêmes refus et les
-        mêmes règles anti-doublon.
+        `cible`: where it posts. The page keeps `/ajouter`; the window posts to
+        the same place — it is the SAME handling, hence the same refusals and
+        the same anti-duplicate rules.
         """
         valeurs = valeurs or {}
         bloc_erreurs = ""
@@ -10532,8 +10326,8 @@ inventé.</small></p>
   <label>Nom du contact<br>
     <input name="nom" value="{html.escape(valeurs.get('nom', ''), quote=True)}"
            placeholder="Mme Exemple Dupont"></label>
-  <label>Téléphone (fictif : +33 6 00 00 00 XX)<br>
-    <input name="telephone" placeholder="+33 6 00 00 00 49"></label>
+  <label>Téléphone (fictif : +33 6 39 98 50 XX)<br>
+    <input name="telephone" placeholder="+33 6 39 98 50 49"></label>
   <label>Date et heure<br>
     <input type="datetime-local" name="date_heure"
            value="{html.escape(valeurs.get('date_heure', ''), quote=True)}"></label>
@@ -10547,11 +10341,11 @@ inventé.</small></p>
 </form>"""
 
     def _modale_ajout(self, parametres):
-        """La fenêtre « ＋ Ajouter un rendez-vous », ouverte depuis un créneau libre.
+        """The `＋ Ajouter un rendez-vous` window, opened from a free slot.
 
-        ⚠ LA DATE ET L'HEURE SONT DÉJÀ REMPLIES avec le créneau cliqué : c'est
-        tout l'intérêt d'ouvrir ce formulaire DEPUIS une place libre. Elles
-        restent modifiables — rien n'est décidé à la place de l'opérateur.
+        ⚠ THE DATE AND TIME ARE ALREADY FILLED IN with the slot clicked: that
+        is the whole point of opening this form FROM a free slot. They stay
+        editable — nothing is decided in the operator's place.
         """
         creneau = (parametres or {}).get("creneau", [""])[0]
         valeurs = {}
@@ -10564,11 +10358,11 @@ inventé.</small></p>
                             self._formulaire_ajout_main(valeurs))
 
     def _page_ajout(self, valeurs=None, erreurs=None):
-        """La page de repli : le même formulaire et les mêmes imports.
+        """The fallback page: the same form and the same imports.
 
-        ⚠ ELLE RESTE, et c'est voulu. Les deux fenêtres (import, ajout) sont
-        de vrais liens vers ici : sans JavaScript — ou sur un téléphone où le
-        script n'a pas chargé — tout reste faisable, à la même adresse.
+        ⚠ IT REMAINS, and that is intended. Both windows (import, add) are real
+        links to here: without JavaScript — or on a phone where the script did
+        not load — everything stays doable, at the same URL.
         """
         corps = f"""<p><a href="/suivi">← Retour aux rendez-vous</a></p>
 <h1>Ajouter un rendez-vous</h1>
@@ -10579,18 +10373,18 @@ inventé.</small></p>
     def _page_confirmation_ajout(self, rdv_id):
         rdv = self.application.base.obtenir_rendezvous(rdv_id)
         if rdv["statut"] == "manqué":
-            # ⚠ « À rappeler » N'EXISTE PLUS (10/08/2026) : on renvoie là où ce
-            # rendez-vous se voit vraiment. Garder l'ancienne ancre aurait
-            # promis un écran qui n'affiche plus rien.
+            # ⚠ `À rappeler` NO LONGER EXISTS (10/08/2026): we send you where
+            # that appointment can really be seen. Keeping the old anchor would
+            # have promised a screen that shows nothing any more.
             visibilite = ("Statut : manqué (l'horaire est déjà passé) — visible "
                           "dans 🗂 Tous les rendez-vous, avec sa pastille.")
             lien = ('<p><a href="/tous">Voir dans « Tous les rendez-vous »</a>'
                     "</p>")
         else:
-            # ⚠ « Rendez-vous à venir » N'EXISTE PLUS (10/08/2026) : on
-            # renvoie là où ce rendez-vous se voit vraiment — le planning, et
-            # la liste complète. Promettre une section retirée aurait mené
-            # sur un écran sans elle.
+            # ⚠ `Rendez-vous à venir` NO LONGER EXISTS (10/08/2026): we send
+            # you where that appointment can really be seen — the schedule, and
+            # the complete list. Promising a removed section would have led to
+            # a screen without it.
             visibilite = ("Statut : prévu — visible dès maintenant sur le "
                           "planning de la page 📅 Rendez-vous.")
             lien = ('<p><a href="/suivi">Voir sur le planning</a> · '
@@ -10609,10 +10403,10 @@ Motif : {html.escape(rdv['motif'])}<br>
         return self._page("Rendez-vous enregistré", corps, actif="suivi")
 
     def _page_doublon(self, existant, propres, rappel_souhaite=None):
-        """Le signal anti-doublon : rien n'est créé sans confirmation.
+        """The anti-duplicate warning: nothing is created without confirmation.
 
-        Le formulaire « Ajouter quand même » repart de l'identifiant du
-        client existant : le numéro en clair n'apparaît nulle part.
+        The `Ajouter quand même` form starts again from the existing client's
+        id: the number in clear appears nowhere.
         """
         champ_rappel = ""
         if rappel_souhaite:
@@ -10641,16 +10435,16 @@ personne), confirmez explicitement :</p>
         return self._page("Ce rendez-vous existe déjà", corps, actif="suivi")
 
     def _compte_rendu_import(self, jeton):
-        """Ce qu'un import vient de faire — affiché EN TÊTE DE L'AGENDA.
+        """What an import has just done — displayed AT THE TOP OF THE CALENDAR.
 
-        ⚠ TROIS CHOSES QU'ON NE PEUT PAS TAIRE : ce qui a été rejeté, ce qui a
-        été DÉPLACÉ (l'import prend la place qu'il trouve), et ce qui arrive
-        sans numéro. Revenir sur l'agenda sans rien dire aurait fait disparaître
-        des rendez-vous sous les yeux de l'opérateur, sans un mot.
+        ⚠ THREE THINGS THAT CANNOT BE PASSED OVER: what was rejected, what was
+        DISPLACED (the import takes the slot it finds), and what arrives with
+        no number. Coming back to the calendar with nothing said would have
+        made appointments disappear before the operator's eyes, without a word.
 
-        Un jeton inconnu (page rechargée bien plus tard, serveur redémarré) ne
-        montre RIEN plutôt qu'un compte rendu vide : mieux vaut pas de message
-        qu'un message qui ne veut rien dire.
+        An unknown token (a page reloaded much later, a restarted server) shows
+        NOTHING rather than an empty report: better no message than a message
+        that means nothing.
         """
         bilan = self.application.bilans_recuperation.get(jeton or "")
         if not bilan:
@@ -10674,13 +10468,13 @@ personne), confirmez explicitement :</p>
                 f"</p>{rejet}{self._bloc_remplaces(bilan)}{complete}")
 
     def _bloc_remplaces(self, bilan):
-        """Ce que l'import a DÉPLACÉ — dit, jamais tu.
+        """What the import DISPLACED — said, never kept quiet.
 
-        ⚠ SANS CE BLOC, UN IMPORT POURRAIT VIDER UNE JOURNÉE EN SILENCE. Les
-        rendez-vous dont la place a été prise ne sont pas effacés : ils passent
-        « annulé » (date passée) ou « supprimé » (date à venir) et restent
-        lisibles dans 🗂 Tous les rendez-vous. Encore faut-il l'apprendre au
-        moment où ça arrive.
+        ⚠ WITHOUT THIS BLOCK, AN IMPORT COULD EMPTY A DAY IN SILENCE. The
+        appointments whose slot was taken are not erased: they become `annulé`
+        (past date) or `supprimé` (upcoming date) and stay readable in 🗂 Tous
+        les rendez-vous. But you still have to learn it at the moment it
+        happens.
         """
         bilan = bilan or {}
         vides = bilan.get("vides") or []
@@ -10708,15 +10502,16 @@ personne), confirmez explicitement :</p>
                 "sur la fiche du contact.</p>"
                 f"<ul>{lignes}{reste}</ul></div>")
 
-    # ⚠ LES DEUX PAGES DE RÉSULTAT D'IMPORT ONT ÉTÉ RETIRÉES le 10/08/2026 :
-    # « une fois l'import effectué, on revient directement sur l'agenda »
-    # (propriétaire). Ce qu'elles disaient — lignes rejetées, rendez-vous
-    # déplacés, numéros à compléter — s'affiche maintenant EN TÊTE DU PLANNING,
-    # voir _compte_rendu_import. Le compte rendu passe par un jeton : il nomme
-    # des personnes, et un nom n'a rien à faire dans une adresse de page.
+    # ⚠ THE TWO IMPORT RESULT PAGES WERE REMOVED on 10/08/2026: `once the
+    # import is done, we come straight back to the calendar` (owner). What they
+    # said — rejected rows, displaced appointments, numbers to complete — is
+    # now displayed AT THE TOP OF THE SCHEDULE, see _compte_rendu_import. The
+    # report travels through a token: it names people, and a name has no
+    # business in a page's URL.
 
     def _bloc_sans_numero(self):
-        """Tableau des rendez-vous sans numéro, avec un champ pour compléter."""
+        """A table of appointments with no number, with a field to complete them.
+        """
         lignes = []
         for rdv in self.application.base.rendezvous_sans_numero():
             lignes.append(f"""<tr>
@@ -10726,7 +10521,7 @@ personne), confirmez explicitement :</p>
   <td><span class="pastille">{html.escape(rdv['statut'])}</span></td>
   <td><form method="post" action="/completer-numero">
     <input type="hidden" name="client" value="{rdv['client_id']}">
-    <input name="telephone" placeholder="+33 6 00 00 00 49" size="16">
+    <input name="telephone" placeholder="+33 6 39 98 50 49" size="16">
     <button>Enregistrer le numéro</button>
   </form></td>
 </tr>""")
@@ -10753,12 +10548,12 @@ contenait pas de téléphone. Un contact sans numéro ne peut pas être rappelé
 
     # ----------------------------------------------------------------- cascade
     def _bloc_generation(self, source, ordre):
-        """Le bloc « Remplir depuis les rendez-vous » du formulaire cascade.
+        """The `Remplir depuis les rendez-vous` block of the cascade form.
 
-        L'ordre d'appel n'a AUCUNE présélection tant que l'utilisateur n'a
-        jamais choisi (décision du 27/07 : aucun ordre imposé par défaut) ;
-        ensuite, son DERNIER choix — mémorisé dans les préférences — est
-        présélectionné, mais reste modifiable à chaque génération.
+        The calling order has NO pre-selection as long as the user has never
+        chosen (decision of 27/07: no order imposed by default); afterwards,
+        their LAST choice — remembered in the preferences — is pre-selected,
+        but stays editable at every generation.
         """
         preferences = self.application.preferences
         source = source or preferences.obtenir("cascade_source") or "annules"
@@ -10839,7 +10634,7 @@ même chose, guidé.</small></p>
   <label>Liste d'attente — une ligne par personne : « Nom;Téléphone »
     (virgule ou tabulation acceptées) ; générée ou collée, elle reste
     modifiable et réordonnable à la main<br>
-    <textarea name="liste" rows="6" placeholder="Mme Exemple Un;+33 6 00 00 00 51&#10;M. Exemple Deux, 06 00 00 00 52">{html.escape(liste)}</textarea></label>
+    <textarea name="liste" rows="6" placeholder="Mme Exemple Un;+33 6 39 98 50 51&#10;M. Exemple Deux, 06 39 98 50 52">{html.escape(liste)}</textarea></label>
   {self._selecteur_theme("creneau_libere", mission=mission, note_creneau=True)}
   <label>Créneau proposé (date et heure du créneau libéré)<br>
     <input type="datetime-local" name="creneau" value="{html.escape(creneau or '')}"></label>
@@ -10876,10 +10671,10 @@ même chose, guidé.</small></p>
         lignes, transcriptions = [], []
         for appel in appeles:
             etiquette = ETIQUETTES_CASCADE.get(appel["issue"], appel["issue"])
-            # CE QUE LE PRODUIT A DÉCIDÉ, écrit au moment du changement :
-            # l'ancien rendez-vous libéré, ou la mention « à libérer dans
-            # votre agenda » quand RingBack ne savait pas duquel il s'agit
-            # (Q7). Jamais une phrase prêtée à l'agent.
+            # WHAT THE PRODUCT DECIDED, written at the moment of the change:
+            # the old appointment released, or the note `to be released in your
+            # calendar` when RingBack did not know which one it was (Q7). Never
+            # a sentence put in the agent's mouth.
             lignes.append(f"""<tr>
   <td>{appel['rang']}</td>
   <td>{html.escape(appel['nom'])}</td>
@@ -10898,10 +10693,10 @@ même chose, guidé.</small></p>
                            + "\n".join(lignes) + "</table>") if lignes else \
             "<p>Personne n'a été appelé.</p>"
         if epargnes:
-            # ⚠ LE MOT AFFICHÉ VIENT DE `mot_etat` (14/08/2026, audit croisé).
-            # Cette page écrivait encore « épargné » en clair — le mot dont le
-            # propriétaire a dit qu'il ne lui parlait pas, et qui a été traduit
-            # partout ailleurs.
+            # ⚠ THE DISPLAYED WORD COMES FROM `mot_etat` (14/08/2026, cross
+            # audit). This page still wrote `épargné` in plain text — the word
+            # the owner said meant nothing to him, and which has been
+            # translated everywhere else.
             mot = assistant.mot_etat("épargné")
             elements = "".join(
                 f"<li>{a['rang']}. {html.escape(a['nom'])} — "
@@ -10959,9 +10754,9 @@ Mission lue par l'agent : « {html.escape(cascade['mission'])} »</p>
                     f"<pre>{html.escape(json.dumps(resultat, indent=2, ensure_ascii=False))}</pre>")
             else:
                 bloc_resultat = "<p>Pas encore de résultat.</p>"
-            # La NOTE dit ce que le produit a décidé face à ce résultat
-            # (appel non composé, date convenue impossible) — jamais un
-            # texte prêté à l'agent.
+            # The NOTE says what the product decided in the face of this result
+            # (call not dialled, agreed date impossible) — never a text put in
+            # the agent's mouth.
             if appel.get("note"):
                 bloc_resultat = (
                     f'<div class="erreurs"><strong>⚠ Ce que RingBack a fait :'
@@ -11011,17 +10806,17 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
 
     def _bloc_duree_et_deplacement(self, rdv, duree_saisie=None,
                                    cible_saisie=None):
-        """Durée, déplacement et annulation d'un rendez-vous.
+        """An appointment's length, move and cancellation.
 
-        Le déplacement ne propose QUE des créneaux où ce rendez-vous tient
-        (sa durée en tranches consécutives) ; s'il n'en existe aucun, le
-        refus est écrit à l'écran, avec ce qui manque — rien n'est mimé.
+        The move only offers slots where this appointment fits (its length in
+        consecutive slots); when there is none, the refusal is written on
+        screen, with what is missing — nothing is mimed.
         """
         base = self.application.base
         preferences = self.application.preferences
         pas = horaires.pas_minutes(preferences)
         tranches = rdv["duree_tranches"]
-        # La valeur refusée n'est jamais perdue : elle revient DANS son champ.
+        # The refused value is never lost: it comes back IN its field.
         duree_affichee = (duree_saisie if duree_saisie is not None
                           else str(tranches * pas))
         if rdv["statut"] in ("annulé", "ignoré"):
@@ -11072,21 +10867,22 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
 
     # --------------------------------------------------------------- plomberie
     def _page(self, titre, corps, actif=None, mode=None):
-        """La page complète. `mode` = « simplifie » / « avance » quand
-        l'écran a deux niveaux de détail (les formulaires de campagne) ; il
-        est écrit sur <main> et c'est la feuille de style qui masque le
-        reste. Les autres écrans ne le passent pas et ne changent pas."""
+        """The complete page. `mode` = `simplifie` / `avance` when the screen has
+        two levels of detail (the campaign forms); it is written on <main> and
+        it is the stylesheet that hides the rest. The other screens do not pass
+        it and do not change.
+        """
         return _gabarit(titre, corps, self.application.mode_reel, actif,
                         mode, self._langue())
 
     @staticmethod
     def _pastille_statut(statut):
-        """La pastille colorée d'un statut de rendez-vous (bleu/orange/vert…)."""
+        """The coloured badge of an appointment status (blue/orange/green…)."""
         classe = CLASSES_STATUT.get(statut, "")
         return f'<span class="pastille {classe}">{html.escape(statut)}</span>'
 
     def _bloc_origine(self, rdv_id):
-        """Le paragraphe « Obtenu par téléphone » d'une fiche, ou "" (jamais vide)."""
+        """A record's `Obtenu par téléphone` paragraph, or "" (never empty)."""
         lien = self._lien_campagne(rdv_id, suffixe="")
         if not lien:
             return ""
@@ -11094,21 +10890,21 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
                 f"{lien}</p>")
 
     def _ligne_origine(self, rdv_id):
-        """La ligne « Vient de » d'une liste de définitions, ou "" (jamais vide)."""
+        """The `Vient de` line of a definition list, or "" (never empty)."""
         lien = self._lien_campagne(rdv_id, suffixe="")
         if not lien:
             return ""
         return f"<dt>Vient de</dt><dd>{lien}</dd>"
 
     def _lien_campagne(self, rdv_id, prefixe="", suffixe=" "):
-        """Le lien vers LA campagne qui a produit ce rendez-vous, ou "".
+        """The link to THE campaign that produced this appointment, or "".
 
-        La demande du propriétaire : « on doit simplement renvoyer la
-        demande de rendez-vous vers la campagne qui l'a faite ». Le lien
-        sort du cahier de changements (db.campagne_du_rendezvous), qui relie
-        déjà chaque changement à sa campagne et à son rendez-vous — aucune
-        colonne n'a été ajoutée pour ça. Un rendez-vous saisi à la main n'a
-        pas de campagne : il n'affiche RIEN, jamais un lien mort.
+        The owner's request: `we must simply point the appointment request back
+        to the campaign that made it`. The link comes out of the change log
+        (db.campagne_du_rendezvous), which already ties every change to its
+        campaign and to its appointment — no column was added for it. An
+        appointment typed by hand has no campaign: it displays NOTHING, never a
+        dead link.
         """
         campagne = self.application.base.campagne_du_rendezvous(rdv_id)
         if not campagne:
@@ -11119,7 +10915,8 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
 
     @staticmethod
     def _badge_stop(rdv_ou_client):
-        """Le badge 🚫 d'un client marqué « Ne plus appeler » (sinon rien)."""
+        """The 🚫 badge of a client marked `Ne plus appeler` (otherwise nothing).
+        """
         if not rdv_ou_client.get("ne_plus_appeler"):
             return ""
         return (' <span class="badge-stop" title="Client marqué « Ne plus '
@@ -11128,7 +10925,7 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
 
     @staticmethod
     def _cellule_horaire(rdv):
-        """L'horaire lisible + la date de rappel souhaitée si elle existe."""
+        """The readable time + the call-back date wanted, when there is one."""
         texte = _date_lisible(rdv["horaire"])
         if rdv.get("rappel_souhaite"):
             texte += ("<br><small>🔔 rappel souhaité : "
@@ -11142,11 +10939,11 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
         else:
             bandeau = ('<p class="bandeau">Mode simulation — aucun appel réel '
                        "n'est émis.</p>")
-        # ⚠ LE RENVOI D'ESSAI SE DIT SUR TOUTES LES PAGES, en mode réel. Sans
-        # cela, on relirait une campagne entière en croyant avoir appelé de
-        # vrais contacts — ou l'inverse. Il ne se dit qu'en mode réel parce
-        # qu'en simulation aucun numéro n'est composé du tout : l'annoncer
-        # ailleurs serait du bruit qui finirait par ne plus se lire.
+        # ⚠ THE TEST REDIRECT IS STATED ON EVERY PAGE, in real mode. Without
+        # that, you would reread a whole campaign believing you had called real
+        # contacts — or the reverse. It is only stated in real mode because in
+        # simulation no number is dialled at all: announcing it elsewhere would
+        # be noise that would end up not being read.
         if self.application.mode_reel:
             renvoi = essai_reel.etat_du_renvoi(self.application.preferences)
             if renvoi["actif"]:
@@ -11164,27 +10961,26 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
                             "vos contacts à sa place. "
                             '<a href="/reglages#renvoi-essai">Corriger le '
                             "numéro</a></p>")
-        # ⚠ LE BANDEAU « JEU D'ESSAI CHARGÉ » EST PARTI (21/08/2026, sa
-        # demande). Il s'affichait sur TOUTES les pages, en tête, et prenait
-        # deux lignes à chaque écran pour redire une chose qu'il sait déjà :
-        # c'est LUI qui a chargé le jeu d'essai.
-        #
-        # ⚠ L'INFORMATION N'EST PAS PERDUE POUR AUTANT, et c'est ce qui rend
-        # le retrait tenable : chaque client d'essai porte toujours son 🧪
-        # partout où il apparaît (voir `essai_reel.badge`), et ⚙ Réglages
-        # garde le bouton pour les retirer en bloc. Ce qui disparaît, c'est
-        # la répétition — pas le fait.
+        # ⚠ THE `JEU D'ESSAI CHARGÉ` BANNER IS GONE (21/08/2026, his request).
+        # It was shown on EVERY page, at the top, and took two lines on every
+        # screen to repeat something he already knows: HE is the one who loaded
+        # the sample data set.  ⚠ THE INFORMATION IS NOT LOST FOR ALL THAT, and
+        # that is what makes the removal tenable: every test client still
+        # carries its 🧪 wherever it appears (see `essai_reel.badge`), and ⚙
+        # Réglages keeps the button to remove them in one go. What disappears
+        # is the repetition — not the fact.
         return bandeau
 
     def _libelle_rappel(self):
         return "Rappeler (RÉEL)" if self.application.mode_reel else "Rappeler (simulé)"
 
     def _langue(self):
-        """La langue choisie pour l'interface. Français tant qu'on n'a rien dit.
+        """The language chosen for the interface. French as long as nothing was
+        said.
 
-        ⚠ ELLE NE PEUT PAS ÉCHOUER. Un réglage absent, vide ou abîmé rend le
-        français : le pire acceptable est de revoir le produit dans sa langue
-        d'origine, jamais un écran qui refuse de s'afficher.
+        ⚠ IT CANNOT FAIL. A setting that is absent, empty or damaged yields
+        French: the worst acceptable outcome is seeing the product in its
+        original language again, never a screen that refuses to display.
         """
         try:
             choisie = self.application.preferences.obtenir(langue.CLE_LANGUE)
@@ -11193,12 +10989,12 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
         return langue.langue_valide(choisie)
 
     def _repondre(self, page, code=200):
-        # ⚠ ICI, ET NULLE PART AILLEURS. Tout le HTML du produit sort par cette
-        # ligne et par celle de `_repondre_cible` : c'est le point de passage
-        # unique où la page finie devient des octets, donc le seul endroit où
-        # une traduction ne peut oublier aucun écran. En français, `traduire`
-        # rend l'objet reçu sans le lire — le produit d'origine ne traverse
-        # donc STRICTEMENT rien.
+        # ⚠ HERE, AND NOWHERE ELSE. All the product's HTML goes out through
+        # this line and through `_repondre_cible`'s: it is the single
+        # checkpoint where the finished page becomes bytes, hence the only
+        # place where a translation cannot forget a single screen. In French,
+        # `traduire` returns the object it received without reading it — so the
+        # original product goes through STRICTLY nothing.
         contenu = langue.traduire(page, self._langue()).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -11207,28 +11003,30 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
         self.wfile.write(contenu)
 
     def _repondre_fragment(self, morceau, code=200):
-        """Répond un MORCEAU de page (sans habillage) : un élément se recharge
-        sur place, la page entière n'est jamais rechargée."""
+        """Answers with a PIECE of page (no chrome): an element reloads in place,
+        the whole page is never reloaded.
+        """
         return self._repondre(morceau, code)
 
     def _depuis_modale(self):
-        """Vrai si la demande vient du mécanisme de modale (et non d'un envoi
-        de formulaire ordinaire, qui attend une page entière en retour)."""
+        """True when the request comes from the modal mechanism (and not from an
+        ordinary form submission, which expects a whole page back).
+        """
         return self.headers.get("X-RingBack-Fragment") == "1"
 
     def _repondre_cible(self, morceau, cible, code=200):
-        """Répond un morceau EN DISANT quel élément doit le recevoir.
+        """Answers with a piece WHILE SAYING which element must receive it.
 
-        « modale » = la modale se remet telle quelle (saisie refusée) ;
-        tout autre nom = l'identifiant de l'élément à remplir à nouveau,
-        et la modale se ferme. C'est ce qui permet de ne rafraîchir QUE
-        l'élément concerné, jamais la page.
+        `modale` = the modal is put back as it was (refused input); any other
+        name = the id of the element to be filled again, and the modal closes.
+        That is what makes it possible to refresh ONLY the element concerned,
+        never the page.
 
-        ⚠ ELLE ENCODE ELLE-MÊME, DONC ELLE TRADUIT ELLE-MÊME. Cette méthode ne
-        passe pas par `_repondre` (elle ajoute un en-tête de cible) : c'est la
-        SECONDE et dernière porte de sortie du HTML. L'oublier laisserait les
-        fenêtres et les éléments rechargés en français au milieu d'un écran
-        anglais — le défaut le plus visible qu'on puisse livrer.
+        ⚠ IT ENCODES ITSELF, SO IT TRANSLATES ITSELF. This method does not go
+        through `_repondre` (it adds a target header): it is the SECOND and
+        last exit door for the HTML. Forgetting it would leave the windows and
+        the reloaded elements in French in the middle of an English screen —
+        the most visible defect you could ship.
         """
         contenu = langue.traduire(morceau, self._langue()).encode("utf-8")
         self.send_response(code)
@@ -11243,40 +11041,38 @@ Durée : {horaires.tranches_lisibles(rdv['duree_tranches'], pas)}{rappel}</p>
                                             '<p><a href="/suivi">← Retour aux rendez-vous</a></p>'), code)
 
     def log_message(self, gabarit, *arguments):
-        # Journal discret ; les pages ne contiennent que des numéros masqués.
+        # A discreet log; the pages contain only masked numbers.
         journal.debug("%s — " + gabarit, self.address_string(), *arguments)
 
 
 class ServeurWeb(ThreadingHTTPServer):
-    """Le serveur : UNE connexion = UN fil, et aucune ne bloque les autres.
+    """The server: ONE connection = ONE thread, and none blocks the others.
 
-    Pourquoi ce n'est pas le HTTPServer ordinaire : celui-là ne traite
-    qu'une connexion à la fois. Or les navigateurs ouvrent des connexions
-    « par anticipation » sur lesquelles ils ne demandent rien — le serveur
-    restait planté à attendre une requête qui ne venait jamais, et TOUT le
-    reste attendait avec lui (jusqu'à ce que le navigateur referme la
-    connexion : deux minutes d'écran figé, mesurées).
+    Why this is not the ordinary HTTPServer: that one handles only one
+    connection at a time. Yet browsers open connections `in anticipation` on
+    which they request nothing — the server stayed stuck waiting for a request
+    that never came, and EVERYTHING else waited with it (until the browser
+    closed the connection: two minutes of frozen screen, measured).
 
-    daemon_threads : un fil de connexion n'empêche jamais l'arrêt. Un
-    Ctrl+C, ou la fermeture de la fenêtre, arrête le programme tout de
-    suite au lieu d'attendre que les navigateurs referment leurs
-    connexions dormantes.
+    daemon_threads: a connection thread never prevents shutdown. A Ctrl+C, or
+    closing the window, stops the program straight away instead of waiting for
+    the browsers to close their dormant connections.
     """
 
     daemon_threads = True
-    # Conséquence de daemon_threads : server_close() n'attend pas les fils
-    # en cours. C'est déjà la valeur déduite par la bibliothèque standard ;
-    # elle est écrite ici pour que la lecture ne laisse pas de doute.
+    # A consequence of daemon_threads: server_close() does not wait for the
+    # threads in progress. That is already the value the standard library
+    # infers; it is written here so the reading leaves no doubt.
     block_on_close = False
 
 
 def chemin_preferences(chemin_base):
-    """Le fichier de réglages qui va avec cette base (None = en mémoire).
+    """The settings file that goes with this database (None = in memory).
 
-    ⚠ UN SEUL CALCUL, pour deux lecteurs : l'Application, et la console qui
-    annonce le renvoi d'essai AVANT la confirmation tapée. Deux calculs qui
-    divergeraient feraient annoncer un réglage qui n'est pas celui qui
-    s'appliquera — le pire endroit pour une approximation.
+    ⚠ ONE SINGLE COMPUTATION, for two readers: the Application, and the console
+    that announces the test redirect BEFORE the typed confirmation. Two
+    computations that diverged would announce a setting that is not the one
+    that will apply — the worst possible place for an approximation.
     """
     if chemin_base == ":memory:":
         return None
@@ -11285,14 +11081,15 @@ def chemin_preferences(chemin_base):
 
 
 def creer_serveur(port=PORT, chemin_base=None, appels_reels=False):
-    """Construit le serveur ; base sur disque par défaut, démo si base vide.
+    """Builds the server; database on disk by default, demo when the database is
+    empty.
 
-    Le fichier donnees/ringback.db (et son dossier) est créé au premier
-    lancement ; s'il contient déjà des données, la démonstration est ignorée.
-    Les tests passent chemin_base=":memory:" pour rester sans trace.
-    appels_reels=True ne doit être passé qu'après confirmation explicite de
-    l'opérateur (voir principal()) ; sans clé CALLE_API_KEY, la construction
-    échoue de toute façon (CleApiAbsente).
+    The donnees/ringback.db file (and its directory) is created at first
+    launch; when it already contains data, the demonstration is skipped. The
+    tests pass chemin_base=":memory:" to leave no trace. appels_reels=True must
+    only be passed after the operator's explicit confirmation (see
+    principal()); with no CALLE_API_KEY key, the construction fails anyway
+    (CleApiAbsente).
     """
     application = Application(chemin_base or CHEMIN_BASE, appels_reels=appels_reels)
     application.peupler_demo()
@@ -11305,35 +11102,32 @@ def creer_serveur(port=PORT, chemin_base=None, appels_reels=False):
 
 
 
-# ⚠ LE 3ᵉ VERROU PARLE LES DEUX LANGUES, CÔTE À CÔTE (04/09/2026). Sa demande :
-# « peu importe d'où tu viens, tu comprends ». La console tourne AVANT
-# l'application — le réglage de langue n'est pas forcément lu, et un membre du
-# jury qui n'a pas encore ouvert l'interface n'a rien réglé du tout. Afficher
-# les deux ne dépend de rien.
-#
-# ⚠ ET LES DEUX MOTS SONT ACCEPTÉS, dans les deux langues : « APPELER » reste
-# donc vrai partout où il est écrit — README publié, texte Devpost, proposition
-# d'ajout. Aucun document ne devient faux, ce qui était le coût caché de toutes
-# les autres solutions envisagées.
-#
-# ⚠ LA CASSE EST TOLÉRÉE, l'orthographe non. Refuser « call » en minuscules
-# n'ajoute aucune sécurité : le geste délibéré, c'est d'écrire le mot ENTIER,
-# pas de tenir la touche majuscule. Un refus sur la casse ferait seulement
-# croire que le produit est cassé.
+# ⚠ THE 3rd LOCK SPEAKS BOTH LANGUAGES, SIDE BY SIDE (04/09/2026). His request:
+# `wherever you come from, you understand`. The console runs BEFORE the
+# application — the language setting is not necessarily read, and a member of
+# the jury who has not yet opened the interface has configured nothing at all.
+# Showing both depends on nothing.  ⚠ AND BOTH WORDS ARE ACCEPTED, in both
+# languages: `APPELER` therefore stays true wherever it is written — the
+# published README, the Devpost text, the pull request. No document becomes
+# false, which was the hidden cost of every other solution considered.  ⚠ CASE
+# IS TOLERATED, SPELLING IS NOT. Refusing `call` in lower case adds no
+# security: the deliberate gesture is writing the WHOLE word, not holding the
+# shift key. A refusal on case would only make people think the product is
+# broken.
 MOT_CONFIRMATION = "APPELER"
 MOT_CONFIRMATION_EN = "CALL"
 MOTS_CONFIRMATION = (MOT_CONFIRMATION, MOT_CONFIRMATION_EN)
 
 
 def _confirmation_tapee():
-    """Verrou 3 : l'opérateur tape « APPELER » à chaque lancement en mode réel.
+    """Lock 3: the operator types `APPELER` at every launch in real mode.
 
-    ⚠ LE RENVOI D'ESSAI EST ANNONCÉ ICI, AVANT LA QUESTION. C'est le moment
-    où l'opérateur décide de laisser partir de vrais appels : s'ils vont tous
-    être renvoyés vers son propre téléphone, il doit le savoir AVANT de taper,
-    pas le découvrir après. Le réglage est relu dans le fichier (l'Application
-    n'existe pas encore), par le MÊME calcul de chemin qu'elle — voir
-    chemin_preferences.
+    ⚠ THE TEST REDIRECT IS ANNOUNCED HERE, BEFORE THE QUESTION. This is the
+    moment the operator decides to let real calls go out: if they are all going
+    to be redirected to their own phone, they must know BEFORE typing, not
+    discover it afterwards. The setting is read back from the file (the
+    Application does not exist yet), through the SAME path computation as it
+    uses — see chemin_preferences.
     """
     print("ATTENTION : --appels-reels demandé. Les appels partiront VRAIMENT.")
     print("WARNING: --appels-reels requested. Calls will REALLY be placed.")
@@ -11360,7 +11154,7 @@ def _confirmation_tapee():
             f"(autre chose = simulation) / "
             f"Type {MOT_CONFIRMATION_EN} to confirm "
             f"(anything else = simulation) : ")
-    except EOFError:  # lancement non interactif : refus par défaut
+    except EOFError:  # non-interactive launch: refusal by default
         reponse = ""
     return reponse.strip().upper() in MOTS_CONFIRMATION
 

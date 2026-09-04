@@ -1,61 +1,50 @@
 # -*- coding: utf-8 -*-
-"""Le choix de langue de l'interface — français par défaut, anglais au choix.
+"""The interface language choice — French by default, English on request.
 
-⚠ POURQUOI LA TRADUCTION SE FAIT À LA SORTIE, ET NON DANS LE CODE.
+⚠ WHY TRANSLATION HAPPENS AT THE EXIT, AND NOT IN THE CODE.
 
-Le produit fabrique ses pages à la main, en f-strings, dans 238 fonctions
-différentes : mesuré le 01/09/2026, 15 440 lignes d'écrans portent environ
-1 757 phrases françaises distinctes, dont 93 à 98 % écrites en dur au milieu du
-code. Il n'existe aucun gabarit où l'on pourrait poser un dictionnaire.
+The product builds its pages by hand, in f-strings, across 238 different
+functions: measured on 01/09/2026, 15,440 lines of screens carry about 1,757
+distinct French sentences, 93 to 98 % of them written inline in the middle of
+the code. There is no template anywhere to hang a dictionary on.
 
-Remplacer chaque phrase par un appel de traduction demanderait de toucher ces
-238 fonctions. C'est précisément le genre de passe qui casse un produit qui
-marche — et celui-ci part en concours dans treize jours.
+Replacing every sentence with a translation call would mean touching those 238
+functions. That is exactly the kind of sweep that breaks a working product —
+and this one enters a contest in thirteen days.
 
-**On traduit donc la page FINIE, au moment exact où elle quitte le produit.**
-Tout le HTML sort par deux lignes (`serveur._repondre` et
-`serveur._repondre_cible`) : c'est le point de passage unique, et il existait
-déjà. Le code métier continue de fabriquer du français, sans qu'une seule de
-ses lignes change ; l'anglais est une couche posée par-dessus.
+**So the FINISHED page is translated, at the exact moment it leaves the product.** All the HTML goes out through two lines (`serveur._repondre` and `serveur._repondre_cible`): that is the single exit point, and it already existed. The business code goes on producing French, without a single one of its lines changing; English is a layer laid on top.
 
-CE QUE ÇA APPORTE, et ce n'est pas un détail :
+WHAT THIS BUYS, and it is not a detail:
 
-1. **En français, RIEN ne se passe.** `traduire(page, "fr")` rend l'objet
-   reçu, à l'identité près. Le produit français ne peut donc pas régresser :
-   il n'est même pas traversé.
-2. **Les phrases composées à l'exécution sont couvertes.** 565 des textes que
-   les essais affirment n'existent nulle part tels quels dans le code — ils
-   sont assemblés au vol. Un extracteur de chaînes ne les verrait jamais ; la
-   page finie, si.
-3. **Rien n'est écrit en base.** La traduction est un habillage d'affichage.
-   Les états stockés en français (« prévu », « à appeler »…) restent
-   exactement ce qu'ils sont : traduire une donnée, ce serait la corrompre.
+1. **In French, NOTHING happens.** `traduire(page, "fr")` returns the object it received, identity included. The French product therefore cannot regress: it is not even traversed.
+2. **Sentences composed at run time are covered.** 565 of the texts the tests assert exist nowhere in the code as such — they are assembled on the fly. A string extractor would never see them; the finished page does.
+3. **Nothing is written to the database.** Translation is display dressing. States stored in French (`prévu`, `à appeler`…) stay exactly what they are: translating data would corrupt it.
 
-CE QU'ELLE NE FAIT PAS, ET C'EST VOULU : elle ne traduit QUE ce qui est écrit
-dans le dictionnaire. Un texte inconnu reste en français. On n'invente jamais
-une traduction au mot à mot — sur un écran qui décide d'appels téléphoniques
-réels, une phrase mal traduite est pire qu'une phrase non traduite.
+WHAT IT DOES NOT DO, AND THAT IS DELIBERATE: it translates ONLY what is written
+in the dictionary. An unknown text stays French. A word-for-word translation is
+never invented — on a screen that decides real phone calls, a badly translated
+sentence is worse than an untranslated one.
 
-⚠ ET ELLE NE TOUCHE JAMAIS AUX DONNÉES DE L'UTILISATEUR. Le nom d'un client,
-le motif d'un rendez-vous, une note écrite à la main ne sont pas dans le
-dictionnaire : ils traversent intacts. C'est la conséquence directe du point
-précédent — ne traduire que ce qu'on connaît.
+⚠ AND IT NEVER TOUCHES THE USER'S DATA. A client's name, an appointment's
+reason, a hand-written note are not in the dictionary: they pass through
+intact. That is the direct consequence of the previous point — translate only
+what you know.
 """
 
 import re
 
 from . import traductions
 
-# Le réglage, rangé ici parce que c'est ce module qui en donne le sens.
+# The setting lives here because this is the module that gives it meaning.
 CLE_LANGUE = "langue_interface"
 
 FRANCAIS = "fr"
 ANGLAIS = "en"
 LANGUE_PAR_DEFAUT = FRANCAIS
 
-# ⚠ LE FRANÇAIS EST LA LANGUE SOURCE, PAS UNE TRADUCTION. Le produit est écrit
-# en français : il n'y a donc rien à traduire pour l'obtenir, et c'est ce qui
-# rend le mode français strictement sans risque.
+# ⚠ FRENCH IS THE SOURCE LANGUAGE, NOT A TRANSLATION. The product is written in
+# French: there is therefore nothing to translate to obtain it, and that is
+# what makes French mode strictly risk-free.
 LANGUES = {
     FRANCAIS: {"code": FRANCAIS, "nom": "Français", "nom_anglais": "French",
                "drapeau": "FR"},
@@ -65,33 +54,33 @@ LANGUES = {
 
 
 def langue_valide(valeur):
-    """La langue demandée, ou le français si elle est inconnue ou absente.
+    """The requested language, or French when it is unknown or absent.
 
-    ⚠ ON NE LÈVE PAS, ET C'EST TESTÉ. Une langue inconnue (réglage abîmé à la
-    main, ancienne valeur, adresse bricolée) ne doit pas empêcher l'écran de
-    s'afficher : le pire acceptable est de revoir le produit dans sa langue
-    d'origine.
+    ⚠ IT DOES NOT RAISE, AND THAT IS TESTED. An unknown language (a setting
+    edited by hand, an old value, a hand-made URL) must not stop the screen
+    from displaying: the worst acceptable outcome is seeing the product in its
+    original language again.
 
-    ⚠ Y COMPRIS QUAND CE N'EST PAS DU TEXTE. Un réglage relu d'un fichier JSON
-    abîmé peut rendre un nombre, une liste, n'importe quoi — `str()` d'abord,
-    questions ensuite. L'essai qui tient cette règle a trouvé la faute : la
-    promesse était écrite ici depuis le premier jour, et la fonction levait
-    un `AttributeError` sur un entier.
+    ⚠ INCLUDING WHEN IT IS NOT TEXT. A setting read back from a damaged JSON
+    file may return a number, a list, anything — `str()` first, questions
+    afterwards. The test that holds this rule found the fault: the promise had
+    been written here since day one, and the function raised an
+    `AttributeError` on an integer.
     """
     valeur = str(valeur or "").strip().lower()
     return valeur if valeur in LANGUES else LANGUE_PAR_DEFAUT
 
 
 def de_preferences(preferences):
-    """La langue choisie, lue dans les réglages. Français en cas de doute.
+    """The chosen language, read from the settings. French when in doubt.
 
-    ⚠ LE RÉGLAGE EST GLOBAL, ET C'EST CE QUI ÉVITE UNE PLOMBERIE ENTIÈRE.
-    RingBack n'a pas de comptes ni de sessions : une installation, un
-    utilisateur. La langue est donc un réglage comme un autre, et chaque
-    fonction qui reçoit déjà `preferences` — c'est-à-dire presque toutes —
-    peut la lire sans qu'on ajoute un paramètre à toute la chaîne d'appels.
+    ⚠ THE SETTING IS GLOBAL, AND THAT IS WHAT AVOIDS A WHOLE LAYER OF PLUMBING.
+    RingBack has no accounts and no sessions: one installation, one user. The
+    language is therefore a setting like any other, and every function that
+    already receives `preferences` — which is nearly all of them — can read it
+    without a parameter being added along the whole call chain.
 
-    ⚠ ELLE NE LÈVE JAMAIS : un réglage absent ou abîmé rend le français.
+    ⚠ IT NEVER RAISES: an absent or damaged setting yields French.
     """
     try:
         return langue_valide(preferences.obtenir(CLE_LANGUE))
@@ -100,15 +89,15 @@ def de_preferences(preferences):
 
 
 def traducteur(langue_code, table=None):
-    """Une fonction `texte -> texte` qui traduit les phrases connues.
+    """A `text -> text` function that translates the sentences it knows.
 
-    ⚠ ON REND UNE FONCTION, PAS UN DICTIONNAIRE, parce que `consigne.py` ne
-    doit dépendre d'AUCUN module de RingBack — c'est écrit en tête de ce
-    fichier-là et c'est ce qui lui permet d'être importé par `calle_client`
-    comme par `assistant`. On lui injecte donc de quoi traduire, sans lui
-    dire d'où ça vient.
+    ⚠ A FUNCTION IS RETURNED, NOT A DICTIONARY, because `consigne.py` must
+    depend on NO RingBack module — that is written at the top of that file and
+    it is what lets it be imported by `calle_client` as well as by `assistant`.
+    So it is handed the means to translate, without being told where they come
+    from.
 
-    En français, la fonction rendue est l'IDENTITÉ : elle ne consulte rien.
+    In French, the returned function is the IDENTITY: it consults nothing.
     """
     if langue_valide(langue_code) == FRANCAIS:
         return lambda texte: texte
@@ -116,15 +105,15 @@ def traducteur(langue_code, table=None):
         table = traductions.table_consigne(langue_code)
 
     def dire(texte):
-        """La phrase traduite, AVEC SES ESPACES DE BORD.
+        """The translated sentence, WITH ITS EDGE SPACES.
 
-        ⚠ LES ESPACES SONT PORTES PAR LES SEGMENTS EUX-MEMES, et c'est ce
-        qui les recolle. Le gabarit d'un message est fait de morceaux collés
-        par `"".join(...)` : chacun porte l'espace qui le sépare du suivant.
-        Rendre la valeur du dictionnaire telle quelle — dont la clé a été
-        récoltée sans ses bords — collait les phrases entre elles :
-        « …que vous serez là.Cela se passe à… ». Mesuré le 01/09/2026 sur la
-        consigne de confirmation.
+        ⚠ THE SPACES ARE CARRIED BY THE SEGMENTS THEMSELVES, and that is what
+        glues them back together. A message template is made of pieces joined
+        by `"".join(...)`: each carries the space that separates it from the
+        next. Returning the dictionary value as it stands — whose key was
+        harvested without its edges — glued the sentences together: `…que vous
+        serez là.Cela se passe à…`. Measured on 01/09/2026 on the confirmation
+        briefing.
         """
         if not texte:
             return texte
@@ -139,12 +128,11 @@ def traducteur(langue_code, table=None):
 
 
 def civilites_de(langue_code, civilites_francaises):
-    """Les abréviations à développer dans CETTE langue.
+    """The abbreviations to expand in THIS language.
 
-    ⚠ VIDE HORS DU FRANÇAIS, et c'est une décision, pas un oubli. Développer
-    « M. » en « monsieur » vient d'un constat fait à l'oreille sur des appels
-    FRANÇAIS. « Mr Smith » se lit très bien tel quel, et « monsieur Smith »
-    serait une faute pure.
+    ⚠ EMPTY OUTSIDE FRENCH, and that is a decision, not an oversight. Expanding
+    `M.` into `monsieur` came from listening to FRENCH calls. `Mr Smith` reads
+    perfectly well as it stands, and `monsieur Smith` would be plainly wrong.
     """
     if langue_valide(langue_code) == FRANCAIS:
         return civilites_francaises
@@ -152,16 +140,16 @@ def civilites_de(langue_code, civilites_francaises):
 
 
 # ---------------------------------------------------------------------------
-# Le découpage d'une page en zones : ce qu'on peut traduire, et le reste.
+# Splitting a page into zones: what can be translated, and the rest.
 # ---------------------------------------------------------------------------
 
-# Les éléments dont le CONTENU n'est pas du texte affiché. Traduire à
-# l'intérieur casserait la page (un nom de fonction JavaScript, une règle CSS).
+# The elements whose CONTENT is not displayed text. Translating inside them
+# would break the page (a JavaScript function name, a CSS rule).
 ELEMENTS_OPAQUES = ("script", "style")
 
-# Les attributs qui portent du texte lu par un humain. Tous les autres
-# (name, value, id, class, action, href…) sont des identifiants : les toucher
-# casserait les formulaires, donc on n'y touche pas.
+# The attributes that carry text a human reads. All the others (name, value,
+# id, class, action, href…) are identifiers: touching them would break the
+# forms, so they are left alone.
 ATTRIBUTS_TRADUISIBLES = ("title", "placeholder", "aria-label", "alt")
 
 _ATTRIBUT = re.compile(
@@ -172,15 +160,15 @@ _OUVERTURE_OPAQUE = re.compile(
 
 
 def _zones(page):
-    """Découpe la page en (genre, texte) : « texte », « balise », « opaque ».
+    """Splits the page into (kind, text): `texte`, `balise`, `opaque`.
 
-    ⚠ UN DÉCOUPAGE, PAS UNE ANALYSE. On ne reconstruit jamais le document : on
-    le coupe en tranches et on ne remplace QUE des tranches entières de genre
-    « texte ». Tout le reste — balises, scripts, styles, espaces — est recopié
-    caractère pour caractère. C'est ce qui garantit qu'une page sans aucune
-    traduction ressort identique à l'octet près, et cette garantie est le
-    fondement de tout le reste : sans elle, on ne pourrait pas affirmer que le
-    mode français ne régresse pas.
+    ⚠ A SPLIT, NOT A PARSE. The document is never rebuilt: it is cut into
+    slices and ONLY whole slices of kind `texte` are replaced. Everything else
+    — tags, scripts, styles, whitespace — is copied character for character.
+    That is what guarantees a page with no translation at all comes out
+    identical byte for byte, and that guarantee is the foundation of all the
+    rest: without it, there would be no way to claim French mode does not
+    regress.
     """
     zones = []
     position = 0
@@ -194,14 +182,14 @@ def _zones(page):
             zones.append(("texte", page[position:debut]))
         opaque = _OUVERTURE_OPAQUE.match(page, debut)
         if opaque:
-            # On saute d'un bloc jusqu'à la fermeture : son contenu n'est ni
-            # du texte ni des balises, c'est du code.
+            # Skip from one block to its closing tag: its content is neither
+            # text nor tags, it is code.
             fin_balise = page.find(">", debut)
             fermeture = page.lower().find(f"</{opaque.group(1).lower()}",
                                           debut)
             if fin_balise == -1 or fermeture == -1:
-                # Page tronquée ou balise non fermée : on recopie le reste tel
-                # quel plutôt que de deviner.
+                # Truncated page or unclosed tag: copy the rest as it stands
+                # rather than guess.
                 zones.append(("opaque", page[debut:]))
                 break
             fin = page.find(">", fermeture)
@@ -219,21 +207,21 @@ def _zones(page):
 
 
 def phrase_traduite(phrase, table, motifs=()):
-    """La traduction d'une phrase : le dictionnaire d'abord, les motifs ensuite.
+    """The translation of a sentence: the dictionary first, the patterns second.
 
-    ⚠ LES MOTIFS EXISTENT PARCE QUE LA MOITIÉ DES PHRASES SONT PÉRISSABLES.
-    Mesuré le 01/09/2026 : 804 des 1 527 phrases traduites portaient une date
-    ou une heure de la semaine en cours — « dimanche 06/09 10h00 — hors
-    horaires d'ouverture ». Écrites en dur, elles auraient cessé de
-    correspondre DÈS LE LENDEMAIN, et la traduction se serait effritée toute
-    seule, sans que rien ne le signale.
+    ⚠ THE PATTERNS EXIST BECAUSE HALF THE SENTENCES ARE PERISHABLE. Measured on
+    01/09/2026: 804 of the 1,527 translated sentences carried a date or a time
+    from the current week — `dimanche 06/09 10h00 — hors horaires d'ouverture`.
+    Written out in full, they would have stopped matching THE VERY NEXT DAY,
+    and the translation would have crumbled on its own with nothing to signal
+    it.
 
-    Un motif, lui, laisse passer la donnée et ne traduit que les mots autour :
-    il tient indéfiniment. Deux règles remplacent ici 728 entrées mortes.
+    A pattern, by contrast, lets the data through and translates only the words
+    around it: it holds indefinitely. Two rules replace 728 dead entries here.
 
-    ⚠ LE DICTIONNAIRE PASSE EN PREMIER, toujours : une phrase écrite en toutes
-    lettres l'emporte sur une règle générale. C'est ce qui permet de corriger
-    un cas particulier sans toucher à la règle.
+    ⚠ THE DICTIONARY ALWAYS COMES FIRST: a sentence written out in full beats a
+    general rule. That is what makes it possible to fix one special case
+    without touching the rule.
     """
     traduit = table.get(phrase)
     if traduit is not None:
@@ -248,12 +236,12 @@ def phrase_traduite(phrase, table, motifs=()):
 
 
 def _traduire_texte(brut, table, motifs=()):
-    """Traduit UNE tranche de texte, en gardant ses espaces d'origine.
+    """Translates ONE slice of text, keeping its original whitespace.
 
-    Le texte d'une page porte l'indentation du code qui l'a écrite. La clé du
-    dictionnaire, elle, est la phrase seule. On isole donc la phrase, on la
-    cherche, et on la repose entre les mêmes espaces — sinon la mise en page
-    changerait de langue en langue.
+    A page's text carries the indentation of the code that wrote it. The
+    dictionary key, on the other hand, is the sentence alone. So the sentence
+    is isolated, looked up, and put back between the same spaces — otherwise
+    the layout would change from one language to the next.
     """
     phrase = brut.strip()
     if not phrase:
@@ -267,7 +255,7 @@ def _traduire_texte(brut, table, motifs=()):
 
 
 def _traduire_balise(balise, table, motifs=()):
-    """Traduit les attributs lisibles d'une balise, et eux seuls."""
+    """Translates a tag's human-readable attributes, and those alone."""
     def remplacer(trouve):
         attribut, valeur = trouve.group(1), trouve.group(2)
         traduit = phrase_traduite(valeur.strip(), table, motifs)
@@ -278,12 +266,11 @@ def _traduire_balise(balise, table, motifs=()):
 
 
 def traduire(page, langue):
-    """La page, dans la langue demandée. Le français ressort tel quel.
+    """The page, in the requested language. French comes back untouched.
 
-    ⚠ LE RETOUR EN FRANÇAIS EST L'OBJET REÇU, PAS UNE COPIE. C'est délibéré :
-    on veut pouvoir écrire dans un essai `traduire(page, "fr") is page` et
-    prouver ainsi, sans discussion possible, que le mode français ne traverse
-    aucun traitement.
+    ⚠ THE FRENCH RETURN IS THE OBJECT RECEIVED, NOT A COPY. That is deliberate:
+    it makes it possible to write `traduire(page, "fr") is page` in a test and
+    prove, beyond argument, that French mode goes through no processing at all.
     """
     if langue_valide(langue) == FRANCAIS:
         return page
@@ -306,25 +293,26 @@ _DEUX_LETTRES = re.compile(r"[^\W\d_]{2,}", re.UNICODE)
 
 
 def est_du_texte(phrase):
-    """Vrai si cette phrase est du TEXTE, et non un symbole ou un chiffre.
+    """True if this sentence is TEXT, and not a symbol or a figure.
 
-    ⚠ SANS CE TRI, LA COUVERTURE MENT DANS LES DEUX SENS. L'écran des réglages
-    porte 728 marqueurs d'une lettre (« f » pour fermé), invisibles à l'œil et
-    doublés d'une infobulle complète, elle traduite. Les compter fait tomber
-    la couverture de 97 % à 69 % sans qu'une seule phrase manque vraiment.
+    ⚠ WITHOUT THIS FILTER, COVERAGE LIES IN BOTH DIRECTIONS. The settings
+    screen carries 728 one-letter markers (`f` for closed), invisible to the
+    eye and doubled by a full tooltip, which is translated. Counting them drops
+    coverage from 97 % to 69 % without a single sentence actually being
+    missing.
 
-    On garde donc ce qui contient au moins deux lettres à la suite. Les
-    pastilles « (0) », les « ☾ », les « 1 », les « . » ne sont pas du texte à
-    traduire — et le produit ne serait pas plus anglais si on les traduisait.
+    So what is kept is whatever contains at least two letters in a row. The
+    `(0)` badges, the `☾`, the `1`, the `.` are not text to translate — and the
+    product would be no more English if they were.
     """
     return bool(_DEUX_LETTRES.search(phrase))
 
 
 def phrases_connues(page, langue_code=ANGLAIS):
-    """(connues, inconnues) — ce que la traduction couvre VRAIMENT d'une page.
+    """(known, unknown) — what translation REALLY covers on a page.
 
-    Sert à chiffrer la couverture sur des écrans réels, motifs compris. Sans
-    elle, « c'est traduit » resterait une impression.
+    Used to put a figure on coverage over real screens, patterns included.
+    Without it, `it's translated` would remain an impression.
     """
     table = traductions.table(langue_code)
     motifs = traductions.motifs(langue_code)
@@ -337,11 +325,11 @@ def phrases_connues(page, langue_code=ANGLAIS):
 
 
 def phrases_de(page):
-    """Toutes les phrases traduisibles d'une page — l'outil de mesure.
+    """Every translatable sentence of a page — the measuring instrument.
 
-    Sert à récolter ce qu'il reste à traduire, et à CHIFFRER la couverture :
-    « combien de phrases de cet écran le dictionnaire connaît-il ? ». Sans
-    cela, on ne saurait dire ce qui est traduit autrement qu'à l'œil.
+    Used to harvest what is left to translate, and to PUT A FIGURE on coverage:
+    `how many sentences of this screen does the dictionary know?`. Without
+    that, there would be no way to say what is translated other than by eye.
     """
     trouvees = []
     for genre, morceau in _zones(page):

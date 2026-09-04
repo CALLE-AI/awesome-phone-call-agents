@@ -269,7 +269,11 @@ Everything that actually protects the key is unchanged:
   a folded *how do I get one?* beside the field, so the screen states one thing at a
   time.
 - The API base URL is configurable with `CALLE_API_URL` (default
-  `https://api.heycall-e.com`).
+  `https://api.heycall-e.com`) but **only within a validated set**: `https://`
+  on `heycall-e.com` or a subdomain, or a loopback address (`127.0.0.1`, `::1`,
+  `localhost`) for the fake API used by the tests and the bench. Anything else
+  is refused outright and the app falls back to simulation — the key and the
+  patients' numbers are never sent to an unapproved host, and never in clear.
 - No other credential exists. The application has no account, no login, no session.
 
 ### Side effects
@@ -843,6 +847,14 @@ the four outcomes at all. The sequence did produce them, but started with the ex
 one: on a first-yes campaign it therefore showed a single case. Neither was a matter of
 proportions — it is the **order** that decides.*
 
-All demonstration numbers are fictional: the documented `+33 6 00 00 00 XX` series, and
-the six ranges the French regulator (Arcep) reserves for fiction, which are assigned to
-nobody and can neither call nor be called.
+Every demonstration number sits inside one of the **six ranges the French regulator
+(Arcep) reserves for fiction** — assigned to nobody, able neither to call nor to be
+called. The demonstration series is `+33 6 39 98 50 XX`, inside the reserved `06 39 98`
+root; the bench uses `06 39 98 00 XX` upwards in the same root.
+
+> Until 4 Sept 2026 the demonstration series used an ordinary `06` mobile block — six
+> zeros in the middle — which is **not** reserved and which Arcep may assign to a real
+> subscriber. A CALL-E reviewer spotted it on pull request #297. The series was moved
+> into the reserved root, and the publication check no longer tolerates anything outside
+> the Arcep fiction roots: a single leftover now fails the build instead of shipping.
+> (That check is why the old number is described here rather than written out.)

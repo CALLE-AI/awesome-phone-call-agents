@@ -1,29 +1,24 @@
-"""Les deux états d'un client, ses campagnes en cours, et « non traité ».
+"""A client's two states, their running campaigns, and `non traité`.
 
-Un client porte **deux états à la fois**, qu'il ne faut jamais confondre
-(c'est le §3 de CAS_DE_FIGURE_CAMPAGNES.md) :
+A client carries **two states at once**, which must never be confused (this is
+§3 of CAS_DE_FIGURE_CAMPAGNES.md):
 
-- son **état d'agenda** — ce que dit le planning : aucun rendez-vous,
-  rendez-vous prévu, rendez-vous manqué (absent), rendez-vous annulé,
-  déplacement en attente ;
-- son **état de conversation** — ce que le dernier appel a produit :
-  accepté, confirmé, refusé, le client rappellera, à reprogrammer,
-  préférence à confirmer, à recontacter, injoignable (N), à rappeler par un
-  humain, mauvais numéro, sans suite, 🚫 ne plus appeler, 💤 épargné.
+- their **calendar state** — what the schedule says: no appointment, appointment scheduled, appointment missed (no-show), appointment cancelled, reschedule pending;
+- their **conversation state** — what the last call produced: accepted, confirmed, refused, the client will call back, to be rescheduled, preference to confirm, to contact again, unreachable (N), to be called back by a human, wrong number, no follow-up, 🚫 do not call again, 💤 spared.
 
-Chaque état dit **ce qu'il reste à faire** et **quelle campagne le traite**
-(table du §3). D'où la définition exacte de « NON TRAITÉ », reprise mot pour
-mot du document :
+Each state says **what remains to be done** and **which campaign handles it**
+(the §3 table). Hence the exact definition of `NON TRAITÉ` (unhandled), taken
+word for word from the document:
 
-1. son état **appelle une action** ;
-2. **aucune campagne en cours** ne le contient pour cet état ;
-3. il n'est ni 🚫 exclu, ni sans numéro.
+1. their state **calls for an action**;
+2. **no running campaign** contains them for that state;
+3. they are neither 🚫 excluded nor without a number.
 
-Rien n'est inventé ici : l'état de conversation vient du dernier appel
-RÉELLEMENT enregistré (contact de campagne, ou appel direct rattaché à un
-rendez-vous). Les états que le produit décrit mais que le moteur ne sait pas
-encore produire (« il a cherché à nous joindre », « demande de rendez-vous »,
-« mauvais numéro ») sont signalés « à venir » plutôt que simulés.
+Nothing is invented here: the conversation state comes from the last call
+ACTUALLY recorded (a campaign contact, or a direct call attached to an
+appointment). The states the product describes but the engine cannot yet
+produce (`he tried to reach us`, `appointment request`, `wrong number`) are
+flagged `à venir` rather than simulated.
 """
 
 import logging
@@ -33,16 +28,16 @@ from . import assistant, campagnes
 
 journal = logging.getLogger("ringback.etats_clients")
 
-# Une campagne « en cours » au sens du §3 : elle n'est ni terminée, ni close,
-# ni arrêtée — donc elle traite encore ses contacts.
+# A campaign `en cours` in the sense of §3: it is neither finished, nor closed,
+# nor stopped — so it is still handling its contacts.
 STATUTS_CAMPAGNE_EN_COURS = ("prête", "en cours", "en pause")
 
-# Sentinelles de la colonne « campagne qui traite » du §3.
-RELANCE = "relance"        # 🔁 relance automatique, même nature que l'origine
-HUMAIN = "humain"          # ⛔ aucune campagne : c'est du travail humain
+# Sentinels for the `handling campaign` column of §3.
+RELANCE = "relance"  # 🔁 automatic follow-up, same kind as the origin
+HUMAIN = "humain"  # ⛔ no campaign: this is human work
 
-# --------------------------------------------------------------- états d'agenda
-# code : (libellé affiché, classe de pastille)
+# --------------------------------------------------------------- calendar
+# states code: (displayed label, badge class)
 ETATS_AGENDA = {
     "rendez-vous prévu": ("📅 rendez-vous prévu", "st-prevu"),
     "déplacement en attente": ("📆 déplacement en attente", "st-deplace"),
@@ -51,23 +46,24 @@ ETATS_AGENDA = {
     "aucun rendez-vous": ("— aucun rendez-vous", "st-ignore"),
 }
 
-# ---------------------------------------------------------- états de conversation
+# ---------------------------------------------------------- conversation
+# states
 ETATS_CONVERSATION = {
     "accepté": ("✅ accepté", "st-confirme"),
     "confirmé": ("✅ confirmé", "st-confirme"),
     "refusé": ("❌ refusé", "st-annule"),
-    # Le client a annulé et n'a pas voulu fixer de date : c'est LUI qui
-    # reprendra contact. On ne le relance pas, on ne monte aucune campagne
-    # pour lui — mais il reste visible et compté ici (§3, correction du
-    # 31/07/2026). À ne pas confondre avec « à reprogrammer », juste dessous.
+    # The client cancelled and did not want to set a date: it is THEY who will
+    # get back in touch. They are not chased, no campaign is built for them —
+    # but they stay visible and counted here (§3, correction of 31/07/2026).
+    # Not to be confused with `à reprogrammer`, just below.
     "le client rappellera": ("📞 le contact rappellera", "st-ignore"),
     "à reprogrammer": ("🔄 à reprogrammer", "st-manque"),
     "préférence à confirmer": ("🕑 préférence à confirmer", "st-manque"),
     "à recontacter": ("🔁 à recontacter", "st-manque"),
     "injoignable": ("📵 injoignable", "st-ignore"),
-    # L'appel EST parti, son résultat n'est pas connu : ni « injoignable »
-    # (son téléphone a sonné), ni « à recontacter » (le rappeler ferait
-    # sonner deux fois pour rien). Voir assistant.ETAT_RESULTAT_INCONNU.
+    # The call DID go out, its result is not known: neither `injoignable`
+    # (their phone rang), nor `à recontacter` (calling back would ring twice
+    # for nothing). See assistant.ETAT_RESULTAT_INCONNU.
     assistant.ETAT_RESULTAT_INCONNU: ("⏱ appelé, résultat inconnu",
                                       "st-manque"),
     "à rappeler par un humain": ("🙋 à rappeler par un humain", "st-deplace"),
@@ -77,22 +73,21 @@ ETATS_CONVERSATION = {
     "jamais appelé": ("— jamais appelé", "st-ignore"),
 }
 
-# Les états que le produit DÉCRIT mais que le moteur ne produit pas encore :
-# ils s'affichent « à venir », jamais remplis d'une valeur inventée.
-#
-# ⚠ « a cherché à nous joindre » a été RETIRÉ le 03/08/2026 avec la nature
-# « rappel d'appel manqué », la seule qui le traitait. Le banc d'essai
-# constatait déjà que le moteur ne le produisait jamais : c'était un état
-# annoncé que rien ne pouvait remplir et qu'aucune campagne n'aurait servi.
+# The states the product DESCRIBES but the engine does not yet produce: they
+# display as `à venir`, never filled with an invented value.  ⚠ `a cherché à
+# nous joindre` was REMOVED on 03/08/2026 along with the `rappel d'appel
+# manqué` kind, the only one that handled it. The bench already showed the
+# engine never produced it: an announced state nothing could fill and no
+# campaign would have served.
 ETATS_A_VENIR = {
     "demande de rendez-vous": "🗓 demande de rendez-vous",
     "mauvais numéro": "📛 mauvais numéro",
 }
 
-# Les états qui n'appellent AUCUNE action automatique, et POURQUOI. Le texte
-# est écrit tel quel à l'écran : sans lui, « le client rappellera » se
-# confondrait avec « à reprogrammer », alors que les deux sont exactement
-# inverses (qui doit rappeler qui).
+# The states that call for NO automatic action, and WHY. The text is written on
+# screen as it stands: without it, `le client rappellera` would be confused
+# with `à reprogrammer`, when the two are exactly opposite (who must call
+# whom).
 SANS_CAMPAGNE = {
     "le client rappellera":
         "rien à faire de notre côté : il a annulé sans fixer de date, "
@@ -107,17 +102,17 @@ SANS_CAMPAGNE = {
         "chez CALL-E sans composer aucun numéro.",
 }
 
-# ------------------------------------------- la table de traitement (§3)
-# état : (ce qu'il reste à faire, les natures de campagne qui le traitent)
+# ------------------------------------------- the handling table (§3) state:
+# (what remains to be done, the campaign kinds that handle it)
 TRAITEMENT = {
-    # -- états d'agenda
+    # -- calendar states
     "rendez-vous prévu": ("le prévenir, ou obtenir un oui ferme",
                           ("rappel_rdv", "confirmation")),
     "rendez-vous manqué (absent)": ("lui refixer un rendez-vous",
                                     ("prise_rdv",)),
     "déplacement en attente": ("lui trouver la nouvelle date",
                                ("deplacement",)),
-    # -- états de conversation
+    # -- conversation states
     "à reprogrammer": ("lui trouver une date", ("prise_rdv",)),
     "préférence à confirmer": ("valider sa préférence, ou proposer mieux",
                                ("prise_rdv",)),
@@ -128,10 +123,10 @@ TRAITEMENT = {
     "demande de rendez-vous": ("fixer la date", ("prise_rdv",)),
 }
 
-# Campagnes d'avant l'assistant : leur thème tient lieu de nature. Le thème
-# « personnalise » n'y figure plus depuis le 03/08/2026 — sa nature a été
-# retirée. Une campagne de ce thème reste LISIBLE (assistant.fiche_nature),
-# elle ne sert simplement plus à déduire quoi faire d'un client.
+# Campaigns from before the assistant: their theme stands in for a kind. The
+# `personnalise` theme is no longer listed since 03/08/2026 — its kind was
+# removed. A campaign of that theme stays READABLE (assistant.fiche_nature), it
+# simply no longer serves to deduce what to do with a client.
 NATURE_DEPUIS_THEME = {
     "manque": "prise_rdv",
     "confirmation": "confirmation",
@@ -139,25 +134,25 @@ NATURE_DEPUIS_THEME = {
     "creneau_libere": "creneau_libere",
 }
 
-# Issue du dernier appel → état de conversation.
+# Outcome of the last call → conversation state.
 ETAT_DEPUIS_ISSUE = {
     "confirmed": "confirmé",
     "accepted": "accepté",
     "rescheduled": "accepté",
     "moved": "accepté",
     "refused": "refusé",
-    # Une annulation qui n'a PAS été replacée pendant l'échange : le
-    # rendez-vous n'existe plus (son statut d'agenda le dit déjà) et c'est
-    # le client qui reprendra contact. Quand elle EST replacée pendant
-    # l'échange, l'agent ne rend pas « canceled » mais « rescheduled » :
-    # c'est un simple déplacement, et il suit le chemin du déplacement.
+    # A cancellation that was NOT rebooked during the exchange: the appointment
+    # no longer exists (its calendar status already says so) and it is the
+    # client who will get back in touch. When it IS rebooked during the
+    # exchange, the agent returns not `canceled` but `rescheduled`: that is a
+    # plain move, and it follows the reschedule path.
     "canceled": "le client rappellera",
     "to_reschedule": "à reprogrammer",
     "no_answer": "injoignable",
     "echec": "à recontacter",
 }
 
-# État du contact de campagne → état de conversation (quand aucune issue).
+# Campaign contact state → conversation state (when there is no outcome).
 ETAT_DEPUIS_CONTACT = {
     "accepté": "accepté",
     "abouti": "accepté",
@@ -172,8 +167,8 @@ ETAT_DEPUIS_CONTACT = {
     "abandonné": "sans suite",
 }
 
-# Statuts de rendez-vous qui font l'état d'agenda, par ordre de PRIORITÉ :
-# un rendez-vous à venir prime sur un manqué, qui prime sur un annulé.
+# Appointment statuses that make the calendar state, by order of PRIORITY: an
+# upcoming appointment beats a missed one, which beats a cancelled one.
 _PRIORITE_AGENDA = (
     ("prévu", "rendez-vous prévu"),
     ("confirmé", "rendez-vous prévu"),
@@ -184,12 +179,13 @@ _PRIORITE_AGENDA = (
 
 
 def libelle_agenda(code):
-    """Le libellé affiché d'un état d'agenda (le code lui-même à défaut)."""
+    """The displayed label of a calendar state (the code itself failing that).
+    """
     return ETATS_AGENDA.get(code, (code, "st-ignore"))[0]
 
 
 def libelle_conversation(code, tentatives=0):
-    """Le libellé d'un état de conversation — « injoignable (3) » compris."""
+    """The label of a conversation state — `injoignable (3)` included."""
     libelle = ETATS_CONVERSATION.get(code, (code, "st-ignore"))[0]
     if code == "injoignable" and tentatives:
         libelle += f" ({tentatives})"
@@ -197,24 +193,24 @@ def libelle_conversation(code, tentatives=0):
 
 
 def classe(code):
-    """La classe de pastille d'un état, d'agenda ou de conversation."""
+    """The badge class of a state, calendar or conversation."""
     if code in ETATS_AGENDA:
         return ETATS_AGENDA[code][1]
     return ETATS_CONVERSATION.get(code, ("", "st-ignore"))[1]
 
 
 def nature_de(campagne):
-    """La nature d'une campagne — son thème en tient lieu pour les anciennes."""
+    """A campaign's kind — its theme stands in for it on the older ones."""
     return (campagne.get("nature")
             or NATURE_DEPUIS_THEME.get(campagne.get("theme"), ""))
 
 
 def libelle_nature(nature):
-    """« 🗓 Prise de rendez-vous » — le nom lisible d'une nature.
+    """`🗓 Prise de rendez-vous` — the readable name of a kind.
 
-    Passe par `fiche_nature` et non par `NATURES` : une campagne d'une
-    nature RETIRÉE garde son nom à l'écran. Une campagne qu'on ne sait plus
-    nommer serait une donnée perdue.
+    Goes through `fiche_nature` and not through `NATURES`: a campaign of a
+    REMOVED kind keeps its name on screen. A campaign that can no longer be
+    named would be lost data.
     """
     fiche = assistant.fiche_nature(nature)
     if fiche:
@@ -223,12 +219,13 @@ def libelle_nature(nature):
 
 
 def etat_agenda(resume):
-    """L'état d'agenda déduit des rendez-vous du client (§3, famille A)."""
+    """The calendar state deduced from the client's appointments (§3, family A).
+    """
     if not resume or not resume.get("total"):
         return "aucun rendez-vous"
     statuts = resume.get("statuts", {})
-    # « prévu » ne vaut « rendez-vous prévu » que s'il en reste un À VENIR :
-    # la règle du manqué a déjà basculé les autres.
+    # `prévu` only means `rendez-vous prévu` when one is still UPCOMING: the
+    # missed-appointment rule has already switched the others over.
     for statut, code in _PRIORITE_AGENDA:
         if statuts.get(statut):
             if code == "rendez-vous prévu" and resume.get("prochain") is None:
@@ -238,12 +235,12 @@ def etat_agenda(resume):
 
 
 def etat_conversation(client, contacts, appel_direct, resume):
-    """L'état de conversation : ce que le DERNIER appel réel a produit.
+    """The conversation state: what the LAST real call produced.
 
-    Ordre de lecture : le drapeau 🚫 d'abord (il prime sur tout), puis le
-    contact de campagne le plus récent, puis l'appel direct rattaché à un
-    rendez-vous, puis — à défaut de tout appel — la préférence de rappel
-    notée à la saisie. Rend (code, tentatives).
+    Reading order: the 🚫 flag first (it overrides everything), then the most
+    recent campaign contact, then the direct call attached to an appointment,
+    then — failing any call at all — the call-back preference noted at data
+    entry. Returns (code, attempts).
     """
     if client.get("ne_plus_appeler"):
         return "ne plus appeler", 0
@@ -262,14 +259,15 @@ def etat_conversation(client, contacts, appel_direct, resume):
         if code is not None:
             return code, 1
     if resume and resume.get("rappel_souhaite"):
-        # Le client a dit QUAND il voulait être rappelé : sa préférence
-        # attend d'être validée — c'est bien un état, pas une invention.
+        # The client said WHEN they wanted to be called back: their preference
+        # is waiting to be confirmed — that really is a state, not an
+        # invention.
         return "préférence à confirmer", 0
     return "jamais appelé", 0
 
 
 def _dernier_contact_appele(contacts):
-    """Le contact de campagne le plus récent qui a VRAIMENT été traité."""
+    """The most recent campaign contact that was ACTUALLY handled."""
     retenu = None
     for contact in contacts or ():
         if contact.get("etat") in ("à appeler", "en cours") and not contact.get("issue"):
@@ -280,12 +278,12 @@ def _dernier_contact_appele(contacts):
 
 
 def besoins(agenda, conversation, tentatives, plafond):
-    """Ce que les deux états du client APPELLENT comme action (§3).
+    """What the client's two states CALL FOR as an action (§3).
 
-    Rend [{"etat", "famille", "action", "natures"}]. `natures` vide veut
-    dire « aucune campagne ne traite cela » : c'est du travail humain, et
-    c'est dit tel quel à l'écran (§6). Un injoignable AU PLAFOND de relances
-    bascule justement de la relance automatique vers l'humain.
+    Returns [{"etat", "famille", "action", "natures"}]. An empty `natures`
+    means `no campaign handles this`: it is human work, and it is said as such
+    on screen (§6). An unreachable contact AT THE CEILING of follow-ups tips
+    precisely from automatic follow-up to human.
     """
     liste = []
     for code, famille in ((agenda, "agenda"), (conversation, "conversation")):
@@ -303,13 +301,13 @@ def besoins(agenda, conversation, tentatives, plafond):
 
 def fiche_client(client, resume, contacts, appel_direct, plafond,
                  campagnes_ignorees=()):
-    """Le dossier complet d'UN client : ses deux états, ses campagnes, ses besoins.
+    """The complete file of ONE client: both states, their campaigns, their needs.
 
-    `campagnes_ignorees` sert à UN seul cas, et il est précis : rejouer la
-    recette d'une campagne née d'un filtre d'état (§8.3). Le critère avait
-    été évalué AVANT que cette campagne existe ; si on la comptait, elle
-    interdirait à sa propre recette de retrouver qui que ce soit. À l'écran,
-    cette liste est toujours vide — rien n'y est jamais caché.
+    `campagnes_ignorees` serves ONE case only, and a precise one: replaying the
+    recipe of a campaign born from a state filter (§8.3). The criterion had
+    been evaluated BEFORE that campaign existed; counting it would forbid its
+    own recipe from finding anyone at all. On screen this list is always empty
+    — nothing is ever hidden in it.
     """
     agenda = etat_agenda(resume)
     conversation, tentatives = etat_conversation(client, contacts, appel_direct,
@@ -321,7 +319,7 @@ def fiche_client(client, resume, contacts, appel_direct, plafond,
     relance_prevue = any((contact.get("relances_planifiees") or 0) > 0
                          for contact in contacts or ())
     attendus = besoins(agenda, conversation, tentatives, plafond)
-    # Quelle campagne en cours traite quel besoin — c'est la condition 2.
+    # Which running campaign handles which need — that is condition 2.
     for besoin in attendus:
         traite_par, vues = [], set()
         for contact in en_cours:
@@ -335,9 +333,9 @@ def fiche_client(client, resume, contacts, appel_direct, plafond,
         besoin["traite_par"] = traite_par
         besoin["traite"] = bool(traite_par)
         besoin["humain"] = besoin["natures"] == (HUMAIN,)
-    # L'état qui a fait ENTRER le client dans chaque campagne en cours.
-    # Une campagne n'apparaît qu'UNE fois, même si elle le contient deux
-    # fois (deux lignes collées pour la même personne).
+    # The state that made the client ENTER each running campaign. A campaign
+    # appears only ONCE, even when it contains them twice (two pasted lines for
+    # the same person).
     campagnes_lisibles, deja_vues = [], set()
     for contact in en_cours:
         if contact["campagne_id"] in deja_vues:
@@ -359,8 +357,8 @@ def fiche_client(client, resume, contacts, appel_direct, plafond,
     exclu = bool(client.get("ne_plus_appeler"))
     non_traite = (not exclu and not sans_numero
                   and any(not besoin["traite"] for besoin in attendus))
-    # L'explication écrite quand l'état ne débouche sur AUCUNE campagne :
-    # « rien à faire » sans raison ressemblerait à un oubli.
+    # The written explanation when a state leads to NO campaign: `nothing to
+    # do` with no reason would look like an oversight.
     sans_campagne = SANS_CAMPAGNE.get(conversation) or SANS_CAMPAGNE.get(agenda)
     return {
         "client": client,
@@ -381,11 +379,11 @@ def fiche_client(client, resume, contacts, appel_direct, plafond,
 
 def tableau_clients(base, preferences=None, maintenant=None,
                     campagnes_ignorees=()):
-    """TOUS les clients avec leurs deux états — une seule passe sur la base.
+    """EVERY client with both their states — a single pass over the database.
 
-    C'est la source unique de la page 👥 Contacts : liste, filtres, compteurs.
-    `campagnes_ignorees` : voir `fiche_client` — vide partout sauf au rejeu
-    d'une recette d'état.
+    This is the single source of the 👥 Contacts page: list, filters, counters.
+    `campagnes_ignorees`: see `fiche_client` — empty everywhere except when
+    replaying a state recipe.
     """
     plafond = 0
     if preferences is not None:
@@ -401,10 +399,10 @@ def tableau_clients(base, preferences=None, maintenant=None,
 
 
 def _correspond(fiche, cherche, ids_numero):
-    """La fiche répond-elle à la recherche libre — par le nom ou le numéro ?
+    """Does the record answer the free-text search — by name or by number?
 
-    ⚠ « OU », PAS « ET » : on tape ce dont on se souvient. Exiger les deux
-    n'aurait jamais rien trouvé.
+    ⚠ `OR`, NOT `AND`: you type what you remember. Requiring both would never
+    have found anything.
     """
     if cherche and cherche in _sans_accents(fiche["client"]["nom"]):
         return True
@@ -412,27 +410,28 @@ def _correspond(fiche, cherche, ids_numero):
 
 
 def _sans_accents(texte):
-    """« Lefèvre » devient « lefevre » : chercher un nom ne doit pas exiger
-    de taper les accents (ni la bonne casse)."""
+    """`Lefèvre` becomes `lefevre`: searching for a name must not require typing
+    the accents (nor the right case).
+    """
     decompose = unicodedata.normalize("NFD", (texte or "").casefold())
     return "".join(c for c in decompose if not unicodedata.combining(c))
 
 
-# ------------------------------------------- §4 : de l'état vers LA CAMPAGNE
-# « Une campagne se crée toujours à partir de ce qui manque » (§1). Ici, ce
-# qui manque est UN TEMPS pour une personne qui attend : la porte est 👥. La
-# nature n'est donc jamais choisie à la main, elle est DÉDUITE de l'état
-# filtré, par la table TRAITEMENT ci-dessus — jamais par une seconde table.
+# ------------------------------------------- §4: from the state towards THE
+# CAMPAIGN `A campaign is always created from what is missing` (§1). Here, what
+# is missing is A TIME for a person who is waiting: the door is 👥. The kind is
+# therefore never chosen by hand, it is DEDUCED from the filtered state,
+# through the TRAITEMENT table above — never through a second table.
 
 
 def besoins_non_traites(fiche, etat=""):
-    """Les besoins de CE client qu'aucune campagne en cours ne prend (§3).
+    """THIS client's needs that no running campaign takes on (§3).
 
-    C'est la définition exacte de « non traité », vue client par client :
-    son état appelle une action, aucune campagne en cours ne le contient
-    pour cet état, il n'est ni 🚫 exclu ni sans numéro. `etat` restreint au
-    seul état filtré à l'écran — sinon c'est un autre besoin qu'on
-    compterait.
+    This is the exact definition of `non traité`, seen client by client: their
+    state calls for an action, no running campaign contains them for that
+    state, they are neither 🚫 excluded nor without a number. `etat` restricts
+    to the single state filtered on screen — otherwise it would be a different
+    need being counted.
     """
     if fiche["exclu"] or fiche["sans_numero"]:
         return []
@@ -441,21 +440,21 @@ def besoins_non_traites(fiche, etat=""):
 
 
 def natures_a_proposer(fiches, etat=""):
-    """LES BOUTONS de création du §4 : une entrée par nature de campagne.
+    """THE creation BUTTONS of §4: one entry per campaign kind.
 
-    Décision du propriétaire (31/07/2026) : quand la sélection mêle des
-    états traités par des campagnes DIFFÉRENTES, on affiche **un bouton par
-    nature**, chacun avec son propre compte — jamais un bouton grisé qui
-    laisserait deviner. Un même état peut d'ailleurs appeler deux natures à
-    lui seul (`rendez-vous prévu` → 🔔 rappel OU ✅ confirmation).
+    Owner's decision (31/07/2026): when the selection mixes states handled by
+    DIFFERENT campaigns, **one button per kind** is shown, each with its own
+    count — never a greyed-out button leaving the user to guess. One state can
+    in fact call for two kinds on its own (`rendez-vous prévu` → 🔔 reminder OR
+    ✅ confirmation).
 
-    Les sentinelles RELANCE et HUMAIN ne sont pas des natures de campagne :
-    elles ne donnent aucun bouton (voir `etats_sans_campagne`, qui dit
-    pourquoi à l'écran plutôt que de laisser un vide).
+    The RELANCE and HUMAIN sentinels are not campaign kinds: they give no
+    button (see `etats_sans_campagne`, which says why on screen rather than
+    leaving a blank).
 
-    Rend [{"nature", "libelle", "etats", "clients"}], le plus gros compte
-    d'abord — à égalité, l'ordre du catalogue des natures, pour que deux
-    affichages successifs ne se contredisent jamais.
+    Returns [{"nature", "libelle", "etats", "clients"}], the largest count
+    first — on a tie, the order of the kind catalogue, so that two successive
+    displays never contradict each other.
     """
     par_nature = {}
     for fiche in fiches:
@@ -478,12 +477,12 @@ def natures_a_proposer(fiches, etat=""):
 
 
 def etats_sans_campagne(fiches, etat=""):
-    """Les états de la sélection qu'AUCUNE campagne ne traite, et POURQUOI (§6).
+    """The states in the selection that NO campaign handles, and WHY (§6).
 
-    « À dire clairement à l'écran plutôt que de laisser croire que le robot
-    s'en charge » : un état qui ne donne aucun bouton doit dire pourquoi,
-    sinon l'absence de bouton ressemble à un oubli.
-    Rend [{"etat", "libelle", "raison", "clients"}].
+    `To be said plainly on screen rather than letting people believe the robot
+    is taking care of it`: a state that gives no button must say why, otherwise
+    the absence of a button looks like an oversight. Returns [{"etat",
+    "libelle", "raison", "clients"}].
     """
     RAISONS = {
         HUMAIN: "aucune campagne ne traite cela : quelqu'un doit s'en "
@@ -511,17 +510,17 @@ def etats_sans_campagne(fiches, etat=""):
 
 
 def _campagnes_du_meme_critere(base, critere):
-    """Les campagnes DÉJÀ nées de CE critère — elles ne se bloquent pas entre elles.
+    """The campaigns ALREADY born of THIS criterion — they do not block each
+    other.
 
-    Sans cela, une campagne née d'un filtre d'état interdirait à sa propre
-    recette d'être rejouée : les clients qu'elle tient ne seraient plus
-    « non traités », et la cascade s'arrêterait au premier maillon. Or le
-    critère avait été évalué AVANT que cette campagne existe — le rejouer,
-    c'est se replacer dans les mêmes conditions (§8.3).
+    Without this, a campaign born of a state filter would forbid its own recipe
+    from being replayed: the clients it holds would no longer be `non traités`,
+    and the cascade would stop at the first link. Yet the criterion had been
+    evaluated BEFORE that campaign existed — replaying it means placing
+    yourself back in the same conditions (§8.3).
 
-    Une campagne née d'un AUTRE critère, elle, compte normalement : on ne
-    va pas remettre dans une liste quelqu'un qu'une autre campagne appelle
-    déjà.
+    A campaign born of ANOTHER criterion counts normally: someone another
+    campaign is already calling is not put back into a list.
     """
     ignorees = set()
     for campagne in base.lister_campagnes():
@@ -537,24 +536,25 @@ def _campagnes_du_meme_critere(base, critere):
 
 def contacts_par_etat(base, etat, champs, telephones_connus=(),
                       preferences=None):
-    """TOUS les clients dans cet état — sans autre condition. Rend
-    (contacts, complements).
+    """EVERY client in this state — with no further condition. Returns (contacts,
+    extras).
 
-    ⚠ CE N'EST PAS `contacts_depuis_etat`, et c'est voulu. Cette dernière
-    sert la page 👥 Contacts, où l'état a fait CHOISIR la nature : elle
-    n'garde donc que les clients qu'aucune campagne ne couvre déjà, et que
-    la nature choisie sait traiter. Deux conditions parfaitement justes
-    là-bas, et incompréhensibles ici : quand on demande « charge-moi les
-    clients qui ont un rendez-vous prévu », on veut ces clients-là.
+    ⚠ THIS IS NOT `contacts_depuis_etat`, and that is deliberate. The latter
+    serves the 👥 Contacts page, where the state made the kind be CHOSEN: it
+    therefore keeps only the clients no campaign already covers, and that the
+    chosen kind knows how to handle. Two conditions that are perfectly right
+    over there, and incomprehensible here: when you ask `load me the clients
+    who have an appointment scheduled`, you want those clients.
 
-    Constaté par le propriétaire le 02/08/2026 : « 0 contact ajouté… cet
-    état ne se traite pas par Créneau libéré » — un refus qui n'avait aucune
-    raison d'être, puisqu'une campagne de créneau libéré s'adresse
-    justement à des gens qui ont déjà un rendez-vous.
+    Observed by the owner on 02/08/2026: `0 contacts added… this state is not
+    handled by Freed slot` — a refusal with no reason to exist, since a
+    freed-slot campaign is aimed precisely at people who already have an
+    appointment.
 
-    Ce qui reste écarté, et compté : les sans-numéro et les doublons. Ce
-    qui est SIGNALÉ sans être écarté : les clients qu'une autre campagne
-    traite déjà — l'information est utile, la décision revient à l'opérateur.
+    What stays excluded, and counted: those without a number, and duplicates.
+    What is FLAGGED without being excluded: the clients another campaign
+    already handles — the information is useful, the decision belongs to the
+    operator.
     """
     if etat and etat not in TRAITEMENT:
         raise assistant.SaisieInvalide(
@@ -601,17 +601,16 @@ def contacts_par_etat(base, etat, champs, telephones_connus=(),
 
 def contacts_depuis_etat(base, etat, nature, champs, telephones_connus=(),
                          recherche="", preferences=None):
-    """LA RECETTE « etat » : rejoue le filtre de 👥 Contacts qui a bâti la liste.
+    """THE `etat` RECIPE: replays the 👥 Contacts filter that built the list.
 
-    Même mécanique que `assistant.contacts_depuis_base` : rend
-    (contacts, complements). La liste n'est jamais recopiée — elle est
-    RECALCULÉE à partir du critère (état filtré + « non traité » + la
-    nature qui le traite, plus la recherche par nom si elle a servi). C'est
-    ce qui permet à une campagne née d'un filtre d'état d'être rejouée sur
-    un autre créneau (§8.3, la cascade).
+    Same mechanism as `assistant.contacts_depuis_base`: returns (contacts,
+    extras). The list is never copied — it is RECOMPUTED from the criterion
+    (filtered state + `non traité` + the kind that handles it, plus the name
+    search if one was used). That is what lets a campaign born of a state
+    filter be replayed on another slot (§8.3, the cascade).
 
-    Le numéro est lu EN CLAIR ici — comme toutes les constitutions de liste
-    demandées explicitement par l'utilisateur — et n'est jamais affiché.
+    The number is read IN CLEAR here — as in every list build explicitly
+    requested by the user — and is never displayed.
     """
     if nature not in assistant.NATURES:
         raise assistant.SaisieInvalide(
@@ -641,9 +640,9 @@ def contacts_depuis_etat(base, etat, nature, champs, telephones_connus=(),
             doublons += 1
             continue
         deja_vus.add(telephone)
-        # Le rendez-vous qui porte le contexte : celui qui vient (s'il en a
-        # un), sinon le dernier passé. Rien n'est inventé — quand il n'y en
-        # a aucun, les colonnes restent vides, visibles et à remplir.
+        # The appointment that carries the context: the upcoming one (if there
+        # is one), otherwise the last past one. Nothing is invented — when
+        # there is none, the columns stay empty, visible and to be filled in.
         rdv = (fiche["resume"].get("prochain")
                or fiche["resume"].get("dernier"))
         valeurs = {}
@@ -659,10 +658,10 @@ def contacts_depuis_etat(base, etat, nature, champs, telephones_connus=(),
         complements.append(f"{sans_numero} client(s) sans numéro écarté(s)")
     if doublons:
         complements.append(f"{doublons} déjà dans la grille, non redoublé(s)")
-    # ⚠ DIRE POURQUOI QUAND IL N'Y A PERSONNE. Trois causes très différentes
-    # produisaient exactement le même écran vide, et le propriétaire l'a
-    # constaté le 02/08/2026 : son contact avait bien un rendez-vous prévu,
-    # mais une campagne le prenait déjà en charge — rien ne le disait.
+    # ⚠ SAY WHY WHEN THERE IS NOBODY. Three very different causes produced
+    # exactly the same empty screen, and the owner saw it on 02/08/2026: his
+    # contact did have an appointment scheduled, but a campaign was already
+    # handling them — nothing said so.
     if not contacts:
         complements.extend(_pourquoi_personne(toutes, fiches, etat, nature,
                                               recherche, hors_nature))
@@ -670,17 +669,16 @@ def contacts_depuis_etat(base, etat, nature, champs, telephones_connus=(),
 
 
 def _pourquoi_personne(toutes, retenues, etat, nature, recherche, hors_nature):
-    """Les raisons du zéro, en français, chiffres tirés de la base.
+    """The reasons for the zero, in French, figures drawn from the database.
 
-    Un « 0 contact » muet laisse croire à une panne. Ici on distingue :
-    ① personne n'est dans cet état ;
-    ② des gens y sont, mais des campagnes les prennent DÉJÀ en charge — on
-       les compte et on nomme les campagnes qui bloquent ;
-    ③ des gens y sont et sont libres, mais la nature choisie à l'étape 1 ne
-       traite pas cet état.
+    A silent `0 contacts` makes people think something is broken. Here a
+    distinction is made: ① nobody is in that state; ② people are, but campaigns
+    are ALREADY handling them — they are counted and the blocking campaigns are
+    named; ③ people are there and free, but the kind chosen at step 1 does not
+    handle that state.
     """
     libelle = libelle_etat(etat) if etat else "à traiter"
-    # Sans le filtre « non traité » : combien sont réellement dans cet état.
+    # Without the `non traité` filter: how many really are in that state.
     dans_l_etat = filtrer(toutes, recherche, etat, non_traite=False)
     if not dans_l_etat:
         return [f"aucun client n'est dans l'état « {libelle} »"]
@@ -700,11 +698,11 @@ def _pourquoi_personne(toutes, retenues, etat, nature, recherche, hors_nature):
 
 
 def _campagnes_qui_bloquent(fiches, etat, combien=3):
-    """Les noms des campagnes qui couvrent déjà cet état (trois au plus).
+    """The names of the campaigns already covering this state (three at most).
 
-    Nommer la campagne évite la question suivante (« laquelle ? ») et permet
-    d'aller la clore ou de la reprendre. Au-delà de trois, on abrège : la
-    liste complète est sur la page 👥 Contacts, colonne « Campagnes en cours ».
+    Naming the campaign heads off the next question (`which one?`) and lets the
+    user go and close it or resume it. Beyond three it is abbreviated: the
+    complete list is on the 👥 Contacts page, column `Campagnes en cours`.
     """
     noms = []
     for fiche in fiches:
@@ -721,7 +719,7 @@ def _campagnes_qui_bloquent(fiches, etat, combien=3):
 
 
 def libelle_etat(code):
-    """Le libellé d'un état, quelle que soit sa famille (agenda ou conversation)."""
+    """The label of a state, whatever its family (calendar or conversation)."""
     if code in ETATS_AGENDA:
         return libelle_agenda(code)
     return libelle_conversation(code)
@@ -729,21 +727,19 @@ def libelle_etat(code):
 
 def filtrer(fiches, recherche="", etat="", non_traite=False,
             interdit=False, ids_numero=None):
-    """Les filtres de la page Contacts, appliqués dans cet ordre.
+    """The Contacts page filters, applied in this order.
 
-    recherche : sur le nom, sans tenir compte de la casse ni des accents ;
-    ids_numero: les identifiants que la BASE a reconnus au numéro (voir
-                `db.clients_par_chiffres`). La recherche vaut « nom OU
-                numéro » ;
-    etat      : un code d'état, d'agenda OU de conversation ;
-    non_traite: la définition exacte du §3 — et, si un état est filtré, c'est
-                CET état qui doit rester sans campagne (pas un autre) ;
-    interdit  : ne garder que les contacts 🚫 « ne plus appeler ».
+    recherche : on the name, ignoring case and accents; ids_numero: the
+    identifiers the DATABASE recognised from the number (see
+    `db.clients_par_chiffres`). The search means `name OR number`; etat : a
+    state code, calendar OR conversation; non_traite: the exact definition of
+    §3 — and, when a state is filtered, it is THAT state which must be left
+    without a campaign (not another); interdit : keep only the 🚫 `ne plus
+    appeler` contacts.
 
-    ⚠ LE NUMÉRO N'EST PAS COMPARÉ ICI. Les fiches ne portent que le masque :
-    la couche d'affichage n'a jamais vu le vrai numéro, et ce n'est pas une
-    recherche qui va l'y faire entrer. La base rend des IDENTIFIANTS ; on ne
-    fait que les reconnaître.
+    ⚠ THE NUMBER IS NOT COMPARED HERE. The records carry only the mask: the
+    display layer has never seen the real number, and a search is not going to
+    let it in. The database returns IDENTIFIERS; all we do is recognise them.
     """
     brut = (recherche or "").strip()
     cherche = _sans_accents(brut)

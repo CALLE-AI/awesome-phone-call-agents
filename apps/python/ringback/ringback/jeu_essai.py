@@ -1,75 +1,58 @@
-"""Jeu d'essai — un cabinet de kinésithérapie plausible, entièrement fictif.
+"""Sample data set — a plausible physiotherapy practice, entirely fictional.
 
-À quoi ça sert : essayer RingBack sur de l'information RÉALISTE (noms
-français variés, motifs cohérents entre eux, rendez-vous passés ET à venir,
-manqués, annulés, déplacés, deux contacts 🚫 « ne plus appeler », deux sans
-numéro) plutôt que sur quatre lignes de démonstration.
+What it is for: trying RingBack on REALISTIC information (varied French names,
+reasons that hang together, past AND future appointments, missed, cancelled,
+moved, two 🚫 `do not call again` contacts, two with no number) rather than on
+four demonstration rows.
 
-Trois règles tenues ici :
-1. Le chargement est un GESTE EXPLICITE (bouton « Charger un jeu d'essai »
-   sur ⚙ Réglages, avec confirmation) — jamais automatique.
-2. Il est ADDITIF et RÉVERSIBLE : chaque client créé porte le drapeau
-   clients.jeu_essai = 1 ; « Retirer le jeu d'essai » ne supprime QUE
-   ceux-là (et leurs rendez-vous). Les données de l'utilisateur ne sont
-   jamais touchées.
-3. C'est dit à l'écran : tant qu'un jeu d'essai est chargé, le bandeau de
-   chaque page l'annonce et la page Clients marque chaque ligne 🧪.
+Three rules held here:
+1. Loading it is an EXPLICIT GESTURE (the `Charger un jeu d'essai` button on ⚙ Réglages, with confirmation) — never automatic.
+2. It is ADDITIVE and REVERSIBLE: every client created carries the flag clients.jeu_essai = 1; `Retirer le jeu d'essai` deletes ONLY those (and their appointments). The user's data is never touched.
+3. It is said on screen: as long as a sample data set is loaded, every page's banner announces it and the Clients page marks each row 🧪.
 
 --------------------------------------------------------------------------
-LES NUMÉROS : RÉALISTES DE FORME, INCAPABLES DE SONNER CHEZ QUELQU'UN
+THE NUMBERS: REALISTIC IN SHAPE, INCAPABLE OF RINGING AT ANYONE'S
 --------------------------------------------------------------------------
-Tous les numéros du jeu d'essai sont pris dans les SIX RACINES que l'Arcep
-réserve aux œuvres audiovisuelles (les « numéros de fiction » du cinéma et
-de la télévision), soit six blocs de 10 000 numéros :
+Every number in the sample data set is taken from the SIX ROOTS Arcep reserves for audiovisual works (the `fiction numbers` of cinema and television), that is, six blocks of 10,000 numbers:
 
-    01 99 00 xx xx   02 61 91 xx xx   03 53 01 xx xx
-    04 65 71 xx xx   05 36 49 xx xx   06 39 98 xx xx
+01 99 00 xx xx 02 61 91 xx xx 03 53 01 xx xx 04 65 71 xx xx 05 36 49 xx xx 06
+39 98 xx xx
 
-Ces numéros ne sont attribués à personne et, par construction, « ne
-pourront ni appeler ou être utilisés comme identifiant d'appelant, ni être
-appelés » : composer l'un d'eux ne peut donc PAS sonner chez un inconnu.
-C'est exactement la garantie recherchée pour un jeu d'essai.
+These numbers are assigned to nobody and, by construction, `may neither call
+nor be used as a caller identifier, nor be called`: dialling one therefore
+CANNOT ring at a stranger's. That is exactly the guarantee wanted for a sample
+data set.
 
-Sources :
-- Arcep, décision n° 2018-0881 du 24 juillet 2018 établissant le plan
-  national de numérotation et ses règles de gestion, article 2.5.12
-  « Numéros pour œuvres audiovisuelles » —
-  https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000037262971
-- Arcep, consultation publique sur le plan de numérotation (décembre 2021),
-  « Allocation de blocs de numéros pouvant être utilisés dans des œuvres
-  audiovisuelles » : six blocs de 10 000 numéros, qui « ne pourront ni
-  appeler ou être utilisés comme identifiant d'appelant, ni être appelés » —
-  https://www.arcep.fr/uploads/tx_gspublication/consultation-plan-numerotation-regles-gestion_dec2021.pdf
-- Liste des six racines reprise et vérifiée sur
-  https://www.hteumeuleu.fr/numeros-pour-oeuvres-audiovisuelles/
+Sources:
+- Arcep, decision no. 2018-0881 of 24 July 2018 establishing the national numbering plan and its management rules, article 2.5.12 `Numbers for audiovisual works` — https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000037262971
+- Arcep, public consultation on the numbering plan (December 2021), `Allocation of number blocks usable in audiovisual works`: six blocks of 10,000 numbers, which `may neither call nor be used as a caller identifier, nor be called` — https://www.arcep.fr/uploads/tx_gspublication/consultation-plan-numerotation-regles-gestion_dec2021.pdf
+- The list of the six roots taken and checked at https://www.hteumeuleu.fr/numeros-pour-oeuvres-audiovisuelles/
 
-Terminaisons 51 à 56 : le simulateur d'appels (calle_client) force une
-issue déterministe selon les deux derniers chiffres (51 accepte, 52 refuse,
-53 ne décroche pas, 54 propose une autre date, 55 demande à être rappelé
-par un humain, 56 ne décroche qu'au premier appel). Une poignée de contacts
-du jeu d'essai porte donc ces terminaisons : elles sont le moyen d'EXIGER une
-issue précise, dans une démonstration ou dans un contrôle.
+Endings 51 to 56: the call simulator (calle_client) forces a deterministic
+outcome according to the last two digits (51 accepts, 52 refuses, 53 does not
+pick up, 54 offers another date, 55 asks to be called back by a human, 56 picks
+up only on the first call). A handful of the sample data set's contacts
+therefore carry those endings: they are the means of DEMANDING a precise
+outcome, in a demonstration or in a check.
 
-Et elles y sont pour CHAQUE SOURCE de campagne, pas seulement pour les
-manqués : rendez-vous à venir, manqués, annulés et « déplacés en attente »
-comportent chacun les six terminaisons. Sans cela, une campagne bâtie sur
-les annulés ou sur les déplacés ne rencontrait jamais que des tirages au
-hasard, et trois des huit natures de campagne n'étaient jamais éprouvées de
-bout en bout (voir banc_essai.py, qui parcourt cette matrice).
+And they are there for EVERY campaign SOURCE, not only for the missed ones:
+upcoming, missed, cancelled and `pending move` appointments each carry the six
+endings. Without that, a campaign built on cancellations or on pending moves
+only ever met random draws, and three of the eight campaign kinds were never
+exercised end to end (see banc_essai.py, which walks this matrix).
 
-⚠ CE N'EST PLUS LE SEUL MOYEN DE VOIR TOUS LES CAS DE FIGURE (11/08/2026).
-Une campagne simulée déroule d'elle-même la liste des cas propres à sa nature
-— refus, report, injoignable, 🚫 « ne me rappelez plus », 🔇 « ne me proposez
-plus de place », et l'issue qui aboutit en dernier. Voir
+⚠ THAT IS NO LONGER THE ONLY WAY TO SEE EVERY CASE (11/08/2026). A simulated
+campaign now unrolls by itself the list of cases specific to its kind —
+refusal, postponement, unreachable, 🚫 `stop calling me`, 🔇 `stop offering me
+slots`, and the outcome that concludes last. See
 calle_client.SUITES_PAR_NATURE.
 
-Trois terminaisons existent SANS être portées par un contact d'essai, à
-dessein : 57 (refuse + 🚫), 58 (refuse + 🔇) et 59 (réponse illisible)
-laissent une trace durable ou mettent la campagne en pause. Les poser sur un
-contact du jeu d'essai aurait changé le comportement de toutes les campagnes
-d'essai qui le croisent — et le banc, qui parcourt 115 combinaisons, n'aurait
-plus rendu deux fois le même rapport. Elles s'obtiennent en tapant un numéro
-qui finit par 57, 58 ou 59.
+Three endings exist WITHOUT being carried by a test contact, by design: 57
+(refuses + 🚫), 58 (refuses + 🔇) and 59 (unreadable answer) leave a lasting
+trace or pause the campaign. Putting them on a sample contact would have
+changed the behaviour of every test campaign that met it — and the bench, which
+walks 115 combinations, would no longer have produced the same report twice.
+They are obtained by typing a number ending in 57, 58 or 59.
 """
 
 import datetime
@@ -80,7 +63,7 @@ from . import saisie
 
 journal = logging.getLogger("ringback.jeu_essai")
 
-# Les six racines réservées à la fiction (voir l'en-tête pour la source).
+# The six roots reserved for fiction (see the header for the source).
 RACINES_FICTION = ("0199 00", "0261 91", "0353 01", "0465 71", "0536 49",
                    "0639 98")
 
@@ -90,9 +73,9 @@ CHEMIN_AGENDA = os.path.join(
     "exemple_agenda_realiste.ics")
 
 # --------------------------------------------------------------------------
-# Les clients : (nom, téléphone, ne plus appeler)
-# Volontairement variés — civilités, particules, noms composés, accents, un
-# nom très long, deux homonymes, deux sans numéro, deux 🚫.
+# The clients: (name, phone, do-not-call) Deliberately varied — honorifics,
+# nobiliary particles, compound names, accents, one very long name, two
+# namesakes, two with no number, two 🚫.
 # --------------------------------------------------------------------------
 CLIENTS = (
     ("Mme Nadia Lefèvre", "06 39 98 00 51", False),
@@ -110,53 +93,49 @@ CLIENTS = (
     ("Mme Fatima Zahra El Amrani", "06 39 98 01 18", False),
     ("M. Sébastien Nguyen", "06 39 98 01 19", False),
     ("Mme Camille Aubert", "06 39 98 01 20", False),
-    # Homonymes : deux personnes distinctes portant EXACTEMENT le même nom.
+    # Namesakes: two distinct people bearing EXACTLY the same name.
     ("M. Jean Martin", "06 39 98 01 21", False),
     ("M. Jean Martin", "06 39 98 01 22", False),
     ("Mme Solange Dupuis-Ferrand", "06 39 98 01 23", False),
     ("M. Abdel Haddad", "06 39 98 01 24", False),
     ("Mme Béatrice Vandenberghe", "06 39 98 01 25", False),
-    # Fixes : un cabinet a aussi des patients âgés qui ne donnent qu'un fixe.
+    # Landlines: a practice also has elderly patients who give only a landline.
     ("Mme Yvonne Lecomte", "01 99 00 02 31", False),
     ("M. Raymond Bouchard", "01 99 00 02 32", False),
     ("Mme Geneviève Marceau", "04 65 71 03 41", False),
     ("M. Gilbert Perrin", "05 36 49 04 51", False),
     ("Mme Chantal Renaudin", "03 53 01 05 52", False),
     ("M. Théo Sanchez", "02 61 91 06 53", False),
-    # 🚫 Ne plus appeler : deux personnes qui l'ont demandé.
+    # 🚫 Do not call again: two people who asked for it.
     ("Mme Sophie Mercier", "06 39 98 01 26", True),
     ("M. Bruno Lacombe", "06 39 98 01 27", True),
-    # Sans numéro : importés d'un agenda, à compléter.
+    # No number: imported from a calendar, to be completed.
     ("Mme Zoé Berthier", "", False),
     ("M. Antoine Villeneuve", "", False),
-    # --- Six patients « déplacés en attente », terminaisons 51 à 56 ---------
-    # Pourquoi eux : la source « Déplacés en attente » ne retient QUE les
-    # clients qui n'ont plus aucun rendez-vous à venir (voir
-    # db.candidats_cascade). Les six porteurs de terminaison ci-dessus ont,
-    # eux, des rendez-vous futurs : ils ne peuvent donc pas servir cette
-    # source. Ces six-là lui sont réservés, pour qu'une campagne bâtie sur
-    # « Déplacés en attente » rencontre elle aussi les six issues du
-    # simulateur (51 à 56) au lieu de trois tirages au hasard.
+    # --- Six `pending move` patients, endings 51 to 56 --------- Why them: the
+    # `Déplacés en attente` source keeps ONLY the clients who no longer have
+    # any upcoming appointment (see db.candidats_cascade). The six
+    # ending-carriers above do have future appointments: they therefore cannot
+    # serve that source. These six are reserved for it, so that a campaign
+    # built on `Déplacés en attente` also meets the simulator's six outcomes
+    # (51 to 56) instead of three random draws.
     ("Mme Aurélie Pastor", "02 61 91 07 51", False),
     ("M. Damien Rouvière", "02 61 91 07 52", False),
     ("Mme Leïla Bencheikh", "02 61 91 07 53", False),
     ("M. Olivier Tanguy", "02 61 91 07 54", False),
     ("Mme Hélène Sabatier", "02 61 91 07 55", False),
     ("M. Frédéric Aumont", "02 61 91 07 56", False),
-    # --- Douze patients EN COURS DE TRAITEMENT sur les trois prochains mois --
-    # ⚠ POURQUOI DOUZE DE PLUS (11/08/2026). Demande du propriétaire : « puisqu'
-    # on a du 90 jours on devrait avoir des exemples sur 100 jours ». Mesuré
-    # avant : le rendez-vous à venir le plus lointain du jeu d'essai était à
-    # +9 JOURS. Conséquences, mesurées elles aussi :
-    #   · une place libérée au-delà de +9 jours ne trouvait PERSONNE sur les
-    #     sources « rendez-vous à venir » et « rendez-vous posés » ;
-    #   · les options « jusqu'à 30 jours après » et « jusqu'à 90 jours après »
-    #     de la règle de liste ne pouvaient rien donner de différent de
-    #     « sans limite » — deux réglages sur quatre sans matière pour les
-    #     éprouver.
-    # Ces douze-là ont chacun DEUX séances espacées, et quatre rendez-vous du
-    # lot passent la barre des 90 jours : sans eux, « jusqu'à 90 jours » et
-    # « sans limite » resteraient identiques.
+    # --- Twelve patients UNDER TREATMENT over the next three months -- ⚠ WHY
+    # TWELVE MORE (11/08/2026). Owner's request: `since we have 90 days we
+    # ought to have samples over 100 days`. Measured before: the sample data
+    # set's furthest upcoming appointment was at +9 DAYS. Consequences, also
+    # measured: · a slot freed beyond +9 days found NOBODY on the `upcoming
+    # appointments` and `booked appointments` sources; · the list rule's `up to
+    # 30 days after` and `up to 90 days after` options could give nothing
+    # different from `no limit` — two settings out of four with no material to
+    # exercise them. These twelve each have TWO spaced sessions, and four
+    # appointments of the batch cross the 90-day mark: without them, `up to 90
+    # days` and `no limit` would stay identical.
     ("Mme Laurence Thibault", "06 39 98 01 28", False),
     ("M. Serge Pouliquen", "06 39 98 01 29", False),
     ("Mme Nawel Boukhari", "06 39 98 01 30", False),
@@ -169,33 +148,28 @@ CLIENTS = (
     ("M. Patrick Ferreira", "06 39 98 01 37", False),
     ("Mme Roselyne Gauthier", "06 39 98 01 38", False),
     ("M. Anselme Kouassi", "06 39 98 01 39", False),
-    # --- Deux patients dont le SEUL rendez-vous est au-delà de 90 jours -------
-    # ⚠ ILS NE SONT PAS UN DOUBLON DES QUATRE RENDEZ-VOUS LOINTAINS CI-DESSUS,
-    # et c'est une correction née d'une mesure. Ces quatre-là appartiennent à des
-    # patients qui ont AUSSI une séance plus proche ; or la liste ne retient
-    # qu'un rendez-vous par personne, le premier. « Jusqu'à 90 jours après »
-    # rendait donc encore exactement la même liste que « sans limite ». Il faut
-    # des gens dont le seul rendez-vous soit hors de la fenêtre pour que la
-    # fenêtre se voie.
+    # --- Two patients whose ONLY appointment is beyond 90 days ------- ⚠ THEY
+    # ARE NOT A DUPLICATE OF THE FOUR DISTANT APPOINTMENTS ABOVE, and this is a
+    # correction born of a measurement. Those four belong to patients who ALSO
+    # have a nearer session; yet the list keeps only one appointment per
+    # person, the first. `Up to 90 days after` therefore still returned exactly
+    # the same list as `no limit`. People whose only appointment falls outside
+    # the window are needed for the window to be visible.
     ("Mme Christiane Lemarié", "06 39 98 01 40", False),
     ("M. Aurélien Pichot", "06 39 98 01 41", False),
-    # --- Vingt-cinq patients, UNE séance chacun, répartis sur trois mois ------
-    # ⚠ CE QUI MANQUAIT ENCORE (11/08/2026), et c'est une leçon sur les jeux de
-    # données. Le renfort précédent avait ajouté des RENDEZ-VOUS au loin, mais
-    # peu de PERSONNES : douze patients y tenaient deux ou trois séances chacun.
-    # Le propriétaire l'a vu tout de suite — « il y a 100 jours de test et j'ai
-    # du mal à me dire qu'il n'y a que 16 personnes qui gagnent au moins
-    # 30 jours ». Compté à la main : 27 rendez-vous au-delà du seuil, mais
-    # 18 personnes distinctes seulement. Le filtre avait raison ; le jeu
-    # d'essai, lui, était mince.
-    #
-    # ⚠ UNE SEULE SÉANCE CHACUN, ET C'EST TOUT L'INTÉRÊT : une campagne ne
-    # retient qu'UNE personne par client, quel que soit son nombre de
-    # rendez-vous. Pour qu'une liste soit fournie, il faut des GENS, pas des
-    # lignes d'agenda.
-    #
-    # ⚠ AUCUNE TERMINAISON ENTRE 51 ET 59 : cette plage est réservée aux issues
-    # forcées du simulateur (voir l'entête). D'où le saut de 01 50 à 01 60.
+    # --- Twenty-five patients, ONE session each, spread over three months
+    # ------ ⚠ WHAT WAS STILL MISSING (11/08/2026), and it is a lesson about
+    # data sets. The previous reinforcement had added APPOINTMENTS far out, but
+    # few PEOPLE: twelve patients held two or three sessions each. The owner
+    # saw it at once — `there are 100 days of test and I find it hard to
+    # believe only 16 people gain at least 30 days`. Counted by hand: 27
+    # appointments beyond the threshold, but only 18 distinct people. The
+    # filter was right; the sample data set was thin.  ⚠ ONE SESSION EACH, AND
+    # THAT IS THE WHOLE POINT: a campaign keeps only ONE person per client,
+    # whatever their number of appointments. For a list to be well supplied,
+    # you need PEOPLE, not calendar rows.  ⚠ NO ENDING BETWEEN 51 AND 59: that
+    # range is reserved for the simulator's forced outcomes (see the header).
+    # Hence the jump from 01 50 to 01 60.
     ("Mme Corinne Vasseur", "06 39 98 01 42", False),
     ("M. Alain Bouvier", "06 39 98 01 43", False),
     ("Mme Sandrine Leclerc", "06 39 98 01 44", False),
@@ -224,45 +198,42 @@ CLIENTS = (
 )
 
 # --------------------------------------------------------------------------
-# LES QUATRE CONTACTS D'AMORÇAGE : (nom, téléphone, jours, heure, minute, motif)
-# Ce que RingBack pose TOUT SEUL dans une base vide, pour qu'un premier écran
-# ne soit pas désert. Le serveur les crée (voir Application.peupler_demo) ;
-# ils ne sont PAS marqués 🧪, et ce sont des rendez-vous manqués — de quoi
-# essayer un rappel dès la première minute.
-#
-# ⚠ TROIS DE CES QUATRE NOMS EXISTENT AUSSI DANS `CLIENTS`, SOUS UN AUTRE
-# NUMÉRO (constaté le 13/08/2026). L'histoire des deux listes explique tout :
-# elles ont été écrites à des mois d'intervalle, et la même personne y a reçu
-# deux numéros. Conséquence mesurée : charger le jeu d'essai sur une base
-# fraîche crée une SECONDE « Mme Nadia Lefèvre ».
-#
-# On ne renomme personne et on ne récrit aucun numéro — des bases existantes
-# portent déjà ces fiches, et les récrire irait contre la règle « on n'écrase
-# jamais ce qui est enregistré ». La liste est ici, à côté de l'autre, pour
-# que le voisinage soit VISIBLE : `agenda_exemple` s'en sert pour ne jamais
-# annoncer un de ces noms avec le numéro de son homonyme.
+# THE FOUR SEED CONTACTS: (name, phone, days, hour, minute, reason) What
+# RingBack puts down BY ITSELF into an empty database, so a first screen is not
+# deserted. The server creates them (see Application.peupler_demo); they are
+# NOT marked 🧪, and they are missed appointments — enough to try a call-back
+# from the very first minute.  ⚠ THREE OF THESE FOUR NAMES ALSO EXIST IN
+# `CLIENTS`, UNDER A DIFFERENT NUMBER (observed on 13/08/2026). The history of
+# the two lists explains everything: they were written months apart, and the
+# same person received two numbers there. Measured consequence: loading the
+# sample data set into a fresh database creates a SECOND `Mme Nadia Lefèvre`.
+# Nobody is renamed and no number is rewritten — existing databases already
+# carry these records, and rewriting them would go against the rule `we never
+# overwrite what has been saved`. The list is here, beside the other, so the
+# neighbouring is VISIBLE: `agenda_exemple` uses it never to announce one of
+# these names with its namesake's number.
 PREMIERS_CONTACTS = (
-    ("Mme Nadia Lefèvre", "+33 6 00 00 00 41", 1, 10, 0,
+    ("Mme Nadia Lefèvre", "+33 6 39 98 50 41", 1, 10, 0,
      "Séance de kinésithérapie"),
-    ("M. Karim Osman", "+33 6 00 00 00 42", 1, 14, 30, "Coupe et barbe"),
-    ("Mme Élise Charpentier", "+33 6 00 00 00 43", 2, 9, 15,
+    ("M. Karim Osman", "+33 6 39 98 50 42", 1, 14, 30, "Coupe et barbe"),
+    ("Mme Élise Charpentier", "+33 6 39 98 50 43", 2, 9, 15,
      "Bilan nutrition"),
-    ("M. Paul Guillot", "+33 6 00 00 00 44", 2, 16, 0, "Cours de guitare"),
+    ("M. Paul Guillot", "+33 6 39 98 50 44", 2, 16, 0, "Cours de guitare"),
 )
 
 # --------------------------------------------------------------------------
-# Les rendez-vous : (client, jours depuis aujourd'hui, heure, minute, motif,
-#                    statut, jours de rappel souhaité ou None, durée)
-# Un décalage NÉGATIF est dans le passé, POSITIF dans le futur.
-# Statuts : prévu | manqué | confirmé | déplacé | annulé.
-# La DURÉE est un nombre de TRANCHES (voir horaires.py) : 1 = la durée
-# moyenne d'un rendez-vous (15 minutes par défaut), 2 = une demi-heure,
-# 4 = une heure. Un cabinet réel mélange les durées : le jeu d'essai aussi,
-# sinon la règle « on ne replace pas un client là où il ne tient pas » ne
-# rencontrerait jamais de cas concret.
+# The appointments: (client, days from today, hour, minute, reason, status,
+# desired call-back days or None, length) A NEGATIVE offset is in the past, a
+# POSITIVE one in the future. Statuses: prévu | manqué | confirmé | déplacé |
+# annulé. The LENGTH is a number of SLOTS (see horaires.py): 1 = the average
+# length of an appointment (15 minutes by default), 2 = half an hour, 4 = an
+# hour. A real practice mixes lengths: so does the sample data set, otherwise
+# the rule `a client is never rebooked where they do not fit` would never meet
+# a concrete case.
 # --------------------------------------------------------------------------
 RENDEZVOUS = (
-    # --- passé : manqués (le cœur du produit, « je rappelle les manqués »)
+    # --- past: missed (the heart of the product, `I call the missed ones
+    # back`)
     ("Mme Nadia Lefèvre", -9, 10, 0,
      "Rééducation du genou — séance 4/10", "manqué", None, 2),
     ("M. Karim Ben Amar", -8, 14, 30,
@@ -279,7 +250,7 @@ RENDEZVOUS = (
      "Rééducation de la hanche après prothèse", "manqué", None),
     ("M. Jean Martin", -3, 17, 0,
      "Massage décontracturant du dos", "manqué", None),
-    # --- passé : honorés / confirmés
+    # --- past: honoured / confirmed
     ("Mme Gaëlle Le Goff", -14, 9, 0,
      "Bilan de posture initial", "confirmé", None),
     ("M. Loïc Kerhervé", -12, 10, 30,
@@ -290,21 +261,21 @@ RENDEZVOUS = (
      "Kinésithérapie du sport — reprise de course", "confirmé", None),
     ("Mme Yvonne Lecomte", -21, 9, 30,
      "Rééducation de l'équilibre (prévention des chutes)", "confirmé", None),
-    # --- passé : annulés (source « annulés » des campagnes)
+    # --- past: cancelled (the campaigns' `cancelled` source)
     ("M. Sébastien Nguyen", -6, 13, 30,
      "Rééducation cervicale après coup du lapin", "annulé", None),
     ("Mme Camille Aubert", -4, 11, 0,
      "Séance de kinésithérapie du dos", "annulé", None),
     ("M. Raymond Bouchard", -2, 15, 45,
      "Rééducation respiratoire (BPCO)", "annulé", None),
-    # --- passé : déplacés SANS nouvelle date (source « déplacés en attente »)
+    # --- past: moved WITH no new date (the `pending moves` source)
     ("Mme Fatima Zahra El Amrani", -5, 16, 30,
      "Rééducation de l'épaule — séance 3/12", "déplacé", None),
     ("M. Abdel Haddad", -2, 8, 30,
      "Kinésithérapie maxillo-faciale", "déplacé", 1),
     ("Mme Béatrice Vandenberghe", -1, 12, 0,
      "Rééducation vestibulaire (vertiges)", "déplacé", None),
-    # --- à venir : la semaine qui arrive (source « rendez-vous à venir »)
+    # --- upcoming: the week ahead (the `upcoming appointments` source)
     ("Mme Solange Dupuis-Ferrand", 1, 9, 0,
      "Rééducation du genou — séance 6/10", "prévu", None, 2),
     ("M. Jean Martin", 1, 10, 30,
@@ -327,27 +298,25 @@ RENDEZVOUS = (
      "Kinésithérapie du sport — test d'appui", "prévu", None, 2),
     ("Mme Camille Aubert", 9, 13, 0,
      "Séance de kinésithérapie du dos (reprise)", "prévu", None),
-    # --- à venir : les deux contacts 🚫 en ont aussi (ils doivent être écartés)
+    # --- upcoming: the two 🚫 contacts have some too (they must be set aside)
     ("Mme Sophie Mercier", 5, 14, 30,
      "Rééducation du genou — séance 2/10", "prévu", None),
     ("M. Bruno Lacombe", -7, 9, 30,
      "Rééducation cervicale", "manqué", None),
-    # --- les deux sans numéro : venus d'un agenda, à compléter
+    # --- the two with no number: from a calendar, to be completed
     ("Mme Zoé Berthier", 2, 8, 30,
      "Première consultation — bilan complet", "prévu", None, 4),
     ("M. Antoine Villeneuve", -1, 17, 45,
      "Rééducation du dos — séance 1/6", "manqué", None),
     # --------------------------------------------------------------------
-    # DE LA MATIÈRE POUR CHAQUE SOURCE DE CAMPAGNE
-    # --------------------------------------------------------------------
-    # Les six terminaisons 51 à 56 n'étaient présentes que parmi les
-    # MANQUÉS : une campagne bâtie sur « Rendez-vous annulés », sur
-    # « Déplacés en attente » ou sur « Rendez-vous à venir » ne rencontrait
-    # donc jamais les six issues du simulateur. Les lignes ci-dessous
-    # comblent ce manque — mêmes patients, mêmes numéros de fiction, un
-    # rendez-vous de plus dans le statut qui manquait.
-    #
-    # --- annulés : les six terminaisons (source « Rendez-vous annulés »)
+    # MATERIAL FOR EVERY CAMPAIGN SOURCE
+    # -------------------------------------------------------------------- The
+    # six endings 51 to 56 were present only among the MISSED ones: a campaign
+    # built on `Rendez-vous annulés`, on `Déplacés en attente` or on
+    # `Rendez-vous à venir` therefore never met the simulator's six outcomes.
+    # The rows below fill that gap — same patients, same fiction numbers, one
+    # more appointment in the missing status.  --- cancelled: the six endings
+    # (`Rendez-vous annulés` source)
     ("Mme Nadia Lefèvre", -16, 11, 0,
      "Rééducation du genou — séance 3/10", "annulé", None, 2),
     ("M. Karim Ben Amar", -15, 15, 0,
@@ -360,9 +329,9 @@ RENDEZVOUS = (
      "Rééducation de la cheville — séance 2/8", "annulé", None),
     ("M. Hervé Dombasle", -12, 14, 15,
      "Drainage lymphatique — séance 4/10", "annulé", None),
-    # --- déplacés SANS nouvelle date : les six terminaisons
-    #     (source « Déplacés en attente » — ces six patients n'ont AUCUN
-    #      rendez-vous à venir, sinon la source les écarterait)
+    # --- moved WITH no new date: the six endings (`Déplacés en attente` source
+    # — these six patients have NO upcoming appointment, otherwise the source
+    # would set them aside)
     ("Mme Aurélie Pastor", -8, 10, 15,
      "Rééducation du dos — séance 2/10", "déplacé", None, 2),
     ("M. Damien Rouvière", -7, 14, 45,
@@ -375,35 +344,32 @@ RENDEZVOUS = (
      "Rééducation vestibulaire — séance 2/6", "déplacé", None),
     ("M. Frédéric Aumont", -3, 8, 15,
      "Rééducation du poignet — séance 4/8", "déplacé", None),
-    # --- à venir : les terminaisons 54, 55 et 56 manquaient
-    #     (51, 52 et 53 y sont déjà : MM. Perrin, Mmes Renaudin, M. Sanchez)
+    # --- upcoming: endings 54, 55 and 56 were missing (51, 52 and 53 are
+    # already there: MM. Perrin, Mmes Renaudin, M. Sanchez)
     ("M. Paul Guillot", 5, 11, 45,
      "Lombalgie chronique — nouvelle séance", "prévu", None),
     ("Mme Anaïs Rousseau-Vidal", 6, 15, 0,
      "Rééducation de la cheville — reprise", "prévu", None),
     ("M. Hervé Dombasle", 8, 10, 45,
      "Drainage lymphatique — séance 5/10", "prévu", None),
-    # --------------------------------------------------------------------
-    # LES TROIS PROCHAINS MOIS (11/08/2026)
-    # --------------------------------------------------------------------
-    # Voir le pavé des douze nouveaux patients, plus haut : sans ces lignes,
-    # rien n'existait au-delà de +9 jours, et la moitié des fenêtres de la
-    # règle de liste était impossible à éprouver.
-    #
-    # ⚠ AUCUN DES SIX « DÉPLACÉS EN ATTENTE » N'EN REÇOIT (les 02 61 91 07 5x,
-    # plus Mmes El Amrani et Vandenberghe et M. Haddad). Leur source ne retient
-    # que les clients SANS aucun rendez-vous à venir : leur en donner un les en
-    # ferait sortir, et une nature de campagne entière n'aurait plus de matière.
-    #
-    # --- les terminaisons forcées portent aussi loin : une campagne montée sur
-    #     une place dans trois semaines doit pouvoir exiger son issue
+    # -------------------------------------------------------------------- THE
+    # NEXT THREE MONTHS (11/08/2026)
+    # -------------------------------------------------------------------- See
+    # the block about the twelve new patients, above: without these rows,
+    # nothing existed beyond +9 days, and half the list rule's windows were
+    # impossible to exercise.  ⚠ NONE OF THE SIX `PENDING MOVES` GETS ONE (the
+    # 02 61 91 07 5x, plus Mmes El Amrani and Vandenberghe and M. Haddad).
+    # Their source keeps only clients WITH no upcoming appointment: giving them
+    # one would push them out of it, and a whole campaign kind would have no
+    # material left.  --- the forced endings reach far out too: a campaign set
+    # up on a slot three weeks away must be able to demand its outcome
     ("Mme Nadia Lefèvre", 12, 10, 30,
      "Rééducation du genou — séance 5/10", "prévu", None, 2),
     ("M. Karim Ben Amar", 16, 15, 15,
      "Rééducation de l'épaule — séance 6/12", "prévu", None),
     ("Mme Élise Charpentier", 19, 8, 45,
      "Kinésithérapie respiratoire — séance 4/6", "prévu", None),
-    # --- de la matière entre trois semaines et deux mois
+    # --- material between three weeks and two months
     ("Mme Marie-Christine de La Tour du Pin", 23, 11, 15,
      "Rééducation de la hanche — séance 8/15", "confirmé", None, 2),
     ("M. Jean-Baptiste d'Aubigné", 26, 16, 30,
@@ -414,13 +380,13 @@ RENDEZVOUS = (
      "Prévention des chutes — séance 3/10", "prévu", None, 2),
     ("M. Raymond Bouchard", 40, 10, 45,
      "Kinésithérapie respiratoire — suivi", "prévu", None),
-    # --- deux cas particuliers, AU LOIN eux aussi : le 🚫 doit être écarté même
-    #     à trois mois, et le « sans numéro » doit rester à compléter
+    # --- two special cases, FAR OUT as well: the 🚫 must be set aside even at
+    # three months, and the `no number` one must stay to be completed
     ("M. Bruno Lacombe", 44, 15, 45,
      "Rééducation cervicale — séance 3/8", "prévu", None),
     ("M. Antoine Villeneuve", 48, 17, 15,
      "Rééducation du dos — séance 2/6", "prévu", None),
-    # --- les douze traitements en cours : deux séances espacées chacun
+    # --- the twelve treatments under way: two spaced sessions each
     ("Mme Laurence Thibault", 13, 9, 15,
      "Rééducation du genou — séance 2/12", "prévu", None),
     ("Mme Laurence Thibault", 52, 9, 15,
@@ -465,9 +431,9 @@ RENDEZVOUS = (
      "Rééducation vestibulaire — séance 3/6", "prévu", None),
     ("M. Anselme Kouassi", 65, 16, 45,
      "Massage thérapeutique — séance 2/6", "prévu", None),
-    # --- ⚠ AU-DELÀ DE 90 JOURS, ET C'EST LEUR SEULE RAISON D'ÊTRE : sans eux,
-    #     « jusqu'à 90 jours après » rendrait exactement la même liste que
-    #     « sans limite », et le réglage serait indémontrable.
+    # --- ⚠ BEYOND 90 DAYS, AND THAT IS THEIR ONLY REASON TO EXIST: without
+    # them, `up to 90 days after` would return exactly the same list as `no
+    # limit`, and the setting would be undemonstrable.
     ("Mme Roselyne Gauthier", 91, 10, 15,
      "Rééducation vestibulaire — bilan de fin", "prévu", None),
     ("M. Anselme Kouassi", 95, 16, 45,
@@ -476,23 +442,20 @@ RENDEZVOUS = (
      "Contrôle à trois mois", "prévu", None),
     ("M. Serge Pouliquen", 100, 15, 0,
      "Contrôle à trois mois", "prévu", None),
-    # --- Et les deux qui n'ont QUE cela : eux seuls font que « jusqu'à 90 jours
-    #     après » rend une liste différente de « sans limite » (voir leur pavé
-    #     dans CLIENTS).
+    # --- And the two who have ONLY that: they alone make `up to 90 days after`
+    # return a different list from `no limit` (see their block in CLIENTS).
     ("Mme Christiane Lemarié", 94, 11, 0,
      "Première consultation — bilan complet", "prévu", None, 4),
     ("M. Aurélien Pichot", 97, 14, 15,
      "Bilan de posture initial", "prévu", None, 2),
     # --------------------------------------------------------------------
-    # VINGT-CINQ PERSONNES DE PLUS, UNE SÉANCE CHACUNE (11/08/2026)
-    # --------------------------------------------------------------------
-    # Voir leur pavé dans CLIENTS : ce qui manquait n'était pas des rendez-vous
-    # mais des PERSONNES. Réparties de +11 à +99 jours, une par ligne, pour
-    # qu'une place libérée trouve du monde à toutes les distances.
-    #
-    # Quelques-unes sont « confirmé » : la source « à venir, pas encore
-    # confirmés » doit pouvoir en écarter, sinon elle ne se distingue jamais de
-    # « rendez-vous posés ».
+    # TWENTY-FIVE MORE PEOPLE, ONE SESSION EACH (11/08/2026)
+    # -------------------------------------------------------------------- See
+    # their block in CLIENTS: what was missing was not appointments but PEOPLE.
+    # Spread from +11 to +99 days, one per row, so that a freed slot finds
+    # somebody at every distance.  A few are `confirmé`: the `upcoming, not yet
+    # confirmed` source must be able to set some aside, otherwise it is never
+    # distinguishable from `booked appointments`.
     ("Mme Corinne Vasseur", 11, 9, 0,
      "Rééducation du genou — séance 3/10", "prévu", None),
     ("M. Alain Bouvier", 15, 10, 30,
@@ -547,24 +510,22 @@ RENDEZVOUS = (
 
 
 # ---------------------------------------------------------------------------
-# LE DÉCOR ANGLOPHONE — le même jeu d'essai, joué par une autre distribution
+# THE ENGLISH-SPEAKING SETTING — the same sample data set, played by another
+# cast
 # ---------------------------------------------------------------------------
-#
-# ⚠ CE N'EST PAS UNE TRADUCTION, C'EST UN CASTING. On ne traduit pas un nom
-# propre. Mais un testeur anglophone qui découvre le produit sur « Mme Marie-
-# Christine de La Tour du Pin » bute sur le décor avant d'avoir vu le logiciel.
-#
-# ⚠ ET LES PARTICULARITÉS DU DÉCOR SONT VOULUES, DONC REPRODUITES. Ce jeu
-# d'essai n'est pas une liste de noms : c'est un banc. Il porte exprès des
-# civilités variées, des particules, des noms composés, des accents, un nom
-# très long, DEUX HOMONYMES, deux fiches sans numéro, deux 🚫. Chacune de ces
-# propriétés éprouve une règle du produit — l'homonymie éprouve la clé
-# (nom, téléphone), le nom très long éprouve la mise en page. Une distribution
-# anglophone qui les perdrait ne serait plus un banc, juste une liste.
-#
-# ⚠ SANS ÉQUIVALENT, ON GARDE LE FRANÇAIS. C'est la même règle que partout
-# ailleurs dans ce produit : on ne traduit que ce qu'on connaît. Un nom absent
-# du tableau traverse intact.
+# ⚠ THIS IS NOT A TRANSLATION, IT IS A CASTING. A proper noun is not
+# translated. But an English-speaking tester discovering the product on `Mme
+# Marie-Christine de La Tour du Pin` trips over the scenery before having seen
+# the software.  ⚠ AND THE SETTING'S PECULIARITIES ARE DELIBERATE, HENCE
+# REPRODUCED. This sample data set is not a list of names: it is a test bench.
+# It deliberately carries varied honorifics, nobiliary particles, compound
+# names, accents, one very long name, TWO NAMESAKES, two records with no
+# number, two 🚫. Each of those properties exercises a rule of the product — the
+# namesakes exercise the (name, phone) key, the very long name exercises the
+# layout. An English-speaking cast that lost them would no longer be a bench,
+# just a list.  ⚠ WITH NO EQUIVALENT, FRENCH IS KEPT. It is the same rule as
+# everywhere else in this product: only what we know is translated. A name
+# absent from the table passes through intact.
 
 NOMS_EN = {
     'M. Abdel Haddad':
@@ -922,17 +883,18 @@ NOM_METIER_EN = 'Physiotherapy practice'
 
 
 def _traduit(table, valeur):
-    """La valeur traduite si on la connaît, sinon la valeur telle quelle."""
+    """The translated value if we know it, otherwise the value as it stands."""
     return table.get(valeur, valeur)
 
 
 def decor(langue_code="fr"):
-    """(clients, rendez-vous, premiers contacts, nom du métier) dans CETTE langue.
+    """(clients, appointments, seed contacts, trade name) in THIS language.
 
-    Le décor anglais est FABRIQUÉ à partir du français, par substitution des
-    seuls noms et motifs : la structure — l'ordre, les numéros de téléphone
-    fictifs, les statuts, les durées, les homonymes — est donc conservée par
-    construction, et non par recopie. Il n'y a rien à tenir à jour en double.
+    The English setting is BUILT from the French, by substituting names and
+    reasons only: the structure — the order, the fictional phone numbers, the
+    statuses, the lengths, the namesakes — is therefore preserved by
+    construction, and not by copying. There is nothing to keep up to date
+    twice.
     """
     if (langue_code or "fr") != "en" or not NOMS_EN:
         return CLIENTS, RENDEZVOUS, PREMIERS_CONTACTS, NOM_METIER
@@ -950,12 +912,12 @@ def decor(langue_code="fr"):
 
 
 def noms_du_jeu():
-    """TOUS les noms du jeu d'essai, dans les deux langues.
+    """EVERY name in the sample data set, in both languages.
 
-    ⚠ LES DEUX, ET C'EST NÉCESSAIRE. Un écran qui reconnaît une fiche de
-    démonstration à son nom doit la reconnaître même si elle a été chargée
-    dans l'autre langue — sinon le compte affiché change en changeant de
-    langue, alors que la base n'a pas bougé.
+    ⚠ BOTH, AND THAT IS NECESSARY. A screen that recognises a demonstration
+    record by its name must recognise it even when it was loaded in the other
+    language — otherwise the displayed count changes when the language changes,
+    while the database has not moved.
     """
     noms = {nom for nom, _, _ in CLIENTS}
     noms |= set(NOMS_EN.values())
@@ -963,15 +925,15 @@ def noms_du_jeu():
 
 
 def est_charge(base):
-    """Vrai si un jeu d'essai est actuellement en base."""
+    """True when a sample data set is currently in the database."""
     return base.compter_clients_jeu_essai() > 0
 
 
 def resume(langue_code="fr"):
-    """Ce que le jeu d'essai contient — annoncé AVANT de le charger.
+    """What the sample data set contains — announced BEFORE loading it.
 
-    ⚠ LES COMPTES NE CHANGENT PAS AVEC LA LANGUE : c'est le même décor,
-    joué par une autre distribution. Seul le nom du métier change.
+    ⚠ THE COUNTS DO NOT CHANGE WITH THE LANGUAGE: it is the same setting,
+    played by another cast. Only the trade name changes.
     """
     CLIENTS_L, RENDEZVOUS_L, _, metier = decor(langue_code)
     sans_numero = sum(1 for _, telephone, _ in CLIENTS_L if not telephone)
@@ -985,8 +947,8 @@ def resume(langue_code="fr"):
         "sans_numero": sans_numero,
         "ne_plus_appeler": stop,
         "statuts": statuts,
-        # Rendez-vous plus longs que la durée moyenne (2 tranches ou plus) :
-        # ce sont eux qui font vivre la règle des tranches consécutives.
+        # Appointments longer than the average length (2 slots or more): they
+        # are the ones that bring the consecutive-slots rule to life.
         "longs": sum(1 for entree in RENDEZVOUS_L
                      if len(entree) > 7 and entree[7] > 1),
         "passes": sum(1 for entree in RENDEZVOUS_L if entree[1] < 0),
@@ -996,35 +958,34 @@ def resume(langue_code="fr"):
 
 
 def charger(base, maintenant=None, langue_code="fr"):
-    """Ajoute le jeu d'essai à la base ; rend (clients créés, rendez-vous créés).
+    """Adds the sample data set to the database; returns (clients created,
+    appointments created).
 
-    ADDITIF : rien n'est effacé, les clients existants ne sont pas touchés.
-    Un second chargement ne double rien. Chaque client créé porte
-    clients.jeu_essai = 1, ce qui rend le retrait possible sans risque pour les
-    vraies données.
+    ADDITIVE: nothing is erased, existing clients are not touched. A second
+    load doubles nothing. Every client created carries clients.jeu_essai = 1,
+    which makes removal possible without risk to real data.
 
-    ⚠ « NE DOUBLE RIEN » ÉTAIT FAUX POUR LES RENDEZ-VOUS (corrigé le
-    11/08/2026). Les CLIENTS étaient bien réutilisés ; les rendez-vous, eux,
-    étaient recréés à chaque fois. Mesuré : 112 rendez-vous au premier
-    chargement, 224 au deuxième, 336 au troisième. Le défaut ne se voyait pas
-    parce que l'essai qui gardait cette promesse ne regardait que le compte de
-    CLIENTS.
+    ⚠ `DOUBLES NOTHING` WAS FALSE FOR THE APPOINTMENTS (fixed on 11/08/2026).
+    The CLIENTS were indeed reused; the appointments, though, were recreated
+    every time. Measured: 112 appointments on the first load, 224 on the
+    second, 336 on the third. The defect did not show because the test guarding
+    this promise looked only at the CLIENT count.
 
-    C'est un défaut qui MORD : pour obtenir des données de démonstration
-    enrichies, il faut recharger — et recharger doublait l'agenda.
+    It is a defect that BITES: to get richer demonstration data you have to
+    reload — and reloading doubled the calendar.
 
-    ⚠ L'IDENTITÉ D'UN RENDEZ-VOUS DE DÉMONSTRATION EST (patient, motif), PAS
-    (patient, horaire). Les horaires sont calculés à partir de « maintenant » :
-    un rechargement le lendemain donnerait d'autres horaires, et la comparaison
-    par horaire n'aurait donc rien reconnu. Le couple (patient, motif) est
-    unique dans RENDEZVOUS — un essai le garde.
+    ⚠ A DEMONSTRATION APPOINTMENT'S IDENTITY IS (patient, reason), NOT
+    (patient, time). The times are computed from `now`: a reload the next day
+    would give different times, so comparing by time would have recognised
+    nothing. The (patient, reason) pair is unique within RENDEZVOUS — a test
+    guards that.
     """
     if maintenant is None:
         maintenant = datetime.datetime.now()
     maintenant = maintenant.replace(second=0, microsecond=0)
     CLIENTS_L, RENDEZVOUS_L, _, _ = decor(langue_code)
-    # Les homonymes ont le même nom : la clé est (nom, téléphone), et les
-    # deux « sans numéro » sont distingués par leur nom.
+    # The namesakes share the same name: the key is (name, phone), and the two
+    # `no number` records are told apart by their name.
     identifiants, clients_crees = {}, 0
     for nom, telephone, ne_plus_appeler in CLIENTS_L:
         client_id, cree = _obtenir_ou_creer_essai(base, nom, telephone)
@@ -1032,17 +993,17 @@ def charger(base, maintenant=None, langue_code="fr"):
         identifiants.setdefault(nom, []).append(client_id)
         if ne_plus_appeler:
             base.definir_ne_plus_appeler(client_id, True)
-    # CE QUI EST DÉJÀ LÀ, lu EN UNE SEULE PASSE : (client, motif). Voir la
-    # docstring — c'est cette identité-là qui reconnaît un rendez-vous de
-    # démonstration déjà chargé, y compris un autre jour.
+    # WHAT IS ALREADY THERE, read IN A SINGLE PASS: (client, reason). See the
+    # docstring — it is that identity which recognises a demonstration
+    # appointment already loaded, including on another day.
     deja = {(r["client_id"], r["motif"]) for r in base.tous_les_rendezvous()}
-    # Les rendez-vous des homonymes vont au premier des deux, sauf le second
-    # « M. Jean Martin » qui n'en a pas : c'est justement ce qui rend
-    # l'homonymie visible à l'écran (deux fiches, un seul dossier chargé).
+    # The namesakes' appointments go to the first of the two, except the second
+    # `M. Jean Martin` who has none: that is precisely what makes the namesake
+    # case visible on screen (two records, only one file loaded).
     rendezvous_crees = 0
     for entree in RENDEZVOUS_L:
         nom, jours, heure, minute, motif, statut, rappel = entree[:7]
-        # Durée facultative en fin de ligne : 1 tranche par défaut.
+        # Optional length at the end of the row: 1 slot by default.
         tranches = entree[7] if len(entree) > 7 else 1
         client_id = identifiants[nom][0]
         if (client_id, motif) in deja:
@@ -1066,18 +1027,18 @@ def charger(base, maintenant=None, langue_code="fr"):
 
 
 def _obtenir_ou_creer_essai(base, nom, telephone):
-    """Le client d'essai (nom, téléphone) ; rend (identifiant, créé ?).
+    """The test client (name, phone); returns (id, created?).
 
-    Ne réutilise QUE des clients déjà marqués « jeu d'essai » : un vrai
-    client homonyme de l'utilisateur ne se retrouverait jamais embarqué
-    dans le retrait du jeu d'essai. Le numéro passe par le validateur
-    commun — le jeu d'essai est stocké exactement comme une saisie.
+    ONLY reuses clients already marked `jeu d'essai`: a real client with the
+    user's namesake would never be swept up in the removal of the sample data
+    set. The number goes through the common validator — the sample data set is
+    stored exactly like typed input.
     """
     if telephone:
         telephone = saisie.valider_telephone(telephone)
-    # Requête écrite ici plutôt que dans db.py : elle passe donc par le
-    # verrou de la base à la main (voir db._sous_verrou), sans quoi elle
-    # pourrait tomber au milieu d'une écriture du fil de campagne.
+    # The query is written here rather than in db.py: it therefore goes through
+    # the database lock by hand (see db._sous_verrou), without which it could
+    # land in the middle of a write by the campaign thread.
     with base.verrou:
         ligne = base.conn.execute(
             "SELECT id FROM clients WHERE nom = ? AND telephone = ? "
@@ -1088,5 +1049,7 @@ def _obtenir_ou_creer_essai(base, nom, telephone):
 
 
 def retirer(base):
-    """Retire le jeu d'essai ; rend (clients retirés, rendez-vous retirés)."""
+    """Removes the sample data set; returns (clients removed, appointments
+    removed).
+    """
     return base.supprimer_jeu_essai()

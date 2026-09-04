@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Le français qui reste sur les pages RENDUES EN ANGLAIS.
+"""The French left over on the pages RENDERED IN ENGLISH.
 
-⚠ C'EST LA SEULE MESURE QUI VOIT LES PHRASES ASSEMBLÉES, et elle a été écrite
-le 02/09/2026 parce que les deux autres ne les voyaient pas.
+⚠ THIS IS THE ONLY MEASURE THAT SEES ASSEMBLED SENTENCES, and it was written on
+02/09/2026 because the other two did not see them.
 
-Une phrase collée en Python — « Ses rendez-vous (3) », « N personne(s)
-écartée(s) : cette place ne leur » + « ferait pas gagner G jours » — est UN
-SEUL nœud de page. Ses morceaux peuvent être au dictionnaire sans que la
-phrase entière le soit : elle reste alors française, et :
+A sentence glued together in Python — `Ses rendez-vous (3)`, `N personne(s)
+écartée(s) : cette place ne leur` + `ferait pas gagner G jours` — is ONE SINGLE
+page node. Its pieces can be in the dictionary without the whole sentence being
+there: it then stays French, and:
 
-· lire les SOURCES ne le dit pas — elle n'y existe qu'en morceaux ;
-· explorer une base VIDE ne le dit pas — rien à compter, aucun tableau rempli.
+· reading the SOURCES does not say so — it only exists there in pieces; ·
+exploring an EMPTY database does not say so — nothing to count, no table
+filled.
 
-Cet outil rend donc les pages EN ANGLAIS, jeu d'essai chargé, et cherche ce
-qui est resté français. Il a trouvé 255 phrases que les deux autres mesures
-annonçaient traduites.
+So this tool renders the pages IN ENGLISH, with the sample data set loaded, and
+looks for what stayed French. It found 255 sentences that the other two
+measures reported as translated.
 
-⚠ IL SIGNALE DES FAUX POSITIFS, ET C'EST VOULU. « place » est un mot des deux
-langues ; « [client] » et « [créneau] » sont des codes de gabarit, pas du
-texte. Mieux vaut relire six lignes que d'en manquer une.
+⚠ IT REPORTS FALSE POSITIVES, AND THAT IS DELIBERATE. `place` is a word in both
+languages; `[client]` and `[créneau]` are template codes, not text. Better to
+reread six lines than to miss one.
 
-Usage :
-    python outils/francais_restant.py            # le compte rendu
-    python outils/francais_restant.py fichier    # + le détail en JSON
+Usage: python outils/francais_restant.py # the report python
+outils/francais_restant.py fichier # + the detail as JSON
 """
 import collections
 import datetime
@@ -42,7 +42,8 @@ sys.path.insert(0, RACINE)
 from ringback import (assistant, campagnes, generation,  # noqa: E402
                       horaires, jeu_essai, langue, serveur, themes)
 
-# Des mots que l'anglais n'a pas : leur presence signe du francais reste.
+# Words English does not have: their presence is the signature of leftover
+# French.
 FRANCAIS = re.compile(
     r"\b(?:vous|votre|vos|nous|notre|elle|elles|ils|est|sont|était|"
     r"dans|pour|avec|sans|sous|chez|aucun|aucune|jamais|toujours|"
@@ -51,12 +52,12 @@ FRANCAIS = re.compile(
     r"numéro|numéros|téléphone|personne|personnes|client|clients|"
     r"place|places|liste|listes|jour|jours|heure|heures)\b",
     re.IGNORECASE)
-# ⚠ LES MARQUES SE GARDENT EN ANGLAIS, ET CE N'EST PAS UN OUBLI. « [créneau] »,
-# « [client] » sont ce que le MOTEUR DE SUBSTITUTION cherche dans le texte de
-# l'utilisateur. Les traduire à l'écran ferait écrire « [slot] » à un juré
-# anglophone — et rien ne serait remplacé, puisque le moteur, lui, cherche
-# toujours « [créneau] ». L'écran anglais explique la marque au lieu de la
-# changer. L'instrument les met donc de côté avant de chercher du français.
+# ⚠ THE MARKERS STAY FRENCH IN ENGLISH, AND THAT IS NOT AN OVERSIGHT.
+# `[créneau]`, `[client]` are what the SUBSTITUTION ENGINE looks for in the
+# user's text. Translating them on screen would have an English-speaking judge
+# write `[slot]` — and nothing would be substituted, since the engine still
+# looks for `[créneau]`. The English screen explains the marker instead of
+# changing it. So the instrument sets them aside before looking for French.
 MARQUEUR = re.compile(r"\[[a-zé_]+\]")
 LIEN = re.compile(r'href="(/[^"#]*)"')
 SANS_INTERET = re.compile(r"^/(image/|.*\.(png|ico|csv|ics|json)$)")
@@ -73,16 +74,15 @@ def adresses():
 
 
 def _peupler(app):
-    """Crée des campagnes de CHAQUE nature, dans CHAQUE état utile.
+    """Creates campaigns of EVERY kind, in EVERY useful state.
 
-    ⚠ SANS ÇA, DES ÉCRANS ENTIERS N'EXISTENT PAS. Une base sans campagne n'a
-    ni titre de section (« En cours (3) »), ni bouton « Effacer la liste », ni
-    étiquette d'état, ni tableau d'avancement. Ils ne sont apparus dans aucune
-    mesure jusqu'au 03/09 — et l'utilisateur, lui, les a vus du premier coup
-    en se servant du produit.
+    ⚠ WITHOUT THIS, WHOLE SCREENS DO NOT EXIST. A database with no campaign has
+    no section title (`En cours (3)`), no `Effacer la liste` button, no state
+    label, no progress table. They appeared in no measure until 03/09 — and the
+    user saw them at first glance, simply by using the product.
 
-    On passe par l'API du produit et non par ses formulaires : ce qu'on mesure
-    ici, ce sont les ÉCRANS, pas le chemin qui a créé la campagne.
+    The product's API is used rather than its forms: what is measured here is
+    the SCREENS, not the path that created the campaign.
     """
     base, prefs = app.base, app.preferences
     for jour in range(7):
@@ -138,8 +138,8 @@ def _peupler(app):
         except Exception:                                    # noqa: BLE001
             continue
 
-    # ⚠ ET DANS PLUSIEURS ÉTATS : « prête », « en cours », « en pause »,
-    # « terminée ». Chaque état a son étiquette, sa section et son tableau.
+    # ⚠ AND IN SEVERAL STATES: `prête`, `en cours`, `en pause`, `terminée`.
+    # Each state has its label, its section and its table.
     for rang, identifiant in enumerate(crees):
         try:
             if rang % 4 == 1:
@@ -158,8 +158,8 @@ threading.Thread(target=http.serve_forever, daemon=True).start()
 app = http.RequestHandlerClass.application
 base_url = f"http://127.0.0.1:{http.server_address[1]}"
 
-# ⚠ AVEC LE JEU D'ESSAI CHARGE : sans lui, aucun tableau n'est rempli, et les
-# phrases qui comptent des lignes ne paraissent jamais.
+# ⚠ WITH THE SAMPLE DATA SET LOADED: without it no table is filled, and the
+# sentences that count rows never appear.
 app.preferences.definir(langue.CLE_LANGUE, "en")
 jeu_essai.charger(app.base, langue_code="en")
 _peupler(app)

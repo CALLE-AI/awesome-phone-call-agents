@@ -1,29 +1,22 @@
-"""Horaires d'ouverture : semaine type, jours fermés, tranches et créneaux libres.
+"""Opening hours: typical week, closed days, slots and free openings.
 
-Le principe, en une phrase : **ce qu'on peut proposer se CALCULE** —
-c'est l'ouvert, moins ce qui est déjà pris, moins les jours fermés.
+The principle, in one sentence: **what can be offered is COMPUTED** — it is
+what is open, minus what is already taken, minus the closed days.
 
-Les trois réglages (fichier donnees/preferences.json, comme le reste) :
+The three settings (the donnees/preferences.json file, like the rest):
 
-- « durée moyenne d'un rendez-vous » (le PAS, 15 minutes par défaut) : c'est
-  l'unité de découpage. Une journée est une suite de TRANCHES de cette
-  durée ; un rendez-vous occupe une tranche par défaut, davantage s'il est
-  plus long (30 minutes = 2 tranches de 15) ;
-- la SEMAINE TYPE : pour chacun des sept jours, les périodes ouvertes, en
-  minutes depuis minuit ({0 : [(540, 720)]} = lundi 9h→12h). Lundi = 0,
-  comme datetime.date.weekday() ;
-- les JOURS FERMÉS exceptionnels : des dates où rien n'est possible bien que
-  la semaine type soit ouverte (jour férié, vacances, formation).
+- `average length of an appointment` (the STEP, 15 minutes by default): it is the unit of division. A day is a run of SLOTS of that length; an appointment occupies one slot by default, more when it is longer (30 minutes = 2 slots of 15);
+- the TYPICAL WEEK: for each of the seven days, the open periods, in minutes from midnight ({0: [(540, 720)]} = Monday 9am→12pm). Monday = 0, as in datetime.date.weekday();
+- the exceptional CLOSED DAYS: dates where nothing is possible even though the typical week is open (a public holiday, leave, training).
 
-Ce module calcule aussi les JOURS FÉRIÉS français (Pâques comprise, sans
-aucune bibliothèque extérieure) — mais il ne les ajoute JAMAIS tout seul :
-il les PROPOSE, l'ajout reste un geste de l'utilisateur (⚙ Réglages).
+This module also computes the French PUBLIC HOLIDAYS (Easter included, with no
+external library) — but it NEVER adds them by itself: it OFFERS them, adding
+stays the user's gesture (⚙ Réglages).
 
-Rien n'est inventé : un créneau proposé est une tranche réellement ouverte,
-réellement libre, un jour réellement ouvert. Les créneaux ajoutés à la main
-(le cas particulier : « exceptionnellement, je peux recevoir samedi ») sont
-conservés tels quels et signalés comme tels — une saisie n'est jamais
-perdue en silence.
+Nothing is invented: an offered slot is a genuinely open slot, genuinely free,
+on a genuinely open day. Slots added by hand (the special case: `exceptionally,
+I can see people on Saturday`) are kept as they stand and flagged as such —
+input is never silently lost.
 """
 
 import datetime
@@ -34,58 +27,57 @@ from . import langue as mod_langue
 
 journal = logging.getLogger("ringback.horaires")
 
-# ------------------------------------------------------------ clés de réglage
-CLE_PAS = "pas_minutes"          # durée moyenne d'un rendez-vous, en minutes
-CLE_SEMAINE = "semaine_type"     # {jour (0=lundi) : [[début, fin] en minutes]}
+# ------------------------------------------------------------ setting keys
+CLE_PAS = "pas_minutes"  # average length of an appointment, in minutes
+CLE_SEMAINE = "semaine_type"  # {day (0=Monday): [[start, end] in minutes]}
 CLE_FERMES = "jours_fermes"      # [{"date": "AAAA-MM-JJ", "libelle": "…"}]
-CLE_DERNIER_IMPORT = "dernier_import_agenda"  # trace du dernier fichier importé
-CLE_SEUIL_REMPLACEMENT = "seuil_remplacement_heures"  # le seuil des 12 h
+CLE_DERNIER_IMPORT = "dernier_import_agenda"  # trace of the last imported file
+CLE_SEUIL_REMPLACEMENT = "seuil_remplacement_heures"  # the 12-hour threshold
 
 PAS_DEFAUT = 15
 PAS_MINIMUM = 5
 PAS_MAXIMUM = 240
 
-# LE SEUIL DE REMPLACEMENT, en heures — la valeur du propriétaire, pas une
-# invention : « si le rendez-vous est dans plus de 12 h, on propose dans le
-# récapitulatif à l'opérateur de démarrer une campagne de créneau libre pour
-# compenser l'absence ; si c'est < 12 h alors on laisse en annulé et on
-# indique que l'on ne peut pas dans ces conditions faire un remplacement ».
-# Réglable dans « ⚙ Réglages ».
+# THE REPLACEMENT THRESHOLD, in hours — the owner's value, not an invention:
+# `if the appointment is more than 12 h away, we offer the operator in the
+# summary to start a freed-slot campaign to make up for the absence; if it is <
+# 12 h then we leave it as cancelled and state that under these conditions we
+# cannot arrange a replacement`. Configurable in `⚙ Réglages`.
 SEUIL_REMPLACEMENT_DEFAUT = 12
 SEUIL_REMPLACEMENT_MINIMUM = 0
-SEUIL_REMPLACEMENT_MAXIMUM = 168   # une semaine : au-delà, plus rien ne serait
+SEUIL_REMPLACEMENT_MAXIMUM = 168  # one week: beyond that, nothing would remain
                                    # jamais compensable
 
-# Horizon de calcul des créneaux proposables (en jours) : au-delà, plus
-# personne ne prend rendez-vous par téléphone « pour la place qui se libère ».
+# Horizon for computing offerable slots (in days): beyond it, nobody books over
+# the phone `for the slot that has come free`.
 HORIZON_JOURS = 21
 
-# Délai de rattrapage standard (en jours) : la distance à laquelle le produit
-# propose une place quand il n'a AUCUN horaire d'ouverture pour en calculer
-# une (c'est la convention historique de l'agent — « je peux vous proposer un
-# nouveau créneau la semaine prochaine »). Elle ne sert QUE dans ce cas ; dès
-# qu'une semaine type est réglée, les places viennent de creneaux_proposables.
+# Standard make-up delay (in days): the distance at which the product offers a
+# slot when it has NO opening hours to compute one from (it is the agent's
+# historic convention — `I can offer you a new slot next week`). It is used
+# ONLY in that case; as soon as a typical week is configured, the slots come
+# from creneaux_proposables.
 RATTRAPAGE_JOURS = 7
 
-# Amplitude affichée du calendrier, élargie si la semaine type déborde.
+# Displayed span of the calendar, widened when the typical week overflows it.
 AFFICHAGE_DEBUT = 7 * 60
 AFFICHAGE_FIN = 20 * 60
 
-# ⚠ REPRIS DE `themes`, PAS RECOPIÉ (24/08/2026). Les noms de jours y vivent
-# désormais avec les noms de mois, dont la date dite au téléphone a besoin.
-# Deux listes, ce serait deux vérités — et c'est ainsi qu'un jour finit par
-# s'appeler autrement d'un écran à l'autre. `horaires.JOURS` reste le nom que
-# tout le produit emploie : rien à récrire ailleurs.
+# ⚠ TAKEN FROM `themes`, NOT COPIED (24/08/2026). The day names now live there
+# alongside the month names, which the date spoken on the phone needs. Two
+# lists would be two truths — and that is how a day ends up being called
+# something else from one screen to the next. `horaires.JOURS` stays the name
+# the whole product uses: nothing to rewrite elsewhere.
 JOURS = themes.JOURS
 
-# Statuts qui OCCUPENT réellement une tranche. Un rendez-vous annulé,
-# déplacé, ignoré ou supprimé libère sa place : c'est tout l'intérêt du calcul.
+# Statuses that really OCCUPY a slot. A cancelled, moved, ignored or deleted
+# appointment frees its slot: that is the whole point of the computation.
 STATUTS_OCCUPANTS = ("prévu", "confirmé")
 
 
-# ------------------------------------------------- annuler : la règle, ici
+# ------------------------------------------------- cancelling: the rule, here
 def seuil_remplacement(preferences):
-    """Le seuil de remplacement réglé, en heures (12 par défaut)."""
+    """The configured replacement threshold, in hours (12 by default)."""
     if preferences is None:
         return SEUIL_REMPLACEMENT_DEFAUT
     try:
@@ -98,7 +90,9 @@ def seuil_remplacement(preferences):
 
 
 def valider_seuil_remplacement(brut):
-    """Valide le seuil saisi ; lève ValueError avec le format attendu en clair."""
+    """Validates the threshold typed in; raises ValueError with the expected
+    format in clear.
+    """
     texte = (str(brut) if brut is not None else "").strip()
     try:
         seuil = int(texte)
@@ -117,28 +111,19 @@ def valider_seuil_remplacement(brut):
 
 
 def decision_annulation(preferences, horaire, maintenant=None):
-    """LA règle d'annulation du propriétaire, tenue en UN SEUL endroit.
+    """THE owner's cancellation rule, held in ONE SINGLE place.
 
-    Rend un dictionnaire, jamais un simple statut, parce que l'écran a besoin
-    de dire POURQUOI :
-      - « statut »      : ce qu'on écrit sur le rendez-vous —
-                          db.STATUT_SUPPRIME ou « annulé » ;
-      - « compensable » : peut-on encore monter une campagne pour remplir la
-                          place ? (c'est ce qui déclenche la proposition) ;
-      - « seuil »       : le seuil réglé, en heures ;
-      - « heures »      : combien d'heures nous séparent du rendez-vous
-                          (None si la date est illisible) ;
-      - « pourquoi »    : la phrase à afficher, en français, telle quelle.
+    Returns a dictionary, never a bare status, because the screen needs to say WHY:
+    - `statut`      : what is written on the appointment — db.STATUT_SUPPRIME or `annulé`;
+    - `compensable` : can a campaign still be set up to fill the slot? (that is what triggers the offer);
+    - `seuil`       : the configured threshold, in hours;
+    - `heures`      : how many hours separate us from the appointment (None when the date is unreadable);
+    - `pourquoi`    : the sentence to display, in French, as it stands.
 
-    Les trois cas, mot pour mot d'après la règle du 31/07/2026 :
-    1. date PASSÉE → « annulé ». C'est le statut d'HISTOIRE : « annulé c'est
-       pour les dates passées ». Rien à compenser, c'est derrière nous ;
-    2. date à venir, à PLUS de `seuil` heures → « supprimé » : le rendez-vous
-       n'existe plus, sa place redevient libre, et on PROPOSE à l'opérateur
-       une campagne « créneau libéré » pour compenser l'absence ;
-    3. date à venir, à MOINS de `seuil` heures → « annulé », et l'écran dit
-       qu'on ne peut pas organiser de remplacement dans ces conditions —
-       l'opérateur reste libre de le faire à la main.
+    The three cases, word for word from the rule of 31/07/2026:
+    1. date in the PAST → `annulé`. It is the HISTORY status: `annulé is for past dates`. Nothing to make up for, it is behind us;
+    2. date ahead, MORE than `seuil` hours away → `supprimé`: the appointment no longer exists, its slot becomes free again, and the operator is OFFERED a `créneau libéré` campaign to make up for the absence;
+    3. date ahead, LESS than `seuil` hours away → `annulé`, and the screen says a replacement cannot be arranged under these conditions — the operator remains free to do it by hand.
     """
     seuil = seuil_remplacement(preferences)
     if maintenant is None:
@@ -147,7 +132,7 @@ def decision_annulation(preferences, horaire, maintenant=None):
     try:
         quand = datetime.datetime.fromisoformat(horaire)
     except (TypeError, ValueError):
-        # Date illisible : on ne prétend rien deviner, c'est « annulé ».
+        # Unreadable date: we claim to guess nothing, it is `annulé`.
         return {"statut": "annulé", "compensable": False, "seuil": seuil,
                 "heures": None,
                 "pourquoi": "la date de ce rendez-vous est illisible : il "
@@ -174,46 +159,43 @@ def decision_annulation(preferences, horaire, maintenant=None):
 
 
 def genre_de_retrait(statut):
-    """Le genre de ligne du cahier qui correspond au statut RÉELLEMENT écrit.
+    """The kind of change-log row matching the status ACTUALLY written.
 
-    ⚠ LE MOT SUIT L'ÉTAT — c'était le défaut n° 5 du 18/08/2026. Le cahier des
-    changements écrivait « ➖ Rendez-vous supprimé » dans TOUS les cas
-    d'annulation, y compris quand le produit venait d'écrire « annulé ». Mesuré
-    sur sa journée : la même ligne portait « supprimé » en colonne CHANGEMENT et
-    « il reste marqué « annulé » » en colonne POURQUOI, et le fichier CSV
-    exporté disait la même chose. Trois mots pour un seul événement, dans le
-    document dont tout l'objet est d'être RETAPÉ dans un autre logiciel.
+    ⚠ THE WORD FOLLOWS THE STATE — that was defect no. 5 of 18/08/2026. The
+    change log wrote `➖ Rendez-vous supprimé` in ALL cancellation cases,
+    including when the product had just written `annulé`. Measured over his
+    day: the same row carried `supprimé` in the CHANGE column and `it stays
+    marked « annulé »` in the WHY column, and the exported CSV said the same.
+    Three words for one event, in the very document whose whole purpose is to
+    be RETYPED into another program.
 
-    Et ce n'est pas qu'une affaire de vocabulaire : les deux états ne demandent
-    pas le même geste (voir `decision_annulation` juste au-dessus).
-      - « supprimé » : le rendez-vous n'existe plus, sa place redevient libre —
-        il y a un créneau à rouvrir dans le logiciel de l'établissement ;
-      - « annulé »   : la place reste bloquée, trop tard pour organiser un
-        remplacement (ou date déjà passée).
-    Reporter « supprimé » là où le produit a écrit « annulé », c'est faire
-    rouvrir un créneau qui ne l'est pas.
+    And it is not only a matter of vocabulary: the two states do not call for the same gesture (see `decision_annulation` just above).
+    - `supprimé`: the appointment no longer exists, its slot becomes free again — there is a slot to reopen in the establishment's software;
+    - `annulé`  : the slot stays blocked, too late to arrange a replacement (or the date is already past).
+    Reporting `supprimé` where the product wrote `annulé` means having a slot reopened that is not.
 
-    ⚠ CETTE RÈGLE VIT ICI, à côté de celle qui décide du statut : trois
-    endroits écrivent une ligne de retrait au cahier (une campagne de
-    l'assistant, la place rendue d'une cascade, la transcription d'une cascade
-    directe). Écrite dans l'un d'eux, elle aurait manqué aux deux autres — le
-    genre de demi-correction qui fait revenir le même défaut sous un autre nom.
+    ⚠ THIS RULE LIVES HERE, beside the one that decides the status: three
+    places write a removal row into the change log (an assistant campaign, the
+    slot given back by a cascade, the transcription of a direct cascade).
+    Written in one of them, it would have been missing from the other two — the
+    kind of half-correction that brings the same defect back under another
+    name.
 
-    Les deux genres existent depuis le 17/08/2026 (voir
-    assistant.GENRES_CHANGEMENT) ; un seul chemin écrivait « annulation ».
+    Both kinds have existed since 17/08/2026 (see assistant.GENRES_CHANGEMENT);
+    only one path wrote `annulation`.
     """
     return "suppression" if statut == db.STATUT_SUPPRIME else "annulation"
 
 
-# --------------------------------------------------------------------- le pas
+# --------------------------------------------------------------------- the
+# step
 def pas_minutes(preferences):
-    """La durée moyenne d'un rendez-vous, en minutes (15 par défaut).
+    """The average length of an appointment, in minutes (15 by default).
 
-    ⚠ `preferences` PEUT ÊTRE None (10/08/2026), comme pour
-    `seuil_remplacement` : « aucun réglage » vaut « les valeurs par défaut ».
-    Sans cela, chaque appelant devait écrire lui-même le repli — et celui qui
-    l'oubliait obtenait un « NoneType n'a pas d'attribut obtenir » au moment
-    d'importer un fichier, très loin de la cause.
+    ⚠ `preferences` MAY BE None (10/08/2026), as for `seuil_remplacement`: `no
+    settings` means `the default values`. Without that, every caller had to
+    write the fallback themselves — and whoever forgot got a `NoneType has no
+    attribute obtenir` while importing a file, a long way from the cause.
     """
     if preferences is None:
         return PAS_DEFAUT
@@ -228,7 +210,9 @@ def pas_minutes(preferences):
 
 
 def valider_pas(texte):
-    """Rend le pas validé (entier), ou lève ValueError avec un message français."""
+    """Returns the validated step (an integer), or raises ValueError with a French
+    message.
+    """
     brut = (texte or "").strip()
     if not brut.isdigit():
         raise ValueError(
@@ -243,17 +227,17 @@ def valider_pas(texte):
 
 
 def heure_lisible(minutes):
-    """540 devient « 9h00 » (heure française, sans zéro de tête)."""
+    """540 becomes `9h00` (French time, no leading zero)."""
     return f"{minutes // 60}h{minutes % 60:02d}"
 
 
 def heure_hhmm(minutes):
-    """540 devient « 09:00 » — le format des champs <input type="time">."""
+    """540 becomes `09:00` — the format of <input type="time"> fields."""
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
 def minutes_depuis_hhmm(texte):
-    """« 09:00 » devient 540 ; lève ValueError (message français) sinon."""
+    """`09:00` becomes 540; raises ValueError (French message) otherwise."""
     brut = (texte or "").strip()
     morceaux = brut.split(":")
     if len(morceaux) != 2 or not all(m.isdigit() for m in morceaux):
@@ -275,7 +259,7 @@ def duree_lisible(minutes):
 
 
 def tranches_lisibles(nombre, pas):
-    """« 2 tranches de 15 min (30 minutes) » — dit toujours les deux."""
+    """`2 slots of 15 min (30 minutes)` — always says both."""
     unite = "tranche" if nombre <= 1 else "tranches"
     return (f"{nombre} {unite} de {pas} min "
             f"({duree_lisible(nombre * pas)})")
@@ -283,11 +267,11 @@ def tranches_lisibles(nombre, pas):
 
 # ------------------------------------------------------------- semaine type
 def semaine(preferences):
-    """La semaine type réglée : {jour (0=lundi) : [(début, fin) en minutes]}.
+    """The configured typical week: {day (0=Monday): [(start, end) in minutes]}.
 
-    Toujours les sept jours (une liste vide = jour fermé), périodes
-    fusionnées et triées. Un réglage abîmé (fichier édité à la main) est
-    ignoré silencieusement plutôt que de casser l'écran.
+    Always all seven days (an empty list = a closed day), with periods merged
+    and sorted. A damaged setting (a file edited by hand) is ignored silently
+    rather than breaking the screen.
     """
     brut = preferences.obtenir(CLE_SEMAINE) or {}
     resultat = {jour: [] for jour in range(7)}
@@ -315,14 +299,14 @@ def semaine(preferences):
 
 
 def definir_semaine(preferences, valeur):
-    """Enregistre la semaine type (les jours vides ne sont pas stockés)."""
+    """Saves the typical week (empty days are not stored)."""
     a_ecrire = {str(jour): [[d, f] for d, f in periodes]
                 for jour, periodes in sorted(valeur.items()) if periodes}
     preferences.definir(CLE_SEMAINE, a_ecrire)
 
 
 def _fusionner(periodes):
-    """Trie et fusionne les périodes qui se touchent ou se chevauchent."""
+    """Sorts and merges the periods that touch or overlap."""
     fusionnees = []
     for debut, fin in sorted(periodes):
         if fusionnees and debut <= fusionnees[-1][1]:
@@ -333,7 +317,8 @@ def _fusionner(periodes):
 
 
 def _retirer(periodes, debut, fin):
-    """Retire [début, fin) des périodes ouvertes (le trou est vraiment fermé)."""
+    """Removes [start, end) from the open periods (the hole is really closed).
+    """
     restantes = []
     for periode_debut, periode_fin in periodes:
         if periode_fin <= debut or periode_debut >= fin:
@@ -347,7 +332,7 @@ def _retirer(periodes, debut, fin):
 
 
 def periode_ouverte(periodes, debut, fin):
-    """Vrai si TOUT l'intervalle [début, fin) est déjà ouvert."""
+    """True when the WHOLE interval [start, end) is already open."""
     for periode_debut, periode_fin in periodes:
         if periode_debut <= debut and periode_fin >= fin:
             return True
@@ -355,15 +340,14 @@ def periode_ouverte(periodes, debut, fin):
 
 
 def basculer_periode(preferences, jour, debut, fin, geste="basculer"):
-    """Ouvre, ferme ou BASCULE une période de la semaine type.
+    """Opens, closes or TOGGLES a period of the typical week.
 
-    geste : « ouvrir », « fermer », ou « basculer » (le glisser-relâché —
-    une période déjà entièrement ouverte se referme). Les bornes sont
-    alignées sur la grille des tranches : on appuie sur une tranche, on
-    relâche sur une autre, la période va du début de la première à la fin
-    de la dernière. Rend True si la période est ouverte à l'arrivée.
-    Lève ValueError (message français) si le jour ou les heures sont hors
-    bornes — la saisie fautive n'est jamais enregistrée en silence.
+    geste: `ouvrir`, `fermer`, or `basculer` (the drag-and-release — a period
+    already entirely open closes again). The bounds are aligned on the slot
+    grid: you press on one slot, release on another, and the period runs from
+    the start of the first to the end of the last. Returns True when the period
+    is open at the end. Raises ValueError (French message) when the day or the
+    times are out of bounds — faulty input is never saved silently.
     """
     if jour not in range(7):
         raise ValueError(f"Jour inconnu : « {jour} » (attendu 0 = lundi à "
@@ -371,7 +355,7 @@ def basculer_periode(preferences, jour, debut, fin, geste="basculer"):
     pas = pas_minutes(preferences)
     debut, fin = min(debut, fin), max(debut, fin)
     debut = (debut // pas) * pas
-    fin = -(-fin // pas) * pas          # arrondi à la tranche supérieure
+    fin = -(-fin // pas) * pas  # rounded up to the next slot
     fin = min(fin, 24 * 60)
     if fin <= debut:
         raise ValueError("Période vide : l'heure de fin doit venir après "
@@ -398,15 +382,15 @@ def basculer_periode(preferences, jour, debut, fin, geste="basculer"):
 
 
 def semaine_ouverte(preferences):
-    """Vrai si au moins une période est ouverte dans la semaine type."""
+    """True when at least one period is open in the typical week."""
     return any(periodes for periodes in semaine(preferences).values())
 
 
 def amplitude_affichee(preferences):
-    """(début, fin) en minutes du calendrier affiché — rien n'est caché.
+    """(start, end) in minutes of the displayed calendar — nothing is hidden.
 
-    L'amplitude par défaut (7h→20h) s'élargit si la semaine type déborde :
-    une ouverture à 6h30 ou jusqu'à 22h reste visible et modifiable.
+    The default span (7am→8pm) widens when the typical week overflows it: an
+    opening at 6:30am or until 10pm stays visible and editable.
     """
     pas = pas_minutes(preferences)
     debut, fin = AFFICHAGE_DEBUT, AFFICHAGE_FIN
@@ -419,9 +403,9 @@ def amplitude_affichee(preferences):
     return debut, fin
 
 
-# ------------------------------------------------------ jours fermés (dates)
+# ------------------------------------------------------ closed days (dates)
 def jours_fermes(preferences):
-    """Les jours fermés exceptionnels : [{"date", "libelle"}], triés."""
+    """The exceptional closed days: [{"date", "libelle"}], sorted."""
     brut = preferences.obtenir(CLE_FERMES) or []
     fermes = {}
     if not isinstance(brut, (list, tuple)):
@@ -442,7 +426,7 @@ def jours_fermes(preferences):
 
 
 def valider_date(texte):
-    """Rend la date en « AAAA-MM-JJ » ; accepte aussi « JJ/MM/AAAA »."""
+    """Returns the date as `YYYY-MM-DD`; also accepts `DD/MM/YYYY`."""
     brut = (texte or "").strip()
     if not brut:
         raise ValueError("Date obligatoire : attendu AAAA-MM-JJ "
@@ -459,7 +443,7 @@ def valider_date(texte):
 
 
 def ajouter_jour_ferme(preferences, date, libelle=""):
-    """Déclare un jour fermé (geste de l'utilisateur) ; rend la date écrite."""
+    """Declares a closed day (the user's gesture); returns the date written."""
     date = valider_date(date)
     libelle = " ".join((libelle or "").split())
     fermes = {entree["date"]: entree["libelle"] for entree in
@@ -474,7 +458,7 @@ def ajouter_jour_ferme(preferences, date, libelle=""):
 
 
 def retirer_jour_ferme(preferences, date):
-    """Retire un jour fermé ; rend True s'il y était."""
+    """Removes a closed day; returns True when it was there."""
     restants = [entree for entree in jours_fermes(preferences)
                 if entree["date"] != date]
     retire = len(restants) != len(jours_fermes(preferences))
@@ -483,10 +467,10 @@ def retirer_jour_ferme(preferences, date):
 
 
 def est_ferme(preferences, jour):
-    """Le libellé du jour fermé si CETTE date est fermée, sinon None.
+    """The closed day's label when THIS date is closed, otherwise None.
 
-    Rend "" (chaîne vide, qui reste « fermé ») quand aucun libellé n'a été
-    donné : le code appelant teste `is not None`.
+    Returns "" (an empty string, which still means `closed`) when no label was
+    given: the calling code tests `is not None`.
     """
     cible = jour.isoformat() if isinstance(jour, (datetime.date,)) else str(jour)
     for entree in jours_fermes(preferences):
@@ -495,17 +479,17 @@ def est_ferme(preferences, jour):
     return None
 
 
-# ------------------------------------------ trace du dernier import d'agenda
-# À quoi ça sert : avant de démarrer une campagne, RingBack rappelle que les
-# créneaux proposés au téléphone sortent de SON agenda. « Depuis quand cet
-# agenda n'a-t-il pas été alimenté ? » est le fait le plus utile de ce
-# rappel — encore faut-il l'avoir noté. On ne note QUE les apports par
-# FICHIER (agenda ICS, fichier CSV) : ce sont les seuls dont on puisse dire
-# « l'agenda a été rechargé ». Une saisie à la main ne compte pas ici, et
-# tant que rien n'a été importé la date reste franchement INCONNUE — jamais
-# remplacée par une valeur inventée.
+# ------------------------------------------ trace of the last calendar import
+# What it is for: before starting a campaign, RingBack points out that the
+# slots offered on the phone come out of ITS calendar. `How long since this
+# calendar was last fed?` is the most useful fact of that reminder — provided
+# it was recorded. ONLY inputs by FILE are recorded (ICS calendar, CSV file):
+# they are the only ones we can call `the calendar was reloaded`. Typing by
+# hand does not count here, and until something has been imported the date
+# stays frankly UNKNOWN — never replaced by an invented value.
 def noter_import_agenda(preferences, quoi, rendezvous, quand=None):
-    """Retient qu'un fichier vient d'alimenter l'agenda ; rend la trace écrite."""
+    """Records that a file has just fed the calendar; returns the trace written.
+    """
     moment = (quand or datetime.datetime.now()).replace(second=0, microsecond=0)
     trace = {"quand": moment.isoformat(timespec="minutes"),
              "quoi": str(quoi),
@@ -517,11 +501,11 @@ def noter_import_agenda(preferences, quoi, rendezvous, quand=None):
 
 
 def dernier_import_agenda(preferences):
-    """La trace du dernier import, ou None si AUCUN n'a jamais été noté.
+    """The trace of the last import, or None when NONE was ever recorded.
 
-    Rend {"quand" (ISO), "quoi", "rendezvous", "moment" (datetime)}. Une
-    trace abîmée (fichier de réglages édité à la main) est traitée comme
-    absente : mieux vaut « inconnu » qu'une date fausse.
+    Returns {"quand" (ISO), "quoi", "rendezvous", "moment" (datetime)}. A
+    damaged trace (a settings file edited by hand) is treated as absent: better
+    `unknown` than a wrong date.
     """
     brut = preferences.obtenir(CLE_DERNIER_IMPORT)
     if not isinstance(brut, dict):
@@ -534,12 +518,12 @@ def dernier_import_agenda(preferences):
             "rendezvous": brut.get("rendezvous"), "moment": moment}
 
 
-# ------------------------------------------------- jours fériés (proposition)
+# ------------------------------------------------- public holidays (offer)
 def paques(annee):
-    """Le dimanche de Pâques de CETTE année (calendrier grégorien).
+    """Easter Sunday of THIS year (Gregorian calendar).
 
-    Algorithme dit « de Butcher / Meeus » : arithmétique pure, donc aucune
-    bibliothèque extérieure — la contrainte du projet est tenue.
+    The so-called `Butcher / Meeus` algorithm: pure arithmetic, hence no
+    external library — the project's constraint is held.
     """
     a = annee % 19
     b, c = divmod(annee, 100)
@@ -555,11 +539,11 @@ def paques(annee):
 
 
 def feries(annee):
-    """Les onze jours fériés français d'une année : [(date, nom)], triés.
+    """The eleven French public holidays of a year: [(date, name)], sorted.
 
-    Ce sont les fériés de la France métropolitaine (l'Alsace-Moselle et les
-    outre-mer en comptent d'autres). RingBack ne les ajoute JAMAIS tout
-    seul : il les propose, un par un, dans ⚙ Réglages.
+    These are the holidays of metropolitan France (Alsace-Moselle and the
+    overseas territories have more). RingBack NEVER adds them by itself: it
+    offers them, one by one, in ⚙ Réglages.
     """
     dimanche = paques(annee)
     liste = [
@@ -579,11 +563,12 @@ def feries(annee):
 
 
 def feries_a_proposer(preferences, depuis=None, jusqu_a_mois=12):
-    """Les fériés encore À VENIR non déclarés : [{"date", "nom", "deja"}].
+    """The public holidays still AHEAD and not declared: [{"date", "nom",
+    "deja"}].
 
-    Couvre les douze mois qui viennent (deux années civiles au besoin).
-    « deja » dit qu'il est déjà déclaré fermé — l'écran le montre grisé
-    plutôt que de le proposer une seconde fois.
+    Covers the coming twelve months (two calendar years when needed). `deja`
+    says it is already declared closed — the screen shows it greyed out rather
+    than offering it a second time.
     """
     if depuis is None:
         depuis = datetime.date.today()
@@ -598,13 +583,13 @@ def feries_a_proposer(preferences, depuis=None, jusqu_a_mois=12):
     return proposition
 
 
-# ----------------------------------------------------- tranches d'une journée
+# ----------------------------------------------------- slots of a day
 def tranches_du_jour(preferences, jour):
-    """Les débuts de tranches OUVERTES de cette date : [datetime], triés.
+    """The starts of this date's OPEN slots: [datetime], sorted.
 
-    Une tranche compte comme ouverte seulement si elle est ENTIÈREMENT
-    couverte par une période de la semaine type (une ouverture de 15 min ne
-    rend pas disponible une tranche de 30). Un jour fermé rend [].
+    A slot counts as open only when it is ENTIRELY covered by a period of the
+    typical week (a 15-minute opening does not make a 30-minute slot
+    available). A closed day returns [].
     """
     if est_ferme(preferences, jour) is not None:
         return []
@@ -620,12 +605,12 @@ def tranches_du_jour(preferences, jour):
 
 
 def tranches_occupees(base, preferences, jour, sauf_rdv=None):
-    """Les débuts de tranches déjà prises ce jour-là (set de datetime).
+    """The starts of the slots already taken that day (a set of datetime).
 
-    Un rendez-vous de N tranches en occupe N ; un rendez-vous dont
-    l'horaire ne tombe pas pile sur la grille occupe toutes les tranches
-    qu'il CHEVAUCHE (rien n'est proposé « à moitié »). sauf_rdv : le
-    rendez-vous qu'on est en train de déplacer, qui ne se gêne pas lui-même.
+    An appointment of N slots occupies N; an appointment whose time does not
+    fall exactly on the grid occupies every slot it OVERLAPS (nothing is
+    offered `half way`). sauf_rdv: the appointment being moved, which does not
+    get in its own way.
     """
     pas = pas_minutes(preferences)
     minuit = datetime.datetime.combine(jour, datetime.time())
@@ -640,7 +625,7 @@ def tranches_occupees(base, preferences, jour, sauf_rdv=None):
         except (TypeError, ValueError):
             continue
         fin = debut + datetime.timedelta(minutes=pas * max(rdv["duree_tranches"], 1))
-        # Toutes les tranches de la grille que ce rendez-vous chevauche.
+        # Every slot of the grid this appointment overlaps.
         depart = minuit + datetime.timedelta(
             minutes=(int((debut - minuit).total_seconds() // 60) // pas) * pas)
         while depart < fin:
@@ -651,7 +636,7 @@ def tranches_occupees(base, preferences, jour, sauf_rdv=None):
 
 def tranches_libres_du_jour(base, preferences, jour, sauf_rdv=None,
                             depuis=None):
-    """Les tranches ouvertes ET libres de cette date : [datetime], triées."""
+    """The slots of this date that are open AND free: [datetime], sorted."""
     occupees = tranches_occupees(base, preferences, jour, sauf_rdv=sauf_rdv)
     libres = [tranche for tranche in tranches_du_jour(preferences, jour)
               if tranche not in occupees]
@@ -661,7 +646,7 @@ def tranches_libres_du_jour(base, preferences, jour, sauf_rdv=None,
 
 
 def suites_libres(tranches, pas):
-    """Découpe une liste de tranches en SUITES consécutives : [[datetime]]."""
+    """Cuts a list of slots into CONSECUTIVE runs: [[datetime]]."""
     suites, courante = [], []
     for tranche in tranches:
         if courante and tranche - courante[-1] != datetime.timedelta(minutes=pas):
@@ -673,15 +658,15 @@ def suites_libres(tranches, pas):
     return suites
 
 
-# -------------------------------------------------------- créneaux à proposer
+# -------------------------------------------------------- slots to offer
 def creneaux_libres(base, preferences, tranches=1, depuis=None,
                     jours=HORIZON_JOURS, limite=None, sauf_rdv=None):
-    """Les créneaux réellement libres : ouvert − déjà pris − jours fermés.
+    """The genuinely free slots: open − already taken − closed days.
 
-    tranches : la longueur exigée, en tranches CONSÉCUTIVES (un rendez-vous
-    de 30 minutes avec un pas de 15 en demande 2). Les créneaux rendus ne se
-    chevauchent pas entre eux : dans une suite libre, on avance de la
-    longueur demandée. Rend une liste d'horaires ISO 8601 à la minute.
+    tranches: the required length, in CONSECUTIVE slots (a 30-minute
+    appointment with a 15-minute step needs 2). The returned slots do not
+    overlap each other: within a free run, we advance by the requested length.
+    Returns a list of ISO 8601 times to the minute.
     """
     if depuis is None:
         depuis = datetime.datetime.now()
@@ -703,13 +688,12 @@ def creneaux_libres(base, preferences, tranches=1, depuis=None,
 
 def suites_libres_datees(base, preferences, depuis=None, jours=HORIZON_JOURS,
                          limite=None):
-    """Les TROUS libres du planning, l'un après l'autre.
+    """The free GAPS in the schedule, one after another.
 
-    Un « créneau disponible » au sens du bouton « ⏭ Prochain créneau
-    disponible » n'est pas une tranche isolée mais une SUITE de tranches
-    libres d'affilée : c'est ce qu'on cherche quand on cherche de la place.
-    Rend [{"debut": datetime, "fin": datetime, "tranches": n}], du plus
-    proche au plus lointain.
+    An `available slot` in the sense of the `⏭ Prochain créneau disponible`
+    button is not an isolated slot but a RUN of free slots in a row: that is
+    what you look for when you look for room. Returns [{"debut": datetime,
+    "fin": datetime, "tranches": n}], from nearest to furthest.
     """
     if depuis is None:
         depuis = datetime.datetime.now()
@@ -730,27 +714,27 @@ def suites_libres_datees(base, preferences, depuis=None, jours=HORIZON_JOURS,
 
 
 def creneaux_manuels(preferences):
-    """Les créneaux ajoutés À LA MAIN (le cas particulier), triés.
+    """The slots added BY HAND (the special case), sorted.
 
-    Ils vivent dans le même réglage qu'avant l'existence des horaires
-    d'ouverture (themes.CLE_CRENEAUX) : une liste tapée reste valable, elle
-    n'est jamais effacée par le calcul — elle s'y AJOUTE.
+    They live in the same setting as before opening hours existed
+    (themes.CLE_CRENEAUX): a typed list stays valid, it is never erased by the
+    computation — it is ADDED to it.
     """
     return sorted(preferences.obtenir(themes.CLE_CRENEAUX) or [])
 
 
 def plancher_de_proposition(depuis=None):
-    """La plus proche date qu'on ait le droit de proposer : DEMAIN, à minuit.
+    """The nearest date we are allowed to offer: TOMORROW, at midnight.
 
-    ⚠ SA RÈGLE, DU 17/08/2026, mot pour mot : « il ne faut pas proposer de date
-    du jour même (aujourd'hui) mais seulement à partir de demain ». Une place à
-    17 h annoncée au téléphone à 16 h 30 n'est pas une proposition : personne ne
-    peut s'organiser, et c'est le cabinet qui paiera l'absence.
+    ⚠ HIS RULE, OF 17/08/2026, word for word: `we must not offer a date on the
+    same day (today) but only from tomorrow`. A 5pm slot announced on the phone
+    at 4:30pm is not an offer: nobody can organise themselves, and it is the
+    practice that will pay for the absence.
 
-    UN SEUL ENDROIT décide de ce plancher, et tout ce qui mène au téléphone en
-    hérite — y compris un chemin écrit demain. `depuis` déjà plus lointain est
-    respecté : on ne ramène jamais une recherche en arrière (la cascade demande
-    « à partir de telle place », et elle doit le rester).
+    ONE PLACE decides this floor, and everything leading to the phone inherits
+    it — including a path written tomorrow. A `depuis` already further out is
+    respected: we never bring a search backwards (the cascade asks `from such a
+    slot`, and it must stay that way).
     """
     demain = (datetime.date.today() + datetime.timedelta(days=1))
     minuit = datetime.datetime.combine(demain, datetime.time())
@@ -762,40 +746,39 @@ def plancher_de_proposition(depuis=None):
 def creneaux_proposables(base, preferences, tranches=1, depuis=None,
                          jours=HORIZON_JOURS, limite=None, sauf_rdv=None,
                          avec_les_passes=False):
-    """Les créneaux à proposer : les calculés PLUS ceux ajoutés à la main.
+    """The slots to offer: the computed ones PLUS those added by hand.
 
-    Rend [{"horaire", "origine", "occupe", "passe"}] trié par horaire —
-    origine vaut « calculé » ou « à la main ». Un créneau manuel déjà occupé
-    par un rendez-vous est conservé mais SIGNALÉ (occupe = True) :
-    l'utilisateur voit sa saisie et ce qui cloche, plutôt qu'une disparition
-    silencieuse.
+    Returns [{"horaire", "origine", "occupe", "passe"}] sorted by time —
+    origine is `calculé` or `à la main`. A manual slot already taken by an
+    appointment is kept but FLAGGED (occupe = True): the user sees their input
+    and what is wrong with it, rather than a silent disappearance.
 
-    ⚠ JAMAIS UNE DATE PASSÉE AU TÉLÉPHONE (16/08/2026). Les créneaux CALCULÉS
-    partent de `depuis` — ils sont donc à venir par construction. Ceux ajoutés
-    À LA MAIN, eux, entraient tels quels : un créneau saisi il y a trois
-    semaines restait dans la liste, et comme le tri se fait par horaire il
-    arrivait EN PREMIER. C'est donc lui que le produit proposait au téléphone.
-    +
-    MESURÉ DANS SA BASE le 16/08/2026 : cinq créneaux manuels antérieurs à ce
-    jour, et `creneau_le_plus_proche` rendait « le 28/07/2026 à 09h30 » — vingt
-    jours dans le passé. Son rendez-vous a donc été « déplacé » vers cette
-    date, où il est aussitôt devenu MANQUÉ. Un rendez-vous déplacé vers hier
-    n'est pas un rendez-vous déplacé : c'est un rendez-vous perdu.
+    ⚠ NEVER A PAST DATE ON THE PHONE (16/08/2026). The COMPUTED slots start
+    from `depuis` — so they are ahead by construction. Those added BY HAND,
+    though, went in as they stood: a slot typed three weeks ago stayed in the
+    list, and since sorting is by time it came FIRST. So that is the one the
+    product offered on the phone.
 
-    D'où `avec_les_passes`, et son défaut : NON. Tout chemin qui mène au
-    téléphone hérite du comportement sûr sans avoir à y penser — y compris un
-    chemin écrit demain. Seul l'ÉCRAN qui a reçu la saisie demande à les voir
-    (Réglages > Agenda), parce qu'une saisie ne doit jamais disparaître de
-    l'écran qui l'a reçue : elle s'y affiche marquée `passe`, et reste
-    supprimable. Ma première correction filtrait ici sans cette porte, et deux
-    essais du produit l'ont refusée — ils avaient raison.
+    MEASURED IN HIS DATABASE on 16/08/2026: five manual slots earlier than that
+    day, and `creneau_le_plus_proche` returned `le 28/07/2026 à 09h30` — twenty
+    days in the past. His appointment was therefore `moved` to that date, where
+    it immediately became MISSED. An appointment moved to yesterday is not a
+    moved appointment: it is a lost appointment.
 
-    ⚠ ET JAMAIS LE JOUR MÊME (sa demande du 17/08/2026) : « il ne faut pas
-    proposer de date du jour même mais seulement à partir de demain ». Le
-    plancher est donc DEMAIN À MINUIT, pas « maintenant ». Une place à 17 h
-    proposée à 16 h 30 par téléphone ne laisse à personne le temps de
-    s'organiser — et c'est le cabinet qui en paie l'absence.
-    Voir `plancher_de_proposition`, seul endroit qui décide de ce plancher.
+    Hence `avec_les_passes`, and its default: NO. Every path leading to the
+    phone inherits the safe behaviour without having to think about it —
+    including a path written tomorrow. Only the SCREEN that received the input
+    asks to see them (Réglages > Agenda), because input must never disappear
+    from the screen that received it: it is displayed there marked `passe`, and
+    stays deletable. My first fix filtered here without that door, and two of
+    the product's tests refused it — they were right.
+
+    ⚠ AND NEVER THE SAME DAY (his request of 17/08/2026): `we must not offer a
+    date on the same day but only from tomorrow`. The floor is therefore
+    TOMORROW AT MIDNIGHT, not `now`. A 5pm slot offered at 4:30pm by phone
+    leaves nobody the time to organise themselves — and it is the practice that
+    pays for the absence. See `plancher_de_proposition`, the only place that
+    decides this floor.
     """
     plancher_dt = plancher_de_proposition(depuis)
     calcules = creneaux_libres(base, preferences, tranches=tranches,
@@ -811,9 +794,9 @@ def creneaux_proposables(base, preferences, tranches=1, depuis=None,
         if horaire in proposes:
             proposes[horaire]["origine"] = "à la main"
             continue
-        # DEUX RAISONS DISTINCTES de ne pas proposer, et l'écran doit pouvoir
-        # dire LAQUELLE : « l'heure est passée » et « c'est aujourd'hui » ne se
-        # corrigent pas de la même façon.
+        # TWO DISTINCT REASONS not to offer, and the screen must be able to say
+        # WHICH: `the time has passed` and `it is today` are not fixed the same
+        # way.
         trop_tot = horaire < plancher
         if trop_tot and not avec_les_passes:
             continue
@@ -827,7 +810,7 @@ def creneaux_proposables(base, preferences, tranches=1, depuis=None,
 
 
 def _occupe(base, preferences, horaire, tranches, sauf_rdv=None):
-    """Vrai si CE créneau manuel tombe sur un rendez-vous déjà en place."""
+    """True when THIS manual slot falls on an appointment already in place."""
     try:
         debut = datetime.datetime.fromisoformat(horaire)
     except (TypeError, ValueError):
@@ -845,34 +828,33 @@ def _occupe(base, preferences, horaire, tranches, sauf_rdv=None):
     return False
 
 
-# Note : « occupants_du_creneau » (qui occupe déjà telle place) a été retiré
-# le 31/07/2026 avec la première lecture, erronée, du §8.3 : la cascade ne
-# vise plus l'occupant d'une place convoitée, elle repart de la place qu'un
-# client vient de LIBÉRER. Plus aucun appelant — donc plus de code mort.
+# Note: `occupants_du_creneau` (who already occupies a given slot) was removed
+# on 31/07/2026 along with the first, mistaken reading of §8.3: the cascade no
+# longer targets the occupant of a coveted slot, it starts again from the slot
+# a client has just FREED. No caller left — hence no dead code.
 
 
 # ---------------------------------------------------------------------------
-# CE QU'UN IMPORT REMPLACE — « pas de superposition possible »
+# WHAT AN IMPORT REPLACES — `no overlapping possible`
 # ---------------------------------------------------------------------------
 def remplacer_sur_le_creneau(base, preferences, rendezvous_id, maintenant=None):
-    """Retire ce qui occupait la place de CE rendez-vous ; rend les retirés.
+    """Removes whatever occupied THIS appointment's slot; returns those removed.
 
-    Règle du propriétaire (10/08/2026) : « dans tous les cas, les nouveaux
-    créneaux de l'import remplacent les anciens (pas de superposition de
-    rendez-vous possible) ».
+    Owner's rule (10/08/2026): `in every case, the import's new slots replace
+    the old ones (no overlapping of appointments possible)`.
 
-    ⚠ RIEN N'EST EFFACÉ, et la règle n'est pas récrite ici : chaque rendez-vous
-    déplacé passe par `decision_annulation`, celle du retrait à la main —
-    « annulé » s'il est passé, « supprimé » s'il est à venir. Les deux rendent
-    la place ; aucun des deux ne perd la trace.
+    ⚠ NOTHING IS ERASED, and the rule is not rewritten here: every displaced
+    appointment goes through `decision_annulation`, the one for removal by hand
+    — `annulé` when it is past, `supprimé` when it is ahead. Both give the slot
+    back; neither loses the trace.
 
-    ⚠ ET C'EST LE NOUVEAU QUI GAGNE, jamais l'inverse. L'import est la volonté
-    la plus récente de l'opérateur : refuser l'événement importé aurait laissé
-    l'agenda en désaccord avec le fichier qu'il vient de charger, sans qu'aucun
-    écran ne puisse dire lequel des deux a raison.
+    ⚠ AND IT IS THE NEW ONE THAT WINS, never the reverse. The import is the
+    operator's most recent intention: refusing the imported event would have
+    left the calendar in disagreement with the file just loaded, with no screen
+    able to say which of the two was right.
 
-    Rend la liste des rendez-vous retirés, telle qu'elle était AVANT le
-    changement — c'est elle qui permet de dire à l'écran ce qui a bougé.
+    Returns the list of removed appointments, as they were BEFORE the change —
+    it is that list which lets the screen say what moved.
     """
     nouveau = base.obtenir_rendezvous(rendezvous_id)
     if nouveau is None:
@@ -885,9 +867,9 @@ def remplacer_sur_le_creneau(base, preferences, rendezvous_id, maintenant=None):
     fin = debut + datetime.timedelta(
         minutes=pas * max(nouveau["duree_tranches"] or 1, 1))
     retires = []
-    # `rendezvous_occupants` ne rend que « prévu » et « confirmé » — les seuls
-    # qui occupent — et regarde la veille en plus, pour attraper un rendez-vous
-    # commencé avant la fenêtre et qui déborde dedans.
+    # `rendezvous_occupants` returns only `prévu` and `confirmé` — the only
+    # ones that occupy — and also looks at the previous day, to catch an
+    # appointment started before the window that spills into it.
     for autre in base.rendezvous_occupants(debut.isoformat(timespec="minutes"),
                                            fin.isoformat(timespec="minutes")):
         if autre["id"] == rendezvous_id:
@@ -899,12 +881,12 @@ def remplacer_sur_le_creneau(base, preferences, rendezvous_id, maintenant=None):
         sa_fin = sien + datetime.timedelta(
             minutes=pas * max(autre["duree_tranches"] or 1, 1))
         if sa_fin <= debut or sien >= fin:
-            continue                      # ils ne se chevauchent pas
+            continue  # they do not overlap
         decision = decision_annulation(preferences, autre["horaire"],
                                        maintenant)
-        # ⚠ LA LIGNE COMPLÈTE, LUE AVANT LE CHANGEMENT. « rendezvous_occupants »
-        # ne rend que ce qu'il faut au calcul des places — pas le nom du
-        # contact — et l'écran, lui, doit pouvoir dire QUI a été déplacé.
+        # ⚠ THE COMPLETE ROW, READ BEFORE THE CHANGE. `rendezvous_occupants`
+        # returns only what the slot computation needs — not the contact's name
+        # — and the screen must be able to say WHO was moved.
         retires.append(dict(base.obtenir_rendezvous(autre["id"]) or autre,
                             statut_pose=decision["statut"]))
         base.mettre_a_jour_rendezvous(autre["id"], statut=decision["statut"])
@@ -915,15 +897,15 @@ def remplacer_sur_le_creneau(base, preferences, rendezvous_id, maintenant=None):
 
 
 def vider_l_agenda_a_venir(base, preferences, maintenant=None):
-    """« Remplacer entièrement l'agenda » : ce qui tient encore une place part.
+    """`Replace the calendar entirely`: whatever still holds a slot goes.
 
-    ⚠ LE PASSÉ N'EST PAS TOUCHÉ. Un agenda qu'on remplace, c'est ce qui est
-    DEVANT nous ; ce qui a eu lieu est de l'histoire, et un import n'a pas à la
-    récrire. Les rendez-vous à venir qui tenaient encore une place passent
-    « supprimé » (leur place est rendue, ils restent lisibles dans les
-    archives) — c'est encore `decision_annulation` qui l'écrit.
+    ⚠ THE PAST IS NOT TOUCHED. A calendar you replace is what is AHEAD of us;
+    what has taken place is history, and an import has no business rewriting
+    it. Upcoming appointments that still held a slot become `supprimé` (their
+    slot is given back, they stay readable in the archives) — again it is
+    `decision_annulation` that writes it.
 
-    Rend la liste des rendez-vous retirés.
+    Returns the list of removed appointments.
     """
     if maintenant is None:
         maintenant = datetime.datetime.now()
@@ -932,11 +914,11 @@ def vider_l_agenda_a_venir(base, preferences, maintenant=None):
     for rdv in base.rendezvous_occupants(depart.isoformat(timespec="minutes"),
                                          "9999-12-31T23:59"):
         if rdv["horaire"] < depart.isoformat(timespec="minutes"):
-            continue                      # commencé avant : il a lieu, on n'y touche pas
+            continue  # started before: it is taking place, we do not touch it
         decision = decision_annulation(preferences, rdv["horaire"], maintenant)
-        # ⚠ LA LIGNE COMPLÈTE, LUE AVANT LE CHANGEMENT. « rendezvous_occupants »
-        # ne rend que ce qu'il faut au calcul des places — pas le nom du
-        # contact — et l'écran, lui, doit pouvoir dire QUI a été déplacé.
+        # ⚠ THE COMPLETE ROW, READ BEFORE THE CHANGE. `rendezvous_occupants`
+        # returns only what the slot computation needs — not the contact's name
+        # — and the screen must be able to say WHO was moved.
         retires.append(dict(base.obtenir_rendezvous(rdv["id"]) or rdv,
                             statut_pose=decision["statut"]))
         base.mettre_a_jour_rendezvous(rdv["id"], statut=decision["statut"])
@@ -948,134 +930,113 @@ def vider_l_agenda_a_venir(base, preferences, maintenant=None):
 
 
 def creneaux_lisibles(base, preferences, tranches=1, depuis=None, limite=6):
-    """Les créneaux à proposer, en français : « le 03/08/2026 à 09h00, … ».
+    """The slots to offer, in French: `le 03/08/2026 à 09h00, …`.
 
-    C'est ce texte qui remplit [créneaux_disponibles] dans les missions et
-    pré-remplit les campagnes. Rend "" si rien n'est proposable — la
-    variable reste alors visible dans le texte, jamais remplacée par du vide
-    trompeur.
+    This is the text that fills [créneaux_disponibles] in the missions and
+    pre-fills the campaigns. Returns "" when nothing is offerable — the
+    variable then stays visible in the text, never replaced by misleading
+    emptiness.
     """
     return places_a_proposer(base, preferences, tranches=tranches,
                              depuis=depuis, limite=limite)[0]
 
 
-# ============================ UN STOCK POUR NÉGOCIER, PAS UNE LISTE À RÉCITER
-# Sa demande du 16/08/2026 : « choisir automatiquement des dates avec des
-# créneaux libres le plus proche possible, puis compléter avec des dates tous
-# les jours ouvrés + matin et après-midi, plusieurs de chaque ».
-#
-# CE QUE FAISAIT `creneaux_lisibles` : les SIX premières places libres. Or les
-# six premières se suivent — même matinée, souvent la même heure à vingt
-# minutes près. L'agent n'avait donc rien à négocier : « non » sur la première
-# valait « non » sur les six.
-#
-# Le stock est bâti en deux temps, et c'est ce qui compte :
-#   ① les places les plus PROCHES, telles quelles — c'est ce qu'on propose en
-#     premier, parce qu'un rendez-vous déplacé au plus tôt dérange le moins ;
-#   ② puis une COUVERTURE : quelques jours ouvrés d'affilée, et dans chacun
-#     des créneaux le matin ET l'après-midi. De quoi répondre à « plutôt le
-#     mardi » ou « plutôt l'après-midi » sans rappeler.
-#
-# ⚠ CE N'EST PAS UN TEXTE À LIRE AU TÉLÉPHONE. Personne n'écoute vingt dates :
-# le stock vit dans « ce que tu sais », et le message d'ouverture n'en nomme
-# qu'UNE (voir `creneau_le_plus_proche` et la conduite de la nature).
+# ============================ A STOCK TO NEGOTIATE WITH, NOT A LIST TO RECITE
+# His request of 16/08/2026: `automatically choose dates with free slots as
+# close as possible, then fill out with dates on every working day + morning
+# and afternoon, several of each`.  WHAT `creneaux_lisibles` DID: the SIX first
+# free slots. But the first six follow one another — the same morning, often
+# the same hour give or take twenty minutes. So the agent had nothing to
+# negotiate: `no` on the first meant `no` on all six.  The stock is built in
+# two stages, and that is what counts: ① the NEAREST slots, as they stand —
+# that is what is offered first, because an appointment moved as early as
+# possible causes the least disruption; ② then a SPREAD: a few working days in
+# a row, and within each of them slots in the morning AND the afternoon. Enough
+# to answer `Tuesday rather` or `the afternoon rather` without calling back.  ⚠
+# THIS IS NOT A TEXT TO READ ON THE PHONE. Nobody listens to twenty dates: the
+# stock lives in `what you know`, and the opening message names only ONE (see
+# `creneau_le_plus_proche` and the kind's conduct).
 
-# ⚠ CES TROIS CHIFFRES ONT ÉTÉ REVUS ENSEMBLE LE 04/09/2026, sur sa demande et
-# sur SA base. Le défaut qu'il a vu : une campagne de déplacement avec UN
-# rendez-vous à sortir proposait sept créneaux, dont cinq le même samedi.
-# « Tout est le samedi alors qu'il faut qu'il y ait plein de jours différents
-# et matin et après-midi. »
-#
-# Mesuré sur sa base avant de changer quoi que ce soit :
-#
-#   facteur  par demi-journée  proches d'abord │  1 rdv      3 rdv
-#       7           2                 3        │  2 jours    6 jours
-#      10           2                 3        │  3 jours    8 jours
-#      10           1                 1        │  5 jours   15 jours   ← retenu
-#
-# ⚠ ET C'EST « PAR DEMI-JOURNÉE » QUI ÉTALE, pas le facteur. Passer de 7 à 10
-# ne gagnait qu'un jour : un jour ouvré donnait toujours quatre places (deux le
-# matin, deux l'après-midi), donc dix places tenaient encore en trois jours.
-# À une place par demi-journée, un jour n'en donne plus que deux — et dix
-# places couvrent cinq jours.
-#
-# ⚠ « LE PLUS PROCHE D'ABORD » N'A BESOIN QUE D'UNE PLACE. Trois places prises
-# telles quelles tombaient dans la même matinée (trois créneaux consécutifs de
-# vingt minutes) et déséquilibraient le matin contre l'après-midi. La règle
-# voulait dire « propose d'abord ce qui est le plus tôt » : une seule place
-# suffit à la tenir.
+# ⚠ THESE THREE FIGURES WERE REVISED TOGETHER ON 04/09/2026, at his request and
+# on HIS database. The defect he saw: a move campaign with ONE appointment to
+# clear offered seven slots, five of them on the same Saturday. `Everything is
+# on Saturday when there need to be plenty of different days and morning and
+# afternoon.`  Measured on his database before changing anything:  factor  per
+# half-day  nearest first │  1 appt     3 appts 7           2                 3
+# │  2 days     6 days 10           2                 3        │  3 days     8
+# days 10           1                 1        │  5 days    15 days   ← chosen
+# ⚠ AND IT IS `PER HALF-DAY` THAT SPREADS, not the factor. Going from 7 to 10
+# gained only one day: a working day still gave four slots (two in the morning,
+# two in the afternoon), so ten slots still fitted into three days. At one slot
+# per half-day, a day gives only two — and ten slots cover five days.  ⚠
+# `NEAREST FIRST` NEEDS ONLY ONE SLOT. Three slots taken as they stood fell in
+# the same morning (three consecutive twenty-minute slots) and unbalanced
+# morning against afternoon. The rule meant `offer the earliest thing first`: a
+# single slot is enough to hold it.
 
-PROCHES_DABORD = 1          # LA place la plus proche, prise telle quelle
-JOURS_COUVERTS_NEGO = 5     # jours ouvrés distincts à couvrir ensuite
-PAR_DEMI_JOURNEE = 1        # UNE place par demi-journée : c'est ce qui étale
-HEURE_BASCULE_MIDI = 13     # avant 13 h = matin, à partir de 13 h = après-midi
+PROCHES_DABORD = 1  # THE nearest slot, taken as it stands
+JOURS_COUVERTS_NEGO = 5  # distinct working days to cover next
+PAR_DEMI_JOURNEE = 1  # ONE slot per half-day: that is what spreads
+HEURE_BASCULE_MIDI = 13  # before 1pm = morning, from 1pm = afternoon
 
-# ⚠ LE CHOIX OFFERT SUIT LE NOMBRE DE RENDEZ-VOUS À DÉPLACER (sa demande du
-# 17/08/2026) : « il faut qu'il y ait beaucoup plus de possibilités de
-# rendez-vous sur lesquels déplacer que de rendez-vous à déplacer […] Le nombre
-# doit être proportionnel au nombre de rendez-vous à déplacer (7 rendez-vous à
-# déplacer, il y a alors 7 fois plus de possibilités) ».
-#
-# POURQUOI CE N'EST PAS UN CAPRICE DE CHIFFRE : chaque oui CONSOMME une place.
-# Sur une après-midi de sept personnes, un stock de vingt places voyait les
-# premiers accords prendre les meilleures, et les derniers appelés s'entendre
-# proposer une date lointaine — ou rien. Le stock doit tenir jusqu'au dernier.
-#
-# LECTURE RETENUE : « proportionnel » au sens strict, facteur CONSTANT de sept
-# places par rendez-vous à déplacer. Son exemple donne la même réponse dans les
-# deux lectures possibles (7 × 7 = 49) ; l'autre — un facteur égal au nombre —
-# serait quadratique, soit 900 places pour trente rendez-vous. Une constante
-# nommée : un seul chiffre à changer s'il la veut autrement.
+# ⚠ THE CHOICE OFFERED FOLLOWS THE NUMBER OF APPOINTMENTS TO MOVE (his request
+# of 17/08/2026): `there must be far more possible appointments to move onto
+# than appointments to move […] The number must be proportional to the number
+# of appointments to move (7 appointments to move, then there are 7 times more
+# possibilities)`.  WHY THIS IS NOT A WHIM ABOUT A FIGURE: every yes CONSUMES a
+# slot. Over an afternoon of seven people, a stock of twenty slots saw the
+# first agreements take the best ones, and the last people called hear a
+# distant date offered — or nothing. The stock must last until the last one.
+# READING CHOSEN: `proportional` in the strict sense, a CONSTANT factor of
+# seven slots per appointment to move. His example gives the same answer under
+# both possible readings (7 × 7 = 49); the other — a factor equal to the number
+# — would be quadratic, i.e. 900 slots for thirty appointments. A named
+# constant: a single figure to change should he want it otherwise.
 PAR_RENDEZVOUS_A_DEPLACER = 10
 
-# ⚠ JUSQU'OÙ CHERCHER UNE PLACE — MESURÉ DANS SA BASE LE 17/08/2026.
-# Son agenda est COMPLET sur les 21 jours de l'horizon : zéro créneau libre. Au
-# 30ᵉ jour il y en a 250, au 45ᵉ 662. Une campagne de déplacement n'avait donc
-# RIEN à proposer — `creneau_le_plus_proche` rendait "" — et cinq de ses neuf
-# contacts finissaient sans date, « à rappeler par un humain » ou « le client
-# rappellera ». Le message qui nomme une date n'en nommait aucune.
-#
-# Or un déplacement DOIT aboutir : le praticien n'est pas là ce jour-là, le
-# rendez-vous doit aller quelque part. Refuser de regarder au-delà de trois
-# semaines, c'est refuser de le déplacer.
-#
-# On garde donc le proche EN PREMIER — c'est mieux pour le client — et on
-# n'élargit que si l'on ne trouve rien. Le cas courant ne coûte pas un calcul de
-# plus ; le cas d'un agenda plein, lui, cesse d'être une impasse.
+# ⚠ HOW FAR TO LOOK FOR A SLOT — MEASURED IN HIS DATABASE ON 17/08/2026. His
+# calendar is FULL over the horizon's 21 days: zero free slots. On the 30th day
+# there are 250, on the 45th 662. A move campaign therefore had NOTHING to
+# offer — `creneau_le_plus_proche` returned "" — and five of his nine contacts
+# ended with no date, `to be called back by a human` or `the client will call
+# back`. The message that names a date named none.  Yet a move MUST conclude:
+# the practitioner is not there that day, the appointment has to go somewhere.
+# Refusing to look beyond three weeks means refusing to move it.  So the near
+# ones are kept FIRST — it is better for the client — and we only widen when we
+# find nothing. The common case does not cost one extra computation; the case
+# of a full calendar stops being a dead end.
 HORIZONS_NEGO = (HORIZON_JOURS, 45, 90, 180)
 
 
 def places_libres_elargies(base, preferences, tranches=1, depuis=None,
                            sauf_places=(), limite=None, sauf_jours=()):
-    """Les horaires libres, en élargissant l'horizon tant qu'on ne trouve rien.
+    """The free times, widening the horizon as long as nothing is found.
 
-    ⚠ UN SEUL ENDROIT POUR CETTE RÈGLE, et c'est tout l'objet de cette
-    fonction. Ma première correction ne l'a élargie que dans le stock de la
-    négociation ; la vérification d'avant-appel, elle, employait l'ancien
-    horizon. Résultat mesuré sur sa base : le message annonçait bien « le
-    08/09/2026 à 08h40 »… et la campagne refusait de composer, « il n'en reste
-    plus AUCUN de libre », pour ses NEUF contacts. Deux calculs, deux vérités —
-    la famille de défaut qui revient le plus souvent ici.
+    ⚠ ONE PLACE ONLY FOR THIS RULE, and that is the whole point of this
+    function. My first fix widened it only in the negotiation stock; the
+    pre-call check still used the old horizon. Result measured on his database:
+    the message duly announced `le 08/09/2026 à 08h40`… and the campaign
+    refused to dial, `there is not a single free one left`, for all NINE of his
+    contacts. Two computations, two truths — the family of defect that comes
+    back most often here.
 
-    ⚠ ET `limite` COMPTE LES PLACES LIBRES, PAS LES LIGNES DE LA LISTE
-    (17/08/2026). C'était l'inverse, et c'est le défaut le plus coûteux mesuré
-    sur sa base : il a 106 créneaux ajoutés à la main, dont 99 DÉJÀ PRIS. Comme
-    le tri se fait par horaire, ces 99-là remplissaient les six premières
-    lignes ; la liste annoncée dans le message sortait donc VIDE, alors que 662
-    places étaient libres derrière. Or c'est ce texte vide que la campagne
-    relit avant de composer : elle concluait « il n'en reste plus aucun » et
-    n'appelait personne. On écarte donc l'occupé D'ABORD, on coupe ENSUITE.
+    ⚠ AND `limite` COUNTS FREE SLOTS, NOT ROWS OF THE LIST (17/08/2026). It was
+    the other way round, and it is the costliest defect measured on his
+    database: he has 106 slots added by hand, 99 of them ALREADY TAKEN. Since
+    sorting is by time, those 99 filled the first six rows; the list announced
+    in the message therefore came out EMPTY, while 662 slots were free behind
+    them. And it is that empty text the campaign reads back before dialling: it
+    concluded `there is not one left` and called nobody. So the taken ones are
+    set aside FIRST, and the cut is made SECOND.
 
-    ⚠ `sauf_jours` : LES JOURNÉES QU'ON VIDE, écartées EN ENTIER (sa règle du
-    17/08/2026) : « cela a sélectionné des créneaux durant la journée que je
-    veux annuler. Il ne faut pas non plus sélectionner des créneaux libres sur
-    la ou les journées où l'on a l'annulation ».
-    +
-    C'est évident dès qu'on le dit : si le praticien n'est pas là ce jour-là,
-    aucune heure de ce jour-là n'est proposable — même celles qui n'ont jamais
-    porté de rendez-vous. Écarter les places une par une (`sauf_places`) ne
-    suffisait pas : elle n'enlevait QUE les heures des rendez-vous à déplacer,
-    et laissait tous les trous de la journée autour.
+    ⚠ `sauf_jours`: THE DAYS BEING EMPTIED, set aside IN FULL (his rule of
+    17/08/2026): `it selected slots during the day I want to cancel. It must
+    also not select free slots on the day or days where we have the
+    cancellation.` It is obvious as soon as it is said: if the practitioner is
+    not there that day, no hour of that day is offerable — even ones that never
+    carried an appointment. Setting slots aside one by one (`sauf_places`) was
+    not enough: it only removed the times of the appointments being moved, and
+    left all the gaps of the day around them.
     """
     ecartees = set(sauf_places or ())
     jours_exclus = {jour for jour in (sauf_jours or ()) if jour}
@@ -1090,51 +1051,42 @@ def places_libres_elargies(base, preferences, tranches=1, depuis=None,
     return []
 
 
-# ⚠ QUELQUES PLACES POUR REMPLACER UN RENDEZ-VOUS ANNULÉ (31/08/2026, sa
-# demande, relevée sur un VRAI appel). Ce qui partait était les six prochaines
-# places libres — et sa transcription du 31/08 le montre en toutes lettres :
-#
-#   « le mardi 1 septembre 2026 à 8 heures 20, le mardi 1 septembre 2026 à
-#     9 heures 20, le mardi 1 septembre 2026 à 9 heures 40, le mardi
-#     1 septembre 2026 à 10 heures 20, le mardi 1 septembre 2026 à 11 heures,
-#     le mardi 1 septembre 2026 à 11 heures 40. »
-#
-# SIX FOIS LE MÊME JOUR — et pire, le jour même du rendez-vous auquel elle
-# venait de dire qu'elle ne pourrait pas venir. « Aucun », a-t-elle répondu.
-#
-# Sa règle : « des dates à des jours différents, mais pas trop lointain (max
-# 7 jours) ; le matin et l'après-midi d'une même journée cela me convient
-# aussi ».
-#
-# ⚠ CE N'EST PAS `places_negociables`, et c'est voulu. Celle-là bâtit le STOCK
-# d'une négociation de déplacement : elle vise plusieurs dizaines de places et
-# s'étale sur des semaines. Ici on cite des dates À VOIX HAUTE, une par une :
-# au-delà d'une poignée, personne n'écoute.
-#
-# ⚠ ELLES SONT LIBRES PAR CONSTRUCTION : `places_libres_elargies` écarte
-# l'occupé AVANT de couper (c'est le défaut du 17/08, corrigé là-bas), et le
-# recalcul de l'instant de l'appel les reprend juste avant de composer.
-JOURS_REMPLACEMENT_MAX = 7   # « pas trop lointain » — sa borne, en jours
-PLACES_REMPLACEMENT = 6      # ce qu'on peut citer au téléphone sans lasser
+# ⚠ A FEW SLOTS TO REPLACE A CANCELLED APPOINTMENT (31/08/2026, his request,
+# noted on a REAL call). What went out was the next six free slots — and his
+# transcript of 31/08 shows it in plain words:  `Tuesday 1 September 2026 at
+# 8:20, Tuesday 1 September 2026 at 9:20, Tuesday 1 September 2026 at 9:40,
+# Tuesday 1 September 2026 at 10:20, Tuesday 1 September 2026 at 11, Tuesday 1
+# September 2026 at 11:40.`  SIX TIMES THE SAME DAY — and worse, the very day
+# of the appointment she had just said she could not attend. `None`, she
+# answered.  His rule: `dates on different days, but not too far off (max 7
+# days); the morning and the afternoon of the same day suits me too`.  ⚠ THIS
+# IS NOT `places_negociables`, and that is deliberate. That one builds the
+# STOCK of a move negotiation: it aims at several dozen slots and spreads over
+# weeks. Here dates are quoted OUT LOUD, one by one: beyond a handful, nobody
+# listens.  ⚠ THEY ARE FREE BY CONSTRUCTION: `places_libres_elargies` sets the
+# taken ones aside BEFORE cutting (that is the 17/08 defect, fixed over there),
+# and the recomputation at call time takes them again just before dialling.
+JOURS_REMPLACEMENT_MAX = 7  # `not too far off` — his bound, in days
+PLACES_REMPLACEMENT = 6  # what can be quoted on the phone without wearying anyone
 
 
 def places_de_remplacement(base, preferences, tranches=1, depuis=None,
                            sauf_places=(), sauf_jours=()):
-    """Quelques places libres pour remplacer un rendez-vous — ÉTALÉES.
+    """A few free slots to replace an appointment — SPREAD OUT.
 
-    Des jours DIFFÉRENTS d'abord, matin et après-midi d'une même journée
-    ensuite, et rien au-delà de sept jours. Rend une liste d'horaires ISO,
-    triée ; vide si rien n'est proposable — on n'invente aucune date.
+    DIFFERENT days first, morning and afternoon of the same day next, and
+    nothing beyond seven days. Returns a list of ISO times, sorted; empty when
+    nothing is offerable — no date is invented.
     """
     libres = places_libres_elargies(base, preferences, tranches=tranches,
                                     depuis=depuis, sauf_places=sauf_places,
                                     sauf_jours=sauf_jours)
     if not libres:
         return []
-    # ⚠ LA BORNE SE COMPTE DEPUIS LA PREMIÈRE PLACE LIBRE, pas depuis
-    # aujourd'hui. Un agenda plein huit jours durant rendrait sinon une liste
-    # VIDE — et une liste vide, c'est un appel qui ne propose rien alors qu'il
-    # y avait des places à citer.
+    # ⚠ THE BOUND IS COUNTED FROM THE FIRST FREE SLOT, not from today. A
+    # calendar full for eight days would otherwise return an EMPTY list — and
+    # an empty list means a call that offers nothing while there were slots to
+    # quote.
     try:
         origine = datetime.datetime.fromisoformat(libres[0]).date()
     except (TypeError, ValueError):
@@ -1150,17 +1102,17 @@ def places_de_remplacement(base, preferences, tranches=1, depuis=None,
             continue
         if quand.date() > limite:
             break
-        # ⚠ UNE SEULE PLACE PAR DEMI-JOURNÉE au premier tour : c'est ce qui
-        # écarte les six créneaux d'affilée d'une même matinée. Le second tour
-        # (plus bas) complète, matin ET après-midi, s'il reste de la place.
+        # ⚠ ONE SLOT PER HALF-DAY on the first pass: that is what rules out six
+        # slots in a row from the same morning. The second pass (below) fills
+        # out, morning AND afternoon, when there is room left.
         demi = (quand.date().isoformat(),
                 quand.hour < HEURE_BASCULE_MIDI)
         if demi in par_demi_journee:
             continue
         par_demi_journee[demi] = horaire
         retenues.append(horaire)
-    # Pas assez de journées ouvertes pour remplir : on complète avec ce qui
-    # reste, dans l'ordre — mieux vaut deux heures d'un même matin que rien.
+    # Not enough open days to fill up: we fill out with what is left, in order
+    # — two hours of the same morning is better than nothing.
     if len(retenues) < PLACES_REMPLACEMENT:
         for horaire in libres:
             if len(retenues) >= PLACES_REMPLACEMENT:
@@ -1177,18 +1129,18 @@ def places_de_remplacement(base, preferences, tranches=1, depuis=None,
 
 def places_negociables(base, preferences, tranches=1, depuis=None,
                        sauf_places=(), a_deplacer=0, sauf_jours=()):
-    """Le stock de places d'une négociation : proches d'abord, puis variées.
+    """The stock of slots for a negotiation: nearest first, then varied.
 
-    Rend une liste d'horaires ISO 8601, triée. Vide si rien n'est proposable —
-    on n'invente aucune date, comme partout ailleurs.
+    Returns a list of ISO 8601 times, sorted. Empty when nothing is offerable —
+    no date is invented, as everywhere else.
 
-    La recherche s'élargit tant qu'elle ne trouve rien (voir HORIZONS_NEGO).
+    The search widens as long as it finds nothing (see HORIZONS_NEGO).
 
-    `a_deplacer` : le nombre de rendez-vous que la campagne doit sortir de leur
-    place. Le stock visé vaut alors `a_deplacer × PAR_RENDEZVOUS_A_DEPLACER`, et
-    la couverture s'étend sur autant de jours et de semaines qu'il en faut pour
-    l'atteindre. À zéro (le défaut), on garde le stock court d'un appel
-    isolé — un rappel individuel n'a personne d'autre à servir.
+    `a_deplacer`: the number of appointments the campaign must clear out of
+    their slots. The stock aimed at is then `a_deplacer ×
+    PAR_RENDEZVOUS_A_DEPLACER`, and the spread extends over as many days and
+    weeks as it takes to reach it. At zero (the default), the short stock of an
+    isolated call is kept — a single call-back has nobody else to serve.
     """
     libres = places_libres_elargies(base, preferences, tranches=tranches,
                                     depuis=depuis, sauf_places=sauf_places,
@@ -1198,19 +1150,17 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
     cible = max(0, int(a_deplacer or 0)) * PAR_RENDEZVOUS_A_DEPLACER
     retenues = list(libres[:PROCHES_DABORD])
     deja = set(retenues)
-    # ⚠ LES PLUS PROCHES CONSOMMENT LEUR QUOTA (04/09/2026). Elles sont prises
-    # telles quelles — c'est voulu, on propose d'abord ce qui est le plus tôt —
-    # mais elles n'étaient inscrites NI dans le compte par demi-journée, NI
-    # dans les jours déjà vus. La première demi-journée pouvait donc en
-    # recevoir `PAR_DEMI_JOURNEE` de PLUS : le premier jour ramassait 3 + 2 + 2
-    # = sept places au lieu de quatre, et avec une cible de sept — un seul
-    # rendez-vous à déplacer — la boucle s'arrêtait avant d'avoir vu le
-    # deuxième jour.
-    #
-    # ⚠ CONSTATÉ SUR SA VRAIE BASE : « au lieu de faire un tirage de plein de
-    # dates, il n'en a sélectionné qu'une seule ». Sept fois le même samedi
-    # n'est pas sept propositions — l'agent n'avait rien à négocier, ce qui est
-    # exactement le défaut que cet étalement existe pour éviter.
+    # ⚠ THE NEAREST ONES CONSUME THEIR QUOTA (04/09/2026). They are taken as
+    # they stand — that is intended, we offer the earliest thing first — but
+    # they were entered NEITHER into the per-half-day count NOR into the days
+    # already seen. The first half-day could therefore receive
+    # `PAR_DEMI_JOURNEE` MORE: the first day gathered 3 + 2 + 2 = seven slots
+    # instead of four, and with a target of seven — a single appointment to
+    # move — the loop stopped before it had even seen the second day.  ⚠
+    # OBSERVED ON HIS REAL DATABASE: `instead of drawing plenty of dates, it
+    # selected only one`. Seven times the same Saturday is not seven offers —
+    # the agent had nothing to negotiate, which is exactly the defect this
+    # spreading exists to avoid.
     comptes, jours_vus = {}, []
     for horaire in retenues:
         try:
@@ -1222,16 +1172,14 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
             jours_vus.append(jour)
         demi = "matin" if quand.hour < HEURE_BASCULE_MIDI else "apres"
         comptes[(jour, demi)] = comptes.get((jour, demi), 0) + 1
-    # ⚠ ON COMPTE LES JOURS, PAS LES CRÉNEAUX. Compter les créneaux ramenait
-    # tout le stock sur les deux premières journées ouvertes — exactement le
-    # défaut qu'on corrige.
-    #
-    # ⚠ ET LA COUVERTURE S'ÉTEND JUSQU'À LA CIBLE (17/08/2026). Cinq jours et
-    # deux créneaux par demi-journée plafonnaient le stock à vingt-trois places,
-    # quel que soit le nombre de gens à déplacer. On garde donc les MÊMES deux
-    # règles — plusieurs jours, matin ET après-midi — mais on continue d'avancer
-    # dans le calendrier tant que la cible n'est pas atteinte : le stock s'étale
-    # sur plusieurs semaines au lieu de s'entasser sur la première.
+    # ⚠ WE COUNT DAYS, NOT SLOTS. Counting slots brought the whole stock back
+    # onto the first two open days — exactly the defect being fixed.  ⚠ AND THE
+    # SPREAD EXTENDS UNTIL THE TARGET (17/08/2026). Five days and two slots per
+    # half-day capped the stock at twenty-three slots, whatever the number of
+    # people to move. So the SAME two rules are kept — several days, morning
+    # AND afternoon — but we go on advancing through the calendar as long as
+    # the target is not reached: the stock spreads over several weeks instead
+    # of piling up on the first.
     jours_vises = max(JOURS_COUVERTS_NEGO,
                       -(-cible // (PAR_DEMI_JOURNEE * 2)) if cible else 0)
     for horaire in libres[PROCHES_DABORD:]:
@@ -1254,12 +1202,12 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
         if horaire not in deja:
             deja.add(horaire)
             retenues.append(horaire)
-    # ⚠ SECOND PASSAGE, ET IL EST NÉCESSAIRE : quand le cabinet n'ouvre qu'une
-    # demi-journée, ou que les jours parcourus n'offrent pas assez de places, le
-    # premier tour s'arrête sous la cible. On complète alors dans l'ordre des
-    # dates, en levant le plafond par demi-journée — mieux vaut deux places de
-    # plus le même matin que sept personnes sans date. L'étalement reste acquis :
-    # il a été fait EN PREMIER.
+    # ⚠ A SECOND PASS, AND IT IS NECESSARY: when the practice opens only half a
+    # day, or when the days walked do not offer enough slots, the first pass
+    # stops below the target. We then fill out in date order, lifting the
+    # per-half-day cap — two more slots on the same morning is better than
+    # seven people with no date. The spread is already secured: it was done
+    # FIRST.
     if cible and len(retenues) < cible:
         for horaire in libres:
             if len(retenues) >= cible:
@@ -1270,26 +1218,24 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
     return sorted(retenues)
 
 
-# ⚠ CE QUI SORT D'ICI SERA DIT À VOIX HAUTE (24/08/2026, sa demande). Ces
-# trois fonctions ne fabriquent pas du texte d'écran : elles remplissent les
-# champs « créneaux » de l'étape 2, et ces champs partent MOT POUR MOT dans la
-# consigne dictée à l'agent. « le 25/08/2026 à 09h00 » n'a rien qui dise à une
-# machine qu'il faut lire « vingt-cinq août » plutôt que « vingt-cinq barre
-# zéro huit ». En toutes lettres, la question ne se pose plus.
-#
-# ⚠ LES ÉCRANS, EUX, NE CHANGENT PAS : les tableaux gardent `date_lisible`,
-# compact et alignable d'une ligne à l'autre. Ce sont deux besoins différents,
-# et c'est pourquoi ce sont deux fonctions.
+# ⚠ WHAT COMES OUT OF HERE WILL BE SPOKEN OUT LOUD (24/08/2026, his request).
+# These three functions do not produce screen text: they fill the step-2
+# `slots` fields, and those fields go out WORD FOR WORD in the briefing
+# dictated to the agent. `le 25/08/2026 à 09h00` has nothing telling a machine
+# to read `twenty-fifth of August` rather than `twenty-five slash zero eight`.
+# Spelled out in full, the question no longer arises.  ⚠ THE SCREENS DO NOT
+# CHANGE: the tables keep `date_lisible`, compact and alignable from one row to
+# the next. These are two different needs, which is why they are two functions.
 def _en_toutes_lettres(horaire, langue_code="fr"):
-    """« le mardi 25 août 2026 à 9 heures » — la forme DITE au téléphone.
+    """`le mardi 25 août 2026 à 9 heures` — the form SPOKEN on the phone.
 
-    ⚠ ELLE SUIT LA LANGUE, ET C'EST DIT AU TÉLÉPHONE (03/09/2026). Ces listes
-    de créneaux entrent dans la consigne — « créneaux disponibles à proposer »,
-    « créneaux de remplacement » — et une consigne anglaise annonçait ses dates
-    en français, prononcées par une voix anglaise à un patient anglophone.
+    ⚠ IT FOLLOWS THE LANGUAGE, AND IT IS SPOKEN ON THE PHONE (03/09/2026).
+    These slot lists go into the briefing — `available slots to offer`,
+    `replacement slots` — and an English briefing announced its dates in
+    French, pronounced by an English voice to an English-speaking patient.
 
-    ⚠ ET L'ARTICLE DISPARAÎT EN ANGLAIS : on dit « on Monday 24 August », pas
-    « the Monday 24 August ».
+    ⚠ AND THE ARTICLE DISAPPEARS IN ENGLISH: one says `on Monday 24 August`,
+    not `the Monday 24 August`.
     """
     if langue_code == "en":
         return f"on {themes.date_parlee(horaire, 'en')}"
@@ -1298,7 +1244,7 @@ def _en_toutes_lettres(horaire, langue_code="fr"):
 
 def creneaux_negociables(base, preferences, tranches=1, depuis=None,
                          sauf_places=(), a_deplacer=0, sauf_jours=()):
-    """Le stock ci-dessus, en français. "" si rien n'est proposable."""
+    """The stock above, in French. "" when nothing is offerable."""
     return ", ".join(
         _en_toutes_lettres(
             horaire, mod_langue.de_preferences(preferences))
@@ -1312,7 +1258,7 @@ def creneaux_negociables(base, preferences, tranches=1, depuis=None,
 
 def creneaux_de_remplacement(base, preferences, tranches=1, depuis=None,
                              sauf_places=(), sauf_jours=()):
-    """Les places de remplacement, en français. "" si rien n'est proposable."""
+    """The replacement slots, in French. "" when nothing is offerable."""
     return ", ".join(
         _en_toutes_lettres(
             horaire, mod_langue.de_preferences(preferences))
@@ -1325,10 +1271,10 @@ def creneaux_de_remplacement(base, preferences, tranches=1, depuis=None,
 
 def creneau_le_plus_proche(base, preferences, tranches=1, depuis=None,
                            sauf_places=(), sauf_jours=()):
-    """La PREMIÈRE place libre, en français. "" s'il n'y en a aucune.
+    """The FIRST free slot, in French. "" when there is none.
 
-    C'est elle, et elle seule, que le message d'ouverture nomme : on propose
-    une date, on ne récite pas un catalogue.
+    It is that one, and it alone, that the opening message names: we offer a
+    date, we do not recite a catalogue.
     """
     places = places_negociables(base, preferences, tranches=tranches,
                                 depuis=depuis, sauf_places=sauf_places,
@@ -1340,32 +1286,22 @@ def creneau_le_plus_proche(base, preferences, tranches=1, depuis=None,
 
 def places_a_proposer(base, preferences, tranches=1, depuis=None, limite=6,
                       sauf_places=(), sauf_jours=()):
-    """Ce qu'il y a À PROPOSER au téléphone à cet instant précis.
+    """What there is TO OFFER on the phone at this precise moment.
 
-    `sauf_places` : des horaires à NE PAS proposer, même libres. Une campagne
-    de déplacement s'en sert pour ne jamais reproposer les places qu'elle est
-    justement en train de vider — voir assistant.places_a_vider.
+    `sauf_places`: times NOT to offer, even free ones. A move campaign uses it
+    never to re-offer the very slots it is emptying — see
+    assistant.places_a_vider.
 
-    Rend un couple (texte lisible, PREMIÈRE place libre en ISO 8601 — ou
-    None). Les deux sortent du MÊME calcul : la place envoyée à l'agent
-    comme date de référence est donc exactement la première de celles que
-    le message annonce, jamais un second calcul qui pourrait diverger.
+    Returns a pair (readable text, the FIRST free slot in ISO 8601 — or None).
+    Both come out of the SAME computation: the slot sent to the agent as the
+    reference date is therefore exactly the first of the ones the message
+    announces, never a second computation that could diverge.
 
-    Deux situations, deux réponses honnêtes :
+    Two situations, two honest answers:
 
-    - les horaires d'ouverture sont connus (semaine type réglée, ou
-      créneaux ajoutés à la main dans ⚙ Réglages) : la place est le premier
-      créneau proposable réellement libre. S'il n'y en a plus AUCUN, la
-      place vaut None — l'agenda est plein, et il faut le dire plutôt que
-      de proposer une date qui n'existe pas ;
+    - the opening hours are known (typical week configured, or slots added by hand in ⚙ Réglages): the slot is the first offerable, genuinely free one. When there is NONE left, the slot is None — the calendar is full, and that must be said rather than offering a date that does not exist;
 
-    - aucun horaire d'ouverture n'est réglé : RingBack ne CONNAÎT pas les
-      heures ouvrées et ne les devine pas — le texte lisible reste vide.
-      Il applique alors la seule règle qui lui reste dans cette situation,
-      exactement celle de refus_rendezvous_telephone : ne jamais mettre
-      deux personnes à la même place. La place part du délai de rattrapage
-      standard (RATTRAPAGE_JOURS après l'appel) et AVANCE de tranche en
-      tranche jusqu'à en trouver une qui n'est pas déjà prise.
+    - no opening hours are configured: RingBack does not KNOW the working hours and does not guess them — the readable text stays empty. It then applies the only rule left to it in that situation, exactly the one in refus_rendezvous_telephone: never put two people in the same slot. The slot starts from the standard make-up delay (RATTRAPAGE_JOURS after the call) and MOVES FORWARD slot by slot until it finds one that is not already taken.
     """
     libres = places_libres_elargies(base, preferences, tranches=tranches,
                                     depuis=depuis, sauf_places=sauf_places,
@@ -1377,25 +1313,25 @@ def places_a_proposer(base, preferences, tranches=1, depuis=None, limite=6,
     if libres:
         return texte, libres[0]
     if semaine_ouverte(preferences) or creneaux_manuels(preferences):
-        # ⚠ IL Y AVAIT ICI UN SECOND PARCOURS, sans la limite, qui rattrapait
-        # une place libre que les lignes affichées masquaient. Il n'a plus
-        # d'objet : `places_libres_elargies` écarte l'occupé AVANT de couper, si
-        # bien qu'une liste vide veut désormais dire « rien de libre », pas
-        # « rien dans les six premières lignes ». Ce rattrapage soignait le
-        # symptôme sur la PLACE en laissant le TEXTE vide — et c'est le texte
-        # que la campagne relit avant de composer.
-        return texte, None          # l'agenda est réellement complet
+        # ⚠ THERE WAS A SECOND WALK HERE, without the limit, catching a free
+        # slot that the displayed rows hid. It no longer has a purpose:
+        # `places_libres_elargies` sets the taken ones aside BEFORE cutting, so
+        # an empty list now means `nothing free`, not `nothing in the first six
+        # rows`. That catch-up treated the symptom on the SLOT while leaving
+        # the TEXT empty — and it is the text the campaign reads back before
+        # dialling.
+        return texte, None  # the calendar really is full
     return texte, _place_sans_horaires(base, preferences, tranches, depuis)
 
 
 def _place_sans_horaires(base, preferences, tranches=1, depuis=None):
-    """La prochaine place NON PRISE quand aucun horaire d'ouverture n'est réglé.
+    """The next slot NOT TAKEN when no opening hours are configured.
 
-    Sans semaine type, il n'y a pas d'heures ouvrées à énumérer : la seule
-    chose que RingBack sache encore, c'est quelles places sont DÉJÀ PRISES.
-    On part donc du délai de rattrapage standard et on avance de tranche en
-    tranche (les jours déclarés fermés sont sautés) jusqu'à la première
-    place libre. Rend None si tout l'horizon est pris.
+    With no typical week there are no working hours to enumerate: the only
+    thing RingBack still knows is which slots are ALREADY TAKEN. So we start
+    from the standard make-up delay and advance slot by slot (declared closed
+    days are skipped) to the first free one. Returns None when the whole
+    horizon is taken.
     """
     if depuis is None:
         depuis = datetime.datetime.now()
@@ -1413,9 +1349,8 @@ def _place_sans_horaires(base, preferences, tranches=1, depuis=None):
         premiere = 0
         if decalage == 0:
             premiere = int((depart - minuit).total_seconds() // 60) // pas
-        # La suite exigée doit tenir DANS la journée : les tranches du
-        # lendemain ne sont pas chargées ici, on ne les déclare donc jamais
-        # libres à la légère.
+        # The required run must fit WITHIN the day: the next day's slots are
+        # not loaded here, so they are never lightly declared free.
         for rang in range(premiere, par_jour - exigees + 1):
             place = minuit + datetime.timedelta(minutes=rang * pas)
             suite = [place + datetime.timedelta(minutes=i * pas)
@@ -1425,40 +1360,40 @@ def _place_sans_horaires(base, preferences, tranches=1, depuis=None):
     return None
 
 
-# ------------------------------------------------------- semaine du planning
+# ------------------------------------------------------- schedule week
 def lundi_de(jour):
-    """Le lundi de la semaine de CETTE date."""
+    """The Monday of THIS date's week."""
     return jour - datetime.timedelta(days=jour.weekday())
 
 
 def semaine_iso(jour):
-    """(année ISO, numéro de semaine ISO) de cette date — la norme française."""
+    """(ISO year, ISO week number) of this date — the French standard."""
     annee, numero, _ = jour.isocalendar()
     return annee, numero
 
 
 def nombre_de_semaines(annee):
-    """52 ou 53 : le nombre de semaines ISO de cette année.
+    """52 or 53: the number of ISO weeks in this year.
 
-    Le 28 décembre appartient TOUJOURS à la dernière semaine ISO de son
-    année : c'est la façon la plus courte de connaître ce nombre.
+    28 December ALWAYS belongs to the last ISO week of its year: that is the
+    shortest way to know this number.
     """
     return datetime.date(annee, 12, 28).isocalendar()[1]
 
 
 def lundi_de_semaine(annee, numero):
-    """Le lundi de la semaine ISO n° `numero` de `annee` (bornes corrigées)."""
+    """The Monday of ISO week no. `numero` of `annee` (bounds corrected)."""
     numero = max(1, min(int(numero), nombre_de_semaines(int(annee))))
     return datetime.date.fromisocalendar(int(annee), numero, 1)
 
 
 def libelle_semaine(annee, numero):
-    """« semaine 33 — du 10/08 au 16/08 » : le repère qui fait retrouver.
+    """`semaine 33 — du 10/08 au 16/08`: the landmark that makes things findable.
 
-    Un numéro de semaine seul ne dit rien à personne ; les deux dates, si.
-    Cette forme était écrite en clair dans la barre du planning ; elle vit
-    ici pour que l'étape ③ de l'assistant la reprenne à l'identique plutôt
-    que d'en inventer une seconde (02/08/2026).
+    A week number on its own says nothing to anyone; the two dates do. This
+    form was written inline in the schedule's bar; it lives here so that the
+    assistant's step ③ can reuse it identically rather than inventing a second
+    one (02/08/2026).
     """
     lundi = lundi_de_semaine(annee, numero)
     dimanche = lundi + datetime.timedelta(days=6)
@@ -1466,13 +1401,12 @@ def libelle_semaine(annee, numero):
 
 
 def options_semaines(annee, depuis=None):
-    """[(numéro en texte, libellé), …] des semaines de cette année.
+    """[(number as text, label), …] of this year's weeks.
 
-    `depuis` : une date à partir de laquelle proposer. Pour l'année en
-    cours, on part de la SEMAINE COURANTE et on va jusqu'à la fin de
-    l'année — faire défiler janvier en août pour trouver la semaine
-    prochaine n'aide personne (demande du propriétaire, 02/08/2026). Les
-    semaines déjà passées restent atteignables en changeant d'année.
+    `depuis`: a date from which to offer. For the current year, we start from
+    the CURRENT WEEK and go to the end of the year — scrolling through January
+    in August to find next week helps nobody (owner's request, 02/08/2026).
+    Weeks already past stay reachable by changing year.
     """
     annee = int(annee)
     premiere = 1
@@ -1481,25 +1415,25 @@ def options_semaines(annee, depuis=None):
         if annee == courante_annee:
             premiere = courante
         elif annee < courante_annee:
-            # Une année passée : tout est derrière nous, on montre tout.
+            # A past year: it is all behind us, we show everything.
             premiere = 1
     return [(str(numero), libelle_semaine(annee, numero))
             for numero in range(premiere, nombre_de_semaines(annee) + 1)]
 
 
 def jours_ouverts_de_semaine(preferences, lundi):
-    """Les jours OUVERTS de cette semaine : [(date, libellé), …].
+    """The OPEN days of this week: [(date, label), …].
 
-    Un jour fermé (semaine type ou fermeture exceptionnelle) n'a aucun
-    rendez-vous à rappeler : le proposer serait proposer du vide. Quand la
-    semaine type n'a jamais été réglée, aucun jour n'est ouvert — et c'est
-    la vérité, pas un oubli.
+    A closed day (typical week or exceptional closure) has no appointment to
+    call back about: offering it would be offering emptiness. When the typical
+    week has never been configured, no day is open — and that is the truth, not
+    an oversight.
 
-    ⚠ `est_ferme` rend une chaîne VIDE quand la fermeture n'a pas de motif :
-    on teste donc « is not None », jamais la vérité de la valeur.
+    ⚠ `est_ferme` returns an EMPTY string when the closure has no reason: so we
+    test `is not None`, never the truthiness of the value.
     """
-    # ⚠ « semaine_ouverte » rend un BOOLÉEN (« au moins un jour ouvert »),
-    # pas la semaine : c'est « semaine » qui donne les périodes par jour.
+    # ⚠ `semaine_ouverte` returns a BOOLEAN (`at least one open day`), not the
+    # week: it is `semaine` that gives the periods per day.
     type_de_semaine = semaine(preferences)
     ouverts = []
     for decalage in range(7):
@@ -1513,11 +1447,11 @@ def jours_ouverts_de_semaine(preferences, lundi):
 
 
 def bornes_de_periode(debut, fin):
-    """(début, fin) en texte ISO — intervalle SEMI-OUVERT [début, fin[.
+    """(start, end) as ISO text — a HALF-OPEN interval [start, end[.
 
-    Le dernier jour compte pour ENTIER : on borne au lendemain à 00:00, pas
-    au jour même. Sans cela, un rendez-vous du dimanche à 11 h tomberait
-    hors d'une semaine qui va « jusqu'au dimanche ».
+    The last day counts in FULL: we bound at the next day at 00:00, not at the
+    day itself. Without that, a Sunday 11am appointment would fall outside a
+    week running `to Sunday`.
     """
     return (datetime.datetime.combine(debut, datetime.time())
             .isoformat(timespec="minutes"),
@@ -1526,24 +1460,23 @@ def bornes_de_periode(debut, fin):
 
 
 def grille_semaine(base, preferences, lundi, maintenant=None):
-    """Le PLANNING d'une semaine : sept colonnes de tranches, tuiles comprises.
+    """The SCHEDULE of a week: seven columns of slots, tiles included.
 
-    Le découpage est EXACTEMENT celui de la semaine type des réglages (le
-    pas), pour que les deux écrans se lisent de la même façon. Chaque
-    cellule vaut :
+    The division is EXACTLY that of the settings' typical week (the step), so
+    the two screens read the same way. Each cell is worth:
 
-    - « libre »   : la tranche est ouverte et personne ne l'occupe (vert) ;
-    - « ferme »   : hors des horaires d'ouverture, ou jour fermé ;
-    - « tuile »   : le DÉBUT d'un rendez-vous, avec sa hauteur en tranches ;
-    - « couverte » : une tranche avalée par la tuile du dessus.
+    - `libre`    : the slot is open and nobody occupies it (green);
+    - `ferme`    : outside the opening hours, or a closed day;
+    - `tuile`    : the START of an appointment, with its height in slots;
+    - `couverte` : a slot swallowed by the tile above.
 
-    La règle qui compte : **un rendez-vous qui occupe plusieurs tranches
-    consécutives donne UNE seule tuile** de hauteur N (un `rowspan` à
-    l'affichage), jamais N cases côte à côte. Si deux rendez-vous se
-    superposent (saisie ancienne, import), le second n'écrase pas le
-    premier : il part dans « superposes » et l'écran le dit.
+    The rule that counts: **an appointment occupying several consecutive slots
+    gives ONE single tile** of height N (a `rowspan` on display), never N cells
+    side by side. When two appointments overlap (old input, an import), the
+    second does not overwrite the first: it goes into `superposes` and the
+    screen says so.
 
-    Rend {"lundi", "pas", "minutes", "jours", "superposes"}.
+    Returns {"lundi", "pas", "minutes", "jours", "superposes"}.
     """
     if maintenant is None:
         maintenant = datetime.datetime.now()
@@ -1554,8 +1487,8 @@ def grille_semaine(base, preferences, lundi, maintenant=None):
         datetime.datetime.combine(lundi, datetime.time()).isoformat(timespec="minutes"),
         datetime.datetime.combine(dimanche, datetime.time()).isoformat(timespec="minutes"),
         statuts=STATUTS_OCCUPANTS)
-    # 1. L'amplitude : celle des réglages, ÉLARGIE si un rendez-vous déborde.
-    #    Rien n'est caché — un rendez-vous hors horaires reste visible.
+    # 1. The span: the settings', WIDENED when an appointment overflows it.
+    # Nothing is hidden — an appointment outside the hours stays visible.
     debut, fin = amplitude_affichee(preferences)
     par_jour = {lundi + datetime.timedelta(days=i): [] for i in range(7)}
     for rdv in poses:
@@ -1573,7 +1506,7 @@ def grille_semaine(base, preferences, lundi, maintenant=None):
     fin = min(-(-fin // pas) * pas, 24 * 60)
     minutes = list(range(debut, fin - pas + 1, pas))
     rang = {minute: index for index, minute in enumerate(minutes)}
-    # 2. Les sept colonnes.
+    # 2. The seven columns.
     jours, superposes = [], []
     for decalage in range(7):
         jour = lundi + datetime.timedelta(days=decalage)
@@ -1586,7 +1519,7 @@ def grille_semaine(base, preferences, lundi, maintenant=None):
             minute = ((depart.hour * 60 + depart.minute) // pas) * pas
             index = rang.get(minute)
             if index is None or occupant[index] is not None:
-                superposes.append(rdv)      # jamais écrasé, jamais caché
+                superposes.append(rdv)  # never overwritten, never hidden
                 continue
             voulue = duree_tranches(rdv)
             hauteur = 0
@@ -1616,9 +1549,9 @@ def grille_semaine(base, preferences, lundi, maintenant=None):
             "superposes": superposes}
 
 
-# --------------------------------------------------- déplacement d'un client
+# --------------------------------------------------- moving a client
 def duree_tranches(rdv):
-    """La durée d'un rendez-vous, en tranches (1 si la donnée est absente)."""
+    """The length of an appointment, in slots (1 when the data is absent)."""
     try:
         return max(int(rdv.get("duree_tranches") or 1), 1)
     except (TypeError, ValueError):
@@ -1626,10 +1559,10 @@ def duree_tranches(rdv):
 
 
 def suite_libre_a_partir_de(base, preferences, cible, sauf_rdv=None):
-    """Combien de tranches libres CONSÉCUTIVES à partir de cet instant.
+    """How many CONSECUTIVE free slots there are from this moment.
 
-    L'instant est ramené au début de sa tranche. Rend 0 si la tranche
-    elle-même est fermée ou déjà prise.
+    The moment is brought back to the start of its slot. Returns 0 when the
+    slot itself is closed or already taken.
     """
     pas = pas_minutes(preferences)
     minuit = datetime.datetime.combine(cible.date(), datetime.time())
@@ -1645,11 +1578,11 @@ def suite_libre_a_partir_de(base, preferences, cible, sauf_rdv=None):
 
 
 def refus_deplacement(base, preferences, rdv, cible, sauf_lui_meme=True):
-    """Le message de REFUS si ce rendez-vous ne tient pas là, sinon None.
+    """The REFUSAL message when this appointment does not fit there, else None.
 
-    La règle du propriétaire, à la lettre : on ne peut pas replacer un
-    client dont le rendez-vous occupe plus de tranches consécutives qu'il
-    n'y a de tranches libres consécutives. Le message dit ce qui manque.
+    The owner's rule, to the letter: a client whose appointment occupies more
+    consecutive slots than there are consecutive free slots cannot be rebooked.
+    The message says what is missing.
     """
     pas = pas_minutes(preferences)
     exigees = duree_tranches(rdv)
@@ -1683,61 +1616,55 @@ def refus_deplacement(base, preferences, rdv, cible, sauf_lui_meme=True):
 
 
 def creneaux_pour_rendezvous(base, preferences, rdv, depuis=None, limite=12):
-    """Les créneaux où CE rendez-vous tient (sa durée), pour le déplacer."""
+    """The slots where THIS appointment fits (its length), so it can be moved.
+    """
     return creneaux_libres(base, preferences, tranches=duree_tranches(rdv),
                            depuis=depuis, limite=limite, sauf_rdv=rdv.get("id"))
 
 
-# ------------------------------------- rendez-vous décidé AU TÉLÉPHONE (R3)
+# ------------------------------------- appointment decided ON THE PHONE (R3)
 def refus_rendezvous_telephone(base, preferences, horaire, tranches=1,
                                sauf_rdv=None, place_choisie=False,
                                maintenant=None):
-    """Le message de REFUS si une date convenue AU TÉLÉPHONE ne tient pas.
+    """The REFUSAL message when a date agreed ON THE PHONE does not fit.
 
-    La règle du propriétaire : ce que l'interface refuse à la main, le
-    téléphone doit le refuser aussi — date déjà passée, jour fermé, hors des
-    horaires d'ouverture, place déjà prise, durée qui ne tient pas. Rend le
-    message français, ou None si la place est réellement libre.
+    The owner's rule: what the interface refuses by hand, the phone must refuse
+    too — a date already past, a closed day, outside the opening hours, a slot
+    already taken, a length that does not fit. Returns the French message, or
+    None when the slot really is free.
 
-    ⚠ LA DATE PASSÉE EST REFUSÉE ICI DEPUIS LE 18/08/2026, et il manquait à
-    l'appel. La règle était pourtant écrite deux fois dans ce fichier — voir
-    `creneaux_proposables` : « Un rendez-vous déplacé vers hier n'est pas un
-    rendez-vous déplacé : c'est un rendez-vous perdu. » Elle n'était tenue que
-    du côté des dates PROPOSÉES ; du côté de ce qu'on ACCEPTE d'écrire, rien
-    ne regardait le calendrier.
+    ⚠ A PAST DATE HAS BEEN REFUSED HERE SINCE 18/08/2026, and it was missing.
+    The rule was in fact written twice in this file — see
+    `creneaux_proposables`: `An appointment moved to yesterday is not a moved
+    appointment: it is a lost appointment.` It was only held on the side of the
+    dates OFFERED; on the side of what we AGREE to write, nothing looked at the
+    calendar.
 
-    CE QUE ÇA DONNAIT, mesuré : un rendez-vous manqué le 19/07, l'agent rend
-    « autre date convenue : le 21/07 à 09h30 » — un mois dans le passé —, et le
-    produit l'écrivait sans un mot, statut « confirmé ». La règle du manqué le
-    repassait aussitôt « manqué » au chargement suivant : le rendez-vous avait
-    disparu et personne ne pouvait dire pourquoi. Le banc l'a attrapé le
-    18/08/2026, quand la ligne a cessé d'être marquée « déplacé » — l'ancienne
-    écriture masquait la perte.
+    WHAT THAT PRODUCED, measured: an appointment missed on 19/07, the agent
+    returns `other date agreed: 21/07 at 09h30` — a month in the past —, and
+    the product wrote it without a word, status `confirmé`. The
+    missed-appointment rule turned it straight back to `manqué` at the next
+    load: the appointment had vanished and nobody could say why. The bench
+    caught it on 18/08/2026, when the row stopped being marked `déplacé` — the
+    old wording masked the loss.
 
-    ⚠ ON REFUSE LE PASSÉ, PAS « AUJOURD'HUI ». Ne jamais PROPOSER le jour même
-    est une règle de proposition (`plancher_de_proposition`) : elle protège le
-    client, qui ne peut pas s'organiser en deux heures. Refuser d'ÉCRIRE une
-    date de cet après-midi dont on vient de convenir avec lui au téléphone
-    serait autre chose — ce serait perdre un accord réel.
+    ⚠ THE PAST IS REFUSED, NOT `TODAY`. Never OFFERING the same day is a rule
+    about offering (`plancher_de_proposition`): it protects the client, who
+    cannot organise themselves in two hours. Refusing to WRITE a date this
+    afternoon that has just been agreed with them on the phone would be
+    something else — it would be losing a real agreement.
 
-    Trois précisions honnêtes :
-    - un jour DÉCLARÉ fermé est toujours refusé, même si la semaine type
-      n'a jamais été remplie (c'est une décision explicite de l'utilisateur) ;
-    - tant qu'AUCUNE semaine type n'est réglée, RingBack ne connaît pas les
-      horaires d'ouverture : il ne vérifie alors que le DOUBLE emploi (deux
-      personnes à la même place), et ne prétend rien de plus ;
-    - une place que l'UTILISATEUR a choisie lui-même (le créneau libéré
-      d'une campagne, ou un créneau ajouté à la main dans ⚙ Réglages —
-      « exceptionnellement, je peux recevoir samedi ») n'est pas jugée sur
-      les horaires d'ouverture : elle est déjà une décision humaine. Elle
-      reste refusée si elle est FERMÉE ou DÉJÀ PRISE.
+    Three honest qualifications:
+    - a DECLARED closed day is always refused, even when the typical week has never been filled in (it is an explicit decision by the user);
+    - as long as NO typical week is configured, RingBack does not know the opening hours: it then checks only DOUBLE booking (two people in the same slot), and claims nothing more;
+    - a slot the USER chose themselves (a campaign's freed slot, or a slot added by hand in ⚙ Réglages — `exceptionally, I can see people on Saturday`) is not judged on the opening hours: it is already a human decision. It stays refused when it is CLOSED or ALREADY TAKEN.
     """
     if horaire is None or not str(horaire).strip():
-        # ⚠ ACCORD SANS DATE, LÀ OÙ UNE DATE EST INDISPENSABLE (24/08/2026).
-        # « Date convenue illisible : « None » » ne disait rien à personne. Sur
-        # un déplacement ou une prise de rendez-vous, l'agent a conclu à un
-        # accord sans dire QUAND : il n'y a rien à écrire, et la phrase doit
-        # dire cela plutôt que de parler d'un format.
+        # ⚠ AN AGREEMENT WITH NO DATE, WHERE A DATE IS INDISPENSABLE
+        # (24/08/2026). `Agreed date unreadable: « None »` said nothing to
+        # anyone. On a move or a booking, the agent concluded an agreement
+        # without saying WHEN: there is nothing to write, and the sentence must
+        # say that rather than talk about a format.
         return ("Rendez-vous NON créé : l'agent a conclu à un accord mais n'a "
                 "donné AUCUNE date. Il n'y a rien à inscrire au planning. "
                 "Rappelez cette personne pour convenir d'une date — ce qui a "
@@ -1788,26 +1715,25 @@ def refus_rendezvous_telephone(base, preferences, horaire, tranches=1,
 
 
 def note_date_refusee(refus, date_convenue, rappel_humain=True):
-    """Le texte affiché quand une date convenue au téléphone est refusée.
+    """The text displayed when a date agreed on the phone is refused.
 
-    Il dit les deux choses qui comptent : POURQUOI le rendez-vous n'a pas
-    été créé, et QUELLE date le client avait demandée — en clair, pour
-    qu'un humain puisse reprendre exactement là où l'agent s'est arrêté.
-    Rien de ce qui a été obtenu au téléphone n'est perdu.
+    It says the two things that matter: WHY the appointment was not created,
+    and WHICH date the client had asked for — in clear, so a human can pick up
+    exactly where the agent stopped. Nothing obtained on the phone is lost.
 
-    ⚠ `rappel_humain=False` SUR UN CRÉNEAU LIBÉRÉ (15/08/2026) : cette nature
-    ne produit plus de rappel manuel, il l'a fait retirer. La phrase de fin
-    doit suivre l'état réel du contact, sinon l'écran promet un rappel que
-    personne ne fera — c'est le genre de demi-correction qui use la confiance
-    dans tout le reste de la page.
+    ⚠ `rappel_humain=False` ON A FREED SLOT (15/08/2026): that kind no longer
+    produces a manual call-back, he had it removed. The closing sentence must
+    follow the contact's real state, otherwise the screen promises a call-back
+    nobody will make — the kind of half-correction that wears away trust in the
+    whole rest of the page.
     """
     fin = ("un humain doit rappeler pour convenir d'une autre date."
            if rappel_humain else
            "aucun rendez-vous n'a été écrit, et la place libérée est proposée "
            "à quelqu'un d'autre.")
-    # ⚠ SANS DATE LISIBLE, ON NE FAIT PAS SEMBLANT D'EN CITER UNE. L'agent peut
-    # rendre une date illisible (le refus le dit alors lui-même) : la phrase
-    # « la date demandée était  — … », avec son trou, ne doit pas s'afficher.
+    # ⚠ WITH NO READABLE DATE, WE DO NOT PRETEND TO QUOTE ONE. The agent may
+    # return an unreadable date (the refusal then says so itself): the sentence
+    # `the requested date was  — …`, with its hole, must not be displayed.
     lisible = themes.date_lisible(date_convenue)
     if not lisible:
         return f"{refus} Aucune date exploitable n'a été rendue — {fin}"

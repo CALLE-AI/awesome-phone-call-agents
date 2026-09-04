@@ -1,52 +1,46 @@
-"""RingBack — accès aux données (sqlite3).
+"""RingBack — data access (sqlite3).
 
-Dix tables : clients, rendez-vous, appels, cascades, appels_cascade,
-le modèle « campagne » (campagnes, contacts_campagne, appels_campagne,
-relances) — une campagne est l'instanciation d'un THÈME DE TRAVAIL sur une
-liste de contacts importée à l'instant ; tout appel non abouti y génère une
-relance planifiée qui conserve le thème — et le CAHIER DE CHANGEMENTS
-(changements) : une ligne écrite AU MOMENT où le planning bouge, pour que
-le vrai livrable d'une campagne — la liste des changements à reporter dans
-le logiciel de planification de l'établissement — ne se reconstitue jamais
-après coup, et ne perde donc rien.
-Règle stricte de confidentialité : un numéro de téléphone ne sort JAMAIS
-en clair dans les journaux ni dans l'interface — voir masquer_telephone().
+Ten tables: clients, appointments, calls, cascades, cascade calls, the
+`campaign` model (campagnes, contacts_campagne, appels_campagne, relances) — a
+campaign is the instantiation of a WORK THEME on a list of contacts imported at
+that moment; every call that does not conclude generates a scheduled follow-up
+there that keeps the theme — and the CHANGE LOG (changements): a row written AT
+THE MOMENT the schedule moves, so that a campaign's real deliverable — the list
+of changes to be carried over into the establishment's scheduling software — is
+never reconstructed after the fact, and therefore loses nothing. Strict privacy
+rule: a phone number NEVER comes out in clear in the logs or in the interface —
+see masquer_telephone().
 
-QUI EST APPELÉ, ET QUEL NUMÉRO. Un contact de campagne porte un LIEN vers
-la fiche client (contacts_campagne.client_id) : c'est le numéro ACTUEL de
-cette fiche qui est composé, jamais la copie faite au moment de la
-campagne (qui reste comme trace de ce qui avait été importé). Corriger un
-numéro corrige donc toutes les campagnes en cours, et le 🚫 « Ne plus
-appeler » ne peut plus être contourné par une correction. Un contact
-simplement collé reçoit une fiche à son entrée dans la campagne, pour que
-le lien existe toujours. Le point de passage obligé avant de composer est
-cible_appel_contact() : il tient le lien ET le filet de sécurité (numéro
-OU nom d'un client marqué 🚫, fiche supprimée).
-Un client importé d'un agenda ICS peut ne pas avoir de numéro : son
-telephone vaut alors "" (chaîne vide) tant qu'il n'est pas complété.
-Le drapeau clients.jeu_essai marque les fiches du JEU D'ESSAI (module
-jeu_essai) : elles s'ajoutent aux données réelles et se retirent en bloc
-(supprimer_jeu_essai) sans jamais toucher aux clients de l'utilisateur.
+WHO IS CALLED, AND ON WHICH NUMBER. A campaign contact carries a LINK to the
+client record (contacts_campagne.client_id): it is that record's CURRENT number
+that is dialled, never the copy made at campaign time (which stays as a trace
+of what was imported). Correcting a number therefore corrects every running
+campaign, and the 🚫 `Ne plus appeler` can no longer be bypassed by a
+correction. A merely pasted contact receives a record when it enters the
+campaign, so the link always exists. The compulsory checkpoint before dialling
+is cible_appel_contact(): it holds the link AND the safety net (the number OR
+the name of a client marked 🚫, a deleted record). A client imported from an ICS
+calendar may have no number: their telephone is then "" (an empty string) until
+it is completed. The clients.jeu_essai flag marks the SAMPLE DATA SET's records
+(module jeu_essai): they are added to the real data and are removed in one go
+(supprimer_jeu_essai) without ever touching the user's clients.
 
-LES NUMÉROS D'ESSAI (module essai_reel). L'opérateur peut déclarer les
-numéros de ses TESTEURS dans ⚙ Réglages — le sien, celui d'un collègue,
-celui d'un ami qui accepte de jouer un rôle — pour éprouver le produit en
-conditions réelles. Ces numéros sont confiés à Base.numeros_essai, et c'est
-ICI qu'ils servent : partout où un numéro est masqué pour l'écran, la ligne
-rendue porte en plus « numero_essai » (vrai/faux). L'interface s'en sert
-pour marquer 🧪 la personne concernée. Un numéro d'essai reste MASQUÉ comme
-tous les autres : ce drapeau ne le révèle pas, il dit seulement « ceci est
-un essai ».
-Migration : uniquement additive (CREATE TABLE IF NOT EXISTS + ALTER TABLE
-ADD COLUMN) — une base existante est enrichie à son prochain lancement,
-jamais réécrite.
+THE TEST NUMBERS (module essai_reel). The operator may declare their TESTERS'
+numbers in ⚙ Réglages — their own, a colleague's, a friend's who agrees to play
+a role — to exercise the product in real conditions. Those numbers are handed
+to Base.numeros_essai, and it is HERE that they are used: everywhere a number
+is masked for the screen, the returned row also carries `numero_essai`
+(true/false). The interface uses it to mark the person concerned 🧪. A test
+number stays MASKED like all the others: this flag does not reveal it, it only
+says `this is a test`. Migration: additive only (CREATE TABLE IF NOT EXISTS +
+ALTER TABLE ADD COLUMN) — an existing database is enriched at its next launch,
+never rewritten.
 
-« ANNULÉ » EST UN STATUT D'HISTOIRE, « SUPPRIMÉ » EFFACE LA LIGNE DES VUES.
-Règle du propriétaire (31/07/2026) : « annulé c'est pour les dates passées,
-sinon on supprime le rendez-vous, cela laisse une place libre. » Un
-rendez-vous À VENIR qu'on annule ne porte donc plus « annulé » mais
-STATUT_SUPPRIME — voir le commentaire de cette constante pour le POURQUOI du
-statut plutôt que d'un DELETE.
+`ANNULÉ` IS A HISTORY STATUS, `SUPPRIMÉ` REMOVES THE ROW FROM THE VIEWS.
+Owner's rule (31/07/2026): `annulé is for past dates, otherwise we delete the
+appointment, that leaves a free slot.` An UPCOMING appointment that is
+cancelled therefore no longer carries `annulé` but STATUT_SUPPRIME — see that
+constant's comment for WHY a status rather than a DELETE.
 """
 
 import datetime
@@ -62,34 +56,29 @@ import unicodedata
 
 journal = logging.getLogger("ringback.db")
 
-# --------------------------------------------------- « supprimé » : le choix
-# LA RÈGLE DU PROPRIÉTAIRE, mot pour mot (31/07/2026) : « annulé c'est pour
-# les dates passées, sinon on supprime le rendez-vous, cela laisse une place
-# libre ».
-#
-# CE QU'ON A CHOISI, ET POURQUOI. « Supprimer » n'efface PAS la ligne de la
-# base : elle prend le statut « supprimé », qui la retire de toutes les vues
-# de travail et du calcul des places. Trois raisons, toutes vérifiables dans
-# ce fichier :
-#   1. le CAHIER DE CHANGEMENTS pointe le rendez-vous (changements.
-#      rendezvous_id) — c'est là que vit l'histoire (qui, quand, motif,
-#      raison, horodatage). Un DELETE laisserait ce lien dans le vide ;
-#   2. les CONTACTS DE CAMPAGNE pointent le rendez-vous
-#      (contacts_campagne.rendezvous_id) : l'effacer casserait le lien entre
-#      une campagne passée et ce dont elle parlait ;
-#   3. les APPELS pointent le rendez-vous (appels.rendezvous_id) : un appel
-#      réellement passé ne doit jamais devenir orphelin.
-# Un effacement pur et dur romprait ces trois liens SANS rien apporter à
-# l'utilisateur : ce qu'il demande, c'est que le rendez-vous disparaisse de
-# ses écrans et que la place redevienne libre — les deux sont obtenus.
-# Si le propriétaire préfère l'effacement réel, c'est ICI qu'on le corrigera,
-# et nulle part ailleurs.
+# --------------------------------------------------- `supprimé`: the choice
+# THE OWNER'S RULE, word for word (31/07/2026): `annulé is for past dates,
+# otherwise we delete the appointment, that leaves a free slot`.  WHAT WAS
+# CHOSEN, AND WHY. `Deleting` does NOT erase the row from the database: it
+# takes the `supprimé` status, which removes it from every working view and
+# from the slot computation. Three reasons, all verifiable in this file: 1. the
+# CHANGE LOG points at the appointment (changements.rendezvous_id) — that is
+# where the history lives (who, when, reason, why, timestamp). A DELETE would
+# leave that link dangling; 2. the CAMPAIGN CONTACTS point at the appointment
+# (contacts_campagne.rendezvous_id): erasing it would break the link between a
+# past campaign and what it was about; 3. the CALLS point at the appointment
+# (appels.rendezvous_id): a call that really took place must never become
+# orphaned. A hard erase would break those three links WITHOUT bringing the
+# user anything: what they ask is that the appointment disappear from their
+# screens and that the slot become free again — both are obtained. Should the
+# owner prefer a real erase, it is HERE that it will be fixed, and nowhere
+# else.
 STATUT_SUPPRIME = "supprimé"
 
-# Les statuts qui ne TIENNENT plus : ni place occupée, ni ligne « à venir ».
-# « supprimé » y ajoute qu'il quitte AUSSI les listes de travail et les
-# comptes — il ne subsiste que dans le cahier des changements, dans
-# « Tous les rendez-vous » et sur la fiche du client (les deux archives).
+# The statuses that no longer HOLD: neither an occupied slot, nor an `upcoming`
+# row. `supprimé` adds that it ALSO leaves the working lists and the counts —
+# it survives only in the change log, in `Tous les rendez-vous` and on the
+# client's record (the two archives).
 STATUTS_SANS_PLACE = ("annulé", "déplacé", "ignoré", STATUT_SUPPRIME)
 
 SCHEMA = """
@@ -237,45 +226,41 @@ CREATE TABLE IF NOT EXISTS changements (
 """
 
 
-# --------------------------------------------------- refus AVANT de composer
-# Les quatre raisons pour lesquelles un contact de campagne n'est JAMAIS
-# composé. Ces textes s'affichent tels quels dans la colonne « détail » de la
-# fiche de campagne : l'écran dit toujours POURQUOI l'appel n'est pas parti.
+# --------------------------------------------------- refusal BEFORE dialling
+# The four reasons a campaign contact is NEVER dialled. These texts are
+# displayed as they stand in the campaign record's `détail` column: the screen
+# always says WHY the call did not go out.
 REFUS_STOP = "Client marqué 🚫 « Ne plus appeler »"
 REFUS_STOP_NOM = ("Une fiche au même nom est marquée 🚫 « Ne plus appeler » — "
                   "appel refusé par sécurité")
 REFUS_SANS_NUMERO = "Aucun numéro à composer"
 REFUS_CLIENT_SUPPRIME = ("Fiche client supprimée — ce contact n'est plus "
                          "jamais composé (son historique reste lisible)")
-# ⚠ LE RENDEZ-VOUS A CHANGÉ SOUS NOS PIEDS (21/08/2026, sa demande). Le texte
-# se complète avec CE QUI a changé — voir `rendezvous_change_depuis_la_campagne`.
+# ⚠ THE APPOINTMENT CHANGED UNDER OUR FEET (21/08/2026, his request). The text
+# is completed with WHAT changed — see `rendezvous_change_depuis_la_campagne`.
 REFUS_RDV_CHANGE = "Le rendez-vous dont cette campagne parle a changé"
 
-# Les statuts qui OCCUPENT une place. Recopiés de `horaires.STATUTS_OCCUPANTS`
-# pour que db reste indépendant du calcul des horaires — même convention, même
-# raison que `calle_client.RATTRAPAGE_JOURS`.
+# The statuses that OCCUPY a slot. Copied from `horaires.STATUTS_OCCUPANTS` so
+# that db stays independent of the schedule computation — same convention, same
+# reason as `calle_client.RATTRAPAGE_JOURS`.
 STATUTS_OCCUPANTS_RDV = ("prévu", "confirmé")
 
-# ------------------------------------------- ce que DEVIENT un contact refusé
-# ⚠ SA DEMANDE DU 20/08/2026 : « les personnes qui ont demandé de ne plus être
-# appelées par un agent IA doivent être enregistrées comme à rappeler par un
-# humain dans toutes les campagnes, et donc subir la logique de cet état ».
-#
-# Elles ont refusé L'AGENT, pas le cabinet. Les marquer « exclu » les faisait
-# disparaître en silence : personne ne les rappelait jamais, et leur affaire
-# tombait. « À rappeler par un humain » dit exactement ce qu'il faut faire, et
-# sa logique est déjà celle qu'il faut : état TERMINAL, jamais dans les états
-# appelables (seuls « à appeler » et « en cours » sont composés), aucune
-# relance armée, aucun plafond approché — et la personne apparaît dans
-# 🔁 Relances § 🙋, avec le geste « c'est fait » qui l'en sort sans rien effacer.
-#
-# ⚠ L'HOMONYME AUSSI, choisi par lui le 20/08 : il n'a rien demandé, mais un
-# humain est justement le seul à pouvoir dire s'il s'agit de la même personne.
-# L'écarter en silence pour une coïncidence de nom faisait tomber son affaire
-# sans que personne ne puisse le rattraper.
-#
-# Les deux autres refus NE CHANGENT PAS : sans numéro, un humain n'a rien à
-# composer non plus ; fiche supprimée, il n'y a plus personne à rappeler.
+# ------------------------------------------- what a refused contact BECOMES ⚠
+# HIS REQUEST OF 20/08/2026: `people who have asked not to be called by an AI
+# agent any more must be recorded as to be called back by a human in every
+# campaign, and therefore undergo the logic of that state`.  They refused THE
+# AGENT, not the practice. Marking them `exclu` made them disappear in silence:
+# nobody ever called them back, and their matter dropped. `À rappeler par un
+# humain` says exactly what must be done, and its logic is already the right
+# one: a TERMINAL state, never among the callable states (only `à appeler` and
+# `en cours` are dialled), no follow-up armed, no ceiling approached — and the
+# person appears in 🔁 Relances § 🙋, with the `done` gesture that takes them out
+# of it without erasing anything.  ⚠ THE NAMESAKE TOO, chosen by him on 20/08:
+# they asked for nothing, but a human is precisely the only one who can say
+# whether it is the same person. Setting them aside in silence over a
+# coincidence of name dropped their matter with nobody able to catch it.  The
+# other two refusals DO NOT CHANGE: with no number, a human has nothing to dial
+# either; with a deleted record, there is nobody left to call back.
 ETAT_RAPPEL_HUMAIN = "à rappeler par un humain"
 ETAT_EXCLU = "exclu"
 
@@ -293,53 +278,57 @@ SUITE_DU_REFUS = {
 
 
 def refus_du_rendezvous(refus):
-    """Ce refus vient-il d'un rendez-vous qui a changé ? (pour les écrans)"""
+    """Does this refusal come from an appointment that changed? (for the screens)
+    """
     return (refus or "").startswith(REFUS_RDV_CHANGE)
 
 
 def suite_du_refus(refus):
-    """(état, détail) d'un contact que l'on ne compose pas — UN SEUL endroit.
+    """(state, detail) of a contact we do not dial — ONE SINGLE place.
 
-    Six chemins refusent de composer : la création de la campagne, l'appel de
-    l'assistant, le moteur classique, la relance de cascade, la reprise d'une
-    cascade et la file d'appels. Six décisions séparées auraient fini par
-    diverger, et la divergence se paierait ici en personnes oubliées.
+    Six paths refuse to dial: campaign creation, the assistant's call, the
+    classic engine, the cascade follow-up, resuming a cascade and the call
+    queue. Six separate decisions would have ended up diverging, and the
+    divergence would be paid for here in forgotten people.
 
-    Un refus inconnu retombe sur « exclu » avec son texte tel quel : c'est le
-    comportement d'avant, et il reste juste pour tout ce qui n'est pas un 🚫.
+    An unknown refusal falls back on `exclu` with its text as it stands: that
+    is the previous behaviour, and it stays right for everything that is not a
+    🚫.
     """
     return SUITE_DU_REFUS.get(refus, (ETAT_EXCLU, refus))
 
 
-# ⚠ DÉRIVÉ DE LA TABLE, JAMAIS RECOPIÉ. Les écrans ont besoin de distinguer,
-# parmi les 🙋, ceux qui ont refusé l'agent de ceux que l'agent n'a pas su
-# conclure. Ma première version lisait « le détail commence-t-il par 🚫 » : elle
-# ratait l'homonyme, dont le texte commence par « Une fiche au même nom ». Un
-# critère recopié à la main se désaccorde toujours de la table qu'il imite.
+# ⚠ DERIVED FROM THE TABLE, NEVER COPIED. The screens need to tell apart, among
+# the 🙋, those who refused the agent from those the agent could not conclude
+# with. My first version read `does the detail start with 🚫`: it missed the
+# namesake, whose text starts with `Une fiche au même nom`. A criterion copied
+# by hand always drifts away from the table it imitates.
 DETAILS_REFUS_AGENT = frozenset(
     detail for etat, detail in SUITE_DU_REFUS.values()
     if etat == ETAT_RAPPEL_HUMAIN)
 
 
 def refus_de_l_agent(detail):
-    """Ce 🙋 vient-il d'un 🚫 (appel automatique écarté), et non d'un appel ?"""
+    """Does this 🙋 come from a 🚫 (automatic call set aside), and not from a call?
+    """
     return (detail or "") in DETAILS_REFUS_AGENT
 
 
 def chiffres_significatifs(numero):
-    """Les 9 chiffres qui identifient un numéro français, quelle que soit
-    son écriture (« 06 39 98 00 56 » et « +33 6 39 98 00 56 » rendent tous
-    deux « 639980056 »). Rend "" si le texte n'est pas un numéro plausible."""
+    """The 9 digits that identify a French number, whatever its spelling (`06 39
+    98 00 56` and `+33 6 39 98 00 56` both return `639980056`). Returns "" when
+    the text is not a plausible number.
+    """
     chiffres = re.sub(r"\D", "", numero or "")
     return chiffres[-9:] if len(chiffres) >= 9 else ""
 
 
 def cle_nom(nom):
-    """La clé de comparaison d'un nom : sans casse, sans accents, espaces
-    resserrés (« Mme Nadia Lefèvre » et « mme  nadia lefevre » se répondent).
+    """The comparison key of a name: case-insensitive, accent-insensitive, spaces
+    tightened (`Mme Nadia Lefèvre` and `mme nadia lefevre` match).
 
-    Sert au FILET DE SÉCURITÉ du 🚫 : une fiche marquée « Ne plus appeler »
-    doit être reconnue même si son numéro a changé depuis la campagne.
+    Used by the 🚫 SAFETY NET: a record marked `Ne plus appeler` must be
+    recognised even when its number has changed since the campaign.
     """
     decompose = unicodedata.normalize("NFD", (nom or "").casefold())
     sans_accents = "".join(c for c in decompose if not unicodedata.combining(c))
@@ -347,13 +336,13 @@ def cle_nom(nom):
 
 
 def heure_locale(horodatage):
-    """« 2026-07-29 12:15:31 » (UTC, écrit par sqlite) → ISO local à la minute.
+    """`2026-07-29 12:15:31` (UTC, written by sqlite) → local ISO to the minute.
 
-    Les colonnes `cree_le` portent la valeur de `datetime('now')`, qui est en
-    temps UNIVERSEL ; toutes les autres dates de l'application sont en heure
-    locale. Afficher la valeur brute donnerait une heure d'appel fausse (celle
-    d'un autre fuseau) : cette conversion rétablit l'heure réellement vécue.
-    Rend "" si l'horodatage est absent ou illisible — jamais d'heure inventée.
+    The `cree_le` columns carry the value of `datetime('now')`, which is in
+    UNIVERSAL time; every other date in the application is in local time.
+    Displaying the raw value would give a wrong call time (that of another
+    timezone): this conversion restores the time actually lived. Returns ""
+    when the timestamp is absent or unreadable — never an invented time.
     """
     if not horodatage:
         return ""
@@ -367,11 +356,11 @@ def heure_locale(horodatage):
 
 
 def masquer_telephone(numero):
-    """« +33 6 00 00 00 42 » devient « +33 6 •• •• •• 42 ».
+    """`+33 6 39 98 50 42` becomes `+33 6 •• •• •• 42`.
 
-    Seuls l'indicatif (deux premiers groupes) et le dernier groupe restent
-    lisibles. Un numéro sans espaces est masqué chiffre à chiffre, sauf les
-    deux derniers.
+    Only the dialling code (the first two groups) and the last group stay
+    readable. A number with no spaces is masked digit by digit, except the last
+    two.
     """
     if not numero:
         return ""
@@ -382,14 +371,13 @@ def masquer_telephone(numero):
 
 
 def references_essai(numeros):
-    """L'ensemble des chiffres significatifs des numéros d'essai déclarés.
+    """The set of significant digits of the declared test numbers.
 
-    `numeros` accepte les DEUX formes, et c'est voulu : un seul numéro
-    (texte, ou "" / None quand rien n'est déclaré) — l'écriture d'origine,
-    du temps où l'opérateur ne pouvait déclarer QUE son propre téléphone —
-    ou une liste de numéros, depuis qu'il peut déclarer plusieurs testeurs
-    (lui, un collègue, un ami). Un numéro illisible est simplement ignoré :
-    il n'exempte personne.
+    `numeros` accepts BOTH forms, and that is intended: a single number (text,
+    or "" / None when nothing is declared) — the original form, from when the
+    operator could declare ONLY their own phone — or a list of numbers, since
+    they can declare several testers (themselves, a colleague, a friend). An
+    unreadable number is simply ignored: it exempts nobody.
     """
     if numeros is None:
         candidats = ()
@@ -403,22 +391,21 @@ def references_essai(numeros):
 
 
 def est_numero_essai(telephone, numero_essai):
-    """Ce numéro est-il UN des numéros d'essai déclarés dans ⚙ Réglages ?
+    """Is this number ONE of the test numbers declared in ⚙ Réglages?
 
-    La comparaison porte sur les neuf chiffres significatifs, jamais sur le
-    texte : « 06 39 98 00 51 » et « +33 6 39 98 00 51 » sont le même numéro.
-    Aucun numéro déclaré (chaîne vide, liste vide) : la réponse est toujours
-    FAUX — la règle stricte s'applique alors à tout le monde, sans exception.
+    The comparison is on the nine significant digits, never on the text: `06 39
+    98 00 51` and `+33 6 39 98 00 51` are the same number. No number declared
+    (empty string, empty list): the answer is always FALSE — the strict rule
+    then applies to everybody, without exception.
 
-    `numero_essai` est soit UN numéro, soit la LISTE des numéros des
-    testeurs déclarés (voir references_essai) : dans les deux cas, seuls les
-    numéros réellement déclarés sont reconnus, et eux seuls.
+    `numero_essai` is either ONE number, or the LIST of the declared testers'
+    numbers (see references_essai): in both cases only the numbers actually
+    declared are recognised, and they alone.
 
-    Pourquoi pas une comparaison de numéros masqués : le masquage est
-    volontairement destructeur, et deux numéros différents peuvent se
-    masquer pareil (06 39 98 00 51 et 06 39 12 34 51 donnent tous deux
-    « 06 39 •• •• 51 »). Les confondre marquerait une VRAIE personne comme
-    donnée d'essai : exactement ce qu'il ne faut jamais faire.
+    Why not a comparison of masked numbers: masking is deliberately
+    destructive, and two different numbers can mask the same way (06 39 98 00
+    51 and 06 39 12 34 51 both give `06 39 •• •• 51`). Confusing them would
+    mark a REAL person as test data: exactly what must never be done.
     """
     references = references_essai(numero_essai)
     if not references:
@@ -428,24 +415,18 @@ def est_numero_essai(telephone, numero_essai):
 
 
 def _sous_verrou(methode):
-    """Enveloppe une méthode de Base : UN SEUL fil à la fois dans la base.
+    """Wraps a Base method: ONE SINGLE thread at a time in the database.
 
-    Le verrou est pris à l'entrée de la méthode et rendu à sa sortie. Il
-    couvre donc les trois moments, et pas seulement le premier :
-      1. l'envoi de la requête ;
-      2. la LECTURE de ses lignes — un curseur sqlite3 se lit paresseusement,
-         les lignes ne sortent qu'au fur et à mesure de la boucle ;
-      3. le commit.
-    C'est exactement là que la panne se produisait : le commit d'un fil
-    remettait à zéro la requête que l'autre fil était en train de lire, ce
-    qui donnait « bad parameter or other API misuse » ou « cannot commit -
-    no transaction is active », et mettait la campagne en pause sans raison
-    visible.
+    The lock is taken on entering the method and released on leaving it. It therefore covers all three moments, and not only the first:
+    1. sending the query;
+    2. READING its rows — a sqlite3 cursor is read lazily, the rows come out only as the loop advances;
+    3. the commit.
+    That is exactly where the failure occurred: one thread's commit reset the query the other thread was reading, which gave `bad parameter or other API misuse` or `cannot commit - no transaction is active`, and paused the campaign for no visible reason.
 
-    Ce que le verrou n'entoure JAMAIS : l'attente d'un appel téléphonique.
-    Un appel se joue dans planificateur.py / calle_client.py, hors de cette
-    classe ; aucune méthode de Base n'attend le téléphone. Une campagne qui
-    passe trente secondes en ligne ne gèle donc pas l'interface.
+    What the lock NEVER surrounds: waiting for a phone call. A call happens in
+    planificateur.py / calle_client.py, outside this class; no Base method
+    waits for the phone. A campaign spending thirty seconds on the line
+    therefore does not freeze the interface.
     """
     @functools.wraps(methode)
     def enveloppe(self, *arguments, **nommes):
@@ -455,17 +436,16 @@ def _sous_verrou(methode):
 
 
 def _serialiser_les_acces(classe):
-    """Pose le verrou sur TOUTES les méthodes de la classe, d'un coup.
+    """Puts the lock on ALL the class's methods, in one go.
 
-    Écrit à la main, ce serait « with self.verrou: » recopié dans quatre-
-    vingts méthodes — une occasion d'oubli à chaque nouvelle méthode. Ici
-    l'enveloppe est posée une fois pour toutes : une méthode ajoutée demain
-    est protégée sans que personne ait à y penser.
+    Written by hand, it would be `with self.verrou:` copied into eighty methods
+    — one chance to forget with every new method. Here the wrapper is put in
+    place once and for all: a method added tomorrow is protected without anyone
+    having to think about it.
 
-    Deux exceptions volontaires : __init__ (il CRÉE le verrou) et les
-    fonctions déclarées @staticmethod, qui n'ont pas de « self » et ne
-    touchent donc jamais la connexion (ce sont des metteurs en forme de
-    lignes déjà lues).
+    Two deliberate exceptions: __init__ (it CREATES the lock) and the functions
+    declared @staticmethod, which have no `self` and therefore never touch the
+    connection (they are formatters of rows already read).
     """
     for nom, valeur in list(vars(classe).items()):
         if nom == "__init__" or not inspect.isfunction(valeur):
@@ -476,73 +456,66 @@ def _serialiser_les_acces(classe):
 
 @_serialiser_les_acces
 class Base:
-    """Petite couche d'accès à la base sqlite3.
+    """A small access layer over the sqlite3 database.
 
-    UNE seule connexion, partagée par tous les fils (le fil de fond qui
-    déroule une campagne et les fils qui répondent aux pages web), et un
-    verrou qui les fait passer un par un — voir _sous_verrou ci-dessus.
-    Pourquoi une connexion partagée plutôt qu'une connexion par fil : la
-    base des tests est « :memory: », et une base en mémoire n'existe QUE
-    dans sa connexion — une connexion par fil donnerait à chaque fil une
-    base vide et différente, sans le moindre message d'erreur.
+    ONE single connection, shared by every thread (the background thread
+    running a campaign and the threads answering the web pages), and a lock
+    that makes them pass one at a time — see _sous_verrou above. Why a shared
+    connection rather than one per thread: the tests' database is `:memory:`,
+    and an in-memory database exists ONLY within its connection — one
+    connection per thread would give each thread a different, empty database,
+    without the slightest error message.
     """
 
     def __init__(self, chemin=":memory:"):
         if chemin != ":memory:":
-            # Base sur disque : le dossier (ex. donnees/) est créé au besoin.
+            # Database on disk: the directory (e.g. donnees/) is created as
+            # needed.
             dossier = os.path.dirname(os.path.abspath(chemin))
             os.makedirs(dossier, exist_ok=True)
-        # Verrou d'abord : toutes les autres méthodes le prennent en entrant.
-        # Ré-entrant, parce qu'une méthode de Base en appelle souvent une
-        # autre — le même fil doit pouvoir repasser la porte.
+        # The lock first: every other method takes it on entering. Re-entrant,
+        # because a Base method often calls another — the same thread must be
+        # able to pass the door again.
         self.verrou = threading.RLock()
-        # Les numéros d'ESSAI déclarés par l'opérateur (⚙ Réglages) : un par
-        # TESTEUR (lui, un collègue, un ami qui joue un rôle). Liste vide =
-        # personne n'est déclaré. Ils ne changent RIEN à ce qui est stocké ni
-        # à ce qui est composé : ils servent uniquement à poser le drapeau
-        # « numero_essai » sur les lignes rendues à l'écran, pour qu'elles
-        # soient marquées 🧪. Posés par serveur.Application au démarrage et à
-        # chaque enregistrement des réglages ; vides partout ailleurs (tests,
-        # banc d'essai) — donc aucune ligne marquée tant que rien n'est
-        # déclaré.
+        # The TEST numbers declared by the operator (⚙ Réglages): one per
+        # TESTER (themselves, a colleague, a friend playing a role). An empty
+        # list = nobody is declared. They change NOTHING about what is stored
+        # or what is dialled: they serve only to put the `numero_essai` flag on
+        # the rows returned to the screen, so they can be marked 🧪. Set by
+        # serveur.Application at start-up and whenever the settings are saved;
+        # empty everywhere else (tests, bench) — so no row is marked as long as
+        # nothing is declared.
         self.numeros_essai = []
-        # Le PREMIER de ces numéros, gardé sous son ancien nom : du temps où
-        # un seul numéro était déclarable, c'était LE numéro d'essai. Tout ce
-        # qui le lisait continue de fonctionner.
+        # The FIRST of those numbers, kept under its old name: from when only
+        # one number could be declared, it was THE test number. Everything that
+        # read it goes on working.
         self.numero_essai = ""
-        # check_same_thread=False : le serveur web répond depuis un autre fil.
+        # check_same_thread=False: the web server answers from another thread.
         self.conn = sqlite3.connect(chemin, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
-        # Filet pour le cas où un AUTRE programme ouvre le même fichier (le
-        # banc d'essai, une copie de secours…) : au lieu d'abandonner tout de
-        # suite sur « database is locked », sqlite patiente jusqu'à 5 s.
+        # A net for the case where ANOTHER program opens the same file (the
+        # bench, a backup copy…): instead of giving up straight away on
+        # `database is locked`, sqlite waits up to 5 s.
         self.conn.execute("PRAGMA busy_timeout = 5000")
-        # ⚠ POURQUOI CES DEUX RÉGLAGES : L'IMPORT D'UN AGENDA DURAIT UNE MINUTE
-        # (constaté par le propriétaire le 17/08/2026, « extrêmement long »).
-        #
-        # MESURÉ, sur une copie de sa base, un agenda de 471 rendez-vous :
-        #   par défaut ................ 4,36 s
-        #   WAL seul .................. 1,31 s
-        #   WAL + synchronous NORMAL .. 0,78 s   (5,6 fois plus rapide)
-        #
-        # LA CAUSE : un import écrit rendez-vous par rendez-vous, donc il
-        # enregistre 937 fois. Par défaut, chaque enregistrement force une
-        # écriture physique sur le disque (fsync) — 2,6 des 4,4 secondes y
-        # passaient. En mode WAL les écritures vont dans un journal ajouté en
-        # bout de fichier, et « synchronous = NORMAL » n'exige plus le fsync à
-        # chaque fois.
-        #
-        # CE QU'ON GARDE : la base reste cohérente, une transaction reste tout
-        # ou rien, et deux programmes peuvent la lire pendant qu'un troisième
-        # écrit (c'est même plus sûr qu'avant sur ce point). CE QU'ON ACCEPTE :
-        # une coupure de courant BRUTALE pourrait perdre les toutes dernières
-        # transactions — pas corrompre la base. Pour un outil local qui tourne
-        # sur le poste d'un cabinet, c'est le bon échange ; le contraire faisait
-        # attendre une minute à chaque agenda importé.
-        #
-        # Effet de bord à connaître : SQLite crée deux fichiers voisins,
-        # `ringback.db-wal` et `ringback.db-shm`. Ils sont écartés de la copie
-        # à publier, comme la base elle-même.
+        # ⚠ WHY THESE TWO SETTINGS: IMPORTING A CALENDAR TOOK A MINUTE
+        # (observed by the owner on 17/08/2026, `extremely long`).  MEASURED,
+        # on a copy of his database, a calendar of 471 appointments: by default
+        # ................ 4.36 s WAL alone ................. 1.31 s WAL +
+        # synchronous NORMAL .. 0.78 s   (5.6 times faster)  THE CAUSE: an
+        # import writes appointment by appointment, so it commits 937 times. By
+        # default, every commit forces a physical write to disk (fsync) — 2.6
+        # of the 4.4 seconds went there. In WAL mode the writes go into a
+        # journal appended at the end of the file, and `synchronous = NORMAL`
+        # no longer demands the fsync every time.  WHAT IS KEPT: the database
+        # stays consistent, a transaction stays all-or-nothing, and two
+        # programs can read it while a third writes (it is even safer than
+        # before on that point). WHAT IS ACCEPTED: a BRUTAL power cut could
+        # lose the very last transactions — not corrupt the database. For a
+        # local tool running on a practice's workstation, that is the right
+        # trade; the opposite meant waiting a minute for every imported
+        # calendar.  A side effect worth knowing: SQLite creates two
+        # neighbouring files, `ringback.db-wal` and `ringback.db-shm`. They are
+        # excluded from the copy to be published, like the database itself.
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.execute("PRAGMA synchronous = NORMAL")
         self.conn.executescript(SCHEMA)
@@ -550,10 +523,10 @@ class Base:
         self.conn.commit()
 
     def _migrer(self):
-        """Ajoute les colonnes récentes à une base créée avant leur existence.
+        """Adds the recent columns to a database created before they existed.
 
-        Migration douce et sans perte : uniquement des ALTER TABLE ADD
-        COLUMN, jamais de suppression ni de réécriture de données.
+        A gentle, lossless migration: only ALTER TABLE ADD COLUMN, never a
+        deletion nor a rewrite of data.
         """
         colonnes = {ligne["name"] for ligne in
                     self.conn.execute("PRAGMA table_info(clients)")}
@@ -566,9 +539,9 @@ class Base:
                               "jeu_essai INTEGER NOT NULL DEFAULT 0")
             journal.info("Migration : colonne clients.jeu_essai ajoutée")
         if "plus_de_proposition" not in colonnes:
-            # Additive, et la valeur par défaut est le comportement d'AVANT :
-            # tout le monde reçoit les propositions de créneau libéré. Une
-            # base existante ne change donc pas de conduite.
+            # Additive, and the default value is the PREVIOUS behaviour:
+            # everybody receives freed-slot offers. An existing database
+            # therefore does not change conduct.
             self.conn.execute("ALTER TABLE clients ADD COLUMN "
                               "plus_de_proposition INTEGER NOT NULL DEFAULT 0")
             journal.info("Migration : colonne clients.plus_de_proposition "
@@ -580,8 +553,9 @@ class Base:
                               "rappel_souhaite TEXT")
             journal.info("Migration : colonne rendezvous.rappel_souhaite ajoutée")
         if "duree_tranches" not in colonnes:
-            # Additive : les rendez-vous déjà en base valent UNE tranche (la
-            # durée moyenne d'un rendez-vous) — aucune donnée n'est réécrite.
+            # Additive: the appointments already in the database are worth ONE
+            # slot (the average length of an appointment) — no data is
+            # rewritten.
             self.conn.execute("ALTER TABLE rendezvous ADD COLUMN "
                               "duree_tranches INTEGER NOT NULL DEFAULT 1")
             journal.info("Migration : colonne rendezvous.duree_tranches "
@@ -603,16 +577,16 @@ class Base:
                 journal.info("Migration : colonne contacts_campagne.%s ajoutée",
                              colonne)
         if "client_id" not in colonnes:
-            # Additive : les contacts déjà en base n'ont PAS de lien (NULL) ;
-            # ils continuent d'être composés sur leur copie d'époque, mais le
-            # filet de sécurité (numéro OU nom d'un client 🚫) les couvre.
+            # Additive: the contacts already in the database have NO link
+            # (NULL); they go on being dialled on their period copy, but the
+            # safety net (the number OR the name of a 🚫 client) covers them.
             self.conn.execute("ALTER TABLE contacts_campagne ADD COLUMN "
                               "client_id INTEGER")
             journal.info("Migration : colonne contacts_campagne.client_id "
                          "ajoutée (lien vers la fiche client)")
-        # L'identifiant CALL-E de l'appel PARTI dont le résultat se fait
-        # attendre. Additive : les contacts déjà en base n'en ont pas (NULL)
-        # — aucun appel ancien n'est réinventé, rien n'est réécrit.
+        # The CALL-E id of the call that WENT OUT and whose result is awaited.
+        # Additive: the contacts already in the database have none (NULL) — no
+        # old call is reinvented, nothing is rewritten.
         if "appel_externe_id" not in colonnes:
             self.conn.execute("ALTER TABLE contacts_campagne ADD COLUMN "
                               "appel_externe_id TEXT")
@@ -640,8 +614,8 @@ class Base:
         colonnes = {ligne["name"] for ligne in
                     self.conn.execute("PRAGMA table_info(appels_cascade)")}
         if "rendezvous_libere" not in colonnes:
-            # Additive : les cascades déjà jouées n'ont libéré aucun ancien
-            # rendez-vous (NULL) — rien n'est réécrit, rien n'est deviné.
+            # Additive: the cascades already played released no old appointment
+            # (NULL) — nothing is rewritten, nothing is guessed.
             self.conn.execute("ALTER TABLE appels_cascade ADD COLUMN "
                               "rendezvous_libere INTEGER")
             journal.info("Migration : colonne appels_cascade.rendezvous_libere "
@@ -650,35 +624,36 @@ class Base:
     def fermer(self):
         self.conn.close()
 
-    # -------------------------------------------------------- numéro d'essai
+    # -------------------------------------------------------- test number
     def definir_numero_essai(self, numero):
-        """Déclare (ou efface, avec "") UN SEUL numéro d'ESSAI.
+        """Declares (or clears, with "") ONE SINGLE TEST number.
 
-        Le chemin d'origine, gardé tel quel : il déclare un unique testeur.
-        Pour en déclarer plusieurs, voir definir_numeros_essai.
+        The original path, kept as it stands: it declares a single tester. To
+        declare several, see definir_numeros_essai.
         """
         self.definir_numeros_essai([numero] if numero else [])
 
     def definir_numeros_essai(self, numeros):
-        """Déclare (ou efface, avec []) les numéros d'ESSAI des TESTEURS.
+        """Declares (or clears, with []) the TESTERS' TEST numbers.
 
-        Aucune écriture en base : c'est un réglage d'affichage, gardé le
-        temps de la session et relu du fichier de réglages au démarrage.
+        No database write: it is a display setting, kept for the session and
+        read back from the settings file at start-up.
         """
         self.numeros_essai = [numero for numero in (numeros or []) if numero]
         self.numero_essai = self.numeros_essai[0] if self.numeros_essai else ""
 
     def _est_essai(self, telephone):
-        """Vrai si ce numéro est celui d'un testeur déclaré (essai réel)."""
+        """True when this number is a declared tester's (real-conditions test).
+        """
         return est_numero_essai(telephone, self.numeros_essai)
 
     # ------------------------------------------------------------------ clients
     def ajouter_client(self, nom, telephone, jeu_essai=False):
-        """Crée un client ; jeu_essai=True le marque comme donnée d'ESSAI.
+        """Creates a client; jeu_essai=True marks them as TEST data.
 
-        Le drapeau ne change rien au fonctionnement : il sert uniquement à
-        dire « ceci est un jeu d'essai » à l'écran et à pouvoir le RETIRER
-        en bloc sans toucher aux vraies données (supprimer_jeu_essai).
+        The flag changes nothing about how things work: it serves only to say
+        `this is a sample data set` on screen and to be able to REMOVE it in
+        one go without touching real data (supprimer_jeu_essai).
         """
         curseur = self.conn.execute(
             "INSERT INTO clients (nom, telephone, jeu_essai) VALUES (?, ?, ?)",
@@ -692,21 +667,20 @@ class Base:
         return self.conn.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
 
     def compter_clients_jeu_essai(self):
-        """Combien de clients viennent du jeu d'essai (0 = aucun chargé)."""
+        """How many clients come from the sample data set (0 = none loaded)."""
         return self.conn.execute(
             "SELECT COUNT(*) FROM clients WHERE jeu_essai = 1").fetchone()[0]
 
     def supprimer_jeu_essai(self):
-        """Retire UNIQUEMENT les données d'essai ; rend (clients, rendez-vous).
+        """Removes ONLY the test data; returns (clients, appointments).
 
-        Symétrique du chargement : seuls les clients marqués jeu_essai = 1
-        (et leurs rendez-vous, et les appels de ces rendez-vous) partent.
-        Les clients de l'utilisateur ne sont JAMAIS touchés, et les
-        campagnes déjà jouées restent en base — leurs résultats sont un
-        historique, pas une donnée d'essai rattachée à un client. Comme pour
-        la suppression d'un client, les relances encore PLANIFIÉES de ces
-        fiches sont annulées : retirer le jeu d'essai ne laisse jamais un
-        appel armé derrière lui.
+        The mirror of loading: only the clients marked jeu_essai = 1 (and their
+        appointments, and those appointments' calls) go. The user's clients are
+        NEVER touched, and campaigns already played stay in the database —
+        their results are history, not test data attached to a client. As with
+        deleting a client, those records' still-SCHEDULED follow-ups are
+        cancelled: removing the sample data set never leaves an armed call
+        behind it.
         """
         self.desarmer_jeu_essai()
         self.conn.execute(
@@ -725,11 +699,11 @@ class Base:
         return clients, rendezvous
 
     def desarmer_jeu_essai(self):
-        """Annule les relances encore armées de TOUTES les fiches d'essai.
+        """Cancels the still-armed follow-ups of ALL the test records.
 
-        Rend le nombre de relances annulées. Appelée juste avant le retrait
-        du jeu d'essai (et par lui) : retirer des données d'essai ne doit
-        jamais laisser un appel programmé derrière lui.
+        Returns the number of follow-ups cancelled. Called just before the
+        sample data set is removed (and by it): removing test data must never
+        leave a scheduled call behind.
         """
         annulees = 0
         for ligne in self.conn.execute(
@@ -738,9 +712,9 @@ class Base:
         return annulees
 
     def obtenir_ou_creer_client(self, nom, telephone):
-        """Réutilise le client si le couple (nom, téléphone) existe déjà.
+        """Reuses the client when the (name, phone) pair already exists.
 
-        Évite les doublons quand un même fichier CSV est importé deux fois.
+        Avoids duplicates when the same CSV file is imported twice.
         """
         ligne = self.conn.execute(
             "SELECT id FROM clients WHERE nom = ? AND telephone = ?",
@@ -750,18 +724,18 @@ class Base:
         return self.ajouter_client(nom, telephone)
 
     def telephone_de(self, client_id):
-        """Numéro EN CLAIR — réservé au passage d'appel, jamais à l'affichage."""
+        """Number IN CLEAR — reserved for placing a call, never for display."""
         ligne = self.conn.execute(
             "SELECT telephone FROM clients WHERE id = ?", (client_id,)).fetchone()
         return ligne["telephone"] if ligne else None
 
     def client_equivalent(self, nom, telephone):
-        """Le client de CE nom portant le MÊME numéro, quelle que soit son
-        écriture (« 06 39 98 00 56 » et « +33 6 39 98 00 56 »), sinon None.
+        """The client of THIS name carrying the SAME number, whatever its spelling
+        (`06 39 98 00 56` and `+33 6 39 98 00 56`), otherwise None.
 
-        Sert à l'import d'agenda : les outils écrivent le numéro tantôt en
-        forme nationale, tantôt en forme internationale (URI « tel: ») ;
-        sans cette équivalence, le même patient ferait deux fiches.
+        Used by the calendar import: tools write the number sometimes in
+        national form, sometimes in international form (a `tel:` URI); without
+        this equivalence, the same patient would make two records.
         """
         cible = chiffres_significatifs(telephone)
         if not cible:
@@ -774,11 +748,12 @@ class Base:
         return None
 
     def client_sans_numero_par_nom(self, nom):
-        """L'identifiant du client de CE nom encore SANS numéro, sinon None.
+        """The id of the client of THIS name still WITHOUT a number, otherwise
+        None.
 
-        Sert à l'import d'agenda : quand l'ICS porte enfin le téléphone
-        d'un client importé « à compléter », on complète sa fiche au lieu
-        d'en créer une seconde.
+        Used by the calendar import: when the ICS finally carries the phone of
+        a client imported `to be completed`, we complete their record instead
+        of creating a second one.
         """
         ligne = self.conn.execute(
             "SELECT id FROM clients WHERE nom = ? AND telephone = '' "
@@ -786,11 +761,12 @@ class Base:
         return ligne["id"] if ligne else None
 
     def telephone_par_nom(self, nom):
-        """Le numéro EN CLAIR du client portant CE nom (s'il en a un), sinon None.
+        """The number IN CLEAR of the client bearing THIS name (when they have
+        one), otherwise None.
 
-        Réservé à la constitution d'une liste d'appel demandée EXPLICITEMENT
-        (rapprochement d'un agenda ICS avec les clients connus) — jamais à
-        l'affichage, qui reste masqué.
+        Reserved for composing a call list EXPLICITLY requested (matching an
+        ICS calendar against known clients) — never for display, which stays
+        masked.
         """
         ligne = self.conn.execute(
             "SELECT telephone FROM clients WHERE nom = ? AND telephone != '' "
@@ -798,7 +774,9 @@ class Base:
         return ligne["telephone"] if ligne else None
 
     def mettre_a_jour_telephone(self, client_id, telephone):
-        """Complète (ou corrige) le numéro d'un client — import ICS sans numéro."""
+        """Completes (or corrects) a client's number — an ICS import with no
+        number.
+        """
         self.conn.execute(
             "UPDATE clients SET telephone = ? WHERE id = ?", (telephone, client_id))
         self.conn.commit()
@@ -806,7 +784,7 @@ class Base:
                      client_id, masquer_telephone(telephone))
 
     def lister_clients(self):
-        """Tous les clients (numéros masqués), avec leur nombre de rendez-vous."""
+        """Every client (numbers masked), with their number of appointments."""
         lignes = self.conn.execute(
             "SELECT c.id, c.nom, c.telephone, c.ne_plus_appeler, c.jeu_essai, "
             "c.plus_de_proposition, "
@@ -817,14 +795,15 @@ class Base:
                  "telephone_masque": masquer_telephone(ligne["telephone"]),
                  "numero_essai": self._est_essai(ligne["telephone"]),
                  "ne_plus_appeler": bool(ligne["ne_plus_appeler"]),
-                 # ⚠ LE DRAPEAU PLUS DOUX voyage avec la fiche : l'écran doit
-                 # pouvoir le distinguer du 🚫, et les deux se lisent ensemble.
+                 # ⚠ THE GENTLER FLAG travels with the record: the screen must
+                 # be able to tell it from the 🚫, and the two are read
+                 # together.
                  "plus_de_proposition": bool(ligne["plus_de_proposition"]),
                  "jeu_essai": bool(ligne["jeu_essai"]),
                  "nb_rendezvous": ligne["nb_rendezvous"]} for ligne in lignes]
 
     def obtenir_client(self, client_id):
-        """La fiche d'un client (numéro masqué), ou None."""
+        """A client's record (number masked), or None."""
         ligne = self.conn.execute(
             "SELECT c.id, c.nom, c.telephone, c.ne_plus_appeler, c.jeu_essai, "
             "c.plus_de_proposition, "
@@ -837,17 +816,17 @@ class Base:
                 "telephone_masque": masquer_telephone(ligne["telephone"]),
                 "numero_essai": self._est_essai(ligne["telephone"]),
                 "ne_plus_appeler": bool(ligne["ne_plus_appeler"]),
-                # ⚠ LE DRAPEAU PLUS DOUX voyage avec la fiche : l'écran doit
-                # pouvoir le distinguer du 🚫, et les deux se lisent ensemble.
+                # ⚠ THE GENTLER FLAG travels with the record: the screen must
+                # be able to tell it from the 🚫, and the two are read together.
                 "plus_de_proposition": bool(ligne["plus_de_proposition"]),
                 "jeu_essai": bool(ligne["jeu_essai"]),
                 "nb_rendezvous": ligne["nb_rendezvous"]}
 
     def plus_de_proposition(self, client_id):
-        """Ce client refuse-t-il qu'on lui PROPOSE des créneaux libérés ?
+        """Does this client refuse to be OFFERED freed slots?
 
-        ⚠ TOLÉRANT SUR L'ENTRÉE : un contact sans fiche (None) reçoit les
-        propositions — on ne devine pas un refus qu'on n'a pas entendu.
+        ⚠ TOLERANT ON INPUT: a contact with no record (None) receives the
+        offers — we do not guess a refusal we have not heard.
         """
         if not client_id:
             return False
@@ -857,10 +836,10 @@ class Base:
         return bool(ligne and ligne["plus_de_proposition"])
 
     def definir_plus_de_proposition(self, client_id, valeur):
-        """Pose ou lève le refus des propositions de créneau (réversible).
+        """Sets or lifts the refusal of slot offers (reversible).
 
-        ⚠ CE N'EST PAS LE 🚫 : voir le commentaire de la colonne. Ce drapeau
-        n'empêche AUCUN appel sur les rendez-vous de la personne.
+        ⚠ THIS IS NOT THE 🚫: see the column's comment. This flag prevents NO
+        call about the person's own appointments.
         """
         self.conn.execute(
             "UPDATE clients SET plus_de_proposition = ? WHERE id = ?",
@@ -868,7 +847,7 @@ class Base:
         self.conn.commit()
 
     def definir_ne_plus_appeler(self, client_id, valeur):
-        """Pose ou lève le drapeau « Ne plus appeler » (réversible)."""
+        """Sets or lifts the `Ne plus appeler` flag (reversible)."""
         self.conn.execute("UPDATE clients SET ne_plus_appeler = ? WHERE id = ?",
                           (1 if valeur else 0, client_id))
         self.conn.commit()
@@ -876,14 +855,13 @@ class Base:
                      client_id, "posé" if valeur else "levé")
 
     def telephone_exclu(self, telephone):
-        """Vrai si CE numéro appartient à un client marqué « Ne plus appeler ».
+        """True when THIS number belongs to a client marked `Ne plus appeler`.
 
-        Sert à la cascade : même une liste collée à la main ne doit jamais
-        faire appeler quelqu'un qui a demandé à ne plus l'être. La
-        comparaison porte sur les CHIFFRES significatifs, pas sur le texte :
-        « 06 39 98 00 56 » et « +33 6 39 98 00 56 » sont le même numéro, et
-        un agenda qui écrit la forme internationale ne doit pas faire sauter
-        le garde-fou.
+        Used by the cascade: even a list pasted by hand must never cause
+        someone to be called who has asked not to be. The comparison is on the
+        significant DIGITS, not on the text: `06 39 98 00 56` and `+33 6 39 98
+        00 56` are the same number, and a calendar that writes the
+        international form must not blow past the guard.
         """
         cible = chiffres_significatifs(telephone)
         if not cible:
@@ -895,12 +873,12 @@ class Base:
         return False
 
     def telephone_sans_proposition(self, telephone):
-        """Vrai si CE numéro refuse les propositions de créneau libéré.
+        """True when THIS number refuses freed-slot offers.
 
-        Le pendant de `telephone_exclu` pour le drapeau plus doux : même
-        comparaison sur les CHIFFRES significatifs, pour qu'une liste collée à
-        la main l'honore aussi — « 06 39 98 00 56 » et « +33 6 39 98 00 56 »
-        sont le même numéro.
+        The counterpart of `telephone_exclu` for the gentler flag: the same
+        comparison on the significant DIGITS, so that a list pasted by hand
+        honours it too — `06 39 98 00 56` and `+33 6 39 98 00 56` are the same
+        number.
         """
         cible = chiffres_significatifs(telephone)
         if not cible:
@@ -912,14 +890,13 @@ class Base:
         return False
 
     def nom_exclu(self, nom):
-        """Vrai si CE nom est celui d'un client marqué « Ne plus appeler ».
+        """True when THIS name is that of a client marked `Ne plus appeler`.
 
-        Le second brin du FILET DE SÉCURITÉ : un numéro corrigé après coup
-        ne reconnaît plus la personne par son numéro — le nom, lui, la
-        reconnaît encore. La comparaison ignore la casse et les accents
-        (cle_nom). Conséquence assumée par le propriétaire : un homonyme
-        non concerné peut être écarté à tort — mieux vaut un appel de moins
-        qu'un appel à quelqu'un qui a demandé qu'on cesse.
+        The second strand of the SAFETY NET: a number corrected after the fact
+        no longer recognises the person by their number — the name still does.
+        The comparison ignores case and accents (cle_nom). A consequence
+        accepted by the owner: an unrelated namesake may be set aside wrongly —
+        better one call fewer than a call to somebody who asked us to stop.
         """
         cible = cle_nom(nom)
         if not cible:
@@ -931,13 +908,13 @@ class Base:
         return False
 
     def client_connu(self, nom, telephone):
-        """L'identifiant du client DÉJÀ en fiche pour ce contact, ou None.
+        """The id of the client ALREADY on file for this contact, or None.
 
-        La MÊME reconnaissance que client_pour_contact, amputée de sa
-        dernière étape : ici, rien n'est créé. C'est ce qui permet de
-        distinguer « on sait de qui on parle » de « c'est une ligne collée
-        qu'on découvre » — la différence exacte que demande la règle du
-        propriétaire avant de toucher au rendez-vous de quelqu'un.
+        The SAME recognition as client_pour_contact, minus its last step: here,
+        nothing is created. That is what makes it possible to tell `we know who
+        we are talking about` from `it is a pasted row we are discovering` —
+        the exact difference the owner's rule requires before touching
+        somebody's appointment.
         """
         if telephone:
             ligne = self.conn.execute(
@@ -951,11 +928,11 @@ class Base:
         return self.client_sans_numero_par_nom(nom)
 
     def rendezvous_a_venir_du_client(self, client_id, maintenant=None):
-        """Les rendez-vous de CE client encore devant nous qui TIENNENT.
+        """THIS client's appointments still ahead of us that HOLD.
 
-        Mêmes statuts que « Rendez-vous à venir » (STATUTS_A_VENIR) : un
-        annulé, un déplacé, un supprimé n'en font pas partie — ils ne
-        tiennent plus. Rendus du plus proche au plus lointain.
+        The same statuses as `Rendez-vous à venir` (STATUTS_A_VENIR): a
+        cancelled, a moved, a deleted one are not among them — they no longer
+        hold. Returned from nearest to furthest.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
@@ -968,20 +945,15 @@ class Base:
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def client_pour_contact(self, nom, telephone, rendezvous_id=None):
-        """LA fiche client d'un contact de campagne — créée si elle manque.
+        """THE client record of a campaign contact — created when missing.
 
-        Une campagne ne recopie plus un numéro « pour toujours » : elle
-        porte un LIEN vers la fiche, et c'est le numéro ACTUEL de la fiche
-        qui est composé. Un contact simplement collé n'a pas de fiche : il
-        en reçoit une ICI, à son entrée dans la campagne, pour que le lien
-        existe toujours. Ordre de reconnaissance :
-        1. le rendez-vous repris de la base désigne son client ;
-        2. le couple (nom exact, numéro exact) ;
-        3. le même nom avec le MÊME numéro écrit autrement
-           (« 06 39 98 00 56 » / « +33 6 39 98 00 56 ») ;
-        4. le même nom encore sans numéro (import d'agenda à compléter) ;
-        5. sinon une fiche est créée.
-        Rend l'identifiant du client (jamais None).
+        A campaign no longer copies a number `for ever`: it carries a LINK to the record, and it is the record's CURRENT number that is dialled. A merely pasted contact has no record: it receives one HERE, on entering the campaign, so the link always exists. Recognition order:
+        1. the appointment taken from the database designates its client;
+        2. the (exact name, exact number) pair;
+        3. the same name with the SAME number written differently (`06 39 98 00 56` / `+33 6 39 98 00 56`);
+        4. the same name still with no number (a calendar import to be completed);
+        5. otherwise a record is created.
+        Returns the client's id (never None).
         """
         if rendezvous_id:
             ligne = self.conn.execute(
@@ -1009,31 +981,32 @@ class Base:
         return self.ajouter_client(nom, telephone or "")
 
     def rendezvous_du_client(self, client_id):
-        """Les identifiants des rendez-vous d'un client (pour purger la file)."""
+        """The ids of a client's appointments (for purging the queue)."""
         return [ligne["id"] for ligne in self.conn.execute(
             "SELECT id FROM rendezvous WHERE client_id = ?", (client_id,))]
 
     def completer_telephone(self, client_id, telephone):
-        """Écrit ce numéro sur la fiche SI elle n'en a pas ; rend True si écrit.
+        """Writes this number on the record IF it has none; returns True when
+        written.
 
-        ⚠ SEULEMENT UNE FICHE VIDE, ET C'EST TOUT L'ÉCART AVEC
-        `modifier_client`. Compléter ce qui manque est le geste que l'écran
-        demande (« son numéro est à compléter dans la grille de l'étape 3 ») ;
-        ÉCRASER un numéro déjà en fiche serait modifier ses données clients
-        sans le lui demander — une campagne n'a pas à faire cela.
+        ⚠ ONLY AN EMPTY RECORD, AND THAT IS THE WHOLE DIFFERENCE FROM
+        `modifier_client`. Completing what is missing is the gesture the screen
+        asks for (`their number is to be completed in the step-3 grid`);
+        OVERWRITING a number already on file would be modifying their client
+        data without asking them — a campaign has no business doing that.
 
-        CE QUE ÇA CORRIGE, mesuré dans sa base le 18/08/2026 : il complète le
-        numéro d'une personne dans la grille, la campagne l'enregistre… sur la
-        CAMPAGNE. Or c'est le numéro de la FICHE qui est composé (voir
-        `client_pour_contact`) : la fiche restait vide, et le contact partait
-        « exclu — Aucun numéro à composer ». Le geste que l'écran lui demandait
-        n'allait pas jusqu'au bout.
+        WHAT THIS FIXES, measured in his database on 18/08/2026: he completes a
+        person's number in the grid, the campaign saves it… on the CAMPAIGN.
+        Yet it is the RECORD's number that is dialled (see
+        `client_pour_contact`): the record stayed empty, and the contact went
+        out `exclu — no number to dial`. The gesture the screen asked of him
+        did not go all the way.
         """
-        # ⚠ `obtenir_client` REND UNE VUE MASQUÉE (« telephone_masque ») : le
-        # numéro en clair ne sort que par `telephone_de`, et c'est la règle du
-        # produit. Ma première version lisait « client["telephone"] » et
-        # plantait le serveur à chaque validation de grille — 180 essais
-        # tombés d'un coup, ce qui est la bonne façon de l'apprendre.
+        # ⚠ `obtenir_client` RETURNS A MASKED VIEW (`telephone_masque`): the
+        # number in clear comes out only through `telephone_de`, and that is
+        # the product's rule. My first version read `client["telephone"]` and
+        # crashed the server on every grid validation — 180 tests down at once,
+        # which is the right way to learn it.
         if self.obtenir_client(client_id) is None:
             return False
         if (self.telephone_de(client_id) or "").strip():
@@ -1048,12 +1021,12 @@ class Base:
         return True
 
     def modifier_client(self, client_id, nom=None, telephone=None):
-        """Corrige la fiche d'un client (nom, numéro) ; rend True s'il existe.
+        """Corrects a client's record (name, number); returns True when it exists.
 
-        Le numéro arrive DÉJÀ validé par saisie.valider_telephone ; il est
-        stocké en clair comme partout ailleurs et ne ressort qu'masqué.
-        Aucune suppression, aucun effet de bord : c'est une correction de
-        fiche, pas un geste sur les rendez-vous.
+        The number arrives ALREADY validated by saisie.valider_telephone; it is
+        stored in clear like everywhere else and comes back out only masked. No
+        deletion, no side effect: it is a record correction, not an action on
+        the appointments.
         """
         if self.obtenir_client(client_id) is None:
             return False
@@ -1069,19 +1042,19 @@ class Base:
         return True
 
     def etat_rendezvous_par_client(self, maintenant=None):
-        """{client_id : résumé de son agenda} — une seule passe sur la base.
+        """{client_id: a summary of their calendar} — a single pass over the
+        database.
 
-        Le résumé porte le compte de rendez-vous PAR STATUT, le prochain
-        rendez-vous à venir, le dernier passé, et si une préférence de
-        rappel a été notée. Un rendez-vous long (plusieurs tranches
-        consécutives) reste UN rendez-vous : c'est une ligne de la table,
-        jamais N.
+        The summary carries the count of appointments BY STATUS, the next
+        upcoming appointment, the last past one, and whether a call-back
+        preference was noted. A long appointment (several consecutive slots) is
+        still ONE appointment: it is one row of the table, never N.
 
-        « Prochain » ne retient que les rendez-vous qui TIENNENT (les
-        STATUTS_A_VENIR) : annoncer « prochain : le 6 août » pour un
-        rendez-vous annulé serait un faux affichage, et la fiche du client
-        en déduirait à tort qu'il a un rendez-vous prévu. Le compte par
-        statut, lui, garde TOUT — rien ne se perd.
+        `Next` keeps only appointments that HOLD (the STATUTS_A_VENIR):
+        announcing `next: 6 August` for a cancelled appointment would be a
+        false display, and the client's record would wrongly conclude they have
+        an appointment scheduled. The count by status, for its part, keeps
+        EVERYTHING — nothing is lost.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
@@ -1109,13 +1082,13 @@ class Base:
         return resume
 
     def contacts_campagne_par_client(self):
-        """{client_id : [contacts de campagne]} — l'appariement se fait ICI.
+        """{client_id: [campaign contacts]} — the matching is done HERE.
 
-        Un contact de campagne désigne un client par son rendez-vous, par
-        les chiffres de son numéro (« 06 39 98 00 56 » et
-        « +33 6 39 98 00 56 » sont le même numéro) ou, à défaut, par son
-        nom exact. Aucun numéro en clair ne sort de cette méthode : le
-        rapprochement est fait ici, les fiches rendues n'en portent pas.
+        A campaign contact designates a client by their appointment, by the
+        digits of their number (`06 39 98 00 56` and `+33 6 39 98 00 56` are
+        the same number) or, failing that, by their exact name. No number in
+        clear leaves this method: the matching is done here, and the returned
+        records carry none.
         """
         clients = self.conn.execute(
             "SELECT id, nom, telephone FROM clients").fetchall()
@@ -1142,8 +1115,8 @@ class Base:
                 FROM contacts_campagne c
                 JOIN campagnes k ON k.id = c.campagne_id
                 ORDER BY c.id"""):
-            # Le LIEN vers la fiche prime sur toute déduction : c'est lui
-            # qui dit de qui il s'agit, même si le numéro a changé depuis.
+            # The LINK to the record beats any deduction: it is what says who
+            # this is, even when the number has changed since.
             client_id = ligne["client_id"]
             if client_id is None:
                 client_id = par_rendezvous.get(ligne["rendezvous_id"])
@@ -1163,11 +1136,11 @@ class Base:
         return resultat
 
     def dernier_appel_direct_par_client(self):
-        """{client_id : dernier appel DIRECT terminé} (file, rappel individuel).
+        """{client_id: last DIRECT call finished} (queue, single call-back).
 
-        Les campagnes ont leur propre trace ; celle-ci couvre les appels
-        rattachés à un rendez-vous. Le résultat structuré est décodé, la
-        transcription n'est pas remontée (elle vit sur la fiche).
+        Campaigns have their own trace; this one covers calls attached to an
+        appointment. The structured result is decoded, the transcript is not
+        brought up (it lives on the record).
         """
         dernier = {}
         for ligne in self.conn.execute("""
@@ -1187,18 +1160,18 @@ class Base:
         return dernier
 
     def rendezvous_de_periode(self, debut, fin, statuts=None):
-        """Les rendez-vous d'une fenêtre de temps, client compris (numéro masqué).
+        """The appointments in a time window, client included (number masked).
 
-        statuts : la liste des statuts retenus (par défaut TOUS). C'est la
-        source du PLANNING : un rendez-vous y est une ligne, avec sa durée
-        en tranches — jamais une ligne par tranche.
+        statuts: the list of statuses kept (ALL by default). This is the
+        SCHEDULE's source: an appointment is one row there, with its length in
+        slots — never one row per slot.
         """
-        # ⚠ LES DEUX BORNES SONT INDÉPENDANTES (09/08/2026). Les exiger
-        # ensemble faisait qu'une fenêtre « depuis la place, sans limite »
-        # perdait AUSSI sa borne de début : la règle reprenait alors des gens
-        # dont le rendez-vous est AVANT la place, à qui l'avancer n'apporte
-        # rien. Exactement le défaut corrigé le 03/08 dans
-        # `rendezvous_a_recaser` — la même faute, à un autre endroit.
+        # ⚠ THE TWO BOUNDS ARE INDEPENDENT (09/08/2026). Requiring them
+        # together meant a `from the slot, no limit` window ALSO lost its start
+        # bound: the rule then took back people whose appointment is BEFORE the
+        # slot, for whom bringing it forward gains nothing. Exactly the defect
+        # fixed on 03/08 in `rendezvous_a_recaser` — the same mistake, in
+        # another place.
         requete = self._REQUETE_RDV + " WHERE 1 = 1"
         parametres = []
         if debut:
@@ -1215,13 +1188,13 @@ class Base:
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def contacts_campagne_du_client(self, client_id):
-        """Les identifiants des contacts de campagne qui désignent ce client.
+        """The ids of the campaign contacts that designate this client.
 
-        Trois façons de le reconnaître, de la plus sûre à la plus large :
-        le LIEN vers la fiche, le rendez-vous repris de la base, et les
-        CHIFFRES du numéro gelé (contacts d'avant la colonne `client_id`).
-        Le nom seul n'est PAS retenu ici : désarmer la relance d'un homonyme
-        ferait perdre un travail réel.
+        Three ways of recognising them, from the surest to the broadest: the
+        LINK to the record, the appointment taken from the database, and the
+        DIGITS of the frozen number (contacts from before the `client_id`
+        column). The name alone is NOT used here: disarming a namesake's
+        follow-up would lose real work.
         """
         fiche = self.conn.execute(
             "SELECT telephone FROM clients WHERE id = ?",
@@ -1241,14 +1214,14 @@ class Base:
         return vises
 
     def desarmer_contacts_du_client(self, client_id):
-        """Désarme ce qui pourrait encore SONNER pour ce client ; rend le nombre
-        de relances annulées.
+        """Disarms whatever could still RING for this client; returns the number
+        of follow-ups cancelled.
 
-        La décision du propriétaire : on garde l'historique, on désarme.
-        Les contacts et les appels déjà passés restent lisibles ; seules les
-        relances encore « planifiée » sont annulées, et chaque contact reçoit
-        le LIEN vers la fiche pour que sa disparition soit constatable au
-        moment de composer (cible_appel_contact refuse alors l'appel).
+        The owner's decision: we keep the history, we disarm. The contacts and
+        the calls already placed stay readable; only the still-`planifiée`
+        follow-ups are cancelled, and each contact receives the LINK to the
+        record so that its disappearance can be observed at dialling time
+        (cible_appel_contact then refuses the call).
         """
         contacts = self.contacts_campagne_du_client(client_id)
         if not contacts:
@@ -1269,15 +1242,14 @@ class Base:
         return annulees
 
     def supprimer_client(self, client_id):
-        """Supprime le client, SES rendez-vous et leurs appels ; rend le nombre
-        de rendez-vous supprimés.
+        """Deletes the client, THEIR appointments and those appointments' calls;
+        returns the number of appointments deleted.
 
-        Ses relances encore planifiées sont ANNULÉES au passage : supprimer
-        une fiche ne doit jamais laisser un appel armé pour elle. Ses
-        contacts de campagne et les appels déjà passés, eux, restent
-        lisibles — c'est de l'histoire, pas une donnée du client.
-        Action définitive — le serveur ne l'atteint qu'après une page de
-        confirmation explicite, jamais en un clic.
+        Their still-scheduled follow-ups are CANCELLED along the way: deleting
+        a record must never leave a call armed for them. Their campaign
+        contacts and the calls already placed, for their part, stay readable —
+        that is history, not client data. A permanent action — the server only
+        reaches it after an explicit confirmation page, never in one click.
         """
         self.desarmer_contacts_du_client(client_id)
         curseur = self.conn.execute(
@@ -1295,10 +1267,10 @@ class Base:
     # -------------------------------------------------------------- rendez-vous
     def ajouter_rendezvous(self, client_id, horaire, motif, statut="prévu",
                            rappel_souhaite=None, duree_tranches=1):
-        """Crée un rendez-vous ; duree_tranches = sa longueur en TRANCHES.
+        """Creates an appointment; duree_tranches = its length in SLOTS.
 
-        1 = la durée moyenne d'un rendez-vous (réglage « pas », 15 minutes
-        par défaut) ; 2 = deux tranches consécutives (30 minutes), etc.
+        1 = the average length of an appointment (the `pas` setting, 15 minutes
+        by default); 2 = two consecutive slots (30 minutes), and so on.
         """
         curseur = self.conn.execute(
             "INSERT INTO rendezvous (client_id, horaire, motif, statut, "
@@ -1326,13 +1298,13 @@ class Base:
         self.conn.commit()
 
     def rendezvous_occupants(self, debut, fin):
-        """Les rendez-vous qui OCCUPENT le planning entre ces deux horaires.
+        """The appointments that OCCUPY the schedule between these two times.
 
-        Occupent : « prévu » et « confirmé » — un rendez-vous annulé,
-        déplacé ou ignoré libère sa place, c'est ce qui permet de recalculer
-        les créneaux proposables. Un rendez-vous qui commence AVANT la
-        fenêtre mais déborde dedans est renvoyé aussi (la marge d'une
-        journée suffit : aucune durée ne dépasse 24 h).
+        Occupy: `prévu` and `confirmé` — a cancelled, moved or ignored
+        appointment frees its slot, which is what makes it possible to
+        recompute the offerable slots. An appointment starting BEFORE the
+        window but spilling into it is returned too (a margin of one day is
+        enough: no length exceeds 24 h).
         """
         veille = debut
         try:
@@ -1351,23 +1323,22 @@ class Base:
                  "duree_tranches": max(ligne["duree_tranches"] or 1, 1)}
                 for ligne in lignes]
 
-    # Les statuts qui basculent en « manqué » quand leur heure est passée.
-    # Décision du propriétaire : « Si c'est des dates dans le passé on peut
-    # donc marquer manqué » — un rendez-vous CONFIRMÉ dont l'heure est
-    # passée bascule lui aussi, au même titre qu'un « prévu ». Sans quoi
-    # les confirmés se volatilisaient : ni dans « à venir » (c'est passé),
-    # ni dans « à rappeler » (ils n'étaient pas manqués). Plus personne ne
-    # disparaît. Le prix, assumé et écrit à l'écran : on reverra dans la
-    # liste des gens qui sont bel et bien venus, faute de savoir qui s'est
-    # présenté — « ignoré » sert exactement à les écarter, réversiblement.
+    # The statuses that switch to `manqué` when their time has passed. Owner's
+    # decision: `If they are dates in the past then we can mark them missed` —
+    # a CONFIRMED appointment whose time has passed switches too, just like a
+    # `prévu`. Otherwise the confirmed ones vanished: neither in `à venir` (it
+    # is past), nor in `à rappeler` (they were not missed). Nobody disappears
+    # any more. The price, accepted and written on screen: we will see in the
+    # list people who really did turn up, for want of knowing who did —
+    # `ignoré` serves exactly to set them aside, reversibly.
     STATUTS_QUI_MANQUENT = ("prévu", "confirmé")
 
     def marquer_manques_echus(self, maintenant=None):
-        """Règle du manqué : « prévu » ou « confirmé » passé → « manqué ».
+        """The missed rule: a past `prévu` or `confirmé` → `manqué`.
 
-        Rend le nombre de rendez-vous modifiés. Les horaires sont tous
-        stockés en ISO 8601 à la minute (« 2026-07-27T14:30 ») : la
-        comparaison de texte suffit.
+        Returns the number of appointments modified. The times are all stored
+        in ISO 8601 to the minute (`2026-07-27T14:30`): a text comparison is
+        enough.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
@@ -1381,11 +1352,11 @@ class Base:
         return curseur.rowcount
 
     def ignorer_tous_les_manques(self):
-        """« Vider la liste » : tous les manqués passent « ignoré » (réversible).
+        """`Empty the list`: every missed one becomes `ignoré` (reversible).
 
-        Rend le nombre de rendez-vous basculés. Le statut « ignoré » se
-        rétablit depuis « Tous les rendez-vous » (retablir_manque) : rien
-        n'est perdu, la liste « À rappeler » est simplement vidée.
+        Returns the number of appointments switched. The `ignoré` status is
+        restored from `Tous les rendez-vous` (retablir_manque): nothing is
+        lost, the `À rappeler` list is simply emptied.
         """
         curseur = self.conn.execute(
             "UPDATE rendezvous SET statut = 'ignoré' WHERE statut = 'manqué'")
@@ -1396,9 +1367,10 @@ class Base:
         return curseur.rowcount
 
     def retablir_manque(self, rendezvous_id):
-        """L'inverse d'« ignoré » : le rendez-vous redevient « manqué ».
+        """The opposite of `ignoré`: the appointment becomes `manqué` again.
 
-        Rend True si le rendez-vous était bien « ignoré » (sinon rien ne bouge).
+        Returns True when the appointment really was `ignoré` (otherwise
+        nothing moves).
         """
         curseur = self.conn.execute(
             "UPDATE rendezvous SET statut = 'manqué' "
@@ -1414,25 +1386,25 @@ class Base:
     """
 
     def sorties_du_planning(self, debut, fin):
-        """Les rendez-vous de la période qui n'occupent PLUS de place, et pourquoi.
+        """The period's appointments that NO LONGER occupy a slot, and why.
 
-        ⚠ SON SIGNALEMENT DU 20/08/2026 : « la troisième a disparu, elle n'est
-        plus présente dans le calendrier de la page rendez-vous ». Elle n'avait
-        pas disparu : son rendez-vous était ANNULÉ — elle l'avait demandé
-        pendant l'appel. Mais la grille ne montre que ce qui OCCUPE une place
-        (horaires.STATUTS_OCCUPANTS), et la page ne l'offrait nulle part
-        ailleurs : de sa place, le rendez-vous s'était bel et bien évaporé.
+        ⚠ HIS REPORT OF 20/08/2026: `the third one has disappeared, it is no
+        longer in the calendar on the appointments page`. She had not
+        disappeared: her appointment was CANCELLED — she had asked for it
+        during the call. But the grid only shows what OCCUPIES a slot
+        (horaires.STATUTS_OCCUPANTS), and the page offered it nowhere else:
+        from its slot, the appointment really had evaporated.
 
-        ⚠ ET LA LÉGENDE DE LA PAGE LE PROMETTAIT DÉJÀ — « il n'apparaît donc
-        pas ici mais dans les listes ci-dessous » — alors qu'il n'y avait
-        AUCUNE liste en dessous. C'est ce qui l'a envoyé chercher pour rien.
+        ⚠ AND THE PAGE'S CAPTION ALREADY PROMISED IT — `it therefore does not
+        appear here but in the lists below` — when there was NO list below.
+        That is what sent him looking for nothing.
 
-        La RAISON vient du cahier des changements, sa DERNIÈRE ligne pour ce
-        rendez-vous : c'est elle qui explique le statut actuel. Un rendez-vous
-        annulé à la main n'en a pas, et on ne lui en invente pas.
+        The REASON comes from the change log, its LAST row for that
+        appointment: it is what explains the current status. An appointment
+        cancelled by hand has none, and we do not invent one for it.
 
-        Rend une liste de dicts : le rendez-vous, plus « raison », « campagne_id »
-        et « campagne_nom » quand une campagne l'a écrit.
+        Returns a list of dicts: the appointment, plus `raison`, `campagne_id`
+        and `campagne_nom` when a campaign wrote it.
         """
         lignes = self.conn.execute(
             self._REQUETE_RDV + """
@@ -1455,55 +1427,50 @@ class Base:
         return sorties
 
     def rendezvous_manques(self):
-        """Rendez-vous manqués, numéros déjà masqués (le brut ne sort pas d'ici)."""
+        """Missed appointments, numbers already masked (the raw form does not
+        leave here).
+        """
         lignes = self.conn.execute(
             self._REQUETE_RDV + " WHERE r.statut = 'manqué' ORDER BY r.horaire").fetchall()
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def rendezvous_sans_numero(self):
-        """Rendez-vous dont le client n'a pas de numéro (import ICS à compléter)."""
+        """Appointments whose client has no number (an ICS import to be
+        completed).
+        """
         lignes = self.conn.execute(
             self._REQUETE_RDV + " WHERE c.telephone = '' ORDER BY r.horaire").fetchall()
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def rendezvous_a_venir(self):
-        """Rendez-vous « prévu », du plus proche au plus lointain.
+        """`prévu` appointments, from nearest to furthest.
 
-        Après marquer_manques_echus(), tout « prévu » est à venir. Cette
-        liste-ci sert à COMPOSER une liste d'appel (reprise de campagne sur
-        le filtre « prévu ») : elle ne retient donc que ce qui n'est pas
-        encore confirmé. Pour l'AFFICHAGE, c'est rendezvous_a_venir_tous()
-        qu'il faut — une ligne confirmée ne disparaît pas de l'écran.
+        After marquer_manques_echus(), every `prévu` is upcoming. This
+        particular list serves to COMPOSE a call list (a campaign resumed on
+        the `prévu` filter): it therefore keeps only what is not yet confirmed.
+        For DISPLAY, rendezvous_a_venir_tous() is the one needed — a confirmed
+        row does not disappear from the screen.
         """
         lignes = self.conn.execute(
             self._REQUETE_RDV + " WHERE r.statut = 'prévu' ORDER BY r.horaire").fetchall()
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
-    # Les statuts d'un rendez-vous « à venir » : ceux qui TIENNENT encore.
-    # Ce sont exactement les statuts qui occupent une place au planning
-    # (horaires.STATUTS_OCCUPANTS) — la liste et la grille disent donc la
-    # même chose.
+    # The statuses of an `upcoming` appointment: those that still HOLD. They
+    # are exactly the statuses that occupy a slot in the schedule
+    # (horaires.STATUTS_OCCUPANTS) — the list and the grid therefore say the
+    # same thing.
     STATUTS_A_VENIR = ("prévu", "confirmé")
 
     def rendezvous_a_venir_tous(self, maintenant=None):
-        """Les rendez-vous encore devant nous qui TIENNENT (prévu, confirmé).
+        """The appointments still ahead of us that HOLD (scheduled, confirmed).
 
-        Deux règles du propriétaire, qui se complètent :
+        Two owner's rules, which complement each other:
 
-        - « ce n'est pas un contact qui disparaît, mais une ligne qui
-          évolue » : un rendez-vous CONFIRMÉ reste visible ici, avec sa
-          pastille — il ne s'escamote pas parce qu'on vient de l'obtenir ;
-        - correction du 31/07/2026 : un rendez-vous ANNULÉ, lui, n'existe
-          plus. Il n'a rien à faire dans « à venir ». Soit il a été replacé
-          pendant l'échange (c'est alors un DÉPLACEMENT, et c'est la
-          nouvelle ligne qui s'affiche), soit aucune date n'est fixée et le
-          client passe « le client rappellera ». Un rendez-vous DÉPLACÉ
-          (l'ancienne ligne) et un rendez-vous IGNORÉ sont écartés pour la
-          même raison : ils ne tiennent plus. Rien n'est perdu pour autant —
-          « Tous les rendez-vous » et la fiche du client les gardent.
+        - `it is not a contact that disappears, but a row that evolves`: a CONFIRMED appointment stays visible here, with its badge — it does not vanish because we have just obtained it;
+        - correction of 31/07/2026: a CANCELLED appointment, on the other hand, no longer exists. It has no business in `à venir`. Either it was rebooked during the exchange (it is then a MOVE, and it is the new row that shows), or no date was set and the client becomes `le client rappellera`. A MOVED appointment (the old row) and an IGNORED appointment are set aside for the same reason: they no longer hold. Nothing is lost for all that — `Tous les rendez-vous` and the client's record keep them.
 
-        Le filtre est donc l'HEURE **et** le statut : les horaires sont tous
-        stockés en ISO 8601 à la minute, la comparaison de texte suffit.
+        The filter is therefore the TIME **and** the status: the times are all
+        stored in ISO 8601 to the minute, a text comparison is enough.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
@@ -1515,16 +1482,17 @@ class Base:
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def tous_les_rendezvous(self):
-        """TOUS les rendez-vous, le plus récent d'abord — aucune saisie perdue."""
+        """ALL the appointments, most recent first — no input lost."""
         lignes = self.conn.execute(
             self._REQUETE_RDV + " ORDER BY r.horaire DESC, r.id DESC").fetchall()
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def rendezvous_identique(self, nom, telephone, horaire):
-        """Rendez-vous déjà en base pour CE client à CET horaire exact, ou None.
+        """An appointment already in the database for THIS client at THIS exact
+        time, or None.
 
-        Garde-fou anti-doublon du formulaire d'ajout : la même saisie faite
-        deux fois est signalée à l'écran au lieu d'être doublée en silence.
+        The add form's duplicate guard: the same input made twice is flagged on
+        screen instead of being silently doubled.
         """
         ligne = self.conn.execute(
             self._REQUETE_RDV + " WHERE c.nom = ? AND c.telephone = ? "
@@ -1538,17 +1506,17 @@ class Base:
         return self._ligne_rdv(ligne) if ligne else None
 
     def _ligne_rdv(self, ligne):
-        # Méthode d'instance (et non @staticmethod comme _ligne_appel) : elle
-        # a besoin du numéro d'essai déclaré pour poser le drapeau 🧪. Le
-        # verrou est ré-entrant, la reprendre ici ne coûte rien.
+        # An instance method (and not a @staticmethod like _ligne_appel): it
+        # needs the declared test number to set the 🧪 flag. The lock is
+        # re-entrant, taking it again here costs nothing.
         return {
             "id": ligne["id"],
             "horaire": ligne["horaire"],
             "motif": ligne["motif"],
             "statut": ligne["statut"],
             "rappel_souhaite": ligne["rappel_souhaite"],
-            # Durée en tranches : 1 pour tous les rendez-vous d'avant la
-            # colonne (migration additive) — jamais 0, jamais None.
+            # Length in slots: 1 for every appointment from before the column
+            # (additive migration) — never 0, never None.
             "duree_tranches": max(ligne["duree_tranches"] or 1, 1),
             "client_id": ligne["client_id"],
             "nom": ligne["nom"],
@@ -1572,9 +1540,10 @@ class Base:
 
     def terminer_appel(self, appel_id, statut, resultat=None, transcription=None,
                        note=None):
-        """Clôt un appel. `note` = ce que LE PRODUIT a décidé face au résultat
-        (par exemple : la date convenue ne tient pas, le rendez-vous n'a donc
-        pas été créé) — jamais du texte inventé pour l'agent."""
+        """Closes a call. `note` = what THE PRODUCT decided in the face of the
+        result (for instance: the agreed date does not hold, so the appointment
+        was not created) — never text invented for the agent.
+        """
         self.conn.execute(
             "UPDATE appels SET statut = ?, resultat = ?, transcription = ?, "
             "note = ? WHERE id = ?",
@@ -1584,7 +1553,7 @@ class Base:
         self.conn.commit()
 
     def noter_appel(self, appel_id, note):
-        """Écrit (ou remplace) la note du produit sur cet appel."""
+        """Writes (or replaces) the product's note on this call."""
         self.conn.execute("UPDATE appels SET note = ? WHERE id = ?",
                           (note, appel_id))
         self.conn.commit()
@@ -1610,18 +1579,17 @@ class Base:
     STATUTS_A_RECASER = ("annulé", "manqué", "déplacé")
 
     def rendezvous_a_recaser(self, debut=None, fin=None, maintenant=None):
-        """Les rendez-vous d'une période dont le client attend TOUJOURS.
+        """The period's appointments whose client is STILL waiting.
 
-        Annulés, manqués, ou déplacés — et, dans les trois cas, seulement si
-        ce client n'a AUCUN rendez-vous à venir. C'est la définition d'« en
-        attente » déjà retenue par `candidats_cascade`, mais rendue ici
-        RENDEZ-VOUS PAR RENDEZ-VOUS : une source datée doit donner la date et
-        l'identifiant du rendez-vous concerné, sans quoi la colonne
-        obligatoire « rendez-vous existant » resterait vide et la grille les
-        refuserait.
+        Cancelled, missed, or moved — and, in all three cases, only when that
+        client has NO upcoming appointment. It is the definition of `waiting`
+        already used by `candidats_cascade`, but returned here APPOINTMENT BY
+        APPOINTMENT: a dated source must give the date and the id of the
+        appointment concerned, otherwise the mandatory `existing appointment`
+        column would stay empty and the grid would refuse them.
 
-        ⚠ LE « NOT EXISTS » EST LE CŒUR. Sans lui, on rappellerait des gens
-        qui ont déjà repris rendez-vous pour leur en proposer un autre.
+        ⚠ THE `NOT EXISTS` IS THE HEART. Without it, we would call back people
+        who have already rebooked in order to offer them another appointment.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
@@ -1632,20 +1600,17 @@ class Base:
                    "  AND futur.statut IN ('prévu', 'confirmé')"
                    "  AND futur.horaire >= ?)")
         parametres = list(self.STATUTS_A_RECASER) + [maintenant]
-        # ⚠ LES DEUX BORNES SONT INDÉPENDANTES : les exiger ensemble faisait
-        # qu'une fenêtre « depuis telle date, sans limite » perdait AUSSI sa
-        # borne de début. Trouvé par l'essai de la fenêtre relative, le
-        # 03/08/2026.
-        #
-        # ⚠ MAIS L'APPELANT NE LES POSE PLUS SUR CETTE SOURCE-CI (09/08/2026).
-        # Le raisonnement d'alors — « leur rendez-vous est avant la place, à
-        # qui l'avancer n'apporte rien » — était FAUX ici : les gens de cette
-        # source n'ont plus AUCUN rendez-vous, c'est sa définition même. Leur
-        # ancienne date ne dit rien de ce qu'ils veulent maintenant, et elle
-        # est presque toujours passée — la borne les écartait donc tous.
-        # Mesuré : une personne retenue sur quatre qui attendent. Les deux
-        # paramètres restent, ils servent aux écrans qui demandent une période
-        # explicite.
+        # ⚠ THE TWO BOUNDS ARE INDEPENDENT: requiring them together meant a
+        # `from such a date, no limit` window ALSO lost its start bound. Found
+        # by the relative-window test, on 03/08/2026.  ⚠ BUT THE CALLER NO
+        # LONGER SETS THEM ON THIS SOURCE (09/08/2026). The reasoning at the
+        # time — `their appointment is before the slot, and bringing it forward
+        # gains them nothing` — was WRONG here: the people in this source no
+        # longer have ANY appointment, that is its very definition. Their old
+        # date says nothing about what they want now, and it is almost always
+        # in the past — so the bound set them all aside. Measured: one person
+        # kept out of four who were waiting. Both parameters stay, they serve
+        # the screens that ask for an explicit period.
         if debut:
             requete += " AND r.horaire >= ?"
             parametres.append(debut)
@@ -1657,30 +1622,19 @@ class Base:
         return [self._ligne_rdv(ligne) for ligne in lignes]
 
     def candidats_cascade(self, source, maintenant=None):
-        """Candidats à une cascade ; rend (candidats, sans numéro, 🚫 écartés).
+        """Candidates for a cascade; returns (candidates, no number, 🚫 set aside).
 
-        candidats = [{"nom", "telephone", "reference"}] — le numéro est EN
-        CLAIR ici : cette méthode est réservée à la génération de liste
-        demandée EXPLICITEMENT par l'utilisateur (remplissage de la zone de
-        collage, export CSV), l'équivalent de ce qu'il collerait lui-même.
-        Elle ne sert JAMAIS à l'affichage courant, qui reste masqué.
-        « reference » est l'horaire ISO du rendez-vous concerné le plus
-        ancien (pour les tris) ; les clients SANS numéro sont exclus et
-        comptés ; les clients marqués « Ne plus appeler » sont toujours
-        écartés (quelle que soit la source) — et COMPTÉS eux aussi depuis le
-        14/08/2026, parce qu'un écart muet se lit comme un défaut : l'écran
-        annonçait « 123 contacts ajoutés » là où la base en portait 138.
-        Sources :
-        - « annules »  : clients ayant un rendez-vous annulé ;
-        - « deplaces » : clients ayant un rendez-vous déplacé et AUCUN
-          rendez-vous à venir (prévu ou confirmé) — les « en attente » ;
-        - « tous »     : tous les clients.
+        candidates = [{"nom", "telephone", "reference"}] — the number is IN CLEAR here: this method is reserved for generating a list EXPLICITLY requested by the user (filling the paste area, CSV export), the equivalent of what they would paste themselves. It NEVER serves the ordinary display, which stays masked. `reference` is the ISO time of the oldest appointment concerned (for sorting); clients WITHOUT a number are excluded and counted; clients marked `Ne plus appeler` are always set aside (whatever the source) — and COUNTED too since 14/08/2026, because a silent exclusion reads like a defect: the screen announced `123 contacts added` where the database held 138.
+        Sources:
+        - `annules`  : clients with a cancelled appointment;
+        - `deplaces` : clients with a moved appointment and NO upcoming appointment (scheduled or confirmed) — the `waiting` ones;
+        - `tous`     : every client.
         """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
-        # ⚠ LE 🚫 N'EST PLUS ÉCARTÉ PAR LA REQUÊTE, il est LU puis écarté ici :
-        # c'est la seule façon de le COMPTER. Le filtre en SQL le faisait
-        # disparaître sans laisser de trace à afficher.
+        # ⚠ THE 🚫 IS NO LONGER SET ASIDE BY THE QUERY, it is READ then set
+        # aside here: that is the only way to COUNT it. The SQL filter made it
+        # vanish without leaving a trace to display.
         if source == "annules":
             requete = ("SELECT c.nom, c.telephone, c.ne_plus_appeler, "
                        "MIN(r.horaire) AS reference "
@@ -1708,24 +1662,26 @@ class Base:
         candidats, exclus, exclus_stop = [], 0, 0
         for ligne in self.conn.execute(requete, parametres).fetchall():
             if ligne["ne_plus_appeler"]:
-                exclus_stop += 1     # 🚫 : jamais appelé, et l'écran le DIT
+                exclus_stop += 1  # 🚫: never called, and the screen SAYS so
                 continue
             if not ligne["telephone"]:
-                exclus += 1  # sans numéro : rien à composer, signalé à l'écran
+                exclus += 1  # no number: nothing to dial, flagged on screen
                 continue
             candidats.append({"nom": ligne["nom"], "telephone": ligne["telephone"],
                               "reference": ligne["reference"] or ""})
         return candidats, exclus, exclus_stop
 
     def creer_cascade(self, mission, creneau):
-        """Ouvre une cascade « premier oui » ; rend son identifiant."""
+        """Opens a `first yes` cascade; returns its id."""
         curseur = self.conn.execute(
             "INSERT INTO cascades (mission, creneau) VALUES (?, ?)", (mission, creneau))
         self.conn.commit()
         return curseur.lastrowid
 
     def cloturer_cascade(self, cascade_id, statut, rendezvous_id=None):
-        """Clôt la cascade : « pourvue » (avec le rendez-vous créé) ou « épuisée »."""
+        """Closes the cascade: `pourvue` (with the appointment created) or
+        `épuisée`.
+        """
         self.conn.execute(
             "UPDATE cascades SET statut = ?, rendezvous_id = ? WHERE id = ?",
             (statut, rendezvous_id, cascade_id))
@@ -1737,7 +1693,7 @@ class Base:
         return dict(ligne) if ligne else None
 
     def lister_cascades(self):
-        """Toutes les cascades, la plus récente en premier (pour l'historique)."""
+        """Every cascade, most recent first (for the history)."""
         lignes = self.conn.execute(
             "SELECT * FROM cascades ORDER BY id DESC").fetchall()
         return [dict(ligne) for ligne in lignes]
@@ -1745,16 +1701,16 @@ class Base:
     def ajouter_appel_cascade(self, cascade_id, rang, nom, telephone, etat,
                               issue=None, resultat=None, transcription=None,
                               note=None, rendezvous_libere=None):
-        """Trace une personne de la cascade : appelée (avec issue) ou épargnée.
+        """Records a person in the cascade: called (with an outcome) or spared.
 
-        `note` = ce que LE PRODUIT a décidé (par exemple : la date convenue
-        ne tenait pas, aucun rendez-vous n'a été créé) — jamais du texte
-        prêté à l'agent.
-        `rendezvous_libere` = l'identifiant de l'ANCIEN rendez-vous que cet
-        appel a réellement rendu (le client a pris une autre place). NULL
-        quand rien n'a été libéré : soit il n'y avait rien à libérer, soit
-        RingBack ne savait pas de quel rendez-vous il s'agissait — et la
-        note le dit alors en clair, pour qu'un humain s'en charge."""
+        `note` = what THE PRODUCT decided (for instance: the agreed date did
+        not hold, so no appointment was created) — never text put in the
+        agent's mouth. `rendezvous_libere` = the id of the OLD appointment this
+        call really gave back (the client took another slot). NULL when nothing
+        was released: either there was nothing to release, or RingBack did not
+        know which appointment it was — and the note then says so plainly, so a
+        human can take care of it.
+        """
         curseur = self.conn.execute(
             "INSERT INTO appels_cascade (cascade_id, rang, nom, telephone, etat, "
             "issue, resultat, transcription, note, rendezvous_libere) "
@@ -1766,7 +1722,9 @@ class Base:
         return curseur.lastrowid
 
     def appels_de_cascade(self, cascade_id):
-        """Les lignes de la cascade, numéros déjà masqués (le brut ne sort pas)."""
+        """The cascade's rows, numbers already masked (the raw form does not come
+        out).
+        """
         lignes = self.conn.execute(
             "SELECT * FROM appels_cascade WHERE cascade_id = ? ORDER BY rang",
             (cascade_id,)).fetchall()
@@ -1781,12 +1739,12 @@ class Base:
         return detail
 
     def bilan_issues(self):
-        """Compte les issues des appels exécutés, pour le tableau à l'écran.
+        """Counts the outcomes of the calls placed, for the on-screen table.
 
-        confirmed / rescheduled / canceled = issue rendue par l'agent ;
-        to_reschedule = le client veut déplacer sans conclure de date ;
-        echec = appel passé mais sans résultat exploitable. Les appels
-        annulés AVANT exécution ne comptent pas : ils n'ont pas eu d'issue.
+        confirmed / rescheduled / canceled = the outcome returned by the agent;
+        to_reschedule = the client wants to move without settling a date; echec
+        = a call placed but with no usable result. Calls cancelled BEFORE
+        execution do not count: they had no outcome.
         """
         bilan = {"confirmed": 0, "rescheduled": 0, "canceled": 0,
                  "to_reschedule": 0, "echec": 0}
@@ -1803,11 +1761,11 @@ class Base:
     def creer_campagne(self, nom, theme, sujet="", mission="", creneau=None,
                        cascade_id=None, nature=None, configuration=None,
                        statut=None):
-        """Ouvre une campagne (l'instanciation d'un thème de travail).
+        """Opens a campaign (the instantiation of a work theme).
 
-        nature + configuration : le modèle de l'assistant en 3 étapes ;
-        statut : « prête » pour une campagne de l'assistant (elle n'appelle
-        personne avant ▶ Démarrer), sinon le défaut historique « en cours ».
+        nature + configuration: the 3-step assistant's model; statut: `prête`
+        for an assistant campaign (it calls nobody before ▶ Démarrer),
+        otherwise the historic default `en cours`.
         """
         curseur = self.conn.execute(
             "INSERT INTO campagnes (nom, theme, sujet, mission, creneau, "
@@ -1825,22 +1783,22 @@ class Base:
         self.conn.commit()
 
     def definir_raison_pause_campagne(self, campagne_id, raison):
-        """POURQUOI la campagne s'est mise en pause toute seule (ou None).
+        """WHY the campaign paused itself (or None).
 
-        Écrite quand une panne DE NOTRE CÔTÉ arrête la campagne (clé
-        refusée, service en panne, crédit épuisé) : c'est ce texte que la
-        fiche affiche, en français, avec la marche à suivre. Remise à None
-        au redémarrage — une raison périmée ne doit jamais rester à l'écran.
+        Written when a failure ON OUR SIDE stops the campaign (key refused,
+        service down, credit exhausted): it is that text the record displays,
+        in French, with what to do next. Reset to None on restart — a stale
+        reason must never stay on screen.
         """
         self.conn.execute("UPDATE campagnes SET raison_pause = ? WHERE id = ?",
                           (raison, campagne_id))
         self.conn.commit()
 
     def definir_configuration_campagne(self, campagne_id, configuration):
-        """Réécrit la configuration (JSON) d'une campagne de l'assistant.
+        """Rewrites an assistant campaign's configuration (JSON).
 
-        Sert au maillon de cascade : la campagne préparée note d'où elle
-        vient et à quelle profondeur de chaîne elle se trouve.
+        Used by the cascade link: the prepared campaign notes where it comes
+        from and how deep in the chain it sits.
         """
         self.conn.execute(
             "UPDATE campagnes SET configuration = ? WHERE id = ?",
@@ -1848,13 +1806,13 @@ class Base:
         self.conn.commit()
 
     def definir_creneau_campagne(self, campagne_id, creneau, mission=None):
-        """Fait avancer une campagne sur la place SUIVANTE de sa liste.
+        """Advances a campaign to the NEXT slot in its list.
 
-        ⚠ LA COLONNE SUIT LE CURSEUR. Tout ce qui lit `campagnes.creneau` —
-        et c'est le cas du chemin d'appel lui-même — doit voir la place EN
-        COURS, sinon un OUI serait écrit sur une place déjà pourvue.
-        `mission` accompagne le mouvement : le message annonce une date, il
-        ne peut pas rester sur l'ancienne.
+        ⚠ THE COLUMN FOLLOWS THE CURSOR. Everything that reads
+        `campagnes.creneau` — and that includes the call path itself — must see
+        the CURRENT slot, otherwise a YES would be written on a slot already
+        filled. `mission` moves with it: the message announces a date, it
+        cannot stay on the old one.
         """
         if mission is None:
             self.conn.execute(
@@ -1872,11 +1830,11 @@ class Base:
         return dict(ligne) if ligne else None
 
     def lister_campagnes(self):
-        """Toutes les campagnes, la plus récente d'abord, avec leur avancement.
+        """Every campaign, most recent first, with its progress.
 
-        appeles = contacts ayant eu au moins une tentative ; aboutis =
-        contacts dont la chaîne s'est conclue positivement ; relances =
-        relances encore planifiées.
+        appeles = contacts having had at least one attempt; aboutis = contacts
+        whose chain concluded positively; relances = follow-ups still
+        scheduled.
         """
         lignes = self.conn.execute("""
             SELECT k.*,
@@ -1893,32 +1851,33 @@ class Base:
         return [dict(ligne) for ligne in lignes]
 
     def campagnes_ayant_appele(self):
-        """Les identifiants des campagnes qui ont passé AU MOINS UN appel.
+        """The ids of the campaigns that placed AT LEAST ONE call.
 
-        ⚠ POURQUOI PAS LE STATUT (21/08/2026). « Terminée » ne suffit pas, et
-        « close » encore moins : une campagne préparée puis close n'a jamais
-        fait sonner un téléphone. Mesuré dans sa base ce jour-là : sur 113
-        campagnes passées, SEPT étaient closes sans avoir appelé personne — les
-        annoncer « déjà envoyées » aurait été faux, exactement le genre d'écart
-        qu'il venait de signaler.
+        ⚠ WHY NOT THE STATUS (21/08/2026). `Terminée` is not enough, and
+        `close` even less: a campaign prepared then closed has never made a
+        phone ring. Measured in his database that day: of 113 past campaigns,
+        SEVEN were closed without having called anybody — announcing them as
+        `already sent` would have been false, exactly the kind of discrepancy
+        he had just reported.
 
-        Le seul fait qui ne ment pas est la trace d'appel elle-même.
+        The only fact that does not lie is the call trace itself.
         """
         return {ligne["campagne_id"] for ligne in self.conn.execute(
             "SELECT DISTINCT campagne_id FROM appels_campagne")}
 
-    # ------------------------------------------- effacer des campagnes
-    # ⚠ C'EST LE SEUL ENDROIT DU PRODUIT QUI DÉTRUIT DE L'HISTORIQUE. Tout le
-    # reste ne fait qu'ajouter ou changer un statut. Deux fonctions, exprès :
-    # on COMPTE d'abord, on montre les nombres, et on n'efface qu'ensuite.
+    # ------------------------------------------- erasing campaigns ⚠ THIS IS
+    # THE ONLY PLACE IN THE PRODUCT THAT DESTROYS HISTORY. Everything else only
+    # adds or changes a status. Two functions, on purpose: we COUNT first, we
+    # show the numbers, and only then do we erase.
     def compter_avant_suppression_campagnes(self, ids):
-        """Ce qu'effacer ces campagnes emporterait — sans rien toucher.
+        """What erasing these campaigns would take with it — without touching
+        anything.
 
-        Sert à l'écran de confirmation. Le compte des appels EN ATTENTE est
-        le plus important : ce sont des appels réellement PARTIS chez CALL-E
-        dont le résultat n'est pas encore lu, et l'identifiant qui permet de
-        le retrouver ne vit que sur le contact. L'effacer, c'est perdre le
-        résultat d'une vraie conversation, pas une ligne de tableau.
+        Used by the confirmation screen. The count of PENDING calls is the most
+        important: those are calls that really WENT OUT to CALL-E whose result
+        has not yet been read, and the id that makes it findable lives only on
+        the contact. Erasing it means losing the result of a real conversation,
+        not a table row.
         """
         if not ids:
             return {"campagnes": 0, "contacts": 0, "appels": 0,
@@ -1958,19 +1917,18 @@ class Base:
         }
 
     def supprimer_campagnes(self, ids):
-        """Efface ces campagnes et tout ce qui n'existe que par elles.
+        """Erases these campaigns and everything that exists only through them.
 
-        Dans l'ordre des dépendances, en une seule transaction : le cahier de
-        changements, les relances, les appels, les contacts, la cascade
-        éventuelle, puis la campagne. Rend le même relevé de comptes que
+        In dependency order, in a single transaction: the change log, the
+        follow-ups, the calls, the contacts, the cascade if any, then the
+        campaign. Returns the same set of counts as
         `compter_avant_suppression_campagnes`.
 
-        ⚠ CE QUI N'EST PAS TOUCHÉ, et c'est voulu : les CLIENTS et les
-        RENDEZ-VOUS. Une campagne les a peut-être modifiés — le rendez-vous
-        déplacé reste déplacé, la place libérée reste libre. Effacer la
-        campagne efface la TRACE du travail, jamais son résultat dans
-        l'agenda. C'est aussi pour cela que le cahier de changements s'en va
-        avec elle : il raconte ce qu'ELLE a fait.
+        ⚠ WHAT IS NOT TOUCHED, and that is deliberate: the CLIENTS and the
+        APPOINTMENTS. A campaign may have modified them — the moved appointment
+        stays moved, the freed slot stays free. Erasing the campaign erases the
+        TRACE of the work, never its result in the calendar. That is also why
+        the change log goes with it: it recounts what IT did.
         """
         ids = [int(x) for x in ids]
         if not ids:
@@ -2006,21 +1964,24 @@ class Base:
                                  rendezvous_id=None, etat="à appeler",
                                  issue=None, champs=None, detail=None,
                                  client_id=None):
-        """Ajoute un contact ; client_id=None fait CRÉER (ou retrouver) sa fiche.
+        """Adds a contact; client_id=None makes their record be CREATED (or
+        found).
 
-        Le contact porte donc toujours un lien vers une fiche client : c'est
-        le numéro ACTUEL de cette fiche qui sera composé, jamais la copie
-        gelée ici (qui reste comme trace de ce qui avait été importé).
+        The contact therefore always carries a link to a client record: it is
+        that record's CURRENT number that will be dialled, never the copy
+        frozen here (which stays as a trace of what was imported).
         """
         if client_id is None:
             client_id = self.client_pour_contact(nom, telephone, rendezvous_id)
-        # ⚠ L'ÉTAT DU RENDEZ-VOUS AU MOMENT OÙ LA CAMPAGNE LE PREND (21/08/2026).
-        # Sans lui, impossible de savoir plus tard s'il a changé SOUS NOS PIEDS :
-        # une campagne de rappel des MANQUÉS prend des rendez-vous « manqué »,
-        # une reprise des ANNULÉS en prend des « annulé » — refuser sur le seul
-        # statut courant les aurait toutes cassées. C'est l'ÉCART qui compte,
-        # pas l'état. Ajout ADDITIF : les campagnes déjà en base n'en ont pas,
-        # et `cible_appel_contact` sait s'en passer.
+        # ⚠ THE APPOINTMENT'S STATE AT THE MOMENT THE CAMPAIGN TAKES IT
+        # (21/08/2026). Without it, there is no way of knowing later whether it
+        # changed UNDER OUR FEET: a campaign reminding about MISSED
+        # appointments takes `manqué` appointments, a resumption of the
+        # CANCELLED ones takes `annulé` ones — refusing on the current status
+        # alone would have broken them all. It is the DIFFERENCE that counts,
+        # not the state. An ADDITIVE addition: campaigns already in the
+        # database have none, and `cible_appel_contact` knows how to do
+        # without.
         champs = self._avec_statut_du_rendezvous(champs, rendezvous_id,
                                                 nom, telephone)
         curseur = self.conn.execute(
@@ -2034,16 +1995,17 @@ class Base:
 
     def _avec_statut_du_rendezvous(self, champs, rendezvous_id, nom="",
                                    telephone=""):
-        """Ajoute « rdv_statut » aux champs du contact, s'il y a un rendez-vous.
+        """Adds `rdv_statut` to the contact's fields, when there is an
+        appointment.
 
-        ⚠ DEUX FAÇONS D'ÊTRE LIÉ À UN RENDEZ-VOUS, et il faut les deux : par
-        IDENTIFIANT quand la liste vient du planning ou de la base, par DATE
-        quand elle est collée ou importée d'un CSV (voir `_rendezvous_vise`,
-        qui fait exactement la même lecture au moment d'appeler).
+        ⚠ TWO WAYS OF BEING TIED TO AN APPOINTMENT, and both are needed: by ID
+        when the list comes from the schedule or the database, by DATE when it
+        is pasted or imported from a CSV (see `_rendezvous_vise`, which does
+        exactly the same reading at call time).
 
-        Rend le JSON tel quel quand RingBack ne connaît aucun rendez-vous pour
-        ce contact : c'est ce qui distingue « il a changé » de « on n'en a
-        jamais su le premier mot », et on ne devine pas la différence.
+        Returns the JSON as it stands when RingBack knows no appointment for
+        this contact: that is what tells `it changed` from `we never knew the
+        first thing about it`, and we do not guess the difference.
         """
         try:
             valeurs = json.loads(champs) if champs else {}
@@ -2058,7 +2020,7 @@ class Base:
         return json.dumps(valeurs, ensure_ascii=False)
 
     def _rendezvous_du_contact(self, rendezvous_id, champs, nom, telephone):
-        """LE rendez-vous dont parle ce contact, par identifiant ou par date."""
+        """THE appointment this contact is about, by id or by date."""
         if rendezvous_id:
             return self.conn.execute(
                 "SELECT id, horaire, statut FROM rendezvous WHERE id = ?",
@@ -2074,24 +2036,24 @@ class Base:
             (trouve["id"] if isinstance(trouve, dict) else trouve,)).fetchone()
 
     def rendezvous_change_depuis_la_campagne(self, contact_id):
-        """Le rendez-vous a-t-il changé depuis que la campagne l'a pris ?
+        """Has the appointment changed since the campaign took it?
 
-        ⚠ SA DEMANDE DU 21/08/2026, et le défaut qu'elle corrige. Éprouvé :
-        j'annule un rendez-vous entre la création de la campagne et l'appel, le
-        téléphone sonne quand même — et le « oui » REMET le rendez-vous au
-        planning. Mesuré dans sa base : 131 contacts pouvaient encore sonner
-        pour un rendez-vous supprimé ou annulé.
+        ⚠ HIS REQUEST OF 21/08/2026, and the defect it fixes. Exercised: I
+        cancel an appointment between the campaign's creation and the call, the
+        phone rings anyway — and the `yes` PUTS the appointment BACK on the
+        schedule. Measured in his database: 131 contacts could still ring about
+        a deleted or cancelled appointment.
 
-        Rend la phrase qui dit CE QUI a changé, ou "" si rien n'a bougé.
+        Returns the sentence saying WHAT changed, or "" when nothing moved.
 
-        ⚠ C'EST L'ÉCART QUI DÉCIDE, PAS L'ÉTAT COURANT. Une campagne de rappel
-        des manqués prend des rendez-vous « manqué » : ils sont normaux pour
-        elle. Ce qui n'est pas normal, c'est qu'un rendez-vous ait quitté
-        l'état où la campagne l'avait trouvé.
+        ⚠ IT IS THE DIFFERENCE THAT DECIDES, NOT THE CURRENT STATE. A campaign
+        reminding about missed appointments takes `manqué` appointments: they
+        are normal for it. What is not normal is an appointment having left the
+        state where the campaign found it.
 
-        ⚠ ET SANS ÉTAT DE CAPTURE, ON NE DEVINE PAS : les campagnes d'avant le
-        21/08/2026 n'en portent pas. On s'en tient alors à ce qui est certain —
-        la ligne a disparu, ou l'horaire n'est plus celui annoncé.
+        ⚠ AND WITH NO CAPTURED STATE, WE DO NOT GUESS: campaigns from before
+        21/08/2026 carry none. We then stick to what is certain — the row has
+        disappeared, or the time is no longer the one announced.
         """
         ligne = self.conn.execute(
             "SELECT rendezvous_id, champs, nom, telephone "
@@ -2106,19 +2068,20 @@ class Base:
             champs = {}
         capture_statut = champs.get("rdv_statut")
         if not capture_statut:
-            # ⚠ RIEN N'A ÉTÉ CAPTURÉ : soit la campagne est antérieure au
-            # 21/08/2026, soit RingBack n'a jamais connu ce rendez-vous (une
-            # ligne collée avec une date tapée à la main). Dans les deux cas on
-            # ne devine pas — refuser ici écarterait des gens sans raison.
+            # ⚠ NOTHING WAS CAPTURED: either the campaign predates 21/08/2026,
+            # or RingBack never knew this appointment (a pasted row with a
+            # hand-typed date). In both cases we do not guess — refusing here
+            # would set people aside for no reason.
             return ""
         rdv = self._rendezvous_du_contact(ligne["rendezvous_id"], champs,
                                           ligne["nom"], ligne["telephone"])
         if rdv is None:
-            # ⚠ LE TEXTE DIT CE QU'ON SAIT, PAS PLUS. Quand le contact est lié
-            # par IDENTIFIANT (planning, base), une absence est une suppression,
-            # sans ambiguïté. Quand il l'est par DATE (liste collée, CSV), un
-            # rendez-vous introuvable a pu être déplacé, annulé ou supprimé —
-            # les trois se ressemblent, et prétendre choisir serait inventer.
+            # ⚠ THE TEXT SAYS WHAT WE KNOW, NO MORE. When the contact is tied
+            # by ID (schedule, database), an absence is a deletion,
+            # unambiguously. When it is tied by DATE (pasted list, CSV), an
+            # appointment that cannot be found may have been moved, cancelled
+            # or deleted — the three look alike, and claiming to choose would
+            # be inventing.
             if ligne["rendezvous_id"]:
                 return "il a été supprimé de l'agenda"
             return ("il n'est plus à la date que la campagne avait retenue — "
@@ -2134,15 +2097,18 @@ class Base:
         return ""
 
     def definir_detail_contact(self, contact_id, detail):
-        """Écrit l'information clé affichée pour ce contact (assistant) —
-        toujours depuis le résultat réel de l'appel, jamais inventée."""
+        """Writes the key information displayed for this contact (assistant) —
+        always from the call's real result, never invented.
+        """
         self.conn.execute(
             "UPDATE contacts_campagne SET detail = ? WHERE id = ?",
             (detail, contact_id))
         self.conn.commit()
 
     def contacts_de_campagne(self, campagne_id):
-        """Les contacts de la campagne, numéros déjà masqués (le brut ne sort pas)."""
+        """The campaign's contacts, numbers already masked (the raw form does not
+        come out).
+        """
         lignes = self.conn.execute(
             "SELECT * FROM contacts_campagne WHERE campagne_id = ? ORDER BY rang",
             (campagne_id,)).fetchall()
@@ -2155,7 +2121,7 @@ class Base:
         return contacts
 
     def obtenir_contact_campagne(self, contact_id):
-        """La fiche d'un contact de campagne (numéro masqué), ou None."""
+        """A campaign contact's record (number masked), or None."""
         ligne = self.conn.execute(
             "SELECT * FROM contacts_campagne WHERE id = ?", (contact_id,)).fetchone()
         if ligne is None:
@@ -2166,13 +2132,13 @@ class Base:
         return contact
 
     def telephone_contact_campagne(self, contact_id):
-        """Le numéro ACTUEL de ce contact, EN CLAIR — jamais à l'affichage.
+        """This contact's CURRENT number, IN CLEAR — never for display.
 
-        C'est le numéro de sa FICHE CLIENT qui fait foi, pas la copie gelée
-        à la création de la campagne : corriger un numéro corrige toutes les
-        campagnes en cours. Rend None si la fiche a été supprimée (plus rien
-        à composer) ; les contacts d'avant la colonne `client_id` (base
-        ancienne) retombent sur leur copie d'époque.
+        It is their CLIENT RECORD's number that counts, not the copy frozen
+        when the campaign was created: correcting a number corrects every
+        running campaign. Returns None when the record has been deleted
+        (nothing left to dial); contacts from before the `client_id` column (an
+        old database) fall back on their period copy.
         """
         ligne = self.conn.execute(
             "SELECT telephone, client_id FROM contacts_campagne WHERE id = ?",
@@ -2184,14 +2150,15 @@ class Base:
         return self.telephone_de(ligne["client_id"])
 
     def cible_appel_contact(self, contact_id):
-        """Ce qu'il faut composer pour ce contact — et le REFUS s'il y en a un.
+        """What must be dialled for this contact — and the REFUSAL when there is
+        one.
 
-        Rend {"telephone": str|None, "refus": str|None, "client_id": int|None}.
-        C'est le point de passage OBLIGÉ de tous les chemins d'appel de
-        campagne : il tient le lien vers la fiche (numéro actuel) ET le
-        filet de sécurité du 🚫 (numéro OU nom d'un client marqué « Ne plus
-        appeler »). Quand « refus » est rempli, aucun appel ne part et le
-        texte est celui qui s'affiche à l'écran.
+        Returns {"telephone": str|None, "refus": str|None, "client_id":
+        int|None}. This is the COMPULSORY checkpoint of every campaign call
+        path: it holds the link to the record (the current number) AND the 🚫
+        safety net (the number OR the name of a client marked `Ne plus
+        appeler`). When `refus` is filled in, no call goes out and the text is
+        the one displayed on screen.
         """
         ligne = self.conn.execute(
             "SELECT nom, telephone, client_id FROM contacts_campagne "
@@ -2204,13 +2171,13 @@ class Base:
             fiche = self.conn.execute(
                 "SELECT telephone, ne_plus_appeler FROM clients WHERE id = ?",
                 (client_id,)).fetchone()
-            if fiche is None:  # fiche supprimée : le contact reste lisible…
+            if fiche is None:  # record deleted: the contact stays readable…
                 return {"telephone": None, "refus": REFUS_CLIENT_SUPPRIME,
                         "client_id": client_id}
             if fiche["ne_plus_appeler"]:
                 return {"telephone": None, "refus": REFUS_STOP,
                         "client_id": client_id}
-            telephone = fiche["telephone"]  # …et c'est le numéro ACTUEL
+            telephone = fiche["telephone"]  # …and it is the CURRENT number
         if telephone and self.telephone_exclu(telephone):
             return {"telephone": None, "refus": REFUS_STOP,
                     "client_id": client_id}
@@ -2220,11 +2187,11 @@ class Base:
         if not telephone:
             return {"telephone": None, "refus": REFUS_SANS_NUMERO,
                     "client_id": client_id}
-        # ⚠ LE RENDEZ-VOUS EST RELU ICI, à l'instant de composer (21/08/2026).
-        # C'est le même filet que le 🚫 juste au-dessus, et pour la même
-        # raison : ce qui était vrai à la création de la campagne a pu cesser
-        # de l'être. Éprouvé : un rendez-vous annulé entre-temps était appelé
-        # quand même, et le « oui » le remettait au planning.
+        # ⚠ THE APPOINTMENT IS READ BACK HERE, at the moment of dialling
+        # (21/08/2026). It is the same net as the 🚫 just above, and for the
+        # same reason: what was true when the campaign was created may have
+        # stopped being so. Exercised: an appointment cancelled in the meantime
+        # was called anyway, and the `yes` put it back on the schedule.
         change = self.rendezvous_change_depuis_la_campagne(contact_id)
         if change:
             return {"telephone": None,
@@ -2233,17 +2200,19 @@ class Base:
         return {"telephone": telephone, "refus": None, "client_id": client_id}
 
     def client_du_contact(self, contact_id):
-        """L'identifiant de la fiche client liée à ce contact (None si aucune)."""
+        """The id of the client record tied to this contact (None when there is
+        none).
+        """
         ligne = self.conn.execute(
             "SELECT client_id FROM contacts_campagne WHERE id = ?",
             (contact_id,)).fetchone()
         return ligne["client_id"] if ligne else None
 
     def compter_contacts_par_etat(self, campagne_id):
-        """{état : nombre} pour CETTE campagne — sert au filtre de reprise.
+        """{state: count} for THIS campaign — used by the resumption filter.
 
-        Le total est donné sous la clé « tous » : l'écran annonce ainsi le
-        nombre de personnes trouvées AVANT de les ajouter à la grille.
+        The total is given under the key `tous`: that is how the screen
+        announces the number of people found BEFORE adding them to the grid.
         """
         comptes = {"tous": 0}
         for ligne in self.conn.execute(
@@ -2254,12 +2223,12 @@ class Base:
         return comptes
 
     def contacts_campagne_en_clair(self, campagne_id, etat=None):
-        """Contacts d'une campagne passée, numéro EN CLAIR, filtrés par état.
+        """The contacts of a past campaign, number IN CLEAR, filtered by state.
 
-        etat=None (ou « tous ») rend toute la liste. Numéro en clair :
-        même usage que candidats_cascade / contacts_depuis_rendezvous —
-        la constitution d'une liste d'appel demandée EXPLICITEMENT par
-        l'utilisateur, jamais l'affichage (qui reste masqué).
+        etat=None (or `tous`) returns the whole list. Number in clear: the same
+        use as candidats_cascade / contacts_depuis_rendezvous — composing a
+        call list EXPLICITLY requested by the user, never the display (which
+        stays masked).
         """
         requete = ("SELECT nom, telephone, champs, rendezvous_id, etat, detail "
                    "FROM contacts_campagne WHERE campagne_id = ?")
@@ -2277,15 +2246,14 @@ class Base:
             (etat, issue, contact_id))
         self.conn.commit()
 
-    # ------------------------------- l'appel PARTI dont le résultat manque
+    # ------------------------------- the call that WENT OUT with no result
     def definir_appel_en_attente(self, contact_id, identifiant, tentative=None):
-        """Garde l'identifiant CALL-E d'un appel PARTI dont le résultat manque.
+        """Keeps the CALL-E id of a call that WENT OUT whose result is missing.
 
-        C'est la seule chose qui empêche un appel déjà passé d'être perdu :
-        sans elle, une attente qui expire effaçait toute trace de la
-        conversation (constaté le 01/08/2026). Aucun appel n'est créé ici,
-        aucune tentative n'est comptée : on note seulement où retrouver le
-        résultat.
+        It is the only thing that stops a call already placed from being lost:
+        without it, an expiring wait erased every trace of the conversation
+        (observed on 01/08/2026). No call is created here, no attempt is
+        counted: we only note where to find the result.
         """
         self.conn.execute(
             "UPDATE contacts_campagne SET appel_externe_id = ?, "
@@ -2294,14 +2262,15 @@ class Base:
         self.conn.commit()
 
     def effacer_appel_en_attente(self, contact_id):
-        """L'appel en attente a rendu son résultat : plus rien à récupérer."""
+        """The pending call has returned its result: nothing left to retrieve.
+        """
         self.definir_appel_en_attente(contact_id, None, None)
 
     def contacts_en_attente_de_resultat(self, campagne_id=None):
-        """Les contacts dont un appel PARTI n'a pas encore rendu son résultat.
+        """The contacts whose call WENT OUT and has not yet returned its result.
 
-        Numéros masqués, comme partout à l'affichage. campagne_id=None
-        balaie toutes les campagnes (le compteur du bandeau).
+        Numbers masked, as everywhere on display. campagne_id=None sweeps every
+        campaign (the banner's counter).
         """
         requete = ("SELECT * FROM contacts_campagne "
                    "WHERE appel_externe_id IS NOT NULL")
@@ -2319,7 +2288,7 @@ class Base:
         return contacts
 
     def definir_appel_externe(self, appel_id, identifiant):
-        """L'identifiant CALL-E d'un appel de la FILE (rappel individuel)."""
+        """The CALL-E id of a QUEUE call (single call-back)."""
         self.conn.execute(
             "UPDATE appels SET appel_externe_id = ? WHERE id = ?",
             (identifiant, appel_id))
@@ -2327,7 +2296,9 @@ class Base:
 
     def ajouter_appel_campagne(self, campagne_id, contact_id, tentative,
                                issue=None, resultat=None, transcription=None):
-        """Trace une tentative d'appel de campagne (0 = initiale, 1..n = relances)."""
+        """Records a campaign call attempt (0 = the initial one, 1..n =
+        follow-ups).
+        """
         curseur = self.conn.execute(
             "INSERT INTO appels_campagne (campagne_id, contact_id, tentative, "
             "issue, resultat, transcription) VALUES (?, ?, ?, ?, ?, ?)",
@@ -2338,7 +2309,7 @@ class Base:
         return curseur.lastrowid
 
     def appels_du_contact_campagne(self, contact_id):
-        """L'historique des tentatives d'un contact (aucun numéro dedans)."""
+        """A contact's attempt history (no number in it)."""
         lignes = self.conn.execute(
             "SELECT * FROM appels_campagne WHERE contact_id = ? ORDER BY id",
             (contact_id,)).fetchall()
@@ -2351,12 +2322,13 @@ class Base:
         return appels
 
     def dernier_rendezvous_connu(self):
-        """La date du rendez-vous le PLUS LOIN de l'agenda, ou "" s'il n'y en a.
+        """The date of the FURTHEST appointment in the calendar, or "" when there
+        is none.
 
-        Sert au choix « dernière date » du décalage en cascade : au-delà, la
-        chaîne ne peut plus trouver personne — c'est donc la seule borne qui
-        ait un sens sans en inventer une. Les rendez-vous supprimés et annulés
-        sont écartés : ils n'occupent plus rien et ne peuvent servir personne.
+        Used by the `last date` choice of the cascading shift: beyond it, the
+        chain can no longer find anybody — so it is the only bound that makes
+        sense without inventing one. Deleted and cancelled appointments are set
+        aside: they no longer occupy anything and can serve nobody.
         """
         ligne = self.conn.execute(
             "SELECT MAX(horaire) AS fin FROM rendezvous "
@@ -2364,14 +2336,14 @@ class Base:
         return (ligne["fin"] or "")[:10] if ligne else ""
 
     def compter_personnes_appelees(self, campagne_id):
-        """Combien de PERSONNES cette campagne a-t-elle composées ?
+        """How many PEOPLE has this campaign dialled?
 
-        Des personnes, pas des tentatives : quelqu'un qu'on a relancé trois
-        fois compte pour un. C'est ce compte-là que borne le plafond réglé —
-        « 30 appels autorisés » veut dire trente personnes composées.
+        People, not attempts: somebody followed up three times counts as one.
+        It is that count the configured ceiling bounds — `30 calls allowed`
+        means thirty people dialled.
 
-        Une seule requête : ce compte est relu à CHAQUE tour de la boucle
-        d'exécution, une lecture par contact y coûterait cher.
+        A single query: this count is read back at EVERY turn of the execution
+        loop, and one read per contact would be costly.
         """
         return self.conn.execute(
             "SELECT COUNT(DISTINCT a.contact_id) FROM appels_campagne a "
@@ -2420,14 +2392,15 @@ class Base:
         return self._ligne_relance(ligne) if ligne else None
 
     def lister_relances(self, statut="planifiée"):
-        """Les relances de CE statut, échéance la plus proche d'abord (masquées)."""
+        """The follow-ups with THIS status, nearest due date first (masked)."""
         lignes = self.conn.execute(
             self._REQUETE_RELANCE + " WHERE r.statut = ? "
             "ORDER BY r.echeance, r.id", (statut,)).fetchall()
         return [self._ligne_relance(ligne) for ligne in lignes]
 
     def relances_dues(self, maintenant=None):
-        """Les relances planifiées dont l'échéance est atteinte (masquées)."""
+        """The scheduled follow-ups whose due date has been reached (masked).
+        """
         if maintenant is None:
             maintenant = datetime.datetime.now().isoformat(timespec="minutes")
         lignes = self.conn.execute(
@@ -2437,7 +2410,7 @@ class Base:
         return [self._ligne_relance(ligne) for ligne in lignes]
 
     def relances_de_campagne(self, campagne_id):
-        """Toutes les relances d'une campagne (masquées), par échéance."""
+        """Every follow-up of a campaign (masked), by due date."""
         lignes = self.conn.execute(
             self._REQUETE_RELANCE + " WHERE r.campagne_id = ? "
             "ORDER BY r.echeance, r.id", (campagne_id,)).fetchall()
@@ -2452,10 +2425,10 @@ class Base:
                               (echeance, relance_id))
         self.conn.commit()
 
-    # ------------------------------------- contacts qui attendent un rappel
-    # Une personne qu'on n'a PAS pu joindre reste visible même quand plus
-    # aucune relance n'est programmée pour elle : sans cela elle disparaîtrait
-    # de l'écran alors qu'il faut toujours la rappeler.
+    # ------------------------------------- contacts waiting for a call-back A
+    # person we could NOT reach stays visible even when no follow-up is
+    # scheduled for them any more: without that they would disappear from the
+    # screen while they still need calling back.
     _REQUETE_CONTACT_RAPPEL = """
         SELECT c.id, c.campagne_id, c.rang, c.nom, c.telephone, c.etat,
                c.issue, c.detail, c.traite_le, c.client_id,
@@ -2473,23 +2446,24 @@ class Base:
         contact = dict(ligne)
         contact["numero_essai"] = self._est_essai(contact["telephone"])
         contact["telephone_masque"] = masquer_telephone(contact.pop("telephone"))
-        # `dernier_appel` vient de sqlite (temps universel) ; `traite_le` est
-        # écrit par l'application en heure locale — seul le premier se convertit.
+        # `dernier_appel` comes from sqlite (universal time); `traite_le` is
+        # written by the application in local time — only the first is
+        # converted.
         contact["dernier_appel"] = heure_locale(contact.get("dernier_appel"))
         return contact
 
     def contacts_injoignables(self):
-        """Les contacts non joints dont plus AUCUNE relance n'est programmée.
+        """The contacts not reached for whom NO follow-up is scheduled any more.
 
-        Deux états disent la même chose — « on n'a pas réussi à le joindre,
-        et la chaîne automatique s'est arrêtée » : « injoignable » (campagnes
-        de l'assistant) et « abandonné » (chaînes de relance classiques).
+        Two states say the same thing — `we did not manage to reach them, and
+        the automatic chain has stopped`: `injoignable` (assistant campaigns)
+        and `abandonné` (classic follow-up chains).
 
-        Le plafond de tentatives les a fait sortir de la chaîne automatique :
-        plus rien ne partira tout seul pour eux, et pourtant il faut toujours
-        les rappeler. Ils appartiennent donc à la famille des rappels
-        automatiques (c'est le système qui les y a mis), avec la mention
-        explicite qu'aucune nouvelle relance n'est programmée.
+        The attempt ceiling took them out of the automatic chain: nothing will
+        go out by itself for them any more, and yet they still need calling
+        back. They therefore belong to the family of automatic call-backs (it
+        is the system that put them there), with the explicit mention that no
+        new follow-up is scheduled.
         """
         lignes = self.conn.execute(
             self._REQUETE_CONTACT_RAPPEL + """
@@ -2501,36 +2475,35 @@ class Base:
         return [self._ligne_contact_rappel(ligne) for ligne in lignes]
 
     def clients_interdits(self):
-        """Les identifiants des fiches marquées 🚫 « ne plus appeler ».
+        """The ids of the records marked 🚫 `ne plus appeler`.
 
-        ⚠ EN UN SEUL COUP, et c'est la raison d'être de cette méthode : le
-        filtre « contact par l'agent » de 🔁 Relances la pose sur des centaines
-        de lignes — une lecture par ligne aurait fait des centaines de requêtes
-        pour afficher une page.
+        ⚠ IN ONE GO, and that is this method's reason to exist: the `contact by
+        the agent` filter of 🔁 Relances applies it to hundreds of rows — one
+        read per row would have meant hundreds of queries to display one page.
         """
         return {ligne["id"] for ligne in self.conn.execute(
             "SELECT id FROM clients WHERE ne_plus_appeler = 1")}
 
     def clients_par_chiffres(self, chiffres):
-        """Les identifiants des contacts dont le numéro contient ces chiffres.
+        """The ids of the contacts whose number contains these digits.
 
-        ⚠ LA COMPARAISON A LIEU ICI, ET LE NUMÉRO EN CLAIR N'EN SORT PAS. Les
-        fiches d'affichage ne portent que le masque (`telephone_masque`) —
-        c'est voulu : la couche qui rend l'écran n'a jamais vu le vrai numéro.
-        Une recherche « 0600000042 » ne doit pas casser cette règle, donc elle
-        rend des IDENTIFIANTS, pas des numéros.
+        ⚠ THE COMPARISON HAPPENS HERE, AND THE NUMBER IN CLEAR DOES NOT LEAVE.
+        The display records carry only the mask (`telephone_masque`) — that is
+        deliberate: the layer that renders the screen has never seen the real
+        number. A `0639985042` search must not break that rule, so it returns
+        IDENTIFIERS, not numbers.
 
-        On compare les chiffres significatifs (sans indicatif, sans espaces) :
-        on retient rarement le « +33 », et on tape souvent la fin.
+        The significant digits are compared (no dialling code, no spaces):
+        people rarely remember the `+33`, and often type the ending.
         """
         brut = "".join(c for c in (chiffres or "") if c.isdigit())
         if not brut:
             return set()
-        # ⚠ DEUX FORMES, PAS UNE. Le numéro rangé est réduit à ses chiffres
-        # SIGNIFICATIFS (« +33 6 00 00 00 42 » → « 600000042 ») : un
-        # « 0600000042 » tapé en entier ne s'y trouvait donc pas, alors qu'un
-        # « 42 » y était. On compare la saisie telle quelle ET réduite de la
-        # même façon — « chiffres_significatifs("42") » rend "", d'où le OU.
+        # ⚠ TWO FORMS, NOT ONE. The stored number is reduced to its SIGNIFICANT
+        # digits (`+33 6 39 98 50 42` → `639985042`): a `0639985042` typed in
+        # full was therefore not found in it, while a `42` was. We compare the
+        # input as it stands AND reduced the same way —
+        # `chiffres_significatifs("42")` returns "", hence the OR.
         formes = {brut}
         reduite = chiffres_significatifs(brut)
         if reduite:
@@ -2542,21 +2515,20 @@ class Base:
                 trouves.add(ligne["id"])
         return trouves
 
-    # ⚠ « rendezvous_avec_rappel_souhaite » A ÉTÉ RETIRÉE le 10/08/2026 avec
-    # le tableau « ☎ À contacter à la main », son unique appelant (voir
-    # serveur.py). Le champ `rappel_souhaite` lui SURVIT : il se saisit
-    # toujours, et le drapeau 🔔 s'affiche partout où le contact apparaît. Une
-    # requête que personne n'appelle finit par mentir sur ce que le produit
-    # sait faire.
+    # ⚠ `rendezvous_avec_rappel_souhaite` WAS REMOVED on 10/08/2026 along with
+    # the `☎ À contacter à la main` table, its only caller (see serveur.py).
+    # The `rappel_souhaite` field OUTLIVES it: it is still typed in, and the 🔔
+    # flag is shown wherever the contact appears. A query nobody calls ends up
+    # lying about what the product can do.
 
     def contacts_rappel_humain(self, traites=False):
-        """Les contacts 🙋 « à rappeler par un humain », traités ou non.
+        """The 🙋 `à rappeler par un humain` contacts, handled or not.
 
-        C'est la sortie de secours des fiches de discussion : le client veut
-        quelque chose que l'agent n'a pas pu conclure. Aucun appel automatique
-        ne part JAMAIS pour eux (leur état ne fait plus partie des états
-        appelables) ; seul un humain les traite, et le geste « c'est fait »
-        les sort de la liste sans rien effacer.
+        It is the discussion sheets' escape hatch: the client wants something
+        the agent could not conclude. NO automatic call EVER goes out for them
+        (their state is no longer among the callable states); only a human
+        handles them, and the `done` gesture takes them out of the list without
+        erasing anything.
         """
         condition = "IS NOT NULL" if traites else "IS NULL"
         lignes = self.conn.execute(
@@ -2566,10 +2538,10 @@ class Base:
         return [self._ligne_contact_rappel(ligne) for ligne in lignes]
 
     def marquer_contact_traite(self, contact_id, traite=True):
-        """Pose (ou retire) la marque « traité » d'un rappel par un humain.
+        """Sets (or removes) the `handled` mark of a human call-back.
 
-        Rend True si le contact existait. Rien n'est effacé : la demande du
-        client, la campagne et l'historique d'appels restent en base.
+        Returns True when the contact existed. Nothing is erased: the client's
+        request, the campaign and the call history stay in the database.
         """
         if self.conn.execute("SELECT 1 FROM contacts_campagne WHERE id = ?",
                              (contact_id,)).fetchone() is None:
@@ -2585,10 +2557,10 @@ class Base:
         return True
 
     def annuler_relances_campagne(self, campagne_id):
-        """Annule TOUTES les relances planifiées d'une campagne ; rend le nombre.
+        """Cancels ALL of a campaign's scheduled follow-ups; returns the number.
 
-        Sert à la clôture manuelle et au créneau pourvu pendant une relance :
-        plus rien à relancer quand l'objectif est atteint ou abandonné.
+        Used by manual closure and by a slot filled during a follow-up: nothing
+        left to follow up once the objective is met or abandoned.
         """
         curseur = self.conn.execute(
             "UPDATE relances SET statut = 'annulée' "
@@ -2597,12 +2569,12 @@ class Base:
         return curseur.rowcount
 
     def annuler_relances_contact(self, contact_id):
-        """Annule les relances planifiées d'UN contact ; rend le nombre.
+        """Cancels ONE contact's scheduled follow-ups; returns the number.
 
-        ⚠ CELLES DE CE CONTACT SEULEMENT — pas celles de la campagne. Le seul
-        appelant est le 🚫 demandé au téléphone (voir
-        assistant._poser_ne_plus_appeler) : c'est cette personne-là qui a
-        demandé qu'on ne la rappelle plus, pas les autres de la liste.
+        ⚠ THAT CONTACT'S ONLY — not the campaign's. The only caller is the 🚫
+        requested on the phone (see assistant._poser_ne_plus_appeler): it is
+        that person who asked not to be called back, not the others on the
+        list.
         """
         curseur = self.conn.execute(
             "UPDATE relances SET statut = 'annulée' "
@@ -2615,13 +2587,13 @@ class Base:
                            client_id=None, rendezvous_id=None,
                            ancienne_date=None, nouvelle_date=None, motif="",
                            duree="", raison=""):
-        """Écrit UNE ligne du cahier de changements, à l'instant du changement.
+        """Writes ONE row of the change log, at the moment of the change.
 
-        C'est une TRACE, pas un calcul : elle est posée là où le planning
-        bouge réellement (assistant._appeler_contact), jamais reconstituée
-        après coup — c'est ce qui garantit qu'aucun changement ne se perd.
-        genre : « ajout » (➕), « suppression » (➖), « deplacement » (↔) ou
-        « humain » (🙋, une demande qu'un humain doit traiter).
+        It is a TRACE, not a computation: it is placed where the schedule
+        really moves (assistant._appeler_contact), never reconstructed after
+        the fact — that is what guarantees no change is lost. genre: `ajout`
+        (➕), `suppression` (➖), `deplacement` (↔) or `humain` (🙋, a request a
+        human must handle).
         """
         curseur = self.conn.execute(
             "INSERT INTO changements (campagne_id, contact_id, client_id, "
@@ -2637,33 +2609,32 @@ class Base:
         return curseur.lastrowid
 
     def changements_de_campagne(self, campagne_id):
-        """Le cahier de changements d'une campagne, dans l'ordre d'écriture."""
+        """A campaign's change log, in writing order."""
         lignes = self.conn.execute(
             "SELECT * FROM changements WHERE campagne_id = ? ORDER BY id",
             (campagne_id,)).fetchall()
         return [dict(ligne) for ligne in lignes]
 
     def changements_du_contact(self, contact_id):
-        """Les changements écrits pour CE contact de campagne."""
+        """The changes written for THIS campaign contact."""
         lignes = self.conn.execute(
             "SELECT * FROM changements WHERE contact_id = ? ORDER BY id",
             (contact_id,)).fetchall()
         return [dict(ligne) for ligne in lignes]
 
     def campagne_du_rendezvous(self, rendezvous_id):
-        """LA campagne qui a produit ce rendez-vous, ou None. Rien n'est ajouté.
+        """THE campaign that produced this appointment, or None. Nothing is added.
 
-        La règle du propriétaire : « on doit simplement renvoyer la demande
-        de rendez-vous vers la campagne qui l'a faite ». Le lien existe
-        DÉJÀ — le cahier de changements relie chaque ligne à sa campagne ET
-        à son rendez-vous. On le relit à l'envers plutôt que de recopier une
-        colonne de plus : un rendez-vous né d'un appel retrouve donc sa
-        campagne, et un rendez-vous saisi à la main n'en a simplement pas
-        (None), sans qu'on lui en invente une.
+        The owner's rule: `we must simply point the appointment request back to
+        the campaign that made it`. The link ALREADY exists — the change log
+        ties every row to its campaign AND to its appointment. We read it
+        backwards rather than copy one more column: an appointment born of a
+        call therefore finds its campaign again, and an appointment typed by
+        hand simply has none (None), without one being invented for it.
 
-        Rend {"id", "nom", "genre"} — le genre dit ce que la campagne a fait
-        de ce rendez-vous (« ajout », « deplacement »…). La PREMIÈRE ligne
-        du cahier fait foi : c'est celle qui l'a créé.
+        Returns {"id", "nom", "genre"} — the genre says what the campaign did
+        with this appointment (`ajout`, `deplacement`…). The FIRST row of the
+        log counts: it is the one that created it.
         """
         ligne = self.conn.execute(
             "SELECT ch.campagne_id AS id, ca.nom AS nom, ch.genre AS genre "

@@ -13,9 +13,7 @@ EN UNE LIGNE : TOUT PASSE — 661/661 contrôles, 121/121 combinaisons parcourue
   ✅ Le client d'appels est le SIMULATEUR
   ✅ L'application n'est pas en mode réel
   ✅ La clé CALLE_API_KEY est absente de ce processus
-  ❌ Construire un client d'appels RÉELS est impossible ici
-       attendu : l'exception CleApiAbsente, donc aucun appel réel possible
-       obtenu  : AUCUN refus — un client d'appels réels a pu être construit
+  ✅ Construire un client d'appels RÉELS est impossible ici
   ✅ Le mot « --appels-reels » n'est jamais employé par le banc
   ✅ Le journal d'audit des appels réels n'a pas bougé
   ✅ La base de données réelle du produit n'a pas bougé

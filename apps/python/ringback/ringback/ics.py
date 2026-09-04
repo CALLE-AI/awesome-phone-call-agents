@@ -1,80 +1,42 @@
-"""Import d'agenda au format ICS (iCalendar) — bibliothèque standard.
+"""Calendar import in ICS (iCalendar) format — standard library only.
 
-Lit les événements VEVENT d'un fichier .ics : SUMMARY donne le nom du
-client et le motif (séparés par un tiret ou deux-points ; sans séparateur,
-tout devient le nom), DTSTART donne la date et l'heure. Particularités du
-format gérées ici :
-- les lignes PLIÉES (une ligne longue continue sur la suivante, qui
-  commence par une espace ou une tabulation) sont recollées — RFC 5545
-  § 3.1 impose de plier au-delà de 75 octets, un vrai export le fait
-  systématiquement ;
-- les caractères échappés de SUMMARY (\\, \\; \\n …) sont rétablis ;
-- les dates UTC (suffixe « Z ») sont converties à l'heure LOCALE de la
-  machine (datetime.astimezone, aucune base de fuseaux requise) ;
-- les dates avec fuseau nommé (DTSTART;TZID=…) sont converties si la
-  machine connaît ce fuseau (zoneinfo) ; sinon l'heure murale est gardée
-  telle quelle — c'est le repli le plus honnête sans base tzdata ;
-- les dates sans fuseau sont prises telles quelles (heure locale) ;
-- les événements « journée entière » (VALUE=DATE, sans heure) sont
-  REJETÉS avec une erreur française : un rendez-vous a une heure ;
-- l'HEURE DE FIN est lue (DTEND, ou DURATION si l'export l'écrit à la
-  place — RFC 5545 § 3.6.1 autorise l'une OU l'autre, jamais les deux) et
-  convertie en nombre de TRANCHES selon le pas réglé, ARRONDI AU
-  SUPÉRIEUR : une consultation d'une heure avec un pas de 15 minutes
-  occupe 4 tranches, et 20 minutes en occupent 2 (mieux vaut réserver une
-  tranche de trop que vendre une place qui n'existe pas). Sans heure de
-  fin lisible, le rendez-vous vaut une tranche, comme avant ;
-- STATUS:CANCELLED donne un rendez-vous « annulé » (les autres valeurs,
-  CONFIRMED et TENTATIVE, donnent « prévu » : côté agenda elles disent
-  seulement que l'organisateur a posé la case, pas que le CLIENT a
-  confirmé au téléphone — ce sens-là reste réservé à RingBack).
+Reads the VEVENT entries of a .ics file: SUMMARY gives the client's name and the reason (separated by a dash or a colon; with no separator, all of it becomes the name), DTSTART gives the date and time. Quirks of the format handled here:
+- FOLDED lines (a long line continuing on the next, which begins with a space or a tab) are glued back together — RFC 5545 § 3.1 requires folding beyond 75 bytes, and a real export does it systematically;
+- the escaped characters of SUMMARY (\\, \\; \\n …) are restored;
+- UTC dates (`Z` suffix) are converted to the machine's LOCAL time (datetime.astimezone, no timezone database required);
+- dates with a named timezone (DTSTART;TZID=…) are converted when the machine knows that zone (zoneinfo); otherwise the wall-clock time is kept as it stands — the most honest fallback without a tzdata database;
+- dates with no timezone are taken as they stand (local time);
+- `all day` events (VALUE=DATE, no time) are REJECTED with a French error: an appointment has a time;
+- the END TIME is read (DTEND, or DURATION when the export writes that instead — RFC 5545 § 3.6.1 allows one OR the other, never both) and converted into a number of SLOTS according to the configured step, ROUNDED UP: a one-hour consultation with a 15-minute step occupies 4 slots, and 20 minutes occupy 2 (better to reserve one slot too many than to sell a slot that does not exist). With no readable end time, the appointment is worth one slot, as before;
+- STATUS:CANCELLED yields an `annulé` appointment (the other values, CONFIRMED and TENTATIVE, yield `prévu`: on the calendar side they only say the organiser ticked the box, not that the CLIENT confirmed on the phone — that meaning stays reserved to RingBack).
 
 --------------------------------------------------------------------------
-OÙ SE TROUVE UN NUMÉRO DE TÉLÉPHONE DANS UN VRAI FICHIER .ICS
+WHERE A PHONE NUMBER LIVES IN A REAL .ICS FILE
 --------------------------------------------------------------------------
-Constat après examen de la norme et de ce qu'écrivent réellement Google
-Agenda et Outlook / Exchange (voir exemple_agenda_realiste.ics, qui
-reproduit les deux structures ligne à ligne) :
+Findings after examining the standard and what Google Calendar and Outlook / Exchange actually write (see exemple_agenda_realiste.ics, which reproduces both structures line by line):
 
-1. ATTENDEE et ORGANIZER portent une valeur de type CAL-ADDRESS, c'est-à-dire
-   un URI. RFC 5545 § 3.3.3 : pour une adresse de courrier la valeur DOIT
-   être un URI « mailto », mais toute autre forme d'URI enregistrée à l'IANA
-   est admise — dont « tel: » (RFC 3966). Un agenda de cabinet qui inscrit
-   le patient comme participant écrit donc
-   ATTENDEE;CN="Mme Untel":tel:+33639980051.
-   En pratique, l'immense majorité des ATTENDEE restent des mailto: — c'est
-   alors une adresse de courriel, PAS un téléphone : on l'ignore.
-2. CONTACT (RFC 5545 § 3.8.4.2) existe exactement pour ça — « contact
-   information […] associated with the calendar component ». Les exemples
-   de la norme elle-même portent un numéro :
-   CONTACT:Jim Dolittle\\, ABC Industries\\, +1-919-555-1234
-   CONTACT;CN="John Smith":tel:+1-617-555-1234
-   Peu d'agendas grand public l'écrivent, mais les logiciels métier oui.
-3. DESCRIPTION est le cas de LOIN le plus fréquent : c'est le champ « notes »
-   de l'événement. Un logiciel de prise de rendez-vous (ou le praticien
-   lui-même) y écrit « Téléphone : 06 39 98 00 51 ». Outlook double ce champ
-   d'un X-ALT-DESC;FMTTYPE=text/html qui contient le MÊME texte en HTML.
-4. LOCATION contient parfois le numéro du lieu (rare, et c'est celui du
-   cabinet, pas du client) : cherché en dernier.
+1. ATTENDEE and ORGANIZER carry a CAL-ADDRESS value, that is, a URI. RFC 5545 § 3.3.3: for a mail address the value MUST be a `mailto` URI, but any other URI form registered with IANA is allowed — including `tel:` (RFC 3966). A practice calendar that records the patient as an attendee therefore writes ATTENDEE;CN="Mme Untel":tel:+33639980051. In practice the vast majority of ATTENDEEs stay mailto: — that is an email address, NOT a phone: it is ignored.
+2. CONTACT (RFC 5545 § 3.8.4.2) exists exactly for this — `contact information […] associated with the calendar component`. The standard's own examples carry a number: CONTACT:Jim Dolittle\\, ABC Industries\\, +1-919-555-1234 CONTACT;CN="John Smith":tel:+1-617-555-1234 Few consumer calendars write it, but professional software does.
+3. DESCRIPTION is BY FAR the most frequent case: it is the event's `notes` field. Booking software (or the practitioner) writes `Téléphone : 06 39 98 00 51` in it. Outlook doubles this field with an X-ALT-DESC;FMTTYPE=text/html carrying the SAME text as HTML.
+4. LOCATION sometimes carries the venue's number (rare, and it is the practice's, not the client's): searched last.
 
-Ordre de recherche retenu, du plus explicite au plus incertain :
-CONTACT, puis ATTENDEE/ORGANIZER en « tel: », puis DESCRIPTION, puis
-X-ALT-DESC, puis LOCATION. Dans les champs de texte libre (3 et 4) un
-numéro n'est retenu que s'il est ÉTIQUETÉ (« tél », « téléphone »,
-« portable », « mobile », « GSM », « n° »…) ou s'il est le SEUL numéro
-plausible du texte — sinon on ne devine pas.
+Search order chosen, from the most explicit to the least certain: CONTACT, then
+ATTENDEE/ORGANIZER as `tel:`, then DESCRIPTION, then X-ALT-DESC, then LOCATION.
+In the free-text fields (3 and 4) a number is only kept if it is LABELLED
+(`tél`, `téléphone`, `portable`, `mobile`, `GSM`, `n°`…) or if it is the ONLY
+plausible number in the text — otherwise nothing is guessed.
 
-Repli inchangé et honnête : quand aucun numéro n'est trouvé, le client est
-créé SANS numéro (telephone = ""), et l'écran « à compléter » permet de le
-renseigner ensuite. AUCUN numéro n'est jamais inventé ni reconstitué.
+The fallback is unchanged and honest: when no number is found, the client is
+created WITHOUT one (telephone = ""), and the `à compléter` screen lets it be
+filled in afterwards. NO number is ever invented or reconstructed.
 
-Sources : RFC 5545 (§ 3.1 pliage, § 3.3.3 CAL-ADDRESS, § 3.8.4.1 ATTENDEE,
-§ 3.8.4.2 CONTACT) — https://www.rfc-editor.org/rfc/rfc5545.html ;
-RFC 3966 (URI « tel ») — https://www.rfc-editor.org/rfc/rfc3966 ;
-propriétés X-MICROSOFT-CDO-* d'Exchange —
+Sources: RFC 5545 (§ 3.1 folding, § 3.3.3 CAL-ADDRESS, § 3.8.4.1 ATTENDEE, §
+3.8.4.2 CONTACT) — https://www.rfc-editor.org/rfc/rfc5545.html ; RFC 3966 (the
+`tel` URI) — https://www.rfc-editor.org/rfc/rfc3966 ; Exchange
+X-MICROSOFT-CDO-* properties —
 https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcical/
 
-Tous les messages d'erreur sont en français.
+Every error message is written in French.
 """
 
 import datetime
@@ -82,41 +44,41 @@ import re
 
 from . import horaires, saisie
 
-# Séparateurs acceptés dans SUMMARY pour distinguer « nom » et « motif ».
+# Separators accepted inside SUMMARY to tell `name` from `reason`.
 _SEPARATEURS_SUMMARY = (" — ", " – ", " - ", " : ", ": ")
 MOTIF_PAR_DEFAUT = "Rendez-vous importé de l'agenda"
 
-# Propriétés relevées en plus de SUMMARY / DTSTART, dans l'ordre où l'on y
-# cherche un numéro (les trois premières sont explicites, les suivantes du
-# texte libre où il faut une étiquette).
+# Properties recorded on top of SUMMARY / DTSTART, in the order a number is
+# looked for in them (the first three are explicit, the rest are free text
+# where a label is required).
 PROPRIETES_TELEPHONE = ("CONTACT", "ATTENDEE", "ORGANIZER", "DESCRIPTION",
                         "X-ALT-DESC", "LOCATION")
 _TEXTE_LIBRE = ("DESCRIPTION", "X-ALT-DESC", "LOCATION")
 
-# Un numéro français plausible dans du texte : +33 / 0033 / 0 puis 9 chiffres,
-# séparés au choix par espace, point, tiret ou insécable.
+# A plausible French number inside text: +33 / 0033 / 0 then 9 digits,
+# separated by a space, dot, dash or non-breaking space, as you like.
 _NUMERO = re.compile(
     r"(?:\+\s?33|0033|0)[\s.\- ]?[1-9](?:[\s.\- ]?\d{2}){4}")
-# Étiquettes qui DÉSIGNENT un numéro dans du texte libre (« Tél. : … »).
+# Labels that DESIGNATE a number in free text (`Tél. : …`).
 _ETIQUETTE = re.compile(
     r"\b(?:t[ée]l[ée]phones?|t[ée]l|mobile|portable|gsm|phone|"
     r"joignable(?:\s+au)?|num[ée]ro|n[°o])[\s.:=—–-]*$",
     re.IGNORECASE)
 _BALISE_HTML = re.compile(r"<[^>]+>")
 
-# Une DURATION au format RFC 5545 § 3.3.6 : « PT1H », « PT1H30M », « P1DT2H »,
-# « P2W ». Les secondes sont lues mais comptent comme du temps, pas comme une
-# tranche à part : tout finit en minutes.
+# A DURATION in RFC 5545 § 3.3.6 format: `PT1H`, `PT1H30M`, `P1DT2H`, `P2W`.
+# Seconds are read but count as time, not as a slot of their own: everything
+# ends up in minutes.
 _DUREE_ICS = re.compile(
     r"^([+-])?P(?:(\d+)W|(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?)$",
     re.IGNORECASE)
 
 
 def _deplier(texte):
-    """Recolle les lignes pliées du format ICS (RFC 5545, section 3.1).
+    """Glues back the folded lines of the ICS format (RFC 5545, section 3.1).
 
-    Une ligne qui commence par une espace ou une tabulation est la suite
-    de la précédente (le premier caractère blanc est retiré).
+    A line beginning with a space or a tab is the continuation of the previous
+    one (the first whitespace character is dropped).
     """
     lignes_brutes = texte.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     lignes = []
@@ -129,15 +91,15 @@ def _deplier(texte):
 
 
 def _desechapper(texte):
-    """Rétablit les caractères échappés d'une valeur ICS (\\, \\; \\n …)."""
+    """Restores the escaped characters of an ICS value (\\, \\; \\n …)."""
     return re.sub(r"\\([\\;,nN])",
                   lambda m: " " if m.group(1) in "nN" else m.group(1), texte)
 
 
 def _heure_locale(valeur, parametres):
-    """Convertit une valeur DTSTART en ISO 8601 local à la minute.
+    """Converts a DTSTART value into local ISO 8601 to the minute.
 
-    Lève ValueError (message français) si la valeur est inutilisable.
+    Raises ValueError (French message) when the value is unusable.
     """
     parametres = {clef.upper(): val
                   for clef, _, val in (p.partition("=") for p in parametres)}
@@ -155,12 +117,13 @@ def _heure_locale(valeur, parametres):
         raise ValueError(f"date illisible : « {valeur} » (attendu "
                          "AAAAMMJJTHHMMSS, avec « Z » final pour l'UTC).")
     if valeur[-1:] in "Zz":
-        # UTC -> heure locale de la machine (aucune base de fuseaux requise).
+        # UTC -> the machine's local time (no timezone database required).
         moment = (moment.replace(tzinfo=datetime.timezone.utc)
                   .astimezone().replace(tzinfo=None))
     elif "TZID" in parametres:
-        # Fuseau nommé : converti si la machine le connaît, sinon l'heure
-        # murale du fuseau d'origine est gardée telle quelle (repli honnête).
+        # Named timezone: converted when the machine knows it, otherwise the
+        # wall-clock time of the original zone is kept as it stands (honest
+        # fallback).
         try:
             import zoneinfo
             fuseau = zoneinfo.ZoneInfo(parametres["TZID"])
@@ -172,10 +135,10 @@ def _heure_locale(valeur, parametres):
 
 
 def _minutes_de_duration(valeur):
-    """Les minutes d'une DURATION ICS (« PT1H30M » → 90), ou None si illisible.
+    """The minutes of an ICS DURATION (`PT1H30M` → 90), or None if unreadable.
 
-    Une durée négative ou nulle rend None : elle ne dit rien d'utilisable
-    sur l'occupation d'une place, et on n'invente pas à sa place.
+    A negative or zero duration returns None: it says nothing usable about how
+    long a slot is occupied, and nothing is invented in its place.
     """
     trouve = _DUREE_ICS.match((valeur or "").strip())
     if not trouve:
@@ -198,14 +161,12 @@ def _minutes_de_duration(valeur):
 
 
 def _minutes_occupees(evenement, debut_iso):
-    """La durée RÉELLE de l'événement en minutes, ou None si elle est absente.
+    """The event's REAL duration in minutes, or None when it is absent.
 
-    Deux sources possibles, dans l'ordre de la norme (RFC 5545 § 3.6.1 :
-    DTEND et DURATION s'excluent, mais un export abîmé peut porter les
-    deux — DTEND, plus explicite, gagne alors) :
-    1. DTEND, lu exactement comme DTSTART (UTC, fuseau nommé, heure locale) ;
-    2. DURATION, quand l'export écrit la durée plutôt que la fin.
-    Une fin ANTÉRIEURE ou ÉGALE au début ne rend rien : on ne devine pas.
+    Two possible sources, in the order of the standard (RFC 5545 § 3.6.1: DTEND and DURATION are mutually exclusive, but a damaged export may carry both — DTEND, being more explicit, then wins):
+    1. DTEND, read exactly like DTSTART (UTC, named timezone, local time);
+    2. DURATION, when the export writes the length rather than the end.
+    An end EARLIER than or EQUAL to the start returns nothing: nothing is guessed.
     """
     fin = evenement.pop("dtend", None)
     if fin is not None:
@@ -213,7 +174,7 @@ def _minutes_occupees(evenement, debut_iso):
         try:
             fin_iso = _heure_locale(valeur, parametres)
         except ValueError:
-            fin_iso = None          # fin illisible : on n'invente pas
+            fin_iso = None  # unreadable end: nothing is invented
         if fin_iso:
             ecart = (datetime.datetime.fromisoformat(fin_iso)
                      - datetime.datetime.fromisoformat(debut_iso))
@@ -227,13 +188,13 @@ def _minutes_occupees(evenement, debut_iso):
 
 
 def tranches_de_minutes(minutes, pas):
-    """Le nombre de TRANCHES qu'occupent ces minutes, ARRONDI AU SUPÉRIEUR.
+    """How many SLOTS these minutes occupy, ROUNDED UP.
 
-    Arrondir au supérieur plutôt qu'au plus proche est un choix assumé :
-    sous-estimer une occupation ferait vendre au téléphone une place déjà
-    prise, alors que sur-estimer coûte au pire une tranche réservée pour
-    rien. 60 minutes au pas de 15 donnent 4 tranches ; 20 minutes en
-    donnent 2. Toujours au moins 1.
+    Rounding up rather than to the nearest is a deliberate choice:
+    under-estimating an occupancy would sell a slot on the phone that is
+    already taken, whereas over-estimating costs at worst one slot reserved for
+    nothing. 60 minutes at a 15-minute step give 4 slots; 20 minutes give 2.
+    Always at least 1.
     """
     if not minutes or minutes <= 0:
         return 1
@@ -242,11 +203,11 @@ def tranches_de_minutes(minutes, pas):
 
 
 def _numeros_plausibles(texte):
-    """Les numéros français lisibles dans CE texte : [(numéro, position)].
+    """The French numbers readable in THIS text: [(number, position)].
 
-    Normalisés, sans doublon, dans l'ordre d'apparition. Chaque candidat
-    passe par saisie.valider_telephone : ce qui n'est pas un vrai numéro
-    français est écarté, rien n'est « réparé » au jugé.
+    Normalised, without duplicates, in order of appearance. Every candidate
+    goes through saisie.valider_telephone: whatever is not a genuine French
+    number is discarded, nothing is `repaired` by guesswork.
     """
     trouves, deja_vus = [], set()
     for occurrence in _NUMERO.finditer(texte or ""):
@@ -265,13 +226,13 @@ def _numeros_plausibles(texte):
 
 
 def _numero_dans_texte(texte, exiger_etiquette=True):
-    """Le numéro d'un champ de texte, ou "" si rien de sûr.
+    """The number from a text field, or "" when nothing is certain.
 
-    exiger_etiquette=True (notes, lieu) : « Téléphone : 06 39 98 00 51 » est
-    retenu ; un texte qui porte plusieurs nombres de dix chiffres sans
-    étiquette ne l'est pas — on ne devine pas lequel serait le bon.
-    exiger_etiquette=False (propriété CONTACT) : la propriété EST une
-    information de contact, son premier numéro est donc le bon.
+    exiger_etiquette=True (notes, location): `Téléphone : 06 39 98 00 51` is
+    kept; a text carrying several ten-digit numbers with no label is not —
+    there is no guessing which one would be right. exiger_etiquette=False (the
+    CONTACT property): the property IS contact information, so its first number
+    is the right one.
     """
     texte = _BALISE_HTML.sub(" ", texte or "")
     candidats = _numeros_plausibles(texte)
@@ -286,9 +247,9 @@ def _numero_dans_texte(texte, exiger_etiquette=True):
 
 
 def _telephone_de_lurl(valeur):
-    """Le numéro d'une valeur CAL-ADDRESS « tel: » (RFC 3966), sinon "".
+    """The number from a `tel:` CAL-ADDRESS value (RFC 3966), otherwise "".
 
-    Une valeur « mailto: » est une adresse de courriel : elle ne rend rien.
+    A `mailto:` value is an email address: it returns nothing.
     """
     valeur = (valeur or "").strip()
     if not valeur.lower().startswith("tel:"):
@@ -298,11 +259,11 @@ def _telephone_de_lurl(valeur):
 
 
 def _telephone_evenement(brut):
-    """Le numéro du client trouvé dans CET événement, ou "" (jamais inventé).
+    """The client's number found in THIS event, or "" (never invented).
 
-    Ordre : CONTACT (URI tel:, puis texte — la propriété prévue par la
-    norme pour ça), ATTENDEE / ORGANIZER en « tel: », puis les champs de
-    texte libre (DESCRIPTION, X-ALT-DESC d'Outlook, LOCATION).
+    Order: CONTACT (tel: URI, then text — the property the standard provides
+    for this), ATTENDEE / ORGANIZER as `tel:`, then the free-text fields
+    (DESCRIPTION, Outlook's X-ALT-DESC, LOCATION).
     """
     for propriete in PROPRIETES_TELEPHONE:
         for valeur in brut.get(propriete, ()):
@@ -311,7 +272,7 @@ def _telephone_evenement(brut):
                           or _numero_dans_texte(valeur, exiger_etiquette=False))
             elif propriete in _TEXTE_LIBRE:
                 numero = _numero_dans_texte(valeur)
-            else:  # ATTENDEE / ORGANIZER : seul un URI « tel: » est un numéro
+            else:  # ATTENDEE / ORGANIZER: only a `tel:` URI is a number
                 numero = _telephone_de_lurl(valeur)
             if numero:
                 return numero
@@ -319,7 +280,7 @@ def _telephone_evenement(brut):
 
 
 def _nom_et_motif(summary):
-    """Découpe « Nom — Motif » ; sans séparateur, tout est le nom."""
+    """Splits `Name — Reason`; with no separator, all of it is the name."""
     for separateur in _SEPARATEURS_SUMMARY:
         if separateur in summary:
             nom, motif = summary.split(separateur, 1)
@@ -328,14 +289,14 @@ def _nom_et_motif(summary):
 
 
 def analyser_ics(texte):
-    """Analyse un fichier ICS ; rend (evenements, erreurs).
+    """Parses an ICS file; returns (events, errors).
 
-    evenements = [{"nom", "motif", "horaire", "telephone", "statut",
-    "minutes"}] (horaire en ISO 8601 local ; telephone = "" si l'agenda
-    n'en porte aucun — jamais de numéro inventé ; minutes = la durée lue
-    dans DTEND ou DURATION, ou None quand l'agenda n'en donne pas) ;
-    erreurs = messages français, un par événement rejeté. Lève
-    saisie.SaisieInvalide si le fichier ne contient AUCUN événement.
+    events = [{"nom", "motif", "horaire", "telephone", "statut", "minutes"}]
+    (horaire in local ISO 8601; telephone = "" when the calendar carries none —
+    never an invented number; minutes = the duration read from DTEND or
+    DURATION, or None when the calendar gives none); errors = French messages,
+    one per rejected event. Raises saisie.SaisieInvalide when the file contains
+    NO event at all.
     """
     evenements, erreurs = [], []
     courant, numero = None, 0
@@ -367,8 +328,8 @@ def analyser_ics(texte):
             elif propriete == "STATUS":
                 courant["status"] = valeur.strip().upper()
             elif propriete in PROPRIETES_TELEPHONE:
-                # Une même propriété peut revenir (plusieurs ATTENDEE) : on
-                # les garde toutes, dans l'ordre du fichier.
+                # The same property may occur several times (several
+                # ATTENDEEs): they are all kept, in file order.
                 courant["brut"].setdefault(propriete, []).append(
                     _desechapper(valeur.strip()))
     if numero == 0:
@@ -379,8 +340,9 @@ def analyser_ics(texte):
 
 
 def _valider_evenement(evenement, numero):
-    """Complète l'événement (nom, motif, horaire, téléphone, statut) ;
-    rend une erreur française ou None."""
+    """Fills in the event (name, reason, time, phone, status); returns a French
+    error or None.
+    """
     titre = evenement.pop("summary", "").strip()
     brut = evenement.pop("brut", {})
     statut_ics = evenement.pop("status", "")
@@ -408,39 +370,37 @@ def _valider_evenement(evenement, numero):
 
 def importer_ics(base, texte, preferences=None, remplacer_tout=False,
                  bilan=None):
-    """Importe les événements d'un ICS ; rend (importés, erreurs).
+    """Imports the events of an ICS; returns (imported, errors).
 
-    Chaque événement valide devient un rendez-vous « prévu » (la règle du
-    manqué le basculera s'il est déjà passé ; STATUS:CANCELLED donne
-    « annulé ») rattaché à un client dont le numéro est celui LU dans
-    l'agenda quand il s'y trouve — sinon un client SANS numéro, que
-    l'écran « à compléter » sert ensuite à renseigner. Comme pour le CSV :
-    les bons événements s'importent même si d'autres sont rejetés, chacun
-    avec son message.
+    Every valid event becomes a `prévu` appointment (the missed-appointment
+    rule will switch it over if it is already past; STATUS:CANCELLED yields
+    `annulé`) attached to a client whose number is the one READ in the calendar
+    when it is there — otherwise a client WITHOUT a number, which the `à
+    compléter` screen then serves to fill in. As with the CSV: the good events
+    import even when others are rejected, each with its own message.
 
-    preferences : les réglages, pour connaître le PAS (durée d'une
-    tranche). Avec eux, l'heure de fin lue dans l'agenda devient un nombre
-    de tranches — un rendez-vous d'une heure occupe réellement une heure de
-    planning au lieu d'une seule tranche. Sans eux (essais isolés), le pas
-    par défaut s'applique : la durée reste lue, jamais inventée.
+    preferences: the settings, so the STEP (a slot's length) is known. With
+    them, the end time read from the calendar becomes a number of slots — a
+    one-hour appointment really occupies an hour of the schedule instead of a
+    single slot. Without them (isolated tests), the default step applies: the
+    duration is still read, never invented.
 
-    remplacer_tout : vide l'agenda À VENIR avant d'importer (case « Remplacer
-    entièrement l'agenda »). Le passé n'est pas touché.
+    remplacer_tout: empties the UPCOMING calendar before importing (the
+    `Remplacer entièrement l'agenda` box). The past is not touched.
 
-    bilan : dictionnaire À REMPLIR, quand l'appelant veut savoir ce que
-    l'import a déplacé — « remplaces » (rendez-vous dont la place a été prise)
-    et « vides » (retirés par « remplacer entièrement »). Un dictionnaire
-    plutôt qu'une troisième valeur de retour : vingt appelants dépaquettent
-    déjà ce couple, et leur casser les jambes pour un compte aurait été un
-    mauvais échange.
+    bilan: a dictionary TO BE FILLED, when the caller wants to know what the
+    import displaced — `remplaces` (appointments whose slot was taken) and
+    `vides` (removed by `replace entirely`). A dictionary rather than a third
+    return value: twenty callers already unpack that pair, and breaking their
+    legs for one count would have been a bad trade.
     """
-    # ⚠ « preferences=None » est admis par pas_minutes depuis le 10/08/2026 :
-    # aucun réglage vaut les valeurs par défaut. Le repli n'a plus à être
-    # récrit ici.
+    # ⚠ `preferences=None` has been accepted by pas_minutes since 10/08/2026:
+    # no settings means the default values. The fallback no longer has to be
+    # rewritten here.
     pas = horaires.pas_minutes(preferences)
     evenements, erreurs = analyser_ics(texte)
-    # ⚠ VIDER D'ABORD, IMPORTER ENSUITE. L'inverse aurait retiré les
-    # rendez-vous qu'on venait de poser.
+    # ⚠ EMPTY FIRST, IMPORT SECOND. The other way round would have removed the
+    # appointments just laid down.
     vides = (horaires.vider_l_agenda_a_venir(base, preferences)
              if remplacer_tout else [])
     importes, remplaces = 0, []
@@ -449,19 +409,21 @@ def importer_ics(base, texte, preferences=None, remplacer_tout=False,
         telephone = evenement.get("telephone") or ""
         client_id = None
         if telephone:
-            # Déjà connu avec ce numéro (écrit autrement, « +33 … » contre
-            # « 0… ») : on reprend SA fiche plutôt que d'en faire une seconde.
+            # Already known under this number (written differently, `+33 …`
+            # against `0…`): THEIR record is reused rather than a second one
+            # created.
             client_id = base.client_equivalent(nom, telephone)
             if client_id is None:
-                # Ce nom est déjà en base « à compléter » : l'agenda apporte
-                # enfin son numéro, on complète la fiche existante.
+                # This name is already in the database as `à compléter`: the
+                # calendar finally brings its number, so the existing record is
+                # completed.
                 client_id = base.client_sans_numero_par_nom(nom)
                 if client_id is not None:
                     base.mettre_a_jour_telephone(client_id, telephone)
         else:
-            # L'agenda ne porte aucun numéro : si ce nom est déjà connu AVEC
-            # un numéro, le rendez-vous rejoint cette fiche — rien n'est
-            # inventé, on relie seulement à ce qui existe déjà.
+            # The calendar carries no number: if this name is already known
+            # WITH one, the appointment joins that record — nothing is
+            # invented, it is only linked to what already exists.
             telephone = base.telephone_par_nom(nom) or ""
         if client_id is None:
             client_id = base.obtenir_ou_creer_client(nom, telephone)
@@ -469,8 +431,9 @@ def importer_ics(base, texte, preferences=None, remplacer_tout=False,
             client_id, evenement["horaire"], evenement["motif"],
             statut=evenement.get("statut", "prévu"),
             duree_tranches=tranches_de_minutes(evenement.get("minutes"), pas))
-        # ⚠ APRÈS L'INSERTION, jamais avant : on relit l'horaire et la durée
-        # tels qu'ils ont été ÉCRITS, et le nouveau ne se gêne pas lui-même.
+        # ⚠ AFTER THE INSERT, never before: the time and the duration are read
+        # back as they were WRITTEN, and the new one does not get in its own
+        # way.
         remplaces.extend(
             horaires.remplacer_sur_le_creneau(base, preferences, rdv_id))
         importes += 1

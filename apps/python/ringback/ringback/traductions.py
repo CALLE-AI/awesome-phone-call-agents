@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Le dictionnaire des phrases de l'interface, français vers anglais.
+"""The dictionary of interface sentences, French to English.
 
-⚠ UN DICTIONNAIRE, PAS UN TRADUCTEUR. Chaque entrée est une phrase du produit,
-écrite telle qu'elle paraît à l'écran. Ce qui n'y est pas reste en français —
-voir `langue.traduire`. Sur un écran qui décide d'appels téléphoniques réels,
-une phrase mal traduite est pire qu'une phrase non traduite.
+⚠ A DICTIONARY, NOT A TRANSLATOR. Each entry is a sentence of the product,
+written exactly as it appears on screen. Whatever is not in it stays French —
+see `langue.traduire`. On a screen that decides real phone calls, a badly
+translated sentence is worse than an untranslated one.
 
-COMMENT ON L'ALIMENTE, et c'est une procédure, pas un coup de main :
-`outils/recolter_phrases.py` parcourt les vraies pages du produit, en relève
-les phrases par `langue.phrases_de`, et dit lesquelles manquent ici. La
-couverture est donc un CHIFFRE mesuré sur des écrans réels, jamais une
-impression.
+HOW IT IS FED, and this is a procedure, not a knack:
+`outils/recolter_phrases.py` walks the product's real pages, records their
+sentences through `langue.phrases_de`, and says which ones are missing here.
+Coverage is therefore a FIGURE measured on real screens, never an impression.
 
-⚠ LES CLÉS SONT SENSIBLES À L'ESPACE ET À LA CASSE. La clé est la phrase
-DÉBARRASSÉE de ses espaces de bord (le code d'origine l'indente), mais rien
-d'autre n'est normalisé : « Enregistrer » et « enregistrer » sont deux
-entrées. C'est voulu — deviner l'un depuis l'autre finirait par traduire un
-nom propre.
+⚠ THE KEYS ARE WHITESPACE- AND CASE-SENSITIVE. The key is the sentence STRIPPED
+of its edge spaces (the original code indents it), but nothing else is
+normalised: `Enregistrer` and `enregistrer` are two entries. That is deliberate
+— guessing one from the other would end up translating a proper noun.
 """
 
 import functools
@@ -26,14 +24,14 @@ import re
 from . import themes
 
 # ---------------------------------------------------------------------------
-# Français -> anglais
+# French -> English
 # ---------------------------------------------------------------------------
 
 FR_VERS_EN = {
     '"\n           placeholder="Cabinet Dupont Kinésithérapie">':
         '"\n           placeholder="Dupont Physiotherapy Practice">',
-    '"\n           placeholder="Lefèvre, ou 0600000042">':
-        '"\n           placeholder="Lefèvre, or 0600000042">',
+    '"\n           placeholder="Lefèvre, ou 0639985042">':
+        '"\n           placeholder="Lefèvre, or 0639985042">',
     '"\n           placeholder="Séance de kinésithérapie">':
         '"\n           placeholder="Physiotherapy session">',
     '"\n           placeholder="laisser vide pour garder le numéro actuel">':
@@ -2168,8 +2166,8 @@ FR_VERS_EN = {
         'The title « Name — Reason » fills the reason column, the date fills\n  the existing appointment; the number is looked up among known contacts,\n  otherwise the contact arrives « without a number », to complete before validation —\n  never an invented number.',
     "Le vrai livrable de cette campagne : ce qu'il reste à saisir dans votre\nlogiciel de planification. Une ligne par changement, rien à déduire.":
         'The real deliverable of this campaign: what is left to enter in your\nscheduling software. One row per change, nothing to work out.',
-    'Lefèvre, ou 0600000042':
-        'Lefèvre, or 0600000042',
+    'Lefèvre, ou 0639985042':
+        'Lefèvre, or 0639985042',
     'Les':
         'The',
     'Les 5 plus récentes :':
@@ -2302,8 +2300,8 @@ FR_VERS_EN = {
         'Misses',
     'Mme':
         'Mrs',
-    'Mme Exemple Un;+33 6 00 00 00 51&#10;M. Exemple Deux, 06 00 00 00 52':
-        'Ms Example One;+33 6 00 00 00 51&#10;Mr Example Two, 06 00 00 00 52',
+    'Mme Exemple Un;+33 6 39 98 50 51&#10;M. Exemple Deux, 06 39 98 50 52':
+        'Ms Example One;+33 6 39 98 50 51&#10;Mr Example Two, 06 39 98 50 52',
     'Mmes':
         'Mmes',
     'Mode de saisie':
@@ -2428,12 +2426,12 @@ FR_VERS_EN = {
         'Test number removed (%s): forwarding stopped',
     "Numéro d'essai ». Un numéro déjà déclaré n'est":
         'Test number ». A number already declared is not',
-    'Numéro de téléphone invalide : attendu 10 chiffres commençant par 0, ou +33 suivi de 9 chiffres (exemple fictif : +33 6 00 00 00 42).':
-        'Invalid phone number: expected 10 digits starting with 0, or +33 followed by 9 digits (fictional example: +33 6 00 00 00 42).',
+    'Numéro de téléphone invalide : attendu 10 chiffres commençant par 0, ou +33 suivi de 9 chiffres (exemple fictif : +33 6 39 98 50 42).':
+        'Invalid phone number: expected 10 digits starting with 0, or +33 followed by 9 digits (fictional example: +33 6 39 98 50 42).',
     'Numéro de téléphone invalide : attendu un numéro français (10 chiffres commençant par 0), ou un numéro international avec son indicatif — « + » suivi de 8 à 15 chiffres (exemple fictif : +44 20 7946 0958).':
         'Invalid phone number: expected a French number (10 digits starting with 0), or an international number with its country code — « + » followed by 8 to 15 digits (fictional example: +44 20 7946 0958).',
-    'Numéro de téléphone — format attendu : 10 chiffres commençant par 0,\n    ou +33 suivi de 9 chiffres (exemple fictif : +33 6 00 00 00 42)':
-        'Phone number — expected format: 10 digits starting with 0,\n    or +33 followed by 9 digits (fictitious example: +33 6 00 00 00 42)',
+    'Numéro de téléphone — format attendu : 10 chiffres commençant par 0,\n    ou +33 suivi de 9 chiffres (exemple fictif : +33 6 39 98 50 42)':
+        'Phone number — expected format: 10 digits starting with 0,\n    or +33 followed by 9 digits (fictitious example: +33 6 39 98 50 42)',
     'Numéro refusé :':
         'Number refused:',
     'Oct':
@@ -3286,8 +3284,8 @@ FR_VERS_EN = {
         'Download the list (CSV, numbers in plain text —\n  generated on the fly, never stored)',
     'Téléphone':
         'Phone',
-    'Téléphone (fictif : +33 6 00 00 00 XX)':
-        'Phone (fictional: +33 6 00 00 00 XX)',
+    'Téléphone (fictif : +33 6 39 98 50 XX)':
+        'Phone (fictional: +33 6 39 98 50 XX)',
     'Téléphone à compléter':
         'Phone to complete',
     "Un\nrendez-vous déplacé reste déplacé, une place libérée reste libre : c'est la\nTRACE du travail qui part, jamais son résultat dans votre agenda.":
@@ -5587,43 +5585,37 @@ FR_VERS_EN = {
 }
 
 # ---------------------------------------------------------------------------
-# Les RÈGLES — pour tout ce qui porte une date, une heure ou un nombre
+# The RULES — for everything carrying a date, a time or a number
 # ---------------------------------------------------------------------------
-#
-# ⚠ POURQUOI DES RÈGLES ET PAS DES PHRASES. Mesuré le 01/09/2026 : sur les
-# 1 527 phrases traduites de la première passe, 804 — plus de la moitié —
-# portaient une date ou une heure de la semaine en cours, du genre
-# « dimanche 06/09 10h00 — hors horaires d'ouverture ». Écrites en toutes
-# lettres, elles auraient cessé de correspondre DÈS LE LENDEMAIN, et la
-# traduction se serait effritée d'elle-même, sans que rien ne le signale.
-#
-# Les deux premières règles ci-dessous remplacent à elles seules 728 de ces
-# entrées, et elles tiendront tant que la grille des horaires existera.
-#
-# Chaque règle est un couple (motif, fabrique). La fabrique reçoit le résultat
-# de la recherche et le dictionnaire — elle peut donc traduire les mots autour
-# de la donnée sans jamais toucher à la donnée elle-même. Elle rend None quand
-# elle ne sait pas conclure : la phrase reste alors en français, ce qui est
-# toujours préférable à une phrase à moitié juste.
+# ⚠ WHY RULES AND NOT SENTENCES. Measured on 01/09/2026: of the 1,527 sentences
+# translated in the first pass, 804 — more than half — carried a date or a time
+# from the current week, of the kind `dimanche 06/09 10h00 — hors horaires
+# d'ouverture`. Written out in full, they would have stopped matching THE VERY
+# NEXT DAY, and the translation would have crumbled on its own with nothing to
+# signal it.  The first two rules below replace 728 of those entries on their
+# own, and they will hold for as long as the schedule grid exists.  Each rule
+# is a (pattern, factory) pair. The factory receives the match and the
+# dictionary — so it can translate the words around the data without ever
+# touching the data itself. It returns None when it cannot conclude: the
+# sentence then stays French, which is always preferable to a half-right one.
 
 _JOURS_FR_VERS_EN = dict(zip(themes.JOURS, themes.JOURS_EN))
 
 
 def _jour_traduit(nom):
-    """« dimanche » -> « Sunday ». None si ce n'est pas un jour connu."""
+    """`dimanche` -> `Sunday`. None when it is not a known day."""
     return _JOURS_FR_VERS_EN.get(nom.lower())
 
 
 def _fin_traduite(reste, table):
-    """La fin de phrase, par le dictionnaire. None si elle est inconnue.
+    """The end of the sentence, through the dictionary. None when unknown.
 
-    ⚠ LE MÊME TEXTE S'ÉCRIT DE DEUX FAÇONS SELON L'ENDROIT. Dans un attribut
-    `title`, le produit échappe l'apostrophe : « hors horaires
-    d&#x27;ouverture ». Dans le corps de la page, il l'écrit telle quelle. Le
-    dictionnaire ne connaît qu'une des deux formes — celle qui a été récoltée.
-    On essaie donc les deux, et l'on rend le résultat dans l'écriture d'où
-    l'on vient : reposer une apostrophe nue dans un attribut casserait la
-    balise.
+    ⚠ THE SAME TEXT IS WRITTEN TWO WAYS DEPENDING ON WHERE IT IS. Inside a
+    `title` attribute the product escapes the apostrophe: `hors horaires
+    d&#x27;ouverture`. In the page body it writes it plainly. The dictionary
+    knows only one of the two forms — the one that was harvested. So both are
+    tried, and the result is returned in the spelling it came from: putting a
+    bare apostrophe back inside an attribute would break the tag.
     """
     brut = reste.strip()
     traduit = table.get(brut)
@@ -5638,12 +5630,12 @@ def _fin_traduite(reste, table):
     return traduit.replace("&", "&amp;").replace("'", "&#x27;")
 
 
-# « dimanche 06/09 10h00 — hors horaires d'ouverture » (grille des rendez-vous)
-# « dimanche 10h00 — fermé »                          (grille des horaires)
-# ⚠ LES NOMBRES SONT BORNES, ET CE N'EST PAS DU ZELE. Une regle qui accepte
-# « 32/13/2026 99h99 » accepte aussi, un jour, le texte qu'un utilisateur aura
-# tape dans un motif de rendez-vous — et le traduira. Une regle ne doit se
-# reconnaitre que dans ce que le produit ECRIT vraiment.
+# `dimanche 06/09 10h00 — hors horaires d'ouverture` (appointment grid)
+# `dimanche 10h00 — fermé`                          (opening-hours grid) ⚠ THE
+# NUMBERS ARE BOUNDED, AND THAT IS NOT PEDANTRY. A rule that accepts
+# `32/13/2026 99h99` also accepts, one day, the text a user typed into an
+# appointment reason — and translates it. A rule must recognise itself only in
+# what the product actually WRITES.
 _JOUR_DU_MOIS = r"(?:0?[1-9]|[12]\d|3[01])"
 _MOIS_DU_AN = r"(?:0?[1-9]|1[0-2])"
 _GRILLE = re.compile(
@@ -5663,7 +5655,7 @@ def _grille(trouve, table):
             f" \u2014 {fin}")
 
 
-# « semaine 12 — du 16/03 au 22/03 »
+# `semaine 12 — du 16/03 au 22/03`
 _SEMAINE_N = re.compile(
     r"^semaine (\d{1,2}) \u2014 du (\S+) au (\S+)$", re.IGNORECASE)
 
@@ -5673,7 +5665,7 @@ def _semaine_n(trouve, _table):
             f"{trouve.group(3)}")
 
 
-# « Semaine du 31/08/2026 au 06/09/2026\n— 3 rendez-vous »
+# `Semaine du 31/08/2026 au 06/09/2026\n— 3 rendez-vous`
 _SEMAINE_DU = re.compile(
     r"^Semaine du (\S+) au (\S+)(\s*)\u2014 (\d+) rendez-vous$",
     re.IGNORECASE)
@@ -5686,7 +5678,7 @@ def _semaine_du(trouve, _table):
             f"{trouve.group(3)}\u2014 {nombre} {mot}")
 
 
-# « Horaire : 30/08/2026 à 09h15 »
+# `Horaire : 30/08/2026 à 09h15`
 _HORAIRE = re.compile(r"^Horaire : (\S+) \u00e0 (\d{1,2})h(\d{2})$")
 
 
@@ -5695,7 +5687,7 @@ def _horaire(trouve, _table):
             f"{trouve.group(3)}")
 
 
-# « Choisir toute la journée du 01/09, de 07h00 à 19h45 »
+# `Choisir toute la journée du 01/09, de 07h00 à 19h45`
 _JOURNEE = re.compile(
     r"^Choisir toute la journ\u00e9e du (\S+?),? de (\d{1,2})h(\d{2}) "
     r"\u00e0 (\d{1,2})h(\d{2})$")
@@ -5707,9 +5699,9 @@ def _journee(trouve, _table):
             f"{int(trouve.group(4)):02d}:{trouve.group(5)}")
 
 
-# Le pied de page porte la date du code : « … · code du 01/09 19h05 ».
-# ⚠ ELLE CHANGE À CHAQUE VERSION : sans cette règle, le pied redeviendrait
-# français au premier changement de code, sur TOUTES les pages à la fois.
+# The footer carries the code's date: `… · code du 01/09 19h05`. ⚠ IT CHANGES
+# WITH EVERY VERSION: without this rule the footer would go back to French at
+# the first code change, on ALL the pages at once.
 _PIED = re.compile(r"^(.*?) \u00b7 code du (.+)$", re.DOTALL)
 
 
@@ -5720,9 +5712,9 @@ def _pied(trouve, table):
     return f"{debut} \u00b7 code from {trouve.group(2)}"
 
 
-# « dimanche 01/11/2026 » : un jour de la liste des jours fermés. Pas d'heure,
-# donc la règle de la grille ne s'applique pas — et sans celle-ci, la liste
-# des jours fériés resterait en français au milieu d'un écran anglais.
+# `dimanche 01/11/2026`: a day from the list of closed days. No time, so the
+# grid rule does not apply — and without this one the public-holiday list would
+# stay French in the middle of an English screen.
 _JOUR_ET_DATE = re.compile(
     r"^(" + "|".join(themes.JOURS) + r")\s+("
     + _JOUR_DU_MOIS + r"/" + _MOIS_DU_AN + r"(?:/\d{2,4})?)$",
@@ -5735,26 +5727,21 @@ def _jour_et_date(trouve, _table):
 
 
 # ---------------------------------------------------------------------------
-# Les phrases des ECRANS DE CAMPAGNE — vues seulement en PEUPLANT le produit
+# The sentences of the CAMPAIGN SCREENS — seen only by POPULATING the product
 # ---------------------------------------------------------------------------
-#
-# ⚠ ELLES N'EXISTAIENT DANS AUCUNE MESURE jusqu'au 03/09/2026, parce qu'aucune
-# mesure n'avait créé de campagne. Une base sans campagne n'a ni titre de
-# section, ni bouton « Effacer la liste », ni nom de campagne, ni ligne de
-# récapitulatif. C'est l'utilisateur qui les a vues, du premier coup, en se
-# servant du produit — et c'est `outils/francais_restant.py`, une fois qu'il
-# peuple, qui les a toutes sorties.
+# ⚠ THEY EXISTED IN NO MEASURE until 03/09/2026, because no measure had ever
+# created a campaign. A database with no campaign has no section title, no
+# `Effacer la liste` button, no campaign name, no summary line. The user saw
+# them at first glance, simply by using the product — and it was
+# `outils/francais_restant.py`, once it populates, that brought them all out.
 
-# --- LA RÈGLE GÉNÉRALE : « Libellé : valeur » -----------------------------
-#
-# ⚠ UNE RÈGLE PLUTÔT QUE TRENTE ENTRÉES. Le récapitulatif d'une campagne est
-# fait de lignes « Politique d'appel : appeler toute la liste », « Ordre
-# d'appel : Ordre de la liste »… Le libellé et la valeur sont DÉJÀ traduits
-# chacun de son côté ; c'est leur assemblage qui n'a pas d'entrée.
-#
-# ⚠ ET ELLE NE REND RIEN SI L'UNE DES DEUX MOITIÉS EST INCONNUE. C'est ce qui
-# la rend sûre : une donnée de l'utilisateur qui contiendrait « : » ne peut
-# pas être à moitié traduite, puisqu'elle n'est pas au dictionnaire.
+# --- THE GENERAL RULE: `Label: value` -----------------------------  ⚠ ONE
+# RULE RATHER THAN THIRTY ENTRIES. A campaign's summary is made of lines like
+# `Politique d'appel : appeler toute la liste`, `Ordre d'appel : Ordre de la
+# liste`… The label and the value are ALREADY translated each on their own; it
+# is their assembly that has no entry.  ⚠ AND IT RETURNS NOTHING WHEN EITHER
+# HALF IS UNKNOWN. That is what makes it safe: a piece of user data containing
+# `:` cannot be half translated, since it is not in the dictionary.
 _LIBELLE_VALEUR = re.compile(r"^([^:\n]{3,70}) : (.+)$", re.DOTALL)
 
 
@@ -5766,20 +5753,19 @@ def _libelle_valeur(trouve, table):
     return f"{libelle}: {valeur}"
 
 
-# --- LES NOMS DE CAMPAGNE, engendrés par le produit ------------------------
-#
-# ⚠ CE SONT DES DONNÉES, ET POURTANT ELLES SE TRADUISENT. Le nom est écrit en
-# base — mais c'est LE PRODUIT qui l'a écrit, pas l'utilisateur. Le traduire à
-# l'affichage ne touche pas la base : c'est la même règle que pour les états
-# (« prévu », « à appeler »), stockés en français et montrés en anglais.
+# --- CAMPAIGN NAMES, generated by the product ------------------------  ⚠
+# THESE ARE DATA, AND YET THEY ARE TRANSLATED. The name is written in the
+# database — but it is THE PRODUCT that wrote it, not the user. Translating it
+# at display time does not touch the database: it is the same rule as for the
+# states (`prévu`, `à appeler`), stored in French and shown in English.
 _NOM_DATE = r"(\d{1,2}/\d{1,2}(?:/\d{2,4})?)"
 _NOM_CONFIRMATION = re.compile(
     r"^Confirmation de rendez-vous du " + _NOM_DATE +
     r" \((\d+) contact\(s\)\) — " + _NOM_DATE + r"(.*)$")
-# ⚠ LA CONFIRMATION MANQUAIT (03/09/2026). Elle a DEUX formes de nom : « du
-# <date> » quand elle vise un jour, « de N journées, dès le <date> » quand elle
-# en couvre plusieurs. Seule la première était couverte, et une campagne sur
-# trois gardait donc son nom français sur le premier écran.
+# ⚠ THE CONFIRMATION WAS MISSING (03/09/2026). Its name has TWO forms: `du
+# <date>` when it targets one day, `de N journées, dès le <date>` when it
+# covers several. Only the first was covered, so one campaign in three kept its
+# French name on the very first screen.
 _NOM_JOURNEES = re.compile(
     r"^(Rappel de rendez-vous|Prise de rendez-vous|Déplacement de rendez-vous"
     r"|Confirmation de rendez-vous)"
@@ -5815,7 +5801,7 @@ def _nom_creneau(trouve, _table):
             f"{trouve.group(3)}{trouve.group(4)}")
 
 
-# --- LES COMPTES DES ÉCRANS DE CAMPAGNE ------------------------------------
+# --- THE COUNTS ON THE CAMPAIGN SCREENS ------------------------------------
 _PRETES_N = re.compile(
     r"^Prêtes — personne n(?:&#x27;|')est appelé avant ▶ Démarrer \((\d+)\)$")
 _SECTION_N = re.compile(r"^(En cours|Terminées|Prêtes|Brouillons) \((\d+)\)$")
@@ -5845,10 +5831,10 @@ _CRENEAU_DATE_HEURE = re.compile(
 
 
 def _prise_en_charge(trouve, table):
-    """« ... — pris en charge par : <nom de campagne> ».
+    """`... — pris en charge par : <campaign name>`.
 
-    Le nom de campagne vient lui-meme d'une regle : on les essaie ici, sinon
-    la phrase resterait francaise a cause de sa fin.
+    The campaign name itself comes from a rule: they are tried here, otherwise
+    the sentence would stay French because of its ending.
     """
     nom = trouve.group(1).strip()
     rendu = table.get(nom)
@@ -5880,29 +5866,27 @@ def _effacer_groupe(trouve, table):
 
 
 # ---------------------------------------------------------------------------
-# Les MESSAGES D'OUVERTURE, une fois leurs marques remplacées
+# The OPENING MESSAGES, once their markers are filled in
 # ---------------------------------------------------------------------------
-#
-# ⚠ LE DICTIONNAIRE LES CONNAÎT, ET POURTANT ILS RESTAIENT FRANÇAIS. Il connaît
-# le gabarit BRUT — « ... de la part de [entreprise] ... » — mais l'écran, lui,
-# montre le gabarit REMPLI : le nom du cabinet à la place de [entreprise], la
-# liste des créneaux à la place de [créneaux_disponibles]. Deux textes
-# différents ; le second n'a aucune entrée, et n'en aura jamais, puisqu'il
-# change avec les données.
-#
-# ⚠ ET LA RÈGLE NE TIENT PAS UNE SECONDE TRADUCTION : elle relit l'entrée du
-# gabarit au dictionnaire et y replante les valeurs vues. Une correction de la
-# phrase anglaise se fait donc à UN seul endroit. Si l'entrée manque, la règle
-# ne rend rien plutôt que d'inventer.
+# ⚠ THE DICTIONARY KNOWS THEM, AND YET THEY STAYED FRENCH. It knows the RAW
+# template — `... de la part de [entreprise] ...` — but the screen shows the
+# FILLED template: the practice's name in place of [entreprise], the list of
+# slots in place of [créneaux_disponibles]. Two different texts; the second has
+# no entry, and never will, since it changes with the data.  ⚠ AND THE RULE
+# DOES NOT HOLD A SECOND TRANSLATION: it reads the template's entry back from
+# the dictionary and replants the observed values into it. A correction to the
+# English sentence is therefore made in ONE place only. When the entry is
+# missing, the rule returns nothing rather than invent.
 _APOSTROPHE = r"(?:&(?:amp;)?#x27;|\')"
 _MARQUE = re.compile(r"\[[a-zé_]+\]")
 
 
 def _motif_de_gabarit(gabarit):
-    """Le gabarit français, avec un trou à la place de chacune de ses marques.
+    """The French template, with a hole in place of each of its markers.
 
-    Le trou accepte AUSSI la marque elle-même : selon l'écran, elle est tantôt
-    remplacée, tantôt montrée telle quelle. Un seul motif couvre les deux.
+    The hole ALSO accepts the marker itself: depending on the screen it is
+    sometimes replaced, sometimes shown as it stands. A single pattern covers
+    both.
     """
     morceaux, noms, fin = [], [], 0
     for vu in _MARQUE.finditer(gabarit):
@@ -5916,12 +5900,12 @@ def _motif_de_gabarit(gabarit):
 
 
 def _remplir(modele, valeurs):
-    """Le modèle anglais, avec les valeurs vues remises à LEURS marques.
+    """The English model, with the observed values put back at THEIR markers.
 
-    ⚠ PAR LE NOM, JAMAIS PAR LE RANG : l'anglais réordonne. « nos
-    disponibilités sont [créneaux_disponibles] » peut fort bien devenir « we
-    have [créneaux_disponibles] free », et un remplissage par rang mettrait
-    alors le nom du cabinet dans la liste des créneaux.
+    ⚠ BY NAME, NEVER BY POSITION: English reorders. `nos disponibilités sont
+    [créneaux_disponibles]` may very well become `we have
+    [créneaux_disponibles] free`, and filling by position would then put the
+    practice's name into the list of slots.
     """
     morceaux, fin = [], 0
     for vu in _MARQUE.finditer(modele):
@@ -5955,11 +5939,10 @@ def _regles_des_gabarits():
 MOTIFS_GABARITS = _regles_des_gabarits()
 
 
-# --- L'AVERTISSEMENT DE CLÉ, qui porte la taille de la clé mise de côté ----
-#
-# ⚠ UNE RÈGLE, PARCE QU'ELLE PORTE UN NOMBRE. « (41 caractère(s)) » change avec
-# la clé : écrite en toutes lettres, l'entrée serait juste pour une clé et
-# morte pour la suivante.
+# --- THE KEY WARNING, which carries the length of the key set aside ----  ⚠ A
+# RULE, BECAUSE IT CARRIES A NUMBER. `(41 caractère(s))` changes with the key:
+# written out in full, the entry would be right for one key and dead for the
+# next.
 _CLE_IGNOREE = re.compile(
     r"^Une AUTRE clé est posée dans la variable d(?:&#x27;|')environnement "
     r"CALLE_API_KEY, et elle gagne contre le fichier\. Celle que vous avez "
@@ -5974,12 +5957,11 @@ MOTIFS_CLE = (
 )
 
 
-# --- L'AVANCEMENT D'UNE CAMPAGNE, en tête de la liste ----------------------
-#
-# ⚠ SUR LE PREMIER ÉCRAN, ET RESTÉ FRANÇAIS JUSQU'AU 03/09/2026. Il porte trois
-# nombres, donc il n'existe que sur une base peuplée ET déroulée : aucune de
-# mes mesures n'avait fait tourner une campagne. C'est l'œil, en préparant des
-# captures d'écran, qui l'a vu.
+# --- A CAMPAIGN'S PROGRESS, at the top of the list ----------------------  ⚠
+# ON THE VERY FIRST SCREEN, AND STILL FRENCH UNTIL 03/09/2026. It carries three
+# numbers, so it only exists on a database that is both populated AND run
+# through: none of my measures had ever run a campaign. It was the eye, while
+# preparing screenshots, that saw it.
 _AVANCEMENT = re.compile(
     r"^(\d+)/(\d+) appelé\(s\) · (\d+) accepté\(s\) · (\d+) relance\(s\)$")
 
@@ -5990,7 +5972,7 @@ MOTIFS_AVANCEMENT = (
 )
 
 
-# --- LES HUIT DERNIERES, chacune assemblee a sa facon ----------------------
+# --- THE LAST EIGHT, each assembled in its own way ----------------------
 _LISTE_PERSONNES = re.compile(
     r"^Liste des personnes : depuis la base — « (.+?) » — "
     r"(rejouable|non rejouable) sur un autre créneau$", re.DOTALL)
@@ -6007,11 +5989,11 @@ _ICS_NOMS = re.compile(
 
 
 def _liste_personnes(trouve, table):
-    """« Liste des personnes : depuis la base — « X » — rejouable… »
+    """`Liste des personnes : depuis la base — « X » — rejouable…`
 
-    ⚠ TROIS MORCEAUX, TROIS ORIGINES : le libellé, le nom de la source (une
-    entrée du dictionnaire), et la mention de rejouabilité. La règle générale
-    « Libellé : valeur » ne suffit pas — la valeur est elle-même assemblée.
+    ⚠ THREE PIECES, THREE ORIGINS: the label, the source name (a dictionary
+    entry), and the replayability note. The general `Label: value` rule is not
+    enough — the value is itself assembled.
     """
     source = table.get(trouve.group(1).strip())
     if source is None:
@@ -6082,14 +6064,13 @@ MOTIFS_CAMPAGNE = (
 
 
 # ---------------------------------------------------------------------------
-# Les phrases ASSEMBLEES — celles qui portent un nombre
+# ASSEMBLED sentences — the ones carrying a number
 # ---------------------------------------------------------------------------
-#
-# ⚠ ON NE LES VOIT QU'EN RENDANT LES PAGES. Une phrase collée en Python —
-# « Ses rendez-vous (3) » — est UN SEUL nœud de page. Ni la lecture des
-# sources ni l'exploration d'une base vide ne la montrent : la première ne
-# voit que les morceaux, la seconde n'a rien à compter. C'est
-# `outils/francais_restant.py` qui les a sorties, toutes les 255 d'un coup.
+# ⚠ THEY ARE ONLY VISIBLE BY RENDERING THE PAGES. A sentence glued together in
+# Python — `Ses rendez-vous (3)` — is ONE SINGLE page node. Neither reading the
+# sources nor exploring an empty database shows it: the first sees only the
+# pieces, the second has nothing to count. It was `outils/francais_restant.py`
+# that brought them out, all 255 at once.
 
 def _n(trouve, rang=1):
     return int(trouve.group(rang))
@@ -6168,7 +6149,8 @@ MOTIFS_ASSEMBLES = (
 
 
 def _agenda(trouve, table):
-    """« Agenda : <état> » — l'état est traduit à part, le libellé ici."""
+    """`Agenda : <state>` — the state is translated separately, the label here.
+    """
     fin = table.get(trouve.group(1).strip())
     return None if fin is None else f"Diary: {fin}"
 
@@ -6180,15 +6162,15 @@ def _prevenir(trouve, table):
 
 
 def _jeu_ajoute(trouve, _table):
-    """La phrase du jeu d'essai — le nom du métier passe, le reste est rendu.
+    """The sample-data sentence — the trade name passes through, the rest is
+    returned.
 
-    ⚠ ELLE ALLAIT CHERCHER SA FIN DANS LA TABLE, ET NE LA TROUVAIT PAS. La
-    fin existe bien au dictionnaire, mais sous une AUTRE découpe : la phrase
-    est écrite d'un bloc dans le code, coupée seulement par le nom du métier,
-    et la clé récoltée ne correspondait donc pas exactement à ce que la règle
-    capturait. Une règle qui dépend d'une entrée dépend de deux découpages qui
-    s'accordent — ici ils ne s'accordaient pas. Elle rend donc la phrase
-    entière elle-même.
+    ⚠ IT WENT LOOKING FOR ITS ENDING IN THE TABLE, AND DID NOT FIND IT. The
+    ending does exist in the dictionary, but under ANOTHER split: the sentence
+    is written as one block in the code, cut only by the trade name, so the
+    harvested key did not exactly match what the rule captured. A rule that
+    depends on an entry depends on two splits agreeing — here they did not. So
+    it returns the whole sentence itself.
     """
     return (f"It adds\ncontacts and appointments from a fictional "
             f"{trouve.group(1)}:\npast and upcoming appointments, missed "
@@ -6214,12 +6196,12 @@ MOTIFS_ASSEMBLES = MOTIFS_ASSEMBLES + (
 )
 
 
-# ⚠ UNE PHRASE ASSEMBLÉE EN PYTHON RESTE UNE SEULE PHRASE À L'ÉCRAN.
-# `assistant.py` écrit « N personne(s) écartée(s) : cette place ne leur » puis
-# lui colle « ferait pas gagner G jours ». Les deux moitiés sont devenues deux
-# entrées du dictionnaire — et AUCUNE ne correspond, puisque le nœud de page
-# porte la phrase ENTIÈRE. Résultat : elle restait en français au milieu d'un
-# écran anglais. Une règle sur la phrase complète les remplace toutes les deux.
+# ⚠ A SENTENCE ASSEMBLED IN PYTHON IS STILL ONE SENTENCE ON SCREEN.
+# `assistant.py` writes `N personne(s) écartée(s) : cette place ne leur` then
+# glues `ferait pas gagner G jours` to it. Both halves became two dictionary
+# entries — and NEITHER matches, since the page node carries the WHOLE
+# sentence. Result: it stayed French in the middle of an English screen. One
+# rule on the complete sentence replaces both.
 _ECARTES_GAIN = re.compile(
     r"^(\d+) personne\(s\) écartée\(s\) : cette place ne leur ferait pas "
     r"gagner (\d+) jours$")
@@ -6241,9 +6223,9 @@ def _ecartes_rien(trouve, _table):
             f"is not after it")
 
 
-# Le bouton d'exécution de la file : la phrase entière, le nombre laissé
-# passer. Deux règles parce que le produit écrit deux phrases — c'est ce qui
-# permet à chacune d'avoir sa grammaire anglaise.
+# The queue's run button: the whole sentence, the number let through. Two rules
+# because the product writes two sentences — that is what lets each have its
+# own English grammar.
 _FILE_REELLE = re.compile(
     r"^Exécuter la file — passer RÉELLEMENT les (\d+) appel\(s\)$")
 _FILE_SIMULEE = re.compile(
@@ -6282,23 +6264,21 @@ MOTIFS = {
 
 
 def motifs(langue):
-    """Les règles de cette langue, ou aucune."""
+    """This language's rules, or none."""
     return MOTIFS.get(langue) or ()
 
 
 # ---------------------------------------------------------------------------
-# La CONSIGNE téléphonique — un dictionnaire à part, et pour une raison
+# The PHONE BRIEFING — a separate dictionary, and for a reason
 # ---------------------------------------------------------------------------
-#
-# ⚠ CE N'EST PAS DU TEXTE D'ÉCRAN. Ces phrases sont DITES AU TÉLÉPHONE par une
-# machine, à de vraies personnes, ou dictées à l'agent comme des ordres. Elles
-# ne se relisent pas, ne se survolent pas, ne se corrigent pas d'un clic. Les
-# mêler au dictionnaire des écrans ferait qu'une retouche d'interface pourrait
-# changer, sans qu'on y pense, ce qu'un patient entend au bout du fil.
-#
-# Elles portent aussi des [crochets] que le produit remplit ensuite : un
-# crochet traduit est un trou qui ne sera jamais rempli, et l'agent dirait
-# « identite » à voix haute. Un essai tient cette règle sur le dictionnaire.
+# ⚠ THIS IS NOT SCREEN TEXT. These sentences are SPOKEN ON THE PHONE by a
+# machine, to real people, or dictated to the agent as orders. They are not
+# reread, not skimmed, not fixed with a click. Mixing them into the screen
+# dictionary would mean an interface tweak could change, without anyone
+# thinking about it, what a patient hears on the line.  They also carry
+# [brackets] the product fills in afterwards: a translated bracket is a hole
+# that will never be filled, and the agent would say `identite` out loud. A
+# test holds this rule on the dictionary.
 CONSIGNE_FR_VERS_EN = {
     ', en écrivant dans « new_datetime » la date convenue (format 2026-08-15T14:30) si une date précise a été convenue, et rien sinon':
         ', writing the agreed date in « new_datetime » (format 2026-08-15T14:30) if a precise date was agreed, and nothing otherwise',
@@ -6689,7 +6669,7 @@ TABLES_CONSIGNE = {
 
 
 def table_consigne(langue):
-    """Le dictionnaire de la consigne pour cette langue, ou un vide."""
+    """The briefing dictionary for this language, or an empty one."""
     return TABLES_CONSIGNE.get(langue) or {}
 
 
@@ -6699,20 +6679,20 @@ TABLES = {
 
 
 def table(langue):
-    """Le dictionnaire de cette langue, ou un dictionnaire vide."""
+    """This language's dictionary, or an empty dictionary."""
     return TABLES.get(langue) or {}
 
 
 def compte(langue):
-    """Combien de phrases cette langue connaît — pour le mesurer, pas l'estimer.
+    """How many sentences this language knows — to measure it, not estimate it.
 
-    ⚠ CE N'EST PAS LA COUVERTURE. Les règles (`MOTIFS`) traduisent, à elles
-    seules, plus de phrases que ce compte n'en contient : la couverture se
-    mesure sur des écrans réels, avec `outils/recolter_phrases.py`.
+    ⚠ THIS IS NOT COVERAGE. The rules (`MOTIFS`) translate, on their own, more
+    sentences than this count contains: coverage is measured on real screens,
+    with `outils/recolter_phrases.py`.
     """
     return len(table(langue))
 
 
 def compte_regles(langue):
-    """Combien de règles cette langue applique."""
+    """How many rules this language applies."""
     return len(motifs(langue))

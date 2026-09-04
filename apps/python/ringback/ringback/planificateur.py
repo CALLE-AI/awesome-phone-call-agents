@@ -1,31 +1,22 @@
-"""File d'appels avec garde-fous + cascade « premier oui ».
+"""Call queue with guards + the `first yes` cascade.
 
-Trois verrous indépendants avant tout appel RÉEL :
-1. le client d'appels doit détenir une clé (sinon il ne se construit pas) ;
-2. le drapeau global dry_run (vrai par défaut) doit être levé explicitement ;
-3. confirmer_appels_reels() doit avoir été appelé sur CETTE instance.
-Les appels simulés, eux, passent toujours. Un appel en file peut être
-annulé tant qu'il n'a pas été exécuté. La cascade « premier oui » passe
-par les MÊMES verrous que la file classique.
+Three independent locks before any REAL call:
+1. the call client must hold a key (otherwise it does not construct);
+2. the global dry_run flag (true by default) must be lifted explicitly;
+3. confirmer_appels_reels() must have been called on THIS instance.
+Simulated calls, for their part, always go through. A queued call can be cancelled as long as it has not been executed. The `first yes` cascade goes through the SAME locks as the classic queue.
 
-DEUX RÈGLES DE PLUS, tenues ici pour qu'aucune porte n'y échappe :
-- le MOMENT : la plage d'appel autorisée et la période interdite sont
-  revérifiées dans verifier_garde_fous(), par où passe TOUTE exécution
-  d'appels (file, cascade, campagne, relance due) — aucune dérogation,
-  même pour un geste déclenché à la main ;
-- la DATE CONVENUE AU TÉLÉPHONE : un rendez-vous n'est écrit que si la
-  place existe vraiment (jour ouvert, dans les horaires, libre, assez
-  longue). Sinon RIEN n'est écrit et la raison — avec la date demandée en
-  clair — est rendue à l'appelant, qui la met sous les yeux d'un humain.
-Ces deux règles demandent les réglages : ils sont passés au constructeur
-(preferences). Sans eux, le planificateur ne prétend rien vérifier.
+TWO MORE RULES, held here so that no door escapes them:
+- the MOMENT: the permitted calling window and the forbidden period are re-checked in verifier_garde_fous(), through which ALL call execution passes (queue, cascade, campaign, due follow-up) — no exemption, not even for a gesture triggered by hand;
+- the DATE AGREED ON THE PHONE: an appointment is only written when the slot really exists (open day, within hours, free, long enough). Otherwise NOTHING is written and the reason — with the requested date in clear — is returned to the caller, who puts it in front of a human.
+These two rules need the settings: they are passed to the constructor (preferences). Without them, the planner claims to check nothing.
 
-ET LA DATE PROPOSÉE, symétrique de la précédente : la place offerte en
-rattrapage d'un rendez-vous manqué sort de horaires.places_a_proposer() —
-les places réellement libres, à la durée du rendez-vous — et non d'une
-formule « date manquée + 7 jours » qui pouvait tomber dans le passé. Quand
-il n'y a plus aucune place libre, AUCUN appel ne part et l'écran le dit :
-on ne propose pas une date qu'on ne peut pas tenir.
+AND THE OFFERED DATE, the mirror image of the previous: the slot offered to
+make up for a missed appointment comes out of horaires.places_a_proposer() —
+the genuinely free slots, at the appointment's length — and not from a `missed
+date + 7 days` formula that could land in the past. When there is no free slot
+left, NO call goes out and the screen says so: a date we cannot honour is not
+offered.
 """
 
 import datetime
@@ -35,28 +26,27 @@ from . import calle_client, db, horaires, themes
 
 journal = logging.getLogger("ringback.planificateur")
 
-# Mission proposée par défaut sur la page cascade (le gabarit du thème
-# « créneau libéré ») ; [entreprise] vient des réglages, [créneau] est
-# remplacé automatiquement par la date choisie au moment de l'appel.
+# The mission offered by default on the cascade page (the `freed slot` theme's
+# template); [entreprise] comes from the settings, [créneau] is replaced
+# automatically by the date chosen at call time.
 MISSION_EXEMPLE = themes.GABARITS["creneau_libere"]
 
 MOTIF_CRENEAU_ATTRIBUE = "Créneau libéré attribué (cascade « premier oui »)"
 MOTIF_AUTRE_DATE = "Rendez-vous convenu par téléphone (cascade « premier oui »)"
 
-# ------------------------------- l'ancien rendez-vous, dans la cascade directe
-# LE TROU Q7, REFERMÉ. Une cascade directe part d'une liste « Nom;Téléphone »
-# collée à la main : elle ne dit PAS de quel rendez-vous le client parle.
-# Quand il prend le créneau libéré (« accepted ») ou convient d'une autre date
-# (« moved »), son ancien rendez-vous doit pourtant partir — sinon il en a
-# deux et une place reste bloquée pour rien.
-# La règle appliquée, et sa limite assumée :
-#   - le contact est reconnu comme un client DÉJÀ en fiche (db.client_connu,
-#     qui ne crée rien) ET il a EXACTEMENT UN rendez-vous à venir → c'est
-#     celui-là, il est libéré selon horaires.decision_annulation ;
-#   - il en a PLUSIEURS → on n'invente rien : RingBack ne sait pas duquel il
-#     s'agit. La ligne le dit en clair, un humain tranche ;
-#   - il n'est pas en fiche, ou il n'a aucun rendez-vous à venir → il n'y a
-#     rien à libérer, et on ne dit rien plutôt que d'inquiéter pour rien.
+# ------------------------------- the old appointment, in the direct cascade
+# THE Q7 GAP, CLOSED. A direct cascade starts from a `Name;Phone` list pasted
+# by hand: it does NOT say which appointment the client is talking about. Yet
+# when they take the freed slot (`accepted`) or agree another date (`moved`),
+# their old appointment must go — otherwise they have two and a slot stays
+# blocked for nothing. The rule applied, and its acknowledged limit: - the
+# contact is recognised as a client ALREADY on file (db.client_connu, which
+# creates nothing) AND they have EXACTLY ONE upcoming appointment → that is the
+# one, and it is released according to horaires.decision_annulation; - they
+# have SEVERAL → nothing is invented: RingBack does not know which one it is.
+# The row says so plainly, a human decides; - they are not on file, or they
+# have no upcoming appointment → there is nothing to release, and nothing is
+# said rather than worrying anyone for nothing.
 NOTE_ANCIEN_AMBIGU = (
     "Ancien rendez-vous à libérer dans votre agenda : {nom} a {nombre} "
     "rendez-vous à venir dans RingBack ({dates}) — impossible de savoir "
@@ -64,18 +54,18 @@ NOTE_ANCIEN_AMBIGU = (
 NOTE_ANCIEN_LIBERE = (
     "Ancien rendez-vous {date} libéré ({statut}) : {pourquoi}")
 
-# Issue « le client a dit oui, mais la date convenue ne tient pas » : aucun
-# rendez-vous n'est écrit, la personne passe à un rappel PAR UN HUMAIN avec
-# la date demandée en clair. Ce n'est ni un refus ni un succès : c'est un
-# accord que la machine ne sait pas honorer sans casser le planning.
+# Outcome `the client said yes, but the agreed date does not hold`: no
+# appointment is written, the person moves to a call-back BY A HUMAN with the
+# requested date in clear. It is neither a refusal nor a success: it is an
+# agreement the machine cannot honour without breaking the schedule.
 ISSUE_DATE_REFUSEE = "date_refusee"
 
-# Issue « plus aucune place libre à proposer » : l'appel N'EST PAS PASSÉ.
-# Décision du propriétaire (Q6) : « On propose toujours des dates selon la
-# disponibilité réelle, pas en estimant une date algorithmiquement en
-# espérant que cela tombe sur un moment incertain. » Sans place réellement
-# libre, il n'y a rien à proposer au téléphone : on se tait plutôt que
-# d'inventer une date. La raison est écrite en clair sur l'appel.
+# Outcome `no free slot left to offer`: the call IS NOT PLACED. Owner's
+# decision (Q6): `We always offer dates according to real availability, not by
+# estimating a date algorithmically and hoping it lands on an uncertain
+# moment.` With no genuinely free slot there is nothing to offer on the phone:
+# we stay silent rather than invent a date. The reason is written plainly on
+# the call.
 NOTE_SANS_PLACE = (
     "Personne n'a été appelé : plus aucune place libre à proposer dans les "
     "{jours} prochains jours. Aucune date n'a été inventée. Libérez une "
@@ -83,25 +73,27 @@ NOTE_SANS_PLACE = (
 
 
 def _mission_effective(mission, creneau):
-    """Remplace le gabarit [créneau] par la date proposée, lisible en français."""
+    """Replaces the [créneau] placeholder with the offered date, readable in
+    French.
+    """
     creneau_dt = datetime.datetime.fromisoformat(creneau)
     return mission.replace("[créneau]", creneau_dt.strftime("le %d/%m/%Y à %Hh%M"))
 
 
 class GardeFou(RuntimeError):
-    """Un garde-fou a bloqué l'exécution d'un appel réel."""
+    """A guard blocked the execution of a real call."""
 
 
 class ClientExclu(RuntimeError):
-    """Le client est marqué « Ne plus appeler » : appel refusé (réversible)."""
+    """The client is marked `Ne plus appeler`: call refused (reversible)."""
 
 
 class Planificateur:
-    """preferences : les réglages (horaires d'ouverture, jours fermés).
+    """preferences: the settings (opening hours, closed days).
 
-    Sans eux, une date convenue au téléphone ne peut pas être vérifiée : le
-    planificateur écrit alors ce que l'agent a rendu, comme avant. Le
-    serveur les fournit toujours ; seuls des essais isolés s'en passent.
+    Without them, a date agreed on the phone cannot be checked: the planner
+    then writes what the agent returned, as before. The server always supplies
+    them; only isolated tests do without.
     """
 
     def __init__(self, base, client_appels, dry_run=True, preferences=None):
@@ -110,17 +102,18 @@ class Planificateur:
         self.dry_run = dry_run
         self.preferences = preferences
         self._appels_reels_confirmes = False
-        self.file = []  # entrées : {"appel_id": int, "rendezvous_id": int}
+        self.file = []  # entries: {"appel_id": int, "rendezvous_id": int}
 
     def confirmer_appels_reels(self):
-        """Confirmation explicite, à donner à chaque session (jamais persistée)."""
+        """Explicit confirmation, to be given each session (never persisted).
+        """
         self._appels_reels_confirmes = True
 
     def programmer(self, rendezvous_id):
-        """Met un appel en file pour ce rendez-vous ; rend l'identifiant d'appel.
+        """Queues a call for this appointment; returns the call id.
 
-        Refuse (ClientExclu) si le client est marqué « Ne plus appeler » :
-        cette exclusion vaut pour TOUT chemin d'appel, individuel compris.
+        Refuses (ClientExclu) when the client is marked `Ne plus appeler`: that
+        exclusion applies to EVERY call path, single ones included.
         """
         rdv = self.base.obtenir_rendezvous(rendezvous_id)
         if rdv is None:
@@ -137,13 +130,12 @@ class Planificateur:
         return appel_id
 
     def programmer_tous_les_manques(self):
-        """Met en file tous les rendez-vous manqués pas encore en file.
+        """Queues every missed appointment not already queued.
 
-        Rend la liste des identifiants d'appels créés (vide si rien de
-        nouveau) ; un rendez-vous déjà en file n'est jamais doublé, un
-        rendez-vous SANS numéro (import ICS pas complété) n'est pas mis en
-        file (rien à composer), et un client marqué « Ne plus appeler »
-        est toujours sauté.
+        Returns the list of created call ids (empty when there is nothing new);
+        an appointment already queued is never doubled, an appointment WITH no
+        number (an ICS import not completed) is not queued (nothing to dial),
+        and a client marked `Ne plus appeler` is always skipped.
         """
         deja_en_file = {entree["rendezvous_id"] for entree in self.file}
         crees = []
@@ -161,7 +153,8 @@ class Planificateur:
         return crees
 
     def file_detaillee(self):
-        """La file, enrichie des informations affichables (numéros masqués)."""
+        """The queue, enriched with displayable information (numbers masked).
+        """
         detail = []
         for entree in self.file:
             rdv = self.base.obtenir_rendezvous(entree["rendezvous_id"])
@@ -169,7 +162,9 @@ class Planificateur:
         return detail
 
     def annuler(self, appel_id):
-        """Retire un appel de la file avant exécution. Rend True si trouvé."""
+        """Removes a call from the queue before execution. Returns True when
+        found.
+        """
         for entree in self.file:
             if entree["appel_id"] == appel_id:
                 self.file.remove(entree)
@@ -179,10 +174,10 @@ class Planificateur:
         return False
 
     def annuler_tout(self):
-        """« Vider la file » : annule TOUS les appels en attente d'un coup.
+        """`Empty the queue`: cancels ALL pending calls at once.
 
-        Rend le nombre d'appels annulés. Comme l'annulation unitaire, ne
-        touche que les appels PAS ENCORE exécutés.
+        Returns the number of calls cancelled. Like the single cancellation, it
+        touches only calls NOT YET EXECUTED.
         """
         annules = 0
         for entree in list(self.file):
@@ -191,10 +186,11 @@ class Planificateur:
         return annules
 
     def purger_rendezvous(self, rendezvous_ids):
-        """Retire de la file les appels liés à ces rendez-vous (suppression client).
+        """Removes from the queue the calls tied to these appointments (client
+        deletion).
 
-        Aucun statut n'est écrit : les appels vont être supprimés de la
-        base avec le client. Rend le nombre d'entrées retirées.
+        No status is written: the calls are about to be deleted from the
+        database along with the client. Returns the number of entries removed.
         """
         vises = set(rendezvous_ids)
         avant = len(self.file)
@@ -203,26 +199,26 @@ class Planificateur:
         return avant - len(self.file)
 
     def _verifier_moment(self, hors_plage_permis=False):
-        """La plage d'appel autorisée ET la période interdite — pour TOUT.
+        """The permitted calling window AND the forbidden period — for EVERYTHING.
 
-        Décision du propriétaire (R2) : la période interdite vaut sur les
-        cinq portes, sans dérogation, même pour un geste manuel. Comme
-        toute exécution d'appels passe par verifier_garde_fous, la règle est
-        tenue ici une fois pour toutes plutôt que recopiée porte par porte.
-        Sans réglages fournis (essais isolés), il n'y a rien à vérifier.
+        Owner's decision (R2): the forbidden period applies to all five doors,
+        without exemption, even for a manual gesture. Since all call execution
+        goes through verifier_garde_fous, the rule is held here once and for
+        all rather than copied door by door. With no settings supplied
+        (isolated tests), there is nothing to check.
 
-        `hors_plage_permis` : le geste « forcer malgré l'heure » a été fait
-        (voir assistant.CLE_HORAIRE_FORCE). Il ne lève QUE la plage horaire —
-        jamais la période interdite — et il n'est honoré que si le client
-        d'appels est SIMULÉ. C'est la garantie de fond : elle ne repose pas
-        sur la bonne foi de l'appelant, mais sur l'objet qui compose les
-        numéros. Un client réel refuse de lever quoi que ce soit, même si
-        toutes les couches au-dessus le lui demandent.
+        `hors_plage_permis`: the `force it despite the hour` gesture was made
+        (see assistant.CLE_HORAIRE_FORCE). It lifts ONLY the time window —
+        never the forbidden period — and it is honoured only when the call
+        client is SIMULATED. That is the underlying guarantee: it does not rest
+        on the caller's good faith, but on the object that dials the numbers. A
+        real client refuses to lift anything at all, even when every layer
+        above asks it to.
         """
         if self.preferences is None:
             return
-        # Import local : themes est déjà importé, assistant ne l'est pas
-        # (il importe campagnes, qui importe ce module).
+        # Local import: themes is already imported, assistant is not (it
+        # imports campagnes, which imports this module).
         from . import assistant
         simulation = not getattr(self.client_appels, "est_reel", False)
         message = assistant.dans_periode_interdite(self.preferences)
@@ -245,25 +241,25 @@ class Planificateur:
                 "confirmer_appels_reels() avant tout appel réel.")
 
     def verifier_garde_fous(self, hors_plage_permis=False):
-        """Les MÊMES trois verrous, exposés aux campagnes et aux relances.
+        """The SAME three locks, exposed to campaigns and follow-ups.
 
-        Toute exécution d'appels — file, cascade, campagne, relance due —
-        passe par CETTE vérification : les verrous ne sont jamais dupliqués
-        ni contournés. Lève GardeFou si un appel réel n'est pas permis.
+        Every call execution — queue, cascade, campaign, due follow-up — goes
+        through THIS check: the locks are never duplicated nor bypassed. Raises
+        GardeFou when a real call is not permitted.
 
-        `hors_plage_permis` : voir `_verifier_moment`. Seule la campagne s'en
-        sert, et seulement en simulation.
+        `hors_plage_permis`: see `_verifier_moment`. Only the campaign uses it,
+        and only in simulation.
         """
         self._verifier_garde_fous(hors_plage_permis)
 
     def executer(self, seulement=None, mission=None):
-        """Traite la file ; rend la liste des identifiants d'appels passés.
+        """Works the queue; returns the list of ids of the calls placed.
 
-        Avec seulement=<appel_id>, seul cet appel est traité : les autres
-        restent en file (utilisé par le bouton « Rappeler » individuel).
-        mission : texte facultatif choisi au lancement (thème d'appel) —
-        [client] et [date_rdv] y sont substitués PAR APPEL ; sans mission,
-        chaque client d'appels garde sa consigne standard.
+        With seulement=<appel_id>, only that call is handled: the others stay
+        queued (used by the single `Rappeler` button). mission: optional text
+        chosen at launch (call theme) — [client] and [date_rdv] are substituted
+        PER CALL; with no mission, each call client keeps its standard
+        briefing.
         """
         self._verifier_garde_fous()
         if seulement is None:
@@ -275,27 +271,27 @@ class Planificateur:
             self.file.remove(entree)
             appel_id = entree["appel_id"]
             rdv = self.base.obtenir_rendezvous(entree["rendezvous_id"])
-            if rdv is None:  # client supprimé entre la mise en file et ici
+            if rdv is None:  # client deleted between queueing and here
                 self.base.terminer_appel(
                     appel_id, "annulé", note=db.REFUS_CLIENT_SUPPRIME)
                 journal.info("Appel n°%d abandonné : le rendez-vous n'existe "
                              "plus", appel_id)
                 continue
             refus = self._refus_avant_composition(rdv)
-            if refus:  # FILET DE SÉCURITÉ : le 🚫 relu à l'instant de composer
+            if refus:  # SAFETY NET: the 🚫 read back at the moment of dialling
                 self.base.terminer_appel(appel_id, "annulé", note=refus)
                 journal.info("Appel n°%d NON composé : %s", appel_id, refus)
                 continue
             telephone = self.base.telephone_de(rdv["client_id"])
-            if not telephone:  # import ICS pas encore complété : rien à composer
+            if not telephone:  # ICS import not yet completed: nothing to dial
                 self.base.terminer_appel(appel_id, "échec",
                                          note=db.REFUS_SANS_NUMERO)
                 journal.error("Appel n°%d en échec : aucun numéro pour %s "
                               "(à compléter avant de rappeler)", appel_id, rdv["nom"])
                 continue
-            # LA PLACE PROPOSÉE : une place réellement libre de l'agenda, à
-            # la durée de CE rendez-vous, calculée à l'instant de l'appel.
-            # S'il n'y en a plus aucune, on n'appelle pas — et on le dit.
+            # THE OFFERED SLOT: a genuinely free slot in the calendar, at the
+            # length of THIS appointment, computed at the moment of the call.
+            # When there is none left, we do not call — and we say so.
             support, sans_place = self._support_de_l_appel(rdv)
             if sans_place:
                 self.base.terminer_appel(appel_id, "annulé", note=sans_place)
@@ -307,10 +303,10 @@ class Planificateur:
                 issue = self.client_appels.appeler(rdv["nom"], telephone, support,
                                                    mission=mission_appel)
             except calle_client.ResultatEnAttente as attente:
-                # L'APPEL EST PARTI : il ne doit surtout PAS repartir en file
-                # (le téléphone sonnerait une seconde fois pour une
-                # conversation qui a déjà eu lieu). On garde l'identifiant
-                # CALL-E et on écrit ce qui est vrai : le résultat manque.
+                # THE CALL WENT OUT: it must above all NOT go back into the
+                # queue (the phone would ring a second time for a conversation
+                # that has already taken place). The CALL-E id is kept and what
+                # is true is written: the result is missing.
                 self.base.terminer_appel(appel_id, "en attente",
                                          note=str(attente))
                 self.base.definir_appel_externe(appel_id, attente.identifiant)
@@ -319,11 +315,11 @@ class Planificateur:
                               appel_id, attente.identifiant)
                 raise
             except calle_client.ResultatInvalide as refus:
-                # LA CONVERSATION A EU LIEU et RingBack n'a pas su la lire.
-                # L'appel ne repart PAS en file (le téléphone sonnerait une
-                # seconde fois pour rien) et il n'est pas écrit « échec » :
-                # sa fiche porte la RÉPONSE BRUTE de CALL-E et la
-                # transcription, pour qu'un humain reprenne en une minute.
+                # THE CONVERSATION TOOK PLACE and RingBack could not read it.
+                # The call does NOT go back into the queue (the phone would
+                # ring a second time for nothing) and `échec` is not written:
+                # its record carries CALL-E's RAW ANSWER and the transcript, so
+                # a human can pick it up in a minute.
                 self.base.terminer_appel(
                     appel_id, "réponse illisible",
                     transcription=refus.transcription or None,
@@ -338,11 +334,11 @@ class Planificateur:
                               refus.constat)
                 raise
             except calle_client.EchecDeNotreCote as panne:
-                # Panne DE NOTRE CÔTÉ (clé refusée, service en panne…) :
-                # l'appel n'a pas eu lieu, il REPART EN FILE tel qu'il était
-                # — aucun « échec » ne lui est collé, aucun client n'est mis
-                # en cause — et la fournée s'arrête là : les suivants
-                # échoueraient tous de la même façon.
+                # A failure ON OUR SIDE (key refused, service down…): the call
+                # did not take place, it GOES BACK INTO THE QUEUE as it was —
+                # no `échec` is pinned on it, no client is blamed — and the
+                # batch stops there: the following ones would all fail the same
+                # way.
                 self.file.insert(0, entree)
                 journal.error("File d'appels interrompue au n°%d — %s",
                               appel_id, panne)
@@ -362,21 +358,21 @@ class Planificateur:
         return traites
 
     def _honorer_ne_plus_appeler(self, resultat, client_id, nom, telephone):
-        """Le 🚫 demandé PENDANT l'appel — sur la fiche, tout de suite.
+        """The 🚫 requested DURING the call — on the record, straight away.
 
-        ⚠ LA PROMESSE EST DITE SUR TOUS LES CHEMINS, PAS SEULEMENT EN
-        CAMPAGNE (03/09/2026). La consigne dictée à l'agent contient toujours
-        « c'est noté, vous ne serez plus appelé » ; le champ `do_not_call`
-        est toujours demandé dans le schéma. Mais seul l'assistant le lisait :
-        depuis la file d'appels ou la cascade directe, la personne s'entendait
-        promettre qu'on ne la rappellerait plus, et rien n'était écrit. Elle
-        était rappelée le lendemain. Promettre sans tenir est pire que ne rien
-        promettre — et ce n'est pas qu'une question de courtoisie.
+        ⚠ THE PROMISE IS SPOKEN ON EVERY PATH, NOT ONLY IN CAMPAIGNS
+        (03/09/2026). The briefing dictated to the agent always contains
+        `noted, you will not be called again`; the `do_not_call` field is
+        always requested in the schema. But only the assistant read it: from
+        the call queue or the direct cascade, the person heard the promise that
+        they would not be called again, and nothing was written. They were
+        called again the next day. Promising without keeping is worse than
+        promising nothing — and it is not only a question of courtesy.
 
-        ⚠ SUR LA FICHE DU CLIENT, comme le fait l'assistant : le drapeau vaut
-        pour TOUS les appels à venir, pas seulement pour cette file-là.
+        ⚠ ON THE CLIENT'S RECORD, as the assistant does: the flag applies to
+        ALL future calls, not only to that queue.
 
-        Rend Vrai si le drapeau a été posé.
+        Returns True when the flag was set.
         """
         if not calle_client.ne_plus_appeler_demande(resultat):
             return False
@@ -392,12 +388,12 @@ class Planificateur:
         return True
 
     def _refus_avant_composition(self, rdv):
-        """Le FILET DE SÉCURITÉ, relu à l'instant même de composer.
+        """The SAFETY NET, read back at the very moment of dialling.
 
-        Le 🚫 « Ne plus appeler » peut avoir été posé APRÈS la mise en file :
-        il est donc revérifié ici, sur le numéro ET sur le nom (une fiche
-        dont le numéro vient d'être corrigé reste reconnue par son nom).
-        Rend le message de refus, ou None.
+        The 🚫 `Ne plus appeler` may have been set AFTER queueing: it is
+        therefore re-checked here, on the number AND on the name (a record
+        whose number has just been corrected stays recognised by its name).
+        Returns the refusal message, or None.
         """
         if rdv["ne_plus_appeler"]:
             return db.REFUS_STOP
@@ -406,46 +402,43 @@ class Planificateur:
         return None
 
     def _support_de_l_appel(self, rdv):
-        """Le rendez-vous envoyé à l'agent, enrichi d'une place RÉELLEMENT libre.
+        """The appointment sent to the agent, enriched with a GENUINELY free slot.
 
-        Rend (support, refus). Le support est le rendez-vous manqué lui-même
-        — c'est de CELUI-LÀ qu'on parle au client — augmenté de la place
-        qu'on lui propose en rattrapage. Cette place vient de
-        horaires.places_a_proposer(), la MÊME source que les créneaux
-        annoncés dans les campagnes : elle est libre, à la bonne durée, un
-        jour ouvert, et devant nous. Plus jamais « la date manquée + 7
-        jours », qui pouvait tomber dans le passé.
+        Returns (support, refusal). The support is the missed appointment
+        itself — it is THAT one we talk to the client about — augmented with
+        the slot offered to make up for it. That slot comes from
+        horaires.places_a_proposer(), the SAME source as the slots announced in
+        campaigns: it is free, at the right length, on an open day, and ahead
+        of us. Never again `the missed date + 7 days`, which could land in the
+        past.
 
-        ⚠ ET UNE SECONDE PLACE, pour le cas « la personne en propose une
-        AUTRE » (18/08/2026). Les campagnes la fournissent depuis le
-        16/08/2026 — voir `assistant._support_de_l_appel` — et le commentaire
-        de `calle_client` dit ce qu'elle coûte quand elle manque : « sans elle
-        […] on retombe sur la date tirée au sort, qui n'a aucune chance d'être
-        libre ». La file d'appels, elle, ne la fournissait pas.
+        ⚠ AND A SECOND SLOT, for the case `the person offers ANOTHER one`
+        (18/08/2026). Campaigns have supplied it since 16/08/2026 — see
+        `assistant._support_de_l_appel` — and `calle_client`'s comment says
+        what it costs when it is missing: `without it […] we fall back on a
+        randomly drawn date, which has no chance of being free`. The call queue
+        did not supply it.
 
-        CE QUE ÇA DONNAIT, mesuré le 18/08/2026 : sur un rendez-vous manqué le
-        19/07, l'autre date convenue tombait le 21/07 — un mois dans le passé.
-        Le rendez-vous n'était pas déplacé, il était perdu. Deux chemins vers
-        le même téléphone, un seul qui proposait des dates réelles.
+        WHAT THAT PRODUCED, measured on 18/08/2026: on an appointment missed on
+        19/07, the other agreed date fell on 21/07 — a month in the past. The
+        appointment was not moved, it was lost. Two paths to the same phone,
+        only one offering real dates.
 
-        Trois cas où l'on ne prétend rien :
-        - sans réglages (essais isolés), le support part tel quel et
-          l'ancienne convention de rattrapage s'applique ;
-        - plus AUCUNE place libre : refus explicite, aucun appel ;
-        - une seule place libre : pas de seconde à offrir, et c'est honnête —
-          on n'en invente pas.
+        Three cases where nothing is claimed:
+        - with no settings (isolated tests), the support goes out as it is and the old make-up convention applies;
+        - NO free slot left: explicit refusal, no call;
+        - only one free slot: no second one to offer, and that is honest — none is invented.
         """
         if self.preferences is None:
             return rdv, None
         tranches = horaires.duree_tranches(rdv)
-        # ⚠ LA PREMIÈRE PLACE GARDE SON CALCUL, ET C'EST VOLONTAIRE.
-        # `places_a_proposer` porte ses propres replis — notamment le cas « aucun
-        # horaire d'ouverture réglé », où il n'y a pas de semaine type à
-        # parcourir et où la place se cherche autrement. Ma première version
-        # l'avait remplacé par le calcul des places libres : huit essais sont
-        # tombés d'un coup, tous sur des bases sans semaine type — plus aucun
-        # appel ne partait. On AJOUTE la seconde place, on ne refait pas la
-        # première.
+        # ⚠ THE FIRST SLOT KEEPS ITS OWN COMPUTATION, AND THAT IS DELIBERATE.
+        # `places_a_proposer` carries its own fallbacks — notably the `no
+        # opening hours configured` case, where there is no typical week to
+        # walk and the slot is found another way. My first version replaced it
+        # with the free-slot computation: eight tests fell at once, all on
+        # databases with no typical week — no call went out any more. The
+        # second slot is ADDED, the first one is not redone.
         _, place = horaires.places_a_proposer(
             self.base, self.preferences, tranches=tranches)
         if not place:
@@ -461,10 +454,10 @@ class Planificateur:
 
     def _refus_date_convenue(self, horaire, tranches=1, sauf_rdv=None,
                              place_choisie=False):
-        """Le refus d'écrire une date convenue au téléphone, ou None.
+        """The refusal to write a date agreed on the phone, or None.
 
-        Sans réglages fournis au planificateur, aucune vérification n'est
-        possible : on ne refuse alors rien (et on ne prétend pas vérifier).
+        With no settings supplied to the planner, no check is possible: nothing
+        is then refused (and no check is claimed).
         """
         if self.preferences is None:
             return None
@@ -473,51 +466,49 @@ class Planificateur:
             sauf_rdv=sauf_rdv, place_choisie=place_choisie)
 
     def _appliquer_issue(self, rdv, resultat):
-        """Répercute l'issue de l'appel sur le rendez-vous ; rend une NOTE ou None.
+        """Applies the call's outcome to the appointment; returns a NOTE or None.
 
-        ⚠ UNE DATE CONVENUE AU TÉLÉPHONE DÉPLACE LA LIGNE ; elle n'en crée
-        JAMAIS une seconde. C'est vrai des deux façons d'accepter — prendre le
-        créneau proposé (« confirmed ») ou convenir d'une autre date
-        (« rescheduled ») : pour la personne appelée c'est le même événement,
-        et l'écran écrit « ✅ accepté » dans les deux cas.
+        ⚠ A DATE AGREED ON THE PHONE MOVES THE ROW; it NEVER creates a second
+        one. That is true of both ways of accepting — taking the offered slot
+        (`confirmed`) or agreeing another date (`rescheduled`): for the person
+        called it is the same event, and the screen writes `✅ accepté` in both
+        cases.
 
-        ⚠ CE N'ÉTAIT PAS LE CAS, ET C'EST SON CONSTAT DU 17/08/2026 : « le
-        premier rendez-vous n'a pas été annulé, mais on l'a bien ajouté pour le
-        lendemain ». « rescheduled » marquait l'ancienne ligne « déplacé » et
-        en créait une SECONDE à la date convenue. Mesuré sur sa journée du
-        18/08 : quatre lignes se déplaçaient proprement, deux restaient sur la
-        journée — elle ne se vidait qu'à moitié dans ses archives et sur les
-        fiches de ses clients.
+        ⚠ THAT WAS NOT THE CASE, AND IT IS HIS OBSERVATION OF 17/08/2026: `the
+        first appointment was not cancelled, but we did indeed add it for the
+        next day`. `rescheduled` marked the old row `déplacé` and created a
+        SECOND one at the agreed date. Measured over his 18/08 day: four rows
+        moved cleanly, two stayed on the day — it only half emptied in his
+        archives and on his clients' records.
 
-        La décision était pourtant déjà prise, par lui, le 14/08/2026 : « tu
-        déplaces un rendez-vous d'une date à une autre, c'est ultra simple ».
-        Elle avait été écrite dans `assistant._rendre_la_place` et dans
-        `assistant._deplacer_le_rendezvous` — pas ici. Trois chemins pour une
-        règle, deux qui l'appliquaient.
+        The decision had in fact already been taken, by him, on 14/08/2026:
+        `you move an appointment from one date to another, it's dead simple`.
+        It had been written into `assistant._rendre_la_place` and into
+        `assistant._deplacer_le_rendezvous` — not here. Three paths for one
+        rule, two that applied it.
 
-        ⚠ ET « déplacé » VOULAIT DÉJÀ DIRE AUTRE CHOSE PARTOUT AILLEURS : une
-        personne dont le rendez-vous a bougé SANS nouvelle date, donc qui
-        ATTEND (voir `db.STATUTS_A_RECASER`, `jeu_essai` — « déplacés SANS
-        nouvelle date » — et `etats_clients`, qui en déduit « déplacement en
-        attente : lui trouver la nouvelle date »). Écrire « déplacé » sur
-        quelqu'un qui VIENT d'obtenir une date, c'était le ranger parmi ceux à
-        qui il faut en trouver une. Un seul garde-fou l'empêchait d'être
-        rappelé — le `NOT EXISTS` de `rendezvous_a_recaser` —, et un garde-fou
-        n'est pas une règle.
+        ⚠ AND `déplacé` ALREADY MEANT SOMETHING ELSE EVERYWHERE ELSE: a person
+        whose appointment has moved WITHOUT a new date, and who is therefore
+        WAITING (see `db.STATUTS_A_RECASER`, `jeu_essai` — `moved WITH no new
+        date` — and `etats_clients`, which deduces `pending move: find them the
+        new date`). Writing `déplacé` on somebody who has JUST obtained a date
+        meant filing them among those who need one found. Only one guard
+        stopped them being called again — the `NOT EXISTS` of
+        `rendezvous_a_recaser` — and a guard is not a rule.
 
-        L'histoire ne se perd pas : le cahier des changements porte UNE ligne ↔
-        avec les deux dates, et c'est LUI le livrable de la campagne. Une ligne
-        fantôme dans l'agenda n'était pas une mémoire, c'était un doublon.
+        The history is not lost: the change log carries ONE ↔ row with both
+        dates, and IT is the campaign's deliverable. A ghost row in the
+        calendar was not a memory, it was a duplicate.
 
-        « to_reschedule » (déplacement voulu mais NON conclu) ne change RIEN au
-        rendez-vous : rien n'a été convenu — c'est le rôle d'une relance de
-        conclure. C'est désormais le seul cas où la personne attend vraiment.
+        `to_reschedule` (a move wanted but NOT concluded) changes NOTHING about
+        the appointment: nothing was agreed — concluding is a follow-up's job.
+        That is now the only case where the person really is waiting.
 
-        Toute date convenue AU TÉLÉPHONE est vérifiée comme une saisie à la
-        main : jour fermé, horaires d'ouverture, place déjà prise, durée qui
-        ne tient pas. Si elle ne tient pas, RIEN n'est écrit et la raison est
-        rendue en clair (elle devient la note de l'appel) — le planning ne
-        devient jamais faux, et l'accord obtenu n'est pas perdu pour autant.
+        Every date agreed ON THE PHONE is checked like typed input: closed day,
+        opening hours, slot already taken, length that does not fit. When it
+        does not fit, NOTHING is written and the reason is returned in clear
+        (it becomes the call's note) — the schedule never becomes wrong, and
+        the agreement obtained is not lost for all that.
         """
         statut = resultat["appointment_status"]
         tranches = horaires.duree_tranches(rdv)
@@ -527,8 +518,8 @@ class Planificateur:
             journal.info("Rendez-vous n°%d : déplacement voulu mais non conclu "
                          "— rendez-vous inchangé, à relancer", rdv["id"])
         else:
-            # confirmed | rescheduled : une date A ÉTÉ convenue. La MÊME ligne
-            # change d'heure et passe « confirmé » — la personne a dit oui.
+            # confirmed | rescheduled: a date HAS been agreed. The SAME row
+            # changes time and becomes `confirmé` — the person said yes.
             refus = self._refus_date_convenue(resultat["new_datetime"],
                                               tranches, sauf_rdv=rdv["id"])
             if refus:
@@ -543,26 +534,28 @@ class Planificateur:
 
     @staticmethod
     def _note_date_refusee(rdv, resultat, refus):
-        """La note d'un rendez-vous NON écrit : la raison + la date demandée
-        EN CLAIR (rien de ce qui a été obtenu au téléphone n'est perdu)."""
+        """The note of an appointment NOT written: the reason + the requested date
+        IN CLEAR (nothing obtained on the phone is lost).
+        """
         journal.info("Rendez-vous n°%d : date convenue refusée (%s)",
                      rdv["id"], resultat.get("new_datetime"))
         return horaires.note_date_refusee(refus, resultat.get("new_datetime"))
 
     def appliquer_issue(self, rdv, resultat):
-        """L'application d'issue, exposée aux campagnes (même logique, un seul
-        code). Rend la NOTE si la date convenue a été refusée, sinon None."""
+        """The outcome application, exposed to campaigns (same logic, a single
+        piece of code). Returns the NOTE when the agreed date was refused,
+        otherwise None.
+        """
         return self._appliquer_issue(rdv, resultat)
 
     def _liberer_ancien_de_cascade(self, nom, telephone, pourquoi,
                                    maintenant=None):
-        """L'ancien rendez-vous du contact, libéré si on sait lequel.
+        """The contact's old appointment, released when we know which one it is.
 
-        Rend (rendezvous_libere_id, note). La note est le texte lisible à
-        poser sur la ligne de cascade : soit ce qui a été libéré, soit
-        pourquoi RingBack n'a rien touché. (None, None) quand il n'y a
-        simplement rien à dire. Voir le commentaire de NOTE_ANCIEN_AMBIGU
-        pour la règle et sa limite.
+        Returns (rendezvous_libere_id, note). The note is the readable text to
+        put on the cascade row: either what was released, or why RingBack
+        touched nothing. (None, None) when there is simply nothing to say. See
+        the comment on NOTE_ANCIEN_AMBIGU for the rule and its limit.
         """
         client_id = self.base.client_connu(nom, telephone)
         if client_id is None:
@@ -588,22 +581,14 @@ class Planificateur:
 
     # ----------------------------------------------------------------- cascade
     def executer_cascade(self, personnes, mission, creneau):
-        """Cascade « premier oui » : un appel à la fois, DANS L'ORDRE.
+        """`First yes` cascade: one call at a time, IN ORDER.
 
-        personnes : liste [{"nom", "telephone"}] déjà validée (saisie.
-        analyser_liste_cascade) ; mission : texte lu par l'agent ([créneau]
-        y est remplacé par la date) ; creneau : ISO 8601. Déroulé :
-        - « accepted » -> ARRÊT : rendez-vous créé (confirmé) au créneau
-          pour cette personne, les suivantes sont ÉPARGNÉES (jamais appelées) ;
-        - « moved »    -> rendez-vous créé (prévu) à la date demandée, mais
-          le créneau reste libre : la cascade CONTINUE ;
-        - « refused », pas de réponse, échec technique -> personne suivante ;
-        - liste épuisée sans oui -> cascade close « épuisée », bilan honnête.
-        Une personne dont le numéro appartient à un client marqué « Ne plus
-        appeler » n'est JAMAIS composée : elle est tracée « exclue », même
-        collée à la main. Les MÊMES garde-fous que la file classique
-        s'appliquent AVANT tout appel réel. Rend l'identifiant de la
-        cascade (tout est en base).
+        personnes: a list [{"nom", "telephone"}] already validated (saisie.analyser_liste_cascade); mission: text read by the agent ([créneau] is replaced in it by the date); creneau: ISO 8601. Sequence:
+        - `accepted` -> STOP: appointment created (confirmed) at the slot for that person, the following ones are SPARED (never called);
+        - `moved`    -> appointment created (scheduled) at the requested date, but the slot stays free: the cascade CONTINUES;
+        - `refused`, no answer, technical failure -> next person;
+        - list exhausted with no yes -> cascade closed as `épuisée`, honest report.
+        A person whose number belongs to a client marked `Ne plus appeler` is NEVER dialled: they are recorded as `exclue`, even when pasted by hand. The SAME guards as the classic queue apply BEFORE any real call. Returns the cascade's id (everything is in the database).
         """
         self._verifier_garde_fous()
         mission_lue = _mission_effective(mission, creneau)
@@ -611,22 +596,23 @@ class Planificateur:
         rendezvous_attribue = None
         for rang, personne in enumerate(personnes, start=1):
             nom, telephone = personne["nom"], personne["telephone"]
-            # FILET DE SÉCURITÉ : le numéro OU le nom d'un client 🚫 suffit
-            # à écarter la ligne, même collée à la main.
+            # SAFETY NET: the number OR the name of a 🚫 client is enough to set
+            # the row aside, even one pasted by hand.
             if self.base.telephone_exclu(telephone) or self.base.nom_exclu(nom):
                 journal.info("Cascade n°%d, rang %d : client « Ne plus "
                              "appeler », jamais composé", cascade_id, rang)
-                # ⚠ LA RAISON EST ÉCRITE, pas seulement l'état. La cascade se
-                # rejoue ensuite en campagne (`campagnes._rejouer_la_cascade`),
-                # et c'est cette note qui lui dit que la personne doit partir
-                # vers un HUMAIN plutôt que disparaître (voir db.suite_du_refus).
+                # ⚠ THE REASON IS WRITTEN, not only the state. The cascade is
+                # later replayed as a campaign
+                # (`campagnes._rejouer_la_cascade`), and it is this note that
+                # tells it the person must go to a HUMAN rather than disappear
+                # (see db.suite_du_refus).
                 self.base.ajouter_appel_cascade(
                     cascade_id, rang, nom, telephone, etat="exclu",
                     note=(db.REFUS_STOP
                           if self.base.telephone_exclu(telephone)
                           else db.REFUS_STOP_NOM))
                 continue
-            if rendezvous_attribue is not None:  # créneau déjà pris : on épargne
+            if rendezvous_attribue is not None:  # slot already taken: we spare them
                 self.base.ajouter_appel_cascade(
                     cascade_id, rang, nom, telephone, etat="épargné")
                 continue
@@ -639,10 +625,9 @@ class Planificateur:
                     cascade_id, rang, nom, telephone, etat="appelé", issue="no_answer")
                 continue
             except calle_client.ResultatEnAttente as attente:
-                # L'appel EST parti : sa ligne est écrite (avec l'identifiant
-                # CALL-E dans la note, pour qu'il ne soit pas perdu) et la
-                # cascade s'arrête. Personne n'est déclaré « pas de réponse »
-                # alors que son téléphone a sonné.
+                # The call WENT OUT: its row is written (with the CALL-E id in
+                # the note, so it is not lost) and the cascade stops. Nobody is
+                # declared `no answer` when their phone rang.
                 self.base.ajouter_appel_cascade(
                     cascade_id, rang, nom, telephone, etat="appelé",
                     issue="en_attente", note=str(attente))
@@ -652,10 +637,10 @@ class Planificateur:
                               "n° %s)", cascade_id, rang, attente.identifiant)
                 raise
             except calle_client.ResultatInvalide as refus:
-                # La conversation a eu lieu ; nous ne savons pas la lire. La
-                # ligne est écrite avec la transcription et la réponse BRUTE
-                # — jamais « pas de réponse », qui accuserait la personne —
-                # et la cascade s'arrête là.
+                # The conversation took place; we cannot read it. The row is
+                # written with the transcript and the RAW answer — never `no
+                # answer`, which would blame the person — and the cascade stops
+                # there.
                 self.base.ajouter_appel_cascade(
                     cascade_id, rang, nom, telephone, etat="appelé",
                     issue="reponse_illisible",
@@ -669,11 +654,11 @@ class Planificateur:
                               cascade_id, rang, refus.constat)
                 raise
             except calle_client.EchecDeNotreCote as panne:
-                # Panne DE NOTRE CÔTÉ : la cascade s'arrête NET. Aucune ligne
-                # n'est écrite pour cette personne (son téléphone n'a pas
-                # sonné), la cascade est close « interrompue » — jamais
-                # « épuisée », qui ferait croire que la liste a été essayée —
-                # et l'appelant reçoit le message pour l'afficher.
+                # A failure ON OUR SIDE: the cascade stops DEAD. No row is
+                # written for that person (their phone did not ring), the
+                # cascade is closed as `interrompue` — never `épuisée`, which
+                # would suggest the list had been tried — and the caller
+                # receives the message to display.
                 self.base.cloturer_cascade(cascade_id, "interrompue")
                 journal.error("Cascade n°%d interrompue au rang %d — %s",
                               cascade_id, rang, panne)
@@ -688,13 +673,13 @@ class Planificateur:
             self._honorer_ne_plus_appeler(issue.resultat, None, nom, telephone)
             libere_id, note_libere = None, None
             if outcome == "accepted":
-                # Créneau CHOISI par l'utilisateur : jugé sur le jour fermé
-                # et sur le double emploi, pas sur les horaires d'ouverture.
+                # Slot CHOSEN by the user: judged on the closed day and on
+                # double booking, not on the opening hours.
                 refus = self._refus_date_convenue(creneau, place_choisie=True)
                 if refus:
-                    # Le créneau proposé n'est plus tenable (pris entre-temps,
-                    # jour devenu fermé) : rien n'est écrit, la cascade
-                    # continue et la raison reste lisible sur la ligne.
+                    # The offered slot no longer holds (taken in the meantime,
+                    # day now closed): nothing is written, the cascade
+                    # continues and the reason stays readable on the row.
                     journal.info("Cascade n°%d, rang %d : créneau refusé (%s)",
                                  cascade_id, rang, refus)
                     self.base.ajouter_appel_cascade(
@@ -702,9 +687,9 @@ class Planificateur:
                         issue=ISSUE_DATE_REFUSEE, resultat=issue.resultat,
                         transcription=issue.transcription, note=refus)
                     continue
-                # L'ancien rendez-vous est cherché AVANT d'écrire le nouveau :
-                # sinon le nouveau se compterait lui-même parmi les
-                # « rendez-vous à venir » du client.
+                # The old appointment is looked for BEFORE the new one is
+                # written: otherwise the new one would count itself among the
+                # client's `upcoming appointments`.
                 libere_id, note_libere = self._liberer_ancien_de_cascade(
                     nom, telephone, "le client a pris le créneau libéré")
                 client_id = self.base.client_pour_contact(nom, telephone)
@@ -723,18 +708,17 @@ class Planificateur:
                         issue=ISSUE_DATE_REFUSEE, resultat=issue.resultat,
                         transcription=issue.transcription, note=refus)
                     continue
-                # MÊME RÈGLE QUE « accepted » (Q7) : une autre date convenue
-                # doit rendre l'ancienne place, sans quoi le client aurait
-                # deux rendez-vous. Cherché AVANT d'écrire le nouveau.
+                # SAME RULE AS `accepted` (Q7): another agreed date must give
+                # the old slot back, without which the client would have two
+                # appointments. Looked for BEFORE the new one is written.
                 libere_id, note_libere = self._liberer_ancien_de_cascade(
                     nom, telephone, "le client a convenu d'une autre date")
                 client_id = self.base.client_pour_contact(nom, telephone)
-                # ⚠ « confirmé », COMME « accepted » JUSTE AU-DESSUS
-                # (17/08/2026). Les deux façons de dire oui écrivaient deux
-                # états : « confirmé » quand la personne prenait le créneau
-                # offert, « prévu » quand elle convenait d'une autre date. Même
-                # oui, deux pastilles de couleurs différentes au planning, et
-                # deux phrases différentes sur sa fiche.
+                # ⚠ `confirmé`, LIKE `accepted` JUST ABOVE (17/08/2026). The
+                # two ways of saying yes wrote two states: `confirmé` when the
+                # person took the offered slot, `prévu` when they agreed
+                # another date. The same yes, two differently coloured badges
+                # on the schedule, and two different sentences on their record.
                 autre = self.base.ajouter_rendezvous(
                     client_id, issue.resultat["new_datetime"], MOTIF_AUTRE_DATE,
                     statut="confirmé")

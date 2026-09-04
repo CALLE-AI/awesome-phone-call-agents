@@ -1,47 +1,27 @@
-"""Banc d'essai de bout en bout — RingBack, en SIMULATION uniquement.
+"""End-to-end test bench — RingBack, in SIMULATION only.
 
-À quoi ça sert
+What it is for
 -------------
-La suite de tests (test.cmd) est le filet quotidien : elle vérifie des cas
-CHOISIS. Ce banc-ci fait autre chose : il PARCOURT une matrice au lieu d'en
-échantillonner quelques cases. Trois axes :
+The test suite (test.cmd) is the daily net: it checks CHOSEN cases. This bench does something else: it WALKS a matrix instead of sampling a few of its cells. Three axes:
 
-1. les huit NATURES de campagne (assistant.NATURES) ;
-2. les POINTS DE DÉPART : le parcours en 3 étapes lui-même, les cinq voies
-   de remplissage « depuis la base », les six reprises d'une campagne
-   précédente filtrées par état, le collage, le CSV, l'agenda ICS, la file
-   d'appels et la cascade directe ;
-3. les ISSUES déterministes du simulateur (terminaisons 51 à 56) plus les
-   quatre cas de bord : contact 🚫, contact sans numéro, doublon, fiche
-   client supprimée en cours de route.
+1. the eight campaign KINDS (assistant.NATURES);
+2. the STARTING POINTS: the 3-step journey itself, the five `from the database` filling routes, the six resumptions of a previous campaign filtered by state, pasting, CSV, the ICS calendar, the call queue and the direct cascade;
+3. the simulator's deterministic OUTCOMES (endings 51 to 56) plus the four edge cases: a 🚫 contact, a contact with no number, a duplicate, a client record deleted along the way.
 
-Pour chaque case parcourue, le banc contrôle DEUX choses : ce qui est écrit
-en base (statut du rendez-vous, création, annulation, créneau libéré, état
-du contact, relance programmée) ET ce qui devient visible à l'écran (poste
-de pilotage, planning, 👥 Clients, 🔁 Relances).
+For every cell walked, the bench checks TWO things: what is written to the
+database (appointment status, creation, cancellation, freed slot, contact
+state, follow-up scheduled) AND what becomes visible on screen (control desk,
+schedule, 👥 Clients, 🔁 Relances).
 
-Les cinq règles tenues ici
+The five rules held here
 --------------------------
-1. SIMULATION EXCLUSIVE. Le banc ne peut PAS déclencher un appel réel :
-   il retire CALLE_API_KEY de son propre processus, construit l'application
-   avec appels_reels=False, et vérifie ces verrous comme des cas à part
-   entière (section « Les verrous »). Le journal d'audit des appels réels
-   est relevé avant et après : une seule ligne de plus serait un échec.
-2. JAMAIS LA BASE RÉELLE. Le banc travaille sur une base JETABLE créée dans
-   un dossier temporaire, détruite à la fin. Il REFUSE de démarrer si on lui
-   désigne la base réelle (ou n'importe quel fichier du dossier donnees/).
-3. PORT 8779, libéré proprement même en cas d'échec au milieu (le serveur du
-   produit vit sur 8770 ; 8771 à 8778 sont laissés libres).
-4. JAMAIS DE FAUX RÉSULTAT. Une case non parcourue s'affiche « ⬜ non
-   couvert », jamais « ✅ ». Ce qui ne peut pas être vérifié sans souris est
-   listé à part, sous « à vérifier à la main ».
-5. REPRODUCTIBLE. Deux exécutions de suite rendent un rapport IDENTIQUE.
-   Le rapport ne porte que la DATE DU JOUR (pas l'heure), et la seule date
-   relative utilisée est calculée explicitement : aujourd'hui à 12 h 00
-   (constante REFERENCE ci-dessous), ce qui fixe tout le jeu d'essai.
+1. SIMULATION ONLY. The bench CANNOT trigger a real call: it removes CALLE_API_KEY from its own process, builds the application with appels_reels=False, and checks those locks as cases in their own right (the `Les verrous` section). The real-call audit log is read before and after: a single extra row would be a failure.
+2. NEVER THE REAL DATABASE. The bench works on a THROWAWAY database created in a temporary directory, destroyed at the end. It REFUSES to start when pointed at the real database (or at any file in the donnees/ directory).
+3. PORT 8779, released cleanly even on a failure halfway through (the product's server lives on 8770; 8771 to 8778 are left free).
+4. NEVER A FALSE RESULT. A cell not walked shows as `⬜ non couvert`, never `✅`. What cannot be checked without a mouse is listed separately, under `à vérifier à la main`.
+5. REPRODUCIBLE. Two runs in a row give an IDENTICAL report. The report carries only THE DAY'S DATE (not the time), and the only relative date used is computed explicitly: today at 12:00 (the REFERENCE constant below), which fixes the whole sample data set.
 
-Lancement : banc-essai.cmd (ou « python banc_essai.py »).
-Bibliothèque standard uniquement.
+Launch: banc-essai.cmd (or `python banc_essai.py`). Standard library only.
 """
 
 import argparse
@@ -65,10 +45,10 @@ if RACINE_APP not in sys.path:
     sys.path.insert(0, RACINE_APP)
 
 # ---------------------------------------------------------------------------
-# VERROU 1 (avant TOUT import de ringback) : la clé des appels réels est
-# retirée de ce processus. Même une erreur de programmation dans ce fichier
-# ne pourrait plus construire un client d'appels réels : AppelReel refuse de
-# se construire sans clé. Le retrait ne touche QUE ce processus.
+# LOCK 1 (before ANY import of ringback): the real-call key is removed from
+# this process. Even a programming mistake in this file could no longer build a
+# real call client: AppelReel refuses to construct itself without a key. The
+# removal touches ONLY this process.
 # ---------------------------------------------------------------------------
 CLE_RETIREE = os.environ.pop("CALLE_API_KEY", None)
 
@@ -81,39 +61,39 @@ PORTS_RESERVES_PRODUIT = tuple(range(8770, 8779))
 BASE_REELLE = os.path.join(RACINE_APP, "donnees", "ringback.db")
 DOSSIER_DONNEES = os.path.join(RACINE_APP, "donnees")
 
-# La seule date relative du banc, calculée UNE fois et dite en clair dans le
-# rapport : aujourd'hui à 12 h 00. Tout le jeu d'essai en découle (ses
-# rendez-vous sont décrits en « jours depuis maintenant »).
+# The bench's only relative date, computed ONCE and stated plainly in the
+# report: today at 12:00. The whole sample data set follows from it (its
+# appointments are described in `days from now`).
 REFERENCE = datetime.datetime.combine(datetime.date.today(),
                                       datetime.time(12, 0))
 
 
 def _iso(jours, heure, minute=0):
-    """Un horaire ISO 8601 à la minute, à N jours de la date de référence."""
+    """An ISO 8601 time to the minute, N days from the reference date."""
     return (REFERENCE + datetime.timedelta(days=jours)).replace(
         hour=heure, minute=minute).isoformat(timespec="minutes")
 
 
-# Ce que `Banc.demarrer` ouvre : du lundi au vendredi. Écrit ici parce que les
-# scénarios en ont besoin AVANT que le serveur existe.
+# What `Banc.demarrer` opens: Monday to Friday. Written here because the
+# scenarios need it BEFORE the server exists.
 JOURS_OUVRES_BANC = (0, 1, 2, 3, 4)
 
 
 def _jour_ouvre(jours, *aussi):
-    """Décale `jours` jusqu'à ce que ce jour — ET ceux de `aussi` — soient ouverts.
+    """Shifts `jours` until that day — AND those in `aussi` — are open.
 
-    ⚠ CE BANC TOURNE UN JOUR DIFFÉRENT CHAQUE JOUR (14/08/2026). Ses dates
-    partent d'« aujourd'hui à 12 h » : un décalage de dix jours tombe donc sur
-    un jour de semaine différent selon la date, et rien ne garantissait qu'il
-    fût OUVERT. Mesuré un vendredi : le report simulé (toujours la place + deux
-    jours, voir calle_client._date_deplacee) tombait un DIMANCHE, le produit
-    refusait à juste titre de poser le rendez-vous — et le contrôle « l'ancien
-    rendez-vous ne tient plus » échouait, sans que rien n'ait bougé dans le
-    produit. Le même piège avait déjà été rencontré sur les HEURES (voir
-    `demarrer`, 8 h – 19 h) ; il restait entier sur les JOURS.
+    ⚠ THIS BENCH RUNS ON A DIFFERENT DAY EVERY DAY (14/08/2026). Its dates
+    start from `today at noon`: a ten-day shift therefore lands on a different
+    weekday depending on the date, and nothing guaranteed it would be OPEN.
+    Measured on a Friday: the simulated postponement (always the slot + two
+    days, see calle_client._date_deplacee) fell on a SUNDAY, the product
+    rightly refused to place the appointment — and the check `the old
+    appointment no longer holds` failed, without anything having moved in the
+    product. The same trap had already been met on the HOURS (see `demarrer`,
+    8am – 7pm); it was still intact on the DAYS.
 
-    `aussi` : les décalages supplémentaires qui doivent tomber ouverts eux
-    aussi — « 2 » pour un cas qui finit par un report.
+    `aussi`: the additional shifts that must fall on open days too — `2` for a
+    case that ends with a postponement.
     """
     while True:
         vises = (0,) + aussi
@@ -123,7 +103,7 @@ def _jour_ouvre(jours, *aussi):
         jours += 1
 
 
-# --------------------------------------------------------------- les axes
+# --------------------------------------------------------------- the axes
 NATURES_ORDRE = list(assistant.NATURES)
 
 ISSUES = (
@@ -140,9 +120,9 @@ ISSUES = (
 )
 CODES_ISSUES = [code for code, _ in ISSUES]
 
-# Le code « construction » n'est pas une issue d'appel : il porte les
-# contrôles de CONSTRUCTION (⚠ bloquants, grille remplie, campagne prête
-# qui n'appelle personne). Il a sa propre colonne dans le tableau B.
+# The `construction` code is not a call outcome: it carries the CONSTRUCTION
+# checks (⛔ blocking, grid filled, a ready campaign that calls nobody). It has
+# its own column in table B.
 CONSTRUCTION = "construction"
 
 DEPARTS = (
@@ -163,16 +143,16 @@ DEPARTS = (
     ("campagne_tous", "Étape 3 — reprise : tous les contacts"),
     ("file", "La file d'appels (tout rappeler, puis exécuter)"),
     ("cascade", "La cascade directe (page Cascade « premier oui »)"),
-    # ⚠ À NE PAS CONFONDRE avec la ligne au-dessus : celle-ci est l'OPTION
-    # « décaler en cascade » d'une campagne de créneau libéré, pas la page
-    # Cascade. Cette confusion de vocabulaire a caché pendant trois jours le
-    # fait que le banc ne contrôlait PAS l'option (15/08/2026).
+    # ⚠ NOT TO BE CONFUSED with the line above: this one is the `shift in
+    # cascade` OPTION of a freed-slot campaign, not the Cascade page. This
+    # confusion of vocabulary hid for three days the fact that the bench did
+    # NOT check the option (15/08/2026).
     ("cascade_option", "L'option « décaler en cascade » (son parcours entier)"),
-    # SON TEST du 17/08/2026, devenu un filet : déplacer les rendez-vous d'une
-    # JOURNÉE ENTIÈRE, et vérifier que tout le monde est traité.
+    # HIS TEST of 17/08/2026, turned into a net: move a WHOLE DAY's
+    # appointments, and check that everybody is handled.
     ("journee_entiere", "Déplacer une JOURNÉE entière (son parcours entier)"),
-    # LES DEUX PORTES du §1 (R15 fermée le 01/08/2026) : on ne part plus
-    # d'un formulaire, on part de ce qui MANQUE.
+    # THE TWO DOORS of §1 (R15 closed on 01/08/2026): we no longer start from a
+    # form, we start from what is MISSING.
     ("etat_client", "👥 Clients — un état à traiter (§4)"),
     ("planning", "📅 Le planning — un trou, ou un rendez-vous (§5)"),
 )
@@ -188,8 +168,8 @@ ETAT_DU_DEPART = {"campagne_injoignable": "injoignable",
                   "campagne_recontacter": "à recontacter",
                   "campagne_tous": "tous"}
 
-# Cases SANS OBJET : la combinaison n'existe pas dans le produit, ce n'est
-# donc pas un trou de couverture. Dites en français dans le rapport.
+# MEANINGLESS cells: the combination does not exist in the product, so it is
+# not a coverage gap. Stated in French in the report.
 SANS_OBJET_DEPART_NATURE = {
     "file": "La file d'appels ne demande pas de nature : elle rappelle les "
             "rendez-vous manqués et fabrique sa campagne « manqués ».",
@@ -211,8 +191,8 @@ SANS_OBJET_DEPART_NATURE = {
                 "(§5) : ce geste-là n'est pas construit.",
 }
 
-# Les natures RÉELLEMENT atteignables depuis un point de départ qui n'en
-# propose pas huit. Absent de cette table = les huit sont possibles.
+# The kinds ACTUALLY reachable from a starting point that does not offer all
+# eight. Absent from this table = all eight are possible.
 NATURES_DU_DEPART = {
     "file": (),
     "cascade": ("creneau_libere",),
@@ -241,7 +221,7 @@ SANS_OBJET_ISSUE_DEPART = {
                                 "validateur de numéro.",
 }
 
-# Ce que le simulateur fait, dit en français dans le rapport.
+# What the simulator does, stated in French in the report.
 EXPLICATION_ISSUES = {
     "51": "le client accepte",
     "52": "le client refuse, ou annule sans qu'aucune date soit replacée "
@@ -252,30 +232,26 @@ EXPLICATION_ISSUES = {
     "56": "personne ne décroche, puis le client dit oui à la relance",
 }
 
-# État attendu du contact pour chaque issue — la table de vérité du produit.
-# « 52 » sur un appel classique vaut ANNULATION (le simulateur rend
-# « canceled ») : depuis la règle du propriétaire du 31/07/2026, une
-# annulation qui n'a rien replacé donne « le client rappellera ». En
-# CASCADE, le même numéro rend « refused » — un refus du créneau proposé,
-# pas une annulation : le contact y reste « refusé ».
-#
-# « 55 » EN CASCADE valait « refusé » jusqu'au 02/08/2026, faute d'issue pour
-# le dire autrement : la cascade n'avait pas « to_reschedule », et le
-# simulateur rabattait « veut autre chose sans rien conclure » sur un refus.
-# Ce n'était pas la même chose, et le 8ᵉ essai réel l'a montré — la personne
-# demandait qu'on lui répète la date. La cascade a maintenant sa 4ᵉ issue, et
-# ce cas donne le MÊME état qu'ailleurs : « à rappeler par un humain ».
-#
-# ⚠ ET « 55 » NE DONNE PLUS LE MÊME ÉTAT PARTOUT (11/08/2026). Décision du
-# propriétaire : le rappel par un humain n'existe que sur « déplacement de
-# rendez-vous » et « prise de rendez-vous » — les deux natures où il reste une
-# DATE À TROUVER, donc un vrai travail pour un humain. Ailleurs :
-#   · créneau libéré → « refusé » (la place part à quelqu'un d'autre), et son
-#     rendez-vous est conservé, passé en « confirmé » ;
-#   · rappel, confirmation → « le client rappellera » : rien n'attend de notre
-#     côté, le rendez-vous dont on parle est le sien.
-# Le banc LIT la règle dans le produit (assistant.NATURES_RAPPEL_HUMAIN) plutôt
-# que de la recopier : une règle écrite deux fois finit par se contredire.
+# The expected contact state for each outcome — the product's truth table. `52`
+# on a classic call means CANCELLATION (the simulator returns `canceled`):
+# since the owner's rule of 31/07/2026, a cancellation that rebooked nothing
+# gives `le client rappellera`. In CASCADE, the same number returns `refused` —
+# a refusal of the slot offered, not a cancellation: the contact stays `refusé`
+# there.  `55` IN CASCADE meant `refusé` until 02/08/2026, for want of an
+# outcome to say it otherwise: the cascade had no `to_reschedule`, and the
+# simulator folded `wants something else without concluding anything` into a
+# refusal. It was not the same thing, and the 8th real test showed it — the
+# person was asking for the date to be repeated. The cascade now has its 4th
+# outcome, and this case gives the SAME state as elsewhere: `à rappeler par un
+# humain`.  ⚠ AND `55` NO LONGER GIVES THE SAME STATE EVERYWHERE (11/08/2026).
+# The owner's decision: the human call-back exists only on `appointment move`
+# and `booking` — the two kinds where a DATE REMAINS TO BE FOUND, hence real
+# work for a human. Elsewhere: · freed slot → `refusé` (the slot goes to
+# somebody else), and their appointment is kept, moved to `confirmé`; ·
+# reminder, confirmation → `le client rappellera`: nothing is waiting on our
+# side, the appointment being discussed is theirs. The bench READS the rule in
+# the product (assistant.NATURES_RAPPEL_HUMAIN) rather than copying it: a rule
+# written twice ends up contradicting itself.
 ETAT_ATTENDU = {"51": "accepté", "52": assistant.ETAT_RAPPELLERA,
                 "53": "à recontacter", "54": "accepté",
                 "55": "à rappeler par un humain", "56": "à recontacter"}
@@ -283,7 +259,7 @@ ETAT_ATTENDU_CASCADE = dict(ETAT_ATTENDU, **{"52": "refusé"})
 
 
 def etat_attendu(nature, fin, en_cascade):
-    """L'état attendu pour cette terminaison SUR CETTE NATURE."""
+    """The expected state for this ending ON THIS KIND."""
     table = ETAT_ATTENDU_CASCADE if en_cascade else ETAT_ATTENDU
     if fin != "55":
         return table[fin]
@@ -295,34 +271,35 @@ def etat_attendu(nature, fin, en_cascade):
 
 
 def attend_un_humain(nature, fin):
-    """Vrai si CE cas doit faire apparaître le contact sur le panneau humain."""
+    """True when THIS case must make the contact appear on the human panel."""
     return fin == "55" and nature in assistant.NATURES_RAPPEL_HUMAIN
 
 
 class RefusDuBanc(RuntimeError):
-    """Le banc refuse de démarrer (base réelle visée, port occupé…)."""
+    """The bench refuses to start (the real database targeted, port in use…).
+    """
 
 
 def _est_la_base_du_produit(chemin):
-    """Ce chemin désigne-t-il le dossier `donnees\\` du produit ?
+    """Does this path designate the product's `donnees\\` directory?
 
-    Comparé sur le DOSSIER, pas sur le nom du fichier : les préférences vivent
-    à côté de la base, et le banc les récrit aussi (horaires d'ouverture, plage
-    d'appel). Viser un autre nom de fichier dans ce dossier-là serait donc tout
-    aussi destructeur.
+    Compared on the DIRECTORY, not on the file's name: the preferences live
+    beside the database, and the bench rewrites them too (opening hours,
+    calling window). Targeting another file name in that directory would be
+    just as destructive.
     """
     reel = os.path.normcase(os.path.join(RACINE_APP, "donnees"))
     vise = os.path.normcase(os.path.dirname(os.path.abspath(chemin)))
     return vise == reel
 
 
-# Les fenêtres de commande de Windows ne savent pas toujours dessiner ✅ ou ❌.
-# Le FICHIER de rapport les garde toujours ; l'affichage console retombe sur
-# des marques en caractères simples quand la fenêtre ne sait pas les écrire.
-# ⚠ et ⛔ sont DEUX marques distinctes depuis le 02/08/2026 : ⚠ dit « à
-# remplir », ⛔ dit « refusé / interdit ». Le glossaire garde les deux, sinon
-# une phrase du produit citée dans le rapport (« ⛔ Aucun appel n'est parti »)
-# ressortirait avec un « ? » dans une console qui ne sait pas la dessiner.
+# Windows command windows cannot always draw ✅ or ❌. The report FILE always
+# keeps them; the console display falls back on plain-character marks when the
+# window cannot write them. ⚠ and ⛔ are TWO distinct marks since 02/08/2026: ⚠
+# says `to be filled in`, ⛔ says `refused / forbidden`. The glossary keeps
+# both, otherwise a sentence of the product quoted in the report (`⛔ Aucun
+# appel n'est parti`) would come out with a `?` in a console that cannot draw
+# it.
 MARQUES_SIMPLES = {"✅": "OK", "❌": "KO", "⬜": "??", "·": "--",
                    "⚠": "(obligatoire)", "⛔": "(refus)",
                    "🚫": "(ne plus appeler)",
@@ -333,7 +310,7 @@ MARQUES_SIMPLES = {"✅": "OK", "❌": "KO", "⬜": "??", "·": "--",
 
 
 def pour_console(texte):
-    """Le même texte, écrivable dans la fenêtre de commande de cette machine."""
+    """The same text, writable in this machine's command window."""
     encodage = getattr(sys.stdout, "encoding", None) or "ascii"
     try:
         texte.encode(encodage)
@@ -346,10 +323,10 @@ def pour_console(texte):
 
 
 # ===========================================================================
-#  LES CAS ET LEUR VERDICT
+# THE CASES AND THEIR VERDICT
 # ===========================================================================
 class Cas:
-    """UN contrôle : ce qui était attendu, ce qui s'est produit, le verdict."""
+    """ONE check: what was expected, what happened, the verdict."""
 
     def __init__(self, nature, depart, issue, quoi, attendu, obtenu, passe):
         self.nature = nature
@@ -362,23 +339,24 @@ class Cas:
 
 
 class Journal:
-    """Le carnet du banc : les cas, les verrous, les gestes à la main."""
+    """The bench's notebook: the cases, the locks, the gestures to do by hand.
+    """
 
     def __init__(self):
         self.cas = []
-        self.verrous = []          # (libellé, attendu, obtenu, passe)
-        self.a_la_main = []        # (ce qui n'est pas vérifiable, marche à suivre)
-        self.remarques = []        # observations mesurées, sans verdict
-        self.incidents = []        # imprévus du banc lui-même
+        self.verrous = []  # (label, expected, obtained, passed)
+        self.a_la_main = []  # (what is not checkable, what to do)
+        self.remarques = []  # measured observations, with no verdict
+        self.incidents = []  # the bench's own mishaps
 
-    # ------------------------------------------------------------ écriture
+    # ------------------------------------------------------------ writing
     def noter(self, nature, depart, issue, quoi, attendu, obtenu, passe):
         self.cas.append(Cas(nature, depart, issue, quoi, attendu, obtenu,
                             bool(passe)))
         return bool(passe)
 
     def egal(self, nature, depart, issue, quoi, attendu, obtenu):
-        """Contrôle « attendu == obtenu », le plus fréquent."""
+        """The `expected == obtained` check, the commonest one."""
         return self.noter(nature, depart, issue, quoi, str(attendu),
                           str(obtenu), attendu == obtenu)
 
@@ -401,7 +379,7 @@ class Journal:
 
     # ------------------------------------------------------------ lecture
     def cellules(self):
-        """{(nature, depart, issue) : [cas]} — les cases réellement visitées."""
+        """{(kind, start, outcome): [cases]} — the cells actually visited."""
         table = {}
         for cas in self.cas:
             table.setdefault((cas.nature, cas.depart, cas.issue),
@@ -409,13 +387,15 @@ class Journal:
         return table
 
     def marque(self, cas_de_la_case):
-        """✅ si tout passe, ❌ si un seul échoue, ⬜ si la case est vide."""
+        """✅ when everything passes, ❌ when a single one fails, ⬜ when the cell is
+        empty.
+        """
         if not cas_de_la_case:
             return "⬜"
         return "✅" if all(c.passe for c in cas_de_la_case) else "❌"
 
     def agreger(self, axe1, axe2):
-        """Réduit la matrice à deux axes ; rend {(a1, a2) : marque}."""
+        """Reduces the matrix to two axes; returns {(a1, a2): mark}."""
         groupes = {}
         for cas in self.cas:
             cle = (getattr(cas, axe1), getattr(cas, axe2))
@@ -426,26 +406,42 @@ class Journal:
     def echecs(self):
         return [c for c in self.cas if not c.passe]
 
+    @property
+    def verrous_rompus(self):
+        """The LOCKS that failed — counted in the verdict, not merely displayed.
+
+        ⚠ THEY WERE NOT, AND IT IS STRUCTURAL (04/09/2026). `echecs` looked
+        only at `self.cas`: a safety lock could fail without preventing `TOUT
+        PASSE`. The report published in pull request #297 carried one — `a real
+        call client could be built` — under a headline announcing `no
+        failures`. A CALL-E reviewer saw it.
+
+        ⚠ NO LOCK WAS GUARDED, neither that one nor the other nine. Fixing only
+        the faulty lock would have left the following nine silent.
+        """
+        return [(libelle, attendu, obtenu)
+                for libelle, attendu, obtenu, passe in self.verrous
+                if not passe]
+
 
 # ===========================================================================
-#  LE BANC
+# THE BENCH
 # ===========================================================================
 class Banc:
-    """Un serveur RingBack sur base jetable + le pilotage de la matrice."""
+    """A RingBack server on a throwaway database + the matrix driver."""
 
     def __init__(self, chemin_base, port=PORT_BANC, journal=None):
-        # ⚠ JAMAIS LA BASE RÉELLE — VÉRIFIÉ ICI, PAS PROMIS EN COMMENTAIRE
-        # (17/08/2026). Le banc écrit sans retenue : il ajoute des clients, des
-        # rendez-vous, et ouvre les horaires du cabinet en grand. Un
-        # `chemin_base` à None ou vide fait retomber le serveur sur le dossier
-        # `donnees\` du produit — LA BASE DU PROPRIÉTAIRE.
-        #
-        # CE QUE ÇA A COÛTÉ, le 17/08/2026 : deux lancements en direct passés
-        # avec None ont semé 27 contacts d'essai (« M. Journee », « Mme
-        # Cascade ») et leurs rendez-vous dans sa vraie base, et élargi ses
-        # horaires. Ses campagnes ramassaient donc des inconnus, et il a passé
-        # du temps à réparer. Le commentaire « base JETABLE » en tête de classe
-        # était déjà là : un commentaire n'empêche rien, un refus si.
+        # ⚠ NEVER THE REAL DATABASE — CHECKED HERE, NOT PROMISED IN A COMMENT
+        # (17/08/2026). The bench writes without restraint: it adds clients,
+        # appointments, and opens the practice's hours wide. A `chemin_base` of
+        # None or empty makes the server fall back on the product's `donnees\`
+        # directory — THE OWNER'S DATABASE.  WHAT THAT COST, on 17/08/2026: two
+        # live runs done with None seeded 27 test contacts (`M. Journee`, `Mme
+        # Cascade`) and their appointments into his real database, and widened
+        # his opening hours. His campaigns therefore picked up strangers, and
+        # he spent time repairing. The `THROWAWAY database` comment at the top
+        # of the class was already there: a comment prevents nothing, a refusal
+        # does.
         if not chemin_base or _est_la_base_du_produit(chemin_base):
             raise RefusDuBanc(
                 "Refus : le banc écrit (clients, rendez-vous, horaires) et ne "
@@ -458,20 +454,21 @@ class Banc:
         self.serveur_http = None
         self.fil = None
         self.racine = f"http://127.0.0.1:{port}"
-        self.pages_vues = []          # (chemin, contenu) pour le contrôle du masquage
-        # Numéros SUPPLÉMENTAIRES à chercher en clair dans les pages servies
-        # (le 🧪 numéro d'essai s'y ajoute quand son scénario l'a déclaré).
+        self.pages_vues = []  # (path, content) for the masking check
+        # ADDITIONAL numbers to look for in clear in the pages served (the 🧪
+        # test number is added when its scenario has declared it).
         self.numeros_a_masquer = []
         self.rdv_plancher = 0         # dernier rendez-vous AVANT l'appel en cours
-        # Chaque campagne reçoit son propre BLOC de jours (dix jours d'écart) :
-        # sans cela, deux campagnes proposeraient la même place et la seconde
-        # se verrait refuser sa date pour une raison qui n'a rien à voir avec
-        # le cas éprouvé. Le premier bloc commence à 20 jours de la date de
-        # référence, après le dernier rendez-vous du jeu d'essai.
+        # Each campaign gets its own BLOCK of days (ten days apart): without
+        # that, two campaigns would offer the same slot and the second would be
+        # refused its date for a reason having nothing to do with the case
+        # being exercised. The first block starts 20 days from the reference
+        # date, after the sample data set's last appointment.
         self._bloc = 20
 
     def prochain_bloc(self):
-        """Le jour de base de la campagne qui commence (blocs de 10 jours)."""
+        """The base day of the campaign that is starting (blocks of 10 days).
+        """
         bloc = self._bloc
         self._bloc += 10
         return bloc
@@ -484,31 +481,29 @@ class Banc:
                                     daemon=True)
         self.fil.start()
         preferences = self.application.preferences
-        # La plage d'appel est ouverte en grand : sinon le banc lancé à 21 h
-        # verrait toutes ses campagnes se mettre en pause (garde-fou de
-        # politesse, testé ailleurs). Aucune période interdite.
+        # The calling window is opened wide: otherwise the bench launched at
+        # 9pm would see all its campaigns pause (the politeness guard, tested
+        # elsewhere). No forbidden period.
         preferences.definir(themes.CLE_PLAGE_DEBUT, "00:00")
         preferences.definir(themes.CLE_PLAGE_FIN, "23:59")
         preferences.definir(assistant.CLE_INTERDIT_DEBUT, "")
         preferences.definir(assistant.CLE_INTERDIT_FIN, "")
         preferences.definir(themes.CLE_ENTREPRISE, "Cabinet Val Fleuri")
-        # ⚠ DES HORAIRES D'OUVERTURE, DÈS LE DÉPART (11/08/2026). Le banc tournait
-        # SANS aucun horaire réglé : RingBack n'avait donc AUCUNE place libre à
-        # proposer, et les campagnes de créneau libéré travaillaient sur des
-        # heures écrites en dur, parfois déjà occupées. Ce n'est pas un détail de
-        # montage : sans semaine type, la moitié de ce que le produit calcule
-        # (places libres, créneaux annoncés, agenda d'exemple) n'existe pas.
-        # Un cabinet sans horaires n'est pas le cas normal — et le banc doit
-        # éprouver le cas normal.
-        #
-        # ⚠ 8 h – 19 h, ET CE N'EST PAS UN CHOIX ESTHÉTIQUE : le simulateur
-        # propose ses reports entre 8 h et 18 h (calle_client, tirage de l'heure).
-        # Avec une semaine 9 h – 18 h, un report tombait HORS des horaires, le
-        # produit le refusait à juste titre — et un contrôle du banc ne
-        # s'exécutait plus (« l'ancien rendez-vous passe en DÉPLACÉ », mesuré).
-        # La semaine type du banc doit couvrir ce que ses propres appels peuvent
-        # proposer, sinon elle éteint des contrôles sans le dire.
-        for jour in range(5):          # du lundi au vendredi
+        # ⚠ OPENING HOURS, FROM THE START (11/08/2026). The bench used to run
+        # with NO hours configured: RingBack therefore had NO free slot to
+        # offer, and the freed-slot campaigns worked on hard-written times,
+        # sometimes already taken. It is not a setup detail: with no typical
+        # week, half of what the product computes (free slots, announced slots,
+        # sample calendar) does not exist. A practice with no hours is not the
+        # normal case — and the bench must exercise the normal case.  ⚠ 8am –
+        # 7pm, AND IT IS NOT AN AESTHETIC CHOICE: the simulator offers its
+        # postponements between 8am and 6pm (calle_client, the hour draw). With
+        # a 9am–6pm week, a postponement fell OUTSIDE the hours, the product
+        # rightly refused it — and a bench check no longer ran (`the old
+        # appointment becomes MOVED`, measured). The bench's typical week must
+        # cover what its own calls can offer, otherwise it switches checks off
+        # without saying so.
+        for jour in range(5):  # Monday to Friday
             horaires.basculer_periode(preferences, jour, 8 * 60, 19 * 60,
                                       "ouvrir")
 
@@ -530,13 +525,13 @@ class Banc:
         return self.application.base
 
     def nouveau_simulateur(self, graine=1):
-        """Un simulateur NEUF pour le cas qui commence.
+        """A FRESH simulator for the case that is starting.
 
-        Deux raisons : la terminaison 56 est à mémoire (« ne décroche qu'au
-        premier appel de l'instance ») — sans remise à zéro, un contact 56
-        déjà appelé dans un cas précédent décrocherait tout de suite ; et la
-        latence de numérotation est mise à zéro (le banc ne mesure pas le
-        temps d'attente, il mesure les conséquences).
+        Two reasons: the 56 ending has memory (`only fails to pick up on the
+        instance's first call`) — without a reset, a 56 contact already called
+        in an earlier case would pick up straight away; and the dialling
+        latency is set to zero (the bench does not measure waiting time, it
+        measures consequences).
         """
         client = calle_client.AppelSimule(graine=graine, latence=0)
         self.application.planif.client_appels = client
@@ -559,12 +554,12 @@ class Banc:
         return texte, url_finale
 
     def poster_fragment(self, chemin, donnees=None):
-        """Le POST tel que LA MODALE l'envoie ; rend (contenu, cible).
+        """The POST as THE MODAL sends it; returns (content, target).
 
-        L'en-tête « X-RingBack-Fragment » est ce qui distingue l'envoi de la
-        fenêtre de celui d'un formulaire ordinaire : le serveur répond alors
-        un MORCEAU de page, et dit par « X-RingBack-Cible » quel élément
-        doit le recevoir.
+        The `X-RingBack-Fragment` header is what distinguishes the window's
+        submission from an ordinary form's: the server then answers with a
+        PIECE of page, and says through `X-RingBack-Cible` which element must
+        receive it.
         """
         octets = urllib.parse.urlencode(donnees or {},
                                         doseq=True).encode("utf-8")
@@ -602,23 +597,24 @@ class Banc:
         self.pages_vues.append((chemin, texte))
         return texte, url_finale
 
-    # ------------------------------------------------ l'assistant, pas à pas
+    # ------------------------------------------------ the assistant, step by
+    # step
     def place_libre(self, apres_jours=1):
-        """Une place que le produit accepterait VRAIMENT de réserver.
+        """A slot the product would REALLY agree to book.
 
-        ⚠ POURQUOI ELLE EXISTE (11/08/2026). Le banc écrivait ses places « en
-        dur » (jour +11 à 16h30, etc.). Depuis que le jeu d'essai couvre cent
-        jours, ces heures-là sont souvent DÉJÀ PRISES — et depuis qu'une campagne
-        relit sa place avant d'appeler, elle s'arrêtait à juste titre : vingt
-        contrôles tombaient, sur un montage irréaliste (proposer une place déjà
-        occupée). Le banc doit donc proposer une place qui existe.
+        ⚠ WHY IT EXISTS (11/08/2026). The bench wrote its slots `hard` (day +11
+        at 4:30pm, and so on). Since the sample data set covers a hundred days,
+        those times are often ALREADY TAKEN — and since a campaign reads its
+        slot back before calling, it rightly stopped: twenty checks fell over,
+        on an unrealistic setup (offering an already occupied slot). So the
+        bench must offer a slot that exists.
 
-        ⚠ LE CRITÈRE EST CELUI DU PRODUIT, PAS UNE RÈGLE À NOUS :
-        `refus_rendezvous_telephone` est exactement ce que la campagne consulte.
-        Le demander à `creneaux_libres` d'abord est un raccourci — mais il rend
-        une liste VIDE quand aucun horaire d'ouverture n'est réglé, ce qui est le
-        cas du banc pendant presque tout son parcours. D'où le balayage : on
-        essaie des heures jusqu'à en trouver une que le produit accepte.
+        ⚠ THE CRITERION IS THE PRODUCT'S, NOT A RULE OF OURS:
+        `refus_rendezvous_telephone` is exactly what the campaign consults.
+        Asking `creneaux_libres` first is a shortcut — but it returns an EMPTY
+        list when no opening hours are configured, which is the bench's state
+        for almost its whole walk. Hence the sweep: we try times until we find
+        one the product accepts.
         """
         preferences = self.application.preferences
         depart = datetime.datetime.now() + datetime.timedelta(days=apres_jours)
@@ -632,12 +628,12 @@ class Banc:
                 if not horaires.refus_rendezvous_telephone(
                         self.base, preferences, place, tranches=2):
                     return place
-        # Rien de libre en quatorze jours : on rend la date écrite, et le banc
-        # échouera EN LE DISANT plutôt que de faire semblant.
+        # Nothing free in fourteen days: we return the written date, and the
+        # bench will fail BY SAYING SO rather than pretend.
         return _iso(apres_jours, 16, 30)
 
     def infos_de(self, nature):
-        """Les informations d'étape 2, ⚠ comprises, pour cette nature."""
+        """The step-2 information, ⚠ included, for this kind."""
         commun = {"info_entreprise": "Cabinet Val Fleuri"}
         propres = {
             "creneau_libere": {"info_creneau_libere": self.place_libre(11),
@@ -669,11 +665,11 @@ class Banc:
             "relance_max": str(relance_max)}
         formulaire.update(self.infos_de(nature))
         if nature in ("creneau_libere", "deplacement"):
-            # Ces deux natures s'arrêtent au PREMIER OUI par défaut : le banc
-            # doit, lui, parcourir toute la matrice des issues. Il choisit
-            # donc explicitement l'autre réglage, « appeler toute la liste »
-            # (celui du cas « vider une journée entière »). L'arrêt au
-            # premier oui a sa propre section, plus bas.
+            # These two kinds stop at the FIRST YES by default: the bench, for
+            # its part, must walk the whole matrix of outcomes. So it
+            # explicitly chooses the other setting, `call the whole list` (the
+            # one of the `empty a whole day` case). Stopping at the first yes
+            # has its own section, further down.
             formulaire["politique"] = "tous"
         return formulaire
 
@@ -685,13 +681,13 @@ class Banc:
         return page
 
     def valider_grille(self, brouillon, champs=None):
-        """Valide l'étape 3 ; rend (campagne_id ou None, page).
+        """Validates step 3; returns (campagne_id or None, page).
 
-        `champs` : ce que le formulaire de l'étape 3 porte EN MÊME TEMPS que le
-        bouton « Valider » — règle, ordre, plafond. À l'écran ces champs sont
-        rattachés au même formulaire que le bouton (attribut `form`) : les
-        envoyer séparément ferait passer un banc là où le produit échouait
-        vraiment (défaut du 15/08/2026, le gain de 30 jours n'arrivait jamais).
+        `champs`: what step 3's form carries AT THE SAME TIME as the `Valider`
+        button — rule, order, ceiling. On screen those fields are attached to
+        the same form as the button (the `form` attribute): sending them
+        separately would let a bench pass where the product genuinely failed
+        (the 15/08/2026 defect, where the 30-day gain never arrived).
         """
         donnees = {"b": brouillon, "action": "valider"}
         donnees.update(champs or {})
@@ -699,11 +695,11 @@ class Banc:
         trouve = re.search(r"/campagne\?id=(\d+)", url)
         return (int(trouve.group(1)) if trouve else None), page
 
-    # ------------------------------------------------------- l'exécution
+    # ------------------------------------------------------- the execution
     def dernier_rdv_id(self):
-        # Requête écrite ici plutôt que dans db.py : elle prend donc le
-        # verrou de la base à la main (voir db._sous_verrou), pour ne pas
-        # tomber au milieu d'une écriture faite par le serveur.
+        # The query is written here rather than in db.py: it therefore takes
+        # the database lock by hand (see db._sous_verrou), so as not to land in
+        # the middle of a write done by the server.
         with self.base.verrou:
             ligne = self.base.conn.execute(
                 "SELECT COALESCE(MAX(id), 0) AS dernier "
@@ -711,33 +707,34 @@ class Banc:
         return ligne["dernier"]
 
     def marquer_plancher(self):
-        """Retient le dernier rendez-vous existant AVANT d'appeler.
+        """Remembers the last existing appointment BEFORE calling.
 
-        Ce repère sert à distinguer « ce que CET appel a écrit » de ce qui
-        était déjà là : sans lui, un rendez-vous du même client au même
-        horaire, laissé par une campagne précédente, se ferait passer pour
-        une écriture de l'appel en cours.
+        This landmark serves to tell `what THIS call wrote` from what was
+        already there: without it, an appointment for the same client at the
+        same time, left by an earlier campaign, would pass for a write by the
+        current call.
         """
         self.rdv_plancher = self.dernier_rdv_id()
         return self.rdv_plancher
 
     def executer(self, campagne_id):
-        """Déroule la campagne DANS CE FIL (pas de fil de fond).
+        """Runs the campaign IN THIS THREAD (no background thread).
 
-        Pourquoi pas le bouton ▶ Démarrer : il lance un fil de fond qui
-        partage l'unique connexion sqlite3 du serveur avec les requêtes web.
-        Le banc doit être reproductible ; il déroule donc la campagne
-        lui-même, exactement le même code (assistant.executer_campagne),
-        sans concurrence. Le bouton lui-même est vérifié une fois, à part.
+        Why not the ▶ Start button: it launches a background thread that shares
+        the server's single sqlite3 connection with the web requests. The bench
+        must be reproducible; so it runs the campaign itself, with exactly the
+        same code (assistant.executer_campagne), with no concurrency. The
+        button itself is checked once, separately.
         """
         self.marquer_plancher()
         assistant.executer_campagne(self.application, campagne_id)
         return self.base.obtenir_campagne(campagne_id)
 
     def lancer_relances(self, jours=7):
-        """Le geste humain « Lancer les relances dues », vu depuis 7 jours plus
-        tard — l'échéance d'une relance est à quelques heures ouvrées, elle ne
-        serait pas due à l'instant même."""
+        """The human gesture `Lancer les relances dues`, seen from 7 days later —
+        a follow-up's due date is a few working hours away, it would not be due
+        at this very instant.
+        """
         quand = REFERENCE + datetime.timedelta(days=jours)
         return campagnes.executer_relances_dues(
             self.base, self.application.planif, self.application.preferences,
@@ -748,7 +745,7 @@ class Banc:
         return self.base.contacts_de_campagne(campagne_id)
 
     def par_terminaison(self, campagne_id):
-        """{terminaison : contact} pour les contacts à issue forcée."""
+        """{ending: contact} for the contacts with a forced outcome."""
         table = {}
         for contact in self.contacts(campagne_id):
             clair = self.base.telephone_contact_campagne(contact["id"]) or ""
@@ -758,8 +755,9 @@ class Banc:
         return table
 
     def rdv_vise(self, contact):
-        """LE rendez-vous que ce contact concerne, ou None (même règle que le
-        moteur d'appel : assistant._rendezvous_vise)."""
+        """THE appointment this contact is about, or None (the same rule as the
+        call engine: assistant._rendezvous_vise).
+        """
         clair = self.base.telephone_contact_campagne(contact["id"])
         return assistant._rendezvous_vise(self.base, contact, clair)
 
@@ -776,31 +774,32 @@ class Banc:
 
 
 # ===========================================================================
-#  LES CONTRÔLES DE CONSÉQUENCE
-# ===========================================================================
-# ⚠ CET ÉTAT DÉPEND DE LA NATURE DEPUIS LE 15/08/2026. Une date convenue que le
-# produit refuse d'écrire envoie vers un humain… sauf sur « créneau libéré », où
-# ce rappel n'existe plus (il l'a fait retirer ; voir
-# assistant.NATURES_RAPPEL_HUMAIN). Là, le contact part « refusé » : c'est vrai
-# de la PLACE, qui va à quelqu'un d'autre, et son rendez-vous à lui est conservé.
+# THE CONSEQUENCE CHECKS
+# =========================================================================== ⚠
+# THIS STATE HAS DEPENDED ON THE KIND SINCE 15/08/2026. An agreed date the
+# product refuses to write sends the contact to a human… except on `créneau
+# libéré`, where that call-back no longer exists (he had it removed; see
+# assistant.NATURES_RAPPEL_HUMAIN). There, the contact goes `refusé`: that is
+# true of the SLOT, which goes to somebody else, and their own appointment is
+# kept.
 ETAT_DATE_REFUSEE = "à rappeler par un humain"
 ETAT_DATE_REFUSEE_SANS_HUMAIN = "refusé"
 
 
 def etat_date_refusee(nature):
-    """L'état où atterrit un contact dont la date convenue a été refusée."""
+    """The state a contact lands in when their agreed date was refused."""
     return (ETAT_DATE_REFUSEE_SANS_HUMAIN if nature == "creneau_libere"
             else ETAT_DATE_REFUSEE)
 
 
 def _une_date_est_ecrite(fin, en_cascade, rdv_avant, nature):
-    """Cet appel doit-il ÉCRIRE une date dans l'agenda ?
+    """Must this call WRITE a date into the calendar?
 
-    C'est ce qui décide si l'issue « la date convenue est refusée » est un
-    récit possible : une date que le produit refuse d'écrire (place déjà
-    prise, jour fermé) envoie le contact vers un humain, avec la raison en
-    clair. Rien n'est faux là-dedans — mais ce n'est pas le même récit, et le
-    banc doit accepter les deux SANS jamais accepter une incohérence.
+    That is what decides whether the outcome `the agreed date is refused` is a
+    possible story: a date the product refuses to write (slot already taken,
+    closed day) sends the contact to a human, with the reason in clear. Nothing
+    in that is false — but it is not the same story, and the bench must accept
+    both WITHOUT ever accepting an inconsistency.
     """
     if en_cascade:
         return fin in ("51", "54")
@@ -813,7 +812,7 @@ def _une_date_est_ecrite(fin, en_cascade, rdv_avant, nature):
 
 def controler_issue(banc, campagne_id, nature, depart, fin, contact_avant,
                     en_cascade):
-    """Contrôle UNE case (nature × départ × issue) : base PUIS écran."""
+    """Checks ONE cell (kind × start × outcome): database THEN screen."""
     j = banc.j
     contact = banc.base.obtenir_contact_campagne(contact_avant["id"])
     rdv_avant = contact_avant["rdv_avant"]
@@ -854,31 +853,30 @@ def controler_issue(banc, campagne_id, nature, depart, fin, contact_avant,
 
 def _controler_date_ecrite(banc, nature, depart, fin, contact, date_convenue,
                            quoi, ligne_connue=None):
-    """Le rendez-vous est écrit à la date convenue, OU le refus est expliqué.
+    """The appointment is written at the agreed date, OR the refusal is explained.
 
-    Deux récits, un seul doit tenir, et il doit correspondre à la base :
-    soit le rendez-vous existe à la date convenue, soit le contact part vers
-    un humain AVEC la raison ET la date demandée en clair, et RIEN n'est
-    écrit dans l'agenda.
+    Two stories, only one must hold, and it must match the database: either the
+    appointment exists at the agreed date, or the contact goes to a human WITH
+    the reason AND the requested date in clear, and NOTHING is written into the
+    calendar.
     """
     j = banc.j
     frais = banc.base.obtenir_contact_campagne(contact["id"])
-    # « Écrit par CET appel » : soit un rendez-vous plus récent que le repère
-    # posé juste avant l'appel (il vient d'être créé), soit LA LIGNE DU CONTACT
-    # lui-même (elle vient d'être déplacée). Un rendez-vous du même client au
-    # même horaire, mais antérieur et sans rapport, ne compte pas.
-    #
-    # ⚠ LA SECONDE BRANCHE A ÉTÉ AJOUTÉE LE 17/08/2026, avec le défaut n° 4 :
-    # une date convenue au téléphone DÉPLACE désormais la ligne existante au
-    # lieu d'en créer une seconde (sa règle du 14/08). Le contrôle ne cherchait
-    # que du NEUF : il annonçait donc « 0 rendez-vous à cet horaire » alors que
-    # le rendez-vous était bien là, à la bonne date. Il mesurait la mécanique
-    # d'écriture, pas le fait qui compte pour l'opérateur.
-    # ⚠ `ligne_connue` PLUTÔT QUE `contact["rendezvous_id"]` : une liste COLLÉE
-    # ne porte pas d'identifiant de rendez-vous — le produit retrouve la ligne
-    # par nom, numéro et date (voir `db.rendezvous_identique`). S'appuyer sur la
-    # colonne aurait laissé ce départ-là sans contrôle, en silence. C'est le
-    # banc qui sait quelle ligne existait avant l'appel : il la passe.
+    # `Written by THIS call`: either an appointment more recent than the
+    # landmark placed just before the call (it has just been created), or THE
+    # CONTACT'S OWN ROW (it has just been moved). An appointment for the same
+    # client at the same time, but earlier and unrelated, does not count.  ⚠
+    # THE SECOND BRANCH WAS ADDED ON 17/08/2026, along with defect no. 4: a
+    # date agreed on the phone now MOVES the existing row instead of creating a
+    # second one (his rule of 14/08). The check looked only for something NEW:
+    # it therefore announced `0 appointments at that time` while the
+    # appointment was indeed there, at the right date. It measured the writing
+    # mechanism, not the fact that matters to the operator. ⚠ `ligne_connue`
+    # RATHER THAN `contact["rendezvous_id"]`: a PASTED list carries no
+    # appointment id — the product finds the row again by name, number and date
+    # (see `db.rendezvous_identique`). Relying on the column would have left
+    # that starting point unchecked, in silence. It is the bench that knows
+    # which row existed before the call: it passes it.
     connue = (ligne_connue or {}).get("id")
     aux_horaires = [r for r in banc.base.tous_les_rendezvous()
                     if r["nom"] == contact["nom"]
@@ -904,7 +902,7 @@ def _controler_date_ecrite(banc, nature, depart, fin, contact, date_convenue,
 
 
 def _controler_non_joint(banc, campagne_id, nature, depart, fin, contact):
-    """Pas de réponse : une relance est PROGRAMMÉE, aucun appel spontané."""
+    """No answer: a follow-up is SCHEDULED, no spontaneous call."""
     j = banc.j
     relances = banc.relances_du_contact(campagne_id, contact["id"])
     planifiees = [r for r in relances if r["statut"] == "planifiée"]
@@ -930,14 +928,14 @@ def _controler_accepte(banc, nature, depart, contact, rdv_avant, resultat,
             return
         if rdv_avant is not None:
             frais = banc.base.obtenir_rendezvous(rdv_avant["id"])
-            # ⚠ CE CONTRÔLE EST DORMANT, et il faut le savoir : il n'apparaît
-            # pas une seule fois dans le rapport, car aucune combinaison de ce
-            # banc ne donne un rendez-vous PRÉALABLE au contact qui accepte.
-            # Il attendait « annulé » alors que le code écrivait « supprimé » —
-            # une attente fausse qui n'a jamais échoué faute d'être exercée.
-            # Corrigée ici sur la vérité du 03/08/2026 : l'ancien rendez-vous
-            # est DÉPLACÉ. La preuve réelle de ce chemin est dans la suite
-            # d'essais (test_parcours_nominal_creneau_libere), pas ici.
+            # ⚠ THIS CHECK IS DORMANT, and that must be known: it does not
+            # appear once in the report, because no combination in this bench
+            # gives a PRIOR appointment to the contact who accepts. It expected
+            # `annulé` while the code wrote `supprimé` — a false expectation
+            # that never failed for want of being exercised. Corrected here on
+            # the truth of 03/08/2026: the old appointment is MOVED. The real
+            # proof of this path is in the test suite
+            # (test_parcours_nominal_creneau_libere), not here.
             j.egal(nature, depart, "51",
                    "l'ancien rendez-vous du client est DÉPLACÉ (jamais deux "
                    "rendez-vous pour la même personne)",
@@ -954,9 +952,9 @@ def _controler_accepte(banc, nature, depart, contact, rdv_avant, resultat,
     if rdv_avant is not None:
         frais = banc.base.obtenir_rendezvous(rdv_avant["id"])
         if nature == "deplacement":
-            # Une campagne de DÉPLACEMENT annonce au client que son
-            # rendez-vous doit bouger et lui propose des créneaux de
-            # remplacement. S'il accepte, le rendez-vous doit bouger.
+            # A MOVE campaign tells the client their appointment must shift and
+            # offers them replacement slots. If they accept, the appointment
+            # must shift.
             j.vrai(nature, depart, "51",
                    "dans une campagne de DÉPLACEMENT, un accord doit vraiment "
                    "DÉPLACER le rendez-vous",
@@ -999,20 +997,19 @@ def _controler_refus(banc, nature, depart, contact, rdv_avant, en_cascade):
     if rdv_avant is not None and rdv_avant["statut"] in ("prévu", "confirmé",
                                                          "manqué"):
         frais = banc.base.obtenir_rendezvous(rdv_avant["id"])
-        # LA RÈGLE DU PROPRIÉTAIRE (31/07/2026) : « annulé » est le statut
-        # d'HISTOIRE, réservé aux dates passées ; un rendez-vous à venir
-        # qu'on annule est SUPPRIMÉ — sauf s'il est trop proche pour qu'on
-        # organise un remplacement (le seuil, 12 h par défaut). Le banc ne
-        # recopie pas une valeur : il demande la règle au produit, au même
-        # endroit que le produit — il ne peut donc pas mesurer autre chose
-        # que ce qui est réellement décidé.
+        # THE OWNER'S RULE (31/07/2026): `annulé` is the HISTORY status,
+        # reserved for past dates; an upcoming appointment that is cancelled is
+        # DELETED — unless it is too close for a replacement to be arranged
+        # (the threshold, 12 h by default). The bench does not copy a value: it
+        # asks the product for the rule, in the same place the product does —
+        # so it cannot measure anything other than what is really decided.
         decision = horaires.decision_annulation(
             banc.application.preferences, rdv_avant["horaire"])
         j.egal(nature, depart, "52",
                f"le rendez-vous du {themes.date_lisible(rdv_avant['horaire'])} "
                f"passe en « {decision['statut']} » — {decision['pourquoi']}",
                decision["statut"], frais["statut"])
-        # Annulé ou supprimé, il n'existe plus : il quitte « à venir ».
+        # Cancelled or deleted, it no longer exists: it leaves `à venir`.
         a_venir = [r["id"] for r in banc.base.rendezvous_a_venir_tous()]
         j.vrai(nature, depart, "52",
                "le rendez-vous retiré DISPARAÎT de « Rendez-vous à venir »",
@@ -1020,8 +1017,8 @@ def _controler_refus(banc, nature, depart, contact, rdv_avant, en_cascade):
                "absent" if rdv_avant["id"] not in a_venir
                else "TOUJOURS présent dans « à venir »",
                rdv_avant["id"] not in a_venir)
-        # …et sa place est réellement RENDUE : plus aucun occupant à cet
-        # horaire. C'est la mesure qui compte pour l'utilisateur.
+        # …and its slot is genuinely GIVEN BACK: no occupant left at that time.
+        # That is the measurement that matters to the user.
         occupants = [r["id"] for r in banc.base.rendezvous_occupants(
             rdv_avant["horaire"], rdv_avant["horaire"] + ":59")]
         j.vrai(nature, depart, "52",
@@ -1040,12 +1037,12 @@ def _controler_refus(banc, nature, depart, contact, rdv_avant, en_cascade):
 
 
 def _controler_le_client_rappellera(banc, nature, depart, contact):
-    """L'annulation sans replacement : « 📞 le client rappellera ».
+    """Cancellation with no rebooking: `📞 le client rappellera`.
 
-    La règle du propriétaire (31/07/2026) : il a annulé sans fixer de date,
-    c'est LUI qui reprendra contact. Donc — et c'est ce qu'on mesure —
-    aucune relance programmée, aucune campagne montée pour lui, et pourtant
-    il reste VISIBLE et compté dans 👥 Clients avec cet état.
+    The owner's rule (31/07/2026): they cancelled without setting a date, so it
+    is THEY who will get back in touch. Therefore — and this is what is
+    measured — no follow-up scheduled, no campaign set up for them, and yet
+    they stay VISIBLE and counted in 👥 Clients with that state.
     """
     j = banc.j
     relances = [r for r in banc.base.relances_de_campagne(
@@ -1103,11 +1100,11 @@ def _controler_report(banc, nature, depart, contact, rdv_avant, resultat,
                bool(contact["detail"] and "reste à pourvoir" in contact["detail"]))
         return
     if rdv_avant is not None:
-        # ⚠ UNE SEULE LIGNE, QUI A BOUGÉ (sa règle du 14/08/2026, étendue à
-        # cette issue le 17/08). Le banc attendait auparavant l'ancienne ligne
-        # en « déplacé » — donc DEUX rendez-vous pour un seul déplacement, ce
-        # qu'il a constaté sur sa journée du 18/08 : « le premier rendez-vous
-        # n'a pas été annulé, mais on l'a bien ajouté pour le lendemain ».
+        # ⚠ ONE SINGLE ROW, WHICH HAS MOVED (his rule of 14/08/2026, extended
+        # to this outcome on 17/08). The bench previously expected the old row
+        # as `déplacé` — hence TWO appointments for one move, which is what he
+        # observed on his 18/08 day: `the first appointment was not cancelled,
+        # but we did indeed add it for the next day`.
         frais = banc.base.obtenir_rendezvous(rdv_avant["id"])
         j.egal(nature, depart, "54",
                f"la ligne du {themes.date_lisible(rdv_avant['horaire'])} a "
@@ -1127,10 +1124,10 @@ def _controler_report(banc, nature, depart, contact, rdv_avant, resultat,
 
 def _controler_sans_conclure(banc, nature, depart, contact, rdv_avant):
     j = banc.j
-    # « Je veux autre chose, mais je ne conclus rien » n'est ni un oui ni un non.
-    # CE QUE LE PRODUIT EN FAIT DÉPEND DE LA NATURE depuis le 11/08/2026 (voir
-    # etat_attendu) — mais dans TOUS les cas l'écran doit dire ce qui s'est
-    # passé, en clair, sans rien affirmer que la conversation n'a pas donné.
+    # `I want something else, but I am concluding nothing` is neither a yes nor
+    # a no. WHAT THE PRODUCT MAKES OF IT DEPENDS ON THE KIND since 11/08/2026
+    # (see etat_attendu) — but in ALL cases the screen must say what happened,
+    # in clear, without asserting anything the conversation did not produce.
     j.vrai(nature, depart, "55",
            "l'écran dit EN CLAIR ce qui s'est passé, sans rien inventer",
            "une information clé qui cite la demande du client, ou qui dit "
@@ -1141,19 +1138,16 @@ def _controler_sans_conclure(banc, nature, depart, contact, rdv_avant):
                      or "pas pu déterminer" in contact["detail"])))
     if rdv_avant is not None:
         frais = banc.base.obtenir_rendezvous(rdv_avant["id"])
-        # TROIS SUITES SELON LA NATURE, toutes voulues, toutes datées :
-        #
-        # · CRÉNEAU LIBÉRÉ : le rendez-vous est CONSERVÉ et passé en
-        #   « confirmé » — la personne a décroché et n'a pas annulé (décision du
-        #   propriétaire, 11/08/2026). Son rendez-vous n'était pas le sujet de
-        #   l'appel : c'était la place libre.
-        # · DÉPLACEMENT et PRISE DE RENDEZ-VOUS : « 🙋 à rappeler par un
-        #   humain » — quelqu'un du cabinet reprend la main, le rendez-vous
-        #   attend cet appel.
-        # · RAPPEL et CONFIRMATION : le rendez-vous est ANNULÉ (sa règle du
-        #   17/08/2026, « si la personne doit rappeler, le rendez-vous est
-        #   simplement annulé »). Le laisser en place gardait le créneau bloqué
-        #   pour quelqu'un qui venait de dire qu'il ne viendrait pas comme prévu.
+        # THREE OUTCOMES ACCORDING TO THE KIND, all intended, all dated:  ·
+        # FREED SLOT: the appointment is KEPT and moved to `confirmé` — the
+        # person picked up and did not cancel (owner's decision, 11/08/2026).
+        # Their appointment was not the subject of the call: the free slot was.
+        # · MOVE and BOOKING: `🙋 à rappeler par un humain` — somebody at the
+        # practice takes over, the appointment waits for that call. · REMINDER
+        # and CONFIRMATION: the appointment is CANCELLED (his rule of
+        # 17/08/2026, `if the person has to call back, the appointment is
+        # simply cancelled`). Leaving it in place kept the slot blocked for
+        # somebody who had just said they would not come as planned.
         if nature == "creneau_libere":
             attendu, quoi = "confirmé", ("son rendez-vous est conservé et passe "
                                          "en « confirmé »")
@@ -1162,13 +1156,12 @@ def _controler_sans_conclure(banc, nature, depart, contact, rdv_avant):
                                        "rendez-vous est ANNULÉ, sa place est "
                                        "rendue")
         elif nature == "deplacement":
-            # ⚠ SA RÈGLE DU 20/08/2026, et ce contrôle mesurait la précédente :
-            # « lorsqu'on demande de déplacer un rendez-vous et que, pour une
-            # raison ou une autre, nous n'avons pas pu le déplacer : celui-ci
-            # est alors annulé ». Il attend bien le rappel d'un humain — mais
-            # sa PLACE, elle, ne peut pas rester bloquée sur une journée qu'il
-            # ne travaille pas. Le banc a arrêté la première version de cette
-            # règle, c'est exactement son travail.
+            # ⚠ HIS RULE OF 20/08/2026, and this check was measuring the
+            # previous one: `when we ask to move an appointment and, for one
+            # reason or another, we could not move it: it is then cancelled`.
+            # They do wait for a human's call — but their SLOT cannot stay
+            # blocked on a day they are not working. The bench stopped the
+            # first version of this rule, which is exactly its job.
             attendu, quoi = "annulé", ("le déplacement n'a pas pu se faire : le "
                                        "rendez-vous est ANNULÉ, et un humain "
                                        "rappellera pour en fixer un autre")
@@ -1180,7 +1173,7 @@ def _controler_sans_conclure(banc, nature, depart, contact, rdv_avant):
 
 
 def controler_ecran_campagne(banc, campagne_id, nature, depart, cibles):
-    """Ce qui devient VISIBLE : poste de pilotage, Clients, Relances."""
+    """What becomes VISIBLE: control desk, Clients, Relances."""
     j = banc.j
     fiche = banc.obtenir(f"/campagne?id={campagne_id}")
     for fin, contact_avant in cibles.items():
@@ -1193,11 +1186,11 @@ def controler_ecran_campagne(banc, campagne_id, nature, depart, cibles):
                "présent" if (nom in fiche and contact["etat"] in fiche)
                else "absent de la page",
                nom in fiche and contact["etat"] in fiche)
-    # 👥 Contacts : chaque contact appelé doit y porter un état de conversation.
-    # ⚠ « par_page=0 » = TOUS. La page est paginée depuis le 10/08/2026 (25 par
-    # défaut) et le jeu d'essai en compte 36 : chercher un nom sur la seule
-    # première page déclarait absentes onze personnes bel et bien présentes.
-    # Ce contrôle porte sur le CONTENU, pas sur le découpage.
+    # 👥 Contacts: every contact called must carry a conversation state there. ⚠
+    # `par_page=0` = ALL. The page has been paginated since 10/08/2026 (25 by
+    # default) and the sample data set has 36: looking for a name on the first
+    # page alone declared eleven genuinely present people absent. This check is
+    # about CONTENT, not about pagination.
     page_clients = banc.obtenir("/clients?par_page=0")
     for fin, contact_avant in cibles.items():
         nom = html_mod.escape(contact_avant["nom"])
@@ -1206,15 +1199,15 @@ def controler_ecran_campagne(banc, campagne_id, nature, depart, cibles):
                f"« {contact_avant['nom']} » dans le tableau des clients",
                "présent" if nom in page_clients else "absent",
                nom in page_clients)
-    # 🔁 Relances : chaque type sur SON panneau. La page ne se coupe plus en
-    # deux au nom d'une section — elle porte cinq panneaux identifiés, et
-    # c'est par leur identifiant qu'on les lit (position indifférente).
-    # ⚠ « par_page=0 » — LA LISTE ENTIÈRE, ET C'EST INDISPENSABLE ICI
-    # (21/08/2026). Depuis que 🔁 Relances pagine ses cinq parties comme
-    # 👥 Contacts, la page ne sert que 25 lignes : le banc cherchait une
-    # personne précise et ne la trouvait plus — non parce qu'elle manquait, mais
-    # parce qu'elle était page 4. Un instrument de mesure lit ce qui EST, pas ce
-    # que l'écran montre d'abord ; il demande donc « tous ».
+    # 🔁 Relances: each type on ITS OWN panel. The page no longer splits in two
+    # by a section's name — it carries five identified panels, and it is by
+    # their id that they are read (position irrelevant). ⚠ `par_page=0` — THE
+    # WHOLE LIST, AND IT IS INDISPENSABLE HERE (21/08/2026). Since 🔁 Relances
+    # paginates its five parts like 👥 Contacts, the page serves only 25 rows:
+    # the bench looked for a specific person and no longer found them — not
+    # because they were missing, but because they were on page 4. A measuring
+    # instrument reads what IS, not what the screen shows first; so it asks for
+    # `all`.
     page_relances = banc.obtenir("/relances?par_page=0")
 
     def panneau(code):
@@ -1238,24 +1231,21 @@ def controler_ecran_campagne(banc, campagne_id, nature, depart, cibles):
                nom in automatique)
     if "55" in cibles:
         nom = html_mod.escape(cibles["55"]["nom"])
-        # ⚠ SEULEMENT LÀ OÙ LE RAPPEL HUMAIN EXISTE (11/08/2026). Sur les trois
-        # autres natures, le panneau humain ne DOIT PAS le porter : y voir
-        # quelqu'un dont personne n'attend rien ferait travailler l'opérateur
-        # pour rien. Le contrôle vaut donc dans les deux sens.
-        #
-        # ⚠ ET IL SE LIT PAR CONTACT, PAS PAR NOM NI PAR CAMPAGNE. Deux pièges
-        # mesurés, l'un après l'autre :
-        #   · par NOM : la base du banc est la MÊME pour les 115 combinaisons, et
-        #     la même personne attend légitimement un humain depuis une campagne
-        #     de déplacement — trois faux échecs ;
-        #   · par CAMPAGNE : sur un créneau libéré, UN AUTRE contact de la même
-        #     campagne partait « à rappeler par un humain » — celui dont la date
-        #     convenue avait été refusée (voir _date_refusee). *Ce n'est plus le
-        #     cas depuis le 15/08/2026 : cette nature ne produit plus AUCUN
-        #     rappel manuel.* La lecture par contact reste néanmoins la bonne :
-        #     c'est elle qui protège du premier piège, celui des homonymes.
-        # Chaque ligne du panneau porte l'identifiant de SON contact : c'est lui
-        # qu'on cherche, et lui seul.
+        # ⚠ ONLY WHERE THE HUMAN CALL-BACK EXISTS (11/08/2026). On the other
+        # three kinds, the human panel MUST NOT carry them: seeing somebody
+        # there whom nobody is waiting on would make the operator work for
+        # nothing. So the check works in both directions.  ⚠ AND IT IS READ BY
+        # CONTACT, NOT BY NAME NOR BY CAMPAIGN. Two traps measured, one after
+        # the other: · by NAME: the bench's database is the SAME across all 115
+        # combinations, and the same person is legitimately waiting for a human
+        # from a move campaign — three false failures; · by CAMPAIGN: on a
+        # freed slot, ANOTHER contact of the same campaign went to `à rappeler
+        # par un humain` — the one whose agreed date had been refused (see
+        # _date_refusee). *That is no longer the case since 15/08/2026: this
+        # kind no longer produces ANY manual call-back.* Reading by contact
+        # remains the right way nonetheless: it is what protects against the
+        # first trap, that of namesakes. Every row of the panel carries ITS
+        # contact's id: that is what we look for, and it alone.
         attendu_humain = attend_un_humain(nature, "55")
         present = f"contact={cibles['55']['id']}" in humaine
         j.vrai(nature, depart, "55",
@@ -1271,7 +1261,7 @@ def controler_ecran_campagne(banc, campagne_id, nature, depart, cibles):
 
 
 def controler_planning(banc, nature, depart, fin, horaire, nom):
-    """Le rendez-vous créé apparaît-il dans le PLANNING de sa semaine ?"""
+    """Does the appointment created appear in its week's SCHEDULE?"""
     jour = datetime.datetime.fromisoformat(horaire).date().isoformat()
     zone = banc.obtenir(f"/suivi/planning?date={jour}")
     attendu = html_mod.escape(nom)
@@ -1283,7 +1273,7 @@ def controler_planning(banc, nature, depart, fin, horaire, nom):
 
 
 # ===========================================================================
-#  SCÉNARIOS
+# SCENARIOS
 # ===========================================================================
 CONTACTS_FORCES = (
     ("51", "Mme Nadia Lefèvre", "06 39 98 00 51"),
@@ -1303,11 +1293,11 @@ COLONNES_OBLIGATOIRES = {"creneau_libere": ("rdv_existant", "motif"),
 
 
 def _ligne_collage(nature, nom, telephone, jour, heure):
-    """Une ligne de collage complète pour cette nature (colonnes ⚠ remplies).
+    """A complete pasted row for this kind (⚠ columns filled).
 
-    L'horaire est donné par le banc (jour du bloc de la campagne, heure propre
-    au contact) : deux contacts n'ont donc jamais le même rendez-vous, et deux
-    campagnes ne se disputent jamais une place.
+    The time is given by the bench (the campaign block's day, the contact's own
+    hour): two contacts therefore never have the same appointment, and two
+    campaigns never fight over a slot.
     """
     definition = assistant.NATURES[nature]
     morceaux = [nom, telephone]
@@ -1320,7 +1310,7 @@ def _ligne_collage(nature, nom, telephone, jour, heure):
 
 
 def scenario_verrous(banc, chemins_surveilles):
-    """Les verrous : le banc ne PEUT PAS appeler pour de vrai."""
+    """The locks: the bench CANNOT call for real."""
     j = banc.j
     client = banc.application.planif.client_appels
     j.verrou("Le client d'appels est le SIMULATEUR",
@@ -1339,6 +1329,17 @@ def scenario_verrous(banc, chemins_surveilles):
              "retirée (elle était présente, elle a été ôtée du processus)"
              if CLE_RETIREE else "absente dès le départ",
              "CALLE_API_KEY" not in os.environ)
+    # ⚠ THE KEY HAS TWO SOURCES, AND THE BENCH NEUTRALISED ONLY ONE
+    # (04/09/2026). The environment variable was indeed removed — but
+    # `cle_disponible()` ALSO reads `donnees/cle_calle.txt`, and on the owner's
+    # machine that file has existed since he stored his key through the
+    # Settings screen. A real call client could therefore be built, and that
+    # lock was broken in the published report.  ⚠ WE MOVE THE PATH, WE DO NOT
+    # TOUCH THE FILE. His key stays where it is: the bench looks elsewhere, for
+    # the duration of its check.
+    chemin_cle_dorigine = calle_client.CHEMIN_CLE
+    dossier_sans_cle = tempfile.mkdtemp(prefix="ringback-banc-sans-cle-")
+    calle_client.CHEMIN_CLE = os.path.join(dossier_sans_cle, "aucune-cle.txt")
     try:
         calle_client.AppelReel()
         refus = "AUCUN refus — un client d'appels réels a pu être construit"
@@ -1346,6 +1347,9 @@ def scenario_verrous(banc, chemins_surveilles):
     except calle_client.CleApiAbsente as erreur:
         refus = f"refus net : « {erreur} »"
         passe = True
+    finally:
+        calle_client.CHEMIN_CLE = chemin_cle_dorigine
+        shutil.rmtree(dossier_sans_cle, ignore_errors=True)
     j.verrou("Construire un client d'appels RÉELS est impossible ici",
              "l'exception CleApiAbsente, donc aucun appel réel possible",
              refus, passe)
@@ -1369,10 +1373,10 @@ def _empreinte_fichier(chemin):
 
 
 def scenario_assistant_par_nature(banc, nature):
-    """Le parcours en 3 étapes pour UNE nature, avec toutes les issues.
+    """The 3-step journey for ONE kind, with every outcome.
 
-    Un seul passage sert deux axes : le parcours lui-même (⚠ refusés,
-    campagne « prête » qui n'appelle personne) et le collage (les issues).
+    A single pass serves two axes: the journey itself (⛔ refused, a `prête`
+    campaign that calls nobody) and pasting (the outcomes).
     """
     j = banc.j
     banc.nouveau_simulateur()
@@ -1388,7 +1392,7 @@ def scenario_assistant_par_nature(banc, nature):
            etape1.count("carte-nature") >= attendues
            and html_mod.escape(assistant.NATURES[nature]["nom"]) in etape1)
     brouillon, page = banc.ouvrir_brouillon(nature)
-    # ⚠ étape 2 : continuer SANS les informations obligatoires est refusé.
+    # ⚠ step 2: continuing WITHOUT the mandatory information is refused.
     minimal = {"b": brouillon, "action": "continuer", "ordre": "liste"}
     page, _ = banc.poster("/assistant/message", minimal)
     obligatoires = [i for i in assistant.NATURES[nature]["infos"]
@@ -1413,14 +1417,14 @@ def scenario_assistant_par_nature(banc, nature):
            "étape 3 ouverte" if "3. Les personnes" in page else
            "étape 3 toujours fermée",
            "3. Les personnes" in page)
-    # Étape 3 par collage : les six terminaisons + 🚫 + doublon + à supprimer.
+    # Step 3 by pasting: the six endings + 🚫 + duplicate + one to delete.
     lignes = [_ligne_collage(nature, nom, tel, bloc, 10 + indice)
               for indice, (_, nom, tel) in enumerate(CONTACTS_FORCES)]
     lignes.append(_ligne_collage(nature, CONTACT_STOP[0], CONTACT_STOP[1],
                                  bloc, 17))
     lignes.append(_ligne_collage(nature, CONTACT_SUPPRIME[0],
                                  CONTACT_SUPPRIME[1], bloc, 18))
-    # Doublon volontaire : la même personne, deux fois.
+    # A deliberate duplicate: the same person, twice.
     lignes.append(_ligne_collage(nature, CONTACTS_FORCES[0][1],
                                  CONTACTS_FORCES[0][2], bloc, 10))
     page, _ = banc.poster("/assistant/importer",
@@ -1474,31 +1478,30 @@ def scenario_assistant_par_nature(banc, nature):
                         contact_avant, en_cascade=False)
     _controler_fiche_supprimee(banc, campagne_id, nature, "collage")
     controler_ecran_campagne(banc, campagne_id, nature, "collage", cibles)
-    # La relance : le 56 doit aboutir, et lui seul change d'état.
+    # The follow-up: the 56 must conclude, and it alone changes state.
     _relancer_et_controler(banc, campagne_id, nature, "collage", cibles,
                            en_cascade=False)
     return campagne_id
 
 
 def _controler_bords_collage(banc, campagne_id, nature, depart):
-    """Le 🚫 exclu d'office, puis la fiche du dernier contact est SUPPRIMÉE.
+    """The 🚫 excluded outright, then the last contact's record is DELETED.
 
-    La suppression passe par la vraie porte de l'écran (avec confirmation),
-    entre la validation et l'exécution : c'est exactement « la fiche a
-    disparu en cours de route ».
+    The deletion goes through the screen's real door (with confirmation),
+    between validation and execution: that is exactly `the record disappeared
+    along the way`.
     """
     j = banc.j
     contacts = banc.contacts(campagne_id)
     exclus = [c for c in contacts if c["nom"] == CONTACT_STOP[0]]
-    # ⚠ CE CONTRÔLE MESURAIT L'ANCIENNE RÈGLE (« exclu »), et il a arrêté le
-    # banc sur les cinq natures le 20/08/2026 — c'est exactement son travail.
-    # Depuis sa demande du même jour, une personne qui a refusé l'AGENT part
-    # vers un rappel PAR UN HUMAIN : elle n'a pas refusé le cabinet, et la
-    # marquer « exclu » la faisait disparaître sans que personne ne la rappelle.
-    #
-    # ⚠ LA GARANTIE QUI COMPTE N'A PAS BOUGÉ D'UN POUCE, et elle est mesurée
-    # juste en dessous : aucun appel n'est jamais composé pour elle. C'est le
-    # seul point sur lequel ce banc ne transige pas.
+    # ⚠ THIS CHECK WAS MEASURING THE OLD RULE (`exclu`), and it stopped the
+    # bench on all five kinds on 20/08/2026 — which is exactly its job. Since
+    # his request of the same day, a person who refused THE AGENT goes to a
+    # call-back BY A HUMAN: they did not refuse the practice, and marking them
+    # `exclu` made them disappear without anybody calling them back.  ⚠ THE
+    # GUARANTEE THAT MATTERS HAS NOT MOVED AN INCH, and it is measured just
+    # below: no call is ever dialled for them. It is the one point on which
+    # this bench does not compromise.
     j.vrai(nature, depart, "stop",
            "le contact 🚫 part d'office vers un rappel PAR UN HUMAIN",
            f"état « {db.ETAT_RAPPEL_HUMAIN} »",
@@ -1523,7 +1526,7 @@ def _controler_bords_collage(banc, campagne_id, nature, depart):
 
 
 def _controler_fiche_supprimee(banc, campagne_id, nature, depart):
-    """Une fiche disparue en cours de route n'est plus jamais composée."""
+    """A record that disappeared along the way is never dialled again."""
     j = banc.j
     supprime = [c for c in banc.contacts(campagne_id)
                 if c["nom"] == CONTACT_SUPPRIME[0]]
@@ -1546,7 +1549,8 @@ def _erreurs_de(page):
 
 
 def _cibles(banc, campagne_id):
-    """Photographie AVANT l'appel : contact + rendez-vous visé, par terminaison."""
+    """A snapshot BEFORE the call: contact + targeted appointment, per ending.
+    """
     cibles = {}
     for fin, contact in banc.par_terminaison(campagne_id).items():
         rdv = banc.rdv_vise(contact)
@@ -1557,7 +1561,7 @@ def _cibles(banc, campagne_id):
 
 def _relancer_et_controler(banc, campagne_id, nature, depart, cibles,
                            en_cascade):
-    """Le geste « Lancer les relances dues » : le 56 aboutit."""
+    """The `Lancer les relances dues` gesture: the 56 concludes."""
     j = banc.j
     if "56" not in cibles:
         return
@@ -1566,18 +1570,16 @@ def _relancer_et_controler(banc, campagne_id, nature, depart, cibles,
     frais = banc.base.obtenir_contact_campagne(cibles["56"]["id"])
     apres = frais["etat"]
     repli = etat_date_refusee(nature)
-    # ⚠ UNE TROISIÈME FIN LÉGITIME (16/08/2026), et il a fallu la mesurer pour
-    # l'admettre. Depuis que la simulation d'un déplacement commence par un
-    # succès puis mélange le reste (sa demande), une campagne POSE beaucoup
-    # plus de rendez-vous : 38 acceptés sur 56 contacts, mesuré. Les places
-    # utilisables pour un contact donné — à SA durée — finissent par manquer,
-    # et la relance ne peut alors rien annoncer.
-    #
-    # Ce n'est pas un défaut : le produit refuse d'annoncer des dates qu'il ne
-    # pourrait pas honorer, et il l'écrit en clair sur la fiche. Le contrôle
-    # l'accepte donc — mais SEULEMENT avec cette raison-là, vérifiée dans le
-    # détail. L'accepter sur le seul état aurait fait passer n'importe quel
-    # « à rappeler par un humain », y compris un vrai défaut.
+    # ⚠ A THIRD LEGITIMATE ENDING (16/08/2026), and it took measuring to accept
+    # it. Since a move's simulation starts with a success then shuffles the
+    # rest (his request), a campaign PLACES far more appointments: 38 accepted
+    # out of 56 contacts, measured. The slots usable for a given contact — at
+    # THEIR length — end up running out, and the follow-up then has nothing to
+    # announce.  That is not a defect: the product refuses to announce dates it
+    # could not honour, and it writes so in clear on the record. So the check
+    # accepts it — but ONLY with that reason, verified in the detail. Accepting
+    # it on the state alone would have let any `à rappeler par un humain`
+    # through, including a genuine defect.
     def _faute_de_place(fiche):
         return (fiche["etat"] == "à rappeler par un humain"
                 and "il n'en reste plus AUCUN de libre"
@@ -1609,29 +1611,30 @@ def _relancer_et_controler(banc, campagne_id, nature, depart, cibles,
 
 
 def scenario_creneau_libere_cascade(banc):
-    """« Créneau libéré » avec sa vraie mécanique : appel de cascade.
+    """`Créneau libéré` with its real mechanism: a cascade call.
 
-    Deux campagnes : une en « tout le monde » pour voir les six issues, une
-    en « arrêt au premier oui » pour voir l'épargne.
+    Two campaigns: one in `everybody` mode to see the six outcomes, one in
+    `stop at the first yes` to see the sparing.
 
-    Rend l'identifiant de la PREMIÈRE campagne. C'est la seule du banc qui
-    produise encore des contacts « ❌ refusé » : depuis la règle du
-    31/07/2026, une annulation (issue « canceled » des appels classiques)
-    donne « 📞 le client rappellera », tandis qu'un refus du créneau proposé
-    en cascade (« refused ») reste un refus. C'est donc elle qui alimente le
-    filtre de reprise « ❌ Refus ».
+    Returns the id of the FIRST campaign. It is the only one in the bench that
+    still produces `❌ refusé` contacts: since the rule of 31/07/2026, a
+    cancellation (the `canceled` outcome of classic calls) gives `📞 le client
+    rappellera`, whereas a refusal of the slot offered in a cascade (`refused`)
+    stays a refusal. So it is the one that feeds the `❌ Refus` resumption
+    filter.
     """
     j = banc.j
     nature, depart = "creneau_libere", "collage"
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
-    # ⚠ UNE PLACE RÉELLEMENT LIBRE, demandée au produit (voir place_libre) : une
-    # heure écrite en dur tombe sur un rendez-vous depuis que le jeu d'essai
-    # couvre cent jours, et une campagne dont la place est prise s'arrête — à
-    # juste titre.
+    # ⚠ A GENUINELY FREE SLOT, asked of the product (see place_libre): a
+    # hard-written time lands on an appointment now that the sample data set
+    # covers a hundred days, and a campaign whose slot is taken stops —
+    # rightly.
     creneau = banc.place_libre(bloc + 5)
     brouillon, _ = banc.ouvrir_brouillon(nature)
-    # ⚠ propre à cette nature : sans la date du créneau libéré, on ne passe pas.
+    # ⚠ specific to this kind: without the freed slot's date, you cannot get
+    # through.
     page, _ = banc.poster("/assistant/message",
                           {"b": brouillon, "action": "continuer",
                            "ordre": "liste",
@@ -1684,7 +1687,7 @@ def scenario_creneau_libere_cascade(banc):
     _relancer_et_controler(banc, campagne_id, nature, depart, cibles,
                            en_cascade=True)
     campagne_des_refus = campagne_id
-    # Deuxième campagne : arrêt au premier oui, les suivants épargnés.
+    # Second campaign: stop at the first yes, the following ones spared.
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
     brouillon, _ = banc.ouvrir_brouillon(nature)
@@ -1723,15 +1726,15 @@ def scenario_creneau_libere_cascade(banc):
     return campagne_des_refus
 
 
-# ⚠ « scenario_contact_unique » et « _bords_contact_unique » ont disparu
-# le 03/08/2026 avec leur nature. Les trois cas de bord qu'ils portaient
-# (🚫 ne plus appeler, doublon collé deux fois, fiche supprimée en cours
-# de route) sont déjà parcourus par le scénario de collage générique,
-# sur les natures qui restent — rien n'est perdu.
+# ⚠ `scenario_contact_unique` and `_bords_contact_unique` disappeared on
+# 03/08/2026 along with their kind. The three edge cases they carried (🚫 do not
+# call again, a duplicate pasted twice, a record deleted along the way) are
+# already walked by the generic pasting scenario, on the remaining kinds —
+# nothing is lost.
 
 
 def scenario_csv(banc):
-    """Étape 3 remplie par un FICHIER CSV."""
+    """Step 3 filled from a CSV FILE."""
     j = banc.j
     nature, depart = "confirmation", "csv"
     banc.nouveau_simulateur()
@@ -1742,7 +1745,7 @@ def scenario_csv(banc):
     for indice, (_, nom, telephone) in enumerate(CONTACTS_FORCES):
         lignes.append(f"{nom};{telephone};{_iso(bloc, 10 + indice)};"
                       "Séance de contrôle")
-    # Un 🚫, un futur supprimé, et une ligne répétée : les trois cas de bord.
+    # A 🚫, a future deletion, and a repeated row: the three edge cases.
     lignes.append(f"{CONTACT_STOP[0]};{CONTACT_STOP[1]};{_iso(bloc, 17)};"
                   "Séance de contrôle")
     lignes.append(f"{CONTACT_SUPPRIME[0]};{CONTACT_SUPPRIME[1]};"
@@ -1779,7 +1782,8 @@ def scenario_csv(banc):
 
 
 def scenario_ics(banc):
-    """Étape 3 remplie par un AGENDA ICS — dont un contact SANS NUMÉRO."""
+    """Step 3 filled from an ICS CALENDAR — including a contact WITH NO NUMBER.
+    """
     j = banc.j
     nature, depart = "rappel_rdv", "ics"
     chemin = os.path.join(RACINE_APP, "exemple_agenda_realiste.ics")
@@ -1815,7 +1819,8 @@ def scenario_ics(banc):
            campagne_id is None
            and assistant.MESSAGE_CHAMPS_OBLIGATOIRES in page
            and 'class="manque"' in page)
-    # On retire la ligne sans numéro, puis on valide : le reste doit passer.
+    # We remove the row with no number, then validate: the rest must go
+    # through.
     lignes = banc.application.obtenir_brouillon_assistant(brouillon)["contacts"]
     indices = [i for i, c in enumerate(lignes, start=1) if not c["telephone"]]
     for indice in reversed(indices):
@@ -1841,7 +1846,7 @@ def scenario_ics(banc):
 
 
 def scenario_depuis_la_base(banc, depart, nature):
-    """Étape 3 remplie DEPUIS LA BASE (une des cinq sources)."""
+    """Step 3 filled FROM THE DATABASE (one of the five sources)."""
     j = banc.j
     source = SOURCE_DU_DEPART[depart]
     banc.nouveau_simulateur()
@@ -1863,7 +1868,7 @@ def scenario_depuis_la_base(banc, depart, nature):
                "les clients 🚫 « Ne plus appeler » sont écartés et COMPTÉS",
                "un message qui compte les 🚫 écartés",
                _message_de(page), "Ne plus appeler" in page)
-    # Remplir DEUX FOIS depuis la même source ne doit doubler personne.
+    # Filling TWICE from the same source must double nobody.
     combien = len(banc.application.obtenir_brouillon_assistant(
         brouillon)["contacts"])
     page, _ = banc.poster("/assistant/importer",
@@ -1898,8 +1903,9 @@ def scenario_depuis_la_base(banc, depart, nature):
 
 
 def scenario_colonnes_obligatoires_vides(banc):
-    """La limite mesurée : une source SANS rendez-vous lié ne peut pas nourrir
-    une nature dont les colonnes sont ⚠."""
+    """The measured limit: a source WITH no linked appointment cannot feed a kind
+    whose columns are ⚠.
+    """
     j = banc.j
     nature, depart = "rappel_rdv", "base_annules"
     banc.nouveau_simulateur()
@@ -1925,12 +1931,12 @@ def scenario_colonnes_obligatoires_vides(banc):
 
 def scenario_reprise_de_campagne(banc, campagne_source, campagne_injoignable,
                                  campagne_refus=None):
-    """Reprise d'une campagne précédente, filtrée par état (les six filtres).
+    """Resuming a previous campaign, filtered by state (the six filters).
 
-    Trois campagnes sources : la grande (l'essentiel des états), la petite
-    campagne à plafond zéro (seule à contenir un 📵 injoignable), et la
-    campagne « créneau libéré » (seule à contenir un ❌ refusé depuis que
-    l'annulation donne « 📞 le client rappellera »).
+    Three source campaigns: the big one (most of the states), the small
+    zero-ceiling campaign (the only one containing a 📵 unreachable), and the
+    `créneau libéré` campaign (the only one containing a ❌ refusal since a
+    cancellation gives `📞 le client rappellera`).
     """
     j = banc.j
     for depart, etat in ETAT_DU_DEPART.items():
@@ -1979,11 +1985,11 @@ def scenario_reprise_de_campagne(banc, campagne_source, campagne_injoignable,
 
 
 def scenario_injoignable(banc):
-    """Plafond de relances à zéro : le 53 devient 📵 injoignable tout de suite.
+    """A follow-up ceiling of zero: the 53 becomes 📵 unreachable straight away.
 
-    C'est ce qui alimente le filtre de reprise « 📵 injoignables » et le bas
-    de la page 🔁 Relances (« la chaîne s'arrête là, et pourtant on ne l'a
-    pas joint »). Rend l'identifiant de la campagne créée.
+    That is what feeds the `📵 injoignables` resumption filter and the bottom of
+    the 🔁 Relances page (`the chain stops there, and yet we did not reach
+    them`). Returns the id of the campaign created.
     """
     j = banc.j
     nature, depart = "prise_rdv", "collage"
@@ -2017,17 +2023,15 @@ def scenario_injoignable(banc):
 
 
 def scenario_deux_oui_sans_rendezvous_existant(banc):
-    """DEUX personnes disent oui dans une nature SANS « rendez-vous existant ».
+    """TWO people say yes in a kind WITH no `existing appointment`.
 
-    Ce que le banc cherche ici : chacune doit obtenir SON rendez-vous. Les
-    natures « prise de rendez-vous », « contact unique », « rappel d'appel
-    manqué » et « personnalisé » n'ont pas de colonne « rendez-vous
-    existant » : le créneau proposé au téléphone est la PROCHAINE PLACE
-    LIBRE, recalculée à l'instant de chaque appel. La première personne
-    prend une place, cette place est aussitôt bloquée par son rendez-vous,
-    et la seconde s'en voit proposer une AUTRE. Le banc vérifie les deux
-    faits : deux rendez-vous à deux places différentes, et la place prise
-    réellement bloquée ensuite.
+    What the bench is after here: each must get THEIR OWN appointment. The
+    `booking`, `single contact`, `missed-call reminder` and `custom` kinds have
+    no `existing appointment` column: the slot offered on the phone is the NEXT
+    FREE SLOT, recomputed at the instant of each call. The first person takes a
+    slot, that slot is immediately blocked by their appointment, and the second
+    is offered ANOTHER one. The bench checks both facts: two appointments at
+    two different slots, and the slot taken genuinely blocked afterwards.
     """
     j = banc.j
     nature, depart = "prise_rdv", "collage"
@@ -2061,9 +2065,10 @@ def scenario_deux_oui_sans_rendezvous_existant(banc):
                and r["id"] > banc.rdv_plancher
                and r["statut"] in ("prévu", "confirmé")]
         obtenus.append(bool(rdv))
-        # Le récit ne cite PAS la date : elle dépend du jour où le banc
-        # tourne, elle changerait d'une exécution à l'autre et le rapport ne
-        # serait plus comparable. On dit si elle est la même, c'est le point.
+        # The account does NOT quote the date: it depends on the day the bench
+        # runs, it would change from one run to the next and the report would
+        # no longer be comparable. We say whether it is the same one — that is
+        # the point.
         recits.append(f"{nom} : rendez-vous obtenu = "
                       f"{'oui' if rdv else 'NON'}, "
                       f"état « {contact['etat']} »")
@@ -2079,9 +2084,9 @@ def scenario_deux_oui_sans_rendezvous_existant(banc):
            "appel, jamais une date dérivée de l'heure qu'il est",
            " | ".join(recits),
            len(obtenus) == 2 and all(obtenus) and not meme_creneau)
-    # La seconde exigence du propriétaire : une place prise est BLOQUÉE dans
-    # le calendrier du programme. On le demande au produit lui-même — ce qui
-    # est refusé à la main doit l'être au téléphone.
+    # The owner's second requirement: a slot taken is BLOCKED in the program's
+    # calendar. We ask the product itself — what is refused by hand must be
+    # refused on the phone.
     bloquees = [horaires.refus_rendezvous_telephone(
         banc.base, banc.application.preferences, horaire) is not None
         for horaire in proposes if horaire]
@@ -2094,16 +2099,15 @@ def scenario_deux_oui_sans_rendezvous_existant(banc):
 
 
 def _campagne_annulation(banc, nature, contacts, option_active, bloc):
-    """Monte une campagne 🔔/✅ avec l'option d'annulation dans un réglage.
+    """Sets up a 🔔/✅ campaign with the cancellation option in one setting.
 
-    contacts : [(nom, téléphone, heure)] — un VRAI rendez-vous est créé en
-    base pour chacun, à l'heure donnée du bloc, et la ligne collée porte
-    exactement cet horaire (c'est ce qui rattache le contact à SON
-    rendez-vous, comme le fait le produit). Le troisième élément peut aussi
-    être un horaire ISO COMPLET (« 2026-08-01T14:30 ») quand le cas éprouvé
-    a besoin d'une date proche de MAINTENANT plutôt que d'un bloc — c'est
-    ce dont a besoin le seuil de remplacement.
-    Rend (campagne_id, page de validation, {nom : horaire d'origine}).
+    contacts: [(name, phone, hour)] — a REAL appointment is created in the
+    database for each, at the given hour of the block, and the pasted row
+    carries exactly that time (that is what attaches the contact to THEIR
+    appointment, as the product does). The third element may also be a FULL ISO
+    time (`2026-08-01T14:30`) when the case being exercised needs a date close
+    to NOW rather than a block — that is what the replacement threshold needs.
+    Returns (campagne_id, validation page, {name: original time}).
     """
     horaires_poses = {}
     lignes = []
@@ -2112,8 +2116,8 @@ def _campagne_annulation(banc, nature, contacts, option_active, bloc):
         client_id = banc.base.obtenir_ou_creer_client(nom, telephone)
         banc.base.ajouter_rendezvous(client_id, horaire, "Séance de suivi")
         horaires_poses[nom] = horaire
-        # Les colonnes sont celles de LA NATURE (elles diffèrent d'une
-        # nature à l'autre) : la ligne collée est donc toujours acceptable.
+        # The columns are THE KIND's (they differ from one kind to another):
+        # the pasted row is therefore always acceptable.
         morceaux = [nom, telephone]
         for champ in assistant.NATURES[nature]["champs"]:
             if champ["type"] == "date":
@@ -2136,22 +2140,19 @@ def _campagne_annulation(banc, nature, contacts, option_active, bloc):
 
 
 def scenario_annulation_deux_reglages(banc):
-    """L'ANNULATION dans ses deux réglages (règle du 31/07/2026).
+    """CANCELLATION in both of its settings (the rule of 31/07/2026).
 
-    L'option de campagne « proposer une autre date si le client annule »
-    décide de ce que l'agent a le droit de faire — et elle change le TEXTE
-    dicté à l'agent. Le banc mesure les deux réglages :
+    The campaign option `offer another date if the client cancels` decides what
+    the agent is allowed to do — and it changes the TEXT dictated to the agent.
+    The bench measures both settings:
 
-    - décochée : le message dit « je ne vous propose pas d'autre date » ;
-      le client qui annule (52) passe « 📞 le client rappellera », aucune
-      relance, aucune campagne, et son rendez-vous quitte « à venir » ;
-    - cochée : le message annonce les places réellement libres ; le client
-      qui accepte une autre date (54) voit son rendez-vous réellement
-      DÉPLACÉ, avec sa ligne ↔ au cahier des changements.
+    - unticked: the message says `I am not offering you another date`; the client who cancels (52) becomes `📞 le client rappellera`, no follow-up, no campaign, and their appointment leaves `à venir`;
+    - ticked: the message announces the genuinely free slots; the client who accepts another date (54) sees their appointment genuinely MOVED, with its ↔ row in the change log.
     """
     j = banc.j
     nature, depart = "rappel_rdv", "collage"
-    # ---------------------------------------------- réglage 1 : sans l'option
+    # ---------------------------------------------- setting 1: without the
+    # option
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
     campagne_id, page, poses = _campagne_annulation(
@@ -2177,7 +2178,7 @@ def scenario_annulation_deux_reglages(banc):
     for fin, contact_avant in cibles.items():
         controler_issue(banc, campagne_id, nature, depart, fin, contact_avant,
                         en_cascade=False)
-    # ---------------------------------------------- réglage 2 : avec l'option
+    # ---------------------------------------------- setting 2: with the option
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
     campagne_id, page, poses = _campagne_annulation(
@@ -2229,23 +2230,23 @@ def scenario_annulation_deux_reglages(banc):
 
 
 def scenario_seuil_de_compensation(banc):
-    """LE SEUIL DE 12 H — la règle du propriétaire, des deux côtés.
+    """THE 12-HOUR THRESHOLD — the owner's rule, on both sides.
 
-    « si le rendez-vous est dans plus de 12 h, on propose dans le
-    récapitulatif à l'opérateur de démarrer une campagne de créneau libre
-    pour compenser l'absence ; si c'est < 12 h alors on laisse en annulé et
-    on indique que l'on ne peut pas dans ces conditions faire un
-    remplacement, mais que l'opérateur peut le faire manuellement ».
+    `if the appointment is more than 12 h away, we offer the operator in the
+    summary to start a freed-slot campaign to make up for the absence; if it is
+    < 12 h then we leave it as cancelled and state that under these conditions
+    we cannot arrange a replacement, but that the operator can do it manually`.
 
-    Le banc éprouve les DEUX côtés sans dépendre de l'heure à laquelle on
-    le lance : la date des rendez-vous reste celle des blocs, c'est le
-    SEUIL qu'on fait varier. Il mesure aussi la chose qui compte le plus :
-    AUCUN appel ne part de cette proposition.
+    The bench exercises BOTH sides without depending on the hour at which it is
+    launched: the appointments' dates stay those of the blocks, it is the
+    THRESHOLD that is varied. It also measures the thing that matters most: NO
+    call goes out from that offer.
     """
     j = banc.j
     nature, depart = "confirmation", "collage"
     preferences = banc.application.preferences
-    # ------------------------------------------- côté « on peut compenser »
+    # ------------------------------------------- the `we can make up for it`
+    # side
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
     campagne_id, page, poses = _campagne_annulation(
@@ -2297,9 +2298,9 @@ def scenario_seuil_de_compensation(banc):
            "assistant ouvert" if horaire in page else "créneau absent de l'écran",
            horaire in page and "Créneau libéré" in page
            and len(banc.base.lister_campagnes()) == campagnes_avant)
-    # ------------------------------------- côté « trop tard pour compenser »
-    # Un rendez-vous DANS DEUX HEURES : sous le seuil par défaut (12 h),
-    # quelle que soit l'heure à laquelle ce banc est lancé.
+    # ------------------------------------- the `too late to make up for it`
+    # side An appointment IN TWO HOURS: below the default threshold (12 h),
+    # whatever the hour at which this bench is launched.
     banc.nouveau_simulateur()
     dans_deux_heures = (datetime.datetime.now()
                         + datetime.timedelta(hours=2)).replace(
@@ -2353,13 +2354,12 @@ def scenario_seuil_de_compensation(banc):
 
 
 def scenario_cascade_ancien_rendezvous(banc):
-    """Q7 : la cascade DIRECTE ne laisse plus deux rendez-vous au client.
+    """Q7: the DIRECT cascade no longer leaves the client with two appointments.
 
-    Trois cas, tels que la règle les distingue :
-    - un client CONNU avec UN rendez-vous à venir : l'ancien est libéré ;
-    - une ligne collée INCONNUE : rien n'est touché, rien n'est inventé ;
-    - un client connu avec PLUSIEURS rendez-vous à venir : RingBack ne
-      choisit pas à la place de l'humain, il l'écrit.
+    Three cases, as the rule distinguishes them:
+    - a KNOWN client with ONE upcoming appointment: the old one is released;
+    - an UNKNOWN pasted row: nothing is touched, nothing is invented;
+    - a known client with SEVERAL upcoming appointments: RingBack does not choose in the human's place, it writes it down.
     """
     j = banc.j
     nature, depart = "creneau_libere", "cascade"
@@ -2373,10 +2373,10 @@ def scenario_cascade_ancien_rendezvous(banc):
         trouve = re.search(r"/cascade/resultat\?id=(\d+)", url)
         return int(trouve.group(1)) if trouve else None
 
-    # ------------------------------------------- cas 1 : le client est connu
-    # La place proposée est prise sur CE jour : il doit être ouvert, sinon le
-    # produit refuse le rendez-vous et le contrôle mesure le calendrier au
-    # lieu de mesurer le produit (voir `_jour_ouvre`).
+    # ------------------------------------------- case 1: the client is known
+    # The slot offered is taken on THIS day: it must be open, otherwise the
+    # product refuses the appointment and the check measures the calendar
+    # instead of measuring the product (see `_jour_ouvre`).
     bloc = _jour_ouvre(banc.prochain_bloc())
     nom, telephone = "M. Isidore Beaupréau-Lançon", "06 39 98 05 51"
     client_id = base.obtenir_ou_creer_client(nom, telephone)
@@ -2405,7 +2405,7 @@ def scenario_cascade_ancien_rendezvous(banc):
            "la trace dit QUEL rendez-vous a été libéré",
            ancien, ligne["rendezvous_libere"])
 
-    # ------------------------------ cas 2 : la ligne collée est INCONNUE
+    # ------------------------------ case 2: the pasted row is UNKNOWN
     bloc = _jour_ouvre(banc.prochain_bloc())
     rdv_avant = len(base.tous_les_rendezvous())
     cascade_id = _lancer("Mme Perrine Vaudémont-Ourcq", "06 39 98 06 51",
@@ -2422,7 +2422,7 @@ def scenario_cascade_ancien_rendezvous(banc):
                f"{ligne['rendezvous_libere']}",
                crees == 1 and ligne["rendezvous_libere"] is None)
 
-    # -------------------- cas 3 : plusieurs rendez-vous à venir = ambigu
+    # -------------------- case 3: several upcoming appointments = ambiguous
     bloc = _jour_ouvre(banc.prochain_bloc())
     nom, telephone = "Mme Aliénor Trémolière-Sanzey", "06 39 98 07 51"
     client_id = base.obtenir_ou_creer_client(nom, telephone)
@@ -2451,10 +2451,10 @@ def scenario_cascade_ancien_rendezvous(banc):
                else "MENTION ABSENTE de l'écran",
                "à libérer dans votre agenda" in page)
 
-    # ------------------- cas 4 : « autre date convenue » (la branche moved)
-    # ⚠ LE JOUR DU REPORT DOIT ÊTRE OUVERT LUI AUSSI : le simulateur reporte
-    # toujours à la place + DEUX jours, et un dimanche fait refuser le
-    # rendez-vous — voir `_jour_ouvre`.
+    # ------------------- case 4: `another date agreed` (the moved branch) ⚠
+    # THE POSTPONEMENT DAY MUST BE OPEN TOO: the simulator always postpones to
+    # the slot + TWO days, and a Sunday makes the appointment be refused — see
+    # `_jour_ouvre`.
     bloc = _jour_ouvre(banc.prochain_bloc(), 2)
     nom, telephone = "M. Gonzague Malemort-Ferrières", "06 39 98 08 54"
     client_id = base.obtenir_ou_creer_client(nom, telephone)
@@ -2487,14 +2487,14 @@ def scenario_cascade_ancien_rendezvous(banc):
 
 
 def scenario_file_appels(banc):
-    """La file d'appels : « tout rappeler » puis exécuter."""
+    """The call queue: `call everybody back` then run it."""
     j = banc.j
     nature, depart = None, "file"
     banc.nouveau_simulateur()
-    # De la matière fraîche pour la file : les campagnes précédentes ont déjà
-    # traité les manqués du jeu d'essai. Les six rendez-vous ci-dessous sont
-    # ajoutés PAR L'ÉCRAN (formulaire « Ajouter »), à une date passée : c'est
-    # la règle du manqué qui les marque elle-même « manqué ».
+    # Fresh material for the queue: the earlier campaigns have already handled
+    # the sample data set's missed appointments. The six appointments below are
+    # added THROUGH THE SCREEN (the `Ajouter` form), at a past date: it is the
+    # missed rule that marks them `manqué` itself.
     for indice, (_, nom, telephone) in enumerate(CONTACTS_FORCES):
         banc.poster("/ajouter", {
             "nom": nom, "telephone": telephone,
@@ -2514,8 +2514,8 @@ def scenario_file_appels(banc):
            "aucun numéro en clair" if CONTACTS_FORCES[0][2] not in page
            else "NUMÉRO EN CLAIR TROUVÉ",
            CONTACTS_FORCES[0][2] not in page)
-    # « Tout rappeler » écarte d'emblée deux familles : ceux qui n'ont pas de
-    # numéro (rien à composer) et les 🚫. On le vérifie sur pièces.
+    # `Call everybody back` sets aside two families right away: those with no
+    # number (nothing to dial) and the 🚫. We check that on the evidence.
     en_file_ids = {e["rendezvous_id"] for e in banc.application.planif.file}
     for issue_code, nom, quoi in (
             ("sans_numero", "M. Antoine Villeneuve",
@@ -2560,8 +2560,8 @@ def scenario_file_appels(banc):
         "51": ("confirmé", "le rendez-vous manqué est REPLACÉ au créneau "
                            "accepté (statut confirmé)"),
         "52": ("annulé", "le rendez-vous manqué passe en ANNULÉ"),
-        # ⚠ LA MÊME LIGNE BOUGE (17/08/2026) : elle passait auparavant en
-        # « déplacé » et une SECONDE naissait à la date convenue.
+        # ⚠ THE SAME ROW MOVES (17/08/2026): it previously became `déplacé` and
+        # a SECOND one was born at the agreed date.
         "54": ("confirmé", "le rendez-vous manqué BOUGE à la date convenue "
                            "(une seule ligne, pas deux)"),
         "55": (None, "rien n'est touché : le client n'a rien conclu"),
@@ -2597,7 +2597,8 @@ def scenario_file_appels(banc):
 
 
 def scenario_cascade_directe(banc):
-    """La page Cascade : génération de liste depuis la base, puis « premier oui »."""
+    """The Cascade page: generating a list from the database, then `first yes`.
+    """
     j = banc.j
     nature, depart = "creneau_libere", "cascade"
     banc.nouveau_simulateur()
@@ -2612,13 +2613,13 @@ def scenario_cascade_directe(banc):
            "liste générée" if "personne(s) dans la liste" in page
            else "aucune liste générée",
            "personne(s) dans la liste" in page)
-    # Ordre choisi exprès : celui qui accepte est le DERNIER, pour voir
-    # passer toutes les autres issues avant l'arrêt au premier oui.
+    # The order is chosen on purpose: the one who accepts is LAST, so that
+    # every other outcome is seen before the stop at the first yes.
     ordre = [CONTACTS_FORCES[i] for i in (2, 1, 4, 3, 5, 0)]
     liste = "\n".join(f"{nom};{tel}" for _, nom, tel in ordre)
-    # Un doublon dans la liste de cascade : ici, contrairement à la grille de
-    # l'assistant, il ARRÊTE le lancement — rien n'est composé tant que la
-    # liste n'est pas propre. Le banc vérifie que c'est bien dit.
+    # A duplicate in the cascade list: here, unlike the assistant's grid, it
+    # STOPS the launch — nothing is dialled until the list is clean. The bench
+    # checks that this is duly said.
     avant_cascades = len(banc.base.lister_cascades())
     page, _url = banc.poster("/cascade/executer", {
         "liste": liste + f"\n{ordre[0][1]};{ordre[0][2]}",
@@ -2630,7 +2631,7 @@ def scenario_cascade_directe(banc):
            _erreurs_de(page) or "(aucun refus affiché)",
            "doublon" in page.lower()
            and len(banc.base.lister_cascades()) == avant_cascades)
-    # Le 🚫 reste dans la liste : il ne doit JAMAIS être composé.
+    # The 🚫 stays in the list: it must NEVER be dialled.
     liste += f"\n{CONTACT_STOP[0]};{CONTACT_STOP[1]}"
     page, url = banc.poster("/cascade/executer", {
         "liste": liste, "creneau": creneau,
@@ -2694,7 +2695,7 @@ def scenario_cascade_directe(banc):
 
 
 def scenario_bouton_demarrer(banc):
-    """Le vrai bouton ▶ Démarrer (fil de fond), vérifié UNE fois."""
+    """The real ▶ Start button (background thread), checked ONCE."""
     j = banc.j
     nature, depart = "prise_rdv", "collage"
     banc.nouveau_simulateur()
@@ -2709,9 +2710,10 @@ def scenario_bouton_demarrer(banc):
                 "la campagne du bouton ▶ Démarrer se valide",
                 "une campagne prête", "refus : " + _erreurs_de(page), False)
         return
-    # Le démarrage porte le geste conscient sur l'agenda (« agenda_verifie ») :
-    # c'est ce qu'envoie le clic sur le panneau du poste de pilotage. Sans lui,
-    # RingBack refuse de lancer — ce refus a ses tests dédiés.
+    # Starting carries the conscious gesture about the calendar
+    # (`agenda_verifie`): that is what the click on the control desk's panel
+    # sends. Without it, RingBack refuses to launch — that refusal has its own
+    # dedicated tests.
     banc.poster("/campagne/demarrer",
                 {"campagne": campagne_id, "agenda_verifie": "1"})
     limite = time.monotonic() + 30
@@ -2725,12 +2727,12 @@ def scenario_bouton_demarrer(banc):
 
 
 # ===========================================================================
-#  R15 — LES DEUX PORTES MÈNENT À UNE CAMPAGNE
+# R15 — BOTH DOORS LEAD TO A CAMPAIGN
 # ---------------------------------------------------------------------------
-# §4 (porte 👥 : un état à traiter) et §5 (porte 📅 : un trou, un rendez-vous).
-# Ces clients-là portent tous « Portail » dans leur nom : le banc filtre
-# dessus, ce qui rend les COMPTES exacts et indépendants de tout ce que les
-# scénarios précédents ont laissé en base.
+# §4 (the 👥 door: a state to handle) and §5 (the 📅 door: a gap, an
+# appointment). Those clients all carry `Portail` in their name: the bench
+# filters on it, which makes the COUNTS exact and independent of whatever the
+# earlier scenarios left in the database.
 # ===========================================================================
 PORTAIL_MANQUES = (
     ("Mme Portail Manquée Une", "06 39 98 07 71"),
@@ -2744,23 +2746,23 @@ ETAT_MANQUE = "rendez-vous manqué (absent)"
 
 
 def _liste_clients_banc(banc, **filtres):
-    """Le FRAGMENT de liste, tel que les filtres de l'écran le rechargent."""
+    """The list FRAGMENT, as the screen's filters reload it."""
     return banc.obtenir("/clients/liste?" + urllib.parse.urlencode(filtres))
 
 
 def scenario_deux_portes_vers_campagne(banc):
-    """R15 fermée : de l'état au bouton, du trou à la campagne. ZÉRO appel.
+    """R15 closed: from the state to the button, from the gap to the campaign.
+    ZERO calls.
 
-    Ce scénario ne fait passer AUCUN appel, et c'est justement ce qu'il
-    mesure : les deux portes ouvrent l'assistant à l'étape 2 (liste déjà
-    remplie), elles ne lancent rien. Il éprouve aussi la décision du
-    propriétaire du 31/07/2026 — un bouton PAR NATURE quand le filtre mêle
-    des états traités par des campagnes différentes.
+    This scenario places NO call, and that is precisely what it measures: both
+    doors open the assistant at step 2 (list already filled), they launch
+    nothing. It also exercises the owner's decision of 31/07/2026 — one button
+    PER KIND when the filter mixes states handled by different campaigns.
     """
     j = banc.j
     nature, depart = "prise_rdv", "etat_client"
     base = banc.base
-    # --------------------------------------------------- la matière du cas
+    # --------------------------------------------------- the case's material
     for rang, (nom, telephone) in enumerate(PORTAIL_MANQUES):
         client_id = base.obtenir_ou_creer_client(nom, telephone)
         base.ajouter_rendezvous(client_id, _iso(-30 - rang, 9), "Bilan",
@@ -2782,7 +2784,8 @@ def scenario_deux_portes_vers_campagne(banc):
     appels_avant = base.conn.execute(
         "SELECT COUNT(*) FROM appels").fetchone()[0]
 
-    # ------------------------------------ §4.1 : le bouton NAÎT du filtre
+    # ------------------------------------ §4.1: the button IS BORN of the
+    # filter
     sans = _liste_clients_banc(banc, etat=ETAT_MANQUE, recherche="Portail")
     j.vrai(nature, depart, CONSTRUCTION,
            "sans l'option « non traité », AUCUN bouton de création : la "
@@ -2805,7 +2808,7 @@ def scenario_deux_portes_vers_campagne(banc):
            "aucun" if "badge-a-venir" not in avec else "un badge subsiste",
            "badge-a-venir" not in avec)
 
-    # ------------------ §4.2 : un bouton PAR NATURE quand les états se mêlent
+    # ------------------ §4.2: one button PER KIND when the states mix
     prevu = _liste_clients_banc(banc, etat="rendez-vous prévu",
                                 recherche="Portail", non_traite="1")
     for code, libelle in (("rappel_rdv", "🔔 Rappel de rendez-vous"),
@@ -2816,8 +2819,8 @@ def scenario_deux_portes_vers_campagne(banc):
                f"donne aussi le bouton « {libelle} », avec son compte",
                f"« {libelle} » — 1 client(s)",
                "bouton présent" if vu else "bouton absent", vu)
-    # La quatrième nature que la porte 👥 peut désigner : « déplacement en
-    # attente » (un rendez-vous déplacé, et plus rien à venir).
+    # The fourth kind the 👥 door can designate: `pending move` (an appointment
+    # moved, and nothing upcoming left).
     attente = _liste_clients_banc(banc, etat="déplacement en attente",
                                   recherche="Portail", non_traite="1")
     vu = "« 📆 Déplacement de rendez-vous » — 1 client(s)" in attente
@@ -2841,7 +2844,7 @@ def scenario_deux_portes_vers_campagne(banc):
            "3, 1, 1 et 1", "comptes exacts" if comptes else "comptes faux",
            comptes)
 
-    # --------------------- §4.3 : un état sans campagne ne donne AUCUN bouton
+    # --------------------- §4.3: a state with no campaign gives NO button
     humain = _liste_clients_banc(banc, etat="à rappeler par un humain",
                                  recherche="Portail", non_traite="1")
     j.vrai(nature, depart, CONSTRUCTION,
@@ -2860,7 +2863,7 @@ def scenario_deux_portes_vers_campagne(banc):
            "présent" if "pour un humain" in page_clients else "absent",
            "pour un humain" in page_clients)
 
-    # ------------------------- §4.4 : le clic ouvre l'ÉTAPE 2, liste remplie
+    # ------------------------- §4.4: the click opens STEP 2, list filled
     page, _ = banc.poster("/clients/campagne",
                           {"nature": "prise_rdv", "etat": ETAT_MANQUE,
                            "recherche": "Portail"})
@@ -2886,7 +2889,7 @@ def scenario_deux_portes_vers_campagne(banc):
            apres == appels_avant
            and len(base.lister_campagnes()) == campagnes_avant)
 
-    # ---------------------------------- §4.5 : la RECETTE porte le critère
+    # ---------------------------------- §4.5: the RECIPE carries the criterion
     brouillon = re.search(r'name="b" value="(\d+)"', page).group(1)
     banc.passer_etape2("prise_rdv", brouillon)
     campagne_id, fiche = banc.valider_grille(brouillon)
@@ -2914,7 +2917,8 @@ def scenario_deux_portes_vers_campagne(banc):
            f"{len(contacts)} contact(s), rejouable={rejouable}",
            rejouable and len(contacts) == 3)
 
-    # ------------------------------- §5.1 : un trou du planning → la campagne
+    # ------------------------------- §5.1: a gap in the schedule → the
+    # campaign
     preferences = banc.application.preferences
     for jour in range(7):
         horaires.basculer_periode(preferences, jour, 9 * 60, 18 * 60, "ouvrir")
@@ -2944,7 +2948,7 @@ def scenario_deux_portes_vers_campagne(banc):
            else "écran ou compte inattendu",
            ouvert and len(base.lister_campagnes()) == campagnes_avant)
 
-    # ----------------------- §5.2 et §5.3 : DÉPLACER et ANNULER un rendez-vous
+    # ----------------------- §5.2 and §5.3: MOVE and CANCEL an appointment
     bouge_id = base.obtenir_ou_creer_client("M. Portail À Bouger",
                                             "06 39 98 07 76")
     dans_trois_jours = (datetime.datetime.now()
@@ -2974,7 +2978,7 @@ def scenario_deux_portes_vers_campagne(banc):
                           and len(base.lister_campagnes()) == campagnes_avant)
            else "écran ou compte inattendu",
            deplace and len(base.lister_campagnes()) == campagnes_avant)
-    # « Annuler » : la règle des 12 h est APPELÉE, jamais récrite.
+    # `Cancel`: the 12-hour rule is CALLED, never rewritten.
     panneau, _ = banc.poster_fragment("/suivi/detail/annuler",
                                       {"rdv": rdv_id, "geste": "demander"})
     intact = base.obtenir_rendezvous(rdv_id)["statut"] == "prévu"
@@ -3006,59 +3010,57 @@ def scenario_deux_portes_vers_campagne(banc):
            appels_avant, appels_fin)
 
 
-# Le numéro que le banc DÉCLARE comme numéro d'essai. Pris dans les racines
-# que l'Arcep réserve à la fiction (il ne peut ni appeler ni être appelé),
-# hors des terminaisons 51-56 que le simulateur reconnaît, et absent du jeu
-# d'essai : il ne peut donc rien perturber d'autre.
+# The number the bench DECLARES as a test number. Taken from the roots Arcep
+# reserves for fiction (it can neither call nor be called), outside the 51-56
+# endings the simulator recognises, and absent from the sample data set: it can
+# therefore disturb nothing else.
 NUMERO_ESSAI_BANC = "06 39 98 09 88"
 
 
 def scenario_decalage_en_cascade(banc):
-    """⚠ SON PARCOURS, DU FORMULAIRE À L'HISTORIQUE (15/08/2026).
+    """⚠ HIS JOURNEY, FROM THE FORM TO THE HISTORY (15/08/2026).
 
-    Il me l'a demandé en toutes lettres : « Est-ce que tu en fais des vrais
-    comme moi — créer une campagne, l'exécuter, attendre qu'elle s'arrête et
-    regarder l'historique ? » La réponse était NON, et c'est pour cela que
-    trois jours de corrections n'ont rien changé chez lui :
+    He asked me in plain words: `Do you do real ones like me — create a
+    campaign, run it, wait for it to stop and look at the history?` The answer
+    was NO, and that is why three days of fixes changed nothing for him:
 
-    · mes essais unitaires fabriquent la campagne en Python, sous forme de
-      dictionnaire. Ils sautent les formulaires — donc tout ce qui se joue
-      entre son écran et le serveur leur est invisible. C'est exactement là
-      qu'était le défaut du gain de 30 jours ;
-    · le banc, lui, pilote bien les vrais formulaires… mais n'avait AUCUN
-      contrôle sur le décalage en cascade. (Le mot « cascade » y désigne la
-      *page* Cascade, une autre fonctionnalité — d'où la confusion.)
+    · my unit tests build the campaign in Python, as a dictionary. They skip
+    the forms — so everything that happens between his screen and the server is
+    invisible to them. That is exactly where the 30-day-gain defect was; · the
+    bench, for its part, does drive the real forms… but had NO check at all on
+    the cascading shift. (The word `cascade` there means the Cascade *page*, a
+    different feature — hence the confusion.)
 
-    Ce scénario refait donc son geste, en entier et par HTTP : nature, étape 2
-    avec l'option de décalage cochée et sa date limite, étape 3 en mode
-    AUTOMATIQUE avec sa règle et son plafond, « Valider », exécution, puis
-    lecture de ce que la campagne a réellement fait.
+    So this scenario redoes his gesture, in full and over HTTP: kind, step 2
+    with the shift option ticked and its cut-off date, step 3 in AUTOMATIC mode
+    with his rule and his ceiling, `Valider`, execution, then reading what the
+    campaign actually did.
 
-    UNE SEULE PLACE au départ — c'est le cas de TOUTES ses campagnes, vérifié
-    dans sa base. C'est justement celui que mes essais ne couvraient pas.
+    ONE SINGLE SLOT to start with — that is the case of ALL his campaigns,
+    verified in his database. It is precisely the one my tests did not cover.
     """
     j = banc.j
     nature, depart = "creneau_libere", "cascade_option"
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
     creneau = banc.place_libre(bloc + 5)
-    # ⚠ BORNÉ EXPRÈS — plafond 5, limite proche. Le banc partage UNE base entre
-    # toutes ses combinaisons ; une cascade laissée libre déplace des dizaines
-    # de rendez-vous sur des mois et vient piétiner les blocs des scénarios
-    # suivants. Mesuré : elle a fait tomber un contrôle du rappel de
-    # rendez-vous, qui n'avait rien à voir. Cinq appels suffisent à prouver la
-    # mécanique — l'ampleur, elle, se mesure dans les essais unitaires.
+    # ⚠ DELIBERATELY BOUNDED — a ceiling of 5, a near cut-off. The bench shares
+    # ONE database across all its combinations; a cascade left free moves
+    # dozens of appointments over months and tramples the following scenarios'
+    # blocks. Measured: it brought down a check on the appointment reminder,
+    # which had nothing to do with it. Five calls are enough to prove the
+    # mechanism — the scale is measured in the unit tests.
     plafond = "5"
     limite = (REFERENCE + datetime.timedelta(days=250)).date().isoformat()
 
-    # ⚠ SES PROPRES CONTACTS, semés ici. Le jeu d'essai du banc s'arrête au
-    # 23/11/2026, et ce scénario passe EN DERNIER : à ce moment-là, plus aucun
-    # rendez-vous n'est assez loin pour qu'une place en fasse gagner trente
-    # jours. Mesuré : « 0 contact — 58 personne(s) écartée(s) ». Le scénario
-    # aurait alors annoncé « la cascade ne marche pas » alors qu'il n'avait
-    # simplement personne à appeler — un banc qui ment est pire que pas de banc.
-    # Terminaison 51 : le simulateur fait ACCEPTER. Chaque oui libère donc la
-    # place que la personne quitte, et c'est cela qu'on veut voir enchaîner.
+    # ⚠ ITS OWN CONTACTS, seeded here. The bench's sample data set stops on
+    # 23/11/2026, and this scenario runs LAST: by then, no appointment is far
+    # enough away for a slot to gain thirty days. Measured: `0 contacts — 58
+    # people set aside`. The scenario would then have announced `the cascade
+    # does not work` when it simply had nobody to call — a bench that lies is
+    # worse than no bench. Ending 51: the simulator makes them ACCEPT. Each yes
+    # therefore frees the slot the person leaves, and that is what we want to
+    # see chain together.
     debut = datetime.datetime.fromisoformat(creneau)
     for rang in range(8):
         quand = (debut + datetime.timedelta(days=40 + rang * 7)).replace(
@@ -3068,7 +3070,7 @@ def scenario_decalage_en_cascade(banc):
         banc.base.ajouter_rendezvous(client, quand.isoformat(
             timespec="minutes"), "Séance", statut="prévu")
 
-    # ① Étape 2 : une place, arrêt au premier oui, DÉCALAGE EN CASCADE coché.
+    # ① Step 2: one slot, stop at the first yes, CASCADING SHIFT ticked.
     brouillon, _ = banc.ouvrir_brouillon(nature)
     formulaire = banc.formulaire_etape2(nature, brouillon)
     formulaire["info_creneau_libere"] = creneau
@@ -3076,19 +3078,19 @@ def scenario_decalage_en_cascade(banc):
     formulaire["opt_cascade"] = "1"
     formulaire["cascade_jusqu_au"] = limite
     page, url = banc.poster("/assistant/message", formulaire)
-    # ⚠ ON JUGE SUR L'ADRESSE ATTEINTE, pas sur `_erreurs_de` : cette fonction
-    # rend « (sans détail) » quand elle ne trouve rien, ce qui est VRAI au sens
-    # booléen. Un contrôle bâti dessus échoue toujours — le mien l'a fait.
+    # ⚠ WE JUDGE ON THE URL REACHED, not on `_erreurs_de`: that function
+    # returns `(no detail)` when it finds nothing, which is TRUE in the boolean
+    # sense. A check built on it always fails — mine did.
     j.vrai(nature, depart, CONSTRUCTION,
            "l'étape 2 accepte l'option « décaler en cascade » et sa date",
            "l'étape 3 s'ouvre (/assistant/liste)", url,
            "/assistant/liste" in url)
 
-    # ② Étape 3 : mode AUTOMATIQUE, sa règle, son plafond — puis « Valider ».
-    # ⚠ TOUT PART DANS LE MÊME ENVOI QUE « Valider », comme à l'écran : c'est
-    # précisément ce couplage-là qui était rompu le 15/08 (le panneau de la
-    # règle était un formulaire séparé, et le gain n'atteignait jamais le
-    # serveur). Un banc qui enregistrerait la règle à part ne le reverrait pas.
+    # ② Step 3: AUTOMATIC mode, his rule, his ceiling — then `Valider`. ⚠
+    # EVERYTHING GOES OUT IN THE SAME SUBMISSION AS `Valider`, as on screen: it
+    # is precisely that coupling that was broken on 15/08 (the rule panel was a
+    # separate form, and the gain never reached the server). A bench that saved
+    # the rule separately would not see it again.
     banc.poster("/assistant/liste", {"b": brouillon,
                                      "action": "liste:automatique"})
     campagne_id, page = banc.valider_grille(brouillon, {
@@ -3110,10 +3112,10 @@ def scenario_decalage_en_cascade(banc):
             config_avant["options"].get("cascade_jusqu_au"),
             config_avant.get("regle_liste"),
             str(config_avant.get("plafond") or "")))
-    # ⚠ ET LA RÈGLE A VRAIMENT REMPLI LA GRILLE. Sans ce contrôle, une règle qui
-    # ne trouve personne rendrait tous les suivants incompréhensibles : ils
-    # diraient « zéro appel » sans jamais dire POURQUOI. C'est le piège dans
-    # lequel je suis tombé en écrivant ce scénario.
+    # ⚠ AND THE RULE REALLY FILLED THE GRID. Without this check, a rule that
+    # finds nobody would make everything that follows incomprehensible: it
+    # would say `zero calls` without ever saying WHY. That is the trap I fell
+    # into while writing this scenario.
     charges = len(banc.base.contacts_de_campagne(campagne_id))
     notes = " / ".join((config_avant.get("regle_jouee") or {}).get("notes")
                        or []) or "(aucune note)"
@@ -3124,7 +3126,7 @@ def scenario_decalage_en_cascade(banc):
     places_avant = len(assistant.creneaux_de(
         banc.base.obtenir_campagne(campagne_id), config_avant))
 
-    # ③ « ▶ Démarrer », puis on attend l'arrêt — comme lui.
+    # ③ `▶ Démarrer`, then we wait for the stop — as he does.
     banc.executer(campagne_id)
 
     fiche = banc.base.obtenir_campagne(campagne_id)
@@ -3134,10 +3136,10 @@ def scenario_decalage_en_cascade(banc):
     pourvues = [f for f in nees if f["statut"] == assistant.CRENEAU_POURVU]
     appelees = banc.base.compter_personnes_appelees(campagne_id)
 
-    # ⚠ LE CŒUR, ET C'EST CE QU'IL LIT À L'ÉCRAN : la place qu'un contact
-    # quitte rejoint SA campagne. Avant, elle engendrait une campagne « prête »
-    # à côté, et celle-ci s'arrêtait — sa n°12 : sept appels sur trente
-    # autorisés, une place pourvue, campagne terminée.
+    # ⚠ THE HEART, AND IT IS WHAT HE READS ON SCREEN: the slot a contact leaves
+    # joins THEIR campaign. Before, it spawned a `prête` campaign beside it,
+    # and that one stopped — his no. 12: seven calls out of thirty allowed, one
+    # slot filled, campaign finished.
     j.vrai(nature, depart, "51",
            "la place quittée par celui qui accepte REJOINT la campagne "
            "(elle n'en prépare pas une autre à côté)",
@@ -3158,8 +3160,8 @@ def scenario_decalage_en_cascade(banc):
            "et il n'est JAMAIS dépassé",
            f"au plus {plafond} personnes appelées",
            f"{appelees} personne(s) appelée(s)", appelees <= int(plafond))
-    # Aucune campagne « prête » n'a été semée à côté : c'est le geste qu'il
-    # devait faire à la main, et qu'il ne doit plus avoir à faire.
+    # No `prête` campaign was seeded beside it: that was the gesture he had to
+    # do by hand, and must no longer have to.
     semees = [c for c in banc.base.lister_campagnes()
               if c["id"] != campagne_id and c["statut"] == "prête"
               and assistant.configuration_campagne(c)["options"].get(
@@ -3172,46 +3174,44 @@ def scenario_decalage_en_cascade(banc):
 
 
 def scenario_deplacement_journee_entiere(banc):
-    """⚠ SON TEST, MOT POUR MOT (17/08/2026).
+    """⚠ HIS TEST, WORD FOR WORD (17/08/2026).
 
-    « Vérifie que tu fais exactement les mêmes tests que moi : créer une
-    campagne en déplaçant les rendez-vous d'une journée entière : tout le
-    monde est traité et tous les cas de figure apparaissent dans les tests :
-    accepter (rendez-vous déplacé), à rappeler par un humain, à recontacter,
-    injoignable. »
+    `Check that you do exactly the same tests as me: create a campaign moving a
+    whole day's appointments: everybody is handled and every case appears in
+    the tests: accept (appointment moved), to be called back by a human, to
+    contact again, unreachable.`
 
-    Ce qu'il avait sous les yeux, et qu'aucun filet ne voyait :
-    · UN contact accepté, les dix autres « pas appelé » — parce qu'un réglage
-      enregistré (« politique: premier_oui ») écrit par l'ANCIEN défaut
-      continuait d'arrêter la campagne au premier oui ;
-    · et le rendez-vous « déplacé »… vers le 28/07/2026, vingt jours en
-      arrière, où il est aussitôt devenu MANQUÉ — cinq créneaux manuels
-      passés traînaient en tête de la liste des places à proposer.
+    What he had in front of him, and that no net saw: · ONE contact accepted,
+    the other ten `pas appelé` — because a saved setting (`politique:
+    premier_oui`) written by the OLD default went on stopping the campaign at
+    the first yes; · and the appointment `moved`… to 28/07/2026, twenty days
+    back, where it immediately became MISSED — five past manual slots were
+    lingering at the top of the list of slots to offer.
 
-    Le scénario passe donc par « Charger selon les dates » avec un JOUR
-    précis, comme lui, et contrôle les quatre choses qu'il regarde : le compte
-    des appels, le déplacement réel dans l'agenda, l'absence de date passée,
-    et les issues obtenues. Il exécute AUSSI les relances jusqu'au plafond :
-    « injoignable » n'est atteignable que par là — au premier tour, une
-    non-réponse programme une relance et s'affiche « à recontacter ».
+    So the scenario goes through `Charger selon les dates` with a specific DAY,
+    as he did, and checks the four things he looks at: the call count, the real
+    move in the calendar, the absence of a past date, and the outcomes
+    obtained. It ALSO runs the follow-ups up to the ceiling: `unreachable` is
+    only reachable that way — on the first round, a non-answer schedules a
+    follow-up and shows as `à recontacter`.
     """
     j = banc.j
     nature, depart = "deplacement", "journee_entiere"
     banc.nouveau_simulateur()
     bloc = banc.prochain_bloc()
 
-    # ⚠ UNE JOURNÉE ENTIÈRE, semée par nous : le banc partage sa base entre
-    # tous ses scénarios, donc on ne peut pas parier sur une journée déjà
-    # chargée. Onze rendez-vous le même jour, un par personne — c'est
-    # exactement la forme de sa campagne n°22.
+    # ⚠ A WHOLE DAY, seeded by us: the bench shares its database across all its
+    # scenarios, so we cannot bet on a day already loaded. Eleven appointments
+    # on the same day, one per person — exactly the shape of his campaign no.
+    # 22.
     depart_bloc = datetime.datetime.fromisoformat(banc.place_libre(bloc))
     jour = (depart_bloc + datetime.timedelta(days=30)).date()
-    while jour.weekday() >= 5:                  # un jour OUVRÉ, sinon rien
+    while jour.weekday() >= 5:  # an OPEN day, or nothing
         jour += datetime.timedelta(days=1)
-    # ⚠ LE DERNIER FINIT PAR 53 : cette terminaison ne décroche JAMAIS (c'est la
-    # convention du simulateur). C'est le seul moyen de voir « 📵 injoignable »,
-    # qui n'arrive qu'une fois les rappels épuisés — les dix autres tirent leur
-    # issue du plan de la nature, comme n'importe quelle liste réelle.
+    # ⚠ THE LAST ONE ENDS IN 53: that ending NEVER picks up (it is the
+    # simulator's convention). It is the only way to see `📵 injoignable`, which
+    # only happens once the reminders are exhausted — the other ten draw their
+    # outcome from the kind's plan, like any real list.
     for rang in range(11):
         quand = datetime.datetime.combine(
             jour, datetime.time(hour=9 + rang // 2,
@@ -3222,10 +3222,10 @@ def scenario_deplacement_journee_entiere(banc):
         banc.base.ajouter_rendezvous(client, quand.isoformat(
             timespec="minutes"), "Séance", statut="prévu")
 
-    # ⚠ ET UN CRÉNEAU MANUEL DANS LE PASSÉ, comme dans son fichier. C'est le
-    # piège : le tri se fait par horaire, donc celui-là arrive EN PREMIER et
-    # devient la date proposée au téléphone. Sans ce semis, le scénario
-    # passerait au vert sans jamais avoir exercé le défaut.
+    # ⚠ AND A MANUAL SLOT IN THE PAST, as in his file. That is the trap:
+    # sorting is by time, so that one comes FIRST and becomes the date offered
+    # on the phone. Without this seeding, the scenario would go green without
+    # ever having exercised the defect.
     passe = (REFERENCE - datetime.timedelta(days=20)).replace(
         hour=9, minute=30, second=0, microsecond=0).isoformat(
             timespec="minutes")
@@ -3233,8 +3233,8 @@ def scenario_deplacement_journee_entiere(banc):
     banc.application.preferences.definir(themes.CLE_CRENEAUX,
                                          sorted(manuels + [passe]))
 
-    # ① Étape 2 : on ne touche À RIEN — c'est le défaut de la nature qui doit
-    # appeler tout le monde. Poser « politique » ici masquerait le défaut.
+    # ① Step 2: we touch NOTHING — it is the kind's default that must call
+    # everybody. Setting `politique` here would mask the defect.
     brouillon, _ = banc.ouvrir_brouillon(nature)
     formulaire = banc.formulaire_etape2(nature, brouillon)
     formulaire.pop("politique", None)
@@ -3245,7 +3245,7 @@ def scenario_deplacement_journee_entiere(banc):
            "l'étape 3 s'ouvre (/assistant/liste)", url,
            "/assistant/liste" in url)
 
-    # ② « Charger selon les dates » : la source, l'année, la semaine, LE JOUR.
+    # ② `Charger selon les dates`: the source, the year, the week, THE DAY.
     annee, semaine, _ = jour.isocalendar()
     banc.poster("/assistant/importer",
                 {"b": brouillon, "mode": "rendezvous", "source": "a_venir",
@@ -3261,7 +3261,7 @@ def scenario_deplacement_journee_entiere(banc):
     fiche = banc.base.obtenir_campagne(campagne_id)
     config = assistant.configuration_campagne(fiche)
     charges = banc.base.contacts_de_campagne(campagne_id)
-    # ⚠ LE RÉGLAGE HÉRITÉ : c'est LUI qui rendait mon correctif invisible.
+    # ⚠ THE INHERITED SETTING: it is what made my fix invisible.
     j.egal(nature, depart, CONSTRUCTION,
            "un déplacement part sur « tout le monde est appelé » — aucun "
            "réglage enregistré ne peut le ramener à « premier oui »",
@@ -3273,7 +3273,7 @@ def scenario_deplacement_journee_entiere(banc):
            f"{len(charges)} contact(s) chargé(s) le {jour:%d/%m/%Y}",
            len(charges) >= 8)
 
-    # ③ « ▶ Démarrer », puis les relances — jusqu'au plafond, comme lui.
+    # ③ `▶ Démarrer`, then the follow-ups — up to the ceiling, as he did.
     banc.executer(campagne_id)
     for tour in range(4):
         if not banc.lancer_relances(jours=15 * (tour + 1)):
@@ -3287,7 +3287,7 @@ def scenario_deplacement_journee_entiere(banc):
     lisible = ", ".join(f"{etat} : {combien}"
                         for etat, combien in sorted(etats.items()))
 
-    # ⚠ CE QU'IL A VU : 1 appelé sur 11, dix « épargné ». Tout le monde, donc.
+    # ⚠ WHAT HE SAW: 1 called out of 11, ten `épargné`. Everybody, then.
     j.egal(nature, depart, "51",
            "TOUT LE MONDE est appelé : un déplacement n'est pas un traitement "
            "unique, un oui n'arrête rien (§8.2)",
@@ -3296,11 +3296,11 @@ def scenario_deplacement_journee_entiere(banc):
            "et personne ne reste « pas appelé » ni « épargné »",
            0, etats.get("pas appelé", 0) + etats.get("épargné", 0))
 
-    # ④ LE RENDEZ-VOUS A-T-IL VRAIMENT BOUGÉ ? Il l'a vérifié dans l'agenda,
-    # et la réponse était non. Deux écritures sont légitimes : la ligne
-    # elle-même bouge, ou elle passe « déplacé » et une NOUVELLE naît à la
-    # date convenue. On cherche donc le rendez-vous du client À LA DATE
-    # ANNONCÉE — pas la ligne, qui peut mentir.
+    # ④ DID THE APPOINTMENT REALLY MOVE? He checked it in the calendar, and the
+    # answer was no. Two writings are legitimate: the row itself moves, or it
+    # becomes `déplacé` and a NEW one is born at the agreed date. So we look
+    # for the client's appointment AT THE ANNOUNCED DATE — not for the row,
+    # which can lie.
     lignes = [l for l in banc.base.changements_de_campagne(campagne_id)
               if l["genre"] == "deplacement"]
     tenus, passees = [], []
@@ -3321,25 +3321,22 @@ def scenario_deplacement_journee_entiere(banc):
            f"{len(lignes)} déplacement(s) tenus",
            f"{len(tenus)} tenu(s) sur {len(lignes)} annoncé(s)",
            bool(lignes) and len(tenus) == len(lignes))
-    # ⚠ Un rendez-vous déplacé vers hier n'est pas déplacé : il est perdu.
+    # ⚠ An appointment moved to yesterday is not moved: it is lost.
     j.egal(nature, depart, "51",
            "et JAMAIS vers une date passée — un créneau manuel dont l'heure "
            "est révolue n'est plus proposé au téléphone",
            [], passees)
 
-    # ⑤ LES QUATRE CAS QU'IL VEUT VOIR dans l'historique.
-    #
-    # ⚠ CE CONTRÔLE A CHANGÉ DEUX FOIS, ET LE BANC A ARRÊTÉ LES DEUX FOIS.
-    # Le 18/08 il demandait qu'en simulation aucune campagne ne finisse sur le
-    # maximum de rappels : « injoignable » a quitté cette liste, remplacé par
-    # « à recontacter ». Le 21/08 il est revenu dessus — le maximum s'applique
-    # partout — et le contrôle est revenu avec lui. C'est exactement le travail
-    # d'un banc : refuser de suivre en silence.
-    #
-    # POURQUOI CE RETOUR EST TENABLE : au maximum de rappels, une campagne de
-    # déplacement ANNULE désormais le rendez-vous, libère la place et renvoie la
-    # personne vers un rappel humain (20/08). « injoignable » n'est plus un
-    # cul-de-sac, c'est une conclusion.
+    # ⑤ THE FOUR CASES HE WANTS TO SEE in the history.  ⚠ THIS CHECK CHANGED
+    # TWICE, AND THE BENCH STOPPED IT BOTH TIMES. On 18/08 he asked that in
+    # simulation no campaign should end on the maximum number of reminders:
+    # `injoignable` left this list, replaced by `à recontacter`. On 21/08 he
+    # went back on it — the maximum applies everywhere — and the check came
+    # back with it. That is exactly a bench's job: refusing to follow in
+    # silence.  WHY THIS RETURN IS TENABLE: at the maximum number of reminders,
+    # a move campaign now CANCELS the appointment, frees the slot and sends the
+    # person to a human call-back (20/08). `injoignable` is no longer a dead
+    # end, it is a conclusion.
     for etat, code in (("accepté", "51"), ("à rappeler par un humain", "55"),
                        ("injoignable", "53")):
         j.vrai(nature, depart, code,
@@ -3350,15 +3347,14 @@ def scenario_deplacement_journee_entiere(banc):
 
 
 def scenario_numero_essai(banc):
-    """Le 🧪 numéro d'essai : une exception DÉCLARÉE, et rien de plus.
+    """The 🧪 test number: a DECLARED exception, and nothing more.
 
-    Trois temps, dans cet ordre — c'est l'ordre qui fait la preuve :
-    ① sans numéro déclaré, un numéro répété est refusé (le garde-fou est
-      intact, c'est l'état de départ du produit) ;
-    ② le numéro déclaré, quatre identités passent, marquées 🧪 partout, et
-      un AUTRE numéro répété reste refusé ;
-    ③ le champ vidé, le refus revient pour tout le monde.
-    Puis la campagne d'essai préparée : « prête », zéro appel.
+    Three stages, in this order — it is the order that makes the proof: ① with
+    no number declared, a repeated number is refused (the guard is intact, that
+    is the product's starting state); ② with the number declared, four
+    identities go through, marked 🧪 everywhere, and ANOTHER repeated number is
+    still refused; ③ with the field emptied, the refusal comes back for
+    everybody. Then the test campaign prepared: `prête`, zero calls.
     """
     j = banc.j
     nature, depart = "confirmation", "collage"
@@ -3383,7 +3379,7 @@ def scenario_numero_essai(banc):
                      "plage_debut": "00:00", "plage_fin": "23:59",
                      "numero_essai": numero})
 
-    # ① Le garde-fou, tel qu'il est livré.
+    # ① The guard, as shipped.
     _, page, contacts = grille(lignes)
     j.vrai(nature, depart, CONSTRUCTION,
            "sans numéro d'essai déclaré, quatre identités sur le même numéro "
@@ -3393,7 +3389,7 @@ def scenario_numero_essai(banc):
            f"{'oui' if 'doublon ignoré' in page else 'non'}",
            len(contacts) == 1 and "doublon ignoré" in page)
 
-    # ② Le numéro déclaré : l'exception, et elle seule.
+    # ② The number declared: the exception, and it alone.
     declarer(NUMERO_ESSAI_BANC)
     j.egal(nature, depart, CONSTRUCTION,
            "le numéro d'essai déclaré est retenu par les réglages",
@@ -3428,7 +3424,7 @@ def scenario_numero_essai(banc):
            "les quatre contacts portent le drapeau 🧪 dans la fiche de "
            "campagne", 4, sum(1 for c in contacts_bd if c["numero_essai"]))
 
-    # ③ Le champ vidé : la règle stricte revient pour tout le monde.
+    # ③ The field emptied: the strict rule comes back for everybody.
     declarer("")
     _, page, contacts = grille(lignes)
     j.vrai(nature, depart, CONSTRUCTION,
@@ -3438,7 +3434,7 @@ def scenario_numero_essai(banc):
            f"{'oui' if 'doublon ignoré' in page else 'non'}",
            len(contacts) == 1 and "doublon ignoré" in page)
 
-    # La campagne d'essai en conditions réelles : préparée, JAMAIS lancée.
+    # The real-conditions test campaign: prepared, NEVER launched.
     page, _ = banc.poster("/reglages/essai-reel", {"confirmer": "oui"})
     j.vrai(nature, depart, CONSTRUCTION,
            "sans numéro d'essai déclaré, le bouton « Préparer une campagne "
@@ -3468,8 +3464,8 @@ def scenario_numero_essai(banc):
              f"statut « {essai['statut'] if essai else '—'} », "
              f"{appels} appel(s)",
              bool(essai) and essai["statut"] == "prête" and appels == 0)
-    # Le numéro d'essai est rendu au contrôle de masquage global : déclaré ou
-    # non, il ne doit JAMAIS apparaître en clair sur une page.
+    # The test number is handed back to the global masking check: declared or
+    # not, it must NEVER appear in clear on a page.
     banc.numeros_a_masquer.append(NUMERO_ESSAI_BANC)
     declarer("")
 
@@ -3486,20 +3482,21 @@ def _message_de(page):
         if trouve else "(aucun message à l'écran)"
 
 
-# Les DEUX seules pages où un numéro en clair est VOULU, et annoncé comme tel :
-# la zone de collage de la page Cascade (c'est la liste que l'utilisateur
-# collerait lui-même, générée à sa demande) et les exports CSV (leur raison
-# d'être). Elles sont donc écartées du contrôle de masquage — et c'est dit.
+# The TWO only pages where a number in clear is INTENDED, and announced as
+# such: the Cascade page's paste area (it is the list the user would paste
+# themselves, generated at their request) and the CSV exports (their reason to
+# exist). They are therefore excluded from the masking check — and that is
+# said.
 PAGES_NUMEROS_EN_CLAIR_VOULUS = ("/cascade/generer", "/cascade/csv",
                                  "/assistant/csv")
 
 
 def controler_masquage_global(banc):
-    """Aucune page servie ne doit contenir un numéro EN CLAIR."""
+    """No page served must contain a number IN CLEAR."""
     clairs = [tel for _, _, tel in CONTACTS_FORCES]
     clairs += [CONTACT_STOP[1], CONTACT_SUPPRIME[1]]
-    # Le 🧪 numéro d'ESSAI est un numéro comme un autre pour cette règle :
-    # le déclarer exempte du DOUBLON, jamais du masquage.
+    # The 🧪 TEST number is a number like any other for this rule: declaring it
+    # exempts from the DUPLICATE check, never from masking.
     clairs += banc.numeros_a_masquer
     fuites, vues = [], 0
     for chemin, contenu in banc.pages_vues:
@@ -3524,7 +3521,7 @@ def controler_masquage_global(banc):
 
 
 def expliquer_les_trous(journal):
-    """Dire, avant même de compter, POURQUOI il reste des cases ⬜."""
+    """Say, before even counting, WHY there are still ⬜ cells."""
     journal.remarque(
         "Chaque voie de remplissage (CSV, agenda ICS, les cinq sources de la "
         "base, les six reprises de campagne) est éprouvée avec UNE nature, "
@@ -3545,7 +3542,7 @@ def expliquer_les_trous(journal):
 
 
 def gestes_a_la_main(journal):
-    """Ce qu'un banc sans souris ne peut pas prouver — dit en clair."""
+    """What a bench with no mouse cannot prove — stated plainly."""
     journal.main("Le dévoilement en cascade des options (une option qui "
                  "révèle ses sous-options)",
                  "Étape 2 : décocher puis recocher « Recontacter » et vérifier "
@@ -3583,7 +3580,7 @@ def gestes_a_la_main(journal):
 
 
 # ===========================================================================
-#  LE RAPPORT
+# THE REPORT
 # ===========================================================================
 def _libelles(paires):
     return dict(paires)
@@ -3602,7 +3599,7 @@ def _marque_case(journal, cas_de_la_case, sans_objet):
 
 
 def construire_tableaux(journal):
-    """Les trois tableaux du rapport, prêts à rendre en texte ou en HTML."""
+    """The report's three tables, ready to render as text or as HTML."""
     cellules = journal.cellules()
 
     def cas_pour(filtre):
@@ -3626,7 +3623,7 @@ def construire_tableaux(journal):
                  "colonnes": [LIB_ISSUES[c] for c in CODES_ISSUES],
                  "lignes": lignes_a}
 
-    # Tableau B : point de départ × nature (colonne « construction » comprise)
+    # Table B: starting point × kind (`construction` column included)
     lignes_b = []
     for depart in CODES_DEPARTS:
         cases = []
@@ -3643,7 +3640,7 @@ def construire_tableaux(journal):
                  "colonnes": [LIB_NATURES[n] for n in NATURES_ORDRE],
                  "lignes": lignes_b}
 
-    # Tableau C : point de départ × issue
+    # Table C: starting point × outcome
     lignes_c = []
     for depart in CODES_DEPARTS:
         cases = []
@@ -3662,7 +3659,7 @@ def construire_tableaux(journal):
 
 
 def compter(journal):
-    """Les chiffres du rapport, tous mesurés."""
+    """The report's figures, all measured."""
     cellules = journal.cellules()
     trois_axes = {cle: liste for cle, liste in cellules.items()
                   if cle[2] in CODES_ISSUES and cle[0] is not None}
@@ -3692,121 +3689,95 @@ def compter(journal):
     }
 
 
-# LE PLANCHER DU NOMBRE DE CONTRÔLES (10/08/2026). Il ne sert qu'à une chose :
-# rendre VISIBLE la disparition d'un contrôle. Un contrôle conditionné par le
-# contenu d'un écran cesse de s'exécuter dès que l'écran change, et le rapport
-# continue d'annoncer « TOUT PASSE » — c'est exactement ce qui est arrivé ce
-# jour-là (614 → 613, détail identique, aucun échec), puis le compte est
-# revenu à 614 plus tard le même jour, stable à l'octet sur deux exécutions
-# consécutives. Le contrôle en cause n'a pas été nommé : sa condition d'entrée
-# dépend donc de quelque chose qui a bougé entre-temps. C'est précisément ce
-# que ce plancher est là pour rendre criant la prochaine fois.
-# On le RELÈVE en ajoutant des contrôles. On ne le baisse qu'en sachant dire
-# lequel on a perdu, et pourquoi c'est voulu.
-#
-# ⚠ 614 → 613 LE 11/08/2026, ET CETTE FOIS LE CONTRÔLE PERDU EST NOMMÉ — c'est
-# ce que le paragraphe ci-dessus exigeait. Mesuré en comparant les libellés de
-# contrôle d'une exécution à l'autre :
-#
-#   le vivier des contacts « à rappeler par un humain » a RÉTRÉCI par décision
-#   du propriétaire (ce rappel n'existe plus que sur « déplacement » et « prise
-#   de rendez-vous » — voir assistant.NATURES_RAPPEL_HUMAIN). Les départs « Étape
-#   3 — reprise » piochent donc dans d'autres viviers : le cas « 54 » de la prise
-#   de rendez-vous est passé de la reprise « ✅ acceptés » à la reprise « 🙋 à
-#   rappeler par un humain », et une combinaison a un contact de moins à
-#   contrôler.
-#
-# C'est voulu : l'état existe moins souvent parce qu'on l'a voulu ainsi. Le
-# plancher descend donc d'un cran, en connaissance de cause.
-#
-# ⚠ ET LE 14/08/2026, LA VRAIE CAUSE DU PREMIER 614 → 613 EST TROUVÉE : LE JOUR
-# DE LA SEMAINE. Le banc part d'« aujourd'hui à 12 h » ; ses blocs avancent de
-# dix jours en dix jours, et dix jours décalent le jour de la semaine de trois.
-# Certains jours, un bloc tombait donc un samedi ou un dimanche — cabinet
-# fermé. Le produit refusait alors, à juste titre, de poser le rendez-vous, et
-# le contrôle qui suivait mesurait le CALENDRIER, pas le produit. Mesuré ce
-# jour-là (un vendredi) : le report simulé, toujours à la place + deux jours,
-# tombait le dimanche 16/08 — « Rendez-vous NON créé […] hors des horaires
-# d'ouverture », et « l'ancien rendez-vous ne tient plus » échouait.
-#
-# C'est exactement la même famille de piège que les HEURES du 11/08 (voir
-# `Banc.demarrer`, 8 h – 19 h) : le montage du banc doit couvrir ce que ses
-# propres appels peuvent proposer. Les dates de la cascade directe passent
-# désormais par `_jour_ouvre`, et le compte est stable quel que soit le jour.
-# Le plancher remonte donc à 614 — ce qu'il valait avant que le calendrier ne
-# l'abaisse.
-#
-# ⚠ 614 → 619 LE 14/08/2026, ET CETTE FOIS C'EST UN GAIN. L'audit croisé
-# « adaptations × natures » a fait corriger la branche « autre date convenue » :
-# quand la date rendue est l'une des places ANNONCÉES, la place est désormais
-# marquée pourvue et le curseur avance (avant, elle restait « à pourvoir », était
-# réannoncée, puis déclarée « prise entre-temps » alors que la campagne l'avait
-# pourvue). Une combinaison de plus est donc parcourue — 116 au lieu de 115 — et
-# cinq contrôles de plus s'exécutent. Le plancher monte avec eux.
-#
-# ⚠ 619 → 629 LE 15/08/2026, ET LA CAUSE EST NOMMÉE AVANT DE MONTER LE PLANCHER
-# — c'est ce qu'exige le paragraphe du 11/08 ci-dessus, dans l'autre sens.
-# Le rappel manuel a disparu de « créneau libéré » sur SON DERNIER chemin, celui
-# des dates refusées : ces contacts partent maintenant « refusé ». Le vivier des
-# « refusé » grossit d'autant, et les départs « Étape 3 — reprise » qui y
-# piochent atteignent DEUX combinaisons de plus (118 au lieu de 116), donc dix
-# contrôles de plus. C'est le mécanisme exact du 614 → 613, joué à l'envers :
-# la taille d'un vivier commande le nombre de reprises possibles.
-#
-# ⚠ 629 → 637 LE 15/08/2026 : HUIT CONTRÔLES DE PLUS, ET C'EST LE TROU QUI A
-# COÛTÉ TROIS JOURS. Sa question : « Est-ce que tu fais des vrais essais comme
-# moi — créer une campagne, l'exécuter, regarder l'historique ? » Non. Et le
-# banc, qui lui le faisait, ne contrôlait PAS l'option « décaler en cascade » —
-# le mot « cascade » y désignait la *page* Cascade, une autre fonctionnalité.
-# Ni mes essais ni le banc ne pouvaient donc voir son défaut.
-# `scenario_decalage_en_cascade` refait son geste en entier, par HTTP, sur une
-# campagne à UNE place — le cas de toutes les siennes.
-#
-# ⚠ 637 → 633 LE 16/08/2026 : QUATRE CONTRÔLES PERDUS, ET C'EN EST LE PRIX.
-# Sa demande du jour : la règle dynamique s'ouvre désormais sur « rendez-vous à
-# venir, pas encore confirmés » (c'était « à recaser » — voir
-# assistant.REGLE_LISTE_DEFAUT).
-#
-# CE QUI EST PERDU, NOMMÉ : la case « Étape 3 — reprise : ❌ refus » × « 51 ·
-# accepte ». Une campagne de rattrapage est montée en mode automatique ; la
-# règle par défaut y ajoute donc du monde, et ce n'est plus la même liste. Avec
-# « à recaser » elle ramenait le contact à terminaison 51 ; avec « à venir »,
-# non — cette personne n'a plus de rendez-vous à venir, elle attend une place.
-# La combinaison n'a donc plus de contact « qui accepte » à faire jouer.
-#
-# BISSECTÉ, pas supposé : seul REGLE_LISTE_DEFAUT remis à « a_recaser » rend
-# 637/119 ; la date de référence forcée au 15/08 rend toujours 633/118. Ce
-# n'est donc pas le calendrier, contrairement au 614 → 613 du 11/08.
-#
-# C'est voulu — le défaut change, la liste change — mais ce n'est pas gratuit :
-# ce chemin de reprise n'est plus éprouvé avec quelqu'un qui accepte. À rendre
-# indépendant du défaut le jour où l'on y retouche (la reprise devrait valider
-# en mode MANUEL : son sujet est de reprendre une liste, pas de rejouer une
-# règle).
-#
-# ⚠ 633 → 643 LE 17/08/2026 : DIX CONTRÔLES DE PLUS, ET UN PIÈGE ÉVITÉ DE JUSTESSE.
-# SON TEST est devenu un scénario : déplacer les rendez-vous d'une JOURNÉE
-# ENTIÈRE, et vérifier que tout le monde est traité, que les rendez-vous bougent
-# vraiment, que jamais vers une date passée, et que les cas qu'il a nommés
-# apparaissent (voir `scenario_deplacement_journee_entiere`).
-#
-# LE PIÈGE, MESURÉ AVANT DE MONTER LE PLANCHER : à sa première place dans
-# l'ordre, le scénario ajoutait bien ses 10 contrôles… et le total ne montait
-# que de 5. Ses relances faisaient passer les « 🔁 à recontacter » de la base
-# partagée en « 📵 injoignable » ; la reprise « à recontacter », qui vient lire
-# ce vivier ensuite, tombait de 6 contrôles à 1. Aucun échec, aucun incident :
-# le rapport annonçait « TOUT PASSE » avec MOINS de couverture qu'avant.
-#
-# C'est exactement ce que ce plancher existe pour attraper, et c'est la deuxième
-# fois qu'il le fait (voir 614 → 613 et 637 → 633). Remède : le scénario passe
-# APRÈS tous les autres — après les reprises, pas seulement après la matrice.
-# Comptes vérifiés des deux côtés : « à recontacter » revenu à 6, journée
-# entière à 10, total 643/121 = 633/118 + 10/3. Rien de perdu.
+# THE FLOOR ON THE NUMBER OF CHECKS (10/08/2026). It serves one purpose only:
+# making the disappearance of a check VISIBLE. A check conditioned by a
+# screen's content stops running as soon as the screen changes, and the report
+# goes on announcing `TOUT PASSE` — which is exactly what happened that day
+# (614 → 613, identical detail, no failures), and then the count came back to
+# 614 later the same day, stable byte for byte over two consecutive runs. The
+# check in question was not named: its entry condition therefore depends on
+# something that moved in the meantime. That is precisely what this floor
+# exists to make glaring next time. We RAISE it by adding checks. We only lower
+# it knowing which one we lost, and why it is intended.  ⚠ 614 → 613 ON
+# 11/08/2026, AND THIS TIME THE LOST CHECK IS NAMED — which is what the
+# paragraph above demanded. Measured by comparing the check labels from one run
+# to the next: the pool of `à rappeler par un humain` contacts SHRANK by the
+# owner's decision (that call-back now exists only on `déplacement` and `prise
+# de rendez-vous` — see assistant.NATURES_RAPPEL_HUMAIN). The `Étape 3 —
+# reprise` starting points therefore draw from other pools: the booking kind's
+# `54` case moved from the `✅ acceptés` resumption to the `🙋 à rappeler par un
+# humain` one, and one combination has one fewer contact to check.  That is
+# intended: the state exists less often because we wanted it so. So the floor
+# goes down one notch, knowingly.  ⚠ AND ON 14/08/2026, THE REAL CAUSE OF THE
+# FIRST 614 → 613 IS FOUND: THE DAY OF THE WEEK. The bench starts from `today
+# at noon`; its blocks advance ten days at a time, and ten days shift the
+# weekday by three. On some days, a block therefore fell on a Saturday or a
+# Sunday — practice closed. The product then rightly refused to place the
+# appointment, and the check that followed measured the CALENDAR, not the
+# product. Measured that day (a Friday): the simulated postponement, always at
+# the slot + two days, fell on Sunday 16/08 — `Appointment NOT created […]
+# outside the opening hours`, and `the old appointment no longer holds` failed.
+# It is exactly the same family of trap as the HOURS of 11/08 (see
+# `Banc.demarrer`, 8am – 7pm): the bench's setup must cover what its own calls
+# can offer. The direct cascade's dates now go through `_jour_ouvre`, and the
+# count is stable whatever the day. So the floor goes back up to 614 — what it
+# was before the calendar lowered it.  ⚠ 614 → 619 ON 14/08/2026, AND THIS TIME
+# IT IS A GAIN. The `adaptations × kinds` cross audit led to fixing the
+# `another date agreed` branch: when the date returned is one of the ANNOUNCED
+# slots, the slot is now marked filled and the cursor advances (before, it
+# stayed `to be filled`, was announced again, then declared `taken in the
+# meantime` although the campaign had filled it). One more combination is
+# therefore walked — 116 instead of 115 — and five more checks run. The floor
+# rises with them.  ⚠ 619 → 629 ON 15/08/2026, AND THE CAUSE IS NAMED BEFORE
+# THE FLOOR IS RAISED — which is what the 11/08 paragraph above requires, in
+# the other direction. The manual call-back disappeared from `créneau libéré`
+# on ITS LAST path, that of refused dates: those contacts now go `refusé`. The
+# pool of `refusé` grows accordingly, and the `Étape 3 — reprise` starting
+# points that draw from it reach TWO more combinations (118 instead of 116),
+# hence ten more checks. It is the exact mechanism of 614 → 613, played in
+# reverse: the size of a pool commands the number of possible resumptions.  ⚠
+# 629 → 637 ON 15/08/2026: EIGHT MORE CHECKS, AND IT IS THE GAP THAT COST THREE
+# DAYS. His question: `Do you do real tests like me — create a campaign, run
+# it, look at the history?` No. And the bench, which did do that, did NOT check
+# the `cascading shift` option — the word `cascade` there meant the Cascade
+# *page*, a different feature. So neither my tests nor the bench could see his
+# defect. `scenario_decalage_en_cascade` redoes his gesture in full, over HTTP,
+# on a campaign with ONE slot — the case of all of his.  ⚠ 637 → 633 ON
+# 16/08/2026: FOUR CHECKS LOST, AND THAT IS THE PRICE. His request of the day:
+# the dynamic rule now opens on `upcoming appointments, not yet confirmed` (it
+# was `to rebook` — see assistant.REGLE_LISTE_DEFAUT).  WHAT IS LOST, NAMED:
+# the cell `Étape 3 — reprise: ❌ refus` × `51 · accepts`. A catch-up campaign
+# is set up in automatic mode; the default rule therefore adds people, and it
+# is no longer the same list. With `to rebook` it brought back the ending-51
+# contact; with `upcoming`, it does not — that person no longer has an upcoming
+# appointment, they are waiting for a slot. So the combination no longer has a
+# contact `who accepts` to play.  BISECTED, not assumed: only
+# REGLE_LISTE_DEFAUT put back to `a_recaser` gives 637/119; the reference date
+# forced to 15/08 still gives 633/118. So it is not the calendar, unlike the
+# 614 → 613 of 11/08.  It is intended — the default changes, the list changes —
+# but it is not free: that resumption path is no longer exercised with somebody
+# who accepts. To be made independent of the default the day we touch it again
+# (the resumption should validate in MANUAL mode: its subject is resuming a
+# list, not replaying a rule).  ⚠ 633 → 643 ON 17/08/2026: TEN MORE CHECKS, AND
+# A TRAP NARROWLY AVOIDED. HIS TEST became a scenario: moving a WHOLE DAY's
+# appointments, and checking that everybody is handled, that the appointments
+# really move, never to a past date, and that the cases he named appear (see
+# `scenario_deplacement_journee_entiere`).  THE TRAP, MEASURED BEFORE RAISING
+# THE FLOOR: at its first position in the order, the scenario did add its 10
+# checks… and the total only rose by 5. Its follow-ups moved the shared
+# database's `🔁 à recontacter` into `📵 injoignable`; the `à recontacter`
+# resumption, which reads that pool afterwards, fell from 6 checks to 1. No
+# failure, no incident: the report announced `TOUT PASSE` with LESS coverage
+# than before.  That is exactly what this floor exists to catch, and it is the
+# second time it has done so (see 614 → 613 and 637 → 633). Remedy: the
+# scenario runs AFTER all the others — after the resumptions, not only after
+# the matrix. Counts verified on both sides: `à recontacter` back to 6, whole
+# day at 10, total 643/121 = 633/118 + 10/3. Nothing lost.
 CONTROLES_PLANCHER = 643
 
 
 def rapport_texte(journal, chiffres, tableaux):
-    """Le rapport en texte, pour la console."""
+    """The report as text, for the console."""
     lignes = []
     ajouter = lignes.append
     ajouter("=" * 78)
@@ -3814,8 +3785,18 @@ def rapport_texte(journal, chiffres, tableaux):
     ajouter(f"  Rapport du {REFERENCE:%d/%m/%Y}")
     ajouter("=" * 78)
     ajouter("")
-    verdict = ("TOUT PASSE" if not journal.echecs
-               else f"{len(journal.echecs)} CONTRÔLE(S) EN ÉCHEC")
+    # ⚠ THE LOCKS COUNT AS MUCH AS THE CHECKS (04/09/2026): a broken safety
+    # lock must NEVER read as `TOUT PASSE`.
+    rompus = journal.verrous_rompus
+    if journal.echecs or rompus:
+        morceaux = []
+        if rompus:
+            morceaux.append(f"{len(rompus)} VERROU(S) DE SÉCURITÉ ROMPU(S)")
+        if journal.echecs:
+            morceaux.append(f"{len(journal.echecs)} CONTRÔLE(S) EN ÉCHEC")
+        verdict = " ET ".join(morceaux)
+    else:
+        verdict = "TOUT PASSE"
     ajouter(f"EN UNE LIGNE : {verdict} — "
             f"{chiffres['controles_passes']}/{chiffres['controles']} contrôles, "
             f"{chiffres['combinaisons_passees']}/"
@@ -3833,13 +3814,12 @@ def rapport_texte(journal, chiffres, tableaux):
     ajouter("-" * 78)
     ajouter("2. LE COMPTE DES CAS")
     ajouter("-" * 78)
-    # ⚠ UN CONTRÔLE QUI DISPARAÎT NE FAIT AUCUN BRUIT. Le 10/08/2026, le banc
-    # est passé de 614 à 613 contrôles : tout passait, le détail était
-    # identique à l'octet près, et un contrôle avait simplement cessé de
-    # s'exécuter — parce qu'il dépend d'une condition qu'un écran remanié ne
-    # remplit plus. Rien ne l'a signalé. Le plancher ci-dessous le signale
-    # désormais : on le RELÈVE quand on ajoute des contrôles, jamais on ne le
-    # baisse sans savoir lequel on a perdu.
+    # ⚠ A CHECK THAT DISAPPEARS MAKES NO NOISE. On 10/08/2026 the bench went
+    # from 614 to 613 checks: everything passed, the detail was identical byte
+    # for byte, and one check had simply stopped running — because it depends
+    # on a condition a reworked screen no longer meets. Nothing signalled it.
+    # The floor below signals it from now on: we RAISE it when we add checks,
+    # we never lower it without knowing which one we lost.
     manque = CONTROLES_PLANCHER - chiffres["controles"]
     if manque > 0:
         ajouter(f"  ⚠ {manque} CONTRÔLE(S) NE S'EXÉCUTENT PLUS — le banc en")
@@ -3980,7 +3960,7 @@ code { background: #eef1f6; padding: 1px 5px; border-radius: 3px; }
 
 
 def rapport_html(journal, chiffres, tableaux):
-    """Le même rapport, en page autonome (aucune ressource extérieure)."""
+    """The same report, as a standalone page (no external resources)."""
     e = html_mod.escape
     morceaux = ["<!doctype html>", '<html lang="fr"><head>',
                 '<meta charset="utf-8">',
@@ -4100,10 +4080,10 @@ def rapport_html(journal, chiffres, tableaux):
 
 
 # ===========================================================================
-#  DÉROULÉ
+# THE RUN
 # ===========================================================================
 def verifier_chemin_de_base(chemin):
-    """Refuse tout chemin qui toucherait aux données réelles."""
+    """Refuses any path that would touch the real data."""
     cible = os.path.normcase(os.path.abspath(chemin))
     reelle = os.path.normcase(os.path.abspath(BASE_REELLE))
     dossier = os.path.normcase(os.path.abspath(DOSSIER_DONNEES))
@@ -4121,7 +4101,8 @@ def verifier_chemin_de_base(chemin):
 
 
 def verifier_port(port):
-    """Refuse un port du produit, et refuse un port déjà occupé."""
+    """Refuses one of the product's ports, and refuses a port already in use.
+    """
     if port in PORTS_RESERVES_PRODUIT:
         raise RefusDuBanc(
             f"Refus : le port {port} est réservé au produit (8770 à 8778). "
@@ -4137,13 +4118,14 @@ def verifier_port(port):
 
 
 def derouler(banc):
-    """Toute la matrice, dans un ordre FIXE (c'est ce qui rend le banc
-    reproductible)."""
+    """The whole matrix, in a FIXED order (that is what makes the bench
+    reproducible).
+    """
     j = banc.j
     campagne_pour_reprise = None
     for nature in NATURES_ORDRE:
         if nature == "creneau_libere":
-            continue          # sa vraie mécanique est la cascade : à part
+            continue  # its real mechanism is the cascade: handled separately
         try:
             campagne_id = scenario_assistant_par_nature(banc, nature)
             if nature == "prise_rdv" and campagne_id:
@@ -4160,9 +4142,9 @@ def derouler(banc):
                      scenario_seuil_de_compensation,
                      scenario_numero_essai,
                      scenario_bouton_demarrer,
-                     # ⚠ EN DERNIER DE CETTE LISTE, ET C'EST VOULU : il déplace
-                     # des rendez-vous sur plusieurs mois, donc au travers des
-                     # blocs des autres.
+                     # ⚠ LAST IN THIS LIST, AND IT IS INTENDED: it moves
+                     # appointments over several months, hence across the other
+                     # scenarios' blocks.
                      scenario_decalage_en_cascade):
         try:
             resultat = scenario(banc)
@@ -4174,10 +4156,10 @@ def derouler(banc):
     for depart, nature in (("base_a_venir", "deplacement"),
                            ("base_manques", "rappel_rdv"),
                            ("base_annules", "prise_rdv"),
-                           # « prise de rendez-vous » deux fois, à dessein :
-                           # c'est la seule nature dont la GRILLE n'impose
-                           # aucune colonne, donc la seule qui puisse partir
-                           # d'une source qui ne les remplit pas.
+                           # `prise de rendez-vous` twice, deliberately: it is
+                           # the only kind whose GRID imposes no column, hence
+                           # the only one that can start from a source that
+                           # does not fill them.
                            ("base_deplaces", "prise_rdv"),
                            ("base_tous", "prise_rdv")):
         try:
@@ -4208,22 +4190,21 @@ def derouler(banc):
         except Exception as erreur:            # noqa: BLE001
             j.incident(f"{scenario.__name__} : {type(erreur).__name__} — "
                        f"{erreur}")
-    # EN DERNIER : ce scénario ajoute des clients et ouvre les horaires en
-    # grand. Le placer ailleurs déplacerait les comptes des scénarios
-    # suivants — et le banc doit rendre deux fois le MÊME rapport.
+    # LAST: this scenario adds clients and opens the hours wide. Placing it
+    # elsewhere would move the following scenarios' counts — and the bench must
+    # produce the SAME report twice.
     try:
         scenario_deux_portes_vers_campagne(banc)
     except Exception as erreur:                # noqa: BLE001
         j.incident("scenario_deux_portes_vers_campagne : "
                    f"{type(erreur).__name__} — {erreur}")
-    # ⚠ APRÈS TOUT LE RESTE, ET POUR UNE RAISON MESURÉE (17/08/2026) : ce
-    # scénario LANCE LES RELANCES, ce qui fait passer les « 🔁 à recontacter »
-    # de la base partagée en « 📵 injoignable ». Placé plus haut, il vidait la
-    # réserve que la reprise « à recontacter » vient lire : cinq contrôles
-    # disparaissaient sans un seul échec — le rapport annonçait « tout passe »
-    # avec MOINS de couverture qu'avant. C'est le plancher CONTROLES_PLANCHER
-    # qui l'a révélé : le total ne montait que de 5 alors que ce scénario en
-    # pose 10.
+    # ⚠ AFTER EVERYTHING ELSE, AND FOR A MEASURED REASON (17/08/2026): this
+    # scenario RUNS THE FOLLOW-UPS, which moves the shared database's `🔁 à
+    # recontacter` into `📵 injoignable`. Placed higher up, it emptied the pool
+    # the `à recontacter` resumption comes to read: five checks disappeared
+    # without a single failure — the report announced `everything passes` with
+    # LESS coverage than before. It is the CONTROLES_PLANCHER floor that
+    # revealed it: the total rose by only 5 when this scenario adds 10.
     try:
         scenario_deplacement_journee_entiere(banc)
     except Exception as erreur:                # noqa: BLE001
@@ -4268,8 +4249,8 @@ def principal(arguments=None):
          _empreinte_fichier(BASE_REELLE)),
     ]
     journal = Journal()
-    # Le produit journalise ses incidents ; ici, le RAPPORT est la seule
-    # source de vérité — la fenêtre reste lisible pour son propriétaire.
+    # The product logs its incidents; here, the REPORT is the only source of
+    # truth — the window stays readable for its owner.
     logging.getLogger("ringback").setLevel(logging.CRITICAL)
     print("Banc d'essai RingBack — simulation uniquement.")
     print(f"  Base jetable : {chemin_base}")

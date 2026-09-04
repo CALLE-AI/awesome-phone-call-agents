@@ -1,8 +1,9 @@
-"""Saisie et import : validation des entrées + import CSV.
+"""Data entry and import: input validation + CSV import.
 
-Tous les messages d'erreur sont en français et destinés à l'écran.
-La règle de confidentialité reste la même que partout : un numéro n'est
-JAMAIS ré-affiché en clair — seule la personne qui le tape le voit.
+Every error message is written in French and meant for the screen — French is
+the source language, and the translation layer turns it into English at the
+last moment. The privacy rule is the same as everywhere else: a phone number is
+NEVER shown again in clear — only the person typing it sees it.
 """
 
 import csv
@@ -14,12 +15,12 @@ COLONNES_CSV = ("nom", "telephone", "date_heure", "motif")
 
 
 class SaisieInvalide(ValueError):
-    """Une entrée saisie ou importée est invalide (message en français)."""
+    """A typed or imported entry is invalid (message written in French)."""
 
 
 # ------------------------------------------------------------------ champs
 def valider_nom(texte):
-    """Rend le nom nettoyé (espaces multiples repliés)."""
+    """Returns the cleaned-up name (runs of spaces folded)."""
     nom = " ".join((texte or "").split())
     if len(nom) < 2:
         raise SaisieInvalide("Le nom du client est obligatoire (deux caractères minimum).")
@@ -27,12 +28,12 @@ def valider_nom(texte):
 
 
 def valider_telephone(texte):
-    """Rend le numéro normalisé « +33 6 00 00 00 42 » ou « 06 00 00 00 42 ».
+    """Returns the number normalised as `+33 6 39 98 50 42` or `06 39 98 50 42`.
 
-    Formats plausibles acceptés : numéro français à 10 chiffres commençant
-    par 0, ou +33 suivi de 9 chiffres. Espaces, points et tirets sont
-    ignorés à la lecture ; le numéro est reformaté par groupes pour que le
-    masquage (db.masquer_telephone) fonctionne toujours.
+    Plausible formats accepted: a 10-digit French number starting with 0, or
+    +33 followed by 9 digits. Spaces, dots and dashes are ignored while
+    reading; the number is regrouped so that masking (db.masquer_telephone)
+    always works.
     """
     compact = re.sub(r"[ .\-]", "", texte or "")
     if re.fullmatch(r"\+33[1-9]\d{8}", compact):
@@ -43,47 +44,42 @@ def valider_telephone(texte):
         return " ".join(compact[i:i + 2] for i in range(0, 10, 2))
     raise SaisieInvalide(
         "Numéro de téléphone invalide : attendu 10 chiffres commençant par 0, "
-        "ou +33 suivi de 9 chiffres (exemple fictif : +33 6 00 00 00 42).")
+        "ou +33 suivi de 9 chiffres (exemple fictif : +33 6 39 98 50 42).")
 
 
-# ⚠ DEUX VALIDATEURS, ET LA FRONTIÈRE EST NETTE (01/09/2026).
-#
-# `valider_telephone` ci-dessus vaut pour les numéros que RingBack APPELLE :
-# ceux des contacts. Il reste volontairement français — c'est un cabinet
-# français qui appelle des patients français, et une saisie trop large y
-# laisserait passer des fautes de frappe au lieu de les arrêter.
-#
-# `valider_telephone_essai` ci-dessous vaut pour les numéros VERS LESQUELS on
-# renvoie : celui de l'opérateur, ceux des testeurs déclarés. Ceux-là peuvent
-# être n'importe où dans le monde — un juré de concours qui essaie le produit
-# renvoie les appels vers SON téléphone, et il n'est pas forcément en France.
-#
-# La règle qui protège reste la même des deux côtés : aucun appel ne part vers
-# un numéro que l'API ne saurait pas composer (voir calle_client.numero_e164 et
-# numero_composable).
+# ⚠ TWO VALIDATORS, AND THE BORDER BETWEEN THEM IS SHARP (01/09/2026).
+# `valider_telephone` above covers the numbers RingBack DIALS: the contacts'.
+# It stays French on purpose — a French practice calling French patients, and a
+# looser check there would let typos through instead of stopping them.
+# `valider_telephone_essai` below covers the numbers calls are REDIRECTED TO:
+# the operator's own, and those of declared testers. Those may be anywhere in
+# the world — a contest judge trying the product redirects the calls to THEIR
+# phone, and they are not necessarily in France. The rule that protects is the
+# same on both sides: no call goes out to a number the API could not dial (see
+# calle_client.numero_e164 and numero_composable).
 _INTERNATIONAL = re.compile(r"\+[1-9]\d{7,14}")
 
 
 def valider_telephone_essai(texte):
-    """Le numéro d'un TESTEUR ou d'un RENVOI — n'importe quel indicatif.
+    """A TESTER's or a REDIRECT number — any dialling code.
 
-    Rend « +44 20 79 46 09 58 » ou, pour un numéro français, exactement ce que
-    rend `valider_telephone` — au caractère près, pour qu'un numéro déjà
-    enregistré ne change pas de forme en repassant par ici.
+    Returns `+44 20 79 46 09 58` or, for a French number, exactly what
+    `valider_telephone` returns — character for character, so that an already
+    stored number does not change shape by passing through here.
 
-    ⚠ L'INDICATIF NE SE DEVINE PAS — ON LE LIT DANS CE QUI A ÉTÉ TAPÉ. Il fait
-    un, deux ou trois chiffres selon le pays (« +1 », « +33 », « +351 ») et
-    aucune règle ne permet de le retrouver dans une suite de chiffres collés.
-    Alors on ne le devine pas : si la saisie sépare son indicatif d'une espace
-    — « +351 21 234 5678 », comme tout le monde l'écrit — on le prend tel
-    quel. Sinon on retombe sur un groupement régulier, qui reste lisible même
-    s'il coupe l'indicatif au mauvais endroit.
+    ⚠ THE DIALLING CODE IS NOT GUESSED — IT IS READ FROM WHAT WAS TYPED. It is
+    one, two or three digits depending on the country (`+1`, `+33`, `+351`) and
+    no rule can recover it from a run of digits with no separator. So it is not
+    guessed: if the input separates its dialling code with a space — `+351 21
+    234 5678`, the way everyone writes it — it is taken as it stands. Otherwise
+    the number falls back to regular grouping, which stays readable even when
+    it cuts the dialling code in the wrong place.
 
-    ⚠ ET LE RESTE EST GROUPÉ DEPUIS LA FIN, ce qui fait tenir le masquage.
-    `db.masquer_telephone` garde le PREMIER et le DERNIER groupe : grouper
-    depuis la fin garantit que le dernier groupe porte les deux derniers
-    chiffres — ceux qui permettent de reconnaître son propre numéro sans le
-    montrer.
+    ⚠ AND THE REST IS GROUPED FROM THE END, which is what keeps masking
+    working. `db.masquer_telephone` keeps the FIRST and the LAST group:
+    grouping from the end guarantees the last group carries the final two
+    digits — the ones that let someone recognise their own number without it
+    being shown.
     """
     brut = (texte or "").strip()
     try:
@@ -105,11 +101,11 @@ def valider_telephone_essai(texte):
 
 
 def _indicatif_lu(brut, chiffres):
-    """(indicatif, le reste) — l'indicatif tel que la saisie le sépare.
+    """(dialling code, the rest) — the dialling code as the input separates it.
 
-    Rend un découpage de repli quand rien ne le sépare : les deux premiers
-    chiffres. C'est arbitraire, et c'est assumé — mieux vaut un affichage
-    approximatif qu'un indicatif inventé.
+    Returns a fallback split when nothing separates it: the first two digits.
+    That is arbitrary, and deliberately so — an approximate display beats an
+    invented dialling code.
     """
     tete = re.match(r"\+\s*(\d{1,3})[\s.\-]", (brut or "").strip())
     if tete and len(tete.group(1)) < len(chiffres):
@@ -119,10 +115,10 @@ def _indicatif_lu(brut, chiffres):
 
 
 def valider_horaire(texte):
-    """Rend l'horaire en ISO 8601 à la minute (« 2026-08-01T14:30 »).
+    """Returns the time as ISO 8601 to the minute (`2026-08-01T14:30`).
 
-    Accepte l'ISO 8601 (avec « T » ou une espace) et le format français
-    « JJ/MM/AAAA HH:MM ».
+    Accepts ISO 8601 (with a `T` or a space) and the French format `DD/MM/YYYY
+    HH:MM`.
     """
     brut = (texte or "").strip()
     if not brut:
@@ -140,7 +136,7 @@ def valider_horaire(texte):
 
 
 def valider_motif(texte):
-    """Rend le motif nettoyé."""
+    """Returns the cleaned-up reason."""
     motif = " ".join((texte or "").split())
     if not motif:
         raise SaisieInvalide("Le motif du rendez-vous est obligatoire.")
@@ -152,10 +148,10 @@ VALIDATEURS = (("nom", valider_nom), ("telephone", valider_telephone),
 
 
 def valider_entree(nom, telephone, date_heure, motif):
-    """Valide les quatre champs ; rend (valeurs propres, liste d'erreurs).
+    """Validates the four fields; returns (clean values, list of errors).
 
-    Toutes les erreurs sont collectées d'un coup pour que l'écran puisse
-    les afficher ensemble, plutôt que de les découvrir une par une.
+    Every error is collected in one pass so the screen can show them together,
+    rather than letting the user discover them one at a time.
     """
     brut = {"nom": nom, "telephone": telephone,
             "date_heure": date_heure, "motif": motif}
@@ -169,10 +165,11 @@ def valider_entree(nom, telephone, date_heure, motif):
 
 
 def enregistrer_rendezvous(base, nom, telephone, date_heure, motif):
-    """Valide puis enregistre client + rendez-vous ; rend (client_id, rdv_id).
+    """Validates then records client + appointment; returns (client_id, rdv_id).
 
-    Le rendez-vous est créé « prévu » : la règle du manqué
-    (db.marquer_manques_echus) le basculera s'il est déjà passé.
+    The appointment is created as `prévu` (scheduled): the missed-appointment
+    rule (db.marquer_manques_echus) will switch it over if it is already in the
+    past.
     """
     propres, erreurs = valider_entree(nom, telephone, date_heure, motif)
     if erreurs:
@@ -184,18 +181,17 @@ def enregistrer_rendezvous(base, nom, telephone, date_heure, motif):
 
 # ------------------------------------------------------- liste de cascade
 def analyser_liste_cascade(texte):
-    """Analyse la liste collée pour la cascade : une ligne par personne.
+    """Parses the pasted list for the cascade: one line per person.
 
-    Format « Nom;Téléphone » — la virgule et la tabulation sont aussi
-    acceptées comme séparateurs (priorité : tabulation, puis point-virgule,
-    puis virgule, pour tolérer une virgule dans le nom). Les lignes vides
-    sont ignorées ; chaque ligne fautive produit une erreur française qui
-    cite son numéro ; un numéro déjà vu plus haut est signalé comme doublon.
-    Rend (personnes, erreurs) où personnes = [{"nom", "telephone"}] dans
-    l'ORDRE de la liste — c'est cet ordre que la cascade respecte.
+    Format `Name;Phone` — commas and tabs are accepted as separators too
+    (priority: tab, then semicolon, then comma, so that a comma inside a name
+    is tolerated). Blank lines are ignored; each faulty line produces a French
+    error quoting its line number; a number already seen above is reported as a
+    duplicate. Returns (people, errors) where people = [{"nom", "telephone"}]
+    in the ORDER of the list — that order is what the cascade follows.
     """
     personnes, erreurs = [], []
-    deja_vus = {}  # téléphone normalisé -> numéro de ligne
+    deja_vus = {}  # normalised phone -> line number
     for numero, ligne in enumerate((texte or "").splitlines(), start=1):
         if not ligne.strip():
             continue
@@ -230,7 +226,8 @@ def analyser_liste_cascade(texte):
 
 # -------------------------------------------------------------------- CSV
 def decoder_csv(octets):
-    """Décode un fichier importé : UTF-8 (BOM accepté), sinon cp1252 (Excel)."""
+    """Decodes an imported file: UTF-8 (BOM accepted), otherwise cp1252 (Excel).
+    """
     try:
         return octets.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -238,18 +235,18 @@ def decoder_csv(octets):
 
 
 def importer_csv(base, texte_csv, preferences=None, bilan=None):
-    """Importe un CSV « nom;telephone;date_heure;motif » ; rend (importés, erreurs).
+    """Imports a CSV `nom;telephone;date_heure;motif`; returns (imported, errors).
 
-    La première ligne doit être l'en-tête exact. Chaque ligne valide est
-    enregistrée ; chaque ligne fautive est rejetée avec un message qui cite
-    son numéro — un fichier à moitié bon importe quand même ses bonnes lignes.
+    The first line must be the exact header. Every valid line is recorded;
+    every faulty line is rejected with a message quoting its line number — a
+    half-good file still imports its good lines.
 
-    ⚠ UNE LIGNE IMPORTÉE PREND LA PLACE DE CE QUI L'OCCUPAIT (10/08/2026) :
-    même règle que l'agenda ICS, et le même code — voir
-    horaires.remplacer_sur_le_creneau. `bilan` reçoit la liste des rendez-vous
-    déplacés, sous la clé « remplaces », quand l'appelant la demande.
+    ⚠ AN IMPORTED LINE TAKES THE PLACE OF WHATEVER OCCUPIED THE SLOT
+    (10/08/2026): the same rule as the ICS calendar, and the same code — see
+    horaires.remplacer_sur_le_creneau. `bilan` receives the list of displaced
+    appointments, under the key `remplaces`, when the caller asks for it.
     """
-    from . import horaires        # tardif : horaires importe db, pas saisie
+    from . import horaires  # late: horaires imports db, not saisie
     lignes = [(numero, cellules)
               for numero, cellules in enumerate(csv.reader(io.StringIO(texte_csv),
                                                            delimiter=";"), start=1)

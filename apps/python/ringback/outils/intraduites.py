@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Les phrases que la traduction NE CHANGE PAS.
+"""The sentences translation DOES NOT CHANGE.
 
-⚠ POURQUOI UN QUATRIEME INSTRUMENT. Le troisieme (`francais_restant.py`)
-cherche des MOTS francais dans les pages anglaises. C'est une liste de mots,
-donc une passoire : « Parcourir », « Enregistrer », « Ajouter » n'y sont pas,
-et une page pleine de ces boutons-la passait pour traduite.
+⚠ WHY A FOURTH INSTRUMENT. The third one (`francais_restant.py`) looks for
+French WORDS in the English pages. It is a word list, so it is a sieve:
+`Parcourir`, `Enregistrer`, `Ajouter` are not in it, and a page full of those
+buttons passed for translated.
 
-Celui-ci ne devine rien. Il parcourt le produit EN FRANCAIS, exactement comme
-l'utilisateur le voit, et demande pour chaque phrase : est-ce que la traduction
-la change ? Si non, elle est intraduite — quel que soit le mot.
+This one guesses nothing. It walks the product IN FRENCH, exactly as the user
+sees it, and asks of every sentence: does translation change it? If not, it is
+untranslated — whatever the word.
 
-Reste le bruit legitime : un nom propre, un nombre, une adresse ne changent
-pas. La sortie les separe pour qu'on puisse les lire.
+That leaves the legitimate noise: a proper noun, a number, an address do not
+change. The output separates them so they can be read.
 """
 import collections
 import datetime
@@ -32,17 +32,17 @@ from ringback import (assistant, horaires, jeu_essai,  # noqa: E402
 
 LIEN = re.compile(r'href="(/[^"#]*)"')
 SANS_INTERET = re.compile(r"^/(image/|.*\.(png|ico|csv|ics|json)$)")
-# Ce qui ne CHANGE pas d'une langue à l'autre, et n'a pas à changer.
+# What does NOT change from one language to the other, and has no reason to.
 NEUTRE = re.compile(
     r"^[\W\d\s]*$"                      # chiffres, ponctuation, espaces
-    r"|^[+]?\d[\d\s.()-]{4,}$"          # numéros de téléphone
-    r"|^\d{1,2}[/:h]\d{2}"              # heures et dates
+    r"|^[+]?\d[\d\s.()-]{4,}$"  # phone numbers
+    r"|^\d{1,2}[/:h]\d{2}"  # times and dates
     r"|^[A-Za-zÀ-ÿ' -]+@"               # adresses de courriel
     r"|^(RingBack|CALL-E|SQLite|Python|JSON|CSV|ICS|HTML|API)\b")
 
 
 def _peupler(app):
-    """Le même peuplement que `francais_restant.py` : sans lui, pas d'écran."""
+    """The same population as `francais_restant.py`: without it, no screens."""
     base, prefs = app.base, app.preferences
     for jour in range(7):
         horaires.basculer_periode(prefs, jour, 8 * 60, 19 * 60, "ouvrir")
@@ -112,7 +112,7 @@ def principal():
     threading.Thread(target=http.serve_forever, daemon=True).start()
     app = http.RequestHandlerClass.application
     racine_web = f"http://127.0.0.1:{http.server_address[1]}"
-    # ⚠ EN FRANÇAIS : c'est le produit tel qu'il sort, avant toute traduction.
+    # ⚠ IN FRENCH: this is the product as it comes out, before any translation.
     app.preferences.definir(langue.CLE_LANGUE, "fr")
     jeu_essai.charger(app.base, langue_code="fr")
     _peupler(app)

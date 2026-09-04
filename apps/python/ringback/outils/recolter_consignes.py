@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Récolter les phrases de la CONSIGNE téléphonique, telles qu'elles partent.
+"""Harvest the sentences of the PHONE BRIEFING, as they actually go out.
 
-⚠ ON RÉCOLTE CE QUI PART, PAS CE QUI EST ÉCRIT DANS LE CODE. Une consigne est
-assemblée à partir d'un gabarit de nature, des options de comportement, des
-informations d'étape 2 et des réglages : lire les sources ne dirait ni quelles
-combinaisons existent réellement, ni comment les morceaux se recollent. On
-construit donc de VRAIES consignes — les cinq natures, toutes les options, les
-deux genres (classique et cascade) — et l'on relève leurs lignes.
+⚠ WHAT GOES OUT IS HARVESTED, NOT WHAT IS WRITTEN IN THE CODE. A briefing is
+assembled from a template for its kind, the behaviour options, the step-2
+information and the settings: reading the sources would say neither which
+combinations really exist, nor how the pieces glue back together. So REAL
+briefings are built — the five kinds, every option, both genres (classic and
+cascade) — and their lines are recorded.
 
-C'est le même principe que `recolter_phrases.py` pour les écrans, et pour la
-même raison : ce qui n'est pas produit ne peut pas être traduit à l'aveugle.
+Same principle as `recolter_phrases.py` for the screens, and for the same
+reason: what is not produced cannot be translated blind.
 
-Usage :
-    python outils/recolter_consignes.py            # le compte rendu
-    python outils/recolter_consignes.py --json f   # la récolte entière
+Usage: python outils/recolter_consignes.py # the report python
+outils/recolter_consignes.py --json f # the whole harvest
 """
 
 import argparse
@@ -28,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ringback import (assistant, consigne as mod_consigne,  # noqa: E402
                       generation, horaires, themes)
 
-# Les options de comportement qui CHANGENT le texte : on les croise toutes.
+# The behaviour options that CHANGE the text: every combination is crossed.
 OPTIONS = ("liberer_creneau", "cascade", "proposer_autre_date",
            "annuler_si_absent", "confirmer_deplacement")
 
@@ -44,7 +43,7 @@ def _preferences():
 
 
 def _infos(nature):
-    """Une valeur plausible pour chaque information d'étape 2 de la nature."""
+    """A plausible value for each step-2 piece of information of the kind."""
     valeurs = {}
     for info in assistant.NATURES[nature]["infos"]:
         code, genre = info["code"], info.get("type")
@@ -58,7 +57,7 @@ def _infos(nature):
 
 
 def recolter():
-    """(lignes par origine, compteur) — toutes les consignes possibles."""
+    """(lines by origin, counter) — every possible briefing."""
     prefs = _preferences()
     compteur = collections.Counter()
     par_nature = collections.defaultdict(set)
@@ -82,10 +81,10 @@ def recolter():
                     if ligne:
                         compteur[ligne] += 1
                         par_nature[nature].add(ligne)
-    # ⚠ ET LES GABARITS BRUTS, segment par segment. Une consigne assemblee
-    # ne montre que les segments dont la condition etait vraie : ceux qui
-    # dependent d'une information ABSENTE ne paraissent jamais ci-dessus. On
-    # descend donc aussi dans NATURES, ou ils sont ecrits.
+    # ⚠ AND THE RAW TEMPLATES, segment by segment. An assembled briefing shows
+    # only the segments whose condition was true: the ones depending on ABSENT
+    # information never appear above. So NATURES is walked as well, where they
+    # are written.
     def _texte_profond(valeur, nature):
         if isinstance(valeur, str):
             propre = valeur.strip()
@@ -106,7 +105,7 @@ def recolter():
     for nature, definition in assistant.NATURES.items():
         _texte_profond(definition, nature)
 
-    # Les phrases fixes du module lui-même, celles qu'aucune nature ne porte.
+    # The module's own fixed sentences, the ones no kind carries.
     for nom in dir(mod_consigne):
         if not nom.isupper():
             continue

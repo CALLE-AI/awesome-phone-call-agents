@@ -1,36 +1,35 @@
-"""L'INSTALLEUR DU PREMIER LANCEMENT — sa structure et son avancement.
+"""THE FIRST-RUN INSTALLER — its structure and its progress.
 
-Ce module ne dessine rien : il dit **quelles parties existent, quelles pages
-elles contiennent, et lesquelles sont faites**. Le dessin est dans
-`serveur.py`, qui sait rendre les formulaires ; ici on tient la carte.
+This module draws nothing: it states **which parts exist, which pages they
+contain, and which are done**. The drawing lives in `serveur.py`, which knows
+how to render the forms; here we hold the map.
 
-Le principe, tel que le propriétaire l'a demandé (03/08/2026) : au tout
-premier lancement, une variable n'est pas posée — alors l'installeur
-s'ouvre. Il ne demande rien de nouveau : **il fait remplir les mêmes
-réglages que la page ⚙ Réglages**, dans un ordre qui a un sens, une page à
-la fois, avec un fil d'Ariane pour revenir en arrière.
+The principle, as the owner asked for it (03/08/2026): on the very first launch
+a setting is missing — so the installer opens. It asks for nothing new: **it
+has you fill in the same settings as the ⚙ Settings page**, in an order that
+makes sense, one page at a time, with a breadcrumb trail to go back.
 
-Ce que l'avancement veut dire, exactement : une page est « faite » quand on
-l'a **validée**, pas quand une machine a jugé son contenu satisfaisant. Une
-partie passe au vert quand TOUTES ses pages sont faites. C'est vérifiable,
-c'est réversible (rien n'empêche de revenir), et cela ne prétend jamais
-savoir si un réglage est *bon* — seulement s'il a été vu et voulu.
+What progress means, exactly: a page is `done` when it has been **confirmed**,
+not when a machine judged its content satisfactory. A part turns green when ALL
+its pages are done. That is verifiable, it is reversible (nothing stops you
+going back), and it never claims to know whether a setting is *right* — only
+whether it was seen and wanted.
 """
 
-# --------------------------------------------------------------- réglages
-CLE_FAITE = "installation_faite"      # posée à la toute fin, par le geste
-CLE_PAGES = "installation_pages"      # les codes de page déjà validés
+# --------------------------------------------------------------- settings
+CLE_FAITE = "installation_faite"  # set at the very end, by the gesture
+CLE_PAGES = "installation_pages"  # the page codes already confirmed
 
 
-# --------------------------------------------------------------- la carte
-# Partie « Appels » : exactement les cinq formulaires de ⚙ Réglages → Appels,
-# dans le même ordre. Ce ne sont pas des copies : le même code les produit.
+# --------------------------------------------------------------- the map The
+# `Calls` part: exactly the five forms of ⚙ Settings → Calls, in the same
+# order. They are not copies: the same code produces them.
 PAGES_APPELS = (
-    # ⚠ CALL-E EN TÊTE (10/08/2026). C'est ce qui décide si le produit peut
-    # appeler du tout : le régler après l'identité, les relances et les
-    # discours aurait fait tout préparer avant de découvrir qu'aucun appel ne
-    # peut partir. Elle n'est pas obligatoire pour autant — la clé s'obtient
-    # chez CALL-E, et la simulation montre tout sans elle.
+    # ⚠ CALL-E COMES FIRST (10/08/2026). It decides whether the product can
+    # call at all: setting it after the identity, the follow-ups and the
+    # briefings would have meant preparing everything before discovering that
+    # no call can go out. It is not compulsory for all that — the key is
+    # obtained from CALL-E, and simulation shows everything without one.
     ("calle", "Connexion à CALL-E"),
     ("identite", "Identité de l'établissement"),
     ("appel", "Quand appeler"),
@@ -39,43 +38,42 @@ PAGES_APPELS = (
     ("delais", "Délais d'un appel réel"),
 )
 
-# Partie « Agenda » : la semaine type, les jours fermés, puis le chargement
-# d'un agenda. Volontairement SANS « créneaux à proposer » : ils sont
-# calculés à partir des trois précédents, il n'y a rien à saisir.
+# The `Calendar` part: the typical week, the closed days, then loading a
+# calendar. Deliberately WITHOUT `slots to offer`: they are computed from the
+# previous three, there is nothing to type in.
 PAGES_AGENDA = (
     ("horaires", "Horaires d'ouverture"),
     ("jours-fermes", "Jours fermés"),
     ("import", "Charger votre agenda"),
 )
 
-# Les deux pages de CHAQUE nature de campagne. Contrairement aux Réglages,
-# qui groupent par sujet (tous les discours ensemble, toutes les options
-# ensemble), l'installeur groupe par CAMPAGNE : on règle une campagne
-# entièrement, puis on passe à la suivante.
+# The two pages of EACH campaign kind. Unlike the Settings, which group by
+# subject (all the briefings together, all the options together), the installer
+# groups by CAMPAIGN: you set one campaign completely, then move to the next.
 PAGES_NATURE = (
     ("comportement", "Options de comportement"),
     ("discours", "Discours de l'agent"),
 )
 
 
-# Le nœud qui regroupe les campagnes dans le menu. Ce n'est PAS une partie :
-# il n'a aucune page à lui, il ne sert qu'à porter la branche.
+# The node that gathers the campaigns in the menu. It is NOT a part: it has no
+# page of its own, it only exists to carry the branch.
 GROUPE_AGENT = "agent"
 LIBELLE_AGENT = "Comportement de l'agent IA"
 
 
 def parties(natures):
-    """La carte complète : [(code, libellé, [(code_page, libellé), …]), …].
+    """The complete map: [(code, label, [(page_code, label), …]), …].
 
-    `natures` : [(code, icône, nom), …] — les natures de campagne encore
-    créables. L'installeur suit donc le produit : retirer une nature retire
-    sa partie, sans toucher à ce module. L'icône est reçue mais volontairement
-    IGNORÉE dans les libellés : voir `arbre`.
+    `natures`: [(code, icon, name), …] — the campaign kinds that can still be
+    created. The installer therefore follows the product: removing a kind
+    removes its part, without touching this module. The icon is received but
+    deliberately IGNORED in the labels: see `arbre`.
 
-    ⚠ L'ORDRE EST CELUI DU PARCOURS, et il a changé le 03/08/2026 : l'agenda
-    passe AVANT les campagnes. C'est la demande du propriétaire, et elle se
-    tient — les places qu'une campagne peut proposer sortent de l'agenda, il
-    vaut donc mieux l'avoir renseigné avant de régler ce qui s'en sert.
+    ⚠ THE ORDER IS THE ORDER OF THE JOURNEY, and it changed on 03/08/2026: the
+    calendar comes BEFORE the campaigns. That is the owner's request, and it
+    holds up — the slots a campaign can offer come out of the calendar, so it
+    is better to have filled it in before setting up what uses it.
     """
     carte = [
         ("bienvenue", "Bienvenue", [("bienvenue", "Ce que vous allez régler")]),
@@ -91,18 +89,18 @@ def parties(natures):
 
 
 def arbre(natures):
-    """Le MENU, tel qu'il s'affiche : [(code, libellé, [(code, libellé), …])].
+    """The MENU, as it is displayed: [(code, label, [(code, label), …])].
 
-    Quatre entrées, dont une seule se déplie — celle des campagnes. Un seul
-    niveau de retrait, donc : les pages d'une section ne sont pas dans l'arbre,
-    elles ont leur propre liste à côté du formulaire.
+    Four entries, only one of which unfolds — the campaigns one. So there is a
+    single level of indentation: a section's pages are not in the tree, they
+    have their own list beside the form.
 
-    ⚠ « Bienvenue » n'y figure PAS. L'accueil n'affiche aucune navigation, et
-    une fois la configuration démarrée on n'y revient pas : la faire
-    apparaître dans le menu proposerait un retour qui n'a aucun sens.
+    ⚠ `Bienvenue` (Welcome) is NOT in it. The home screen shows no navigation,
+    and once configuration has started you do not go back to it: showing it in
+    the menu would offer a way back that makes no sense.
 
-    ⚠ Aucune icône : ni cotillon, ni téléphone, ni calendrier. Seules la coche
-    et la croix ont leur place ici, parce qu'elles disent quelque chose.
+    ⚠ No icons: no party popper, no telephone, no calendar. Only the tick and
+    the cross belong here, because they say something.
     """
     branche = [(f"nature-{code}", nom) for code, _, nom in natures]
     return [
@@ -114,10 +112,10 @@ def arbre(natures):
 
 
 def noeud_de(page, natures):
-    """(code du nœud de premier niveau, code de la partie) pour cette page.
+    """(top-level node code, part code) for this page.
 
-    Le nœud vaut GROUPE_AGENT quand la page appartient à une campagne : c'est
-    lui qui doit s'afficher déplié et actif.
+    The node is GROUPE_AGENT when the page belongs to a campaign: that is the
+    one that must show unfolded and active.
     """
     partie = partie_de(page, natures)
     if partie and partie.startswith("nature-"):
@@ -126,11 +124,10 @@ def noeud_de(page, natures):
 
 
 def noeud_fait(noeud, preferences, natures):
-    """Vrai quand ce nœud du menu est entièrement réglé.
+    """True when this menu node is entirely configured.
 
-    Pour le groupe des campagnes, cela veut dire : TOUTES les campagnes le
-    sont. Une coche verte sur le groupe alors qu'une campagne reste à faire
-    serait un mensonge.
+    For the campaigns group, that means: ALL the campaigns are. A green tick on
+    the group while one campaign is still outstanding would be a lie.
     """
     if noeud == GROUPE_AGENT:
         codes = [code for code, _ in arbre(natures)[2][2]]
@@ -140,9 +137,9 @@ def noeud_fait(noeud, preferences, natures):
 
 
 def premiere_page(noeud, natures):
-    """La page où mène un clic sur ce nœud du menu."""
+    """The page a click on this menu node leads to."""
     if noeud == GROUPE_AGENT:
-        # Le groupe n'a pas de page : on ouvre la première campagne.
+        # The group has no page: open the first campaign.
         premiere = arbre(natures)[2][2]
         return premiere_page(premiere[0][0], natures) if premiere else None
     for code_partie, _, liste in parties(natures):
@@ -152,12 +149,12 @@ def premiere_page(noeud, natures):
 
 
 def pages(natures):
-    """Tous les codes de page, dans l'ordre du parcours."""
+    """Every page code, in the order of the journey."""
     return [code for _, _, liste in parties(natures) for code, _ in liste]
 
 
 def partie_de(page, natures):
-    """Le code de la partie qui contient cette page (None si inconnue)."""
+    """The code of the part containing this page (None if unknown)."""
     for code_partie, _, liste in parties(natures):
         if any(code == page for code, _ in liste):
             return code_partie
@@ -165,13 +162,13 @@ def partie_de(page, natures):
 
 
 def page_valide(page, natures):
-    """La page demandée, ou la première du parcours si elle n'existe pas."""
+    """The requested page, or the first of the journey if it does not exist."""
     toutes = pages(natures)
     return page if page in toutes else toutes[0]
 
 
 def suivante(page, natures):
-    """La page d'après, ou None si c'est déjà la dernière."""
+    """The next page, or None if this is already the last one."""
     toutes = pages(natures)
     if page not in toutes:
         return toutes[0]
@@ -181,22 +178,22 @@ def suivante(page, natures):
 
 # ------------------------------------------------------------ l'avancement
 def faites(preferences):
-    """L'ensemble des codes de page déjà validés."""
+    """The set of page codes already confirmed."""
     return set(preferences.obtenir(CLE_PAGES) or [])
 
 
 def marquer_faite(preferences, page):
-    """Note cette page comme validée. Deux fois ne change rien."""
+    """Marks this page as confirmed. Twice changes nothing."""
     deja = faites(preferences)
     if page in deja:
         return
     deja.add(page)
-    # Trié : le fichier de préférences reste comparable d'une fois à l'autre.
+    # Sorted: the preferences file stays comparable from one run to the next.
     preferences.definir(CLE_PAGES, sorted(deja))
 
 
 def partie_faite(partie, preferences, natures):
-    """Vrai quand TOUTES les pages de cette partie sont validées."""
+    """True when ALL the pages of this part are confirmed."""
     deja = faites(preferences)
     for code_partie, _, liste in parties(natures):
         if code_partie == partie:
@@ -205,29 +202,29 @@ def partie_faite(partie, preferences, natures):
 
 
 def progression(preferences, natures):
-    """(pages validées, pages en tout) — de quoi écrire « 7 sur 20 »."""
+    """(pages confirmed, pages in total) — enough to write `7 of 20`."""
     toutes = pages(natures)
     deja = faites(preferences)
     return sum(1 for code in toutes if code in deja), len(toutes)
 
 
 def terminee(preferences):
-    """Vrai si l'installation a été menée à son terme, au moins une fois."""
+    """True if the installation was carried through to the end, at least once.
+    """
     return bool(preferences.obtenir(CLE_FAITE))
 
 
 def marquer_terminee(preferences):
-    """Le geste final : l'installeur ne s'ouvrira plus tout seul."""
+    """The final gesture: the installer will no longer open by itself."""
     preferences.definir(CLE_FAITE, True)
 
 
 def rouvrir(preferences):
-    """Repartir de zéro : l'installeur se rouvrira au prochain lancement.
+    """Start again from scratch: the installer will reopen at the next launch.
 
-    Sert au bouton « Refaire la configuration » des Réglages. On efface la
-    marque de fin ET les pages validées : reprendre une installation à
-    moitié cochée montrerait des coches vertes sur des pages qu'on veut
-    justement revoir.
+    Used by the `Redo the configuration` button in the Settings. Both the end
+    marker AND the confirmed pages are erased: resuming a half-ticked
+    installation would show green ticks on the very pages you want to review.
     """
     preferences.definir(CLE_FAITE, False)
     preferences.definir(CLE_PAGES, [])

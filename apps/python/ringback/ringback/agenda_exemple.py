@@ -1,70 +1,66 @@
-"""Un agenda ICS d'exemple, FABRIQUÉ À L'INSTANT où on le demande.
+"""A sample ICS calendar, BUILT AT THE MOMENT it is asked for.
 
-Demande du propriétaire du 10/08/2026 : « une bonne centaine de rendez-vous sur
-les prochaines semaines… par rapport aux dates du moment, pour que peu importe
-le moment où l'on génère le jeu de données ce soit toujours valable ».
+Owner's request of 10/08/2026: `a good hundred appointments over the coming
+weeks… relative to today's dates, so that whenever we generate the data set it
+is always valid`.
 
-⚠ POURQUOI PAS UN FICHIER FIGÉ. Les trois exemples livrés
-(`exemple_agenda.ics` et ses deux variantes) portent des dates ÉCRITES : trois
-mois plus tard, tout y est passé, l'import ne remplit plus le planning et la
-démonstration ne montre rien. Celui-ci part de `datetime.now()` : il est juste
-le jour où on l'ouvre, et il le restera.
+⚠ WHY NOT A FIXED FILE. The three shipped samples (`exemple_agenda.ics` and its
+two variants) carry WRITTEN dates: three months later everything in them is
+past, the import no longer fills the schedule and the demonstration shows
+nothing. This one starts from `datetime.now()`: it is right on the day it is
+opened, and it will stay so.
 
-⚠ TOUS LES NUMÉROS SORTENT DES SIX RACINES QUE L'ARCEP RÉSERVE aux œuvres
-audiovisuelles (voir l'entête de `jeu_essai.py`). Elles ne sont attribuées à
-personne : aucun de ces numéros ne peut appeler ni être appelé. C'est la même
-règle que partout ailleurs dans le produit, et `preparer_publication.py` la
-vérifie sur la copie publiée.
+⚠ EVERY NUMBER COMES FROM THE SIX ROOTS ARCEP RESERVES for audiovisual works
+(see the header of `jeu_essai.py`). They are assigned to nobody: none of these
+numbers can call or be called. It is the same rule as everywhere else in the
+product, and `preparer_publication.py` checks it on the published copy.
 
-⚠ IL SE CALE SUR LES HORAIRES RÉGLÉS (10/08/2026). Les jours ouverts, les
-plages de la semaine type, le pas de créneau et les jours fermés viennent des
-⚙ Réglages → 🗓 Agenda. Avant, ils étaient ÉCRITS ici : importé dans un cabinet
-qui ouvre le samedi, ferme le mercredi ou travaille par quarts d'heure,
-l'exemple tombait à côté des heures d'ouverture — le planning montrait des
-rendez-vous hors des cases, et les campagnes de créneau libre ne trouvaient pas
-les places attendues. Sans aucun horaire réglé, on ne devine pas les heures
-ouvrées d'un cabinet : on prend les plages de repli ci-dessous, et l'écran le
-DIT.
+⚠ IT ALIGNS ITSELF ON THE CONFIGURED HOURS (10/08/2026). The open days, the
+typical week's windows, the slot step and the closed days come from ⚙ Réglages
+→ 🗓 Agenda. Before, they were WRITTEN here: imported into a practice that opens
+on Saturday, closes on Wednesday or works in quarter-hours, the sample fell
+outside the opening hours — the schedule showed appointments outside the boxes,
+and freed-slot campaigns did not find the expected places. With no hours
+configured at all, a practice's working hours cannot be guessed: the fallback
+windows below are used, and the screen SAYS so.
 
-⚠ UNE PLACE SUR DEUX SEULEMENT EST PRISE, PRÈS. Un agenda plein à craquer ne
-laisserait aucune place libre à proposer — et proposer une place libre est
-justement ce que le produit sait faire de mieux.
+⚠ ONLY ONE SLOT IN TWO IS TAKEN, NEARBY. A calendar packed to bursting would
+leave no free slot to offer — and offering a free slot is precisely what the
+product does best.
 
-⚠ ET IL COUVRE CENT QUATRE-VINGTS JOURS, DE PLUS EN PLUS CLAIRSEMÉ. Demande du
-propriétaire le 11/08/2026 : « puisqu'on a du 90 jours on devrait avoir des
-exemples sur 100 jours ». Il visait juste, et le manque était plus large que
-prévu : la règle de liste propose « jusqu'à 30 jours après » et « jusqu'à
-90 jours après » (`assistant.JOURS_APRES`), et l'exemple s'arrêtait à trois
-semaines — ces deux options ne pouvaient donc RIEN donner de différent de
-« sans limite ». Mesuré avant : 462 rendez-vous sur 21 jours.
+⚠ AND IT COVERS ONE HUNDRED AND EIGHTY DAYS, THINNING OUT AS IT GOES. Owner's
+request of 11/08/2026: `since we have 90 days we ought to have samples over 100
+days`. He was right, and the gap was wider than expected: the list rule offers
+`up to 30 days after` and `up to 90 days after` (`assistant.JOURS_APRES`), and
+the sample stopped at three weeks — so those two options could give NOTHING
+different from `no limit`. Measured before: 462 appointments over 21 days.
 
-⚠ CENT → CENT QUATRE-VINGTS LE 15/08/2026, ET LA CAUSE EST MESURÉE. Son
-constat : « la cascade s'arrête à la deuxième occurrence ; normalement cela
-doit continuer jusqu'à la date limite ». Le moteur était juste — c'est
-l'EXEMPLE qui manquait de matière. Chaque maillon d'un décalage en cascade
-consomme le gain demandé : avec « au moins 30 jours », le deuxième maillon
-cherche des rendez-vous à 60 jours, le troisième à 90, le quatrième à 120…
-Cent jours d'exemple n'autorisent donc que DEUX maillons, quelle que soit la
-date limite réglée. Mesuré dans sa base : rendez-vous jusqu'au 23/11, chaîne
-morte sur la place du 06/11 faute de quiconque au 06/12.
+⚠ ONE HUNDRED → ONE HUNDRED AND EIGHTY ON 15/08/2026, AND THE CAUSE IS
+MEASURED. His observation: `the cascade stops at the second occurrence;
+normally it should carry on to the cut-off date`. The engine was right — it was
+the SAMPLE that lacked material. Each link of a cascading shift consumes the
+requested gain: with `at least 30 days`, the second link looks for appointments
+60 days out, the third 90, the fourth 120… A hundred days of sample therefore
+allow only TWO links, whatever cut-off date is configured. Measured in his own
+database: appointments up to 23/11, chain dead on the 06/11 slot for want of
+anyone on 06/12.
 
-Cent quatre-vingts jours laissent cinq à six maillons à 30 jours de gain, et
-la densité du dernier palier a été abaissée (une place sur 30) pour que
-l'agenda ne double pas en volume : au loin, un vrai agenda est presque vide.
+One hundred and eighty days leave five or six links at a 30-day gain, and the
+density of the last tier was lowered (one slot in 30) so the calendar does not
+double in size: far out, a real calendar is nearly empty.
 
-La densité DÉCROÎT avec l'éloignement (voir DENSITE), et ce n'est pas un
-artifice : un agenda réel est presque plein la semaine prochaine et presque
-vide dans trois mois. Deux bénéfices d'un coup — les fenêtres de 30 et 90 jours
-ont enfin de la matière, et les places libres lointaines abondent, ce qui est
-exactement ce qu'une campagne de créneau libéré cherche.
+The density DECREASES with distance (see DENSITE), and that is not a trick: a
+real calendar is nearly full next week and nearly empty in three months. Two
+benefits at once — the 30- and 90-day windows finally have material, and
+distant free slots abound, which is exactly what a freed-slot campaign is
+looking for.
 
-⚠ TROIS FAMILLES D'ÉVÉNEMENT, EXPRÈS. Un agenda réel n'est pas homogène, et
-l'import doit se montrer sur les trois cas :
- · un numéro dans la DESCRIPTION → le contact arrive avec son téléphone ;
- · aucun numéro → il arrive « sans numéro », à compléter (c'est un vrai cas,
-   et l'écran a une page pour lui) ;
- · un nom DÉJÀ dans le carnet, avec SON numéro → il est reconnu sur le couple
-   nom + numéro, et rien n'est dupliqué.
+⚠ THREE FAMILIES OF EVENT, ON PURPOSE. A real calendar is not homogeneous, and
+the import must be shown on all three cases: · a number in the DESCRIPTION →
+the contact arrives with their phone; · no number → they arrive `without a
+number`, to be completed (a real case, and the interface has a page for it); ·
+a name ALREADY in the address book, with THEIR number → they are recognised on
+the name + number pair, and nothing is duplicated.
 """
 
 import collections
@@ -72,32 +68,32 @@ import datetime
 
 from . import horaires, jeu_essai
 
-# ------------------------------------------------------------- LE REPLI
-# Ce qui sert UNIQUEMENT quand aucun horaire d'ouverture n'est réglé. Ce n'est
-# pas une valeur devinée : c'est un exemple assumé, et l'écran dit qu'il en est
-# un (voir `repli` dans le retour de `plan`).
-PAS_REPLI = 30                                    # une demi-heure
+# ------------------------------------------------------------- THE FALLBACK
+# What is used ONLY when no opening hours are configured. It is not a guessed
+# value: it is an acknowledged sample, and the screen says it is one (see
+# `repli` in the return of `plan`).
+PAS_REPLI = 30  # half an hour
 PLAGES_REPLI = ((9 * 60, 12 * 60 + 30), (14 * 60, 18 * 60 + 30))
-JOURS_REPLI = (0, 1, 2, 3, 4)                     # lundi au vendredi
+JOURS_REPLI = (0, 1, 2, 3, 4)  # Monday to Friday
 
-# ------------------------------------------------------- CE QU'ON VISE
-# L'ÉTENDUE, en jours, et c'est ELLE qui décide. Cent, parce que la règle de
-# liste propose « jusqu'à 90 jours après la place » : un exemple qui s'arrête
-# avant rend cette option indiscernable de « sans limite ». Voir l'entête.
+# ------------------------------------------------------- WHAT WE AIM FOR THE
+# SPAN, in days, and it is the SPAN that decides. A hundred, because the list
+# rule offers `up to 90 days after the slot`: a sample that stops before makes
+# that option indistinguishable from `no limit`. See the header.
 JOURS_COUVERTS = 180
-# LE PLANCHER, en nombre de rendez-vous. « Une bonne centaine », dit la demande
-# d'origine. Il n'allonge JAMAIS l'étendue — un exemple qui s'étalerait sur un
-# an pour atteindre son compte ne ressemblerait plus à un agenda. S'il n'est pas
-# atteint avec la densité normale, on prend TOUTES les places libres des cent
-# jours ; et si cela ne suffit toujours pas, c'est que le cabinet a une semaine
-# type étroite — son agenda est petit, et le dire vaut mieux que de l'étirer.
+# THE FLOOR, in number of appointments. `A good hundred`, says the original
+# request. It NEVER lengthens the span — a sample spreading over a year to
+# reach its count would no longer look like a calendar. If it is not reached at
+# the normal density, ALL the free slots of the hundred days are taken; and if
+# that is still not enough, then the practice has a narrow typical week — its
+# calendar is small, and saying so is better than stretching it.
 CIBLE = 100
-# LA DENSITÉ, PAR PALIER : (jusqu'à J jours, une place sur N est prise).
-# Presque plein la semaine prochaine, presque vide dans trois mois — c'est ce
-# que fait un agenda réel, et c'est ce qui laisse des places libres au loin.
+# THE DENSITY, BY TIER: (up to D days, one slot in N is taken). Nearly full
+# next week, nearly empty in three months — that is what a real calendar does,
+# and that is what leaves free slots far out.
 DENSITE = ((21, 2), (45, 5), (70, 10), (110, 20), (JOURS_COUVERTS, 30))
-# Ce qui s'applique au-delà du dernier palier, quand on continue pour atteindre
-# le plancher : la densité la plus faible, celle du loin.
+# What applies beyond the last tier, when we carry on to reach the floor: the
+# lowest density, the one of the far end.
 UNE_PLACE_SUR = DENSITE[-1][1]
 
 MOTIFS = (
@@ -107,39 +103,33 @@ MOTIFS = (
     "Rééducation du dos",
 )
 
-# Des identités qui ne sont PAS dans le carnet : elles arrivent par l'agenda,
-# et c'est le cas le plus courant d'un premier import.
-#
-# ⚠ DEUX GROUPES DISJOINTS, ET UN NUMÉRO PAR PERSONNE. La première version
-# faisait paraître le même nom tantôt avec un numéro, tantôt sans, et lui
-# donnait un numéro DIFFÉRENT à chaque rendez-vous : l'import créait alors huit
-# fiches pour la même personne — mesuré, cinq noms en huit exemplaires. Un vrai
-# agenda ne fait pas ça, et le produit n'a pas à s'en défendre.
-#
-# ⚠ ET LE SANS-NUMÉRO EST DEVENU RARE (11/08/2026). LE DÉFAUT, MESURÉ DANS LA
-# BASE RÉELLE DU PROPRIÉTAIRE : l'agenda importé y avait posé 32 personnes SANS
-# numéro contre 8 avec. Un contact sans numéro ne peut pas être appelé — sa
-# campagne de créneau libéré ne trouvait donc que 7 personnes, quel que soit le
-# réglage. Il a cherché la cause quatre fois de suite, et elle était là.
-#
-# Le cas « sans numéro » doit EXISTER — c'est un vrai cas d'agenda, et le
-# produit a un écran pour lui. Mais il ne doit pas être la règle : un agenda
-# d'exemple sert à faire tourner des campagnes, donc à appeler du monde. Une
-# personne sur dix, désormais (voir `famille` dans `rendezvous`).
-# ⚠ UNE PERSONNE = UN RENDEZ-VOUS (14/08/2026). Demande du propriétaire, mot
-# pour mot : « il faut que ce soit une liste de noms uniquement, sinon les tests
-# deviennent juste impossibles ». Il avait raison, et c'était mesurable : les
-# trente noms ci-dessous tournaient en boucle sur six cent trente rendez-vous —
-# SIX rendez-vous par personne en moyenne, dix-sept pour la plus servie. Impossible
-# de suivre quoi que ce soit : la même personne apparaissait dans la liste d'appel,
-# dans le planning, dans le cahier, à des dates différentes, et l'on ne savait plus
-# ce qu'on regardait.
-#
-# On ne peut pas écrire six cents noms à la main. On les COMPOSE : chaque prénom
-# de PRENOMS marié à chaque nom de FAMILLES fait une identité, et le parcours est
-# déterministe (voir `_identite`). Trente-six prénoms × vingt et un noms = 756
-# personnes distinctes, largement de quoi couvrir cent jours d'agenda sans jamais
-# répéter quelqu'un.
+# Identities that are NOT in the address book: they arrive through the
+# calendar, which is the commonest case of a first import.  ⚠ TWO DISJOINT
+# GROUPS, AND ONE NUMBER PER PERSON. The first version had the same name appear
+# sometimes with a number, sometimes without, and gave them a DIFFERENT number
+# at each appointment: the import then created eight records for the same
+# person — measured, five names in eight copies. A real calendar does not do
+# that, and the product should not have to defend itself against it.  ⚠ AND THE
+# NUMBERLESS CASE HAS BECOME RARE (11/08/2026). THE DEFECT, MEASURED IN THE
+# OWNER'S REAL DATABASE: the imported calendar had put 32 people there WITHOUT
+# a number against 8 with. A contact with no number cannot be called — so his
+# freed-slot campaign found only 7 people, whatever the setting. He hunted for
+# the cause four times in a row, and it was here.  The `no number` case must
+# EXIST — it is a real calendar case, and the product has a screen for it. But
+# it must not be the rule: a sample calendar exists to run campaigns, therefore
+# to call people. One person in ten, from now on (see `famille` in
+# `rendezvous`). ⚠ ONE PERSON = ONE APPOINTMENT (14/08/2026). Owner's request,
+# word for word: `it has to be a list of names only, otherwise the tests become
+# simply impossible`. He was right, and it was measurable: the thirty names
+# below went round in a loop over six hundred and thirty appointments — SIX
+# appointments per person on average, seventeen for the busiest. Impossible to
+# follow anything: the same person appeared in the call list, in the schedule,
+# in the change log, on different dates, and you no longer knew what you were
+# looking at.  Six hundred names cannot be written by hand. They are COMPOSED:
+# each first name in PRENOMS married to each surname in FAMILLES makes an
+# identity, and the walk is deterministic (see `_identite`). Thirty-six first
+# names × twenty-one surnames = 756 distinct people, ample to cover a hundred
+# days of calendar without ever repeating anyone.
 PRENOMS = (
     ("Mme", "Sylvie"), ("M.", "Damien"), ("Mme", "Aïcha"), ("M.", "Hugo"),
     ("Mme", "Patricia"), ("M.", "Étienne"), ("Mme", "Fatou"), ("M.", "Bernard"),
@@ -160,38 +150,36 @@ FAMILLES = (
 )
 
 
-# ⚠ LES TERMINAISONS QUE L'EXEMPLE S'INTERDIT (14/08/2026). Le simulateur
-# RÉSERVE les fins 51 à 59 : un numéro qui finit par là EXIGE son issue (voir
-# calle_client.TERMINAISONS_FORCEES), et « 59 » exige la pire — l'agent ne rend
-# rien de lisible, et la campagne se met EN PAUSE, à dessein.
-#
-# LE DÉFAUT, MESURÉ DANS LA BASE DU PROPRIÉTAIRE : en portant AVEC_NUMERO de 8
-# à 30 noms, la formule « 40 + rang » s'est mise à produire 40 … 69 — donc
-# 51 à 59 au passage. Sa campagne de 30 contacts a reçu, dans ses cinq premiers
-# appels, un « 57 » (refuse et 🚫), un « 58 » (refus poli), un « 52 » (refuse)
-# et un « 59 » : cinq appels, une place pourvue, puis PAUSE. Il attendait
-# trente appels — il n'avait pas tort, et rien ne le lui disait.
-#
-# Ces fins-là doivent rester à la MAIN de celui qui essaie : il tape un numéro
-# en 59 quand il VEUT voir ce cas. L'exemple, lui, ne les tire jamais.
+# ⚠ THE ENDINGS THE SAMPLE FORBIDS ITSELF (14/08/2026). The simulator RESERVES
+# endings 51 to 59: a number ending there DEMANDS its outcome (see
+# calle_client.TERMINAISONS_FORCEES), and `59` demands the worst — the agent
+# returns nothing readable, and the campaign is PAUSED, by design.  THE DEFECT,
+# MEASURED IN THE OWNER'S DATABASE: raising AVEC_NUMERO from 8 to 30 names made
+# the formula `40 + rank` produce 40 … 69 — hence 51 to 59 along the way. His
+# 30-contact campaign received, in its first five calls, a `57` (refuses and
+# 🚫), a `58` (polite refusal), a `52` (refuses) and a `59`: five calls, one
+# slot filled, then PAUSE. He was expecting thirty calls — he was not wrong,
+# and nothing told him.  Those endings must stay in the HANDS of whoever is
+# testing: they type a number ending in 59 when they WANT to see that case. The
+# sample never draws them.
 FINS_RESERVEES = tuple(f"{n:02d}" for n in range(51, 60))
-# Les 81 terminaisons qui restent — celles que l'exemple peut employer.
+# The 81 remaining endings — the ones the sample may use.
 FINS_SURES = tuple(n for n in range(10, 100) if not 51 <= n <= 59)
 
 
 def _identite(rang, famille_debut=0):
-    """LA personne de rang `rang` — jamais la même deux fois.
+    """THE person of rank `rang` — never the same one twice.
 
-    Composition déterministe : le prénom avance d'un cran à chaque personne, le
-    nom de famille avance quand on a fait le tour des prénoms. Comme les deux
-    listes n'ont pas la même longueur, on parcourt les 756 combinaisons avant
-    d'en revoir une — bien au-delà des six cents rendez-vous d'un agenda de
-    cent jours. Voir le pavé au-dessus de PRENOMS.
+    Deterministic composition: the first name advances one step per person, the
+    surname advances when the first names have been gone through. Since the two
+    lists are not the same length, all 756 combinations are walked before one
+    is seen again — far beyond the six hundred appointments of a hundred-day
+    calendar. See the block above PRENOMS.
 
-    `famille_debut` RÉSERVE une plage de noms de famille à une famille de
-    rendez-vous. Les sans-numéro partent des dernières : sans cela, un simple
-    décalage finissait par recouper les autres, et la même personne se
-    retrouvait avec un numéro ici et sans numéro là (mesuré).
+    `famille_debut` RESERVES a range of surnames for a family of appointments.
+    The numberless ones start from the last: without that, a simple offset
+    ended up overlapping the others, and the same person was found with a
+    number here and without one there (measured).
     """
     civilite, prenom = PRENOMS[rang % len(PRENOMS)]
     famille = FAMILLES[(famille_debut + rang // len(PRENOMS)) % len(FAMILLES)]
@@ -199,24 +187,23 @@ def _identite(rang, famille_debut=0):
 
 
 def _numero(rang):
-    """LE numéro de la personne de rang `rang` — toujours le même pour elle.
+    """THE number of the person of rank `rang` — always the same one for them.
 
-    ⚠ JAMAIS UN NUMÉRO INVENTÉ AU HASARD : les six racines sont réservées par
-    l'Arcep aux œuvres audiovisuelles, donc sûres. Un « 06 12 34 56 78 » aurait
-    pu sonner chez quelqu'un.
+    ⚠ NEVER A NUMBER INVENTED AT RANDOM: the six roots are reserved by Arcep
+    for audiovisual works, hence safe. An `06 12 34 56 78` could have rung at
+    someone's home.
 
-    ⚠ ET IL DÉPEND DE LA PERSONNE, PAS DU RENDEZ-VOUS. Un numéro qui changeait
-    d'un rendez-vous à l'autre faisait créer une fiche par rendez-vous.
+    ⚠ AND IT DEPENDS ON THE PERSON, NOT ON THE APPOINTMENT. A number that
+    changed from one appointment to the next caused one record per appointment
+    to be created.
 
-    ⚠ ET IL SAUTE LES TERMINAISONS RÉSERVÉES (voir FINS_RESERVEES) : le
-    simulateur les garde pour exiger une issue précise, et « 59 » met la
-    campagne en pause.
+    ⚠ AND IT SKIPS THE RESERVED ENDINGS (see FINS_RESERVEES): the simulator
+    keeps them to demand a precise outcome, and `59` pauses the campaign.
 
-    ⚠ ET IL TIENT JUSQU'À HUIT MILLE PERSONNES (14/08/2026). L'ancienne formule
-    (« 40 + rang ») débordait dès le centième : elle écrivait trois chiffres là
-    où il en faut deux, et retombait dans les terminaisons réservées. Le couple
-    (milieu, fin) est ici une bijection du rang — deux personnes ne peuvent donc
-    pas partager un numéro.
+    ⚠ AND IT HOLDS UP TO EIGHT THOUSAND PEOPLE (14/08/2026). The old formula
+    (`40 + rank`) overflowed at the hundredth: it wrote three digits where two
+    are needed, and fell back into the reserved endings. The (middle, ending)
+    pair is here a bijection of the rank — so two people cannot share a number.
     """
     racine = jeu_essai.RACINES_FICTION[rang % len(jeu_essai.RACINES_FICTION)]
     fin = FINS_SURES[rang % len(FINS_SURES)]
@@ -225,22 +212,22 @@ def _numero(rang):
 
 
 def _deja_au_carnet():
-    """Les gens du carnet que l'exemple peut annoncer : [(nom, téléphone)].
+    """The address-book people the sample may announce: [(name, phone)].
 
-    ⚠ AVEC LEUR NUMÉRO (11/08/2026). Cette famille sort du carnet, et l'agenda
-    ne portait que leur NOM : quand le jeu d'essai n'est pas chargé — le cas de
-    la base réelle du propriétaire — l'import créait donc des fiches SANS
-    numéro, injoignables. Un export d'agenda porte le téléphone quand il l'a ;
-    celui-ci aussi. Le nom RESTE reconnu, sur le couple nom + numéro.
+    ⚠ WITH THEIR NUMBER (11/08/2026). This family comes from the address book,
+    and the calendar carried only their NAME: when the sample data set is not
+    loaded — the case of the owner's real database — the import therefore
+    created records WITHOUT a number, unreachable. A calendar export carries
+    the phone when it has it; so does this one. The name STAYS recognised, on
+    the name + number pair.
 
-    ⚠ ET DEUX SORTES DE NOMS SONT ÉCARTÉES (13/08/2026), parce qu'elles ne
-    désignent pas UNE personne et UN numéro :
-     · les homonymes du jeu d'essai — deux « M. Jean Martin » distincts, mis là
-       exprès pour que l'écran sache les montrer ;
-     · les quatre contacts d'amorçage (`jeu_essai.PREMIERS_CONTACTS`), qui
-       portent trois de ces noms sous un AUTRE numéro.
-    Sans cet écart, l'import de l'exemple créait une seconde fiche au même nom
-    — précisément ce que cette famille est censée démontrer qu'on évite.
+    ⚠ AND TWO SORTS OF NAME ARE SET ASIDE (13/08/2026), because they do not
+    designate ONE person and ONE number: · the sample data set's namesakes —
+    two distinct `M. Jean Martin`, put there on purpose so the screen knows how
+    to show them; · the four seed contacts (`jeu_essai.PREMIERS_CONTACTS`),
+    which carry three of those names under a DIFFERENT number. Without this
+    exclusion, importing the sample created a second record under the same name
+    — precisely what this family is supposed to demonstrate we avoid.
     """
     comptes = collections.Counter(nom for nom, _, _ in jeu_essai.CLIENTS)
     amorce = {nom for nom, _, _, _, _, _ in jeu_essai.PREMIERS_CONTACTS}
@@ -249,11 +236,11 @@ def _deja_au_carnet():
 
 
 def _tranches_reglees(preferences):
-    """(semaine type, pas) tels qu'ils sont RÉGLÉS, ou le repli. Rend aussi
-    le drapeau « c'est un repli ».
+    """(typical week, step) as they are CONFIGURED, or the fallback. Also returns
+    the `this is a fallback` flag.
 
-    La semaine type est {jour (0=lundi) : [(début, fin) en minutes]}, telle
-    que la rend `horaires.semaine` — donc déjà fusionnée et triée.
+    The typical week is {day (0=Monday): [(start, end) in minutes]}, as
+    `horaires.semaine` returns it — hence already merged and sorted.
     """
     if preferences is not None and horaires.semaine_ouverte(preferences):
         return (horaires.semaine(preferences),
@@ -264,7 +251,7 @@ def _tranches_reglees(preferences):
 
 
 def _creneaux(periodes, pas):
-    """Les minutes de début possibles dans ces périodes, de `pas` en `pas`."""
+    """The possible start minutes within those periods, `pas` by `pas`."""
     minutes = []
     for debut, fin in periodes:
         minutes.extend(range(debut, fin, pas))
@@ -272,11 +259,11 @@ def _creneaux(periodes, pas):
 
 
 def une_place_sur(jours_apres_aujourd_hui):
-    """La densité à cette distance : une place sur N est prise. Voir DENSITE.
+    """The density at this distance: one slot in N is taken. See DENSITE.
 
-    Ouverte parce que l'écran s'en sert pour DIRE ce qu'il a fabriqué : un
-    exemple dont la densité change avec l'éloignement doit s'expliquer, sinon
-    « 250 rendez-vous » ne dit pas où ils sont.
+    Public because the screen uses it to SAY what it built: a sample whose
+    density changes with distance must explain itself, otherwise `250
+    appointments` does not say where they are.
     """
     for limite, sur in DENSITE:
         if jours_apres_aujourd_hui <= limite:
@@ -285,23 +272,23 @@ def une_place_sur(jours_apres_aujourd_hui):
 
 
 def plan(maintenant=None, preferences=None, cible=CIBLE):
-    """Les jours à remplir : {"jours": [(jour, [minutes]), …], "pas", "repli"}.
+    """The days to fill: {"jours": [(day, [minutes]), …], "pas", "repli"}.
 
-    ⚠ C'EST ICI, ET NULLE PART AILLEURS, QUE LES RÉGLAGES SONT LUS. Les jours
-    fermés (fériés, congés) sont sautés ; les jours sans période ouverte le sont
-    aussi. On avance jour par jour à partir de DEMAIN, et l'on s'arrête au
-    centième — l'étendue décide, jamais le compte (voir CIBLE).
+    ⚠ IT IS HERE, AND NOWHERE ELSE, THAT THE SETTINGS ARE READ. Closed days
+    (public holidays, leave) are skipped; days with no open period are skipped
+    too. We advance day by day from TOMORROW, and stop at the hundredth — the
+    span decides, never the count (see CIBLE).
 
-    La densité décroît avec l'éloignement : voir DENSITE et `une_place_sur`.
-    Quand elle ne suffit pas à atteindre le plancher, on refait le même parcours
-    en prenant TOUTES les places libres — sans jamais sortir des cent jours.
+    The density decreases with distance: see DENSITE and `une_place_sur`. When
+    it is not enough to reach the floor, the same walk is done again taking ALL
+    the free slots — without ever leaving the hundred days.
     """
     maintenant = maintenant or datetime.datetime.now()
     depart = maintenant.replace(hour=0, minute=0, second=0, microsecond=0)
     semaine, pas, repli = _tranches_reglees(preferences)
 
     def parcourir(serre):
-        """Les cent jours, à la densité normale ou en prenant tout."""
+        """The hundred days, at normal density or taking everything."""
         jours, poses, jour = [], 0, depart + datetime.timedelta(days=1)
         while (jour - depart).days <= JOURS_COUVERTS:
             distance = (jour - depart).days
@@ -324,68 +311,66 @@ def plan(maintenant=None, preferences=None, cible=CIBLE):
 
 
 def _echapper(texte):
-    """L'échappement iCalendar : virgule, point-virgule, barre et retour."""
+    """The iCalendar escaping: comma, semicolon, backslash and newline."""
     return (texte.replace("\\", "\\\\").replace(";", "\\;")
             .replace(",", "\\,").replace("\n", "\\n"))
 
 
 def rendezvous(maintenant=None, preferences=None, cible=CIBLE):
-    """La liste des rendez-vous de l'exemple : [(début, durée, nom, motif, tél)].
+    """The list of the sample's appointments: [(start, length, name, reason,
+    phone)].
 
-    Déterministe à partir de `maintenant` ET des réglages : deux appels le même
-    jour, sur les mêmes horaires, donnent le même agenda. Rien n'est tiré au
-    hasard — un exemple qui change à chaque ouverture serait impossible à
-    décrire dans une documentation.
+    Deterministic from `maintenant` AND the settings: two calls on the same
+    day, on the same hours, give the same calendar. Nothing is drawn at random
+    — a sample that changed at every opening would be impossible to describe in
+    documentation.
 
-    `preferences` : les réglages du cabinet. Sans eux (ou sans aucun horaire
-    d'ouverture réglé), on prend les plages de repli — voir `plan`.
+    `preferences`: the practice's settings. Without them (or with no opening
+    hours configured), the fallback windows are used — see `plan`.
     """
     detail = plan(maintenant, preferences, cible)
     pas = detail["pas"]
     connus = _deja_au_carnet()
-    # ⚠ UN COMPTEUR PAR FAMILLE, PAS LE RANG (13/08/2026). L'index était
-    # `rang % len(…)` : comme une famille ne prend qu'un rang sur deux, les
-    # rangs PAIRS pris modulo une liste de taille PAIRE ne tombent que sur les
-    # index pairs — la moitié des identités n'était jamais utilisée. Mesuré :
-    # 55 personnes distinctes là où la liste en offrait 88. Un compteur propre
-    # à chaque famille les parcourt toutes, dans l'ordre.
+    # ⚠ ONE COUNTER PER FAMILY, NOT THE RANK (13/08/2026). The index was `rang
+    # % len(…)`: since a family only takes every other rank, EVEN ranks taken
+    # modulo an EVEN-sized list only land on even indices — half the identities
+    # were never used. Measured: 55 distinct people where the list offered 88.
+    # A counter of its own for each family walks them all, in order.
     tirage = {"sans": 0, "avec": 0, "connu": 0}
-    # ⚠ ET LES GENS DU CARNET NE REVIENNENT PAS NON PLUS. Ils sont peu nombreux
-    # (le jeu d'essai en compte quelques dizaines) : une fois la liste épuisée,
-    # on continue avec des identités composées, plutôt que de recommencer au
-    # premier et de lui donner un huitième rendez-vous.
+    # ⚠ AND THE ADDRESS-BOOK PEOPLE DO NOT COME BACK EITHER. There are few of
+    # them (the sample data set has a few dozen): once the list is exhausted,
+    # we carry on with composed identities rather than starting again at the
+    # first and giving them an eighth appointment.
     liste, rang = [], 0
     for jour, creneaux in detail["jours"]:
         for indice, minute in enumerate(creneaux):
             debut = jour + datetime.timedelta(minutes=minute)
-            # Un rendez-vous sur cinq est DEUX FOIS PLUS LONG : un agenda réel
-            # n'est pas homogène. Il mange la place laissée libre après lui —
-            # jamais celle d'un autre rendez-vous, et jamais au-delà du
-            # dernier créneau du jour.
+            # One appointment in five is TWICE AS LONG: a real calendar is not
+            # homogeneous. It eats the space left free after it — never another
+            # appointment's, and never beyond the day's last slot.
             double = rang % 5 == 0 and indice + 1 < len(creneaux)
             duree = pas * (2 if double else 1)
-            # ⚠ TROIS FAMILLES, ET UNE IDENTITÉ N'APPARTIENT QU'À UNE SEULE.
-            # Mélanger les deux premières faisait créer huit fiches pour la
-            # même personne.
-            #
-            # ⚠ LES PROPORTIONS ONT CHANGÉ LE 11/08/2026 : le sans-numéro était
-            # UN SUR TROIS, et un contact sans numéro ne peut pas être appelé.
-            # Dans la base réelle du propriétaire, l'agenda importé avait ainsi
-            # posé 32 personnes injoignables contre 8 joignables — et sa campagne
-            # ne trouvait que 7 personnes. Le cas reste présent, à sa juste
-            # place : un sur dix.
+            # ⚠ THREE FAMILIES, AND AN IDENTITY BELONGS TO ONLY ONE. Mixing the
+            # first two caused eight records to be created for the same person.
+            # ⚠ THE PROPORTIONS CHANGED ON 11/08/2026: the numberless case was
+            # ONE IN THREE, and a contact with no number cannot be called. In
+            # the owner's real database, the imported calendar had thus put 32
+            # unreachable people against 8 reachable — and his campaign found
+            # only 7 people. The case remains, in its rightful place: one in
+            # ten.
             if rang % 10 == 0:
-                # Sans numéro : il arrivera « à compléter », et c'est voulu.
-                # Ses noms de famille sont RÉSERVÉS (les trois derniers) : une
-                # même personne ne peut donc pas être ici sans numéro et
-                # ailleurs avec.
+                # Without a number: they will arrive `à compléter`, and that is
+                # intended. Their surnames are RESERVED (the last three): the
+                # same person therefore cannot be here without a number and
+                # elsewhere with one.
                 nom = _identite(tirage["sans"],
                                 famille_debut=len(FAMILLES) - 3)
                 telephone = ""
                 tirage["sans"] += 1
             elif tirage["connu"] < len(connus) and rang % 7 == 3:
-                # Déjà dans le carnet : reconnu, rien n'est dupliqué. Chacun
-                # une seule fois — la liste est courte, on ne la reboucle pas.
+                # Already in the address book: recognised, nothing duplicated.
+                # Each one only once — the list is short, it is not looped
+                # over.
                 nom, telephone = connus[tirage["connu"]]
                 tirage["connu"] += 1
             else:
@@ -399,11 +384,11 @@ def rendezvous(maintenant=None, preferences=None, cible=CIBLE):
 
 
 def agenda_ics(maintenant=None, preferences=None, cible=CIBLE):
-    """Le fichier ICS complet, en texte — prêt à être téléchargé.
+    """The complete ICS file, as text — ready to be downloaded.
 
-    La forme suit celle d'un export Google Agenda, parce que c'est celle que
-    les gens ont sous la main : VTIMEZONE Europe/Paris, DTSTART avec TZID,
-    DTEND explicite, DESCRIPTION portant le téléphone quand il y en a un.
+    The shape follows that of a Google Calendar export, because that is the one
+    people have to hand: VTIMEZONE Europe/Paris, DTSTART with TZID, explicit
+    DTEND, DESCRIPTION carrying the phone when there is one.
     """
     maintenant = maintenant or datetime.datetime.now()
     lignes = [
@@ -441,9 +426,9 @@ def agenda_ics(maintenant=None, preferences=None, cible=CIBLE):
         fin = debut + datetime.timedelta(minutes=duree)
         description = ("Rendez-vous d'exemple (fiction).")
         if telephone:
-            # ⚠ L'ÉTIQUETTE COMPTE : le lecteur d'ICS ne prend un numéro que
-            # s'il est annoncé (voir ics._numero_dans_texte). Un numéro nu dans
-            # une description ressemble trop à une référence de dossier.
+            # ⚠ THE LABEL MATTERS: the ICS reader only takes a number when it
+            # is announced (see ics._numero_dans_texte). A bare number in a
+            # description looks too much like a file reference.
             description = f"Tél : {telephone}\\n" + description
         lignes.extend([
             "BEGIN:VEVENT",
@@ -457,5 +442,5 @@ def agenda_ics(maintenant=None, preferences=None, cible=CIBLE):
             "END:VEVENT",
         ])
     lignes.append("END:VCALENDAR")
-    # Les fins de ligne d'iCalendar sont des CRLF, et le fichier en finit par un.
+    # iCalendar line endings are CRLF, and the file ends with one.
     return "\r\n".join(lignes) + "\r\n"

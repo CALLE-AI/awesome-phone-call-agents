@@ -1,8 +1,8 @@
-"""Point d'entrée du serveur.
+"""Server entry point.
 
-Le Python portable utilisé est une distribution « embarquée » : son
-sys.path est figé par un fichier ._pth et ignore le dossier courant.
-On rend donc le paquet ringback trouvable explicitement avant l'import.
+The portable Python in use is an `embeddable` distribution: its sys.path is
+frozen by a ._pth file and ignores the current directory. So the ringback
+package is made findable explicitly before the import.
 """
 
 import os

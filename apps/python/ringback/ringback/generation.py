@@ -1,17 +1,16 @@
-"""Génération de la liste de cascade DEPUIS la base + préférences.
+"""Building the cascade list FROM the database + preferences.
 
-Plus besoin de coller une liste à la main : on choisit une SOURCE
-(rendez-vous annulés, déplacés en attente, ou tous les clients) et un
-ORDRE d'appel. Règle voulue par l'utilisateur (décision du 27/07) :
-AUCUN ordre n'est imposé par défaut — le choix de l'ordre est explicite à
-chaque génération ; seul le DERNIER choix est mémorisé (petit fichier de
-préférences dans donnees/, jamais codé en dur) pour être présélectionné
-les fois suivantes.
+No more pasting a list by hand: you pick a SOURCE (cancelled appointments,
+pending moves, or every client) and a CALLING ORDER. Rule requested by the user
+(decision of 27/07): NO order is imposed by default — the choice of order is
+explicit at every generation; only the LAST choice is remembered (a small
+preferences file in donnees/, never hard-coded) so it can be pre-selected next
+time.
 
-Les listes générées (zone de collage, export CSV) contiennent les numéros
-EN CLAIR : c'est leur raison d'être, à la demande explicite de
-l'utilisateur — l'équivalent de ce qu'il collerait lui-même. Les clients
-SANS numéro (import ICS pas complété) sont exclus et comptés à part.
+The generated lists (paste area, CSV export) carry the numbers IN CLEAR: that
+is their whole purpose, at the user's explicit request — the equivalent of what
+they would paste themselves. Clients WITHOUT a number (an ICS import never
+completed) are excluded and counted separately.
 """
 
 import datetime
@@ -38,19 +37,19 @@ ORDRES = {
     "alphabetique": "Alphabétique — par nom",
 }
 
-# Civilités françaises ignorées pour le tri alphabétique (sinon toutes les
-# « Mme » se suivraient) — le nom affiché, lui, reste complet.
+# French honorifics are ignored for alphabetical sorting (otherwise every `Mme`
+# would sort together) — the displayed name itself stays complete.
 _CIVILITE = re.compile(r"^(m\.|mme|mlle|mr|dr)\s+", re.IGNORECASE)
 
 
 def generer(base, source, ordre, creneau=None):
-    """Construit la liste de cascade depuis la base ; rend (personnes, exclus).
+    """Builds the cascade list from the database; returns (people, excluded).
 
-    personnes = [{"nom", "telephone"}] dans l'ordre CHOISI (numéros en
-    clair — voir l'en-tête du module) ; exclus = nombre de clients sans
-    numéro écartés. Lève SaisieInvalide (message français) si la source ou
-    l'ordre est invalide, si aucun ordre n'est choisi, ou si l'ordre
-    « proximité » est demandé sans créneau.
+    people = [{"nom", "telephone"}] in the CHOSEN order (numbers in clear — see
+    the module header); excluded = how many clients were set aside for having
+    no number. Raises SaisieInvalide (French message) if the source or the
+    order is invalid, if no order was chosen, or if the `proximité` order is
+    asked for without a slot.
     """
     if source not in SOURCES:
         raise SaisieInvalide(f"Source inconnue : « {source} ».")
@@ -73,8 +72,8 @@ def generer(base, source, ordre, creneau=None):
 
 def _trier(candidats, ordre, creneau):
     if ordre == "anciennete":
-        # Référence ISO 8601 : le tri de texte suit l'ordre chronologique ;
-        # un candidat sans référence passe en fin de liste.
+        # ISO 8601 reference: sorting the text follows chronological order; a
+        # candidate with no reference goes to the end of the list.
         return sorted(candidats, key=lambda c: (not c["reference"], c["reference"]))
     if ordre == "proximite":
         creneau_dt = datetime.datetime.fromisoformat(creneau)
@@ -89,42 +88,41 @@ def _trier(candidats, ordre, creneau):
 
 
 def _cle_alphabetique(nom):
-    """Clé de tri : sans civilité, sans accents, sans casse."""
+    """Sort key: no honorific, no accents, no case."""
     sans_civilite = _CIVILITE.sub("", nom.strip())
     decompose = unicodedata.normalize("NFD", sans_civilite.casefold())
     return "".join(c for c in decompose if not unicodedata.combining(c))
 
 
 def en_liste_collable(personnes):
-    """La liste au format de la zone de collage : « Nom;Téléphone », une par ligne."""
+    """The list in paste-area format: `Name;Phone`, one per line."""
     return "\n".join(f"{p['nom']};{p['telephone']}" for p in personnes)
 
 
 def en_csv(personnes):
-    """Le contenu CSV « nom;telephone » (fins de ligne Windows, pour Excel).
+    """The CSV content `nom;telephone` (Windows line endings, for Excel).
 
-    Le fichier est servi à la volée et n'est JAMAIS écrit côté serveur ;
-    l'octet d'ordre (BOM) est ajouté à l'encodage (utf-8-sig) par l'appelant.
+    The file is served on the fly and is NEVER written server-side; the byte
+    order mark (BOM) is added by the caller through the encoding (utf-8-sig).
     """
     lignes = ["nom;telephone"] + [f"{p['nom']};{p['telephone']}" for p in personnes]
     return "\r\n".join(lignes) + "\r\n"
 
 
 class Preferences:
-    """Petit fichier JSON de préférences (ex. donnees/preferences.json).
+    """A small JSON preferences file (e.g. donnees/preferences.json).
 
-    chemin=None : préférences en mémoire seulement (tests, base :memory:).
-    Un fichier illisible est ignoré et récrit à la prochaine sauvegarde —
-    jamais d'écran d'erreur pour un fichier de confort.
+    chemin=None: preferences held in memory only (tests, :memory: database). An
+    unreadable file is ignored and rewritten at the next save — never an error
+    screen for a convenience file.
     """
 
     def __init__(self, chemin=None):
         self.chemin = chemin
         self._donnees = {}
-        # Le serveur web répond à plusieurs pages en même temps : deux
-        # enregistrements de réglages simultanés écriraient le fichier l'un
-        # par-dessus l'autre, et le laisseraient à moitié écrit. Le verrou
-        # les fait passer un par un.
+        # The web server answers several pages at once: two simultaneous
+        # settings saves would write the file over each other, and leave it
+        # half-written. The lock makes them go through one at a time.
         self._verrou = threading.Lock()
         if chemin and os.path.exists(chemin):
             try:

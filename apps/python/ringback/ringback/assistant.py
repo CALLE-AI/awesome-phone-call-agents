@@ -1,41 +1,22 @@
-"""Assistant de campagne en 3 étapes — données et moteur (spécification v1.1).
+"""The 3-step campaign assistant — data and engine (specification v1.1).
 
-Huit NATURES de campagne (une par fiche de discussion), chacune décrite par :
-son icône, sa phrase d'usage, sa politique d'appel par défaut, ses
-informations générales (⛔ = obligatoire, le passage à l'étape 3 est refusé
-côté serveur tant qu'elle manque), ses champs de contact (les colonnes de la
-grille de l'étape 3 — Identité et Téléphone ne sont jamais supprimables) et
-son gabarit de mission en segments (un segment conditionnel « si » n'entre
-dans le texte que si son information est renseignée).
+Eight campaign KINDS (one per discussion sheet), each described by: its icon,
+its usage sentence, its default calling policy, its general information (⛔ =
+mandatory, moving on to step 3 is refused server-side as long as it is
+missing), its contact fields (the columns of step 3's grid — Identity and Phone
+can never be removed) and its mission template in segments (a conditional `si`
+segment only enters the text when its information is filled in).
 
-Le module porte aussi :
-- la construction de la mission (mêmes règles que l'aperçu vivant à l'écran :
-  les variables d'étape 2 sont substituées, les variables PAR CONTACT
-  ([identite], [rdv_existant]…) restent et sont remplies à chaque appel) ;
-- l'analyse du collage multi-colonnes (réutilise les validateurs de saisie.py) ;
-- la période interdite (ex. 20 h → 8 h) et l'échéance de relance par délai
-  OU par créneau de rappel ;
-- le moteur d'exécution d'une campagne « prête » : un appel à la fois, la
-  pause et l'arrêt agissent ENTRE deux appels, tout passe par le moteur de
-  SIMULATION déterministe existant (calle_client) et par les mêmes verrous
-  (planificateur.verifier_garde_fous — jamais dupliqués) ;
-- le CAHIER DE CHANGEMENTS (§8.1 de CAS_DE_FIGURE_CAMPAGNES.md) : le vrai
-  livrable d'une campagne n'est pas « des appels passés », c'est la liste
-  des changements à REPORTER dans le logiciel de planification de
-  l'établissement — ➕ ajouté, ➖ supprimé, ↔ déplacé, 🙋 à traiter par un
-  humain. Chaque ligne est écrite AU MOMENT du changement (noter_changement),
-  jamais reconstituée après coup, et ressort lisible, copiable et exportable ;
-- le DÉCALAGE EN CASCADE (§8.3) : quand un contact accepte de décaler son
-  rendez-vous, la campagne s'achève et la place qu'il LIBÈRE devient le
-  créneau d'une NOUVELLE campagne, préparée à l'état « prête » — jamais
-  lancée. Elle rejoue la RECETTE de la campagne d'origine (nature, message,
-  options, ordre, source de contacts, champs) : seul le créneau change, et
-  la liste est recalculée pour ce créneau. Les contacts dont le rendez-vous
-  est ANTÉRIEUR au nouveau créneau sont écartés — c'est ce resserrement qui
-  fait converger la chaîne (voir CASCADE_PROFONDEUR_MAX).
+The module also carries:
+- building the mission (the same rules as the live on-screen preview: the step-2 variables are substituted, the PER-CONTACT variables ([identite], [rdv_existant]…) remain and are filled at every call);
+- parsing the multi-column paste (reusing saisie.py's validators);
+- the forbidden period (e.g. 8pm → 8am) and the follow-up due date by delay OR by call-back window;
+- the execution engine of a `prête` campaign: one call at a time, pause and stop act BETWEEN two calls, everything goes through the existing deterministic SIMULATION engine (calle_client) and through the same locks (planificateur.verifier_garde_fous — never duplicated);
+- the CHANGE LOG (§8.1 of CAS_DE_FIGURE_CAMPAGNES.md): a campaign's real deliverable is not `calls placed`, it is the list of changes to be CARRIED OVER into the establishment's scheduling software — ➕ added, ➖ deleted, ↔ moved, 🙋 for a human to handle. Every row is written AT THE MOMENT of the change (noter_changement), never reconstructed afterwards, and comes out readable, copyable and exportable;
+- the CASCADING SHIFT (§8.3): when a contact agrees to shift their appointment, the campaign ends and the slot they FREE becomes the slot of a NEW campaign, prepared in the `prête` state — never launched. It replays the origin campaign's RECIPE (kind, message, options, order, contact source, fields): only the slot changes, and the list is recomputed for that slot. Contacts whose appointment is EARLIER than the new slot are set aside — it is that tightening that makes the chain converge (see CASCADE_PROFONDEUR_MAX).
 
-Rien ici n'est mimé : chaque affichage de l'interface vient de la base ou du
-brouillon réel ; ce qui n'est pas construit est marqué « à venir » à l'écran.
+Nothing here is mimed: every display in the interface comes from the database
+or from the real draft; what is not built is marked `à venir` on screen.
 """
 
 import csv
@@ -53,67 +34,61 @@ from .saisie import SaisieInvalide
 
 journal = logging.getLogger("ringback.assistant")
 
-# ------------------------------------------------------- clés de réglage
-CLE_INTERDIT_DEBUT = "interdit_debut"            # « HH:MM » — période interdite
+# ------------------------------------------------------- setting keys
+CLE_INTERDIT_DEBUT = "interdit_debut"  # `HH:MM` — forbidden period
 CLE_INTERDIT_FIN = "interdit_fin"                # (vide = aucune)
 CLE_RELANCE_MODE = "relance_mode"                # « delai » | « creneau »
 CLE_RELANCE_CRENEAU_DEBUT = "relance_creneau_debut"  # « HH:MM »
 CLE_RELANCE_CRENEAU_FIN = "relance_creneau_fin"
 
 # ---------------------------------------------------------------------------
-# LES DEUX MODES DE SAISIE — « simplifié » et « avancé »
+# THE TWO INPUT MODES — `simplified` and `advanced`
 # ---------------------------------------------------------------------------
-# Demande du propriétaire (02/08/2026) : les formulaires de campagne montrent
-# trop de choses d'un coup. Le mode SIMPLIFIÉ ne laisse voir que ce qu'il faut
-# remplir ; le mode AVANCÉ ajoute ce qui a un réglage par défaut convenable et
-# qu'on ne touche qu'exceptionnellement (l'aperçu du message, les colonnes
-# attendues, le discours de l'agent propre à cette campagne).
-#
-# ⚠ LE MODE NE CHANGE QUE CE QU'ON VOIT, jamais ce qui est envoyé : les champs
-# du mode avancé restent dans la page et partent avec le formulaire, avec leur
-# valeur venue des Réglages. Basculer d'un mode à l'autre ne peut donc RIEN
-# perdre — c'est la condition pour qu'un mode réduit soit sans danger.
+# Owner's request (02/08/2026): the campaign forms show too much at once.
+# SIMPLIFIED mode shows only what has to be filled in; ADVANCED adds what has a
+# decent default and is only touched exceptionally (the message preview, the
+# expected columns, the agent's speech specific to this campaign).  ⚠ THE MODE
+# ONLY CHANGES WHAT YOU SEE, never what is sent: the advanced-mode fields stay
+# in the page and go out with the form, with their value from the Settings.
+# Switching from one mode to the other can therefore LOSE NOTHING — which is
+# the condition for a reduced mode to be safe.
 MODE_SIMPLIFIE = "simplifie"
 MODE_AVANCE = "avance"
 MODES_FORMULAIRE = {MODE_SIMPLIFIE: "Simplifié", MODE_AVANCE: "Avancé"}
 
 
 def mode_formulaire(preferences=None):
-    """TOUJOURS « simplifié » à l'ouverture d'un formulaire de campagne.
+    """ALWAYS `simplified` when a campaign form opens.
 
-    Le choix était retenu d'une campagne à l'autre. Le propriétaire a tranché
-    le 02/08/2026 : « toujours sélectionner par défaut les formulaires
-    simplifiés pour les campagnes ». Un écran qui s'ouvre en avancé parce
-    qu'on y était passé la veille surprend plus qu'il ne sert.
+    The choice used to be remembered from one campaign to the next. The owner
+    decided on 02/08/2026: `always select the simplified forms by default for
+    campaigns`. A screen that opens in advanced mode because you switched to it
+    yesterday surprises more than it helps.
 
-    La bascule reste entière DANS la page : passer en avancé y montre tout,
-    et rien n'est perdu — les champs du mode avancé sont dans le formulaire
-    quel que soit le mode. Le paramètre `preferences` est gardé pour ne pas
-    faire changer tous les appelants d'un réglage qui pourrait revenir.
+    The toggle stays whole WITHIN the page: switching to advanced shows
+    everything there, and nothing is lost — the advanced-mode fields are in the
+    form whatever the mode. The `preferences` parameter is kept so as not to
+    make every caller change over a setting that might come back.
     """
     return MODE_SIMPLIFIE
 
-# --------------------------------------------------------------- natures
-# L'ordre du dictionnaire est l'ordre des huit cartes de l'étape 1.
-# infos : (code, libellé, type, obligatoire ⛔) — type « texte », « date »,
-# « long » (zone multiligne) ou « oui_non ».
-# champs : (code, libellé, type, obligatoire ⛔, verrouillé) — verrouillé =
-# jamais supprimable (Identité et Téléphone, la règle du propriétaire).
-# gabarit : liste de segments ; un segment est un texte, ou un dictionnaire
-# {"texte": …, "si": code} inclus seulement si l'information est renseignée.
-#
-# LA CONSIGNE EN TROIS PARTIES (décision du propriétaire, 01/08/2026) — ce
-# que le gabarit produit est la PRÉSENTATION, le seul passage dit mot pour
-# mot. Deux clés de plus l'accompagnent jusqu'à l'agent :
-# objectif : ce qu'on cherche à obtenir, en une phrase de français ;
-# issues   : les trois seules conclusions possibles (oui / non / autre) et
-#            leur traduction dans le code que le schéma de résultat impose.
-#            « autre » porte toujours la nuance en clair dans « notes ».
-# genre    : « cascade » quand l'appel part avec le schéma de cascade
-#            (outcome : accepted/refused/moved), « classique » sinon
-#            (appointment_status : confirmed/rescheduled/canceled/
-#            to_reschedule). La correspondance complète, nature par nature,
-#            est écrite dans FICHES_DISCUSSION.md.
+# --------------------------------------------------------------- kinds The
+# dictionary's order is the order of step 1's eight cards. infos: (code, label,
+# type, mandatory ⛔) — type `texte`, `date`, `long` (a multi-line box) or
+# `oui_non`. champs: (code, label, type, mandatory ⛔, locked) — locked = never
+# removable (Identity and Phone, the owner's rule). gabarit: a list of
+# segments; a segment is a text, or a dictionary {"texte": …, "si": code}
+# included only when the information is filled in.  THE THREE-PART BRIEFING
+# (owner's decision, 01/08/2026) — what the template produces is the OPENING,
+# the only passage spoken word for word. Two more keys accompany it to the
+# agent: objectif: what we are trying to obtain, in one French sentence; issues
+# : the only three possible conclusions (yes / no / other) and their
+# translation into the code the result schema imposes. `other` always carries
+# the nuance in clear in `notes`. genre   : `cascade` when the call goes out
+# with the cascade schema (outcome: accepted/refused/moved), `classique`
+# otherwise (appointment_status: confirmed/rescheduled/canceled/to_reschedule).
+# The complete correspondence, kind by kind, is written in
+# FICHES_DISCUSSION.md.
 
 _CHAMPS_SOCLE = (
     {"code": "identite", "libelle": "Identité (civilité + nom)",
@@ -130,111 +105,98 @@ def _champ(code, libelle, type_champ="texte", obligatoire=False):
 
 def _info(code, libelle, type_info="texte", obligatoire=False, reglage=None,
           sous_option=None, multiple=False):
-    """reglage : clé de préférences dont la valeur pré-remplit le champ.
+    """reglage: the preferences key whose value pre-fills the field.
 
-    sous_option : code d'une OPTION de comportement dont cette information
-    est le détail. Elle n'est alors pas affichée avec les autres
-    informations générales : elle apparaît SOUS sa case à cocher, et
-    seulement quand la case est cochée (dévoilement en cascade — on ne
-    montre jamais les réglages d'une option qu'on n'a pas prise).
+    sous_option: the code of a behaviour OPTION of which this information is
+    the detail. It is then not displayed with the other general information: it
+    appears UNDER its checkbox, and only when the box is ticked (cascading
+    disclosure — we never show the settings of an option that was not taken).
 
-    multiple : l'information peut être saisie PLUSIEURS fois (une liste de
-    créneaux, 03/08/2026). Le champ garde son type et son nom — c'est le
-    MÊME « info_<code> » qui part, simplement répété. Le brouillon garde la
-    liste entière dans « creneaux » et sa PREMIÈRE valeur dans « infos », si
-    bien que tout ce qui lisait une valeur unique continue de la lire.
+    multiple: the information can be entered SEVERAL times (a list of slots,
+    03/08/2026). The field keeps its type and its name — it is the SAME
+    `info_<code>` that goes out, simply repeated. The draft keeps the whole
+    list in `creneaux` and its FIRST value in `infos`, so that everything that
+    read a single value goes on reading it.
     """
     return {"code": code, "libelle": libelle, "type": type_info,
             "obligatoire": obligatoire, "reglage": reglage,
             "sous_option": sous_option, "multiple": multiple}
 
 
-# ------------------------------------------- l'annulation pendant l'appel
-# LA RÈGLE DU PROPRIÉTAIRE, mot pour mot (31/07/2026) : « si un rendez-vous
-# est annulé, soit il est directement replacé lors de l'échange, auquel cas
-# c'est simplement un déplacement ; soit on ne fixe pas encore de rendez-vous
-# et on crée un statut "c'est le client qui nous rappelle". Il faudra
-# préciser tout cela dans le prompt pour savoir quand est-ce que le bot peut
-# proposer des rendez-vous en cas d'annulation. »
-#
-# D'où UNE option de campagne, et elle seule, qui décide de ce que l'agent a
-# le droit de faire — et qui CHANGE LE TEXTE dicté à l'agent :
-#   - cochée : il propose les places RÉELLEMENT libres (recalculées à
-#     l'instant de l'appel, jamais une date de formule). Le client en prend
-#     une → c'est un DÉPLACEMENT (issue « rescheduled », cahier ↔). Il n'en
-#     prend aucune → « le client rappellera » ;
-#   - décochée : il ne propose rien et conclut « c'est vous qui nous
-#     rappelez quand vous voulez » → « le client rappellera ».
-# Dans les deux cas, l'état « le client rappellera » ne déclenche NI relance
-# NI campagne : c'est le client qui reprend contact.
+# ------------------------------------------- cancellation during the call THE
+# OWNER'S RULE, word for word (31/07/2026): `if an appointment is cancelled,
+# either it is rebooked directly during the exchange, in which case it is
+# simply a move; or no appointment is set yet and we create a status "the
+# client calls us back". All that will have to be stated in the prompt so we
+# know when the bot may offer appointments in case of a cancellation.`  Hence
+# ONE campaign option, and it alone, which decides what the agent is allowed to
+# do — and which CHANGES THE TEXT dictated to the agent: - ticked: it offers
+# the GENUINELY free slots (recomputed at the instant of the call, never a
+# formula date). The client takes one → it is a MOVE (outcome `rescheduled`,
+# log ↔). They take none → `le client rappellera`; - unticked: it offers
+# nothing and concludes `you call us back whenever you like` → `le client
+# rappellera`. In both cases, the `le client rappellera` state triggers NEITHER
+# a follow-up NOR a campaign: it is the client who gets back in touch.
 CLE_REPLACER_ANNULATION = "replacer_annulation"
 INFO_CRENEAUX_ANNULATION = "creneaux_annulation"
 
-# Le code d'une option ↔ l'identifiant de sa case à cocher dans l'étape 2.
-# L'aperçu vivant s'en sert pour relire la case sans recharger la page :
-# ce que l'écran montre est donc exactement ce que le serveur construira.
+# An option's code ↔ the id of its checkbox in step 2. The live preview uses it
+# to read the box back without reloading the page: what the screen shows is
+# therefore exactly what the server will build.
 CASES_OPTIONS = {CLE_REPLACER_ANNULATION: "opt_replacer"}
 
-# Le contact d'une campagne qui a annulé sans replacer : sa place dans la
-# table des états (assistant.ETATS) et dans celle des clients.
+# The contact of a campaign who cancelled without rebooking: their place in the
+# states table (assistant.ETATS) and in the clients' one.
 ETAT_RAPPELLERA = "le client rappellera"
 
-# L'ÉTAT QUI MANQUAIT, et qui a coûté un appel réel le 01/08/2026 : son
-# téléphone a sonné, il a décroché, il a accepté le nouveau créneau — et
-# RingBack l'a écrit « injoignable » parce que la réponse de CALL-E n'était
-# pas revenue à temps. Ce n'est ni « injoignable » (son téléphone A sonné),
-# ni « à recontacter » (le rappeler ferait sonner deux fois pour rien) : la
-# vérité est que l'appel a EU LIEU et que son résultat n'est pas connu.
-# Le contact garde l'identifiant CALL-E de son appel ; le geste
-# « 📥 Récupérer les résultats en attente » va le lire et l'appliquer.
+# THE STATE THAT WAS MISSING, and that cost a real call on 01/08/2026: his
+# phone rang, he picked up, he accepted the new slot — and RingBack wrote
+# `injoignable` because CALL-E's answer had not come back in time. It is
+# neither `injoignable` (his phone DID ring), nor `à recontacter` (calling back
+# would ring twice for nothing): the truth is that the call TOOK PLACE and that
+# its result is not known. The contact keeps their call's CALL-E id; the `📥
+# Récupérer les résultats en attente` gesture will read it and apply it.
 ETAT_RESULTAT_INCONNU = "appelé, résultat inconnu"
 
-# ⚠ L'OUVERTURE NE RÉCITE PLUS LES DATES (31/08/2026, sa demande, relevée sur
-# un VRAI appel) : « avant même que je confirme ou non ma présence, il m'a tout
-# de suite listé les différentes dates pour décaler le rendez-vous. Il faut
-# d'abord attendre que le client dise non avant de proposer une date. »
-#
-# CE QUE ÇA DONNAIT, mot pour mot, dans sa transcription du 31/08 : six dates
-# lues d'affilée AVANT la question « puis-je compter sur votre présence ? ».
-# La personne n'avait encore rien dit. Elle a fini par répondre « aucun » — à
-# une question qu'on ne lui avait pas posée.
-#
-# Les places restent DANS « ce que tu sais » (voir _INFO_CRENEAUX_ANNULATION) :
-# l'agent les connaît, et la conduite ci-dessous lui dit QUAND les sortir.
-# Ce qu'on dit quand aucune autre date ne sera proposée — deux cas, un texte :
-# la case décochée, ou l'agenda sans une place libre. Le client entend la même
-# chose, et c'est juste : de son côté, la différence n'existe pas.
+# ⚠ THE OPENING NO LONGER RECITES THE DATES (31/08/2026, his request, noted on
+# a REAL call): `before I even confirmed whether I would be there, it
+# immediately listed the various dates for moving the appointment. It must
+# first wait for the client to say no before offering a date.`  WHAT THAT
+# PRODUCED, word for word, in his transcript of 31/08: six dates read out in a
+# row BEFORE the question `can I count on you being there?`. The person had not
+# said anything yet. They ended up answering `none` — to a question they had
+# not been asked.  The slots stay INSIDE `what you know` (see
+# _INFO_CRENEAUX_ANNULATION): the agent knows them, and the conduct below tells
+# it WHEN to bring them out. What is said when no other date will be offered —
+# two cases, one text: the box unticked, or the calendar with no free slot. The
+# client hears the same thing, and rightly so: from their side, the difference
+# does not exist.
 SANS_AUTRE_DATE = (" Si vous ne pouvez plus venir, j'annule votre "
                    "rendez-vous, et je ne vous propose pas d'autre date "
                    "aujourd'hui : c'est vous qui nous rappelez quand vous "
                    "voulez — nous ne vous relancerons pas.")
 
-# ⚠ L'ENTONNOIR — SA MÉTHODE, ET ELLE N'ÉTAIT ÉCRITE QU'À UN SEUL ENDROIT.
-# Sa demande du 16/08, reprise le 31/08 : « qu'il propose d'abord des jours,
-# puis matin ou après-midi, puis qu'il propose une heure. En fonction des
-# réponses, soit le patient accepte, soit il demande de préciser les jours et
-# LE FILTRE REPREND. »
-#
-# Le déplacement l'avait depuis le 16/08 ; la confirmation et le rappel de
-# rendez-vous, non — ils citaient une liste et attendaient. Or les trois font
-# la même chose : proposer une date à quelqu'un qui n'en veut pas encore.
-#
-# ⚠ LA REPRISE MANQUAIT AUX TROIS. La conduite disait quoi faire quand l'agent
-# n'a AUCUNE heure qui corresponde ; elle ne disait rien du cas le plus
-# fréquent — la personne refuse l'heure proposée. L'agent enchaînait alors les
-# heures d'affilée, ce qui est exactement l'énumération qu'on cherche à éviter.
-#
-# ⚠ ÉCRIT ICI, ET PAS TROIS FOIS. Une méthode recopiée dans trois natures
-# diverge à la première retouche : on l'a mesuré assez souvent dans ce projet
-# pour ne plus recommencer.
+# ⚠ THE FUNNEL — HIS METHOD, AND IT WAS WRITTEN IN ONLY ONE PLACE. His request
+# of 16/08, repeated on 31/08: `let it first offer days, then morning or
+# afternoon, then let it offer an hour. Depending on the answers, either the
+# patient accepts, or they ask to narrow the days and THE FILTER STARTS AGAIN.`
+# The move had it since 16/08; the confirmation and the appointment reminder
+# did not — they quoted a list and waited. Yet all three do the same thing:
+# offer a date to somebody who does not want one yet.  ⚠ THE RESTART WAS
+# MISSING FROM ALL THREE. The conduct said what to do when the agent has NO
+# matching hour; it said nothing about the commonest case — the person refuses
+# the hour offered. The agent then reeled off hours one after another, which is
+# exactly the enumeration we are trying to avoid.  ⚠ WRITTEN HERE, AND NOT
+# THREE TIMES. A method copied into three kinds diverges at the first touch-up:
+# we have measured that often enough in this project not to do it again.
 _ENTONNOIR = (
-    # ⚠ LA DEMANDE DE LISTE EST LE CAS LE PLUS COURANT, et il manquait
-    # (04/09/2026). Son essai réel : « Avez-vous d'autres rendez-vous ? » —
-    # ce n'est PAS un refus, donc l'entonnoir ne se déclenchait pas. L'agent a
-    # appliqué la règle voisine (« redire ce que tu sais n'est jamais une
-    # raison de passer la main ») et a récité les dix créneaux, alors que le
-    # champ qui les porte s'appelle « stock, NON RÉCITÉ ». Deux instructions se
-    # contredisaient ; il a tranché, et il n'avait pas tort.
+    # ⚠ THE REQUEST FOR A LIST IS THE COMMONEST CASE, and it was missing
+    # (04/09/2026). His real test: `Do you have other appointments?` — that is
+    # NOT a refusal, so the funnel did not trigger. The agent applied the
+    # neighbouring rule (`repeating what you know is never a reason to hand
+    # over`) and recited the ten slots, while the field carrying them is called
+    # `stock, NOT RECITED`. Two instructions contradicted each other; it
+    # decided, and it was not wrong.
     "si elle demande ce que tu as d'autre — « avez-vous d'autres dates ? », "
     "« qu'est-ce qui reste ? » — NE RÉCITE PAS la liste : réponds « oui, j'ai "
     "d'autres disponibilités » et enchaîne tout de suite sur la question "
@@ -253,10 +215,10 @@ _ENTONNOIR = (
 
 
 _SEGMENTS_ANNULATION = (
-    # ⚠ ON NE PROMET UNE AUTRE DATE QUE SI L'ON EN A UNE. La case cochée ne
-    # suffit pas : encore faut-il que des places soient réellement libres.
-    # Sans ce second garde-fou, l'agent annonçait « je peux vous proposer une
-    # autre date » devant un agenda plein.
+    # ⚠ WE ONLY PROMISE ANOTHER DATE WHEN WE HAVE ONE. The box being ticked is
+    # not enough: slots must genuinely be free. Without this second guard, the
+    # agent announced `I can offer you another date` in front of a full
+    # calendar.
     {"texte": " Si vous ne pouvez plus venir, je peux vous proposer une autre "
               "date ; sinon j'annule votre rendez-vous et c'est vous qui nous "
               "rappelez quand vous voulez — nous ne vous relancerons pas.",
@@ -267,16 +229,14 @@ _SEGMENTS_ANNULATION = (
 )
 
 # ---------------------------------------------------------------------------
-# CHAQUE OUVERTURE SE TERMINE SUR UNE QUESTION
+# EVERY OPENING ENDS ON A QUESTION
 # ---------------------------------------------------------------------------
-# Demande du propriétaire (02/08/2026) : « possibilité de répondre, mais
-# orienté vers l'obtention de réponse ». Un texte qui finit sur une
-# explication laisse un silence ; un texte qui finit sur une question appelle
-# une réponse — et c'est une réponse qu'il faut, puisque l'agent doit
-# conclure sur l'une des trois issues.
-#
-# La question est le DERNIER segment, après les phrases conditionnelles :
-# quelles que soient les options, elle est ce qu'on entend en dernier.
+# Owner's request (02/08/2026): `the possibility to answer, but oriented
+# towards obtaining an answer`. A text ending on an explanation leaves a
+# silence; a text ending on a question calls for an answer — and an answer is
+# what is needed, since the agent must conclude on one of the three outcomes.
+# The question is the LAST segment, after the conditional sentences: whatever
+# the options, it is what is heard last.
 
 _INFO_CRENEAUX_ANNULATION = _info(
     INFO_CRENEAUX_ANNULATION,
@@ -293,16 +253,16 @@ NATURES = {
         "politique": "premier_oui",
         "politique_libelle": "séquentiel, arrêt au premier OUI",
         "politique_modifiable": True,
-        # ⚠ LE RENDEZ-VOUS LE PLUS LOINTAIN D'ABORD (décision du propriétaire
-        # du 03/08/2026, qui REMPLACE la règle inverse d'avant). La raison :
-        # c'est lui qui a le plus à gagner à avancer sur la place qui se
-        # libère. Celui dont le rendez-vous est déjà proche n'y gagnerait
-        # presque rien — l'appeler d'abord, c'est dépenser un appel pour un
-        # petit gain, et prendre la place à quelqu'un qu'elle soulagerait.
+        # ⚠ THE FURTHEST APPOINTMENT FIRST (owner's decision of 03/08/2026,
+        # which REPLACES the opposite rule from before). The reason: it is that
+        # person who has the most to gain from moving forward onto the slot
+        # that comes free. Somebody whose appointment is already near would
+        # gain almost nothing — calling them first means spending a call for a
+        # small gain, and taking the slot from somebody it would relieve.
         "ordre_defaut": "eloignement",
-        # La seule nature qui parte avec le schéma de CASCADE : elle propose
-        # une place qui vient de se libérer, et la campagne s'arrête au
-        # premier oui (voir en_cascade dans _appeler_contact).
+        # The only kind that goes out with the CASCADE schema: it offers a slot
+        # that has just come free, and the campaign stops at the first yes (see
+        # en_cascade in _appeler_contact).
         "genre": consigne.GENRE_CASCADE,
         "objectif": ("savoir si la personne prend la place qui vient de se "
                      "libérer, à la place de son rendez-vous actuel"),
@@ -312,17 +272,18 @@ NATURES = {
             "non": consigne.issue(
                 "refused", "elle décline la proposition et son rendez-vous "
                            "actuel reste inchangé"),
-            # ⚠ PLUS DE « RAPPELÉE PAR UN HUMAIN » ICI (11/08/2026, décision du
-            # propriétaire) : sur un créneau libéré, la place part à quelqu'un
-            # d'autre dans la minute — promettre un rappel serait promettre un
-            # appel qui n'aurait plus d'objet. Voir NATURES_RAPPEL_HUMAIN.
+            # ⚠ NO MORE `CALLED BACK BY A HUMAN` HERE (11/08/2026, owner's
+            # decision): on a freed slot, the slot goes to somebody else within
+            # the minute — promising a call-back would be promising a call that
+            # would no longer have a purpose. See NATURES_RAPPEL_HUMAIN.
             "autre": consigne.issue(
                 "moved", "tout le reste : elle souhaite une autre date, elle "
                          "ne peut pas se décider maintenant, ou elle pose "
                          "une question à laquelle tu n'as pas la réponse",
-                # LE REPLI SANS DATE, qui manquait à cette nature — et à elle
-                # seule. Sans lui, l'agent rendait « moved » sans date et
-                # RingBack déclarait la réponse illisible (02/08/2026).
+                # THE FALLBACK WITH NO DATE, which was missing from this kind —
+                # and from it alone. Without it, the agent returned `moved`
+                # with no date and RingBack declared the answer unreadable
+                # (02/08/2026).
                 code_sans_date="to_reschedule", date="facultative"),
         },
         "infos": (
@@ -355,23 +316,20 @@ NATURES = {
         "politique": "tous",
         "politique_libelle": "tout le monde est appelé",
         "politique_modifiable": False,
-        # On rappelle d'abord ceux dont le rendez-vous est le plus proche :
-        # ce sont les seuls qu'il est encore utile de prévenir.
+        # We call back first those whose appointment is nearest: they are the
+        # only ones it is still useful to warn.
         "ordre_defaut": "proximite",
         "genre": consigne.GENRE_CLASSIQUE,
         "objectif": ("t'assurer que la personne a bien son rendez-vous en "
                      "tête, et savoir si elle le maintient"),
-        # ⚠ NE CITE AUCUNE DATE AVANT D'AVOIR LA RÉPONSE (31/08/2026, sa
-        # demande, relevée sur un VRAI appel) : « avant même que je confirme
-        # ou non ma présence, il m'a tout de suite listé les différentes dates
-        # […] Il faut d'abord attendre que le client dise non avant de
-        # proposer une date. »
-        #
-        # L'ouverture ne les récite plus (voir _SEGMENTS_ANNULATION) ; l'agent
-        # les connaît toujours, elles sont dans « ce que tu sais ». Cette
-        # conduite lui dit QUAND les sortir — et par petits paquets : sa
-        # transcription du 31/08 en alignait six d'affilée, et la personne a
-        # répondu « aucun ».
+        # ⚠ QUOTE NO DATE BEFORE HAVING THE ANSWER (31/08/2026, his request,
+        # noted on a REAL call): `before I even confirmed whether I would be
+        # there, it immediately listed the various dates […] It must first wait
+        # for the client to say no before offering a date.`  The opening no
+        # longer recites them (see _SEGMENTS_ANNULATION); the agent still knows
+        # them, they are in `what you know`. This conduct tells it WHEN to
+        # bring them out — and in small batches: his transcript of 31/08 lined
+        # up six in a row, and the person answered `none`.
         "conduite": (
             "pose D'ABORD ta question et attends la réponse : sera-t-elle "
             "présente, oui ou non ? Ne cite AUCUNE date tant qu'elle n'a pas "
@@ -393,9 +351,9 @@ NATURES = {
             "non": consigne.issue(
                 "canceled", "elle annule son rendez-vous et n'en fixe pas "
                             "d'autre pendant l'appel"),
-            # Pas de « rappelée par un humain » : voir NATURES_RAPPEL_HUMAIN.
-            # Ici le rendez-vous est LE SIEN — elle peut nous rappeler elle-même,
-            # et c'est ce que dit l'état « le client rappellera ».
+            # No `called back by a human`: see NATURES_RAPPEL_HUMAIN. Here the
+            # appointment is THEIRS — they can call us back themselves, and
+            # that is what the state `le client rappellera` says.
             "autre": consigne.issue(
                 "rescheduled",
                 "tout le reste : elle veut déplacer son rendez-vous, elle "
@@ -440,28 +398,25 @@ NATURES = {
         "politique": "tous",
         "politique_libelle": "tout le monde ; non-réponse → relance",
         "politique_modifiable": False,
-        # ⚠ L'ORDRE DE LA LISTE, POSÉ D'OFFICE (20/08/2026, sa demande — la
-        # même que pour le déplacement le 16/08). L'écran affichait
-        # « — à choisir — », et un ordre non choisi est un champ obligatoire de
-        # plus à chaque campagne. Ici il va de soi : on confirme les
-        # rendez-vous d'une journée ou d'une plage qu'on vient de désigner, ils
-        # sont donc DÉJÀ dans l'ordre où on veut les traiter. Les deux autres
-        # ordres restent offerts — c'est un défaut, pas une contrainte.
+        # ⚠ THE LIST'S ORDER, SET BY DEFAULT (20/08/2026, his request — the
+        # same one as for the move on 16/08). The screen showed `— to be chosen
+        # —`, and an unchosen order is one more mandatory field on every
+        # campaign. Here it goes without saying: we are confirming the
+        # appointments of a day or a range we have just designated, so they are
+        # ALREADY in the order we want to handle them. The other two orders
+        # stay available — it is a default, not a constraint.
         "ordre_defaut": "liste",
         "genre": consigne.GENRE_CLASSIQUE,
         "objectif": ("obtenir une réponse FERME : la personne sera-t-elle "
                      "présente à son rendez-vous, oui ou non"),
-        # ⚠ NE CITE AUCUNE DATE AVANT D'AVOIR LA RÉPONSE (31/08/2026, sa
-        # demande, relevée sur un VRAI appel) : « avant même que je confirme
-        # ou non ma présence, il m'a tout de suite listé les différentes dates
-        # […] Il faut d'abord attendre que le client dise non avant de
-        # proposer une date. »
-        #
-        # L'ouverture ne les récite plus (voir _SEGMENTS_ANNULATION) ; l'agent
-        # les connaît toujours, elles sont dans « ce que tu sais ». Cette
-        # conduite lui dit QUAND les sortir — et par petits paquets : sa
-        # transcription du 31/08 en alignait six d'affilée, et la personne a
-        # répondu « aucun ».
+        # ⚠ QUOTE NO DATE BEFORE HAVING THE ANSWER (31/08/2026, his request,
+        # noted on a REAL call): `before I even confirmed whether I would be
+        # there, it immediately listed the various dates […] It must first wait
+        # for the client to say no before offering a date.`  The opening no
+        # longer recites them (see _SEGMENTS_ANNULATION); the agent still knows
+        # them, they are in `what you know`. This conduct tells it WHEN to
+        # bring them out — and in small batches: his transcript of 31/08 lined
+        # up six in a row, and the person answered `none`.
         "conduite": (
             "pose D'ABORD ta question et attends la réponse : sera-t-elle "
             "présente, oui ou non ? Ne cite AUCUNE date tant qu'elle n'a pas "
@@ -483,7 +438,7 @@ NATURES = {
             "non": consigne.issue(
                 "canceled", "elle annule son rendez-vous et n'en fixe pas "
                             "d'autre pendant l'appel"),
-            # Pas de « rappelée par un humain » : voir NATURES_RAPPEL_HUMAIN.
+            # No `called back by a human`: see NATURES_RAPPEL_HUMAIN.
             "autre": consigne.issue(
                 "rescheduled",
                 "tout le reste : elle veut déplacer son rendez-vous, elle "
@@ -517,46 +472,41 @@ NATURES = {
     "deplacement": {
         "icone": "📆", "nom": "Déplacement de rendez-vous",
         "phrase": "« Je dois déplacer des rendez-vous »",
-        # ⚠ TOUT LE MONDE EST APPELÉ, ET UN OUI N'ARRÊTE RIEN (16/08/2026).
-        # C'était « arrêt au premier oui », d'après une §8.2 que j'avais
-        # écrite moi-même et marquée « ma proposition, à confirmer » — jamais
-        # confirmée, et fausse. Sa phrase la renverse en une ligne : « on
-        # sélectionne une après-midi et l'on dit : pour cette après-midi, on
-        # déplace les rendez-vous. C'est évident que l'on ne doit pas seulement
-        # déplacer la première personne qui accepte, mais TOUS les rendez-vous
-        # que nous avions sélectionnés. »
-        #
-        # D'OÙ VENAIT L'ERREUR : la confusion avec « créneau libéré ». Là, il y
-        # a UN trou à combler — le premier oui suffit, déranger les suivants
-        # n'apporte rien. Ici, il y a N rendez-vous à SORTIR d'une plage :
-        # chaque personne non appelée est un rendez-vous qui reste en place.
-        # Deux natures voisines, deux besoins opposés.
-        #
-        # CE QUE CELA A COÛTÉ : sa campagne s'arrêtait au premier contact —
-        # 1 accepté, 2 « pas appelé », constaté à l'écran.
-        #
-        # L'arrêt au premier oui reste OFFERT (politique_modifiable) : il sert
-        # au cas rare où une seule personne suffit.
+        # ⚠ EVERYBODY IS CALLED, AND A YES STOPS NOTHING (16/08/2026). It was
+        # `stop at the first yes`, based on a §8.2 I had written myself and
+        # marked `my proposal, to be confirmed` — never confirmed, and wrong.
+        # His sentence reverses it in one line: `we select an afternoon and we
+        # say: for that afternoon, we move the appointments. It is obvious that
+        # we must not move only the first person who accepts, but ALL the
+        # appointments we had selected.`  WHERE THE MISTAKE CAME FROM:
+        # confusion with `créneau libéré`. There, there is ONE gap to fill —
+        # the first yes is enough, disturbing the following ones brings
+        # nothing. Here, there are N appointments to CLEAR out of a range:
+        # every person not called is an appointment that stays in place. Two
+        # neighbouring kinds, two opposite needs.  WHAT THAT COST: his campaign
+        # stopped at the first contact — 1 accepted, 2 `not called`, observed
+        # on screen.  Stopping at the first yes stays AVAILABLE
+        # (politique_modifiable): it serves the rare case where one person is
+        # enough.
         "politique": "tous",
         "politique_libelle": "tout le monde est appelé ; rien n'est supprimé "
                              "avant accord",
         "politique_modifiable": True,
-        # ⚠ L'ORDRE DE LA LISTE, POSÉ D'OFFICE (16/08/2026, sa demande).
-        # L'écran affichait « — à choisir — », et un ordre non choisi est un
-        # champ obligatoire de plus à chaque campagne. Ici il va de soi : les
-        # rendez-vous à déplacer viennent d'une journée ou d'une plage qu'on a
-        # désignée, ils sont donc DÉJÀ dans l'ordre où on veut les traiter.
-        # Les deux autres ordres restent offerts — c'est un défaut, pas une
-        # contrainte.
+        # ⚠ THE LIST'S ORDER, SET BY DEFAULT (16/08/2026, his request). The
+        # screen showed `— to be chosen —`, and an unchosen order is one more
+        # mandatory field on every campaign. Here it goes without saying: the
+        # appointments to move come from a day or a range we have designated,
+        # so they are ALREADY in the order we want to handle them. The other
+        # two orders stay available — it is a default, not a constraint.
         "ordre_defaut": "liste",
         "genre": consigne.GENRE_CLASSIQUE,
         "objectif": ("faire accepter à la personne l'un des créneaux de "
                      "remplacement, parce que son rendez-vous actuel ne peut "
                      "pas être tenu"),
-        # ⚠ « oui » vaut ici « confirmed » AVEC la date choisie : c'est ce
-        # couple-là que _appliquer_resultat traduit en DÉPLACEMENT réel du
-        # rendez-vous (voir _deplacer_le_rendezvous). Sans date, rien ne
-        # pourrait être écrit.
+        # ⚠ `yes` here means `confirmed` WITH the date chosen: it is that pair
+        # which _appliquer_resultat turns into a real MOVE of the appointment
+        # (see _deplacer_le_rendezvous). With no date, nothing could be
+        # written.
         "issues": {
             "oui": consigne.issue(
                 "confirmed", "elle accepte l'un des créneaux de remplacement "
@@ -577,14 +527,13 @@ NATURES = {
                   reglage=themes.CLE_ENTREPRISE),
             _info("raison", "Raison simple et honnête "
                             "(ex. « un imprévu dans notre planning »)"),
-            # ⚠ DEUX CHAMPS LÀ OÙ IL Y EN AVAIT UN (16/08/2026, sa demande).
-            # Le message d'ouverture nommait TOUTE la liste — « j'ai plusieurs
-            # créneaux : le 17/08 à 09h00, le 17/08 à 09h20, … ». Personne
-            # n'écoute une énumération au téléphone, et les six places se
-            # suivaient de toute façon : un « non » les balayait toutes.
-            # Désormais l'ouverture nomme UNE date, la plus proche ; la liste
-            # devient le STOCK dans lequel l'agent puise pour négocier — elle
-            # reste dans « ce que tu sais », jamais récitée.
+            # ⚠ TWO FIELDS WHERE THERE WAS ONE (16/08/2026, his request). The
+            # opening message named the WHOLE list — `I have several slots:
+            # 17/08 at 09:00, 17/08 at 09:20, …`. Nobody listens to an
+            # enumeration on the phone, and the six slots followed one another
+            # anyway: one `no` swept them all away. Now the opening names ONE
+            # date, the nearest; the list becomes the STOCK the agent draws on
+            # to negotiate — it stays in `what you know`, never recited.
             _info("creneau_le_plus_proche", "Créneau proposé en premier "
                                             "(le plus proche)",
                   reglage="creneau_le_plus_proche"),
@@ -597,26 +546,24 @@ NATURES = {
                    "date", obligatoire=True),
             _champ("motif", "Motif", obligatoire=True),
         ),
-        # ⚠ LA CONDUITE DE L'ÉCHANGE, EN CINQ TEMPS — sa demande, mot pour mot :
-        # « L'agent pourra alors commencer par proposer la date la plus proche ;
-        # si refus : quels jours de la semaine arrange l'interlocuteur ; il
-        # demande ensuite si la personne préfère matin ou après-midi ; il
-        # propose alors un créneau qui correspond jours + heure correspondant
-        # aux attentes, s'il n'en a pas il demande si un autre jour irait ; au
-        # bout de 3 refus, on annonce poliment que puisqu'on n'arrive pas à
-        # organiser un rendez-vous, une personne de [société] va la rappeler. »
-        #
-        # C'est une conduite, pas une contrainte : elle dit COMMENT mener, là
-        # où les contraintes disent ce qu'on ne fait jamais. D'où son bloc à
-        # elle dans la consigne (voir consigne.Consigne.texte_contexte).
+        # ⚠ THE CONDUCT OF THE EXCHANGE, IN FIVE STEPS — his request, word for
+        # word: `The agent can then start by offering the nearest date; if
+        # refused: which days of the week suit the person; it then asks whether
+        # the person prefers morning or afternoon; it then offers a slot
+        # matching days + time as expected, and if it has none it asks whether
+        # another day would do; after 3 refusals, we politely announce that
+        # since we cannot arrange an appointment, somebody from [company] will
+        # call them back.`  It is a conduct, not a constraint: it says HOW to
+        # lead, where the constraints say what is never done. Hence its own
+        # block in the briefing (see consigne.Consigne.texte_contexte).
         "conduite": (
             "commence par proposer LA date la plus proche, celle qui est "
             "écrite en « créneau proposé en premier » — une seule date, pas "
             "la liste ;",
         ) + _ENTONNOIR + (
-            # ⚠ TROIS, ET ON S'ARRÊTE. Sans cette borne, l'agent enchaîne les
-            # propositions jusqu'à l'agacement : « n'insiste jamais » est déjà
-            # une contrainte du produit, celle-ci lui donne un compte précis.
+            # ⚠ THREE, AND WE STOP. Without that bound, the agent chains offers
+            # until it becomes irritating: `never insist` is already a
+            # constraint of the product, this one gives it a precise count.
             "au bout de TROIS propositions refusées, n'insiste plus : "
             "« Je ne veux pas vous retenir plus longtemps. Puisque nous "
             "n'arrivons pas à trouver un moment qui vous convienne, une "
@@ -630,12 +577,12 @@ NATURES = {
             {"texte": " Nous", "sauf": "raison"},
             " devons déplacer votre rendez-vous du [rdv_existant] pour "
             "[motif].",
-            # ⚠ PAS D'ARTICLE DEVANT LA DATE. `horaires._en_toutes_lettres`
-            # rend déjà « le mardi 25 août 2026 à 9 heures » : écrire
-            # « proposer le [créneau] » donnerait « proposer le le mardi… ».
-            # Constaté en lisant la consigne réellement produite — pas en
-            # relisant le gabarit. (C'était `themes.date_lisible` avant le
-            # 24/08/2026 ; l'article, lui, n'a pas bougé.)
+            # ⚠ NO ARTICLE BEFORE THE DATE. `horaires._en_toutes_lettres`
+            # already returns `le mardi 25 août 2026 à 9 heures`: writing
+            # `proposer le [créneau]` would give `proposer le le mardi…`.
+            # Observed while reading the briefing actually produced — not while
+            # rereading the template. (It was `themes.date_lisible` before
+            # 24/08/2026; the article itself has not moved.)
             {"texte": " Je peux vous proposer [creneau_le_plus_proche] — "
                       "est-ce que cela vous conviendrait ?",
              "si": "creneau_le_plus_proche"},
@@ -659,21 +606,19 @@ NATURES = {
                 date="obligatoire"),
             "non": consigne.issue(
                 "canceled", "elle ne veut pas de rendez-vous"),
-            # ⚠ LA SEULE NATURE, AVEC LE DÉPLACEMENT, OÙ LA PHRASE RESTE
-            # (11/08/2026) — et elle y MANQUAIT : le contact partait bien « à
-            # rappeler par un humain », mais l'agent n'avait pas le droit de le
-            # proposer. Ici un humain a un vrai travail : trouver une date.
-            # ⚠ ELLE PROPOSE SON PROPRE MOMENT, ET C'EST UN OUI (24/08/2026).
-            # La simulation JOUAIT cette fin — « rescheduled » est dans la
-            # suite de cette nature — et le produit sait l'absorber : mesuré,
-            # il crée le rendez-vous à la date proposée, contact « accepté ».
-            # Mais la consigne ne la DEMANDAIT jamais : l'agent n'avait le
-            # droit que de rendre « to_reschedule ». Une date convenue au
-            # téléphone repartait donc en rappel par un humain — pour refixer
-            # ce qui venait d'être fixé.
-            #
-            # Même forme que « déplacement » : la date décide. Avec elle, le
-            # rendez-vous est posé ; sans elle, un humain reprend la main.
+            # ⚠ THE ONLY KIND, ALONG WITH THE MOVE, WHERE THE SENTENCE REMAINS
+            # (11/08/2026) — and it was MISSING there: the contact did go to `à
+            # rappeler par un humain`, but the agent was not allowed to offer
+            # it. Here a human has real work: finding a date. ⚠ THEY OFFER
+            # THEIR OWN TIME, AND IT IS A YES (24/08/2026). The simulation
+            # PLAYED this ending — `rescheduled` is in this kind's sequence —
+            # and the product knows how to absorb it: measured, it creates the
+            # appointment at the date offered, contact `accepté`. But the
+            # briefing never ASKED for it: the agent was only allowed to return
+            # `to_reschedule`. So a date agreed on the phone went back into a
+            # human call-back — to re-fix what had just been fixed.  The same
+            # shape as `déplacement`: the date decides. With it, the
+            # appointment is placed; without it, a human takes over.
             "autre": consigne.issue(
                 "rescheduled",
                 "tout le reste : elle préfère un moment qui n'est pas dans "
@@ -708,25 +653,18 @@ NATURES = {
     },
 }
 
-# ⚠ TROIS NATURES RETIRÉES le 03/08/2026, à la demande du propriétaire, et
-# nos propres mesures lui donnaient raison :
-#
-#  · ☎ « Rappel d'appel manqué » — son état déclencheur (« a cherché à nous
-#    joindre ») n'était JAMAIS produit par le moteur : le banc d'essai le
-#    constatait noir sur blanc. Et son discours posait une question ouverte
-#    (« Que puis-je faire pour vous ? ») alors que ses issues étaient celles
-#    d'un rendez-vous : l'agent ne pouvait pas conclure proprement.
-#  · 🎯 « Contact unique avec sujet » et ✍ « Personnalisé » — aucune écriture
-#    dans le carnet de rendez-vous, aucun champ, et des issues taillées pour
-#    un rendez-vous plaquées sur « demander un devis ». « Personnalisé »
-#    n'avait même pas de gabarit.
-#
-# Les cinq qui restent forment un tout : elles agissent TOUTES sur le carnet
-# de rendez-vous et rendent des issues qu'il sait absorber.
-#
-# Elles restent LISIBLES : une base existante peut porter des campagnes de
-# ces natures, et une campagne qu'on ne sait plus nommer serait une donnée
-# perdue. On ne peut simplement plus en créer.
+# ⚠ THREE KINDS REMOVED on 03/08/2026, at the owner's request, and our own
+# measurements proved him right:  · ☎ `Rappel d'appel manqué` — its triggering
+# state (`tried to reach us`) was NEVER produced by the engine: the bench
+# observed it in black and white. And its speech asked an open question (`What
+# can I do for you?`) while its outcomes were an appointment's: the agent could
+# not conclude cleanly. · 🎯 `Contact unique avec sujet` and ✍ `Personnalisé` —
+# no writing into the appointment book, no fields, and outcomes cut for an
+# appointment pasted onto `ask for a quote`. `Personnalisé` did not even have a
+# template.  The five that remain form a whole: they ALL act on the appointment
+# book and return outcomes it knows how to absorb.  They stay READABLE: an
+# existing database may carry campaigns of those kinds, and a campaign you can
+# no longer name would be lost data. You simply cannot create any more.
 NATURES_RETIREES = {
     "appel_manque": {"icone": "☎", "nom": "Rappel d'appel manqué"},
     "contact_unique": {"icone": "🎯", "nom": "Contact unique avec sujet"},
@@ -735,17 +673,17 @@ NATURES_RETIREES = {
 
 
 def fiche_nature(nature):
-    """La fiche d'une nature — y compris celles qu'on ne crée plus.
+    """A kind's record — including the ones no longer created.
 
-    Tout ce qui AFFICHE une campagne passe par ici : sans cela, une
-    campagne d'une nature retirée n'aurait plus ni nom ni pictogramme.
-    Rend None pour une nature inconnue, à charge de l'appelant.
+    Everything that DISPLAYS a campaign goes through here: without that, a
+    campaign of a removed kind would have neither name nor pictogram. Returns
+    None for an unknown kind, for the caller to handle.
     """
     return NATURES.get(nature) or NATURES_RETIREES.get(nature)
 
 
 def nature_creable(nature):
-    """Vrai si l'on peut encore BÂTIR une campagne de cette nature."""
+    """True when a campaign of this kind can still be BUILT."""
     return nature in NATURES
 
 POLITIQUES = {
@@ -754,12 +692,11 @@ POLITIQUES = {
     "unique": "un seul contact",
 }
 
-# ⚠ « ANCIENNETE » DISAIT LE CONTRAIRE DE CE QU'IL FAISAIT. Son libellé
-# annonçait « le rendez-vous le plus ancien d'abord » et le tri prenait la date
-# la plus PETITE — donc le rendez-vous le plus PROCHE. Pour des rendez-vous à
-# venir, le plus petit n'est pas le plus ancien : c'est le plus imminent. Le
-# libellé dit maintenant ce que le code fait, et la clé reste la même pour ne
-# rien casser (03/08/2026).
+# ⚠ `ANCIENNETE` SAID THE OPPOSITE OF WHAT IT DID. Its label announced `the
+# oldest appointment first` and the sorting took the SMALLEST date — hence the
+# NEAREST appointment. For upcoming appointments, the smallest is not the
+# oldest: it is the most imminent. The label now says what the code does, and
+# the key stays the same so as to break nothing (03/08/2026).
 ORDRES_APPEL = {
     "liste": "Ordre de la liste",
     "eloignement": "Le rendez-vous le plus LOINTAIN d'abord",
@@ -768,46 +705,46 @@ ORDRES_APPEL = {
     "alphabetique": "Alphabétique — par nom",
 }
 
-# Les deux seuls ordres qui parlent de la DATE du rendez-vous. Ce sont ceux que
-# le sélecteur posé au-dessus de la grille propose : les autres n'ont pas de
-# sens quand on choisit qui profite d'une place qui se libère.
+# The only two orders that talk about the appointment's DATE. They are the ones
+# the selector above the grid offers: the others make no sense when choosing
+# who benefits from a slot that comes free.
 ORDRES_PAR_DATE = ("eloignement", "anciennete")
 
-# Les états des contacts d'une campagne de l'assistant (pastille, classe CSS).
+# The states of an assistant campaign's contacts (badge, CSS class).
 ETATS = {
     "à appeler": ("⏳", "st-prevu"),
     "en cours": ("📞", "st-prevu"),
     "accepté": ("✅", "st-confirme"),
     "refusé": ("❌", "st-annule"),
-    # Il a annulé sans replacer : plus aucun appel ne partira pour lui,
-    # c'est LUI qui reprendra contact (règle du 31/07/2026).
-    # ⚠ ET LE PICTOGRAMME SUIT LE MOT (21/08/2026). 📞 évoquait un appel ;
-    # ce qui s'est passé, c'est une annulation.
+    # They cancelled without rebooking: no call will go out for them any more,
+    # it is THEY who will get back in touch (the rule of 31/07/2026). ⚠ AND THE
+    # PICTOGRAM FOLLOWS THE WORD (21/08/2026). 📞 suggested a call; what
+    # happened was a cancellation.
     ETAT_RAPPELLERA: ("❌", "st-annule"),
     "à recontacter": ("🔁", "st-manque"),
     "injoignable": ("📵", "st-ignore"),
-    # L'appel EST parti, son résultat n'est pas (encore) connu — voir
-    # ETAT_RESULTAT_INCONNU. Aucune tentative ne lui a été comptée.
+    # The call WENT OUT, its result is not (yet) known — see
+    # ETAT_RESULTAT_INCONNU. No attempt has been counted against them.
     ETAT_RESULTAT_INCONNU: ("⏱", "st-manque"),
     "à rappeler par un humain": ("🙋", "st-deplace"),
     "exclu": ("🚫", "st-annule"),
     "épargné": ("💤", "st-confirme"),
 }
 
-# Sources de remplissage « depuis la base » de l'étape 3.
+# Step 3's `from the database` filling sources.
 SOURCES_BASE = {
-    # « poses » : tout ce qui OCCUPE une place — prévus ET confirmés, comme
-    # le planning les compte. C'est la source qu'on veut pour un rappel :
-    # un rendez-vous confirmé se rappelle aussi. Ajoutée le 02/08/2026 après
-    # qu'une semaine affichant 13 rendez-vous n'en ait repris aucun.
+    # `poses`: everything that OCCUPIES a slot — scheduled AND confirmed, as
+    # the schedule counts them. That is the source you want for a reminder: a
+    # confirmed appointment is worth reminding about too. Added on 02/08/2026
+    # after a week showing 13 appointments took none of them back.
     "poses": "Rendez-vous posés — prévus ET confirmés (comme au planning)",
     "a_venir": "Rendez-vous à venir, pas encore confirmés",
     "manques": "Rendez-vous manqués (avec date et motif)",
-    # ⚠ LA DÉFINITION EST DANS LE LIBELLÉ, entre parenthèses. « En attente »
-    # n'est pas un statut du produit : le mot désigne un rendez-vous DÉPLACÉ
-    # dont le client n'a pris aucune suite. L'écrire évite qu'on coche cette
-    # source en croyant qu'elle rappelle aussi ceux qui ont déjà un
-    # rendez-vous (décision du propriétaire du 03/08/2026).
+    # ⚠ THE DEFINITION IS IN THE LABEL, in brackets. `En attente` is not a
+    # product status: the word means a MOVED appointment whose client took no
+    # further step. Writing it out avoids ticking this source believing it also
+    # calls back those who already have an appointment (owner's decision of
+    # 03/08/2026).
     "a_recaser": ("Rendez-vous annulés, manqués et en attente "
                   "(déplacés sans nouveau rendez-vous)"),
     "annules": "Rendez-vous annulés",
@@ -815,39 +752,36 @@ SOURCES_BASE = {
     "tous": "Tous les clients",
 }
 
-# LES MÊMES SOURCES, RANGÉES EN DEUX FAMILLES (demande du propriétaire,
-# 02/08/2026). « Reprendre depuis la base » était une seule voie qui mélangeait
-# deux questions sans rapport : « quelles DATES de rendez-vous ? » et
-# « quels CLIENTS ? ». On ne change ni les codes ni le calcul — seulement la
-# façon de poser la question, en trois voies distinctes :
-#   ① charger les clients (tous, ou un état particulier) ;
-#   ② charger selon les dates de rendez-vous ;
-#   ③ charger selon une campagne précédente (inchangée).
-# Un code retiré d'ici resterait accepté par contacts_depuis_base : les
-# recettes déjà enregistrées continuent donc de se rejouer à l'identique.
+# THE SAME SOURCES, ARRANGED IN TWO FAMILIES (owner's request, 02/08/2026).
+# `Reprendre depuis la base` was a single route mixing two unrelated questions:
+# `which appointment DATES?` and `which CLIENTS?`. We change neither the codes
+# nor the computation — only the way the question is asked, in three distinct
+# routes: ① load the clients (all, or a particular state); ② load by
+# appointment dates; ③ load from a previous campaign (unchanged). A code
+# removed from here would still be accepted by contacts_depuis_base: the
+# recipes already saved therefore go on replaying identically.
 SOURCES_RENDEZVOUS = {code: SOURCES_BASE[code]
                       for code in ("poses", "a_venir", "manques", "a_recaser",
                                    "annules", "deplaces")}
-# Les sources qui portent une DATE : elles seules acceptent une période.
+# The sources that carry a DATE: they alone accept a period.
 SOURCES_DATEES = ("poses", "a_venir", "manques", "a_recaser")
 
-# ⚠ CE QUE LA RÈGLE DYNAMIQUE PROPOSE, ET C'EST PLUS ÉTROIT (15/08/2026, sa
-# demande). « Rendez-vous posés — prévus ET confirmés » a été retirée d'ICI, et
-# d'ici seulement : la source reste offerte au chargement MANUEL, où elle a du
-# sens (reprendre une journée entière du planning), et les recettes déjà
-# enregistrées continuent de se rejouer — rien n'est cassé en base.
-#
-# Pourquoi la retirer de la règle : une règle dynamique sert à trouver QUI
-# avancer sur une place qui se libère. Un rendez-vous déjà CONFIRMÉ est un
-# accord obtenu ; aller le déranger pour le déplacer travaille contre soi. La
-# source « à venir, pas encore confirmés » vise exactement les bonnes personnes,
-# et c'est elle qui devient le choix par défaut.
+# ⚠ WHAT THE DYNAMIC RULE OFFERS, AND IT IS NARROWER (15/08/2026, his request).
+# `Rendez-vous posés — prévus ET confirmés` was removed from HERE, and from
+# here only: the source stays available for MANUAL loading, where it makes
+# sense (taking a whole day of the schedule), and the recipes already saved go
+# on replaying — nothing is broken in the database.  Why remove it from the
+# rule: a dynamic rule serves to find WHO to move forward onto a slot that
+# comes free. An appointment already CONFIRMED is an agreement obtained; going
+# and disturbing it to move it works against yourself. The source `upcoming,
+# not yet confirmed` targets exactly the right people, and it becomes the
+# default choice.
 SOURCES_REGLE = ("a_venir", "manques", "a_recaser")
 
-# ⚠ UNE TABLE QUI REFUSE CE QU'ELLE NE CONNAÎT PAS. Elle avait « manqué »
-# pour valeur par défaut : un code neuf y tombait sans bruit, et l'écran
-# annonçait une source pendant que la grille en contenait une autre. Ajouter
-# une source, c'est désormais l'ajouter ICI aussi — ou se faire refuser.
+# ⚠ A TABLE THAT REFUSES WHAT IT DOES NOT KNOW. It had `manqué` as its default
+# value: a new code fell into it silently, and the screen announced one source
+# while the grid contained another. Adding a source now means adding it HERE
+# too — or being refused.
 STATUT_PAR_SOURCE_DATEE = {
     "poses": "poses",
     "a_venir": "prévu",
@@ -856,11 +790,11 @@ STATUT_PAR_SOURCE_DATEE = {
 }
 SOURCE_TOUS_CLIENTS = "tous"
 
-# Reprise d'une CAMPAGNE PRÉCÉDENTE, filtrée par état de son résultat.
-# Les résultats de campagne sont déjà en base (contacts_campagne.etat, écrit
-# depuis le résultat réel de chaque appel) : c'est ce qui permet de rejouer
-# « ceux que je n'ai pas eus », « ceux qui ont refusé »… sans ressaisie.
-# C'est un FILTRE : il s'affiche en listes déroulantes, pas en boutons radio.
+# Resuming a PREVIOUS CAMPAIGN, filtered by its result's state. Campaign
+# results are already in the database (contacts_campagne.etat, written from
+# each call's real result): that is what makes it possible to replay `those I
+# did not reach`, `those who refused`… with no retyping. It is a FILTER: it is
+# shown as drop-down lists, not as radio buttons.
 ETATS_REPRISE = {
     "injoignable": "📵 Injoignables",
     "refusé": "❌ Refus",
@@ -872,12 +806,11 @@ ETATS_REPRISE = {
 
 
 def option_annulation_utile(nature):
-    """Vrai si le message de CETTE nature change selon l'option d'annulation.
+    """True when THIS kind's message changes according to the cancellation option.
 
-    Elle n'a de sens que là où le client peut annuler un rendez-vous
-    existant pendant l'appel : 🔔 rappel et ✅ confirmation (fiches 2 et 3).
-    Ailleurs, la case n'est pas affichée — on ne propose pas un réglage
-    qui ne changerait rien.
+    It only makes sense where the client can cancel an existing appointment
+    during the call: 🔔 reminder and ✅ confirmation (sheets 2 and 3). Elsewhere
+    the box is not shown — we do not offer a setting that would change nothing.
     """
     return any(isinstance(segment, dict)
                and CLE_REPLACER_ANNULATION in (segment.get("si_option"),
@@ -886,49 +819,47 @@ def option_annulation_utile(nature):
 
 
 def infos_de_sous_option(nature, option):
-    """Les informations d'étape 2 qui sont le DÉTAIL de cette option."""
+    """The step-2 information that is the DETAIL of this option."""
     return [info for info in NATURES[nature]["infos"]
             if info.get("sous_option") == option]
 
 
 def champs_campagne(brouillon_ou_config):
-    """Les colonnes complètes (socle + nature + personnalisés) d'un brouillon
-    ou d'une configuration enregistrée."""
+    """The complete columns (base + kind + custom) of a draft or of a saved
+    configuration.
+    """
     return list(_CHAMPS_SOCLE) + list(brouillon_ou_config.get("champs", []))
 
 
 # ---------------------------------------------------------------------------
-# CE QUI MANQUE DANS LA GRILLE — une seule phrase, la couleur fait le reste
+# WHAT IS MISSING IN THE GRID — one sentence, the colour does the rest
 # ---------------------------------------------------------------------------
-# Avant le 02/08/2026, chaque case obligatoire vide produisait SA phrase
-# d'erreur. Sur dix contacts et trois colonnes, cela faisait trente phrases
-# identiques empilées au-dessus de la grille : illisible, et sans dire OÙ
-# taper. Le propriétaire a tranché : une seule phrase, et les cases fautives
-# colorées dans la grille elle-même.
-#
-# La couleur ne s'allume PAS seulement après un refus : elle est calculée à
-# chaque affichage, donc dès l'importation des contacts — on voit ce qui
-# reste à faire avant même d'essayer de valider.
+# Before 02/08/2026, every empty mandatory box produced ITS own error sentence.
+# Over ten contacts and three columns, that made thirty identical sentences
+# stacked above the grid: unreadable, and without saying WHERE to type. The
+# owner decided: one sentence, and the faulty boxes coloured in the grid
+# itself.  The colour does NOT light up only after a refusal: it is computed on
+# every display, hence from the moment the contacts are imported — you see what
+# remains to be done before even trying to validate.
 MESSAGE_CHAMPS_OBLIGATOIRES = (
     "Veuillez compléter les champs obligatoires : ils sont encadrés de rouge "
     "dans la grille.")
 
-# Deux caractères au minimum pour une identité : « M » ou une espace ne
-# nomment personne.
+# Two characters minimum for an identity: `M` or a space names nobody.
 LONGUEUR_MINIMALE_IDENTITE = 2
 
 
 def cellules_manquantes(brouillon):
-    """Les cases obligatoires vides : {(n° de ligne, code de colonne)}.
+    """The empty mandatory boxes: {(row number, column code)}.
 
-    Le code est celui qui NOMME le champ dans le formulaire : « identite »
-    et « telephone » pour les deux colonnes du socle, sinon le code de la
-    colonne. C'est ce qui permet à l'écran de colorer exactement la bonne
-    case sans refaire la règle de son côté — une seule vérité, ici.
+    The code is the one that NAMES the field in the form: `identite` and
+    `telephone` for the two base columns, otherwise the column's code. That is
+    what lets the screen colour exactly the right box without redoing the rule
+    on its side — one truth, here.
 
-    ⚠ Ne dit RIEN des valeurs orphelines (celles dont la colonne a été
-    retirée) : « en trop ce n'est pas grave » est la règle du propriétaire,
-    et ces valeurs restent en place pour revenir si la colonne revient.
+    ⚠ It says NOTHING about orphaned values (those whose column was removed):
+    `extra is not a problem` is the owner's rule, and those values stay in
+    place to come back should the column come back.
     """
     obligatoires = [champ for champ in champs_campagne(brouillon)
                     if champ["obligatoire"]
@@ -947,28 +878,31 @@ def cellules_manquantes(brouillon):
 
 
 def verifier_grille(brouillon):
-    """La phrase à afficher quand la grille est incomplète (rien sinon).
+    """The sentence to display when the grid is incomplete (nothing otherwise).
 
-    Appelée après un changement de colonnes : en changer quand la grille est
-    déjà remplie oblige à la revérifier. Rend une LISTE (vide, ou d'un seul
-    élément) pour se brancher sans rien changer sur `brouillon["erreurs"]`,
-    qui en attend une.
+    Called after a column change: changing them while the grid is already
+    filled forces a recheck. Returns a LIST (empty, or of a single element) so
+    it plugs in without changing anything on `brouillon["erreurs"]`, which
+    expects one.
     """
     return ([MESSAGE_CHAMPS_OBLIGATOIRES] if cellules_manquantes(brouillon)
             else [])
 
 
 def code_champ(libelle):
-    """« Numéro de dossier » devient « numero_de_dossier » (variable [code])."""
+    """`Numéro de dossier` becomes `numero_de_dossier` (the [code] variable).
+    """
     decompose = unicodedata.normalize("NFD", (libelle or "").casefold())
     sans_accents = "".join(c for c in decompose if not unicodedata.combining(c))
     code = re.sub(r"[^a-z0-9]+", "_", sans_accents).strip("_")
     return code or "champ"
 
 
-# ------------------------------------------------------ période interdite
+# ------------------------------------------------------ forbidden period
 def periode_interdite(preferences):
-    """La période interdite réglée (« HH:MM », « HH:MM ») ou None si aucune."""
+    """The configured forbidden period (`HH:MM`, `HH:MM`) or None when there is
+    none.
+    """
     debut = (preferences.obtenir(CLE_INTERDIT_DEBUT) or "").strip()
     fin = (preferences.obtenir(CLE_INTERDIT_FIN) or "").strip()
     if debut and fin:
@@ -977,8 +911,9 @@ def periode_interdite(preferences):
 
 
 def dans_periode_interdite(preferences, maintenant=None):
-    """Message d'erreur français si l'instant tombe dans la période interdite
-    (elle peut traverser minuit : 20:00 → 08:00), sinon None."""
+    """A French error message when the instant falls within the forbidden period
+    (it may cross midnight: 20:00 → 08:00), otherwise None.
+    """
     periode = periode_interdite(preferences)
     if periode is None:
         return None
@@ -1000,7 +935,7 @@ def dans_periode_interdite(preferences, maintenant=None):
 
 
 def _hors_interdit(moment, preferences):
-    """Repousse un instant hors de la période interdite (à sa fin)."""
+    """Pushes an instant out of the forbidden period (to its end)."""
     periode = periode_interdite(preferences)
     if periode is None:
         return moment
@@ -1011,28 +946,28 @@ def _hors_interdit(moment, preferences):
         if debut <= heure < fin:
             return moment.replace(hour=heure_fin, minute=minute_fin)
         return moment
-    if heure >= debut:      # soir : la fin est le lendemain matin
+    if heure >= debut:  # evening: the end is the next morning
         return (moment + datetime.timedelta(days=1)).replace(
             hour=heure_fin, minute=minute_fin)
-    if heure < fin:         # petit matin : la fin est le même jour
+    if heure < fin:  # early morning: the end is the same day
         return moment.replace(hour=heure_fin, minute=minute_fin)
     return moment
 
 
 def echeance_relance_campagne(preferences, options, maintenant=None):
-    """L'échéance de la prochaine relance : par délai OU par créneau de rappel.
+    """The next follow-up's due date: by delay OR by call-back window.
 
-    options : les options de comportement de la campagne (étape 2) — elles
-    priment sur les réglages par défaut de la page ⚙.
+    options: the campaign's behaviour options (step 2) — they take precedence
+    over the ⚙ page's default settings.
 
-    L'échéance tombe toujours quand le cabinet TRAVAILLE : dans la plage
-    d'appel autorisée, hors période interdite, un jour ouvert de la semaine
-    type et pas un jour déclaré fermé. C'est la règle du propriétaire —
-    « en cas de demande de rappel, un salarié peut le faire ». Les deux
-    modes y passent : le délai en heures ouvrées (campagnes.
-    echeance_apres_heures_ouvrees, qui connaît désormais les réglages) et
-    le créneau de rappel quotidien, repoussé au prochain jour travaillé.
-    Rend un horaire ISO 8601 à la minute.
+    The due date always falls when the practice is WORKING: within the
+    permitted calling window, outside the forbidden period, on an open day of
+    the typical week and not on a declared closed day. That is the owner's rule
+    — `should somebody ask to be called back, an employee can do it`. Both
+    modes go through it: the delay in working hours
+    (campagnes.echeance_apres_heures_ouvrees, which now knows the settings) and
+    the daily call-back window, pushed to the next working day. Returns an ISO
+    8601 time to the minute.
     """
     if maintenant is None:
         maintenant = datetime.datetime.now()
@@ -1049,7 +984,7 @@ def echeance_relance_campagne(preferences, options, maintenant=None):
         if heure < debut:
             echeance = maintenant.replace(hour=heure_debut, minute=minute_debut)
         elif heure < fin:
-            echeance = maintenant  # déjà dans le créneau : due dès maintenant
+            echeance = maintenant  # already within the window: due right now
         else:
             echeance = (maintenant + datetime.timedelta(days=1)).replace(
                 hour=heure_debut, minute=minute_debut)
@@ -1066,15 +1001,15 @@ def echeance_relance_campagne(preferences, options, maintenant=None):
 
 
 def _prochain_jour_travaille(moment, preferences):
-    """Repousse un instant au prochain jour où le cabinet TRAVAILLE.
+    """Pushes an instant to the next day the practice is WORKING.
 
-    Sert au mode « créneau de rappel quotidien » : un créneau de 12h-14h ne
-    doit pas échoir un dimanche ni un jour déclaré fermé. L'heure du
-    créneau, elle, est conservée telle quelle — c'est ce que l'utilisateur
-    a réglé. Les règles de jours viennent de campagnes.jour_travaille, qui
-    les lit dans horaires : rien n'est dupliqué ici. Au-delà de la butée
-    (rien d'ouvert d'une année), l'instant est rendu INCHANGÉ et le journal
-    le dit — la relance reste visible plutôt que perdue.
+    Used by the `daily call-back window` mode: a 12-2pm window must not fall
+    due on a Sunday nor on a declared closed day. The window's hour, though, is
+    kept as it stands — it is what the user configured. The day rules come from
+    campagnes.jour_travaille, which reads them in horaires: nothing is
+    duplicated here. Beyond the limit (nothing open for a year), the instant is
+    returned UNCHANGED and the log says so — the follow-up stays visible rather
+    than lost.
     """
     candidat = moment
     for _ in range(campagnes.JOURS_CHERCHES_ECHEANCE):
@@ -1089,8 +1024,8 @@ def _prochain_jour_travaille(moment, preferences):
 
 
 def maximum_rappels(preferences, options):
-    """Le nombre maximal de rappels : celui de la campagne, sinon celui des
-    réglages."""
+    """The maximum number of reminders: the campaign's, otherwise the settings'.
+    """
     try:
         return int(options.get("relance_max"))
     except (TypeError, ValueError):
@@ -1098,23 +1033,23 @@ def maximum_rappels(preferences, options):
         return maximum
 
 
-# ------------------------------------------------------------- la mission
+# ------------------------------------------------------------- the mission
 def date_courte(iso):
-    """« 2026-08-03T14:00 » devient « 03/08/2026 à 14h00 » (sans « le »)."""
+    """`2026-08-03T14:00` becomes `03/08/2026 à 14h00` (with no `le`)."""
     lisible = themes.date_lisible(iso)
     return lisible[3:] if lisible.startswith("le ") else lisible
 
 
 def date_chiffree(iso):
-    """« 2026-08-03T14:00 » devient « 03/08/2026 14:00 ».
+    """`2026-08-03T14:00` becomes `03/08/2026 14:00`.
 
-    Le format demandé par le propriétaire le 11/08/2026, jj/mm/aaaa hh:mm, pour
-    une colonne de TABLEAU : on y compare des dates d'une ligne à l'autre, et
-    « à 14h00 » ajoute deux caractères qui n'aident pas à comparer. Ailleurs —
-    dans une phrase, dans un message dit au téléphone — c'est `date_courte` qui
-    reste juste : « le 3 août à 14h00 » se lit, « 03/08/2026 14:00 » s'aligne.
+    The format the owner asked for on 11/08/2026, dd/mm/yyyy hh:mm, for a TABLE
+    column: dates are compared there from one row to the next, and `à 14h00`
+    adds two characters that do not help comparison. Elsewhere — in a sentence,
+    in a message spoken on the phone — it is `date_courte` that stays right:
+    `le 3 août à 14h00` reads, `03/08/2026 14:00` aligns.
 
-    Rend "" pour une valeur vide ou illisible : jamais une date inventée.
+    Returns "" for an empty or unreadable value: never an invented date.
     """
     texte = str(iso or "").strip()
     if not texte:
@@ -1127,82 +1062,82 @@ def date_chiffree(iso):
 
 
 def _valeur_lisible(valeur, type_champ, langue_code="fr"):
-    """La valeur d'un champ telle qu'elle entre DANS LE MESSAGE ET LA CONSIGNE.
+    """A field's value as it enters THE MESSAGE AND THE BRIEFING.
 
-    ⚠ CETTE FONCTION NE SERT QU'À CE QUI SE DIT. Ses cinq appelants
-    construisent tous du texte destiné à l'agent : le message d'ouverture
-    (construire_mission, finaliser_mission), la consigne (construire_consigne,
-    finaliser_consigne) et le contrôle « ce message a-t-il perdu une
-    information ? » (infos_perdues), qui compare au même texte. D'où le format
-    PARLÉ depuis le 24/08/2026 — « lundi 24 août 2026 à 10 heures 20 ».
+    ⚠ THIS FUNCTION ONLY SERVES WHAT IS SPOKEN. Its five callers all build text
+    meant for the agent: the opening message (construire_mission,
+    finaliser_mission), the briefing (construire_consigne, finaliser_consigne)
+    and the check `has this message lost a piece of information?`
+    (infos_perdues), which compares against the same text. Hence the SPOKEN
+    format since 24/08/2026 — `lundi 24 août 2026 à 10 heures 20`.
 
-    ⚠ LES ÉCRANS GARDENT `date_courte` : un tableau se lit en colonne, une
-    phrase se dit à voix haute. Changer les deux d'un coup aurait allongé
-    chaque ligne de chaque liste du produit sans que personne l'ait demandé.
+    ⚠ THE SCREENS KEEP `date_courte`: a table is read in columns, a sentence is
+    said out loud. Changing both at once would have lengthened every row of
+    every list in the product without anybody asking.
     """
     if type_champ == "date":
-        # ⚠ ET DANS LA LANGUE DE L'APPEL. Une date française au milieu d'une
-        # consigne anglaise serait lue telle quelle à voix haute : « mardi 15
-        # septembre 2026 à 9 heures 40 », prononcé par une voix anglaise, à un
-        # patient anglophone. Mesuré le 01/09/2026 sur la ligne « Créneau
-        # libéré », qui était la dernière à rester française.
+        # ⚠ AND IN THE CALL'S LANGUAGE. A French date in the middle of an
+        # English briefing would be read out as it stands: `mardi 15 septembre
+        # 2026 à 9 heures 40`, pronounced by an English voice, to an
+        # English-speaking patient. Measured on 01/09/2026 on the `Créneau
+        # libéré` line, which was the last one still French.
         return themes.date_parlee(valeur, langue_code)
     return valeur
 
 
 def cle_discours(nature):
-    """La clé de réglage du discours d'ouverture de CETTE nature."""
+    """The settings key of THIS kind's opening speech."""
     return f"discours_{nature}"
 
 
 def cle_comportement(nature):
-    """La clé de réglage des options de comportement de CETTE nature."""
+    """The settings key of THIS kind's behaviour options."""
     return f"comportement_{nature}"
 
 
-# Les options de comportement réglables par nature, et rien d'autre. Une clé
-# absente de cette liste est IGNORÉE à la relecture : un réglage écrit par une
-# version future, ou un envoi forgé, ne peut pas introduire une option que le
-# produit ne sait pas honorer.
+# The behaviour options configurable per kind, and nothing else. A key absent
+# from this list is IGNORED on read-back: a setting written by a future
+# version, or a forged submission, cannot introduce an option the product does
+# not know how to honour.
 OPTIONS_COMPORTEMENT = (
     "recontacter", "liberer_creneau", "repondeur_sans_motif", "cascade",
     CLE_REPLACER_ANNULATION,
 )
 
-# Le DÉTAIL des relances, réglable lui aussi par nature : cocher
-# « Recontacter » sans pouvoir dire au bout de combien de temps ni combien de
-# fois ne réglait rien de ce qui compte (signalé le 02/08/2026). Ce sont des
-# textes, pas des cases : ils sont repris tels quels, jamais convertis en
-# booléen — d'où deux listes séparées.
+# The DETAIL of the follow-ups, configurable per kind too: ticking
+# `Recontacter` without being able to say after how long or how many times
+# settled none of what matters (reported on 02/08/2026). These are texts, not
+# boxes: they are taken as they stand, never converted into a boolean — hence
+# two separate lists.
 DETAILS_RELANCE = ("relance_mode", "relance_delai", "relance_max",
                    "relance_creneau_debut", "relance_creneau_fin")
 
-# CE QUE LE PRODUIT LIVRE, en un seul endroit. Ces valeurs étaient écrites
-# dans creer_brouillon_assistant : l'écran des Réglages ne les connaissait
-# donc pas et affichait tout décoché, alors que le formulaire de campagne,
-# lui, arrivait tout coché. Deux écrans, deux vérités — constaté à l'écran le
-# 02/08/2026. Il n'y en a plus qu'une, et les deux la lisent.
+# WHAT THE PRODUCT SHIPS, in one single place. These values were written in
+# creer_brouillon_assistant: the Settings screen therefore did not know them
+# and showed everything unticked, while the campaign form arrived fully ticked.
+# Two screens, two truths — observed on screen on 02/08/2026. There is only one
+# now, and both read it.
 OPTIONS_LIVREES = {
     "recontacter": True,
     "liberer_creneau": True,
     "repondeur_sans_motif": True,
-    # Une annulation pendant l'appel : l'agent a-t-il le droit de proposer
-    # une autre date ? Oui par défaut — c'est ce que décrivent les fiches de
-    # discussion. La case n'est montrée que pour les natures dont le message
-    # en dépend (voir option_annulation_utile).
+    # A cancellation during the call: is the agent allowed to offer another
+    # date? Yes by default — that is what the discussion sheets describe. The
+    # box is only shown for the kinds whose message depends on it (see
+    # option_annulation_utile).
     CLE_REPLACER_ANNULATION: True,
-    # La cascade, elle, ne s'arme JAMAIS toute seule : elle prépare une
-    # campagne de plus, et cela se décide.
+    # The cascade, for its part, NEVER arms itself: it prepares one more
+    # campaign, and that is a decision.
     "cascade": False,
     "cascade_jusqu_au": "",
 }
 
 
 def relances_generales(preferences):
-    """Le réglage GÉNÉRAL des relances, sous forme d'options de campagne.
+    """The GENERAL follow-up setting, as campaign options.
 
-    Un seul endroit lit ces quatre valeurs : l'écran des Réglages et la
-    création d'un brouillon montrent donc exactement la même chose.
+    Only one place reads these four values: the Settings screen and the
+    creation of a draft therefore show exactly the same thing.
     """
     delai, maximum = campagnes.parametres_relance(preferences)
     return {
@@ -1217,35 +1152,34 @@ def relances_generales(preferences):
 
 
 def comportement_regle(nature, preferences, socle=None):
-    """(options, politique, ordre) pour une campagne NEUVE de cette nature.
+    """(options, policy, order) for a NEW campaign of this kind.
 
-    Trois couches, dans cet ordre : ce que le produit livre, puis les
-    réglages généraux (relances), puis le réglage propre à CETTE nature.
-    Demandé par le propriétaire le 02/08/2026 : « les options de comportement
-    doivent être dans les réglages pour les valeurs par défaut selon le type
-    de campagne ».
+    Three layers, in this order: what the product ships, then the general
+    settings (follow-ups), then the setting specific to THIS kind. Requested by
+    the owner on 02/08/2026: `the behaviour options must be in the settings for
+    the default values according to the campaign type`.
 
-    `socle` : les options déjà calculées par l'appelant. Il n'est jamais
-    modifié — on rend une copie. Quand il manque, les réglages généraux de
-    relance sont lus ICI : sans cela, l'écran des Réglages affichait un
-    délai et un plafond VIDES tant qu'on n'avait rien enregistré, alors que
-    le formulaire de campagne, lui, arrivait rempli. Constaté à l'écran par
-    le propriétaire le 02/08/2026 — deux écrans, deux vérités, encore.
+    `socle`: the options already computed by the caller. It is never modified —
+    a copy is returned. When it is missing, the general follow-up settings are
+    read HERE: without that, the Settings screen showed an EMPTY delay and
+    ceiling as long as nothing had been saved, while the campaign form arrived
+    filled in. Observed on screen by the owner on 02/08/2026 — two screens, two
+    truths, again.
 
-    ⚠ Ne vaut que pour les campagnes À VENIR : une campagne créée fige ses
-    options dans sa configuration, et changer ce réglage ne les rejoue pas.
+    ⚠ It only applies to FUTURE campaigns: a campaign once created freezes its
+    options in its configuration, and changing this setting does not replay
+    them.
     """
     definition = NATURES[nature]
     options = dict(OPTIONS_LIVREES)
     options.update(relances_generales(preferences))
     options.update(socle or {})
     politique = definition["politique"]
-    # ⚠ AUCUN ORDRE N'EST INVENTÉ ICI. Deux natures en proposent un parce
-    # qu'il va de soi (ancienneté pour un créneau libéré, proximité pour un
-    # rappel) ; les six autres laissent la question ouverte, et l'écran
-    # affiche « — à choisir — ». C'est une décision du propriétaire
-    # (« proposer, pas imposer ») : un réglage de nature peut la trancher,
-    # le produit non.
+    # ⚠ NO ORDER IS INVENTED HERE. Two kinds offer one because it goes without
+    # saying (oldest for a freed slot, nearest for a reminder); the other six
+    # leave the question open, and the screen shows `— to be chosen —`. It is
+    # an owner's decision (`offer, do not impose`): a kind's setting may decide
+    # it, the product may not.
     ordre = definition.get("ordre_defaut")
     regle = preferences.obtenir(cle_comportement(nature))
     if isinstance(regle, dict):
@@ -1253,8 +1187,9 @@ def comportement_regle(nature, preferences, socle=None):
             if cle in regle:
                 options[cle] = bool(regle[cle])
         for cle in DETAILS_RELANCE:
-            # Une chaîne vide vaut « rien de particulier pour cette nature » :
-            # le réglage général s'applique alors, et il est déjà dans le socle.
+            # An empty string means `nothing particular for this kind`: the
+            # general setting then applies, and it is already in the base
+            # layer.
             if str(regle.get(cle, "")).strip():
                 options[cle] = regle[cle]
         if (definition["politique_modifiable"]
@@ -1266,70 +1201,67 @@ def comportement_regle(nature, preferences, socle=None):
 
 
 def gabarit_nature(nature, options=None):
-    """Le texte d'ouverture LIVRÉ AVEC LE PRODUIT, variables comprises.
+    """The opening text SHIPPED WITH THE PRODUCT, variables included.
 
-    C'est le gabarit de la nature, le point de départ que les Réglages
-    proposent de récrire et celui sur lequel on revient quand on annule sa
-    réécriture.
+    It is the kind's template, the starting point the Settings offer to rewrite
+    and the one you come back to when you cancel your rewrite.
 
-    ⚠ Ses segments conditionnels sont TRANCHÉS (avec `options`, celles de la
-    nature) : une mise à plat sans condition affichait les deux branches à
-    la fois, donc des phrases qui se contredisent. Ce qu'on lit ici est ce
-    qui sera dit.
+    ⚠ Its conditional segments are RESOLVED (with `options`, the kind's): a
+    flattening with no condition showed both branches at once, hence sentences
+    contradicting each other. What is read here is what will be said.
     """
     return _segments_retenus(NATURES[nature], {}, options or {})
 
 
 def discours_regle(nature, preferences):
-    """Le texte d'ouverture de cette nature : le vôtre, sinon celui livré.
+    """This kind's opening text: yours, otherwise the shipped one.
 
-    Réglage ajouté le 02/08/2026 à la demande du propriétaire : « dans ce
-    menu nous allons ajouter les éléments de discours de l'IA selon le cas
-    de figure ». Une campagne peut encore le récrire pour elle seule
-    (étape ② en mode avancé) — ce réglage-ci donne le texte de DÉPART,
-    commun à toutes les campagnes de cette nature.
+    A setting added on 02/08/2026 at the owner's request: `in this menu we are
+    going to add the AI's speech elements according to the case`. A campaign
+    can still rewrite it for itself alone (step ② in advanced mode) — this
+    setting gives the STARTING text, common to every campaign of that kind.
 
-    Un réglage vide vaut « celui livré avec le produit » : effacer la zone
-    est donc le moyen de revenir en arrière, et il n'y a rien d'autre à
-    savoir pour y arriver.
+    An empty setting means `the one shipped with the product`: clearing the box
+    is therefore the way to go back, and there is nothing else to know to get
+    there.
     """
     ecrit = (preferences.obtenir(cle_discours(nature)) or "").strip()
     return ecrit or gabarit_nature(nature)
 
 
 def infos_perdues_par_le_texte(nature, infos, preferences, options, mission):
-    """Les informations que le message RETAPÉ à la main ne dit PLUS.
+    """The information the RETYPED message no longer says.
 
-    Rend [(libellé, valeur lisible)] — vide quand le texte n'a pas été retapé,
-    ou quand il dit toujours tout.
+    Returns [(label, readable value)] — empty when the text was not retyped, or
+    when it still says everything.
 
-    ⚠ SON DÉFAUT N° 10 DU 18/08/2026, et c'est le plus sournois de la liste :
-    il remplit un champ, l'écran le montre rempli, la campagne l'enregistre… et
-    l'agent ne le dit jamais. Mesuré : message retapé à l'étape 2, PUIS la
-    raison saisie (« un imprévu dans notre planning »). Elle est bien dans la
-    campagne, elle n'est pas dans le message — donc pas au téléphone. Rien ne
-    le disait.
+    ⚠ HIS DEFECT NO. 10 OF 18/08/2026, and it is the most insidious in the
+    list: he fills in a field, the screen shows it filled in, the campaign
+    saves it… and the agent never says it. Measured: message retyped at step 2,
+    THEN the reason typed in (`an unforeseen event in our schedule`). It is
+    indeed in the campaign, it is not in the message — hence not on the phone.
+    Nothing said so.
 
-    ⚠ ON NE RÉÉCRIT PAS SON TEXTE, ET C'EST LA RÈGLE : « un message récrit à la
-    main doit partir exactement comme il l'a écrit » (voir
-    `construire_consigne`). Y réinjecter la phrase serait pire que le silence —
-    ce serait modifier ce qu'un humain a décidé de dire. On le DIT, il tranche.
+    ⚠ WE DO NOT REWRITE HIS TEXT, AND THAT IS THE RULE: `a message rewritten by
+    hand must go out exactly as he wrote it` (see `construire_consigne`).
+    Reinjecting the sentence into it would be worse than silence — it would be
+    modifying what a human decided to say. We SAY it, he decides.
 
-    LA COMPARAISON EST FAITE AVEC LE TEXTE DE DÉPART, pas avec le gabarit : une
-    information est « perdue » si le texte que RingBack aurait écrit la disait
-    et que le sien ne la dit plus. C'est exact dans les deux cas qui piègent —
-    un discours réglé dans ⚙ Réglages qui prime sur le gabarit livré, et une
-    date, qui ne s'écrit pas dans le message comme elle est stockée (les deux
-    côtés passent par le même rendu).
+    THE COMPARISON IS MADE WITH THE STARTING TEXT, not with the template: a
+    piece of information is `lost` when the text RingBack would have written
+    said it and his no longer does. That is accurate in both trap cases — a
+    speech configured in ⚙ Réglages that takes precedence over the shipped
+    template, and a date, which is not written into the message the way it is
+    stored (both sides go through the same rendering).
     """
-    # ⚠ UNE NATURE RETIRÉE RESTE LISIBLE EN BASE (« personnalisé », retirée le
-    # 03/08/2026) : une campagne d'alors n'a plus de fiche, et il n'y a donc
-    # rien à comparer. On se tait plutôt que de lever une erreur sur un écran
-    # qui ne demandait qu'à s'afficher.
-    # `nature_creable` et non `fiche_nature` : cette dernière rend AUSSI la
-    # fiche des natures retirées, pour que leurs campagnes restent lisibles —
-    # mais on ne peut plus BÂTIR leur message, et c'est justement ce qu'on
-    # compare ici. Le prédicat existe, il dit exactement cela.
+    # ⚠ A REMOVED KIND STAYS READABLE IN THE DATABASE (`personnalisé`, removed
+    # on 03/08/2026): a campaign from then has no record any more, so there is
+    # nothing to compare. We stay silent rather than raise an error on a screen
+    # that only asked to be displayed. `nature_creable` and not `fiche_nature`:
+    # the latter ALSO returns the record of removed kinds, so their campaigns
+    # stay readable — but their message can no longer be BUILT, and that is
+    # precisely what is compared here. The predicate exists, and it says
+    # exactly that.
     if not nature_creable(nature):
         return []
     definition = NATURES[nature]
@@ -1346,34 +1278,31 @@ def infos_perdues_par_le_texte(nature, infos, preferences, options, mission):
 
 
 def construire_mission(nature, infos, preferences, options=None):
-    """Le texte de mission construit depuis le gabarit, les informations
-    de l'étape 2 ET ses options — exactement ce que fait l'aperçu vivant.
+    """The mission text built from the template, the step-2 information AND its
+    options — exactly what the live preview does.
 
-    Les variables d'étape 2 renseignées sont substituées (les dates en
-    français lisible) ; les variables PAR CONTACT ([identite],
-    [rdv_existant]…) restent telles quelles : elles sont remplies à chaque
-    appel. [plage_rappel] vient des réglages, comme partout.
+    The step-2 variables that are filled in are substituted (dates in readable
+    French); the PER-CONTACT variables ([identite], [rdv_existant]…) stay as
+    they are: they are filled at every call. [plage_rappel] comes from the
+    settings, as everywhere.
 
-    Un segment porte au choix :
-    - « si » / « sauf » : la condition est une INFORMATION de l'étape 2 ;
-    - « si_option » / « sauf_option » : la condition est une OPTION de
-      comportement (une case à cocher). C'est ainsi que l'option
-      « proposer une autre date si le contact annule » change réellement ce
-      que l'agent a le droit de dire, au lieu de rester un réglage muet.
+    A segment carries either:
+    - `si` / `sauf`: the condition is a step-2 INFORMATION;
+    - `si_option` / `sauf_option`: the condition is a behaviour OPTION (a checkbox). That is how the option `offer another date if the contact cancels` really changes what the agent is allowed to say, instead of staying a mute setting.
     """
     definition = NATURES[nature]
     options = options or {}
     types = {info["code"]: info["type"] for info in definition["infos"]}
-    # LE DISCOURS RÉGLÉ PRIME sur le gabarit livré. Il est pris tel quel :
-    # un texte écrit à la main n'a pas de segments conditionnels, donc pas de
-    # phrase à faire tomber ici — celles dont une variable reste vide sont
-    # retirées plus tard, au moment de l'appel (_sans_phrases_incompletes).
+    # THE CONFIGURED SPEECH TAKES PRECEDENCE over the shipped template. It is
+    # taken as it stands: a text written by hand has no conditional segments,
+    # hence no sentence to drop here — those whose variable stays empty are
+    # removed later, at call time (_sans_phrases_incompletes).
     regle = (preferences.obtenir(cle_discours(nature)) or "").strip()
     if regle:
-        # ⚠ UN DISCOURS RÉGLÉ À LA MAIN N'EST JAMAIS TRADUIT. C'est l'exacte
-        # même règle que pour un message de campagne récrit : le texte
-        # appartient à celui qui l'a écrit, et le traduire ferait dire au
-        # téléphone une phrase que personne n'a relue.
+        # ⚠ A SPEECH CONFIGURED BY HAND IS NEVER TRANSLATED. It is the exact
+        # same rule as for a rewritten campaign message: the text belongs to
+        # whoever wrote it, and translating it would have a sentence nobody
+        # proof-read spoken on the phone.
         return _remplir(regle, infos, types, preferences)
     return _remplir(
         _segments_retenus(definition, infos, options,
@@ -1383,18 +1312,19 @@ def construire_mission(nature, infos, preferences, options=None):
 
 
 def _segments_retenus(definition, infos, options, dire=None):
-    """Le texte du gabarit, ses segments conditionnels TRANCHÉS.
+    """The template's text, with its conditional segments RESOLVED.
 
-    Deux segments qui s'excluent (« si raison » / « sauf raison ») ne
-    doivent jamais sortir ensemble : mis à plat sans condition, ils
-    donnaient « En raison de …, nous Nous devons déplacer », et deux
-    phrases contradictoires à la suite dans le rappel de rendez-vous.
-    Constaté par le propriétaire le 02/08/2026 dans l'aperçu des Réglages.
+    Two segments that exclude each other (`si raison` / `sauf raison`) must
+    never come out together: flattened with no condition, they gave `En raison
+    de …, nous Nous devons déplacer`, and two contradictory sentences in a row
+    in the appointment reminder. Observed by the owner on 02/08/2026 in the
+    Settings preview.
     """
-    # ⚠ ON TRADUIT SEGMENT PAR SEGMENT, AVANT DE LES COLLER. Traduire la
-    # phrase assemblée serait impossible : elle dépend des conditions, donc
-    # des informations d'étape 2 et des options — des milliers de
-    # combinaisons. Les segments, eux, sont en nombre fini et écrits une fois.
+    # ⚠ WE TRANSLATE SEGMENT BY SEGMENT, BEFORE GLUING THEM. Translating the
+    # assembled sentence would be impossible: it depends on the conditions,
+    # hence on the step-2 information and the options — thousands of
+    # combinations. The segments, on the other hand, are finite in number and
+    # written once.
     dire = dire or (lambda texte: texte)
     morceaux = []
     for segment in definition["gabarit"]:
@@ -1407,32 +1337,30 @@ def _segments_retenus(definition, infos, options, dire=None):
 
 
 def _segment_retenu(segment, infos, options):
-    """Ce segment du gabarit entre-t-il dans le message ? (conditions ET)
+    """Does this template segment enter the message? (AND conditions)
 
-    ⚠ UN SEGMENT PEUT EN PORTER DEUX DEPUIS LE 31/08/2026, et il le fallait.
-    Le moteur en lisait UNE SEULE : si un segment portait « si_option », sa
-    condition d'INFORMATION était ignorée. Deux dénouements l'ont montré :
+    ⚠ A SEGMENT MAY CARRY TWO SINCE 31/08/2026, and it had to. The engine read
+    only ONE: if a segment carried `si_option`, its INFORMATION condition was
+    ignored. Two endings showed it:
 
-    · 30/08 — sur une confirmation dont les places libres étaient vides, la
-      phrase qui les proposait tombait (elle portait la variable) et la
-      SUIVANTE restait : « … merci de me confirmer votre présence. Si aucune
-      ne vous convient, j'annule votre rendez-vous. » « Aucune » ne renvoyait
-      plus à rien ;
-    · 31/08 — en retirant la liste de l'ouverture (sa demande), la phrase ne
-      portait plus de variable : elle ne pouvait donc plus tomber, et l'agent
-      promettait « je peux vous proposer une autre date » avec ZÉRO place en
-      magasin.
+    · 30/08 — on a confirmation whose free slots were empty, the sentence
+    offering them dropped out (it carried the variable) and the NEXT one
+    stayed: `… please confirm your attendance. If none suits you, I will cancel
+    your appointment.` `None` no longer referred to anything; · 31/08 — on
+    removing the list from the opening (his request), the sentence no longer
+    carried a variable: it could therefore no longer drop out, and the agent
+    promised `I can offer you another date` with ZERO slots in stock.
 
-    Les deux se règlent d'un coup : le segment déclare SES conditions, toutes
-    doivent être vraies. C'est déjà la grammaire de `_fait_retenu`, du côté
-    des faits — les deux moitiés de la consigne se lisent maintenant pareil.
+    Both are settled at once: the segment declares ITS conditions, and all must
+    be true. That is already `_fait_retenu`'s grammar, on the facts side — the
+    two halves of the briefing now read the same way.
     """
     if segment.get("si_option") and not options.get(segment["si_option"]):
         return False
     if segment.get("sauf_option") and options.get(segment["sauf_option"]):
         return False
-    # « non » d'un choix oui/non compte comme NON rempli (sinon la phrase
-    # conditionnelle apparaîtrait justement quand on l'a refusée).
+    # A `no` in a yes/no choice counts as NOT filled in (otherwise the
+    # conditional sentence would appear precisely when it had been refused).
     def rempli(code):
         valeur = (infos.get(code) or "").strip()
         return bool(valeur) and valeur != "non"
@@ -1444,33 +1372,31 @@ def _segment_retenu(segment, infos, options):
     return True
 
 
-# ⚠ L'ÉLISION — son défaut n° 11 du 18/08/2026. Relevé mot pour mot dans une
-# transcription : « **En raison de un imprévu** dans notre planning ». Le
-# gabarit écrit « de [raison] » et la valeur commence par une voyelle : la
-# substitution posait les deux bout à bout. C'est un texte qu'un agent LIT à
-# voix haute — une faute de liaison s'entend.
-#
-# LES QUATRE MOTS QUI S'ÉLIDENT ICI, et pas un de plus : ce sont ceux qui
-# précèdent une variable dans les gabarits livrés ou dans un discours écrit à
-# la main. Un mot absent de cette table n'est simplement pas élidé — on ne
-# devine pas la grammaire d'une phrase qu'on n'a pas écrite.
+# ⚠ ELISION — his defect no. 11 of 18/08/2026. Noted word for word in a
+# transcript: `**En raison de un imprévu** dans notre planning`. The template
+# writes `de [raison]` and the value starts with a vowel: the substitution put
+# the two end to end. It is a text an agent READS out loud — a liaison mistake
+# is heard.  THE FOUR WORDS THAT ELIDE HERE, and not one more: they are the
+# ones preceding a variable in the shipped templates or in a speech written by
+# hand. A word absent from this table is simply not elided — we do not guess
+# the grammar of a sentence we did not write.
 _ELIDABLES = {"de": "d'", "que": "qu'", "le": "l'", "la": "l'"}
 
-# ⚠ LE « h » EN EST EXCLU, VOLONTAIREMENT. Le français a deux h : le muet
-# (« d'homme ») et l'aspiré (« de haricot »), et rien dans une valeur saisie ne
-# dit lequel. Élider au hasard ferait dire « d'haricot » une fois sur deux ;
-# ne pas élider laisse « de homme », qui se remarque mais ne choque pas autant.
-# Devant l'incertitude, on ne devine pas.
+# ⚠ `h` IS DELIBERATELY EXCLUDED. French has two h: the mute one (`d'homme`)
+# and the aspirated one (`de haricot`), and nothing in a typed value says
+# which. Eliding at random would say `d'haricot` half the time; not eliding
+# leaves `de homme`, which is noticeable but not as jarring. Faced with
+# uncertainty, we do not guess.
 _VOYELLES = "aàâäeéèêëiîïoôöuùûü"
 
 
 def _elider(texte, code, valeur):
-    """Substitue [code] par sa valeur, en élidant le mot qui précède s'il le faut.
+    """Substitutes [code] with its value, eliding the preceding word when needed.
 
-    ⚠ SANS EXPRESSION RÉGULIÈRE, ET C'EST PLUS SÛR ICI. Le mot cherché doit
-    être un mot ENTIER : « grande [raison] » ne doit pas devenir
-    « grand'un imprévu ». La borne à gauche est donc l'espace, ou le début du
-    texte — deux cas nommés, qu'on relit sans décoder.
+    ⚠ WITHOUT A REGULAR EXPRESSION, AND THAT IS SAFER HERE. The word sought
+    must be a WHOLE word: `grande [raison]` must not become `grand'un imprévu`.
+    The left boundary is therefore a space, or the start of the text — two
+    named cases, readable without decoding.
     """
     if valeur and valeur[0].lower() in _VOYELLES:
         for mot, forme in _ELIDABLES.items():
@@ -1484,10 +1410,10 @@ def _elider(texte, code, valeur):
 
 
 def _remplir(texte, infos, types, preferences):
-    """Remplace les [variables] d'étape ② par leur valeur, dates lisibles.
+    """Replaces the step-② [variables] with their value, dates readable.
 
-    Les variables PAR CONTACT restent en crochets : elles sont remplies à
-    l'appel, contact par contact.
+    The PER-CONTACT variables stay in brackets: they are filled at call time,
+    contact by contact.
     """
     code_langue = mod_langue.de_preferences(preferences)
     for code, valeur in infos.items():
@@ -1505,10 +1431,10 @@ _VARIABLE = re.compile(r"\[[^\]\n]+\]")
 
 
 def _sans_phrases_incompletes(texte):
-    """Retire les phrases où une variable est restée sans valeur.
+    """Removes the sentences where a variable was left with no value.
 
-    Appliqué au moment de l'appel : l'agent ne lit jamais un [crochet] vide
-    (un champ facultatif non rempli fait simplement tomber sa phrase).
+    Applied at call time: the agent never reads an empty [bracket] (an optional
+    field left unfilled simply drops its sentence).
     """
     gardees = [phrase for phrase in _PHRASES.findall(texte)
                if not _VARIABLE.search(phrase)]
@@ -1517,11 +1443,11 @@ def _sans_phrases_incompletes(texte):
 
 
 def finaliser_mission(mission, contact, champs, langue_code="fr"):
-    """Substitue [identite] et les champs du contact — appelé PAR APPEL.
+    """Substitutes [identite] and the contact's fields — called PER CALL.
 
-    champs : les définitions de colonnes de la campagne (pour connaître le
-    type de chaque champ). Jamais de numéro de téléphone dans le texte :
-    la colonne « telephone » n'est volontairement PAS substituée.
+    champs: the campaign's column definitions (so each field's type is known).
+    Never a phone number in the text: the `telephone` column is deliberately
+    NOT substituted.
     """
     texte = mission.replace("[identite]", contact["nom"])
     valeurs = champs_contact(contact)
@@ -1536,42 +1462,40 @@ def finaliser_mission(mission, contact, champs, langue_code="fr"):
     return _sans_phrases_incompletes(texte)
 
 
-# ------------------------------------------------- la consigne en 3 parties
-# Ce que le gabarit produit est la PRÉSENTATION — le seul passage dit mot
-# pour mot. Autour d'elle, la consigne porte l'OBJECTIF, les FAITS UTILES,
-# les CONTRAINTES et les TROIS ISSUES fermées : voir le module consigne, et
-# la décision du propriétaire citée en tête de ce fichier-là.
-#
-# Les faits utiles ne sont écrits nulle part deux fois : ils sont dérivés des
-# informations de l'étape 2 et des colonnes de contact déjà déclarées dans
-# NATURES. Ajouter une information à une nature l'ajoute donc du même coup à
-# ce que l'agent sait — impossible de les laisser diverger.
+# ------------------------------------------------- the three-part briefing
+# What the template produces is the OPENING — the only passage spoken word for
+# word. Around it, the briefing carries the OBJECTIVE, the USEFUL FACTS, the
+# CONSTRAINTS and the THREE closed OUTCOMES: see the consigne module, and the
+# owner's decision quoted at the top of that file.  The useful facts are
+# written nowhere twice: they are derived from the step-2 information and the
+# contact columns already declared in NATURES. Adding a piece of information to
+# a kind therefore adds it at the same time to what the agent knows — they
+# cannot be left to diverge.
 _PARENTHESES = re.compile(r"\s*\([^)]*\)")
 
 
 def _libelle_court(libelle):
-    """« Rendez-vous existant (date + heure) » devient « Rendez-vous existant ».
+    """`Rendez-vous existant (date + heure)` becomes `Rendez-vous existant`.
 
-    Les parenthèses d'un formulaire aident à REMPLIR le champ ; dictées à
-    l'agent, elles ne feraient que l'encombrer.
+    A form's brackets help to FILL IN the field; dictated to the agent, they
+    would only clutter it.
     """
     return " ".join(_PARENTHESES.sub("", libelle or "").split()).strip(" :⛔")
 
 
 def faits_segments(nature, champs=None):
-    """Les lignes de « ce que tu sais », en segments conditionnels.
+    """The lines of `what you know`, as conditional segments.
 
-    Même grammaire que le gabarit : un segment est un texte, ou un
-    dictionnaire {"texte", "si" / "si_valeur" / "si_option"}. Les conditions
-    se cumulent (ET), exactement comme l'aperçu vivant les évalue.
+    The same grammar as the template: a segment is a text, or a dictionary
+    {"texte", "si" / "si_valeur" / "si_option"}. The conditions accumulate
+    (AND), exactly as the live preview evaluates them.
 
-    - « si »        : l'information est renseignée (« non » compte pour vide) ;
-    - « si_valeur » : l'information porte une valeur, « non » compris — c'est
-      le cas des choix oui/non, dont le « non » est lui-même un fait ;
-    - « si_option » : la case à cocher correspondante est cochée.
+    - `si`        : the information is filled in (`no` counts as empty);
+    - `si_valeur` : the information carries a value, `no` included — that is the case of yes/no choices, whose `no` is itself a fact;
+    - `si_option` : the corresponding checkbox is ticked.
 
-    Le TÉLÉPHONE n'entre jamais dans cette liste : c'est la règle du
-    produit, et elle est vérifiée par les essais.
+    The PHONE never enters this list: that is the product's rule, and it is
+    checked by the tests.
     """
     definition = NATURES[nature]
     lignes = [{"texte": "Personne appelée : [identite]."}]
@@ -1581,8 +1505,8 @@ def faits_segments(nature, champs=None):
         if info["type"] == "oui_non":
             segment["si_valeur"] = info["code"]
         elif not info["obligatoire"]:
-            # Une information facultative laissée vide ne devient pas une
-            # ligne rouge : elle disparaît, comme sa phrase dans le message.
+            # An optional piece of information left empty does not become a red
+            # line: it disappears, like its sentence in the message.
             segment["si"] = info["code"]
         if info.get("sous_option"):
             segment["si_option"] = info["sous_option"]
@@ -1597,7 +1521,7 @@ def faits_segments(nature, champs=None):
 
 
 def _fait_retenu(segment, infos, options):
-    """Ce segment de faits entre-t-il dans la consigne ? (conditions ET)."""
+    """Does this fact segment enter the briefing? (AND conditions)."""
     if segment.get("si_option") and not options.get(segment["si_option"]):
         return False
     brut = (infos.get(segment.get("si_valeur")) or "").strip()
@@ -1610,11 +1534,11 @@ def _fait_retenu(segment, infos, options):
 
 
 def _mot_place(preferences):
-    """« place » ou « slot », selon la langue — l'énumération des places.
+    """`place` or `slot`, according to the language — the slot enumeration.
 
-    Une ligne à part parce qu'elle est fabriquée AU MILIEU d'un assemblage :
-    « place 1 — lundi… ; place 2 — mardi… ». Le mot seul ne peut pas vivre
-    dans le dictionnaire des phrases, il n'en est pas une.
+    A line of its own because it is built IN THE MIDDLE of an assembly: `slot 1
+    — Monday…; slot 2 — Tuesday…`. The word alone cannot live in the sentence
+    dictionary, it is not one.
     """
     return mod_langue.traducteur(
         mod_langue.de_preferences(preferences))("place")
@@ -1622,20 +1546,20 @@ def _mot_place(preferences):
 
 def construire_consigne(nature, infos, preferences, options=None, champs=None,
                         presentation=None, genre=None, places=()):
-    """LA CONSIGNE de l'étape 2 — les trois parties, telles qu'elles partiront.
+    """THE step-2 BRIEFING — the three parts, as they will go out.
 
-    presentation : le message d'ouverture ; par défaut celui du gabarit,
-    mais l'appelant passe le texte RÉCRIT À LA MAIN quand il y en a un —
-    c'est lui qui part alors, mot pour mot, sans être retouché.
+    presentation: the opening message; by default the template's, but the
+    caller passes the text REWRITTEN BY HAND when there is one — it is that one
+    which then goes out, word for word, untouched.
 
-    Les variables PAR CONTACT ([identite], [rdv_existant]…) restent en place :
-    c'est ce qui permet à l'aperçu de montrer où elles seront remplies, et à
-    finaliser_consigne de les remplir au moment de l'appel.
+    The PER-CONTACT variables ([identite], [rdv_existant]…) stay in place: that
+    is what lets the preview show where they will be filled, and
+    finaliser_consigne fill them at call time.
 
-    places : les places qu'UN MÊME APPEL énumère, quand il y en a plus d'une.
-    Elles entrent ici — dans le chemin partagé — et pas chez l'appelant :
-    sinon l'aperçu de l'étape 2 tairait la seule ligne qui change, et
-    l'opérateur ne verrait pas que son appel en propose trois.
+    places: the slots ONE SINGLE CALL enumerates, when there is more than one.
+    They enter here — in the shared path — and not at the caller's: otherwise
+    step 2's preview would keep quiet about the one line that changes, and the
+    operator would not see that their call offers three.
     """
     definition = NATURES[nature]
     options = options or {}
@@ -1646,9 +1570,9 @@ def construire_consigne(nature, infos, preferences, options=None, champs=None,
     genre_nature = definition.get("genre", consigne.GENRE_CLASSIQUE)
     if genre is None:
         genre = genre_nature
-    # Le schéma de résultat décide du champ à renseigner : si l'appel ne
-    # part pas avec le schéma de cette nature, on ne peut plus lui dicter ses
-    # codes — on retombe sur les issues générales, qui sont valables partout.
+    # The result schema decides which field to fill: when the call does not go
+    # out with this kind's schema, its codes can no longer be dictated to it —
+    # we fall back on the general outcomes, which are valid everywhere.
     issues = (definition["issues"] if genre == genre_nature
               else (consigne.ISSUES_DEFAUT_CASCADE
                     if genre == consigne.GENRE_CASCADE
@@ -1667,14 +1591,13 @@ def construire_consigne(nature, infos, preferences, options=None, champs=None,
                                     code_langue))
         return texte
 
-    # ⚠ PLUSIEURS PLACES DANS LE MÊME APPEL (03/08/2026). On les NUMÉROTE
-    # dans les faits — c'est du texte libre, le contrat de l'API n'y touche
-    # pas — et l'on dicte à l'agent d'écrire dans « new_datetime » celle qui
-    # a été retenue : c'est le SEUL canal par lequel une date revient.
-    #
-    # ⚠ CASCADE SEULEMENT. Sur le genre classique, une date sur « confirmed »
-    # est encore refusée par le contrôle de la réponse : dicter cela
-    # reviendrait à demander à l'agent une réponse que le produit rejette.
+    # ⚠ SEVERAL SLOTS IN THE SAME CALL (03/08/2026). We NUMBER them in the
+    # facts — it is free text, the API's contract does not touch it — and we
+    # dictate to the agent to write into `new_datetime` the one that was
+    # chosen: it is the ONLY channel through which a date comes back.  ⚠
+    # CASCADE ONLY. On the classic genre, a date on `confirmed` is still
+    # refused by the answer check: dictating that would mean asking the agent
+    # for an answer the product rejects.
     places = [place for place in (places or []) if place]
     if genre == consigne.GENRE_CASCADE and len(places) > 1:
         faits = faits + [
@@ -1692,30 +1615,31 @@ def construire_consigne(nature, infos, preferences, options=None, champs=None,
                              quand="la personne retient UNE des places "
                                    "proposées",
                              date="obligatoire")
-    # ⚠ LA LANGUE SE LIT DANS LES RÉGLAGES, ICI. Elle n'est pas passée en
-    # paramètre : ce serait la faire traverser toute la chaîne d'appels (le
-    # serveur, la file, les relances, la cascade) pour une valeur GLOBALE à
-    # l'installation. `preferences` est déjà là, et c'est elle qui la porte.
+    # ⚠ THE LANGUAGE IS READ FROM THE SETTINGS, HERE. It is not passed as a
+    # parameter: that would mean carrying it through the whole call chain (the
+    # server, the queue, the follow-ups, the cascade) for a value that is
+    # GLOBAL to the installation. `preferences` is already there, and it is
+    # what carries it.
     code_langue = mod_langue.de_preferences(preferences)
     dire = mod_langue.traducteur(code_langue)
     plage = themes.plage_lisible(preferences, code_langue)
-    # ⚠ ET LE REPLI EST TRADUIT ICI AUSSI. Les contraintes et la conduite sont
-    # substituées AVANT `Consigne.texte()` : corriger le repli là-bas ne
-    # suffisait pas, « l'établissement » était déjà écrit dans les lignes.
-    # Deux endroits substituent, les deux doivent connaître la langue.
+    # ⚠ AND THE FALLBACK IS TRANSLATED HERE TOO. The constraints and the
+    # conduct are substituted BEFORE `Consigne.texte()`: fixing the fallback
+    # over there was not enough, `l'établissement` was already written into the
+    # lines. Two places substitute, and both must know the language.
     entreprise = (infos.get("entreprise")
                   or preferences.obtenir(themes.CLE_ENTREPRISE)
                   or dire(consigne.ENTREPRISE_INCONNUE))
     cadre = [consigne.substituer_cadre(dire(ligne), entreprise, plage)
              for ligne in consigne.CONTRAINTES]
-    # ⚠ LA CONDUITE PASSE PAR `substituer_cadre` COMME LES CONTRAINTES : elle
-    # nomme [entreprise] dans sa phrase de sortie (« une personne de … va vous
-    # rappeler »). Sans cela, le client entendrait le mot « entreprise ».
+    # ⚠ THE CONDUCT GOES THROUGH `substituer_cadre` LIKE THE CONSTRAINTS: it
+    # names [entreprise] in its closing sentence (`somebody from … will call
+    # you back`). Without that, the client would hear the word `entreprise`.
     conduite = [consigne.substituer_cadre(substituer(dire(ligne)),
                                           entreprise, plage)
                 for ligne in definition.get("conduite", ())]
-    # Les issues portent une phrase lisible (« quand ») : c'est elle qui est
-    # dite, le code à côté ne l'est pas.
+    # The outcomes carry a readable sentence (`quand`): it is that which is
+    # spoken, the code beside it is not.
     issues = {cle: dict(fixee, quand=dire(fixee["quand"]))
               for cle, fixee in issues.items()}
     return consigne.Consigne(
@@ -1730,11 +1654,10 @@ def construire_consigne(nature, infos, preferences, options=None, champs=None,
 
 def finaliser_consigne(cadre, contact, champs, presentation=None,
                        langue_code="fr"):
-    """Remplit les variables DE CE CONTACT — appelée par appel, comme la mission.
+    """Fills in THIS CONTACT's variables — called per call, like the mission.
 
-    Le numéro de téléphone n'est volontairement PAS substitué : il ne figure
-    dans aucune ligne, et il ne doit apparaître nulle part dans ce qui est
-    dicté à l'agent.
+    The phone number is deliberately NOT substituted: it appears in no line,
+    and it must appear nowhere in what is dictated to the agent.
     """
     valeurs = {"identite": contact["nom"]}
     donnees = champs_contact(contact)
@@ -1751,27 +1674,26 @@ def finaliser_consigne(cadre, contact, champs, presentation=None,
     return cadre.substituer(valeurs, presentation=presentation)
 
 
-# Combien de places au plus dans un seul appel. Trois : au 8e essai réel, à
-# qui lui demandait simplement de RÉPÉTER une date, l'agent a répondu « je
-# préfère ne pas vous dire de bêtise » et a raccroché. Énumérer, faire
-# choisir, puis reformuler est plus dur que répéter — on ne lui en demande
-# pas dix.
+# How many slots at most in one single call. Three: on the 8th real test, to
+# somebody simply asking it to REPEAT a date, the agent answered `I'd rather
+# not tell you something wrong` and hung up. Enumerating, having somebody
+# choose, then rephrasing is harder than repeating — we do not ask it for ten.
 PLACES_ANNONCEES_MAX = 3
 
 
 def places_annoncees(campagne, configuration=None):
-    """Les places qu'on fait annoncer dans CET appel — la première d'abord.
+    """The slots we have announced in THIS call — the first one first.
 
-    Une campagne à une seule place n'en annonce qu'une : rien ne change pour
-    elle, et le contrôle de la réponse reste celui d'avant.
+    A campaign with a single slot only announces one: nothing changes for it,
+    and the answer check stays the one from before.
     """
     if configuration is None:
         configuration = configuration_campagne(campagne)
-    # ⚠ UNE PLACE PERDUE N'EST PLUS ANNONCÉE, MÊME SANS LISTE (14/08/2026).
-    # La campagne à une seule place lisait sa colonne `creneau` sans regarder
-    # ce qu'était devenue cette place : une fois prise ailleurs, elle
-    # continuait d'être proposée à tout le monde. Voir
-    # `_perdre_la_place_si_prise` — vingt-quatre refus d'affilée, mesurés.
+    # ⚠ A LOST SLOT IS NO LONGER ANNOUNCED, EVEN WITH NO LIST (14/08/2026). The
+    # single-slot campaign read its `creneau` column without looking at what
+    # had become of that slot: once taken elsewhere, it went on being offered
+    # to everybody. See `_perdre_la_place_si_prise` — twenty-four refusals in a
+    # row, measured.
     restantes = [f["horaire"] for f in creneaux_de(campagne, configuration)
                  if f.get("statut") == CRENEAU_A_POURVOIR]
     if not configuration.get("liste_de_places"):
@@ -1780,11 +1702,11 @@ def places_annoncees(campagne, configuration=None):
 
 
 def places_du_brouillon(brouillon):
-    """Les places que l'étape 2 fera annoncer — pour que l'aperçu les montre.
+    """The slots step 2 will have announced — so the preview shows them.
 
-    ⚠ LA CAMPAGNE N'EXISTE PAS ENCORE à l'étape 2 : la liste vit dans le
-    brouillon, et `places_annoncees` ne sait lire qu'une campagne. Sans cette
-    lecture-ci, l'aperçu aurait tu la seule ligne que le lot 9 ajoute.
+    ⚠ THE CAMPAIGN DOES NOT EXIST YET at step 2: the list lives in the draft,
+    and `places_annoncees` can only read a campaign. Without this reading, the
+    preview would have kept quiet about the one line batch 9 adds.
     """
     liste = normaliser_creneaux(brouillon.get("creneaux") or [])
     libres = [fiche["horaire"] for fiche in liste
@@ -1793,16 +1715,15 @@ def places_du_brouillon(brouillon):
 
 
 def place_retenue(resultat, annoncees, creneau_courant):
-    """La place que la personne a prise — ou None si rien n'est exploitable.
+    """The slot the person took — or None when nothing is usable.
 
-    ⚠ UNE DATE RENDUE DOIT FIGURER PARMI CELLES ANNONCÉES. Ce contrôle
-    n'existait nulle part : sans lui, une date inventée ou mal comprise au
-    téléphone serait réservée telle quelle. Quand la date ne correspond à
-    rien, on ne devine pas — l'appelant traitera cela comme un refus de
-    date, et un humain rappellera.
+    ⚠ A DATE RETURNED MUST BE AMONG THOSE ANNOUNCED. That check existed
+    nowhere: without it, a date invented or misheard on the phone would be
+    booked as it stands. When the date matches nothing, we do not guess — the
+    caller will treat it as a date refusal, and a human will call back.
 
-    Sans date rendue, c'est la place en cours : c'est le comportement
-    d'avant, et il reste juste tant qu'une seule place est annoncée.
+    With no date returned, it is the current slot: that is the previous
+    behaviour, and it stays right as long as only one slot is announced.
     """
     brut = (resultat or {}).get("new_datetime")
     if not brut:
@@ -1814,28 +1735,28 @@ def place_retenue(resultat, annoncees, creneau_courant):
 
 
 def infos_sur_la_place_en_cours(campagne, configuration):
-    """Les informations d'étape 2, avec le créneau de la place EN COURS.
+    """The step-2 information, with the CURRENT slot's time.
 
-    ⚠ LA COLONNE FAIT FOI, PAS LA CONFIGURATION (01/09/2026). Une campagne à
-    liste de places avance de place en place : `campagnes.creneau` suit le
-    curseur — c'est écrit noir sur blanc dans `db.definir_creneau_campagne` —
-    tandis que les informations d'étape 2 sont écrites une fois pour toutes à
-    la création. Quand les deux divergent, la consigne annonce DEUX dates pour
-    une seule place : la présentation dit l'une, « ce que tu sais » dit
-    l'autre.
+    ⚠ THE COLUMN IS THE REFERENCE, NOT THE CONFIGURATION (01/09/2026). A
+    campaign with a list of slots advances slot by slot: `campagnes.creneau`
+    follows the cursor — it is written in black and white in
+    `db.definir_creneau_campagne` — while the step-2 information is written
+    once and for all at creation. When the two diverge, the briefing announces
+    TWO dates for one slot: the opening says one, `what you know` says the
+    other.
 
-    CE QUE ÇA A DONNÉ, sur sa campagne n°133 (01/09/2026) : le premier contact
-    prend la place, la campagne avance sur la suivante, et CALL-E refuse
-    l'appel suivant par un 422 dont le message est une question :
+    WHAT THAT PRODUCED, on his campaign no. 133 (01/09/2026): the first contact
+    takes the slot, the campaign moves on to the next, and CALL-E refuses the
+    following call with a 422 whose message is a question:
 
-        « Quelle est la bonne date du créneau libéré à proposer à madame
-          Émilie Aubry ? »
+    `What is the correct date of the freed slot to offer Mrs Émilie Aubry?`
 
-    ⚠ DEUX VERROUS PLUTÔT QU'UN, ET C'EST VOULU. `avancer_sur_la_place_suivante`
-    écrit désormais la configuration recalée — c'est la correction de fond.
-    Celui-ci ferme au point de LECTURE : il répare aussi les campagnes DÉJÀ
-    enregistrées de travers, sans toucher à leurs données. Une campagne
-    interrompue par ce défaut repart donc juste, sans qu'on ait à la refaire.
+    ⚠ TWO LOCKS RATHER THAN ONE, AND THAT IS INTENDED.
+    `avancer_sur_la_place_suivante` now writes the realigned configuration —
+    that is the underlying fix. This one closes at the READING point: it also
+    repairs the campaigns ALREADY saved wrongly, without touching their data. A
+    campaign interrupted by that defect therefore starts again correctly,
+    without having to be redone.
     """
     infos = dict(configuration.get("infos") or {})
     code = INFO_CRENEAU_PAR_NATURE.get((campagne or {}).get("nature"))
@@ -1847,16 +1768,15 @@ def infos_sur_la_place_en_cours(campagne, configuration):
 
 def consigne_de_l_appel(base, preferences, campagne, configuration, contact,
                         mission, en_cascade, adaptee=None):
-    """LA CONSIGNE EXACTE qui part pour CE contact — rien de plus, rien de moins.
+    """THE EXACT BRIEFING that goes out for THIS contact — no more, no less.
 
-    Un seul chemin : l'aperçu de l'étape 2, l'appel réel et les essais
-    passent tous par construire_consigne. Ce qui est montré est donc ce qui
-    part.
+    One single path: step 2's preview, the real call and the tests all go
+    through construire_consigne. What is shown is therefore what goes out.
 
-    mission : le message d'ouverture DÉJÀ finalisé par l'appelant (variables
-    du contact remplacées, créneaux recalculés à l'instant de l'appel) — les
-    lignes de faits reçoivent ici le même traitement, pour qu'elles ne
-    puissent pas annoncer une place que le message n'annonce plus.
+    mission: the opening message ALREADY finalised by the caller (contact
+    variables replaced, slots recomputed at the instant of the call) — the fact
+    lines receive the same treatment here, so they cannot announce a slot the
+    message no longer announces.
     """
     champs = champs_campagne(configuration)
     genre = (consigne.GENRE_CASCADE if en_cascade
@@ -1880,7 +1800,7 @@ def consigne_de_l_appel(base, preferences, campagne, configuration, contact,
 
 
 def champs_contact(contact):
-    """Les valeurs de champs d'un contact de campagne (colonne JSON)."""
+    """The field values of a campaign contact (a JSON column)."""
     brut = contact.get("champs")
     if not brut:
         return {}
@@ -1893,13 +1813,13 @@ def champs_contact(contact):
     return valeurs if isinstance(valeurs, dict) else {}
 
 
-# --------------------------------------------- remplissage de la grille
+# --------------------------------------------- filling the grid
 def format_collage(champs):
-    """Le format attendu d'une ligne collée, colonnes facultatives comprises.
+    """The expected format of a pasted row, optional columns included.
 
-    « Nom;Téléphone;Rendez-vous existant ⛔;Motif ⛔;Numéro de dossier
-    (facultatif) » — sert à la fois d'aide à l'écran ET de message d'erreur :
-    on dit toujours ce qui était attendu, pas seulement ce qui cloche.
+    `Nom;Téléphone;Rendez-vous existant ⛔;Motif ⛔;Numéro de dossier
+    (facultatif)` — it serves both as on-screen help AND as an error message:
+    we always say what was expected, not only what is wrong.
     """
     colonnes = [c for c in champs if c["code"] not in ("identite", "telephone")]
     morceaux = ["Nom", "Téléphone"]
@@ -1910,16 +1830,16 @@ def format_collage(champs):
 
 
 def exemple_collage(champs):
-    """Une ligne d'EXEMPLE au format attendu — repère, jamais une donnée.
+    """An EXAMPLE row in the expected format — a landmark, never data.
 
-    Affichée en filigrane dans la zone de collage (elle n'est pas envoyée :
-    un exemple pré-rempli créerait un faux contact au premier clic).
+    Shown as a watermark in the paste area (it is not submitted: a pre-filled
+    example would create a fake contact at the first click).
     """
     colonnes = [c for c in champs if c["code"] not in ("identite", "telephone")]
-    # Numéro d'exemple pris dans une racine que l'Arcep réserve à la fiction
-    # (06 39 98 …) : il ne peut appartenir à personne, et il reste distinct
-    # des numéros d'essai du produit. Un numéro « plausible » serait pris pour
-    # une vraie fuite par le contrôle de publication — à juste titre.
+    # An example number taken from a root Arcep reserves for fiction (06 39 98
+    # …): it can belong to nobody, and it stays distinct from the product's
+    # test numbers. A `plausible` number would be taken for a genuine leak by
+    # the publication check — rightly so.
     morceaux = ["Mme Dupont Martine", "+33 6 39 98 12 34"]
     for colonne in colonnes:
         if colonne["type"] == "date":
@@ -1930,24 +1850,23 @@ def exemple_collage(champs):
 
 
 def analyser_collage(texte, champs, telephones_connus=(), numero_essai=""):
-    """Analyse un collage multi-colonnes « Nom;Téléphone[;champs…] ».
+    """Parses a multi-column paste `Nom;Téléphone[;fields…]`.
 
-    champs : les colonnes de la campagne (l'ordre du collage = l'ordre des
-    colonnes après Identité et Téléphone). Réutilise les validateurs de
-    saisie.py — mêmes erreurs françaises ligne à ligne, mêmes séparateurs
-    tolérés (tabulation, point-virgule, virgule), mêmes doublons signalés.
-    Rend (contacts, erreurs, refusees) — contacts = [{"nom", "telephone",
-    "champs"}] et refusees = les lignes du collage qui n'ont RIEN donné,
-    telles quelles : l'écran les réaffiche pour correction, sans réafficher
-    celles déjà entrées dans la grille (sinon elles feraient doublon).
+    champs: the campaign's columns (the paste's order = the columns' order
+    after Identity and Phone). Reuses saisie.py's validators — the same French
+    errors line by line, the same tolerated separators (tab, semicolon, comma),
+    the same duplicates flagged. Returns (contacts, errors, refused) — contacts
+    = [{"nom", "telephone", "champs"}] and refused = the pasted rows that
+    produced NOTHING, as they stand: the screen redisplays them for correction,
+    without redisplaying those already entered into the grid (otherwise they
+    would duplicate).
 
-    numero_essai : le numéro — ou la LISTE des numéros — déclarés par
-    l'opérateur dans ⚙ Réglages comme étant ceux de ses TESTEURS (le sien,
-    celui d'un collègue, d'un ami ; module essai_reel), ou "" / []. Ces
-    numéros-là — et eux seuls — peuvent revenir plusieurs fois, avec des
-    identités différentes : c'est ce qui permet d'éprouver une campagne
-    entière sur des téléphones connus. Le garde-fou reste ENTIER pour tous
-    les autres numéros ; sans numéro déclaré, personne n'est exempté.
+    numero_essai: the number — or the LIST of numbers — the operator declared
+    in ⚙ Réglages as their TESTERS' (their own, a colleague's, a friend's;
+    module essai_reel), or "" / []. Those numbers — and they alone — may come
+    back several times, with different identities: that is what makes it
+    possible to exercise a whole campaign on known phones. The guard stays
+    WHOLE for every other number; with no number declared, nobody is exempt.
     """
     colonnes = [c for c in champs if c["code"] not in ("identite", "telephone")]
     attendu = format_collage(champs)
@@ -1971,9 +1890,9 @@ def analyser_collage(texte, champs, telephones_connus=(), numero_essai=""):
                            f"2 au minimum — attendu « {attendu} ».")
             refusees.append(ligne)
             continue
-        # Colonnes obligatoires absentes : on SIGNALE en disant ce qui était
-        # attendu, mais on garde la ligne — elle se complète dans la grille
-        # (la validation, elle, refusera tant qu'un ⛔ reste vide).
+        # Mandatory columns absent: we FLAG it while saying what was expected,
+        # but we keep the row — it is completed in the grid (validation, for
+        # its part, will refuse as long as a ⛔ stays empty).
         manquantes = [c["libelle"] for c in colonnes[len(morceaux) - 2:]
                       if c["obligatoire"]]
         if manquantes:
@@ -2015,7 +1934,7 @@ def analyser_collage(texte, champs, telephones_connus=(), numero_essai=""):
                                                              numero_essai):
             erreurs.append(f"Ligne {numero} : même numéro que "
                            f"{deja_vus[telephone]} — doublon ignoré.")
-            continue        # doublon : inutile de le faire recorriger
+            continue  # a duplicate: no point having it corrected again
         deja_vus[telephone] = f"la ligne {numero}"
         contacts.append({"nom": nom, "telephone": telephone, "champs": valeurs})
     if not contacts and not erreurs:
@@ -2025,15 +1944,14 @@ def analyser_collage(texte, champs, telephones_connus=(), numero_essai=""):
 
 
 def analyser_csv(octets, champs, telephones_connus=(), numero_essai=""):
-    """Un fichier CSV pour la grille : mêmes colonnes que le collage.
+    """A CSV file for the grid: the same columns as the paste.
 
-    Réutilise le décodage tolérant de saisie.py (UTF-8 puis cp1252) ; une
-    ligne d'en-tête (« nom;telephone… ») est reconnue et sautée. Rend
-    (contacts, erreurs) : les lignes refusées ne sont pas réaffichées ici,
-    le fichier reste sur le disque de l'utilisateur.
+    Reuses saisie.py's tolerant decoding (UTF-8 then cp1252); a header row
+    (`nom;telephone…`) is recognised and skipped. Returns (contacts, errors):
+    refused rows are not redisplayed here, the file stays on the user's disk.
 
-    numero_essai : voir analyser_collage — seul le numéro d'essai déclaré
-    échappe au refus de doublon, tous les autres y restent soumis.
+    numero_essai: see analyser_collage — only the declared test number escapes
+    the duplicate refusal, all the others stay subject to it.
     """
     texte = saisie.decoder_csv(octets)
     lignes = texte.splitlines()
@@ -2049,15 +1967,15 @@ def analyser_csv(octets, champs, telephones_connus=(), numero_essai=""):
 
 
 def contacts_depuis_ics(base, octets, champs, telephones_connus=()):
-    """Un agenda ICS pour la grille — réutilise ics.analyser_ics.
+    """An ICS calendar for the grid — reuses ics.analyser_ics.
 
-    Le titre « Nom — Motif » remplit la colonne motif (si elle existe), la
-    date remplit la colonne rendez-vous existant (si elle existe). Le
-    numéro est cherché d'abord DANS l'agenda lui-même (CONTACT, ATTENDEE
-    en « tel: », DESCRIPTION… — voir l'en-tête de ics.py), puis à défaut
-    chez les clients connus ; sinon le contact reste SANS numéro, listé
-    « à compléter avant validation » — jamais de numéro inventé. Rend
-    (contacts, sans_numero, erreurs).
+    The title `Nom — Motif` fills the reason column (when it exists), the date
+    fills the existing-appointment column (when it exists). The number is
+    looked for first IN the calendar itself (CONTACT, ATTENDEE as `tel:`,
+    DESCRIPTION… — see the header of ics.py), then failing that among the known
+    clients; otherwise the contact stays WITHOUT a number, listed `to be
+    completed before validation` — never an invented number. Returns (contacts,
+    sans_numero, errors).
     """
     from . import ics as module_ics
     evenements, erreurs = module_ics.analyser_ics(saisie.decoder_csv(octets))
@@ -2084,7 +2002,7 @@ def contacts_depuis_ics(base, octets, champs, telephones_connus=()):
 
 
 def libelle_periode(periode):
-    """« semaine 33 — du 10/08 au 16/08 » ou « mardi 11/08 », pour l'écran."""
+    """`semaine 33 — du 10/08 au 16/08` or `mardi 11/08`, for the screen."""
     if not periode or not periode.get("semaine"):
         return "toutes les dates"
     if periode.get("jour"):
@@ -2093,28 +2011,26 @@ def libelle_periode(periode):
     return horaires.libelle_semaine(periode["annee"], periode["semaine"])
 
 
-# ------------- un rendez-vous DÉJÀ CONFIRMÉ n'entre pas dans une confirmation
-# ⚠ SA DEMANDE DU 20/08/2026 : « n'importer que les contacts dont les
-# rendez-vous n'ont pas été confirmés ».
-#
-# Une campagne de confirmation demande « serez-vous présent ? ». Le poser à
-# quelqu'un qui a DÉJÀ répondu, c'est le rappeler pour rien — et cela coûte un
-# appel à chaque fois. Mesuré le 20/08 : il sélectionne une matinée, un des
-# rendez-vous est confirmé, la campagne l'appelle quand même.
-#
-# ⚠ CE N'EST PAS UN REFUS, C'EST UN ÉCART DIT EN CLAIR. Le nombre part avec la
-# liste jusqu'à l'écran : sans cela, il compterait ses rendez-vous et n'en
-# retrouverait pas le compte — exactement le défaut n° 7 du 18/08.
+# ------------- an ALREADY CONFIRMED appointment does not enter a confirmation
+# ⚠ HIS REQUEST OF 20/08/2026: `only import the contacts whose appointments
+# have not been confirmed`.  A confirmation campaign asks `will you be there?`.
+# Asking it of somebody who has ALREADY answered means calling them back for
+# nothing — and it costs a call each time. Measured on 20/08: he selects a
+# morning, one of the appointments is confirmed, the campaign calls them
+# anyway.  ⚠ IT IS NOT A REFUSAL, IT IS AN EXCLUSION STATED IN CLEAR. The
+# number travels with the list all the way to the screen: without that, he
+# would count his appointments and not find the total — exactly defect no. 7 of
+# 18/08.
 def ecarter_les_deja_confirmes(base, nature, contacts):
-    """(gardés, nombre d'écartés) — n'écarte QUE sur une confirmation.
+    """(kept, number set aside) — only sets aside on a confirmation.
 
-    ⚠ UN SEUL ENDROIT, PARCE QU'IL Y A TROIS VOIES D'IMPORT : la plage du
-    planning, le bouton « importer » de l'étape ③ (collage, CSV, agenda, base,
-    états, campagne précédente) et la règle automatique rejouée à chaque place.
-    Trois filtres séparés auraient fini par diverger.
+    ⚠ ONE SINGLE PLACE, BECAUSE THERE ARE THREE IMPORT ROUTES: the schedule
+    range, step ③'s `import` button (paste, CSV, calendar, database, states,
+    previous campaign) and the automatic rule replayed at every slot. Three
+    separate filters would have ended up diverging.
 
-    Un contact sans rendez-vous connu est GARDÉ : on ne devine pas qu'il est
-    confirmé, et l'écarter reviendrait à le perdre en silence.
+    A contact with no known appointment is KEPT: we do not guess that they are
+    confirmed, and setting them aside would amount to losing them in silence.
     """
     if nature != "confirmation":
         return list(contacts), 0
@@ -2129,7 +2045,7 @@ def ecarter_les_deja_confirmes(base, nature, contacts):
 
 
 def phrase_deja_confirmes(ecartes):
-    """La phrase à afficher, ou "" s'il n'y a rien à dire."""
+    """The sentence to display, or "" when there is nothing to say."""
     if not ecartes:
         return ""
     return (f"{ecartes} rendez-vous déjà confirmé(s) écarté(s) — les "
@@ -2138,17 +2054,17 @@ def phrase_deja_confirmes(ecartes):
 
 def contacts_depuis_base(base, source, champs, telephones_connus=(),
                          debut=None, fin=None):
-    """Remplit la grille depuis la base — réutilise les briques existantes.
+    """Fills the grid from the database — reuses the existing building blocks.
 
-    « a_venir » et « manques » passent par campagnes.contacts_depuis_rendezvous
-    (le rendez-vous concerné remplit ses colonnes) ; « annules », « deplaces »
-    et « tous » passent par base.candidats_cascade (comme la génération de
-    liste). Rend (contacts, complements) — complements = messages français.
+    `a_venir` and `manques` go through campagnes.contacts_depuis_rendezvous
+    (the appointment concerned fills its columns); `annules`, `deplaces` and
+    `tous` go through base.candidats_cascade (like the list generation).
+    Returns (contacts, complements) — complements = French messages.
 
-    `debut` / `fin` (texte ISO) bornent la période des RENDEZ-VOUS. Ils ne
-    valent que pour les deux sources qui en ont : « annulés », « déplacés »
-    et « tous les clients » n'ont pas de date à filtrer, et le dire vaut
-    mieux que de les filtrer sur autre chose (02/08/2026).
+    `debut` / `fin` (ISO text) bound the APPOINTMENTS' period. They only apply
+    to the two sources that have one: `annulés`, `déplacés` and `tous les
+    clients` have no date to filter, and saying so is better than filtering
+    them on something else (02/08/2026).
     """
     if source not in SOURCES_BASE:
         raise SaisieInvalide(f"Source inconnue : « {source} ».")
@@ -2191,11 +2107,11 @@ def contacts_depuis_base(base, source, champs, telephones_connus=(),
         candidats, exclus, exclus_stop = base.candidats_cascade(source)
         if exclus:
             complements.append(f"{exclus} client(s) sans numéro écarté(s)")
-        # ⚠ LE 🚫 ÉTAIT RETIRÉ EN SILENCE ICI (14/08/2026, audit croisé). La
-        # requête l'écarte (« AND c.ne_plus_appeler = 0 ») et personne ne le
-        # comptait : l'écran annonçait « 123 contacts ajoutés » quand la base
-        # en avait 138, et cinq personnes disparaissaient sans un mot. La
-        # branche datée juste au-dessus, elle, le disait depuis le début.
+        # ⚠ THE 🚫 WAS REMOVED IN SILENCE HERE (14/08/2026, cross audit). The
+        # query excludes it (`AND c.ne_plus_appeler = 0`) and nobody counted
+        # it: the screen announced `123 contacts added` when the database had
+        # 138, and five people disappeared without a word. The dated branch
+        # just above had been saying it from the start.
         if exclus_stop:
             complements.append(f"{exclus_stop} client(s) 🚫 « Ne plus appeler » "
                                "écarté(s)")
@@ -2212,15 +2128,15 @@ def contacts_depuis_base(base, source, champs, telephones_connus=(),
 
 
 def _note_deja_dans_la_grille(combien):
-    """La phrase des contacts écartés parce qu'ILS Y ÉTAIENT DÉJÀ.
+    """The sentence for the contacts set aside because THEY WERE ALREADY THERE.
 
-    ⚠ L'ÉCART TROUVÉ PAR L'AUDIT DU 14/08/2026, et il touche les cinq natures.
-    Charger deux fois la même source — ou deux sources qui se recouvrent, comme
-    « rendez-vous posés » et « rendez-vous à venir » — écartait les doublons
-    SANS un mot. La grille ne bougeait pas, aucun complément n'était rendu, et
-    l'écran concluait « Aucun contact trouvé depuis cette source » : c'était
-    faux, la source en contenait vingt, tous déjà là. L'opérateur changeait de
-    source, ou croyait sa base vide.
+    ⚠ THE GAP FOUND BY THE 14/08/2026 AUDIT, and it affects all five kinds.
+    Loading the same source twice — or two overlapping sources, like
+    `rendez-vous posés` and `rendez-vous à venir` — set the duplicates aside
+    WITHOUT a word. The grid did not move, no extra message was returned, and
+    the screen concluded `Aucun contact trouvé depuis cette source`: that was
+    false, the source contained twenty, all already there. The operator changed
+    source, or believed their database was empty.
     """
     if not combien:
         return []
@@ -2229,12 +2145,11 @@ def _note_deja_dans_la_grille(combien):
 
 
 def campagnes_reprenables(base):
-    """Les campagnes dont on peut repartir : [(id, libellé, comptes)].
+    """The campaigns you can start again from: [(id, label, counts)].
 
-    Une campagne n'est reprenable que si elle a des contacts — sinon il n'y
-    a rien à en tirer et elle n'encombre pas la liste déroulante. Le libellé
-    porte déjà son nombre total, pour que le choix se fasse en connaissance
-    de cause.
+    A campaign can only be resumed when it has contacts — otherwise there is
+    nothing to draw from it and it does not clutter the drop-down. The label
+    already carries its total count, so the choice is made knowingly.
     """
     reprenables = []
     for campagne in base.lister_campagnes():
@@ -2250,14 +2165,14 @@ def campagnes_reprenables(base):
 
 def contacts_depuis_campagne(base, campagne_id, etat, champs,
                              telephones_connus=()):
-    """Reprend les contacts d'une campagne PRÉCÉDENTE, filtrés par état.
+    """Takes back the contacts of a PREVIOUS campaign, filtered by state.
 
-    C'est la réutilisation des résultats déjà enregistrés : une campagne
-    de rattrapage se construit à partir des 📵 injoignables de la veille,
-    des ❌ refus, des 🙋 « à rappeler par un humain »… Les colonnes déjà
-    remplies (motif, rendez-vous existant, champs personnalisés) suivent
-    quand la nouvelle campagne a les mêmes colonnes. Rend (contacts,
-    complements) — complements = messages français comptant les écartés.
+    This is the reuse of results already recorded: a catch-up campaign is built
+    from yesterday's 📵 unreachable ones, the ❌ refusals, the 🙋 `à rappeler par
+    un humain`… The columns already filled (reason, existing appointment,
+    custom fields) follow when the new campaign has the same columns. Returns
+    (contacts, complements) — complements = French messages counting those set
+    aside.
     """
     if etat not in ETATS_REPRISE:
         raise SaisieInvalide(f"État de reprise inconnu : « {etat} ».")
@@ -2303,35 +2218,32 @@ def contacts_depuis_campagne(base, campagne_id, etat, champs,
     return contacts, complements
 
 
-# ------------------------------------------------ la RECETTE d'une campagne
-# De quoi REJOUER une campagne sur un AUTRE créneau (§8.3). Une campagne
-# garde donc, en plus de son résultat, les CRITÈRES qui ont rempli sa liste :
-# la source de base choisie, la campagne précédente reprise et son filtre.
-#
-# Une liste tapée ou collée à la main n'a pas de critère : elle n'est PAS
-# reproductible, et la cascade s'abstient en le disant plutôt que d'inventer
-# une liste. Ajout ADDITIF : une campagne créée avant cette version n'a pas
-# de recette du tout — elle vaut « non reproductible », et l'écran le dit.
-#
-# Le mode « etat » est le CRITÈRE de la porte 👥 Contacts (§4) : « les clients
-# dont l'état est X, non traités, que la nature N traite ». Il est
-# reproductible comme les deux autres — c'est lui qui fait qu'une campagne
-# née d'un filtre d'état peut être rejouée sur un autre créneau.
+# ------------------------------------------------ a campaign's RECIPE Enough
+# to REPLAY a campaign on ANOTHER slot (§8.3). A campaign therefore keeps, on
+# top of its result, the CRITERIA that filled its list: the database source
+# chosen, the previous campaign resumed and its filter.  A list typed or pasted
+# by hand has no criterion: it is NOT reproducible, and the cascade abstains
+# while saying so rather than inventing a list. An ADDITIVE addition: a
+# campaign created before this version has no recipe at all — it counts as `not
+# reproducible`, and the screen says so.  The `etat` mode is the CRITERION of
+# the 👥 Contacts door (§4): `the clients whose state is X, unhandled, that kind
+# N handles`. It is reproducible like the other two — it is what lets a
+# campaign born of a state filter be replayed on another slot.
 MODES_RECETTE_REPRODUCTIBLES = ("base", "campagne", "etat")
 
 
 def recette_vide():
-    """La recette d'un brouillon neuf : rien n'a encore rempli la grille."""
+    """A new draft's recipe: nothing has filled the grid yet."""
     return {"apports": [], "a_la_main": False, "mission_editee": False}
 
 
 def noter_apport_recette(brouillon, mode, **details):
-    """Inscrit d'OÙ vient un lot de personnes ajouté à la grille.
+    """Records WHERE a batch of people added to the grid comes from.
 
-    Les modes reproductibles (base, campagne précédente) sont mémorisés avec
-    leurs critères ; tous les autres (collage, CSV, agenda ICS, ligne ajoutée
-    à la main) lèvent le drapeau « a_la_main » — la liste ne pourra plus être
-    recalculée pour un autre créneau.
+    The reproducible modes (database, previous campaign) are remembered with
+    their criteria; all the others (paste, CSV, ICS calendar, a row added by
+    hand) raise the `a_la_main` flag — the list can no longer be recomputed for
+    another slot.
     """
     recette = brouillon.setdefault("recette", recette_vide())
     if mode in MODES_RECETTE_REPRODUCTIBLES:
@@ -2345,13 +2257,13 @@ def noter_apport_recette(brouillon, mode, **details):
 
 
 def recette_reproductible(recette):
-    """Vrai si la liste peut être RECALCULÉE telle quelle sur un autre créneau."""
+    """True when the list can be RECOMPUTED as it stands on another slot."""
     recette = recette or {}
     return bool(recette.get("apports")) and not recette.get("a_la_main")
 
 
 def libelle_recette(recette):
-    """La recette en français, pour l'écran — jamais une phrase inventée."""
+    """The recipe in French, for the screen — never an invented sentence."""
     recette = recette or {}
     if not recette.get("apports") and not recette.get("a_la_main"):
         return ("inconnue (campagne créée avant que les recettes soient "
@@ -2369,8 +2281,8 @@ def libelle_recette(recette):
                 + ETATS_REPRISE.get(apport.get("etat", "tous"),
                                     apport.get("etat", "?")))
         elif apport["mode"] == "etat":
-            # Import DIFFÉRÉ : etats_clients s'appuie sur ce module-ci, on ne
-            # peut donc pas le charger en tête de fichier sans boucler.
+            # DEFERRED import: etats_clients rests on this module, so it cannot
+            # be loaded at the top of the file without a loop.
             from . import etats_clients
             etat = apport.get("etat", "")
             morceau = ("depuis 👥 Contacts — état « "
@@ -2389,11 +2301,11 @@ def libelle_recette(recette):
 
 
 def contacts_de_recette(base, recette, champs, preferences=None):
-    """REJOUE la recette : reconstruit la liste avec les mêmes critères.
+    """REPLAYS the recipe: rebuilds the list with the same criteria.
 
-    Rend (contacts, complements) — mêmes briques que l'étape 3 de
-    l'assistant, jamais une seconde mécanique. Lève SaisieInvalide si un
-    critère n'est plus valide (campagne effacée, source inconnue).
+    Returns (contacts, complements) — the same building blocks as the
+    assistant's step 3, never a second mechanism. Raises SaisieInvalide when a
+    criterion is no longer valid (campaign erased, unknown source).
     """
     contacts, complements = [], []
     connus = []
@@ -2402,7 +2314,7 @@ def contacts_de_recette(base, recette, champs, preferences=None):
             lot, notes = contacts_depuis_base(base, apport.get("source", ""),
                                               champs, connus)
         elif apport.get("mode") == "etat":
-            # Import DIFFÉRÉ (etats_clients dépend de ce module-ci).
+            # DEFERRED import (etats_clients depends on this module).
             from . import etats_clients
             lot, notes = etats_clients.contacts_depuis_etat(
                 base, apport.get("etat", ""), apport.get("nature", ""),
@@ -2427,17 +2339,18 @@ def contacts_de_recette(base, recette, champs, preferences=None):
 
 
 def resserrer_sur_le_creneau(contacts, creneau, rendezvous_exclus=()):
-    """LE POINT QUI FAIT CONVERGER LA CHAÎNE (§8.3).
+    """THE POINT THAT MAKES THE CHAIN CONVERGE (§8.3).
 
-    « Un créneau n'intéresse que les gens qu'il arrange » : un contact dont
-    le rendez-vous est ANTÉRIEUR au créneau proposé n'a rien à y gagner — le
-    décaler lui ferait perdre du temps au lieu d'en gagner. Il est donc
-    écarté. Un contact dont le rendez-vous est INCONNU l'est aussi : on ne
-    peut pas affirmer que ce créneau l'arrange, et rien n'est inventé.
-    Enfin le rendez-vous qui vient JUSTE de bouger est écarté : lui proposer
-    la place qu'il vient de quitter n'aurait aucun sens.
+    `A slot only interests the people it suits`: a contact whose appointment is
+    EARLIER than the slot offered has nothing to gain from it — shifting them
+    would lose them time instead of gaining it. So they are set aside. A
+    contact whose appointment is UNKNOWN is set aside too: we cannot claim that
+    slot suits them, and nothing is invented. Finally the appointment that has
+    JUST moved is set aside: offering them the slot they have just left would
+    make no sense.
 
-    Rend (retenus, ecartes) — ecartes compte les trois cas, pour l'écran.
+    Returns (kept, set aside) — `ecartes` counts all three cases, for the
+    screen.
     """
     exclus = {r for r in rendezvous_exclus if r}
     retenus = []
@@ -2458,8 +2371,9 @@ def resserrer_sur_le_creneau(contacts, creneau, rendezvous_exclus=()):
 
 
 def en_csv(champs, contacts):
-    """La grille en CSV (numéros EN CLAIR par nature, généré à la volée,
-    jamais écrit côté serveur) — même esprit que generation.en_csv."""
+    """The grid as CSV (numbers IN CLEAR by nature, generated on the fly, never
+    written server-side) — the same spirit as generation.en_csv.
+    """
     codes = [c["code"] for c in champs]
     lignes = [";".join(codes)]
     for contact in contacts:
@@ -2470,26 +2384,26 @@ def en_csv(champs, contacts):
     return "\r\n".join(lignes) + "\r\n"
 
 
-# --------------------------------------------------- création « prête »
+# --------------------------------------------------- `prête` creation
 def nom_campagne(nature, infos, nb_contacts, quand=None, jours=()):
-    """Le nom automatique lisible — réutilise le format existant.
+    """The automatic, readable name — reuses the existing format.
 
-    `jours` : les journées SUR LESQUELLES porte la campagne (les dates des
-    rendez-vous de ses contacts). Elles entrent dans le nom.
+    `jours`: the days the campaign is ABOUT (the dates of its contacts'
+    appointments). They enter the name.
 
-    ⚠ SON DÉFAUT N° 8 DU 18/08/2026 : « Déplacement de rendez-vous (11
-    contact(s)) — 17/08 » — le 17/08 est la date de CRÉATION, pas la journée
-    traitée. Avec 91 campagnes terminées dans sa liste, rien ne permettait de
-    retrouver « celle du 18/08 », celle qui avait vidé sa journée.
+    ⚠ HIS DEFECT NO. 8 OF 18/08/2026: `Déplacement de rendez-vous (11
+    contact(s)) — 17/08` — 17/08 is the CREATION date, not the day being
+    handled. With 91 finished campaigns in his list, nothing made it possible
+    to find `the one from 18/08`, the one that emptied his day.
 
-    La règle existait déjà, pour un seul thème : « Créneau libéré **du 03/08
-    14h** — 28/07 » porte bien sa date concernée. Elle vaut pour toutes les
-    campagnes qui partent d'une plage du planning — déplacement, rappel,
-    confirmation : ce sont des rendez-vous DATÉS qu'elles traitent. Une seule
-    règle, sinon la moitié des campagnes reste introuvable.
+    The rule already existed, for a single theme: `Créneau libéré **du 03/08
+    14h** — 28/07` does carry the date concerned. It applies to every campaign
+    starting from a schedule range — move, reminder, confirmation: it is DATED
+    appointments they handle. One rule, otherwise half the campaigns stay
+    unfindable.
 
-    Les natures sans rendez-vous par contact (prise de rendez-vous) n'ont
-    aucune journée à nommer : `jours` est vide et le nom ne change pas.
+    The kinds with no per-contact appointment (booking) have no day to name:
+    `jours` is empty and the name does not change.
     """
     if nature == "creneau_libere":
         return campagnes.nom_auto("creneau_libere",
@@ -2503,30 +2417,29 @@ def nom_campagne(nature, infos, nb_contacts, quand=None, jours=()):
         if len(jours) == 1:
             nom = f"{nom} du {premier}"
         else:
-            # Plusieurs journées : on ne dit pas « du X au Y », qui ferait
-            # croire à une suite continue — elles peuvent être éparses.
+            # Several days: we do not say `from X to Y`, which would suggest a
+            # continuous run — they may be scattered.
             nom = f"{nom} de {len(jours)} journées, dès le {premier}"
     return f"{nom} ({nb_contacts} contact(s)) — {quand:%d/%m}"
 
 
 def creer_campagne_prete(base, brouillon, preferences, quand=None):
-    """Crée la campagne en état « prête » — elle N'APPELLE PERSONNE.
+    """Creates the campaign in the `prête` state — it CALLS NOBODY.
 
-    Chaque contact reçoit un LIEN vers une fiche client (créée ici s'il
-    était simplement collé) : c'est le numéro ACTUEL de cette fiche qui
-    sera composé, jamais la copie gelée dans la campagne. Les contacts
-    reconnus comme 🚫 « Ne plus appeler » — par leur numéro OU par leur
-    nom — sont créés d'office en état « exclu » (jamais composés) ; le
-    bandeau de la fiche les compte. Rend l'identifiant de la campagne.
+    Every contact receives a LINK to a client record (created here when they
+    were merely pasted): it is that record's CURRENT number that will be
+    dialled, never the copy frozen in the campaign. Contacts recognised as 🚫
+    `Ne plus appeler` — by their number OR by their name — are created outright
+    in the `exclu` state (never dialled); the record's banner counts them.
+    Returns the campaign's id.
     """
     nature = brouillon["nature"]
     infos = brouillon["infos"]
-    # Les listes de créneaux CALCULÉES et laissées telles quelles restent
-    # repérées : au moment de l'appel, elles seront réadaptées à la durée du
-    # client concerné (30 minutes = 2 tranches). Une liste retapée à la main
-    # par l'utilisateur n'est jamais touchée.
-    # Le stock est remis au nombre RÉEL de gens avant qu'on ne fige quoi que ce
-    # soit — voir `rafraichir_stock_du_brouillon`.
+    # The COMPUTED slot lists left as they stand stay marked: at call time,
+    # they will be readapted to the length of the client concerned (30 minutes
+    # = 2 slots). A list retyped by hand by the user is never touched. The
+    # stock is reset to the REAL number of people before anything is frozen —
+    # see `rafraichir_stock_du_brouillon`.
     rafraichir_stock_du_brouillon(base, preferences, brouillon)
     infos_auto = {code: valeur
                   for code, valeur in (brouillon.get("infos_auto") or {}).items()
@@ -2538,32 +2451,31 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
         "infos": infos,
         "infos_auto": infos_auto,
         "champs": brouillon["champs"],
-        # La RECETTE : de quoi rejouer cette campagne sur un autre créneau
-        # (§8.3). Ajout additif — une campagne sans recette le dit à l'écran.
-        # ⚠ La recette porte « mission_editee » : c'est elle qui dit si le
-        # message peut être recalé sur une autre place (voir
-        # `mission_sur_la_place`). Sans elle, on recalerait un texte humain.
+        # The RECIPE: enough to replay this campaign on another slot (§8.3). An
+        # additive addition — a campaign with no recipe says so on screen. ⚠
+        # The recipe carries `mission_editee`: it is what says whether the
+        # message can be realigned onto another slot (see
+        # `mission_sur_la_place`). Without it, we would realign a human text.
         "recette": dict(brouillon.get("recette") or recette_vide(),
                         mission_editee=bool(brouillon.get("mission_editee"))),
-        # ⚠ « .get » ET PAS « [ ] » : les deux constructeurs de brouillon ne
-        # portaient pas cette clé, et un accès direct plantait à CHAQUE
-        # création de campagne (défaut relevé à la revue du 03/08/2026).
-        # Un brouillon sans liste retombe sur son créneau unique : une
-        # campagne d'avant se comporte exactement comme avant.
+        # ⚠ `.get` AND NOT `[ ]`: the two draft constructors did not carry that
+        # key, and a direct access crashed at EVERY campaign creation (defect
+        # found at the review of 03/08/2026). A draft with no list falls back
+        # on its single slot: an older campaign behaves exactly as before.
         "creneaux": normaliser_creneaux(
             brouillon.get("creneaux")
             or [brouillon.get("creneau") or infos.get("creneau_libere")]),
     }
-    # Une SEULE place : la campagne se comporte exactement comme avant, y
-    # compris son décalage en cascade. Plusieurs : c'est une campagne à liste.
+    # ONE single slot: the campaign behaves exactly as before, including its
+    # cascading shift. Several: it is a list campaign.
     configuration["liste_de_places"] = len(configuration["creneaux"]) > 1
-    # Le mode AUTOMATIQUE enregistre sa règle ; le mode manuel n'en a pas.
+    # AUTOMATIC mode saves its rule; manual mode has none.
     if brouillon.get("mode_liste") == "automatique":
         configuration["regle_liste"] = dict(brouillon.get("regle_liste") or {})
-    # LE PLAFOND SUIT LA CAMPAGNE, pas seulement le brouillon : en automatique
-    # la règle est rejouée à CHAQUE place, et elle doit le respecter aussi —
-    # sinon un plafond réglé à cinq laisserait entrer cinq personnes de plus à
-    # chaque changement de place.
+    # THE CEILING FOLLOWS THE CAMPAIGN, not only the draft: in automatic mode
+    # the rule is replayed at EVERY slot, and it must respect it too —
+    # otherwise a ceiling set to five would let five more people in at every
+    # change of slot.
     if brouillon.get("plafond"):
         configuration["plafond"] = str(brouillon["plafond"]).strip()
     campagne_id = base.creer_campagne(
@@ -2571,13 +2483,12 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
                      jours=jours_des_contacts(brouillon)),
         theme=nature, sujet=infos.get("sujet", ""),
         mission=brouillon["mission"],
-        # Le créneau de la campagne : celui de son information quand la nature
-        # en porte une (« créneau libéré »), sinon celui que le brouillon
-        # impose — c'est le cas d'un maillon de cascade, dont le créneau est
-        # la place qu'un client vient de libérer.
-        # ⚠ LE PREMIER DE LA LISTE, et la colonne ne sert plus qu'à ça : tout
-        # ce qui la lit (parcours direct, fiche, écran Clients, banc d'essai)
-        # continue de voir un créneau, sans rien savoir de la liste.
+        # The campaign's slot: that of its information when the kind carries
+        # one (`créneau libéré`), otherwise the one the draft imposes — that is
+        # the case of a cascade link, whose slot is the one a client has just
+        # freed. ⚠ THE FIRST OF THE LIST, and the column now serves only that:
+        # everything that reads it (direct journey, record, Clients screen,
+        # bench) goes on seeing one slot, knowing nothing of the list.
         creneau=(configuration["creneaux"][0]["horaire"]
                  if configuration["creneaux"] else None),
         nature=nature,
@@ -2587,13 +2498,13 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
         client_id = base.client_pour_contact(contact["nom"],
                                              contact["telephone"],
                                              contact.get("rendezvous_id"))
-        # ⚠ LE NUMÉRO TAPÉ DANS LA GRILLE VA JUSQU'À LA FICHE (18/08/2026).
-        # C'est la FICHE qui est composée, jamais la copie gelée dans la
-        # campagne : sans cette ligne, le numéro qu'il venait de saisir restait
-        # sur la campagne et le contact partait « exclu — Aucun numéro à
-        # composer ». Le geste que l'écran lui demandait ne servait à rien.
-        # Une fiche qui a DÉJÀ un numéro n'est pas touchée (voir
-        # `db.completer_telephone`) : compléter n'est pas écraser.
+        # ⚠ THE NUMBER TYPED INTO THE GRID GOES ALL THE WAY TO THE RECORD
+        # (18/08/2026). It is the RECORD that is dialled, never the copy frozen
+        # in the campaign: without this line, the number he had just typed
+        # stayed on the campaign and the contact went out `exclu — no number to
+        # dial`. The gesture the screen asked of him served no purpose. A
+        # record that ALREADY has a number is not touched (see
+        # `db.completer_telephone`): completing is not overwriting.
         base.completer_telephone(client_id, contact["telephone"])
         if base.telephone_exclu(contact["telephone"]):
             refus = db.REFUS_STOP
@@ -2601,10 +2512,10 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
             refus = db.REFUS_STOP_NOM
         else:
             refus = None
-        # ⚠ L'ÉTAT ET LE TEXTE SORTENT DU MÊME ENDROIT, ensemble. Ma première
-        # version ne prenait que l'état : le contact partait bien « à rappeler
-        # par un humain », mais avec l'ancien texte « Client marqué 🚫 Ne plus
-        # appeler » — qui ne dit à personne qu'il y a un appel à passer.
+        # ⚠ THE STATE AND THE TEXT COME OUT OF THE SAME PLACE, together. My
+        # first version took only the state: the contact did go to `à rappeler
+        # par un humain`, but with the old text `Client marqué 🚫 Ne plus
+        # appeler` — which tells nobody there is a call to make.
         etat, detail = (db.suite_du_refus(refus) if refus
                         else ("à appeler", None))
         base.ajouter_contact_campagne(
@@ -2612,13 +2523,13 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
             rendezvous_id=contact.get("rendezvous_id"), etat=etat,
             champs=json.dumps(contact.get("champs") or {}, ensure_ascii=False),
             detail=detail, client_id=client_id)
-    # ⚠ LA RÈGLE EST JOUÉE DÈS LA CRÉATION, sur la PREMIÈRE place (09/08/2026).
-    # Elle ne l'était qu'au changement de place : une campagne automatique
-    # naissait donc VIDE, et le ▶ Démarrer n'appelait personne avant de se
-    # déclarer terminée. Le défaut était supportable tant que l'automatique
-    # était un choix ; il est devenu le mode par défaut, donc le chemin normal.
-    # Elle vient APRÈS les contacts de la grille : le dédoublonnage se fait sur
-    # les numéros déjà présents, et une saisie manuelle n'est jamais écrasée.
+    # ⚠ THE RULE IS PLAYED FROM CREATION, on the FIRST slot (09/08/2026). It
+    # was only played at a change of slot: an automatic campaign was therefore
+    # born EMPTY, and ▶ Start called nobody before declaring itself finished.
+    # The defect was bearable while automatic was a choice; it became the
+    # default mode, hence the normal path. It comes AFTER the grid's contacts:
+    # de-duplication is done on the numbers already present, and manual input
+    # is never overwritten.
     if regle_de_liste(configuration):
         ajoutes = regenerer_la_liste(base, preferences,
                                      base.obtenir_campagne(campagne_id),
@@ -2632,7 +2543,7 @@ def creer_campagne_prete(base, brouillon, preferences, quand=None):
 
 
 def configuration_campagne(campagne):
-    """La configuration enregistrée d'une campagne de l'assistant (dict)."""
+    """The saved configuration of an assistant campaign (a dict)."""
     try:
         configuration = json.loads(campagne.get("configuration") or "{}")
     except (TypeError, ValueError):
@@ -2643,62 +2554,56 @@ def configuration_campagne(campagne):
     configuration.setdefault("infos", {})
     configuration.setdefault("infos_auto", {})
     configuration.setdefault("champs", [])
-    # Une campagne d'avant les recettes n'en a pas : elle vaut « non
-    # reproductible » (aucun apport), et la cascade le dit au lieu d'inventer.
+    # A campaign from before the recipes has none: it counts as `not
+    # reproducible` (no contribution), and the cascade says so instead of
+    # inventing.
     configuration.setdefault("recette", recette_vide())
-    # La LISTE des créneaux (03/08/2026) : vide pour une campagne d'avant,
-    # qui retombe alors sur sa colonne « creneau ». Voir `creneaux_de`.
+    # The LIST of slots (03/08/2026): empty for an older campaign, which then
+    # falls back on its `creneau` column. See `creneaux_de`.
     configuration.setdefault("creneaux", [])
-    # ⚠ « À LISTE » SE DÉCIDE À LA CRÉATION, pas en comptant les places. Une
-    # campagne d'un seul créneau garde son décalage en cascade d'origine ; et
-    # une place rendue qui s'ajouterait ne doit pas la transformer en cours
-    # de route.
+    # ⚠ `LIST-BASED` IS DECIDED AT CREATION, not by counting slots. A
+    # single-slot campaign keeps its original cascading shift; and a slot given
+    # back that would be added must not turn it into one along the way.
     configuration.setdefault("liste_de_places", False)
-    # La règle du mode automatique. Absente : la campagne porte une liste
-    # figée, et rien n'est rejoué (c'est le mode manuel).
+    # The automatic mode's rule. Absent: the campaign carries a frozen list,
+    # and nothing is replayed (that is manual mode).
     configuration.setdefault("regle_liste", {})
     return configuration
 
 
-# ================================================ LA LISTE DES CRÉNEAUX
-# ⚠ UNE CAMPAGNE « CRÉNEAU LIBÉRÉ » PEUT EN PORTER PLUSIEURS (demande du
-# propriétaire du 03/08/2026). Avant, elle en portait UN, dans la colonne
-# campagnes.creneau.
-#
-# Cette colonne NE BOUGE PAS : elle garde le premier créneau, et tout ce qui
-# la lit continue de marcher sans rien savoir de la liste — le parcours
-# direct, la fiche de campagne, l'écran 👥 Contacts, le banc d'essai. La
-# liste, elle, vit dans la configuration JSON qui existait déjà : aucune
-# table neuve, aucun ALTER TABLE, donc aucune migration à écrire.
-#
-# ⚠ L'ORDRE DE STOCKAGE EST L'ORDRE D'AFFICHAGE : chronologique croissant,
-# les plus anciens en tête. Deux tris — un pour ranger, un pour montrer —
-# auraient fini par se contredire.
+# ================================================ THE LIST OF SLOTS ⚠ A
+# `CRÉNEAU LIBÉRÉ` CAMPAIGN MAY CARRY SEVERAL (owner's request of 03/08/2026).
+# Before, it carried ONE, in the campagnes.creneau column.  That column DOES
+# NOT MOVE: it keeps the first slot, and everything reading it goes on working
+# knowing nothing of the list — the direct journey, the campaign record, the 👥
+# Contacts screen, the bench. The list, for its part, lives in the JSON
+# configuration that already existed: no new table, no ALTER TABLE, hence no
+# migration to write.  ⚠ THE STORAGE ORDER IS THE DISPLAY ORDER: chronological
+# ascending, the oldest first. Two sortings — one to store, one to show — would
+# have ended up contradicting each other.
 CRENEAU_A_POURVOIR = "à pourvoir"
 CRENEAU_POURVU = "pourvu"
 CRENEAU_PERDU = "perdu"
 
-# ------------------------------------------ ce qu'un appel conclut, pour la boucle
-# `_appliquer_issue` rend l'une de ces valeurs, ou None quand la campagne
-# continue sans rien changer à ses places.
-#
-# ⚠ POURQUOI « PLACE PERDUE » EXISTE (14/08/2026, second temps). Le premier
-# correctif retirait bien la place de la LISTE, mais la boucle d'exécution n'en
-# savait rien : elle ne relit la campagne que sur « pourvu ». Sur une campagne à
-# UNE SEULE place — le cas le plus courant — elle continuait donc d'appeler tout
-# le monde pour une place morte. Mesuré : six contacts, six appels, six départs
-# « à rappeler par un humain ». C'était le défaut du 14/08 intact, seulement
-# déplacé d'un cran.
+# ------------------------------------------ what a call concludes, for the
+# loop `_appliquer_issue` returns one of these values, or None when the
+# campaign continues without changing anything about its slots.  ⚠ WHY `SLOT
+# LOST` EXISTS (14/08/2026, second stage). The first fix did remove the slot
+# from the LIST, but the execution loop knew nothing of it: it only reads the
+# campaign back on `pourvu`. On a campaign with ONE SINGLE slot — the commonest
+# case — it therefore went on calling everybody for a dead slot. Measured: six
+# contacts, six calls, six departures to `à rappeler par un humain`. It was the
+# 14/08 defect intact, only moved one notch.
 CONCLUSION_POURVU = "pourvu"
 CONCLUSION_PLACE_PERDUE = "place_perdue"
 
 
 def normaliser_creneaux(valeurs):
-    """Une liste de créneaux propre : triée, sans doublon, sans vide.
+    """A clean list of slots: sorted, without duplicates, without blanks.
 
-    Accepte indifféremment des chaînes (« 2026-08-12T09:00 ») et des fiches
-    déjà formées : c'est ce qui permet de recevoir aussi bien une saisie de
-    formulaire que la configuration relue en base, sans deux chemins.
+    Accepts strings (`2026-08-12T09:00`) and already-formed records alike: that
+    is what makes it possible to receive both a form input and the
+    configuration read back from the database, without two paths.
     """
     par_horaire = {}
     for valeur in valeurs or ():
@@ -2715,17 +2620,17 @@ def normaliser_creneaux(valeurs):
         fiche.setdefault("contact_id", None)
         fiche.setdefault("rendezvous_id", None)
         fiche.setdefault("pourquoi", "")
-        # Une même heure ne peut pas être deux places : la dernière gagne.
+        # The same hour cannot be two slots: the last one wins.
         par_horaire[horaire] = fiche
     return [par_horaire[horaire] for horaire in sorted(par_horaire)]
 
 
 def creneaux_de(campagne, configuration=None):
-    """Les créneaux d'une campagne — la liste, ou son créneau unique.
+    """A campaign's slots — the list, or its single slot.
 
-    Une campagne d'AVANT la liste n'a que sa colonne « creneau » : on la rend
-    sous la MÊME forme, pour que le reste du code n'ait qu'un seul chemin à
-    connaître. Une campagne d'une autre nature rend une liste vide.
+    A campaign from BEFORE the list has only its `creneau` column: we return it
+    in the SAME shape, so the rest of the code has only one path to know. A
+    campaign of another kind returns an empty list.
     """
     if configuration is None:
         configuration = configuration_campagne(campagne)
@@ -2737,7 +2642,7 @@ def creneaux_de(campagne, configuration=None):
 
 
 def creneau_courant(campagne, configuration=None):
-    """La prochaine place à pourvoir, ou None quand elles sont toutes réglées."""
+    """The next slot to fill, or None when they are all settled."""
     for fiche in creneaux_de(campagne, configuration):
         if fiche.get("statut") == CRENEAU_A_POURVOIR:
             return fiche
@@ -2745,18 +2650,17 @@ def creneau_courant(campagne, configuration=None):
 
 
 def _ecrire_creneaux(base, campagne_id, configuration, liste):
-    """Range la liste dans la configuration et l'enregistre.
+    """Stores the list in the configuration and saves it.
 
-    ⚠ ET REMET « liste_de_places » D'APRÈS CE QU'ON ÉCRIT (15/08/2026). Ce
-    drapeau était figé à la CRÉATION de la campagne. Depuis que la place
-    quittée rejoint la campagne — y compris quand elle n'en avait qu'une —
-    une campagne peut en compter deux sans que le drapeau bouge : elle
-    continuait alors de se comporter en « place unique », donc sans filtrer
-    les contacts sur l'intérêt et sans recharger de liste.
+    ⚠ AND RESETS `liste_de_places` FROM WHAT IS WRITTEN (15/08/2026). That flag
+    was frozen at the campaign's CREATION. Since the slot left behind joins the
+    campaign — including when it only had one — a campaign may end up with two
+    without the flag moving: it then went on behaving as a `single slot`, hence
+    without filtering the contacts on interest and without reloading a list.
 
-    C'est le point de passage commun de TOUTE écriture de places
-    (`ajouter_creneau`, `marquer_creneau`) : le poser ici, et nulle part
-    ailleurs, est ce qui garantit qu'aucun chemin ne l'oublie.
+    It is the common checkpoint of ALL slot writing (`ajouter_creneau`,
+    `marquer_creneau`): putting it here, and nowhere else, is what guarantees
+    no path forgets it.
     """
     configuration["creneaux"] = normaliser_creneaux(liste)
     configuration["liste_de_places"] = len(configuration["creneaux"]) > 1
@@ -2767,12 +2671,12 @@ def _ecrire_creneaux(base, campagne_id, configuration, liste):
 
 def marquer_creneau(base, campagne_id, horaire, statut, contact_id=None,
                     rendezvous_id=None, pourquoi=""):
-    """Note ce qu'est devenue UNE place, et rend la liste à jour.
+    """Records what became of ONE slot, and returns the updated list.
 
-    ⚠ RELIT LA CAMPAGNE EN BASE avant d'écrire. Le dictionnaire que la boucle
-    d'exécution garde en mémoire date du démarrage : écrire à partir de lui
-    écraserait ce qu'un appel précédent vient de noter. Le défaut, relevé à
-    la revue du 03/08/2026, mettait DEUX personnes dans la même place.
+    ⚠ READS THE CAMPAIGN BACK FROM THE DATABASE before writing. The dictionary
+    the execution loop holds in memory dates from start-up: writing from it
+    would overwrite what a previous call has just recorded. The defect, found
+    at the review of 03/08/2026, put TWO people in the same slot.
     """
     campagne = base.obtenir_campagne(campagne_id)
     if not campagne:
@@ -2789,15 +2693,15 @@ def marquer_creneau(base, campagne_id, horaire, statut, contact_id=None,
 
 
 def ajouter_creneau(base, campagne_id, horaire, pourquoi=""):
-    """Ajoute une place à pourvoir à une campagne, et rend la liste à jour.
+    """Adds a slot to be filled to a campaign, and returns the updated list.
 
-    Sert quand un contact accepte : la place qu'il QUITTE rejoint la liste de
-    la MÊME campagne (décision du propriétaire du 03/08/2026), au lieu
-    d'engendrer une campagne « prête » séparée. Même précaution que
-    `marquer_creneau` : on relit la base avant d'écrire.
+    Used when a contact accepts: the slot they LEAVE joins the SAME campaign's
+    list (owner's decision of 03/08/2026), instead of spawning a separate
+    `prête` campaign. The same precaution as `marquer_creneau`: we read the
+    database back before writing.
 
-    Une place déjà connue n'est pas remise à « à pourvoir » : elle a peut-être
-    déjà été pourvue, et la rouvrir la ferait proposer deux fois.
+    A slot already known is not reset to `to be filled`: it may already have
+    been filled, and reopening it would have it offered twice.
     """
     campagne = base.obtenir_campagne(campagne_id)
     if not campagne or not (horaire or "").strip():
@@ -2813,11 +2717,11 @@ def ajouter_creneau(base, campagne_id, horaire, pourquoi=""):
 
 
 class _decroissant:
-    """Une clé de tri qui INVERSE la comparaison d'une chaîne.
+    """A sort key that REVERSES a string's comparison.
 
-    `reverse=True` aurait inversé AUSSI le premier critère (« sans date en
-    dernier ») et renvoyé les contacts sans rendez-vous en tête. On n'inverse
-    donc que ce qu'il faut.
+    `reverse=True` would have reversed the first criterion TOO (`no date last`)
+    and sent the contacts with no appointment to the top. So we only reverse
+    what needs reversing.
     """
 
     __slots__ = ("valeur",)
@@ -2832,92 +2736,74 @@ class _decroissant:
         return self.valeur == autre.valeur
 
 
-# ============================ LA RÈGLE DE LISTE DU MODE AUTOMATIQUE
-# Une campagne « automatique » ne porte pas une liste figée : elle porte la
-# RÈGLE qui la fabrique, et cette règle est rejouée à chaque changement de
-# place. C'est ce qui permet à la place du 12 août d'intéresser d'autres
-# personnes que celle du 30.
-# ⚠ CE RÉGLAGE A ÉTÉ RETOURNÉ LE 11/08/2026, ET C'ÉTAIT UNE INVERSION, PAS UN
-# LIBELLÉ MALHEUREUX. Il disait « jusqu'à 30 jours après » et gardait les gens
-# dont le rendez-vous tombe DANS les 30 jours qui suivent la place — c'est-à-dire
-# ceux qui gagnent le MOINS. Mesuré sur le jeu d'essai, place dans 3 jours :
-#
-#   « jusqu'à 7 jours »  -> 10 personnes, qui gagnaient de 0 à 6 jours
-#   « jusqu'à 30 jours » -> 19 personnes, qui gagnaient de 0 à 29 jours
-#   « sans limite »      -> 31 personnes, dont certaines gagnaient 0 JOUR
-#
-# Une place libérée sert à faire GAGNER du temps. Le réglage exprime donc
-# maintenant un GAIN MINIMUM : « au moins 30 jours » retient ceux dont le
-# rendez-vous est au moins 30 jours après la place — 12 personnes, qui gagnent
-# vraiment quelque chose. Mots du propriétaire : « on va demander les personnes à
-# partir de la date du rendez-vous + 30 j, et la date de fin est le dernier
-# rendez-vous enregistré ».
-#
-# ⚠ ET LES LIBELLÉS DISENT LE GAIN, PAS LA MÉCANIQUE. « au moins 30 jours »
-# répond à la question qu'on se pose vraiment — « à qui cette place sert-elle
-# assez pour qu'on décroche le téléphone ? »
+# ============================ AUTOMATIC MODE'S LIST RULE An `automatic`
+# campaign does not carry a frozen list: it carries the RULE that builds it,
+# and that rule is replayed at every change of slot. That is what lets the 12
+# August slot interest people other than the 30th's. ⚠ THIS SETTING WAS TURNED
+# AROUND ON 11/08/2026, AND IT WAS AN INVERSION, NOT AN UNFORTUNATE LABEL. It
+# said `up to 30 days after` and kept the people whose appointment falls WITHIN
+# the 30 days following the slot — that is, those who gain the LEAST. Measured
+# on the sample data set, slot in 3 days:  `up to 7 days`  -> 10 people,
+# gaining 0 to 6 days `up to 30 days` -> 19 people, gaining 0 to 29 days `no
+# limit`      -> 31 people, some gaining 0 DAYS  A freed slot exists to make
+# people GAIN time. So the setting now expresses a MINIMUM GAIN: `at least 30
+# days` keeps those whose appointment is at least 30 days after the slot — 12
+# people, who really gain something. The owner's words: `we are going to ask
+# for the people from the appointment date + 30 d, and the end date is the last
+# appointment recorded`.  ⚠ AND THE LABELS STATE THE GAIN, NOT THE MECHANISM.
+# `at least 30 days` answers the question you really ask — `who does this slot
+# serve enough to be worth picking up the phone for?`
 JOURS_APRES = (("", "peu importe"), ("7", "au moins 7 jours"),
                ("30", "au moins 30 jours"), ("90", "au moins 90 jours"))
 
-# ============================ JUSQU'OÙ LA CHAÎNE DU DÉCALAGE PEUT ALLER
-# Sa demande du 15/08/2026 : « au lieu d'avoir uniquement un sélecteur de date,
-# on a également un sélecteur pour définir une période ce qui remplit
-# automatiquement le champ date ».
-#
-# Taper une date à la main pour dire « trois mois » demande d'ouvrir un
-# calendrier et de compter — alors que c'est en durées qu'on pense. Le champ
-# date reste, et reste modifiable : le sélecteur le REMPLIT, il ne le remplace
-# pas. « Date libre » est le premier choix, donc le comportement d'avant.
-#
-# Les valeurs sont des JOURS, sauf « derniere » qui vise le dernier rendez-vous
-# connu de l'agenda — au-delà, la chaîne ne trouverait plus personne, et c'est
-# la seule borne qu'on puisse proposer sans l'inventer.
+# ============================ HOW FAR THE SHIFT CHAIN MAY GO His request of
+# 15/08/2026: `instead of having only a date selector, we also have a selector
+# to define a period which automatically fills the date field`.  Typing a date
+# by hand to say `three months` means opening a calendar and counting — while
+# you think in durations. The date field stays, and stays editable: the
+# selector FILLS it, it does not replace it. `Free date` is the first choice,
+# hence the previous behaviour.  The values are DAYS, except `derniere` which
+# targets the last appointment known in the calendar — beyond it, the chain
+# would find nobody, and it is the only bound we can offer without inventing
+# it.
 PERIODES_CASCADE = (("", "Date libre"), ("7", "7 jours"), ("14", "14 jours"),
                     ("30", "30 jours"), ("60", "2 mois"), ("90", "3 mois"),
                     ("180", "6 mois"), ("365", "1 an"),
                     ("derniere", "Dernière date de l'agenda"))
 
-# LA RÈGLE POSÉE D'OFFICE quand une campagne s'ouvre en mode automatique
-# (09/08/2026). Un mode par défaut SANS règle aurait laissé créer une campagne
-# qui n'appelle personne : le défaut porte donc sa valeur, comme le reste des
-# réglages du produit.
-#
-# ⚠ « À VENIR, PAS ENCORE CONFIRMÉS » DEPUIS LE 15/08/2026 (sa demande). C'était
-# « à recaser » — ceux qui attendent une place. Mais la nature qui se sert le
-# plus de la règle est « créneau libéré », et elle cherche l'inverse : des gens
-# qui ONT un rendez-vous, plus tard, qu'on peut avancer. Le défaut vise donc
-# maintenant ces gens-là. Voir SOURCES_REGLE, où « posés » a été retirée dans
-# le même mouvement.
+# THE RULE SET BY DEFAULT when a campaign opens in automatic mode (09/08/2026).
+# A default mode with NO rule would have allowed a campaign to be created that
+# calls nobody: the default therefore carries its value, like the rest of the
+# product's settings.  ⚠ `UPCOMING, NOT YET CONFIRMED` SINCE 15/08/2026 (his
+# request). It was `to rebook` — those waiting for a slot. But the kind that
+# uses the rule most is `créneau libéré`, and it looks for the opposite: people
+# who HAVE an appointment, later, that can be brought forward. So the default
+# now targets those people. See SOURCES_REGLE, where `posés` was removed in the
+# same move.
 REGLE_LISTE_DEFAUT = {"source": "a_venir", "jours": ""}
 
-# ============================ LE PLAFOND DE CONTACTS À CHARGER
-# Demande du propriétaire du 11/08/2026 : « un champ pour limiter le nombre de
-# contact à charger dans l'étape 3 pour limiter le nombre d'appel ». Une source
-# peut rendre trente personnes ; on n'a pas toujours envie que trente téléphones
-# sonnent.
-#
-# ⚠ IL PLAFONNE CE QUI ENTRE, IL NE TAILLE JAMAIS CE QUI EST DÉJÀ LÀ. Une ligne
-# tapée à la main dans la grille n'est jamais retirée par le plafond : « une
-# saisie refusée n'est jamais perdue » vaut aussi pour une saisie acceptée. Le
-# plafond compte les présents et ne laisse entrer que la différence.
-#
-# ⚠ ET IL GARDE LES PLUS PERTINENTS, PAS LES PREMIERS VENUS. L'ordre d'appel
-# choisi à cette même étape est appliqué AVANT de couper : sur une campagne de
-# créneau libéré, garder « les cinq premiers de la base » au lieu des « cinq
-# dont le rendez-vous est le plus lointain » aurait appelé les gens à qui la
-# place apporte le moins.
-#
-# Vide = aucun plafond, et c'est le défaut : un plafond posé d'office aurait
-# écarté du monde sans que personne ne l'ait demandé.
+# ============================ THE CEILING OF CONTACTS TO LOAD Owner's request
+# of 11/08/2026: `a field to limit the number of contacts to load at step 3, to
+# limit the number of calls`. A source can return thirty people; you do not
+# always want thirty phones to ring.  ⚠ IT CAPS WHAT COMES IN, IT NEVER TRIMS
+# WHAT IS ALREADY THERE. A row typed by hand into the grid is never removed by
+# the ceiling: `refused input is never lost` applies to accepted input too. The
+# ceiling counts those present and only lets the difference in.  ⚠ AND IT KEEPS
+# THE MOST RELEVANT, NOT THE FIRST COMERS. The calling order chosen at that
+# same step is applied BEFORE cutting: on a freed-slot campaign, keeping `the
+# first five in the database` instead of `the five whose appointment is
+# furthest away` would have called the people the slot helps least.  Empty = no
+# ceiling, and that is the default: a ceiling set by default would have set
+# people aside without anybody asking.
 PLAFOND_VIDE = ""
 
 
 def plafond_de(porteur):
-    """Le plafond de contacts d'un brouillon ou d'une configuration, ou None.
+    """A draft's or a configuration's contact ceiling, or None.
 
-    None = pas de plafond. Une valeur illisible ou nulle vaut « pas de
-    plafond » : mieux vaut charger tout le monde que d'écarter sur un chiffre
-    qu'on n'a pas su lire.
+    None = no ceiling. An unreadable or zero value counts as `no ceiling`:
+    better to load everybody than to set people aside on a figure we could not
+    read.
     """
     brut = str((porteur or {}).get("plafond") or "").strip()
     if not brut.isdigit():
@@ -2926,44 +2812,43 @@ def plafond_de(porteur):
 
 
 def limiter_au_plafond(contacts, plafond, ordre=None, creneau=None, deja=0):
-    """Les contacts qui tiennent sous le plafond. Rend (gardes, ecartes).
+    """The contacts that fit under the ceiling. Returns (kept, set aside).
 
-    `deja` : combien sont DÉJÀ dans la liste — ils comptent dans le plafond
-    sans être touchés (voir le pavé au-dessus de PLAFOND_VIDE).
-
-    Sans plafond, rien n'est écarté et l'ordre n'est pas touché : le chemin
-    d'avant reste le chemin d'avant.
+    `deja`: how many are ALREADY in the list — they count towards the ceiling
+    without being touched (see the block above PLAFOND_VIDE).
     """
     if not plafond:
         return list(contacts), 0
     place = max(0, plafond - deja)
     if len(contacts) <= place:
         return list(contacts), 0
-    # L'ordre d'appel décide QUI on garde. Sans ordre connu, on garde les
-    # premiers venus — et l'écran dit combien ont été écartés, dans tous les cas.
+    # The calling order decides WHO we keep. With no known order, we keep the
+    # first comers — and the screen says how many were set aside, in every
+    # case.
     retenus = (ordonner_contacts(contacts, ordre, creneau) if ordre
                else list(contacts))
     return retenus[:place], len(contacts) - place
 
 
 def raison_plafond(plafond, ecartes):
-    """Ce que le maximum de personnes a écarté. Vide s'il n'a rien écarté."""
+    """What the maximum number of people set aside. Empty when it set none aside.
+    """
     if not ecartes:
         return ""
-    # ⚠ ET ICI AUSSI LE MOT NOMME LE RÉGLAGE (21/08/2026). C'est l'AUTRE
-    # sens de « plafond » — celui de l'étape ③, « Au maximum, combien de
-    # personnes ». Renommer l'un et laisser l'autre aurait gardé le mot ambigu
-    # exactement là où il l'a rencontré.
+    # ⚠ AND HERE TOO THE WORD NAMES THE SETTING (21/08/2026). This is the OTHER
+    # sense of `plafond` — step ③'s, `At most, how many people`. Renaming one
+    # and leaving the other would have kept the word ambiguous in exactly the
+    # place where he met it.
     return (f"{ecartes} personne(s) écartée(s) : cette campagne est réglée au "
             f"maximum sur {plafond} personne(s)")
 
 
 def manque_au_plafond(plafond, trouves):
-    """La phrase qui dit POURQUOI le plafond n'est pas atteint.
+    """The sentence saying WHY the ceiling is not reached.
 
-    ⚠ ELLE EXISTE PARCE QUE SON ABSENCE MENTAIT PAR OMISSION (11/08/2026) : un
-    plafond réglé à 30 qui rend 8 personnes ressemble à un défaut, alors que la
-    source n'en contenait que 8. Un chiffre sans son écart ne se lit pas.
+    ⚠ IT EXISTS BECAUSE ITS ABSENCE LIED BY OMISSION (11/08/2026): a ceiling
+    set to 30 that returns 8 people looks like a defect, when the source only
+    contained 8. A figure without its shortfall cannot be read.
     """
     if not plafond or trouves >= plafond:
         return ""
@@ -2973,56 +2858,52 @@ def manque_au_plafond(plafond, trouves):
             "ou ajoutez des personnes à la main")
 
 
-# ⚠ LA RÈGLE DE L'INTÉRÊT (décision du propriétaire, 09/08/2026), écrite ICI
-# une fois pour toutes : une place n'intéresse quelqu'un que si elle lui
-# APPORTE quelque chose.
-#  · il n'a plus aucun rendez-vous à venir → n'importe quelle place ;
-#  · il en a un → seule une place PLUS TÔT que le sien.
-# Elle remplace une borne qui comparait l'ANCIENNE date — celle d'un
-# rendez-vous annulé, donc passée — à la place proposée : cette comparaison
-# écartait précisément les gens qui attendent.
+# ⚠ THE RULE OF INTEREST (owner's decision, 09/08/2026), written HERE once and
+# for all: a slot only interests somebody when it BRINGS them something. · they
+# have no upcoming appointment left → any slot; · they have one → only a slot
+# EARLIER than theirs. It replaces a bound that compared the OLD date — that of
+# a cancelled appointment, hence in the past — with the slot offered: that
+# comparison set aside precisely the people who are waiting.
 SOURCES_A_VENIR = ("poses", "a_venir")
 
 
 def place_utile_au_contact(base, contact, places, maintenant=None, gain=0):
-    """Vrai si au moins une de ces places apporte quelque chose à ce contact.
+    """True when at least one of these slots brings this contact something.
 
-    ⚠ ON DEMANDE À LA BASE, pas à la colonne « rendez-vous existant » du
-    contact : celle-ci porte la date de l'ANCIEN rendez-vous, y compris quand
-    il a été annulé. La question qui compte est « a-t-il encore un rendez-vous
-    à venir ? », et seule la base sait y répondre à cet instant.
+    ⚠ WE ASK THE DATABASE, not the contact's `existing appointment` column:
+    that one carries the date of the OLD appointment, including when it was
+    cancelled. The question that counts is `do they still have an upcoming
+    appointment?`, and only the database can answer it at that instant.
 
-    ⚠ ET ON RÉUTILISE `rendezvous_a_venir_du_client`, QUI EXISTAIT DÉJÀ. J'en
-    avais écrit une seconde, plus simple — et sous le même nom : elle a
-    silencieusement remplacé l'autre et cassé quatre essais de cascade. Ses
-    statuts (STATUTS_A_VENIR) sont exactement ceux du « NOT EXISTS » qui
-    définit « en attente » : deux définitions d'« avoir encore un rendez-vous »
-    auraient fini par se contredire.
+    ⚠ AND WE REUSE `rendezvous_a_venir_du_client`, WHICH ALREADY EXISTED. I had
+    written a second one, simpler — and under the same name: it silently
+    replaced the other and broke four cascade tests. Its statuses
+    (STATUTS_A_VENIR) are exactly those of the `NOT EXISTS` that defines
+    `waiting`: two definitions of `still having an appointment` would have
+    ended up contradicting each other.
 
-    `gain` : le nombre de JOURS que la place doit faire gagner, celui de la
-    règle de la campagne.
+    `gain`: the number of DAYS the slot must save, that of the campaign's rule.
 
-    ⚠ SANS LUI, LE SEUIL NE VALAIT QUE POUR LA PREMIÈRE PLACE (15/08/2026).
-    Constat du propriétaire, mot pour mot : « le rendez-vous +30 jours pour le
-    15/08 cherche des contacts à partir du 15/09, et le créneau du 15/09
-    devrait chercher à partir du 15/10 ». C'était juste, et ce n'était pas fait.
-    La règle chargeait la liste au seuil de la PREMIÈRE place ; ensuite, à
-    chaque place suivante, ce filtre ne demandait plus que « la place est-elle
-    plus tôt que son rendez-vous ». Quelqu'un retenu pour un gain de 35 jours
-    sur la place du 15/08 se voyait donc proposer, une fois la campagne
-    avancée, une place qui ne lui en faisait plus gagner que deux. Le seuil
-    suit maintenant la place en cours.
+    ⚠ WITHOUT IT, THE THRESHOLD ONLY APPLIED TO THE FIRST SLOT (15/08/2026).
+    The owner's observation, word for word: `the +30 days appointment for 15/08
+    looks for contacts from 15/09, and the 15/09 slot should look from 15/10`.
+    He was right, and it was not being done. The rule loaded the list at the
+    FIRST slot's threshold; then, at every following slot, this filter only
+    asked `is the slot earlier than their appointment`. Somebody kept for a
+    35-day gain on the 15/08 slot was therefore offered, once the campaign had
+    advanced, a slot that only gained them two. The threshold now follows the
+    current slot.
     """
     if not places:
         return False
     if not contact.get("client_id"):
-        # Pas de fiche : on ne devine pas, on appelle. Le taire aurait fait
-        # disparaître quelqu'un sans raison affichée.
+        # No record: we do not guess, we call. Keeping quiet would have made
+        # somebody disappear with no displayed reason.
         return True
     a_venir = base.rendezvous_a_venir_du_client(contact["client_id"],
                                                 maintenant)
     if not a_venir:
-        # Plus rien en agenda : toute place libre l'intéresse.
+        # Nothing left in the calendar: any free slot interests them.
         return True
     prochain = a_venir[0]["horaire"]
     if not gain:
@@ -3039,10 +2920,10 @@ RAISON_PLUS_DE_PROPOSITION = (
 
 
 def gain_de_la_regle(configuration):
-    """Le gain minimum réglé sur cette campagne, en jours (0 = aucun).
+    """The minimum gain configured on this campaign, in days (0 = none).
 
-    Une seule lecture pour tout le produit : la règle en porte la valeur, et
-    c'est elle qui doit valoir à CHAQUE place, pas seulement à la première.
+    One single reading for the whole product: the rule carries the value, and
+    it must apply at EVERY slot, not only at the first.
     """
     regle = (configuration or {}).get("regle_liste") or {}
     brut = str(regle.get("jours") or "").strip()
@@ -3050,20 +2931,17 @@ def gain_de_la_regle(configuration):
 
 
 def interesse_par_une_place(base, contact, places, maintenant=None, gain=0):
-    """Y a-t-il une raison d'appeler CE contact pour CES places ?
+    """Is there a reason to call THIS contact about THESE slots?
 
-    Deux questions, posées au même endroit parce qu'elles ont la même
-    conséquence — ne pas appeler :
+    Two questions, asked in the same place because they have the same
+    consequence — not calling:
 
-    1. **le consentement** : la personne a-t-elle demandé au téléphone qu'on
-       ne lui propose plus de place ? (drapeau sur SA FICHE, pas sur la
-       campagne — voir db.clients.plus_de_proposition) ;
-    2. **l'intérêt** : l'une des places restantes est-elle plus tôt que son
-       prochain rendez-vous ? (`place_utile_au_contact`)
+    1. **consent**: did the person ask on the phone not to be offered slots any more? (a flag on THEIR RECORD, not on the campaign — see db.clients.plus_de_proposition);
+    2. **interest**: is one of the remaining slots earlier than their next appointment? (`place_utile_au_contact`)
 
-    ⚠ LES DEUX SONT REJOUÉES À CHAQUE FOIS, jamais mémorisées sur le contact :
-    une place RENDUE par quelqu'un qui accepte peut être plus tôt que la place
-    en cours et rendre quelqu'un de nouveau concerné.
+    ⚠ BOTH ARE REPLAYED EVERY TIME, never memorised on the contact: a slot
+    GIVEN BACK by somebody who accepts may be earlier than the current slot and
+    make somebody relevant again.
     """
     if base.plus_de_proposition(contact.get("client_id")):
         return False
@@ -3071,31 +2949,30 @@ def interesse_par_une_place(base, contact, places, maintenant=None, gain=0):
 
 
 def regle_de_liste(configuration):
-    """La règle enregistrée, ou None si la campagne porte une liste figée."""
+    """The saved rule, or None when the campaign carries a frozen list."""
     regle = (configuration or {}).get("regle_liste") or {}
     return regle if regle.get("source") in SOURCES_DATEES else None
 
 
 def contacts_de_la_regle(base, preferences, regle, champs, creneau,
                          telephones_connus=()):
-    """Les personnes que CETTE place intéresse, d'après la règle.
+    """The people THIS slot interests, according to the rule.
 
-    ⚠ LA FENÊTRE NE VAUT QUE POUR LES SOURCES DE RENDEZ-VOUS À VENIR
-    (09/08/2026). Elle part de la place : « avant elle, l'avancer n'apporte
-    rien ». Vrai de quelqu'un qui A un rendez-vous — faux, et lourd de
-    conséquences, pour quelqu'un qui n'en a plus. Les gens « en attente » ont
-    une date PASSÉE par construction (on annule, la date est derrière) : la
-    borne les écartait tous. Mesuré : une personne retenue sur quatre qui
-    attendent toutes une place. Pour ces sources-là, aucune borne — c'est la
-    règle de l'intérêt, `place_utile_au_contact`, qui décide au moment
-    d'appeler.
+    ⚠ THE WINDOW ONLY APPLIES TO UPCOMING-APPOINTMENT SOURCES (09/08/2026). It
+    starts from the slot: `before it, bringing them forward brings nothing`.
+    True of somebody who HAS an appointment — false, and heavy with
+    consequences, for somebody who no longer has one. The `waiting` people have
+    a PAST date by construction (you cancel, the date is behind you): the bound
+    set them all aside. Measured: one person kept out of four all waiting for a
+    slot. For those sources, no bound at all — it is the rule of interest,
+    `place_utile_au_contact`, that decides at call time.
 
-    ⚠ « JOURS » EST UN GAIN MINIMUM, PAS UNE LIMITE (retourné le 11/08/2026 —
-    voir le pavé au-dessus de JOURS_APRES). « au moins 30 jours » DÉCALE le début
-    de la fenêtre de 30 jours après la place, et il n'y a PAS de fin : le dernier
-    rendez-vous enregistré ferme la liste tout seul. Avant, il fermait la fenêtre
-    à 30 jours et gardait donc ceux qui gagnaient le moins — exactement le
-    contraire de ce que sert une place libérée.
+    ⚠ `JOURS` IS A MINIMUM GAIN, NOT A LIMIT (turned around on 11/08/2026 — see
+    the block above JOURS_APRES). `at least 30 days` SHIFTS the window's start
+    to 30 days after the slot, and there is NO end: the last appointment
+    recorded closes the list by itself. Before, it closed the window at 30 days
+    and therefore kept those who gained the least — exactly the opposite of
+    what a freed slot is for.
     """
     if not creneau:
         return [], []
@@ -3110,15 +2987,14 @@ def contacts_de_la_regle(base, preferences, regle, champs, creneau,
     contacts, complements = contacts_depuis_base(
         base, regle["source"], champs, list(telephones_connus),
         debut=debut or None, fin=None)
-    # ⚠ LA FENÊTRE ÉCARTAIT DU MONDE SANS UN MOT (11/08/2026). Le propriétaire
-    # a créé une campagne sur une place libre et n'a vu que cinq personnes « au
-    # lieu de beaucoup ». La règle marchait : la source « rendez-vous à venir »
-    # en tenait quatorze, et la borne — « une place n'intéresse que ceux dont le
-    # rendez-vous est APRÈS elle » — en gardait trois. Onze personnes écartées,
-    # et l'écran n'en disait RIEN : un compte sans explication se lit comme un
-    # défaut. On rejoue donc la même source SANS bornes, et l'on nomme l'écart.
-    # Un second passage sur un fichier local, au moment d'un geste — pas dans
-    # une boucle d'appels.
+    # ⚠ THE WINDOW SET PEOPLE ASIDE WITHOUT A WORD (11/08/2026). The owner
+    # created a campaign on a free slot and saw only five people `instead of a
+    # lot`. The rule worked: the `rendez-vous à venir` source held fourteen,
+    # and the bound — `a slot only interests those whose appointment is AFTER
+    # it` — kept three. Eleven people set aside, and the screen said NOTHING: a
+    # count with no explanation reads as a defect. So the same source is
+    # replayed WITHOUT bounds, and the gap is named. A second pass over a local
+    # file, at the moment of a gesture — not inside a call loop.
     if debut:
         sans_borne, _ = contacts_depuis_base(
             base, regle["source"], champs, list(telephones_connus))
@@ -3130,15 +3006,13 @@ def contacts_de_la_regle(base, preferences, regle, champs, creneau,
                 + (f"ferait pas gagner {gain} jours" if gain.isdigit()
                    else "ferait rien gagner — leur rendez-vous n'est pas "
                         "après elle"))
-    # ⚠ CEUX QUI ONT DIT « NE ME PROPOSEZ PLUS DE CRÉNEAU » N'ENTRENT PAS DANS
-    # LA LISTE (10/08/2026). Le garde-fou de l'appel les arrêterait de toute
-    # façon, mais une liste qui les compte annoncerait « 12 personnes » pour en
-    # appeler 9 : le compte affiché doit être le vrai.
-    #
-    # ⚠ ET SEULEMENT ICI, jamais dans `contacts_depuis_base` : ce drapeau ne
-    # concerne QUE les propositions de place. Filtrer plus haut aurait écarté
-    # ces gens des rappels et des confirmations de LEURS rendez-vous — ce
-    # n'est pas ce qu'ils ont demandé.
+    # ⚠ THOSE WHO SAID `STOP OFFERING ME SLOTS` DO NOT ENTER THE LIST
+    # (10/08/2026). The call guard would stop them anyway, but a list counting
+    # them would announce `12 people` and call 9: the count displayed must be
+    # the real one.  ⚠ AND ONLY HERE, never in `contacts_depuis_base`: that
+    # flag concerns ONLY slot offers. Filtering higher up would have set those
+    # people aside from reminders and confirmations about THEIR OWN
+    # appointments — which is not what they asked for.
     gardes, ecartes = [], 0
     for contact in contacts:
         if base.telephone_sans_proposition(contact.get("telephone")):
@@ -3153,34 +3027,33 @@ def contacts_de_la_regle(base, preferences, regle, champs, creneau,
 
 
 def appels_passes(base, campagne_id):
-    """Les appels que cette campagne a DÉJÀ dépensés de son plafond.
+    """The calls this campaign has ALREADY spent from its ceiling.
 
-    Des personnes composées, pas des tentatives : quelqu'un relancé trois fois
-    compte pour un. C'est ce compte-là que borne « 30 appels autorisés ».
+    People dialled, not attempts: somebody followed up three times counts as
+    one. It is that count `30 calls allowed` bounds.
     """
     return base.compter_personnes_appelees(campagne_id)
 
 
 def appels_engages(base, campagne, configuration):
-    """Ce que le plafond a déjà engagé : appels PARTIS + appels encore DUS.
+    """What the ceiling has already committed: calls GONE OUT + calls still DUE.
 
-    Un appel est « dû » quand quelqu'un attend d'être appelé **et** qu'une des
-    places restantes l'intéresse encore. C'est la nuance qui fait tout, et
-    elle a coûté deux essais avant d'être juste :
+    A call is `due` when somebody is waiting to be called **and** one of the
+    remaining slots still interests them. That is the nuance that makes all the
+    difference, and it cost two attempts before being right:
 
-    · compter TOUS les présents (le code d'avant) saturait le plafond dès le
-      premier tour — la règle en charge trente, il en reste vingt-neuf en
-      attente, et plus personne n'entrait JAMAIS. Six appels passés sur
-      trente autorisés, et trois places de cascade sans personne à appeler.
-      C'est le défaut qu'il a signalé trois jours de suite ;
-    · ne compter que les appels PARTIS gonflait la liste à l'inverse : chaque
-      place rechargeait tout le budget restant alors qu'un seul appel allait
-      la pourvoir. Mesuré : 465 contacts chargés pour 30 appels, dont 435
-      épargnés — juste, mais illisible à l'écran.
+    · counting ALL those present (the previous code) saturated the ceiling from
+    the first round — the rule loads thirty, twenty-nine are left waiting, and
+    nobody EVER entered again. Six calls placed out of thirty allowed, and
+    three cascade slots with nobody to call. That is the defect he reported
+    three days running; · counting only the calls GONE OUT inflated the list
+    the other way: every slot reloaded the whole remaining budget when a single
+    call was going to fill it. Measured: 465 contacts loaded for 30 calls, 435
+    of them spared — accurate, but unreadable on screen.
 
-    Ce qu'on compte donc : les appels partis, plus les gens encore utiles. Un
-    épargné, un exclu, quelqu'un que les places restantes n'avancent plus ne
-    retient rien — il ne coûtera jamais d'appel.
+    So what is counted: the calls gone out, plus the people still useful. A
+    spared one, an excluded one, somebody the remaining slots no longer help
+    hold nothing back — they will never cost a call.
     """
     campagne_id = campagne["id"]
     engages = appels_passes(base, campagne_id)
@@ -3188,9 +3061,9 @@ def appels_engages(base, campagne, configuration):
                if contact["etat"] in ("à appeler", "en cours")
                and not base.appels_du_contact_campagne(contact["id"])]
     if not configuration.get("liste_de_places"):
-        # Une campagne à UNE place garde son comportement d'avant, à la
-        # lettre : sa liste est déjà resserrée à la création et son curseur ne
-        # bouge jamais — tout ce qui attend lui est utile par construction.
+        # A campaign with ONE slot keeps its previous behaviour, to the letter:
+        # its list is already narrowed at creation and its cursor never moves —
+        # everything waiting is useful to it by construction.
         return engages + len(attente)
     annoncees = places_annoncees(campagne, configuration)
     gain = gain_de_la_regle(configuration)
@@ -3200,16 +3073,16 @@ def appels_engages(base, campagne, configuration):
 
 
 def regenerer_la_liste(base, preferences, campagne, configuration):
-    """Rejoue la règle sur la place en cours ; rend le nombre d'ajouts.
+    """Replays the rule on the current slot; returns the number of additions.
 
-    ⚠ AJOUTE SEULEMENT. Les contacts déjà présents — appelés, épargnés,
-    refusés — sont laissés tels quels : leur retirer leur histoire pour la
-    remplacer par une liste fraîche effacerait des appels qui ont eu lieu.
-    Le dédoublonnage se fait sur le numéro, comme partout ailleurs.
+    ⚠ IT ONLY ADDS. The contacts already present — called, spared, refused —
+    are left as they are: taking away their history to replace it with a fresh
+    list would erase calls that took place. De-duplication is done on the
+    number, as everywhere else.
 
-    ⚠ CE QUE LA RÈGLE A ÉCARTÉ EST ÉCRIT SUR LA CAMPAGNE (clé « regle_jouee »),
-    pas seulement au journal. C'est ce qui manquait : la liste s'affichait avec
-    trois noms sans dire que onze personnes avaient été écartées, ni pourquoi.
+    ⚠ WHAT THE RULE SET ASIDE IS WRITTEN ON THE CAMPAIGN (the `regle_jouee`
+    key), not only in the log. That is what was missing: the list showed three
+    names without saying that eleven people had been set aside, nor why.
     """
     regle = regle_de_liste(configuration)
     if not regle:
@@ -3227,34 +3100,28 @@ def regenerer_la_liste(base, preferences, campagne, configuration):
                      "rejouée (%s) — la liste reste telle quelle",
                      campagne["id"], erreur)
         return 0
-    # ⚠ LE PLAFOND EST UN BUDGET D'APPELS, PAS UNE TAILLE DE LISTE (15/08/2026).
-    #
-    # SA DEMANDE, MOT POUR MOT : « 30 appels autorisés, on en consomme 8 pour
-    # occuper le créneau […] cela laisse 22 appels, on cherche les 22 contacts
-    # sur la base du créneau en cascade et des options automatiques
-    # sélectionnées, on ajoute les contacts, on les appelle. »
-    #
-    # CE QUI SE PASSAIT AVANT, mesuré sur exactement ce scénario : `deja`
-    # comptait les contacts PRÉSENTS. La règle en charge trente au départ, donc
-    # `deja` valait trente dès le premier tour, et le plafond était atteint à
-    # jamais — SIX appels passés, VINGT-QUATRE de budget dormant, et trois
-    # places de cascade laissées « à pourvoir » avec cette note à l'écran :
-    # « 77 personne(s) écartée(s) : plafond réglé à 30 ». La cascade s'ouvrait
-    # bien, mais personne ne pouvait plus entrer pour la servir.
-    #
-    # La règle de comptage est donc celle des APPELS, et elle a deux parts :
-    # ceux qui sont PARTIS, et ceux qui restent DUS — un contact encore « à
-    # appeler » a sa place réservée dans le budget. Les autres (épargnés,
-    # exclus, écartés faute d'intérêt) ne coûteront plus jamais un appel : les
-    # compter, c'est exactement ce qui fermait la porte.
-    #
-    # ⚠ ET CELA NE ROUVRE PAS LE DÉFAUT QUE CE COMPTE PROTÉGEAIT — « une
-    # campagne à six places aurait fini par en appeler trente ». Au contraire :
-    # borner les APPELS est plus strict que borner la liste. Le total d'appels
-    # d'une campagne ne peut, par construction, jamais dépasser son plafond.
-    # ⚠ LA RÈGLE AUTOMATIQUE PASSE PAR LE MÊME FILTRE (20/08/2026) : elle est
-    # rejouée à CHAQUE place, et sans lui elle réimporterait à chaque tour les
-    # rendez-vous que la campagne vient justement de faire confirmer.
+    # ⚠ THE CEILING IS A BUDGET OF CALLS, NOT A LIST SIZE (15/08/2026).  HIS
+    # REQUEST, WORD FOR WORD: `30 calls allowed, we use 8 to fill the slot […]
+    # that leaves 22 calls, we look for the 22 contacts on the basis of the
+    # cascading slot and the automatic options selected, we add the contacts,
+    # we call them.`  WHAT HAPPENED BEFORE, measured on exactly that scenario:
+    # `deja` counted the contacts PRESENT. The rule loads thirty at the start,
+    # so `deja` was thirty from the first round, and the ceiling was reached
+    # for ever — SIX calls placed, TWENTY-FOUR of budget dormant, and three
+    # cascade slots left `to be filled` with this note on screen: `77 people
+    # set aside: ceiling set to 30`. The cascade did open, but nobody could
+    # enter to serve it.  So the counting rule is that of CALLS, and it has two
+    # parts: those that have GONE OUT, and those still DUE — a contact still `à
+    # appeler` has their place reserved in the budget. The others (spared,
+    # excluded, set aside for lack of interest) will never cost a call again:
+    # counting them is exactly what closed the door.  ⚠ AND IT DOES NOT REOPEN
+    # THE DEFECT THIS COUNT PROTECTED AGAINST — `a six-slot campaign would have
+    # ended up calling thirty`. On the contrary: bounding the CALLS is stricter
+    # than bounding the list. A campaign's total calls can, by construction,
+    # never exceed its ceiling. ⚠ THE AUTOMATIC RULE GOES THROUGH THE SAME
+    # FILTER (20/08/2026): it is replayed at EVERY slot, and without it it
+    # would reimport at each round the appointments the campaign has just had
+    # confirmed.
     nouveaux, deja_confirmes = ecarter_les_deja_confirmes(
         base, campagne.get("nature"), nouveaux)
     if deja_confirmes:
@@ -3266,11 +3133,10 @@ def regenerer_la_liste(base, preferences, campagne, configuration):
         deja=deja)
     if hors_plafond:
         notes = list(notes) + [raison_plafond(plafond, hors_plafond)]
-    # ⚠ ET QUAND LE PLAFOND N'EST PAS ATTEINT, ON LE DIT (11/08/2026). Le
-    # propriétaire a réglé 30 et obtenu 8 : « j'ai dit que je voulais 30 contact,
-    # je n'en ai que 8 ». La règle avait raison — la source n'en contenait pas
-    # plus — mais un plafond réglé à 30 qui rend 8 se lit comme un défaut tant
-    # que personne ne dit d'où vient l'écart.
+    # ⚠ AND WHEN THE CEILING IS NOT REACHED, WE SAY SO (11/08/2026). The owner
+    # set 30 and got 8: `I said I wanted 30 contacts, I only have 8`. The rule
+    # was right — the source held no more — but a ceiling set to 30 returning 8
+    # reads as a defect as long as nobody says where the gap comes from.
     elif plafond and deja + len(nouveaux) < plafond:
         notes = list(notes) + [manque_au_plafond(plafond,
                                                  deja + len(nouveaux))]
@@ -3294,11 +3160,11 @@ def regenerer_la_liste(base, preferences, campagne, configuration):
 
 
 def _noter_regle_jouee(base, campagne_id, creneau, retenus, notes):
-    """Écrit sur la campagne ce que la règle a donné, et ce qu'elle a écarté.
+    """Writes on the campaign what the rule gave, and what it set aside.
 
-    Sur la campagne, pas dans une variable de passage : l'écran de la campagne
-    est relu longtemps après le geste, et recalculer à l'affichage donnerait un
-    autre chiffre que celui qui a servi.
+    On the campaign, not in a passing variable: the campaign's screen is read
+    back long after the gesture, and recomputing at display time would give a
+    different figure from the one that was used.
     """
     campagne = base.obtenir_campagne(campagne_id)
     if campagne is None:
@@ -3311,34 +3177,32 @@ def _noter_regle_jouee(base, campagne_id, creneau, retenus, notes):
 
 
 def mission_sur_la_place(base, preferences, campagne, configuration, horaire):
-    """Le message ET LES INFOS de la campagne, recalés sur une AUTRE place.
+    """The campaign's message AND INFORMATION, realigned onto ANOTHER slot.
 
-    Rend le couple (message, informations d'étape 2) — ou (None, None) si le
-    recalage est refusé.
+    Returns the pair (message, step-2 information) — or (None, None) when the
+    realignment is refused.
 
-    ⚠ REFUSÉ QUAND LE MESSAGE A ÉTÉ RÉCRIT À LA MAIN. Il porte alors la date
-    de sa place dans une phrase humaine : la refabriquer inventerait du
-    texte, et la laisser telle quelle ferait annoncer au téléphone une heure
-    que personne ne tiendra. C'est exactement la règle que la cascade
-    applique déjà avant de rejouer une recette — une seule règle, un seul
-    endroit de décision.
+    ⚠ REFUSED WHEN THE MESSAGE WAS REWRITTEN BY HAND. It then carries its
+    slot's date inside a human sentence: rebuilding it would invent text, and
+    leaving it as it stands would have an hour nobody will keep announced on
+    the phone. That is exactly the rule the cascade already applies before
+    replaying a recipe — one rule, one place of decision.
 
-    ⚠ ELLE RENDAIT LE SEUL MESSAGE, ET C'ÉTAIT LE DÉFAUT (01/09/2026). Les
-    informations recalées ci-dessous servaient à fabriquer le message… puis
-    étaient jetées. La campagne avançait donc de place avec un message à jour
-    et une CONFIGURATION restée sur l'ancienne — or c'est la configuration qui
-    nourrit les faits de la consigne (« ce que tu sais »).
+    ⚠ IT RETURNED THE MESSAGE ALONE, AND THAT WAS THE DEFECT (01/09/2026). The
+    information realigned below served to build the message… then was thrown
+    away. So the campaign moved to the next slot with an up-to-date message and
+    a CONFIGURATION still on the old one — yet it is the configuration that
+    feeds the briefing's facts (`what you know`).
 
-    CE QUE ÇA A DONNÉ, mesuré sur sa campagne n°133 : la présentation disait
-    « une place s'est libérée le vendredi 2 octobre 2026 à 9 heures 40 » et
-    les faits disaient « Créneau libéré : mercredi 2 septembre 2026 à
-    9 heures 40 » — la place que le PREMIER contact venait de prendre. CALL-E
-    a refusé la tâche (422) avec la question exacte :
+    WHAT THAT PRODUCED, measured on his campaign no. 133: the opening said `a
+    slot has come free on Friday 2 October 2026 at 9:40` and the facts said
+    `Freed slot: Wednesday 2 September 2026 at 9:40` — the slot the FIRST
+    contact had just taken. CALL-E refused the task (422) with the exact
+    question:
 
-        « Quelle est la bonne date du créneau libéré à proposer à madame
-          Émilie Aubry ? »
+    `What is the correct date of the freed slot to offer Mrs Émilie Aubry?`
 
-    Il avait raison de demander : les deux dates étaient dans le même envoi.
+    It was right to ask: both dates were in the same submission.
     """
     recette = configuration.get("recette") or {}
     code = INFO_CRENEAU_PAR_NATURE.get(campagne["nature"])
@@ -3346,8 +3210,8 @@ def mission_sur_la_place(base, preferences, campagne, configuration, horaire):
         return None, None
     infos = dict(configuration.get("infos") or {})
     infos[code] = horaire
-    # Les listes de créneaux CALCULÉES sont recalculées : annoncer les places
-    # d'hier ferait proposer au téléphone des places déjà prises.
+    # The COMPUTED slot lists are recomputed: announcing yesterday's slots
+    # would have already-taken slots offered on the phone.
     a_deplacer = rendezvous_a_deplacer(base, campagne)
     jours_ecartes = jours_a_vider(base, campagne)
     for autre in (configuration.get("infos_auto") or {}):
@@ -3361,25 +3225,25 @@ def mission_sur_la_place(base, preferences, campagne, configuration, horaire):
 
 
 def avancer_sur_la_place_suivante(base, preferences, campagne, configuration):
-    """Note la place pourvue et passe à la suivante.
+    """Records the slot as filled and moves to the next.
 
-    Rend (campagne relue, configuration relue, place suivante ou None,
-    raison de l'arrêt quand il n'y a pas de suivante).
+    Returns (campaign read back, configuration read back, next slot or None,
+    the reason for stopping when there is no next one).
 
-    ⚠ ON RELIT LA CAMPAGNE EN BASE. Le dictionnaire que la boucle garde en
-    mémoire date du démarrage : continuer avec lui ferait écrire le OUI
-    suivant sur la place DÉJÀ POURVUE — deux personnes à la même heure.
-    C'est le défaut le plus grave qu'ait trouvé la revue du 03/08/2026.
+    ⚠ WE READ THE CAMPAIGN BACK FROM THE DATABASE. The dictionary the loop
+    holds in memory dates from start-up: carrying on with it would write the
+    next YES onto the slot ALREADY FILLED — two people at the same hour. It is
+    the most serious defect the review of 03/08/2026 found.
 
-    ⚠ ON N'AVANCE PAS SI LE MESSAGE NE PEUT PAS SUIVRE. Mieux vaut une
-    campagne qui s'arrête en le disant qu'un agent qui annonce une date et
-    en réserve une autre.
+    ⚠ WE DO NOT ADVANCE WHEN THE MESSAGE CANNOT FOLLOW. Better a campaign that
+    stops while saying so than an agent that announces one date and books
+    another.
     """
-    # ⚠ ELLE NE REÇOIT PLUS LA PLACE POURVUE. On la lui passait, capturée
-    # AVANT l'appel — or avec plusieurs places annoncées, celle qui est prise
-    # n'est pas forcément celle-là. C'est la branche « accepted » qui marque,
-    # puisqu'elle seule sait laquelle la personne a retenue. Ici on se
-    # contente de relire et de chercher la suivante.
+    # ⚠ IT NO LONGER RECEIVES THE FILLED SLOT. We used to pass it, captured
+    # BEFORE the call — yet with several slots announced, the one taken is not
+    # necessarily that one. It is the `accepted` branch that marks it, since it
+    # alone knows which one the person chose. Here we simply read back and look
+    # for the next.
     campagne_id = campagne["id"]
     campagne = base.obtenir_campagne(campagne_id)
     configuration = configuration_campagne(campagne)
@@ -3397,19 +3261,19 @@ def avancer_sur_la_place_suivante(base, preferences, campagne, configuration):
                 "campagne a été récrit à la main et porte la date de sa "
                 "place : l'annoncer sur une autre date aurait fait prendre "
                 "un rendez-vous à une heure jamais dite au téléphone")
-    # ⚠ LA CONFIGURATION SUIT LA PLACE, ELLE AUSSI (01/09/2026). Seules la
-    # colonne « creneau » et le message avançaient ; les informations d'étape 2
-    # restaient sur la place précédente, et la consigne annonçait donc deux
-    # dates pour une seule place. Les infos viennent du MÊME calcul que le
-    # message — elles ne peuvent pas diverger de lui.
+    # ⚠ THE CONFIGURATION FOLLOWS THE SLOT TOO (01/09/2026). Only the `creneau`
+    # column and the message advanced; the step-2 information stayed on the
+    # previous slot, and the briefing therefore announced two dates for one
+    # slot. The information comes from the SAME computation as the message — it
+    # cannot diverge from it.
     a_ecrire = dict(configuration)
     a_ecrire["infos"] = infos
     base.definir_configuration_campagne(
         campagne_id, json.dumps(a_ecrire, ensure_ascii=False))
     base.definir_creneau_campagne(campagne_id, suivante["horaire"], mission)
     campagne = base.obtenir_campagne(campagne_id)
-    # ⚠ LA RÈGLE EST REJOUÉE ICI, et nulle part ailleurs : sur la place qui
-    # vient d'être choisie, une fois que la campagne la porte vraiment.
+    # ⚠ THE RULE IS REPLAYED HERE, and nowhere else: on the slot that has just
+    # been chosen, once the campaign really carries it.
     regenerer_la_liste(base, preferences, campagne,
                        configuration_campagne(campagne))
     journal.info("Campagne n°%d : place pourvue, on passe à la suivante (%s)",
@@ -3418,14 +3282,14 @@ def avancer_sur_la_place_suivante(base, preferences, campagne, configuration):
 
 
 def ordonner_contacts(contacts, ordre, creneau=None):
-    """Applique l'ordre d'appel CHOISI à l'étape 2 (jamais imposé)."""
+    """Applies the calling order CHOSEN at step 2 (never imposed)."""
     def date_rdv(contact):
         return champs_contact(contact).get("rdv_existant", "")
     if ordre == "eloignement":
-        # ⚠ LE PLUS LOINTAIN D'ABORD, et c'est le défaut de « créneau libéré ».
-        # C'est lui qui a le plus à gagner à avancer sur la place qui se
-        # libère ; celui dont le rendez-vous est déjà proche n'y gagnerait
-        # presque rien. Sans date, on passe en dernier : on ne devine pas.
+        # ⚠ THE FURTHEST FIRST, and it is `créneau libéré`'s default. That
+        # person has the most to gain from moving forward onto the slot that
+        # comes free; somebody whose appointment is already near would gain
+        # almost nothing. With no date, they go last: we do not guess.
         return sorted(contacts,
                       key=lambda c: (not date_rdv(c),
                                      _decroissant(date_rdv(c))))
@@ -3443,30 +3307,29 @@ def ordonner_contacts(contacts, ordre, creneau=None):
     if ordre == "alphabetique":
         return sorted(contacts,
                       key=lambda c: generation._cle_alphabetique(c["nom"]))
-    return list(contacts)  # « liste » : l'ordre des rangs
+    return list(contacts)  # `liste`: the order of the ranks
 
 
-# ------------------------------------- l'agenda est-il à jour ? (avant ▶)
-# Le travail est DOUBLE (§8.1) : déplacer ou prendre un rendez-vous change
-# l'agenda LOCAL de RingBack **et** alimente le cahier des changements que
-# l'opérateur reporte dans son propre logiciel. Conséquence : TOUT le
-# produit s'appuie sur cet agenda — les créneaux annoncés au téléphone en
-# sont déduits, et un agenda périmé fait proposer des places déjà prises
-# dans la vraie vie. D'où le rappel au moment de démarrer.
-#
-# Cette fonction ne décide rien et n'estime rien : elle RASSEMBLE LES FAITS
-# de la base et des réglages, à l'instant du clic. Ce qui n'existe pas (la
-# date du dernier import quand rien n'a jamais été importé) vaut None et
-# s'affichera « inconnue » — jamais une valeur inventée.
+# ------------------------------------- is the calendar up to date? (before ▶)
+# The work is TWOFOLD (§8.1): moving or booking an appointment changes
+# RingBack's LOCAL calendar **and** feeds the change log the operator carries
+# over into their own software. Consequence: THE WHOLE product rests on that
+# calendar — the slots announced on the phone are deduced from it, and a stale
+# calendar leads to offering slots already taken in real life. Hence the
+# reminder at the moment of starting.  This function decides nothing and
+# estimates nothing: it GATHERS THE FACTS from the database and the settings,
+# at the instant of the click. What does not exist (the date of the last import
+# when nothing was ever imported) is None and will show as `unknown` — never an
+# invented value.
 def _prochaines_annoncees(base, preferences, campagne, maintenant,
                           sauf_places, sauf_jours, combien=3):
-    """Les premières places que l'agent annoncera VRAIMENT — écarts compris.
+    """The first slots the agent will REALLY announce — exclusions included.
 
-    Le panneau d'avant-démarrage n'a qu'une raison d'exister : lui laisser
-    comparer ces dates à son vrai planning. Elles doivent donc sortir du même
-    calcul que le message — mêmes journées écartées, mêmes places écartées, et
-    la même séparation par durée (une place de 20 minutes ne se propose pas
-    pour une séance de 40).
+    The pre-start panel has one reason to exist: letting him compare those
+    dates with his real schedule. So they must come out of the same computation
+    as the message — the same days set aside, the same slots set aside, and the
+    same separation by length (a 20-minute slot is not offered for a 40-minute
+    session).
     """
     durees = durees_a_deplacer(base, campagne) or {1: 0}
     pas = horaires.pas_minutes(preferences)
@@ -3483,28 +3346,22 @@ def _prochaines_annoncees(base, preferences, campagne, maintenant,
     if not blocs:
         return ""
     if len(blocs) == 1:
-        # Une seule durée : pas d'étiquette, c'est le cas courant.
+        # A single length: no label, it is the common case.
         return blocs[0].split(" : ", 1)[1]
     return " ; ".join(blocs)
 
 
 def verification_agenda(base, preferences, campagne, contacts=None,
                         maintenant=None):
-    """Les faits réels sur l'agenda, juste avant de démarrer CETTE campagne.
+    """The real facts about the calendar, just before starting THIS campaign.
 
-    Rend un dictionnaire :
-    - « debut », « fin » : la période que touche la campagne (l'horizon des
-      créneaux proposables, élargi aux dates propres de la campagne) ;
-    - « rendezvous », « occupants » : les rendez-vous connus sur cette
-      période, et ceux qui occupent réellement une place ;
-    - « places », « places_manuelles », « prochaines » : ce que RingBack
-      peut proposer maintenant (calculé + ajouté à la main), et le début de
-      la liste telle qu'elle sera annoncée ;
-    - « creneaux » : « calcules » (recalculés avant chaque appel),
-      « a_la_main » (liste écrite par l'utilisateur, jamais recalculée) ou
-      « aucun » ;
-    - « import » : la trace du dernier import de fichier, ou None ;
-    - « alertes » : les signes OBJECTIFS que l'agenda est douteux.
+    Returns a dictionary:
+    - `debut`, `fin`: the period the campaign touches (the horizon of offerable slots, widened to the campaign's own dates);
+    - `rendezvous`, `occupants`: the appointments known over that period, and those really occupying a slot;
+    - `places`, `places_manuelles`, `prochaines`: what RingBack can offer now (computed + added by hand), and the start of the list as it will be announced;
+    - `creneaux`: `calcules` (recomputed before every call), `a_la_main` (a list written by the user, never recomputed) or `aucun`;
+    - `import`: the trace of the last file import, or None;
+    - `alertes`: the OBJECTIVE signs that the calendar is doubtful.
     """
     maintenant = (maintenant or datetime.datetime.now()).replace(
         second=0, microsecond=0)
@@ -3512,9 +3369,9 @@ def verification_agenda(base, preferences, campagne, contacts=None,
     if contacts is None:
         contacts = base.contacts_de_campagne(campagne["id"])
     contacts = list(contacts)
-    # 1. La période concernée : l'horizon des créneaux proposables, élargi
-    #    aux dates que la campagne touche vraiment (le rendez-vous existant
-    #    d'un contact peut tomber bien après cet horizon).
+    # 1. The period concerned: the horizon of offerable slots, widened to the
+    # dates the campaign really touches (a contact's existing appointment may
+    # fall well beyond that horizon).
     debut = maintenant
     fin = maintenant + datetime.timedelta(days=horaires.HORIZON_JOURS)
     dates = [campagne.get("creneau")]
@@ -3531,23 +3388,22 @@ def verification_agenda(base, preferences, campagne, contacts=None,
             continue
         debut = min(debut, moment)
         fin = max(fin, moment + datetime.timedelta(minutes=1))
-    # 2. Ce que la base connaît sur cette période (aucun chiffre estimé).
+    # 2. What the database knows over that period (no estimated figure).
     connus = base.rendezvous_de_periode(debut.isoformat(timespec="minutes"),
                                         fin.isoformat(timespec="minutes"))
     occupants = [rdv for rdv in connus
                  if rdv["statut"] in horaires.STATUTS_OCCUPANTS]
-    # 3. Ce que RingBack peut proposer à cet instant — les MÊMES écarts que
-    #    les créneaux annoncés au téléphone, jamais un autre calcul.
-    #
-    # ⚠ CE PARAGRAPHE PROMETTAIT DÉJÀ « la MÊME source », et il mentait
-    # (mesuré le 17/08/2026). L'appel se faisait sans les journées que la
-    # campagne vide, sans les places qu'elle libère et sans les durées : sur sa
-    # campagne du 18/08, le panneau annonçait « les premières places qu'il
-    # annoncera : le 18/08 à 09h00, 09h40, 10h20 » — trois places du jour même
-    # qu'il était en train de vider —, alors que le message de la campagne
-    # commençait bien au 19/08. Et c'est le SEUL écran fait pour qu'il
-    # vérifie : il lui montrait des dates qui ne seraient jamais dites, en
-    # l'invitant à tout arrêter si elles ne lui convenaient pas.
+    # 3. What RingBack can offer at that instant — the SAME exclusions as the
+    # slots announced on the phone, never another computation.  ⚠ THIS
+    # PARAGRAPH ALREADY PROMISED `the SAME source`, and it was lying (measured
+    # on 17/08/2026). The call was made without the days the campaign is
+    # emptying, without the slots it frees and without the lengths: on his
+    # campaign of 18/08, the panel announced `the first slots it will announce:
+    # 18/08 at 09:00, 09:40, 10:20` — three slots from the very day he was
+    # emptying —, while the campaign's message did start on 19/08. And it is
+    # the ONLY screen made for him to check: it showed him dates that would
+    # never be spoken, while inviting him to stop everything should they not
+    # suit him.
     sauf_places = places_a_vider(base, campagne)
     sauf_jours = jours_a_vider(base, campagne)
     proposables = horaires.creneaux_proposables(base, preferences,
@@ -3557,12 +3413,12 @@ def verification_agenda(base, preferences, campagne, contacts=None,
               and entree["horaire"] not in sauf_places
               and entree["horaire"][:10] not in sauf_jours]
     manuelles = [entree for entree in places if entree["origine"] == "à la main"]
-    # 4. Cette campagne annonce-t-elle des créneaux, et lesquels ?
+    # 4. Does this campaign announce slots, and which ones?
     auto = configuration.get("infos_auto") or {}
     mission = campagne.get("mission") or ""
-    # Un créneau n'est « annoncé » que s'il figure VRAIMENT dans le message :
-    # une liste renseignée dont la phrase n'entre pas dans le texte (segment
-    # conditionné par une option décochée) n'annonce rien du tout.
+    # A slot is only `announced` when it really appears IN the message: a
+    # filled-in list whose sentence does not enter the text (a segment
+    # conditioned by an unticked option) announces nothing at all.
     a_la_main = [configuration["infos"].get(info["code"]) or ""
                  for info in NATURES.get(campagne.get("nature"),
                                          {}).get("infos", ())
@@ -3573,7 +3429,7 @@ def verification_agenda(base, preferences, campagne, contacts=None,
         creneaux = "a_la_main"
     else:
         creneaux = "aucun"
-    # 5. Les signes OBJECTIFS qu'il y a un problème — dits franchement.
+    # 5. The OBJECTIVE signs that there is a problem — stated frankly.
     alertes = []
     semaine_reglee = horaires.semaine_ouverte(preferences)
     if not semaine_reglee:
@@ -3607,55 +3463,55 @@ def verification_agenda(base, preferences, campagne, contacts=None,
     }
 
 
-# --------------------------------------------------- cahier de changements
-# Le vrai livrable d'une campagne n'est pas « des appels passés » : c'est la
-# liste des changements à REPORTER dans le logiciel de planification de
-# l'établissement. Quatre genres, et rien d'autre — la table du §8.1.
+# --------------------------------------------------- change log A campaign's
+# real deliverable is not `calls placed`: it is the list of changes to be
+# CARRIED OVER into the establishment's scheduling software. Four kinds, and
+# nothing else — the §8.1 table.
 GENRES_CHANGEMENT = {
     "ajout": ("➕", "Rendez-vous ajouté"),
     "suppression": ("➖", "Rendez-vous supprimé"),
     "deplacement": ("↔", "Rendez-vous déplacé"),
     "humain": ("🙋", "À traiter par un humain"),
-    # ⚠ CE CHANGEMENT-LÀ NE TOUCHE PAS AU PLANNING, et il a quand même sa
-    # ligne : c'est le seul endroit qui garde QUAND et POURQUOI un contact a
-    # cessé d'être appelable. Sans elle, un 🚫 posé au téléphone serait
-    # indistinguable d'un 🚫 posé à la main six mois plus tôt.
+    # ⚠ THAT CHANGE DOES NOT TOUCH THE SCHEDULE, and it still has its row: it
+    # is the only place that keeps WHEN and WHY a contact stopped being
+    # callable. Without it, a 🚫 set on the phone would be indistinguishable
+    # from a 🚫 set by hand six months earlier.
     "ne_plus_appeler": ("🚫", "Ne plus appeler — demandé au téléphone"),
-    # ⚠ PLUS DOUX QUE LE 🚫, et c'est pour cela qu'il a sa propre ligne : la
-    # personne reste appelable pour SES rendez-vous, elle refuse seulement
-    # qu'on lui propose des places libérées.
+    # ⚠ GENTLER THAN THE 🚫, and that is why it has its own row: the person
+    # stays callable about THEIR OWN appointments, they only refuse to be
+    # offered freed slots.
     "plus_de_proposition": ("🔇", "Ne plus proposer de créneau — demandé au "
                                   "téléphone"),
-    # ⚠ AJOUTÉ LE 11/08/2026 avec la règle du rappel par un humain. Sur une
-    # campagne de créneau libéré, une réponse non conclusive fait passer le
-    # rendez-vous de la personne en « confirmé » (voir _confirmer_le_rendezvous).
-    # C'est un changement de STATUT, pas de date : ni un ajout, ni un
-    # déplacement, ni une suppression — d'où sa propre ligne. Et il DOIT en avoir
-    # une : l'opérateur a ce statut à reporter dans son propre logiciel.
+    # ⚠ ADDED ON 11/08/2026 along with the human call-back rule. On a
+    # freed-slot campaign, a non-conclusive answer moves the person's
+    # appointment to `confirmé` (see _confirmer_le_rendezvous). It is a change
+    # of STATUS, not of date: neither an addition, nor a move, nor a deletion —
+    # hence its own row. And it MUST have one: the operator has that status to
+    # carry over into their own software.
     "confirmation": ("✅", "Rendez-vous confirmé"),
-    # ⚠ AJOUTÉ LE 17/08/2026 avec sa règle : « si la personne doit rappeler, le
-    # rendez-vous est simplement annulé ». Ni une suppression (la ligne reste au
-    # planning) ni un déplacement (aucune nouvelle date) : sa propre ligne.
+    # ⚠ ADDED ON 17/08/2026 along with his rule: `if the person has to call
+    # back, the appointment is simply cancelled`. Neither a deletion (the row
+    # stays on the schedule) nor a move (no new date): its own row.
     "annulation": ("✖", "Rendez-vous annulé"),
 }
 
-# Les deux genres qui RETIRENT un rendez-vous du planning. Ils portent la même
-# information — une date qui se libère — et se lisent donc pareil : c'est
-# l'ANCIENNE date qu'on montre, jamais une nouvelle (il n'y en a pas).
-#
-# ⚠ QUI ÉCRIT LEQUEL se décide dans `horaires.genre_de_retrait`, à côté de la
-# règle qui décide du statut : le mot du cahier ne peut donc pas diverger de
-# l'état du rendez-vous. C'était le défaut n° 5 du 18/08/2026.
+# The two kinds that REMOVE an appointment from the schedule. They carry the
+# same information — a date coming free — and are therefore read the same way:
+# it is the OLD date that is shown, never a new one (there is none).  ⚠ WHICH
+# ONE IS WRITTEN is decided in `horaires.genre_de_retrait`, beside the rule
+# that decides the status: the log's word therefore cannot diverge from the
+# appointment's state. That was defect no. 5 of 18/08/2026.
 GENRES_QUI_RETIRENT = ("suppression", "annulation")
 
 
-# Les colonnes de l'export, dans l'ordre où on les lit.
+# The export's columns, in the order they are read.
 COLONNES_CAHIER = ("Changement", "Qui", "Ancienne date", "Nouvelle date",
                    "Motif", "Durée", "Pourquoi / demande")
 
 
 def duree_lisible_tranches(preferences, tranches):
-    """« 30 minutes » depuis un nombre de tranches — la durée SUIT le rendez-vous."""
+    """`30 minutes` from a number of slots — the length FOLLOWS the appointment.
+    """
     try:
         nombre = max(int(tranches or 1), 1)
     except (TypeError, ValueError):
@@ -3664,11 +3520,11 @@ def duree_lisible_tranches(preferences, tranches):
 
 
 def noter_changement(base, campagne, contact, genre, nom=None, **details):
-    """Écrit UNE ligne du cahier, à l'instant même où le planning bouge.
+    """Writes ONE row of the log, at the very moment the schedule moves.
 
-    Enregistrer au moment du changement plutôt que de reconstituer après
-    coup : c'est la seule façon de garantir qu'aucun changement ne se perd
-    (un état de contact écrasé par une relance effacerait la trace).
+    Recording at the moment of the change rather than reconstructing
+    afterwards: it is the only way to guarantee no change is lost (a contact
+    state overwritten by a follow-up would erase the trace).
     """
     contact_id = contact["id"] if contact else None
     return base.ajouter_changement(
@@ -3677,10 +3533,10 @@ def noter_changement(base, campagne, contact, genre, nom=None, **details):
 
 
 def ligne_cahier(changement):
-    """UNE ligne du cahier, lisible d'un coup d'œil, rien à déduire.
+    """ONE row of the log, readable at a glance, nothing to deduce.
 
-    Les dates sont en français (« le 03/08/2026 à 09h00 ») parce que
-    quelqu'un va les RETAPER dans un autre logiciel.
+    The dates are in French (`le 03/08/2026 à 09h00`) because somebody is going
+    to RETYPE them into another program.
     """
     icone, libelle = GENRES_CHANGEMENT.get(changement["genre"],
                                            ("•", changement["genre"]))
@@ -3704,7 +3560,7 @@ def ligne_cahier(changement):
 
 
 def cellules_cahier(changement):
-    """Les cellules d'export d'un changement, dans l'ordre de COLONNES_CAHIER."""
+    """A change's export cells, in the order of COLONNES_CAHIER."""
     _, libelle = GENRES_CHANGEMENT.get(changement["genre"],
                                        ("•", changement["genre"]))
     return [libelle, changement["nom"],
@@ -3714,7 +3570,7 @@ def cellules_cahier(changement):
 
 
 def cahier_texte(changements, titre=""):
-    """Le cahier en texte brut — c'est CE texte que le bouton « Copier » copie."""
+    """The log as plain text — it is THAT text the `Copier` button copies."""
     lignes = []
     if titre:
         lignes += [titre, "=" * len(titre), ""]
@@ -3728,11 +3584,11 @@ def cahier_texte(changements, titre=""):
 
 
 def cahier_csv(changements):
-    """Le cahier en CSV (point-virgule), généré à la volée, jamais stocké.
+    """The log as CSV (semicolon), generated on the fly, never stored.
 
-    csv.writer plutôt qu'un « ; ».join : la demande d'un client, notée en
-    clair, peut contenir un point-virgule ou un guillemet — elle doit
-    ressortir intacte dans le tableur.
+    csv.writer rather than a `;`.join: a client's request, noted in clear, may
+    contain a semicolon or a quotation mark — it must come out intact in the
+    spreadsheet.
     """
     tampon = io.StringIO()
     graveur = csv.writer(tampon, delimiter=";", lineterminator="\r\n")
@@ -3743,46 +3599,34 @@ def cahier_csv(changements):
 
 
 def resume_cahier(changements):
-    """Le compte par genre, dans l'ordre du §8.1 — pour le bandeau de la fiche."""
+    """The count by kind, in §8.1's order — for the record's banner."""
     return [(genre, icone, libelle,
              sum(1 for c in changements if c["genre"] == genre))
             for genre, (icone, libelle) in GENRES_CHANGEMENT.items()]
 
 
 def changement_mis_en_avant(changements):
-    """Le déplacement qui a satisfait le besoin (§8.2), ou None.
+    """The move that met the need (§8.2), or None.
 
-    « Le résumé met en avant le contact qui a MODIFIÉ son rendez-vous » :
-    c'est le dernier ↔ du cahier — celui qui a conclu la campagne.
+    `The summary highlights the contact who MODIFIED their appointment`: it is
+    the log's last ↔ — the one that concluded the campaign.
     """
     deplacements = [c for c in changements if c["genre"] == "deplacement"]
     return deplacements[-1] if deplacements else None
 
 
-# ------------------------------------------------------------- exécution
+# ------------------------------------------------------------- execution
 def _nombre_tentatives(base, contact_id):
     return len(base.appels_du_contact_campagne(contact_id))
 
 
 def _rendezvous_manque_par_la_relance(base, contact_id, echeance, maintenant):
-    """Le rendez-vous que la relance RATERAIT, sinon None.
+    """The appointment the follow-up would MISS, otherwise None.
 
-    Le rendez-vous se lit là où il est : la colonne liée quand la liste vient
-    du planning ou de la base, la date saisie quand elle vient d'un collage.
-    Sans rendez-vous — une prise de rendez-vous, par exemple — il n'y a rien à
-    devancer, et la relance garde son échéance.
-
-    ⚠ DEUX CONDITIONS, ET LA SECONDE M'AVAIT ÉCHAPPÉ (18/08/2026). Il ne suffit
-    pas que l'échéance tombe après le rendez-vous : encore faut-il que ce
-    rendez-vous soit ENCORE DEVANT NOUS au moment de l'appel. Ma première
-    version n'avait que la première condition, et le banc l'a arrêtée sur onze
-    contrôles : une campagne de « rendez-vous MANQUÉS » travaille par
-    construction sur des dates passées — la relance n'y est pas trop tard,
-    elle EST le suivi. J'aurais envoyé vers un humain tous les rappels de
-    manqués du produit.
-
-    On ne protège donc que ce sur quoi on peut encore agir : un rendez-vous à
-    venir, qu'une relance trop tardive ferait manquer.
+    The appointment is read where it is: the linked column when the list comes
+    from the schedule or the database, the date typed in when it comes from a
+    paste. With no appointment — a booking, for instance — there is nothing to
+    get ahead of, and the follow-up keeps its due date.
     """
     contact = base.obtenir_contact_campagne(contact_id)
     if contact is None:
@@ -3804,44 +3648,42 @@ def _rendezvous_manque_par_la_relance(base, contact_id, echeance, maintenant):
 
 def _apres_non_joint(base, preferences, campagne, options, contact_id,
                      issue, maintenant=None):
-    """Pas de réponse (ou échec technique) : rappel programmé, ou « injoignable »
-    quand le NOMBRE MAXIMAL DE RAPPELS est atteint — jamais d'appel spontané :
-    le rappel enregistré attend le geste « Lancer les relances ».
+    """No answer (or a technical failure): a reminder scheduled, or `injoignable`
+    when the MAXIMUM NUMBER OF REMINDERS is reached — never a spontaneous call:
+    the recorded reminder waits for the `Lancer les relances` gesture.
 
-    ⚠ LE MAXIMUM S'APPLIQUE PARTOUT, SIMULATION COMPRISE (21/08/2026, sa
-    décision). Il avait demandé le contraire le 18/08 — « en mode simulation, il
-    ne faut pas faire la finalité du plafond atteint » —, et c'était pour une
-    bonne raison : ses campagnes d'essai s'arrêtaient là sans qu'il voie la
-    suite. Deux choses ont changé depuis :
+    ⚠ THE MAXIMUM APPLIES EVERYWHERE, SIMULATION INCLUDED (21/08/2026, his
+    decision). He had asked for the opposite on 18/08 — `in simulation mode, we
+    must not do the ceiling-reached ending` —, and it was for a good reason:
+    his test campaigns stopped there without him seeing what followed. Two
+    things have changed since:
 
-    · CE QUI LE GÊNAIT EST RÉGLÉ AUTREMENT. Au maximum de rappels, une campagne
-      de déplacement ANNULE désormais le rendez-vous, libère la place et renvoie
-      la personne vers un rappel humain (20/08). Ce n'est plus un cul-de-sac.
+    · WHAT BOTHERED HIM IS SETTLED ANOTHER WAY. At the maximum number of
+    reminders, a move campaign now CANCELS the appointment, frees the slot and
+    sends the person to a human call-back (20/08). It is no longer a dead end.
 
-    · LA LEVÉE N'AVAIT AUCUNE BORNE, et c'est un essai qui l'a montré : maximum
-      réglé à 3, TREIZE rappels armés en douze tours, sans fin — donc aucun
-      rendez-vous jamais annulé en simulation. Une simulation qui se comporte
-      autrement que le réel ne prédit plus le réel.
+    · LIFTING IT HAD NO BOUND, and a test showed it: maximum set to 3, THIRTEEN
+    reminders armed in twelve rounds, endlessly — hence no appointment ever
+    cancelled in simulation. A simulation that behaves differently from the
+    real thing no longer predicts the real thing.
     """
     tentatives = _nombre_tentatives(base, contact_id)
     maximum = maximum_rappels(preferences, options)
     if options.get("recontacter", True) and tentatives <= maximum:
         echeance = echeance_relance_campagne(preferences, options, maintenant)
-        # ⚠ JAMAIS UNE RELANCE QUI SONNERAIT APRÈS LE RENDEZ-VOUS — son défaut
-        # n° 12 du 18/08/2026. L'échéance se calcule à partir de MAINTENANT
-        # (délai en heures ouvrées, ou créneau de rappel quotidien) sans jamais
-        # regarder la date dont on veut parler à la personne.
-        #
-        # REPRODUIT : rendez-vous demain à 08h00, appel sans réponse ce soir,
-        # créneau de rappel réglé 12h00-14h00 → relance programmée demain à
-        # 12h00, QUATRE HEURES après le rendez-vous. On aurait appelé quelqu'un
-        # pour déplacer un rendez-vous déjà passé — ou qu'il vient de manquer.
-        # C'est le cas courant d'une campagne qui vide le lendemain.
-        #
-        # On ne programme donc rien, et le contact part vers un humain : il
-        # RESTE quelque chose à faire, et seule une personne peut le faire à
-        # temps. Même état terminal que les autres impasses (voir
-        # `noter_reponse_illisible`) : aucune relance, aucun plafond approché.
+        # ⚠ NEVER A FOLLOW-UP THAT WOULD RING AFTER THE APPOINTMENT — his
+        # defect no. 12 of 18/08/2026. The due date is computed from NOW (a
+        # delay in working hours, or a daily call-back window) without ever
+        # looking at the date we want to talk to the person about.  REPRODUCED:
+        # appointment tomorrow at 08:00, unanswered call this evening,
+        # call-back window set 12:00-14:00 → follow-up scheduled tomorrow at
+        # 12:00, FOUR HOURS after the appointment. We would have called
+        # somebody to move an appointment already past — or that they had just
+        # missed. It is the common case of a campaign emptying the next day.
+        # So nothing is scheduled, and the contact goes to a human: something
+        # REMAINS to be done, and only a person can do it in time. The same
+        # terminal state as the other dead ends (see
+        # `noter_reponse_illisible`): no follow-up, no ceiling approached.
         trop_tard = _rendezvous_manque_par_la_relance(
             base, contact_id, echeance,
             maintenant or datetime.datetime.now())
@@ -3886,30 +3728,30 @@ def _liberer_ancien_rendezvous(base, preferences, campagne, options, contact,
                                pourquoi=MOTIF_LIBERATION_CRENEAU,
                                maintenant=None, deplace_vers=None,
                                nouveau_rdv_id=None, trace=None):
-    """Un OUI libère l'ancien rendez-vous du client (jamais deux rendez-vous
-    pour la même personne). Rend une description lisible, ou "".
+    """A YES frees the client's old appointment (never two appointments for the
+    same person). Returns a readable description, or "".
 
-    Contact repris de la base : SON rendez-vous quitte le planning — avec le
-    statut que décide horaires.decision_annulation, la règle du propriétaire
-    tenue en un seul endroit (« supprimé » s'il est devant nous, « annulé »
-    s'il est déjà passé : le statut d'histoire). Contact collé : si un
-    rendez-vous du même client au même horaire existe en base, il subit le
-    même sort ; sinon la date saisie est rappelée (l'agenda est ailleurs).
-    Si l'option « libérer son créneau » est cochée, l'horaire libéré rejoint
-    les créneaux disponibles des réglages (visible dans ⚙ Réglages).
-    Dans les deux cas, une ligne ➖ entre au cahier de changements : c'est
-    une suppression à reporter dans le logiciel de planification, et elle
-    porte QUI, QUAND, le MOTIF et la RAISON — c'est là que vit l'histoire.
+    A contact taken from the database: THEIR appointment leaves the schedule —
+    with the status horaires.decision_annulation decides, the owner's rule held
+    in one place (`supprimé` when it is ahead of us, `annulé` when it is
+    already past: the history status). A pasted contact: when an appointment
+    for the same client at the same time exists in the database, it meets the
+    same fate; otherwise the date typed in is recalled (the calendar is
+    elsewhere). When the `free their slot` option is ticked, the freed time
+    joins the settings' available slots (visible in ⚙ Réglages). In both cases,
+    a ➖ row enters the change log: it is a deletion to be carried over into the
+    scheduling software, and it carries WHO, WHEN, the REASON and the WHY —
+    that is where the history lives.
 
-    ⚠ `deplace_vers` CHANGE LA NATURE DU GESTE (décision du propriétaire du
-    03/08/2026). Avec une date, le client n'a rien annulé : son rendez-vous a
-    BOUGÉ. L'ancien prend alors le statut « déplacé » — pas « supprimé », pas
-    « annulé » — et le cahier porte UNE ligne ↔ avec ses deux dates, au lieu
-    d'un couple suppression + ajout qui raconterait deux gestes pour un seul.
-    L'ancienne ligne reste en base : l'heure de départ survit même si la
-    campagne est effacée un jour, ce que le cahier seul n'aurait pas permis.
-    ⚠ « déplacé » figure déjà dans STATUTS_SANS_PLACE : la place quittée
-    redevient donc libre, exactement comme avant.
+    ⚠ `deplace_vers` CHANGES THE NATURE OF THE GESTURE (owner's decision of
+    03/08/2026). With a date, the client cancelled nothing: their appointment
+    MOVED. The old one then takes the status `déplacé` — not `supprimé`, not
+    `annulé` — and the log carries ONE ↔ row with both its dates, instead of a
+    deletion + addition pair that would tell of two gestures for one. The old
+    row stays in the database: the departure time survives even should the
+    campaign be erased one day, which the log alone would not have allowed. ⚠
+    `déplacé` is already in STATUTS_SANS_PLACE: the slot left behind therefore
+    becomes free again, exactly as before.
     """
     ancien = None
     if contact.get("rendezvous_id"):
@@ -3924,22 +3766,20 @@ def _liberer_ancien_rendezvous(base, preferences, campagne, options, contact,
         duree = duree_lisible_tranches(preferences,
                                        horaires.duree_tranches(ancien))
         if deplace_vers:
-            # ⚠ UNE SEULE LIGNE, QUI CHANGE DE DATE (décision du propriétaire du
-            # 14/08/2026 : « tu déplaces un rendez-vous d'une date à une autre,
-            # c'est ultra simple »). AVANT : on créait une SECONDE ligne à la
-            # nouvelle date et on marquait l'ancienne « déplacé » — elle restait
-            # donc dans l'agenda, et il voyait deux rendez-vous pour un seul
-            # déplacement, dont un « déplacé » qui n'était jamais supprimé.
-            #
-            # L'histoire ne se perd pas pour autant : le cahier des changements
-            # porte UNE ligne ↔ avec les deux dates, et c'est LUI le livrable de
-            # la campagne. Une ligne fantôme dans l'agenda n'était pas une
-            # mémoire, c'était un doublon.
+            # ⚠ ONE SINGLE ROW, WHICH CHANGES DATE (owner's decision of
+            # 14/08/2026: `you move an appointment from one date to another,
+            # it's dead simple`). BEFORE: a SECOND row was created at the new
+            # date and the old one was marked `déplacé` — so it stayed in the
+            # calendar, and he saw two appointments for one move, one of them a
+            # `déplacé` that was never deleted.  The history is not lost for
+            # all that: the change log carries ONE ↔ row with both dates, and
+            # IT is the campaign's deliverable. A ghost row in the calendar was
+            # not a memory, it was a duplicate.
             base.mettre_a_jour_rendezvous(ancien["id"], statut="confirmé",
                                           horaire=deplace_vers)
-            # L'appelant DOIT savoir qu'une ligne a bougé : sans cela il en
-            # créerait une seconde à la même heure, et l'on retomberait
-            # exactement dans le défaut qu'on vient de retirer.
+            # The caller MUST know a row has moved: without that it would
+            # create a second one at the same hour, and we would fall straight
+            # back into the defect we have just removed.
             if trace is not None:
                 trace["rendezvous_id"] = ancien["id"]
                 trace["ancienne_date"] = ancien["horaire"]
@@ -3976,10 +3816,10 @@ def _liberer_ancien_rendezvous(base, preferences, campagne, options, contact,
                 f"{date_courte(ancien['horaire'])} libéré "
                 f"({decision['statut']})")
     if date_saisie:
-        # La date est connue (elle vient de la liste), mais le rendez-vous
-        # n'est pas dans RingBack : la ligne ➖ garde tout son sens — c'est
-        # dans VOTRE logiciel qu'il faut le retirer. Rien n'a été supprimé
-        # ici, et la raison le dit.
+        # The date is known (it comes from the list), but the appointment is
+        # not in RingBack: the ➖ row keeps its full meaning — it is in YOUR
+        # software that it must be removed. Nothing was deleted here, and the
+        # reason says so.
         noter_changement(
             base, campagne, contact, "suppression",
             ancienne_date=date_saisie,
@@ -3994,10 +3834,11 @@ def _liberer_ancien_rendezvous(base, preferences, campagne, options, contact,
 
 
 def tranches_du_contact(base, contact):
-    """La durée exigée par CE contact, en tranches (1 s'il n'a pas de rendez-vous).
+    """The length THIS contact requires, in slots (1 when they have no
+    appointment).
 
-    Un client dont le rendez-vous dure 30 minutes (2 tranches de 15) ne doit
-    pas s'entendre proposer un trou de 15 minutes.
+    A client whose appointment lasts 30 minutes (2 slots of 15) must not be
+    offered a 15-minute gap.
     """
     if contact.get("rendezvous_id"):
         rdv = base.obtenir_rendezvous(contact["rendezvous_id"])
@@ -4006,27 +3847,25 @@ def tranches_du_contact(base, contact):
     return 1
 
 
-# Les natures dont le but est de VIDER des places, pas d'en pourvoir. Sur
-# celles-là, les places que la campagne libère ne doivent jamais être
-# reproposées : voir `places_a_vider`.
+# The kinds whose purpose is to EMPTY slots, not to fill them. On those, the
+# slots the campaign frees must never be re-offered: see `places_a_vider`.
 NATURES_QUI_VIDENT = ("deplacement",)
 
-# Les natures où un OUI fait QUITTER une place à quelqu'un. Ce sont les seules
-# que l'option « décaler en cascade » concerne : elle ne commande rien d'autre
-# que le sort de cette place (voir `_rendre_la_place` et `_suite_de_cascade`).
-# Un rappel, une confirmation et une prise de rendez-vous ne déplacent
-# personne — la case y était cochable et parfaitement inerte jusqu'au
-# 14/08/2026.
+# The kinds where a YES makes somebody LEAVE a slot. They are the only ones the
+# `shift in cascade` option concerns: it commands nothing but the fate of that
+# slot (see `_rendre_la_place` and `_suite_de_cascade`). A reminder, a
+# confirmation and a booking move nobody — the box was tickable there and
+# perfectly inert until 14/08/2026.
 NATURES_QUI_LIBERENT_UNE_PLACE = ("creneau_libere", "deplacement")
 
 
 def nature_porte_un_rendezvous(nature):
-    """Les contacts de cette nature ont-ils une colonne « rendez-vous existant » ?
+    """Do this kind's contacts have an `existing appointment` column?
 
-    C'est elle que les deux ordres d'appel par date trient (voir
-    `ordonner_contacts`). Sans elle — le cas de la prise de rendez-vous — les
-    proposer laissait l'ordre INCHANGÉ, et la fiche annonçait ensuite un ordre
-    qui n'avait jamais été appliqué (14/08/2026, audit croisé).
+    It is that column the two date-based calling orders sort on (see
+    `ordonner_contacts`). Without it — the booking case — offering them left
+    the order UNCHANGED, and the record then announced an order that had never
+    been applied (14/08/2026, cross audit).
     """
     fiche = fiche_nature(nature) or {}
     return any(champ["code"] == "rdv_existant"
@@ -4034,19 +3873,19 @@ def nature_porte_un_rendezvous(nature):
 
 
 def places_a_vider(base, campagne):
-    """Les places que CETTE campagne est en train de vider — jamais reproposées.
+    """The slots THIS campaign is emptying — never re-offered.
 
-    ⚠ L'ÉCART TROUVÉ PAR L'AUDIT DU 14/08/2026, et c'est le plus visible de
-    tous. Une campagne « Déplacement de rendez-vous » réglée « appeler toute la
-    liste » sert à VIDER une plage — le cas que le produit revendique
-    lui-même : « vider une journée entière ». Or les créneaux de remplacement
-    sont recalculés avant chaque appel : dès que le premier patient accepte de
-    partir, la place qu'il quitte redevient libre… et l'agent la proposait au
-    patient suivant. La campagne remplissait le créneau qu'elle devait vider.
+    ⚠ THE GAP FOUND BY THE 14/08/2026 AUDIT, and it is the most visible of all.
+    A `Déplacement de rendez-vous` campaign set to `call the whole list` serves
+    to EMPTY a range — the case the product itself claims: `empty a whole day`.
+    Yet the replacement slots are recomputed before every call: as soon as the
+    first patient agrees to leave, the slot they vacate becomes free again… and
+    the agent offered it to the next patient. The campaign was filling the slot
+    it was meant to empty.
 
-    On écarte donc les places des rendez-vous de ses propres contacts — ceux
-    qui sont déjà partis comme ceux qui restent à appeler. Sur les autres
-    natures, rien à écarter : elles ne vident rien (voir NATURES_QUI_VIDENT).
+    So we set aside the slots of its own contacts' appointments — those already
+    gone as well as those still to be called. On the other kinds, nothing to
+    set aside: they empty nothing (see NATURES_QUI_VIDENT).
     """
     if campagne.get("nature") not in NATURES_QUI_VIDENT:
         return ()
@@ -4064,16 +3903,16 @@ def places_a_vider(base, campagne):
 
 def places_du_contact(base, preferences, contact, sauf_places=(),
                      sauf_jours=()):
-    """Ce qu'il y a à proposer À CE CONTACT, à cet instant : (texte, 1re place).
+    """What there is to offer TO THIS CONTACT, at this instant: (text, 1st slot).
 
-    UN SEUL calcul, à la bonne durée. C'est lui qui alimente à la fois la
-    liste annoncée dans le message et la date de référence envoyée à
-    l'agent : les deux ne peuvent donc pas diverger, et la place proposée
-    au téléphone est toujours la première de celles qui sont annoncées.
+    ONE SINGLE computation, at the right length. It is what feeds both the list
+    announced in the message and the reference date sent to the agent: so the
+    two cannot diverge, and the slot offered on the phone is always the first
+    of those announced.
 
-    `sauf_places` : les places que la campagne vide et ne doit pas reproposer.
-    `sauf_jours` : les JOURNÉES qu'elle vide — écartées en entier, jusqu'aux
-    trous qui n'ont jamais porté de rendez-vous (voir `jours_a_vider`).
+    `sauf_places`: the slots the campaign empties and must not re-offer.
+    `sauf_jours`: the DAYS it empties — set aside entirely, down to the gaps
+    that never carried an appointment (see `jours_a_vider`).
     """
     return horaires.places_a_proposer(
         base, preferences, tranches=tranches_du_contact(base, contact),
@@ -4081,26 +3920,26 @@ def places_du_contact(base, preferences, contact, sauf_places=(),
 
 
 def stock_du_contact(base, preferences, contact, campagne):
-    """Le STOCK de négociation recalculé POUR CE CONTACT, ou "" — sa durée, et
-    les places que sa campagne est en train de vider.
+    """The negotiation STOCK recomputed FOR THIS CONTACT, or "" — their length,
+    and the slots their campaign is emptying.
 
-    ⚠ POURQUOI IL NE SUFFIT PAS DE REPRENDRE `adaptee` (mesuré le 24/08/2026).
-    `adaptee` vient de `places_du_contact`, c'est-à-dire des SIX prochaines
-    places libres : de quoi ouvrir la conversation, pas de quoi négocier. Sur
-    une campagne de onze déplacements, la campagne enregistrait 77 places et
-    l'agent n'en entendait plus que 6 — toutes la même matinée, en 1 h 15.
-    C'est exactement le dénouement que sa demande du 16/08/2026 avait fait
-    corriger : « les six premières se suivent […] l'agent n'avait donc rien à
-    négocier : "non" sur la première valait "non" sur les six. »
+    ⚠ WHY TAKING `adaptee` BACK IS NOT ENOUGH (measured on 24/08/2026).
+    `adaptee` comes from `places_du_contact`, that is, the SIX next free slots:
+    enough to open the conversation, not enough to negotiate. On a campaign of
+    eleven moves, the campaign recorded 77 slots and the agent only heard 6 —
+    all in the same morning, within 1 h 15. That is exactly the ending his
+    request of 16/08/2026 had had fixed: `the first six follow one another […]
+    so the agent had nothing to negotiate: "no" on the first meant "no" on all
+    six.`
 
-    ⚠ ET LE STOCK SUIT CE QUI RESTE À DÉPLACER, comme partout ailleurs : il est
-    recalculé à chaque appel, donc il décroît avec la file (sa règle du 17/08 —
-    sept places par rendez-vous restant à replacer).
+    ⚠ AND THE STOCK FOLLOWS WHAT REMAINS TO BE MOVED, as everywhere else: it is
+    recomputed at every call, so it shrinks with the queue (his rule of 17/08 —
+    seven slots per appointment left to rebook).
 
-    ⚠ CE N'EST PAS `valeur_calculee_info`, et c'est voulu : celle-ci raisonne au
-    niveau de la CAMPAGNE (elle sait faire une liste par durée). Ici, la durée
-    est connue — c'est celle de la personne qu'on appelle — et une seule liste
-    a un sens. Les exclusions, elles, sont les mêmes qu'ailleurs.
+    ⚠ IT IS NOT `valeur_calculee_info`, and that is intended: that one reasons
+    at CAMPAIGN level (it knows how to make one list per length). Here the
+    length is known — it is that of the person being called — and only one list
+    makes sense. The exclusions, though, are the same as elsewhere.
     """
     if campagne is None or campagne.get("nature") not in NATURES_A_STOCK_VARIE:
         return ""
@@ -4113,23 +3952,17 @@ def stock_du_contact(base, preferences, contact, campagne):
 
 def creneaux_adaptes_au_contact(base, preferences, configuration, contact,
                                 mission, adaptee=None, campagne=None):
-    """Recalcule la liste de créneaux JUSTE AVANT l'appel — durée comprise.
+    """Recomputes the slot list JUST BEFORE the call — length included.
 
-    Deux raisons, une seule opération :
-    1. la liste a été calculée à la CRÉATION de la campagne ; entre-temps
-       des places ont pu être prises, des jours déclarés fermés. On ne
-       propose au téléphone que ce qui est libre à cet instant précis ;
-    2. un client dont le rendez-vous dure 30 minutes (2 tranches de 15) ne
-       doit pas s'entendre proposer un trou de 15 minutes.
-    N'agit que sur une liste CALCULÉE et laissée telle quelle
-    (configuration["infos_auto"]) : une liste retapée à la main n'est jamais
-    touchée, et si le texte a été modifié au point que l'ancienne liste n'y
-    figure plus, on ne remplace rien — jamais de texte inventé.
+    Two reasons, one operation:
+    1. the list was computed when the campaign was CREATED; in the meantime slots may have been taken, days declared closed. We only offer on the phone what is free at that precise instant;
+    2. a client whose appointment lasts 30 minutes (2 slots of 15) must not be offered a 15-minute gap.
+    It only acts on a COMPUTED list left as it stands (configuration["infos_auto"]): a list retyped by hand is never touched, and if the text was modified to the point that the old list no longer appears in it, we replace nothing — never invented text.
 
-    adaptee : la liste déjà calculée par places_du_contact, quand l'appelant
-    l'a sous la main (il s'en sert aussi comme date de référence) — on ne
-    recalcule alors pas une seconde fois, ce qui garantit que le message et
-    la place proposée sortent bien du MÊME calcul.
+    adaptee: the list already computed by places_du_contact, when the caller
+    has it to hand (it also uses it as the reference date) — we then do not
+    recompute a second time, which guarantees that the message and the slot
+    offered do come out of the SAME computation.
     """
     auto = configuration.get("infos_auto") or {}
     if not auto:
@@ -4140,25 +3973,26 @@ def creneaux_adaptes_au_contact(base, preferences, configuration, contact,
                                              tranches=tranches)[0]
     if not adaptee:
         return mission
-    # ⚠ LA PREMIÈRE PLACE SORT DU MÊME CALCUL, par construction : le texte est
-    # bâti par `", ".join(...)` sur la liste dont `places_a_proposer` rend AUSSI
-    # le premier élément. Son premier segment EST donc la place de référence
-    # envoyée à l'agent — jamais un second calcul qui pourrait diverger.
+    # ⚠ THE FIRST SLOT COMES OUT OF THE SAME COMPUTATION, by construction: the
+    # text is built by `", ".join(...)` over the list of which
+    # `places_a_proposer` ALSO returns the first element. Its first segment IS
+    # therefore the reference slot sent to the agent — never a second
+    # computation that could diverge.
     premiere = adaptee.split(", ")[0]
-    # ⚠ ET LE STOCK, LUI, EST UN STOCK (24/08/2026). Sans campagne sous la
-    # main — de vieux appelants, des essais — on retombe sur `adaptee` : c'est
-    # le comportement d'avant, jamais pire.
+    # ⚠ AND THE STOCK IS A STOCK (24/08/2026). With no campaign to hand — old
+    # callers, tests — we fall back on `adaptee`: that is the previous
+    # behaviour, never worse.
     stock = stock_du_contact(base, preferences, contact, campagne) or adaptee
     remplacements = {}
     for code, valeur in auto.items():
         if not valeur or valeur not in mission:
             continue
-        # ⚠ CHACUNE PAR SON PROPRE RÉGLAGE (24/08/2026). Ce maillon-ci écrivait
-        # le STOCK dans les deux : le champ « Créneau proposé en premier » —
-        # celui que la conduite dictée à l'agent appelle « une seule date, pas
-        # la liste » — recevait six dates. Le même défaut avait été corrigé le
-        # 17/08 au rafraîchissement du brouillon et à la reprise en cascade ;
-        # le troisième maillon, celui de l'instant de l'appel, l'avait gardé.
+        # ⚠ EACH BY ITS OWN SETTING (24/08/2026). This link wrote the STOCK
+        # into both: the field `Créneau proposé en premier` — the one the
+        # conduct dictated to the agent calls `a single date, not the list` —
+        # received six dates. The same defect had been fixed on 17/08 at the
+        # draft refresh and at the cascade resumption; the third link, the one
+        # at call time, had kept it.
         neuve = (premiere if reglage_du_code(code) == "creneau_le_plus_proche"
                  else stock)
         if neuve and neuve != valeur:
@@ -4171,18 +4005,17 @@ def creneaux_adaptes_au_contact(base, preferences, configuration, contact,
     return _remplacer_en_une_passe(mission, remplacements)
 
 
-# ⚠ EN UNE SEULE PASSE, ET C'EST TOUT LE POINT. Les valeurs se contiennent les
-# unes les autres : « le mardi 25 août 2026 à 9 heures » est un PRÉFIXE de
-# « le mardi 25 août 2026 à 9 heures 15 », et la date seule est un préfixe de
-# la liste qui commence par elle. Deux `str.replace` d'affilée font donc mordre
-# le second sur ce que le premier vient d'écrire — mesuré le 24/08/2026 : la
-# ligne « Créneaux disponibles pour négocier » dictée à l'agent répétait quatre
-# fois la même liste et rendait « … à 10 heures 15 15 ».
-#
-# Une expression, essayée du plus long au plus court : `re.sub` avance sans
-# jamais relire ce qu'il a écrit, et l'alternative la plus longue gagne.
+# ⚠ IN A SINGLE PASS, AND THAT IS THE WHOLE POINT. The values contain one
+# another: `le mardi 25 août 2026 à 9 heures` is a PREFIX of `le mardi 25 août
+# 2026 à 9 heures 15`, and the date alone is a prefix of the list starting with
+# it. Two `str.replace` in a row therefore have the second bite into what the
+# first has just written — measured on 24/08/2026: the line `Créneaux
+# disponibles pour négocier` dictated to the agent repeated the same list four
+# times and ended `… à 10 heures 15 15`.  One expression, tried from longest to
+# shortest: `re.sub` advances without ever rereading what it has written, and
+# the longest alternative wins.
 def _remplacer_en_une_passe(texte, remplacements):
-    """Remplace chaque valeur par la sienne, sans qu'aucune morde sur l'autre."""
+    """Replaces each value with its own, without any biting into another."""
     valeurs = sorted((v for v in remplacements if v), key=len, reverse=True)
     if not valeurs:
         return texte
@@ -4190,14 +4023,13 @@ def _remplacer_en_une_passe(texte, remplacements):
     return motif.sub(lambda trouve: remplacements[trouve.group(0)], texte)
 
 
-# ⚠ UN CODE, UN RÉGLAGE — quelle que soit la nature qui porte l'information.
-# C'est ce qui permet de retrouver le réglage là où l'on n'a pas la nature sous
-# la main, sans changer la signature de trois fonctions et de leurs essais. Un
-# essai le vérifie sur TOUTES les natures : le jour où deux d'entre elles
-# donneraient deux réglages au même code, il le dira avant que ce détour ne
-# devienne un mensonge.
+# ⚠ ONE CODE, ONE SETTING — whatever the kind carrying the information. That is
+# what makes it possible to find the setting where the kind is not to hand,
+# without changing the signature of three functions and their tests. A test
+# checks it on EVERY kind: the day two of them gave two settings to the same
+# code, it will say so before this shortcut becomes a lie.
 def reglage_du_code(code):
-    """Le réglage de cette information calculée, ou None si elle n'en a pas."""
+    """The setting of this computed information, or None when it has none."""
     for definition in NATURES.values():
         for info in definition.get("infos", ()):
             if info["code"] == code and info.get("reglage"):
@@ -4206,55 +4038,54 @@ def reglage_du_code(code):
 
 
 def annonce_des_places_calculees(configuration, mission):
-    """Ce message annonce-t-il des places CALCULÉES par RingBack ?
+    """Does this message announce slots COMPUTED by RingBack?
 
-    `infos_auto` ne contient que des valeurs calculées à partir de l'agenda —
-    et il y en a DEUX SORTES, qu'il ne faut pas confondre (voir
-    `valeur_calculee_info`) : le STOCK d'une négociation (« créneaux de
-    remplacement », « créneaux proposés », « créneaux d'annulation ») et LA
-    date que le message d'ouverture nomme (« créneau le plus proche »). Ici,
-    peu importe laquelle : la question est seulement « ce message annonce-t-il
-    des places que RingBack a calculées ? ».
+    `infos_auto` only contains values computed from the calendar — and there
+    are TWO SORTS, not to be confused (see `valeur_calculee_info`): the
+    negotiation STOCK (`créneaux de remplacement`, `créneaux proposés`,
+    `créneaux d'annulation`) and THE date the opening message names (`créneau
+    le plus proche`). Here it does not matter which: the question is only `does
+    this message announce slots RingBack computed?`.
 
-    ⚠ CETTE DOCUMENTATION AFFIRMAIT « QUE des listes de places », et c'était
-    faux depuis toujours — `creneau_le_plus_proche` y entre lui aussi. Trois
-    fonctions ont été écrites sur cette phrase et traitaient donc les deux
-    comme du stock. Une documentation qui ment coûte autant qu'un code qui
-    ment : elle a coûté sa journée du 17/08/2026.
+    ⚠ THIS DOCUMENTATION CLAIMED `ONLY lists of slots`, and it had always been
+    false — `creneau_le_plus_proche` enters it too. Three functions were
+    written on that sentence and therefore treated both as stock. Documentation
+    that lies costs as much as code that lies: it cost him his day of
+    17/08/2026.
 
-    Une valeur retapée à la main quitte `infos_auto` — elle appartient alors à
-    l'opérateur, et RingBack n'y touche plus.
+    A value retyped by hand leaves `infos_auto` — it then belongs to the
+    operator, and RingBack no longer touches it.
     """
     auto = configuration.get("infos_auto") or {}
     return any(valeur and valeur in mission for valeur in auto.values())
 
 
-# ⚠ QUELLE NATURE VEUT UN STOCK VARIÉ (16/08/2026, sa demande). Le déplacement
-# NÉGOCIE : il faut de quoi répondre à « plutôt mardi » ou « plutôt l'après-midi
-# ». Les autres natures annoncent simplement les prochaines places, et c'est
-# très bien ainsi — un rappel de rendez-vous n'a rien à négocier.
+# ⚠ WHICH KIND WANTS A VARIED STOCK (16/08/2026, his request). The move
+# NEGOTIATES: you need enough to answer `Tuesday rather` or `the afternoon
+# rather`. The other kinds simply announce the next slots, and that is quite
+# right — an appointment reminder has nothing to negotiate.
 NATURES_A_STOCK_VARIE = ("deplacement",)
 
-# ⚠ CELLES QUI PROPOSENT UNE PLACE EN CAS D'ANNULATION (31/08/2026, sa demande).
-# Elles ne négocient pas — elles citent quelques dates à voix haute, une par
-# une. Elles annonçaient les six prochaines places libres, toutes le même
-# matin ; elles annoncent maintenant des jours DIFFÉRENTS, à moins de sept
-# jours. Voir horaires.places_de_remplacement.
+# ⚠ THOSE THAT OFFER A SLOT ON A CANCELLATION (31/08/2026, his request). They
+# do not negotiate — they quote a few dates out loud, one by one. They used to
+# announce the next six free slots, all on the same morning; they now announce
+# DIFFERENT days, less than seven days out. See
+# horaires.places_de_remplacement.
 NATURES_A_PLACES_DE_REMPLACEMENT = ("confirmation", "rappel_rdv")
 
 
 def durees_a_deplacer(base, campagne):
-    """Les durées à replacer et leur nombre : {tranches: combien}.
+    """The lengths to rebook and their count: {slots: how many}.
 
-    ⚠ SA RÈGLE DU 17/08/2026 : « on prévoit des créneaux de durée équivalente
-    aux durées de rendez-vous que l'on souhaite annuler. Il faut donc faire
-    plusieurs listes de proposition en fonction de la durée des rendez-vous ».
+    ⚠ HIS RULE OF 17/08/2026: `we provide slots of a length equivalent to the
+    lengths of the appointments we want to cancel. So we must make several
+    lists of offers according to the appointments' length`.
 
-    MESURÉ SUR SA JOURNÉE DU 18/08 : dix rendez-vous de 20 minutes et TROIS de
-    40. Les deux listes de places ne sont pas les mêmes — un trou de 20 minutes
-    ne peut pas recevoir une séance de 40. Le message n'en portait qu'une, celle
-    des 20 minutes : trois personnes s'entendaient donc proposer des heures où
-    leur rendez-vous ne tient pas.
+    MEASURED ON HIS DAY OF 18/08: ten 20-minute appointments and THREE
+    40-minute ones. The two slot lists are not the same — a 20-minute gap
+    cannot take a 40-minute session. The message carried only one, the
+    20-minute one: three people were therefore offered times where their
+    appointment does not fit.
     """
     if campagne.get("nature") not in NATURES_A_STOCK_VARIE:
         return {}
@@ -4268,15 +4099,14 @@ def durees_a_deplacer(base, campagne):
 
 
 def durees_du_brouillon(base, brouillon):
-    """Les mêmes durées, avant que la campagne existe (étape 2 et « Valider »)."""
+    """The same lengths, before the campaign exists (step 2 and `Valider`)."""
     if brouillon.get("nature") not in NATURES_A_STOCK_VARIE:
         return {}
     comptes = {}
-    # ⚠ UN CONTACT DE BROUILLON PORTE DÉJÀ « rendezvous_id » — vérifié le
-    # 17/08/2026. Ma première version cherchait le rendez-vous par son HORAIRE
-    # et n'en trouvait aucun : les onze contacts ressortaient tous à une
-    # tranche, et la seconde liste n'existait pas. La même lecture que la
-    # campagne fait l'affaire.
+    # ⚠ A DRAFT CONTACT ALREADY CARRIES `rendezvous_id` — verified on
+    # 17/08/2026. My first version looked for the appointment by its TIME and
+    # found none: the eleven contacts all came out at one slot, and the second
+    # list did not exist. The same reading as the campaign does the job.
     for contact in (brouillon.get("contacts") or []):
         tranches = tranches_du_contact(base, contact)
         comptes[tranches] = comptes.get(tranches, 0) + 1
@@ -4284,22 +4114,22 @@ def durees_du_brouillon(base, brouillon):
 
 
 def etiquette_duree(preferences, tranches):
-    """« pour un rendez-vous de 40 minutes » — l'intitulé d'une liste de durée.
+    """`for a 40-minute appointment` — a length list's heading.
 
-    ⚠ UN SEUL ENDROIT L'ÉCRIT. Le stock la pose devant chaque liste
-    (`_par_duree`), l'étape 2 la met au-dessus de chaque champ, et le serveur
-    la relit pour recoller ce qu'il a saisi. Trois écritures du même intitulé
-    auraient fini par se désaccorder d'un mot — et la relecture aurait rendu
-    des listes vides sans rien dire.
+    ⚠ ONE PLACE WRITES IT. The stock puts it before each list (`_par_duree`),
+    step 2 puts it above each field, and the server reads it back to reassemble
+    what was typed. Three writings of the same heading would have ended up
+    disagreeing by a word — and the read-back would have returned empty lists
+    without saying anything.
     """
     return f"pour un rendez-vous de {tranches * horaires.pas_minutes(preferences)} minutes"
 
 
 def listes_par_duree(preferences, valeur, durees):
-    """Le stock DÉCOUPÉ en {tranches: texte} — l'inverse de `_par_duree`.
+    """The stock SPLIT into {slots: text} — the inverse of `_par_duree`.
 
-    Une seule durée : le texte entier lui revient, sans intitulé — c'est ainsi
-    qu'il est écrit, et l'étape 2 n'affiche alors qu'un champ.
+    A single length: the whole text goes to it, with no heading — that is how
+    it is written, and step 2 then shows only one field.
     """
     ordre = sorted(durees) or [1]
     if len(ordre) == 1:
@@ -4315,12 +4145,12 @@ def listes_par_duree(preferences, valeur, durees):
 
 
 def recomposer_par_duree(preferences, valeurs, durees):
-    """Recolle les textes saisis — un par durée — dans la forme stockée.
+    """Reassembles the texts typed in — one per length — into the stored form.
 
-    ⚠ L'ORDRE DES CHAMPS EST CELUI DES DURÉES TRIÉES, des deux côtés : c'est
-    la même source (`durees_du_brouillon`) qui décide de l'affichage et de la
-    relecture. Deux ordres différents auraient recollé la liste des 40 minutes
-    sous l'intitulé des 20.
+    ⚠ THE FIELDS' ORDER IS THAT OF THE SORTED LENGTHS, on both sides: it is the
+    same source (`durees_du_brouillon`) that decides the display and the
+    read-back. Two different orders would have reassembled the 40-minute list
+    under the 20-minute heading.
     """
     ordre = sorted(durees) or [1]
     if len(ordre) == 1:
@@ -4336,14 +4166,14 @@ def recomposer_par_duree(preferences, valeurs, durees):
 
 def _stock_par_duree(base, preferences, nature, depuis, sauf_places,
                      sauf_jours, durees):
-    """UNE LISTE PAR DURÉE, chacune annoncée avec la durée qu'elle sert.
+    """ONE LIST PER LENGTH, each announced with the length it serves.
 
-    Le nombre de places de chaque liste suit le nombre de rendez-vous DE CETTE
-    DURÉE (voir horaires.PAR_RENDEZVOUS_A_DEPLACER) : trois séances de 40
-    minutes n'ont pas besoin d'autant de choix que dix de 20.
+    The number of slots in each list follows the number of appointments OF THAT
+    LENGTH (see horaires.PAR_RENDEZVOUS_A_DEPLACER): three 40-minute sessions
+    do not need as much choice as ten 20-minute ones.
 
-    La durée est écrite EN MINUTES, en toutes lettres : c'est l'agent qui lit
-    ce texte, et « 2 tranches » ne veut rien dire au téléphone.
+    The length is written IN MINUTES, spelled out: it is the agent that reads
+    this text, and `2 slots` means nothing on the phone.
     """
     pas = horaires.pas_minutes(preferences)
     blocs = []
@@ -4357,26 +4187,27 @@ def _stock_par_duree(base, preferences, nature, depuis, sauf_places,
         blocs.append(f"pour un rendez-vous de {tranches * pas} minutes : "
                      f"{texte}")
     if len(blocs) == 1:
-        # Une seule durée : on n'alourdit pas le message d'une étiquette qui
-        # n'apporte rien — c'est le cas courant.
+        # A single length: we do not weigh the message down with a heading that
+        # adds nothing — that is the common case.
         return blocs[0].split(" : ", 1)[1]
     return " ; ".join(blocs)
 
 
 def creneaux_annonces(base, preferences, nature, depuis=None, sauf_places=(),
                       a_deplacer=0, sauf_jours=(), durees=None):
-    """LE texte des créneaux d'une nature — le seul endroit qui décide.
+    """THE slot text of a kind — the only place that decides.
 
-    ⚠ POINT DE PASSAGE UNIQUE, ET C'EST TOUT L'INTÉRÊT. Ce texte se recalcule à
-    QUATRE endroits : au pré-remplissage de l'étape 2, quand la campagne change
-    de place, quand un maillon de cascade est préparé, et à chaque appel. Poser
-    la règle dans trois d'entre eux et l'oublier au quatrième, c'est la
-    demi-correction qui a fait tourner en rond le chantier des créneaux
-    libérés. Toute nouvelle règle sur les créneaux annoncés s'écrit ICI.
+    ⚠ A SINGLE CHECKPOINT, AND THAT IS THE WHOLE POINT. This text is recomputed
+    in FOUR places: at step 2's pre-filling, when the campaign changes slot,
+    when a cascade link is prepared, and at every call. Putting the rule in
+    three of them and forgetting the fourth is the half-correction that had the
+    freed-slots project going round in circles. Any new rule about the slots
+    announced is written HERE.
 
-    `a_deplacer` : combien de rendez-vous la campagne doit sortir de leur place.
-    Le stock visé suit ce nombre (voir horaires.PAR_RENDEZVOUS_A_DEPLACER) —
-    sept personnes à replacer ne se négocient pas avec le stock d'une seule.
+    `a_deplacer`: how many appointments the campaign must clear out of their
+    slots. The stock aimed at follows that number (see
+    horaires.PAR_RENDEZVOUS_A_DEPLACER) — seven people to rebook are not
+    negotiated with the stock of one.
     """
     if nature in NATURES_A_STOCK_VARIE:
         if durees:
@@ -4394,38 +4225,34 @@ def creneaux_annonces(base, preferences, nature, depuis=None, sauf_places=(),
     return horaires.creneaux_lisibles(base, preferences, depuis=depuis)
 
 
-# ⚠ CE QUE VAUT UNE INFORMATION CALCULÉE — UN SEUL ENDROIT, PAR RÉGLAGE.
-#
-# Les natures déclarent DEUX informations calculées, et elles n'ont rien à voir
-# (voir NATURES, `_info(...)`) :
-#   - `creneaux_lisibles`      → le STOCK, de quoi négocier. Jamais récité :
-#                                l'intitulé du champ le dit en toutes lettres.
-#   - `creneau_le_plus_proche` → LA date que le message d'ouverture nomme.
-#
-# CE QUI N'ALLAIT PAS, mesuré le 17/08/2026 sur sa journée du 18/08 : les trois
-# endroits qui rafraîchissent ces valeurs bouclaient sur les CLÉS de
-# `infos_auto` sans regarder de quel réglage il s'agissait, et écrivaient le
-# stock dans les deux. Résultat à l'écran : le champ « Créneau proposé en
-# premier (le plus proche) » portait 1 842 caractères et 77 dates — exactement
-# le même texte que le stock d'à côté —, et l'aperçu du message récitait ce
-# catalogue. Ce n'est pas ce que l'agent disait (six dates, recalculées par
-# contact juste avant l'appel) : l'écran annonçait donc pire que la réalité, et
-# c'est sur cet écran qu'il valide.
-#
-# La règle était pourtant déjà écrite, deux fois : dans l'intitulé du champ, et
-# dans `horaires.creneau_le_plus_proche` — « on propose une date, on ne récite
-# pas un catalogue ». Ce qui manquait, c'est UN endroit qui la fasse suivre au
-# rafraîchissement. Le voici : tout code qui recalcule une information passe
-# par ici, et n'a plus à savoir laquelle il tient.
+# ⚠ WHAT A COMPUTED PIECE OF INFORMATION IS WORTH — ONE PLACE, PER SETTING.
+# The kinds declare TWO computed pieces of information, and they have nothing
+# to do with each other (see NATURES, `_info(...)`): - `creneaux_lisibles`
+# → the STOCK, enough to negotiate. Never recited: the field's heading says so
+# in plain words. - `creneau_le_plus_proche` → THE date the opening message
+# names.  WHAT WAS WRONG, measured on 17/08/2026 on his day of 18/08: the three
+# places refreshing these values looped over `infos_auto`'s KEYS without
+# looking at which setting was involved, and wrote the stock into both. Result
+# on screen: the field `Créneau proposé en premier (le plus proche)` carried
+# 1,842 characters and 77 dates — exactly the same text as the stock next to it
+# —, and the message preview recited that catalogue. That is not what the agent
+# said (six dates, recomputed per contact just before the call): so the screen
+# announced worse than reality, and it is on that screen that he validates.
+# The rule was in fact already written, twice: in the field's heading, and in
+# `horaires.creneau_le_plus_proche` — `we offer a date, we do not recite a
+# catalogue`. What was missing was ONE place making it follow through at
+# refresh time. Here it is: any code recomputing a piece of information goes
+# through here, and no longer has to know which one it holds.
 def valeur_calculee_info(base, preferences, nature, reglage, depuis=None,
                          sauf_places=(), a_deplacer=0, sauf_jours=(),
                          durees=None):
-    """La valeur d'une information CALCULÉE, selon SON réglage (None sinon).
+    """The value of a COMPUTED piece of information, per ITS setting (None
+    otherwise).
 
-    Les mêmes écarts s'appliquent aux deux (`sauf_places`, `sauf_jours`) : la
-    journée qu'on vide ne se propose pas plus dans la première date que dans le
-    stock — sans quoi le message d'ouverture proposerait justement le jour que
-    la campagne est en train de libérer.
+    The same exclusions apply to both (`sauf_places`, `sauf_jours`): the day
+    being emptied is no more offered in the first date than in the stock —
+    otherwise the opening message would offer precisely the day the campaign is
+    freeing.
     """
     if reglage == "creneaux_lisibles":
         return creneaux_annonces(base, preferences, nature, depuis=depuis,
@@ -4433,10 +4260,10 @@ def valeur_calculee_info(base, preferences, nature, reglage, depuis=None,
                                  a_deplacer=a_deplacer, sauf_jours=sauf_jours,
                                  durees=durees)
     if reglage == "creneau_le_plus_proche":
-        # La durée retenue est la PLUS LONGUE à replacer : une place qui reçoit
-        # une séance de 40 minutes en reçoit une de 20, l'inverse est faux. À
-        # l'ouverture du brouillon, aucune durée n'est connue — c'est la durée
-        # moyenne, comme avant.
+        # The length used is the LONGEST to be rebooked: a slot that takes a
+        # 40-minute session takes a 20-minute one, the reverse is false. When
+        # the draft is opened, no length is known — it is the average length,
+        # as before.
         tranches = max(durees) if durees else 1
         return horaires.creneau_le_plus_proche(
             base, preferences, tranches=tranches, depuis=depuis,
@@ -4445,53 +4272,53 @@ def valeur_calculee_info(base, preferences, nature, reglage, depuis=None,
 
 
 def reglage_des_infos(nature):
-    """{code de l'information: son réglage} — pour la nature demandée."""
+    """{information code: its setting} — for the kind requested."""
     return {info["code"]: info.get("reglage")
             for info in NATURES.get(nature, {}).get("infos", ())}
 
 
 def _jours_de(horaires_iso):
-    """Les journées (AAAA-MM-JJ) d'une suite d'horaires, sans doublon, triées."""
+    """The days (YYYY-MM-DD) of a run of times, without duplicates, sorted."""
     return tuple(sorted({horaire[:10] for horaire in horaires_iso if horaire}))
 
 
 def jours_a_vider(base, campagne):
-    """Les JOURNÉES que cette campagne vide — aucune place n'y est proposée.
+    """The DAYS this campaign is emptying — no slot is offered on them.
 
-    ⚠ SA RÈGLE DU 17/08/2026 : « cela a sélectionné des créneaux durant la
-    journée que je veux annuler. Il ne faut pas non plus sélectionner des
-    créneaux libres sur la ou les journées où l'on a l'annulation ».
+    ⚠ HIS RULE OF 17/08/2026: `it selected slots during the day I want to
+    cancel. It must also not select free slots on the day or days where we have
+    the cancellation`.
 
-    Évident dès qu'on le dit : si le praticien n'est pas là ce jour-là, aucune
-    heure de ce jour-là n'est proposable — pas même les trous qui n'ont jamais
-    porté de rendez-vous. `places_a_vider` n'écartait QUE les heures des
-    rendez-vous à déplacer, et laissait la journée autour.
+    Obvious as soon as it is said: if the practitioner is not there that day,
+    no hour of that day is offerable — not even the gaps that never carried an
+    appointment. `places_a_vider` set aside ONLY the times of the appointments
+    to be moved, and left the day around them.
     """
     return _jours_de(places_a_vider(base, campagne))
 
 
 def jours_des_contacts(brouillon):
-    """Les JOURNÉES sur lesquelles portent les rendez-vous de ses contacts.
+    """The DAYS its contacts' appointments fall on.
 
-    Les contacts d'un brouillon portent la date de leur rendez-vous dans le
-    champ « rdv_existant » — c'est cette colonne que l'étape 3 remplit depuis le
-    planning ou depuis la base. Vide quand la nature n'en porte pas (prise de
-    rendez-vous : il n'y a pas encore de rendez-vous).
+    A draft's contacts carry their appointment's date in the `rdv_existant`
+    field — it is that column step 3 fills from the schedule or from the
+    database. Empty when the kind does not carry one (booking: there is no
+    appointment yet).
 
-    Deux lecteurs, un seul calcul : le NOM de la campagne (voir `nom_campagne`)
-    et les journées qu'elle vide (juste en dessous). Deux façons de lister les
-    mêmes journées auraient fini par se contredire — un nom qui annonce le
-    18/08 pendant que le calcul en écarte un autre.
+    Two readers, one computation: the campaign's NAME (see `nom_campagne`) and
+    the days it empties (just below). Two ways of listing the same days would
+    have ended up contradicting each other — a name announcing 18/08 while the
+    computation sets aside another day.
     """
     return _jours_de(champs_contact(contact).get("rdv_existant")
                      for contact in (brouillon.get("contacts") or []))
 
 
 def jours_a_vider_du_brouillon(brouillon):
-    """La même règle, avant que la campagne existe (étape 2 et « Valider »).
+    """The same rule, before the campaign exists (step 2 and `Valider`).
 
-    Seules les natures qui VIDENT écartent leurs journées : un rappel ou une
-    confirmation portent aussi sur des journées, mais elles ne les libèrent pas.
+    Only the kinds that EMPTY set their days aside: a reminder or a
+    confirmation are also about days, but they do not free them.
     """
     if brouillon.get("nature") not in NATURES_QUI_VIDENT:
         return ()
@@ -4499,26 +4326,26 @@ def jours_a_vider_du_brouillon(brouillon):
 
 
 def rafraichir_stock_du_brouillon(base, preferences, brouillon):
-    """Remet les listes de places CALCULÉES au nombre réel de gens à déplacer.
+    """Resets the COMPUTED slot lists to the real number of people to move.
 
-    Rend True si quelque chose a changé. Appelée à DEUX endroits, et il en faut
-    les deux : à l'affichage de l'étape 2, et à « Valider ».
+    Returns True when something changed. Called in TWO places, and both are
+    needed: when step 2 is displayed, and at `Valider`.
 
-    ⚠ SON CONSTAT DU 17/08/2026 : « j'ai fait un essai de décalage de 11
-    rendez-vous et j'ai seulement 19 créneaux pour négocier », puis, capture à
-    l'appui : « est-ce simplement un problème d'affichage ? ». Oui — et non.
-    Le champ de l'étape 2 est pré-rempli à l'OUVERTURE du brouillon, avant
-    l'étape 3 : la liste des gens n'existe pas encore, le stock est donc calculé
-    pour zéro. Ce n'est « que » l'affichage, mais cet affichage est un CHAMP :
-    s'il y touche, ses dix-neuf dates deviennent la liste définitive (une valeur
-    retapée quitte `infos_auto` et n'est plus jamais recalculée). Un champ qui
-    montre faux invite à figer le faux.
+    ⚠ HIS OBSERVATION OF 17/08/2026: `I ran a test shifting 11 appointments and
+    I only have 19 slots to negotiate with`, then, with a screenshot: `is it
+    simply a display problem?`. Yes — and no. Step 2's field is pre-filled when
+    the draft is OPENED, before step 3: the list of people does not exist yet,
+    so the stock is computed for zero. It is `only` the display, but that
+    display is a FIELD: if he touches it, his nineteen dates become the
+    definitive list (a retyped value leaves `infos_auto` and is never
+    recomputed again). A field that shows something false invites the false to
+    be frozen.
 
-    ⚠ ON REMPLACE LA LISTE DANS LE MESSAGE, ON NE LE RECONSTRUIT PAS. Ma
-    première version rappelait `construire_mission` : elle rendait un texte SANS
-    la phrase des dates, et la campagne se croyait alors autorisée à appeler
-    alors qu'il ne restait aucune place — un essai du produit l'a attrapée. Une
-    substitution ne peut rien perdre, et un message retapé arrive intact.
+    ⚠ WE REPLACE THE LIST IN THE MESSAGE, WE DO NOT REBUILD IT. My first
+    version called `construire_mission` again: it returned a text WITHOUT the
+    dates sentence, and the campaign then believed itself allowed to call when
+    no slot was left — one of the product's tests caught it. A substitution can
+    lose nothing, and a retyped message arrives intact.
     """
     nature = brouillon.get("nature")
     if nature not in NATURES_A_STOCK_VARIE:
@@ -4533,13 +4360,13 @@ def rafraichir_stock_du_brouillon(base, preferences, brouillon):
     reglages = reglage_des_infos(nature)
     change = False
     for code, ancien in list(auto.items()):
-        # Une liste retapée à la main appartient à l'opérateur : on n'y touche
-        # pas. C'est ce que dit `infos.get(code) != ancien`.
+        # A list retyped by hand belongs to the operator: we do not touch it.
+        # That is what `infos.get(code) != ancien` says.
         if not ancien or infos.get(code) != ancien:
             continue
-        # ⚠ CHAQUE INFORMATION SE RECALCULE PAR SON PROPRE RÉGLAGE. Cette
-        # boucle écrivait le stock dans TOUTES : « le plus proche » recevait
-        # donc le catalogue entier. Voir `valeur_calculee_info`.
+        # ⚠ EACH PIECE OF INFORMATION IS RECOMPUTED BY ITS OWN SETTING. This
+        # loop wrote the stock into ALL of them: `the nearest` therefore
+        # received the whole catalogue. See `valeur_calculee_info`.
         frais = valeur_calculee_info(base, preferences, nature,
                                      reglages.get(code),
                                      a_deplacer=a_deplacer,
@@ -4554,40 +4381,38 @@ def rafraichir_stock_du_brouillon(base, preferences, brouillon):
 
 
 def rendezvous_a_deplacer(base, campagne):
-    """Combien de rendez-vous cette campagne doit encore sortir de leur place.
+    """How many appointments this campaign must still clear out of their slots.
 
-    ⚠ CE QUI RESTE À FAIRE, pas la taille de la liste. Un contact déjà appelé a
-    consommé sa place ; le stock doit couvrir CEUX QUI ATTENDENT. Sur une
-    campagne qui n'est pas un déplacement, rien à déplacer : zéro.
+    ⚠ WHAT REMAINS TO BE DONE, not the size of the list. A contact already
+    called has used their slot; the stock must cover THOSE WAITING. On a
+    campaign that is not a move, nothing to move: zero.
     """
     if campagne.get("nature") not in NATURES_A_STOCK_VARIE:
         return 0
-    # Les deux états d'un contact qui attend son appel — les mêmes que la file
-    # d'exécution retient (voir `file_utile` dans executer_campagne).
+    # The two states of a contact waiting for their call — the same ones the
+    # execution queue keeps (see `file_utile` in executer_campagne).
     return sum(1 for contact in base.contacts_de_campagne(campagne["id"])
                if contact["etat"] in ("à appeler", "en cours"))
 
 
 def _plus_rien_a_annoncer(base, campagne, contact):
-    """Le message annonçait des places calculées, il n'en reste AUCUNE.
+    """The message announced computed slots, and NONE is left.
 
-    ⚠ L'ÉCART TROUVÉ PAR L'AUDIT DU 14/08/2026, et il touche les quatre natures
-    « classiques ». La liste des places est calculée à la CRÉATION de la
-    campagne et recalculée avant chaque appel — mais le recalcul ne remplace
-    rien quand il rend vide (« jamais de texte inventé », voir
-    `creneaux_adaptes_au_contact`). L'agenda s'étant rempli entre-temps, l'agent
-    partait donc annoncer au téléphone six dates TOUTES OCCUPÉES ; chaque OUI
-    revenait ensuite « à rappeler par un humain » puisqu'aucun rendez-vous ne
-    pouvait être écrit. Et le repli qui existait — `_sans_place_a_proposer` —
-    n'était atteint que si le contact n'avait AUCUN rendez-vous : sur
-    « déplacement », il en a toujours un, la nature n'était donc protégée par
-    rien.
+    ⚠ THE GAP FOUND BY THE 14/08/2026 AUDIT, and it affects the four `classic`
+    kinds. The slot list is computed when the campaign is CREATED and
+    recomputed before every call — but the recomputation replaces nothing when
+    it comes back empty (`never invented text`, see
+    `creneaux_adaptes_au_contact`). The calendar having filled in the meantime,
+    the agent therefore went off to announce six dates ALL TAKEN on the phone;
+    every YES then came back as `à rappeler par un humain` since no appointment
+    could be written. And the fallback that existed — `_sans_place_a_proposer`
+    — was only reached when the contact had NO appointment: on `déplacement`
+    they always have one, so the kind was protected by nothing.
 
-    C'est le même travail que `_place_perdue` fait pour « créneau libéré » : ne
-    pas partir sur une place qui n'existe plus. Ici on ne le fait pas au
-    démarrage mais avant CHAQUE appel, parce que la liste est propre à chaque
-    contact (sa durée) et qu'elle bouge à mesure que la campagne remplit
-    l'agenda.
+    It is the same work `_place_perdue` does for `créneau libéré`: not setting
+    off on a slot that no longer exists. Here we do it not at start-up but
+    before EVERY call, because the list is specific to each contact (their
+    length) and it moves as the campaign fills the calendar.
     """
     note = ("Personne n'a été appelé : le message annonce des créneaux "
             "calculés par RingBack, et il n'en reste plus AUCUN de libre "
@@ -4610,31 +4435,30 @@ def _plus_rien_a_annoncer(base, campagne, contact):
 def _date_refusee(base, campagne, contact, refus, date_convenue,
                   texte=None, complement="", cible=None, telephone=None,
                   rdv_du_contact=None):
-    """Le client a dit oui, mais la date convenue ne tient pas : rien n'est écrit.
+    """The client said yes, but the agreed date does not hold: nothing is written.
 
-    La règle du propriétaire, à la lettre : le rendez-vous n'est PAS créé,
-    le contact passe « à rappeler par un humain » avec la date demandée EN
-    CLAIR, et l'écran dit pourquoi. Une ligne 🙋 entre au cahier de
-    changements : ce qui a été obtenu au téléphone n'est jamais perdu, même
-    quand le produit refuse de l'écrire. Rend toujours None (aucune
-    politique « premier oui » ne peut être conclue par un accord qu'on n'a
-    pas pu honorer).
+    The owner's rule, to the letter: the appointment is NOT created, the
+    contact becomes `à rappeler par un humain` with the requested date IN
+    CLEAR, and the screen says why. A 🙋 row enters the change log: what was
+    obtained on the phone is never lost, even when the product refuses to write
+    it. Always returns None (no `first yes` policy can be concluded by an
+    agreement we could not honour).
 
-    ⚠ SAUF SUR UN CRÉNEAU LIBÉRÉ, où il a fait RETIRER cet état (constaté à
-    nouveau le 15/08/2026 : huit contacts « 🙋 à rappeler par un humain » dans
-    ses quatre campagnes, tous par ce chemin). Sa raison, écrite le 11/08 :
-    « le créneau est certainement attribué à quelqu'un d'autre, alors ce sera
-    contacter quelqu'un pour lui dire "en fait on voulait vous demander quelque
-    chose, mais ce n'est plus d'actualité" » — rappeler serait déranger pour
-    rien. Voir NATURES_RAPPEL_HUMAIN et `_rien_de_conclu`, qui tenaient déjà la
-    règle sur LEUR chemin ; celui-ci l'ignorait.
+    ⚠ EXCEPT ON A FREED SLOT, where he had that state REMOVED (observed again
+    on 15/08/2026: eight `🙋 à rappeler par un humain` contacts across his four
+    campaigns, all by this path). His reason, written on 11/08: `the slot has
+    certainly been given to somebody else, so it would mean contacting somebody
+    to tell them "actually we wanted to ask you something, but it no longer
+    applies"` — calling back would be disturbing them for nothing. See
+    NATURES_RAPPEL_HUMAIN and `_rien_de_conclu`, which already held the rule on
+    THEIR path; this one ignored it.
 
-    La fin est alors la même que pour une réponse non conclusive : état
-    REFUSÉ — vrai de la PLACE, qui part à quelqu'un d'autre, sans rien
-    affirmer sur la personne — et son rendez-vous CONSERVÉ, passé en
-    « confirmé ». La date qu'elle demandait et la raison du refus restent
-    écrites en clair sur sa fiche : rien de ce qui a été dit au téléphone
-    n'est perdu, c'est seulement l'agenda qui n'est pas touché (§6.5).
+    The ending is then the same as for a non-conclusive answer: state REFUSED —
+    true of the SLOT, which goes to somebody else, without asserting anything
+    about the person — and their appointment KEPT, moved to `confirmé`. The
+    date they asked for and the reason for the refusal stay written in clear on
+    their record: nothing said on the phone is lost, it is only the calendar
+    that is not touched (§6.5).
     """
     contact_id = contact["id"]
     sans_rappel = campagne["nature"] == "creneau_libere"
@@ -4671,11 +4495,11 @@ def _date_refusee(base, campagne, contact, refus, date_convenue,
 
 
 def _place_de_la_campagne(campagne, configuration, horaire):
-    """Cet horaire est-il une place de CETTE campagne, encore à pourvoir ?
+    """Is this time a slot of THIS campaign, still to be filled?
 
-    Sert à distinguer « le client a convenu d'une date à lui » de « le client a
-    pris l'une des places qu'on venait de lui citer » — deux choses que la
-    branche « autre date convenue » traitait de la même façon.
+    Used to tell `the client agreed a date of their own` from `the client took
+    one of the slots we had just quoted them` — two things the `another date
+    agreed` branch handled the same way.
     """
     if not horaire:
         return False
@@ -4687,31 +4511,31 @@ def _place_de_la_campagne(campagne, configuration, horaire):
 
 def _perdre_la_place_si_prise(base, preferences, campagne, configuration,
                               place):
-    """Cette place vient d'être refusée : est-elle morte pour TOUT LE MONDE ?
+    """This slot has just been refused: is it dead for EVERYBODY?
 
-    Si oui, elle passe « perdue » et la campagne cesse de l'annoncer. Rend la
-    phrase à ajouter au détail du contact, ou "" si la place tient toujours.
+    If so, it becomes `perdue` and the campaign stops announcing it. Returns
+    the sentence to add to the contact's detail, or "" when the slot still
+    holds.
 
-    ⚠ LE DÉFAUT MESURÉ DANS SA BASE (14/08/2026). Une personne avait convenu
-    d'une autre date — 15 h 30, hors du quadrillage des créneaux — et ce
-    rendez-vous chevauchait la place de 15 h 40 que la campagne proposait
-    encore. Les VINGT-QUATRE personnes suivantes ont dit oui à cette place,
-    chacune s'est vu refuser le rendez-vous, et chacune est partie « à
-    rappeler par un humain » : vingt-quatre appels pour rien, et un état que le
-    propriétaire avait justement retiré du créneau libéré.
+    ⚠ THE DEFECT MEASURED IN HIS DATABASE (14/08/2026). One person had agreed
+    another date — 3:30pm, off the slot grid — and that appointment overlapped
+    the 3:40pm slot the campaign was still offering. The TWENTY-FOUR following
+    people said yes to that slot, each was refused the appointment, and each
+    went out `à rappeler par un humain`: twenty-four calls for nothing, and a
+    state the owner had precisely removed from the freed slot.
 
-    ⚠ ON REJUGE AVEC UNE SEULE TRANCHE, et c'est tout le raisonnement. « Il
-    n'y a que vingt minutes d'affilée, il en manque une » parle de la DURÉE DE
-    CE RENDEZ-VOUS, pas de la place : la déclarer perdue arrêterait la campagne
-    pour tous les autres, dont certains tiennent en vingt minutes. Même
-    distinction que dans `_place_perdue`, et pour la même raison.
+    ⚠ WE REJUDGE WITH A SINGLE SLOT, and that is the whole reasoning. `There
+    are only twenty consecutive minutes, one is missing` is about THAT
+    APPOINTMENT'S LENGTH, not about the slot: declaring it lost would stop the
+    campaign for everybody else, some of whom fit into twenty minutes. The same
+    distinction as in `_place_perdue`, and for the same reason.
     """
-    # ⚠ « POURVU PAR NOUS » N'EST PAS « PRIS AILLEURS », et c'est la première
-    # chose à écarter. Sur une campagne réglée « appeler toute la liste », le
-    # premier oui pourvoit la place ; le deuxième se la voit refuser — elle est
-    # occupée, mais par NOUS. La marquer perdue effacerait le fait qu'elle a
-    # servi, et l'écran le dirait de travers. C'est le même piège que celui qui
-    # avait fait tomber vingt contrôles du banc le 11/08/2026.
+    # ⚠ `FILLED BY US` IS NOT `TAKEN ELSEWHERE`, and it is the first thing to
+    # rule out. On a campaign set to `call the whole list`, the first yes fills
+    # the slot; the second is refused it — it is occupied, but by US. Marking
+    # it lost would erase the fact that it served, and the screen would say it
+    # wrongly. It is the same trap that brought down twenty bench checks on
+    # 11/08/2026.
     deja = {f["horaire"]: f.get("statut")
             for f in creneaux_de(campagne, configuration)}
     if deja.get(place) != CRENEAU_A_POURVOIR:
@@ -4722,9 +4546,9 @@ def _perdre_la_place_si_prise(base, preferences, campagne, configuration,
     pourquoi = "place prise entre-temps par un autre rendez-vous"
     liste = marquer_creneau(base, campagne["id"], place, CRENEAU_PERDU,
                             pourquoi=pourquoi)
-    # ⚠ ET DANS LA CONFIGURATION QUE LA BOUCLE TIENT EN MAIN, pas seulement en
-    # base : c'est elle qui sert à choisir les places annoncées au contact
-    # suivant, et elle n'est relue qu'à chaque place pourvue.
+    # ⚠ AND IN THE CONFIGURATION THE LOOP HOLDS IN HAND, not only in the
+    # database: it is what serves to choose the slots announced to the next
+    # contact, and it is only read back at every slot filled.
     configuration["creneaux"] = liste
     reste = sum(1 for f in liste if f["statut"] == CRENEAU_A_POURVOIR)
     journal.info("Campagne n°%d : la place %s est PERDUE (prise ailleurs) — "
@@ -4736,11 +4560,11 @@ def _perdre_la_place_si_prise(base, preferences, campagne, configuration,
 
 
 def _rendezvous_vise(base, contact, telephone):
-    """LE rendez-vous en base que ce contact concerne, ou None.
+    """THE appointment in the database this contact is about, or None.
 
-    Contact repris de la base : le sien. Contact collé : le rendez-vous du
-    même client au même horaire que la colonne « rendez-vous existant »,
-    s'il existe — jamais de rendez-vous inventé.
+    A contact taken from the database: theirs. A pasted contact: the
+    appointment of the same client at the same time as the `existing
+    appointment` column, when it exists — never an invented appointment.
     """
     if contact.get("rendezvous_id"):
         return base.obtenir_rendezvous(contact["rendezvous_id"])
@@ -4750,53 +4574,46 @@ def _rendezvous_vise(base, contact, telephone):
     return None
 
 
-# ------------------------------------------------- décalage en cascade (§8.3)
-# LA RÈGLE DU PROPRIÉTAIRE, à la lettre. Un contact accepte de décaler son
-# rendez-vous : la campagne s'achève, le changement entre au cahier, l'agenda
-# local est modifié — et, SI l'option de cascade est réglée, une NOUVELLE
-# campagne est PRÉPARÉE sur **la place que ce contact vient de libérer**.
-#
-# Cette campagne est la MÊME que celle d'origine, à un détail près : son
-# créneau. Nature, message, options, ordre d'appel, source de contacts,
-# champs — tout est repris ; seule la LISTE est recalculée, avec les mêmes
-# critères appliqués au nouveau créneau.
-#
-# CE QUI FAIT CONVERGER LA CHAÎNE : un créneau n'intéresse que les gens qu'il
-# ARRANGE. Les contacts dont le rendez-vous est ANTÉRIEUR au nouveau créneau
-# sont écartés (les décaler leur ferait perdre du temps, pas en gagner). Le
-# créneau d'un maillon est donc toujours STRICTEMENT plus tard que celui du
-# précédent : la liste se resserre à chaque fois, et la chaîne s'épuise
-# d'elle-même au lieu de tourner en rond.
-#
-# Aucun appel ne part jamais tout seul : chaque maillon naît « prête », et
-# c'est l'opérateur qui valide. Les butées, cumulatives :
-#   1. l'option doit être cochée ET porter une date limite ;
-#   2. le créneau libéré doit tomber AVANT cette date limite ;
-#   3. la chaîne ne dépasse jamais CASCADE_PROFONDEUR_MAX maillons ;
-#   4. jamais deux campagnes pour le MÊME créneau ;
-#   5. sans recette reproductible (liste écrite à la main), on ne prépare
-#      RIEN et on dit pourquoi — jamais de liste inventée.
+# ------------------------------------------------- cascading shift (§8.3) THE
+# OWNER'S RULE, to the letter. A contact agrees to shift their appointment: the
+# campaign ends, the change enters the log, the local calendar is modified —
+# and, IF the cascade option is set, a NEW campaign is PREPARED on **the slot
+# that contact has just freed**.  That campaign is the SAME as the original,
+# with one detail changed: its slot. Kind, message, options, calling order,
+# contact source, fields — everything is taken over; only the LIST is
+# recomputed, with the same criteria applied to the new slot.  WHAT MAKES THE
+# CHAIN CONVERGE: a slot only interests the people it SUITS. Contacts whose
+# appointment is EARLIER than the new slot are set aside (shifting them would
+# lose them time, not gain it). A link's slot is therefore always STRICTLY
+# later than the previous one's: the list narrows every time, and the chain
+# exhausts itself instead of going round in circles.  No call ever goes out on
+# its own: every link is born `prête`, and it is the operator who validates.
+# The bounds, cumulative: 1. the option must be ticked AND carry a cut-off
+# date; 2. the freed slot must fall BEFORE that cut-off; 3. the chain never
+# exceeds CASCADE_PROFONDEUR_MAX links; 4. never two campaigns for the SAME
+# slot; 5. with no reproducible recipe (a list written by hand), we prepare
+# NOTHING and we say why — never an invented list.
 CASCADE_PROFONDEUR_MAX = 5
 
-# L'information d'étape 2 qui porte le créneau de la campagne, par nature.
-# Elle seule change quand on rejoue une campagne sur une autre place.
+# The step-2 information carrying the campaign's slot, per kind. It alone
+# changes when a campaign is replayed on another slot.
 INFO_CRENEAU_PAR_NATURE = {"creneau_libere": "creneau_libere"}
 
 
 def cascade_reglee(options):
-    """La date limite de « décaler en cascade jusqu'au [date] », ou None."""
+    """The cut-off date of `shift in cascade until [date]`, or None."""
     if not options.get("cascade"):
         return None
     return (options.get("cascade_jusqu_au") or "").strip() or None
 
 
 def libelle_cascade(configuration):
-    """Ce que fait « décaler en cascade » sur CETTE campagne, en une phrase.
+    """What `shift in cascade` does on THIS campaign, in one sentence.
 
-    Écrit ici, et pas dans le gabarit : le comportement dépend de deux choses
-    (l'option, et le fait que la campagne porte une liste ou une seule place),
-    et une phrase calculée dans une accolade de gabarit finit toujours par
-    dire autre chose que ce que le code fait.
+    Written here, and not in the template: the behaviour depends on two things
+    (the option, and whether the campaign carries a list or a single slot), and
+    a sentence computed inside a template brace always ends up saying something
+    other than what the code does.
     """
     options = configuration.get("options") or {}
     if configuration.get("nature") not in NATURES_QUI_LIBERENT_UNE_PLACE:
@@ -4824,11 +4641,11 @@ def _profondeur_cascade(configuration):
 
 
 def _creneau_deja_prepare(base, creneau):
-    """Vrai si une campagne porte DÉJÀ ce créneau — jamais deux fois le même.
+    """True when a campaign ALREADY carries this slot — never the same one twice.
 
-    La butée d'anti-doublon de la nouvelle règle. Celle d'hier (« ne jamais
-    viser deux fois le même rendez-vous ») n'a plus d'objet : on ne vise plus
-    l'occupant d'une place, on repart d'une place libérée.
+    The new rule's anti-duplicate bound. Yesterday's (`never target the same
+    appointment twice`) no longer applies: we no longer target the occupant of
+    a slot, we start again from a freed slot.
     """
     return any((campagne["creneau"] or "") == creneau
                for campagne in base.lister_campagnes())
@@ -4837,12 +4654,12 @@ def _creneau_deja_prepare(base, creneau):
 def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
                                     demandeur, creneau_libere,
                                     rendezvous_bouge=None):
-    """§8.3 — rejoue LA MÊME campagne sur la place que le client vient de libérer.
+    """§8.3 — replays THE SAME campaign on the slot the client has just freed.
 
-    Rend {"campagne_id", "creneau", "contacts", "ecartes", "profondeur"} si
-    une campagne a été préparée (état « prête », aucun appel), sinon
-    {"raison": texte} qui dit POURQUOI la chaîne s'arrête là — c'est cette
-    phrase qui s'affiche, jamais un silence.
+    Returns {"campagne_id", "creneau", "contacts", "ecartes", "profondeur"}
+    when a campaign has been prepared (state `prête`, no calls), otherwise
+    {"raison": text} saying WHY the chain stops there — it is that sentence
+    which is displayed, never a silence.
     """
     options = configuration["options"]
     limite = cascade_reglee(options)
@@ -4867,25 +4684,21 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
                           f"{date_courte(creneau_libere)} — aucune n'a été "
                           "préparée en double."}
     recette = configuration.get("recette") or {}
-    # ⚠ DEUX CRITÈRES REJOUABLES, DANS CET ORDRE (15/08/2026).
-    #
-    # 1. LA RECETTE, quand elle existe. C'est elle qui a réellement rempli la
-    #    grille — collage, fichier, agenda importé, source de la base — et c'est
-    #    donc elle qui dit ce que l'opérateur voulait.
-    # 2. SA RÈGLE, sinon. Une campagne montée EN AUTOMATIQUE ne note aucun
-    #    apport : c'est `regenerer_la_liste` qui la remplit. La recette restait
-    #    donc vide, et la cascade refusait de préparer la suite en accusant
-    #    l'opérateur d'avoir « choisi la liste à la main » — alors que son
-    #    critère était là, écrit sur la campagne. Constaté sur sa campagne n°5 :
-    #    règle « à venir, au moins 30 jours », recette vide, chaîne arrêtée net.
-    #
-    # L'ordre compte dans LES DEUX SENS : la règle d'abord cassait la chaîne des
-    # campagnes chargées à la main, où elle porte sa source par défaut
-    # (« à recaser »), sans rapport avec la liste réellement montée.
-    #
-    # Rejouer la règle est ce qui répond à sa demande du 15/08 : elle porte le
-    # gain minimum, qui se recalcule sur la NOUVELLE place — « le créneau du
-    # 15/09 cherche des contacts à partir du 15/10 ».
+    # ⚠ TWO REPLAYABLE CRITERIA, IN THIS ORDER (15/08/2026).  1. THE RECIPE,
+    # when it exists. It is what actually filled the grid — paste, file,
+    # imported calendar, database source — and therefore what says what the
+    # operator wanted. 2. ITS RULE, otherwise. A campaign set up in AUTOMATIC
+    # mode records no contribution: it is `regenerer_la_liste` that fills it.
+    # The recipe therefore stayed empty, and the cascade refused to prepare
+    # what came next, accusing the operator of having `chosen the list by hand`
+    # — while their criterion was right there, written on the campaign.
+    # Observed on his campaign no. 5: rule `upcoming, at least 30 days`, empty
+    # recipe, chain stopped dead.  The order matters IN BOTH DIRECTIONS: the
+    # rule first broke the chain of campaigns loaded by hand, where it carries
+    # its default source (`to rebook`), unrelated to the list actually built.
+    # Replaying the rule is what answers his request of 15/08: it carries the
+    # minimum gain, which is recomputed on the NEW slot — `the 15/09 slot looks
+    # for contacts from 15/10`.
     regle = None if recette_reproductible(recette) else regle_de_liste(
         configuration)
     if not regle and not recette_reproductible(recette):
@@ -4906,8 +4719,9 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
     champs = champs_campagne(configuration)
     try:
         if regle:
-            # La règle se rejoue SUR LA PLACE LIBÉRÉE : le gain minimum repart
-            # donc de cette date-là, pas de celle de la campagne d'origine.
+            # The rule is replayed ON THE FREED SLOT: the minimum gain
+            # therefore starts again from that date, not from the original
+            # campaign's.
             contacts, _ = contacts_de_la_regle(base, preferences, regle,
                                                champs, creneau_libere)
         else:
@@ -4931,11 +4745,11 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
                           f"libérée du {date_courte(creneau_libere)} — "
                           + " ; ".join(details)
                           + ". La chaîne s'arrête d'elle-même."}
-    # ⚠ ET LE PLAFOND S'APPLIQUE AU MAILLON, pas seulement à la campagne
-    # d'origine (14/08/2026, audit croisé). L'écran annonce « avec les mêmes
-    # critères » : un plafond réglé à cinq qui laissait entrer quarante
-    # personnes dans la campagne préparée démentait cette phrase, et c'est
-    # justement le réglage qui protège le crédit d'appels.
+    # ⚠ AND THE CEILING APPLIES TO THE LINK, not only to the original campaign
+    # (14/08/2026, cross audit). The screen announces `with the same criteria`:
+    # a ceiling set to five letting forty people into the prepared campaign
+    # contradicted that sentence, and it is precisely the setting that protects
+    # the call credit.
     plafond = plafond_de(configuration)
     retenus, hors_plafond = limiter_au_plafond(
         retenus, plafond, ordre=configuration.get("ordre"),
@@ -4944,21 +4758,22 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
         journal.info("Cascade : %d contact(s) écarté(s) par le plafond de %s "
                      "personne(s), repris de la campagne n°%d",
                      hors_plafond, plafond, campagne["id"])
-    # Tout est repris de la campagne d'origine ; SEUL le créneau change.
+    # Everything is taken over from the original campaign; ONLY the slot
+    # changes.
     infos = dict(configuration["infos"])
     if code_creneau:
         infos[code_creneau] = creneau_libere
-    # Les listes de créneaux CALCULÉES sont recalculées : annoncer les places
-    # d'hier ferait proposer au téléphone des places déjà prises. Une liste
-    # récrite à la main (absente d'infos_auto) est reprise telle quelle.
+    # The COMPUTED slot lists are recomputed: announcing yesterday's slots
+    # would have already-taken slots offered on the phone. A list rewritten by
+    # hand (absent from infos_auto) is taken over as it stands.
     infos_auto = {}
     a_deplacer = rendezvous_a_deplacer(base, campagne)
     jours_ecartes = jours_a_vider(base, campagne)
     durees = durees_a_deplacer(base, campagne)
     reglages = reglage_des_infos(nature)
     for code in (configuration.get("infos_auto") or {}):
-        # ⚠ PAR SON PROPRE RÉGLAGE, comme au rafraîchissement du brouillon :
-        # ce maillon écrivait lui aussi le stock dans « le plus proche ».
+        # ⚠ BY ITS OWN SETTING, as at the draft's refresh: this link too wrote
+        # the stock into `the nearest`.
         valeur = valeur_calculee_info(base, preferences, nature,
                                       reglages.get(code),
                                       a_deplacer=a_deplacer,
@@ -4979,27 +4794,27 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
         "champs": [dict(champ) for champ in configuration.get("champs", [])],
         "contacts": retenus,
         "mission": mission,
-        # ⚠ LE PLAFOND SUIT LE MAILLON (14/08/2026, audit croisé). L'écran
-        # annonce « la campagne n°X a été PRÉPARÉE, avec les mêmes critères » :
-        # sans cette ligne, c'était faux sur le point qui compte le plus — un
-        # plafond réglé à cinq était perdu, et le maillon chargeait tout le
-        # monde. Et il n'était pas seulement ignoré : il n'était pas enregistré,
-        # donc l'écran de la campagne préparée ne pouvait même pas le dire.
+        # ⚠ THE CEILING FOLLOWS THE LINK (14/08/2026, cross audit). The screen
+        # announces `campaign no. X has been PREPARED, with the same criteria`:
+        # without this line, that was false on the point that matters most — a
+        # ceiling set to five was lost, and the link loaded everybody. And it
+        # was not merely ignored: it was not saved either, so the prepared
+        # campaign's screen could not even say it.
         "plafond": str(configuration.get("plafond") or ""),
-        # ⚠ ET LA RÈGLE AUSSI (15/08/2026) : sans elle, le maillon naissait avec
-        # une liste figée et la chaîne s'arrêtait au premier relais. C'est
-        # pourtant la règle qui fait tout le travail — elle se rejoue sur la
-        # place de CE maillon, avec le gain recalculé depuis cette date.
+        # ⚠ AND THE RULE TOO (15/08/2026): without it, the link was born with a
+        # frozen list and the chain stopped at the first relay. Yet it is the
+        # rule that does all the work — it is replayed on THIS link's slot,
+        # with the gain recomputed from that date.
         "mode_liste": "automatique" if regle else "manuel",
         "regle_liste": dict(regle or {}),
         "recette": dict(recette),
-        # ⚠ LE MAILLON PORTE LA PLACE LIBÉRÉE, quelle que soit sa nature — c'est
-        # la règle §8.3, et c'est aussi ce qui empêche d'en préparer deux pour la
-        # même place (voir `_creneau_deja_prepare`). Sur une nature qui n'annonce
-        # pas de place — « déplacement » annonce des créneaux de REMPLACEMENT —
-        # cette place est une TRACE, pas une place à pourvoir : c'est la boucle
-        # d'exécution qui doit le savoir, et elle le sait depuis le 14/08 (voir
-        # `campagne_a_des_places` dans `executer_campagne`).
+        # ⚠ THE LINK CARRIES THE FREED SLOT, whatever its kind — that is the
+        # §8.3 rule, and it is also what prevents two being prepared for the
+        # same slot (see `_creneau_deja_prepare`). On a kind that does not
+        # announce a slot — `déplacement` announces REPLACEMENT slots — that
+        # slot is a TRACE, not a slot to be filled: it is the execution loop
+        # that must know it, and it has known since 14/08 (see
+        # `campagne_a_des_places` in `executer_campagne`).
         "creneau": creneau_libere,
         "creneaux": normaliser_creneaux([creneau_libere]),
     }
@@ -5022,7 +4837,7 @@ def preparer_cascade_creneau_libere(base, preferences, campagne, configuration,
 
 
 def marquer_cascade(base, campagne_id, marque):
-    """Inscrit le maillon de cascade dans la configuration de la campagne."""
+    """Records the cascade link in the campaign's configuration."""
     campagne = base.obtenir_campagne(campagne_id)
     configuration = configuration_campagne(campagne)
     configuration["cascade"] = marque
@@ -5040,25 +4855,16 @@ def date_jour_lisible(iso_jour):
 
 def _support_de_l_appel(campagne, contact, nature, place_libre,
                         place_alternative=None):
-    """Le rendez-vous de RÉFÉRENCE envoyé à l'agent, ou None s'il n'y en a pas.
+    """The REFERENCE appointment sent to the agent, or None when there is none.
 
-    Trois cas, dans cet ordre :
+    Three cases, in this order:
 
-    1. le contact a SON rendez-vous (colonne « rendez-vous existant » des
-       natures 🔔 rappel, ✅ confirmation, 📆 déplacement, 📞 créneau
-       libéré) : c'est de celui-là qu'on lui parle, rien ne change ;
-    2. la campagne porte un créneau choisi par l'utilisateur (📞 créneau
-       libéré) : c'est LA place qu'on cherche à pourvoir, elle est FIXE —
-       la cascade se charge de la suite ;
-    3. les natures SANS rendez-vous par contact (🗓 prise de rendez-vous,
-       🎯 contact unique, ☎ rappel d'appel manqué, ✍ personnalisé) : la
-       référence est la PROCHAINE PLACE LIBRE, recalculée à l'instant de
-       CET appel. Comme une réservation crée un rendez-vous, la place quitte
-       d'elle-même les places libres de l'appel suivant : le créneau avance
-       tout seul, et deux personnes ne se voient plus proposer la même.
+    1. the contact has THEIR appointment (the `existing appointment` column of the 🔔 reminder, ✅ confirmation, 📆 move, 📞 freed-slot kinds): it is that one we talk to them about, nothing changes;
+    2. the campaign carries a slot chosen by the user (📞 freed slot): it is THE slot we are trying to fill, and it is FIXED — the cascade handles what follows;
+    3. the kinds WITH no per-contact appointment (🗓 booking, 🎯 single contact, ☎ missed-call reminder, ✍ custom): the reference is the NEXT FREE SLOT, recomputed at the instant of THIS call. Since a booking creates an appointment, the slot leaves the free slots of the next call by itself: the slot advances on its own, and two people are no longer offered the same one.
 
-    Rend None quand il n'y a plus aucune place à proposer (cas 3 seulement) :
-    l'appelant le dit franchement plutôt que d'inventer une date.
+    Returns None when there is no slot left to offer (case 3 only): the caller
+    says so frankly rather than invent a date.
     """
     rdv_du_contact = champs_contact(contact).get("rdv_existant")
     horaire = rdv_du_contact or campagne.get("creneau") or place_libre
@@ -5069,50 +4875,46 @@ def _support_de_l_appel(campagne, contact, nature, place_libre,
         "motif": champs_contact(contact).get("motif")
                  or campagne.get("sujet")
                  or (fiche_nature(nature) or {}).get("nom", nature),
-        # Vrai quand la référence EST la place proposée (cas 3) et non un
-        # rendez-vous déjà pris : l'agent propose alors CETTE place — celle
-        # que le message annonce en premier — au lieu d'en dériver une autre.
+        # True when the reference IS the slot offered (case 3) and not an
+        # appointment already taken: the agent then offers THAT slot — the one
+        # the message announces first — instead of deriving another from it.
         "place_a_pourvoir": not rdv_du_contact and not campagne.get("creneau"),
     }
-    # ⚠ LA PLACE RÉELLE, TRANSMISE (16/08/2026). Elle était CALCULÉE ici — à
-    # l'instant de l'appel, sur l'agenda vrai — et pourtant jamais transmise :
-    # quand le contact a son propre rendez-vous (📆 déplacement), la simulation
-    # retombait sur sa formule de dernier recours, « rendez-vous + 7 jours, même
-    # heure ». Elle ne garantit RIEN sur la disponibilité, son propre code le
-    # dit (voir calle_client._creneau_propose).
-    #
-    # CE QUE CELA DONNAIT, dans sa campagne : trois contacts, trois « Confirmé »
-    # au téléphone, et trois « Rendez-vous NON créé : cette place est déjà
-    # prise, ou hors des horaires d'ouverture » — donc trois « 🙋 à rappeler par
-    # un humain ». Son rendez-vous du 22/08 à 10h00 donnait 29/08 à 10h00, une
-    # place occupée. Le premier appel POSITIF qu'il venait de demander se
-    # retournait en échec au moment d'écrire.
-    #
-    # `place_libre` est recalculée À CHAQUE APPEL : deux contacts d'affilée ne
-    # peuvent donc pas recevoir la même — le rendez-vous du premier occupe la
-    # place, elle disparaît des libres du second.
+    # ⚠ THE REAL SLOT, PASSED ON (16/08/2026). It was COMPUTED here — at the
+    # instant of the call, on the real calendar — and yet never passed on: when
+    # the contact has their own appointment (📆 move), the simulation fell back
+    # on its last-resort formula, `appointment + 7 days, same hour`. It
+    # guarantees NOTHING about availability, its own code says so (see
+    # calle_client._creneau_propose).  WHAT THAT PRODUCED, in his campaign:
+    # three contacts, three `Confirmé` on the phone, and three `Appointment NOT
+    # created: this slot is already taken, or outside the opening hours` —
+    # hence three `🙋 à rappeler par un humain`. His appointment of 22/08 at
+    # 10:00 gave 29/08 at 10:00, an occupied slot. The first POSITIVE call he
+    # had just asked for turned into a failure at writing time.  `place_libre`
+    # is recomputed AT EVERY CALL: two contacts in a row therefore cannot
+    # receive the same one — the first's appointment occupies the slot, and it
+    # disappears from the second's free ones.
     if place_libre and not support["place_a_pourvoir"]:
         support["place_proposee"] = place_libre
-    # ⚠ ET UNE SECONDE PLACE RÉELLE POUR « elle en propose une AUTRE ». Sans
-    # elle, ce cas-là gardait sa date tirée au sort (jour + 1 à 10, heure au
-    # hasard) : le troisième contact de sa campagne est reparti « à rappeler
-    # par un humain » pour cette raison exacte, après un « Déplacé (date
-    # convenue) ». Une autre date doit être une autre date LIBRE.
+    # ⚠ AND A SECOND REAL SLOT FOR `they offer ANOTHER one`. Without it, that
+    # case kept its randomly drawn date (day + 1 to 10, random hour): the third
+    # contact of his campaign went out `à rappeler par un humain` for exactly
+    # that reason, after a `Déplacé (date convenue)`. Another date must be
+    # another FREE date.
     if place_alternative and place_alternative != place_libre:
         support["place_alternative"] = place_alternative
     return support
 
 
 def _sans_place_a_proposer(base, campagne, contact):
-    """Plus AUCUNE place libre : personne n'est appelé, et l'écran dit pourquoi.
+    """NO free slot left: nobody is called, and the screen says why.
 
-    La règle du propriétaire, à la lettre : jamais de date inventée. Sans
-    place à proposer, l'appel n'aurait rien à annoncer — le contact part
-    donc « à rappeler par un humain » avec la raison en clair, une ligne 🙋
-    entre au cahier de changements (rien ne se perd), et AUCUN appel n'est
-    passé. La campagne CONTINUE : une place peut se libérer entre deux
-    appels, et chaque contact reste visible avec sa raison plutôt que
-    d'être escamoté par un arrêt global.
+    The owner's rule, to the letter: never an invented date. With no slot to
+    offer, the call would have nothing to announce — so the contact goes to `à
+    rappeler par un humain` with the reason in clear, a 🙋 row enters the change
+    log (nothing is lost), and NO call is placed. The campaign CONTINUES: a
+    slot may come free between two calls, and each contact stays visible with
+    their reason rather than being spirited away by a global stop.
     """
     note = ("Personne n'a été appelé : plus aucune place libre à proposer "
             f"dans les {horaires.HORIZON_JOURS} prochains jours. Libérez une "
@@ -5132,17 +4934,17 @@ def _sans_place_a_proposer(base, campagne, contact):
 
 def _appeler_contact(base, planif, preferences, campagne, configuration,
                      contact, tentative, maintenant=None):
-    """UN appel de campagne de l'assistant (simulation ou réel, mêmes verrous).
+    """ONE assistant campaign call (simulation or real, the same locks).
 
-    Rend « pourvu » si ce OUI conclut une politique « premier oui »,
-    sinon None. Tout ce qui s'affiche ensuite (état, détail, information
-    clé) est écrit ICI, depuis le résultat réel de l'appel.
+    Returns `pourvu` when this YES concludes a `first yes` policy, otherwise
+    None. Everything displayed afterwards (state, detail, key information) is
+    written HERE, from the call's real result.
     """
     options = configuration["options"]
     contact_id = contact["id"]
-    # Le numéro composé est celui de la FICHE CLIENT à cet instant précis
-    # (pas la copie gelée dans la campagne), et le 🚫 est relu ici — par le
-    # numéro ET par le nom. Une fiche supprimée n'est plus jamais composée.
+    # The number dialled is the CLIENT RECORD's at that precise instant (not
+    # the copy frozen in the campaign), and the 🚫 is read back here — by the
+    # number AND by the name. A deleted record is never dialled again.
     cible = base.cible_appel_contact(contact_id)
     if cible["refus"]:
         etat, detail = db.suite_du_refus(cible["refus"])
@@ -5155,26 +4957,27 @@ def _appeler_contact(base, planif, preferences, campagne, configuration,
     mission = finaliser_mission(
         campagne["mission"], contact, champs_campagne(configuration),
         mod_langue.de_preferences(preferences))
-    # UN SEUL calcul des places libres, fait ICI, à l'instant de l'appel : la
-    # liste annoncée dans le message et la date de référence envoyée à
-    # l'agent en sortent toutes les deux.
+    # ONE SINGLE computation of the free slots, done HERE, at the instant of
+    # the call: both the list announced in the message and the reference date
+    # sent to the agent come out of it.
     creneaux, place_libre = places_du_contact(
         base, preferences, contact, sauf_places=places_a_vider(base, campagne),
         sauf_jours=jours_a_vider(base, campagne))
     mission = creneaux_adaptes_au_contact(base, preferences, configuration,
                                           contact, mission, adaptee=creneaux,
                                           campagne=campagne)
-    # ⚠ ET SI LE RECALCUL NE REND PLUS RIEN, ON NE COMPOSE PAS. Le message
-    # porterait alors la liste de la CRÉATION, dont plus une place n'est libre :
-    # l'agent annoncerait des dates déjà prises. Voir `_plus_rien_a_annoncer`.
+    # ⚠ AND WHEN THE RECOMPUTATION RETURNS NOTHING, WE DO NOT DIAL. The message
+    # would then carry the list from CREATION, of which not one slot is free:
+    # the agent would announce dates already taken. See
+    # `_plus_rien_a_annoncer`.
     if not creneaux and annonce_des_places_calculees(configuration, mission):
         return _plus_rien_a_annoncer(base, campagne, contact)
     nature = campagne["nature"]
     en_cascade = nature == "creneau_libere" and campagne.get("creneau")
-    # ⚠ LE CONSENTEMENT EST RELU ICI AUSSI, à l'instant de composer. Les
-    # filtres de file ne voient que les campagnes à liste de places ; celui-ci
-    # voit TOUS les appels de cascade — y compris ceux d'une liste collée à la
-    # main, où l'opérateur ne pouvait pas savoir.
+    # ⚠ CONSENT IS READ BACK HERE TOO, at the instant of dialling. The queue
+    # filters only see the list-based campaigns; this one sees ALL cascade
+    # calls — including those from a list pasted by hand, where the operator
+    # could not know.
     if en_cascade and base.plus_de_proposition(cible.get("client_id")):
         base.changer_etat_contact_campagne(contact_id, "épargné", None)
         base.definir_detail_contact(
@@ -5184,13 +4987,12 @@ def _appeler_contact(base, planif, preferences, campagne, configuration,
         return None
     rdv_support = None
     if not en_cascade:
-        # La SECONDE place libre, pour le cas « elle en propose une autre ».
-        # Même source que la première, même instant, mêmes exclusions : deux
-        # calculs ne pourraient pas diverger puisqu'ils partent des mêmes
-        # arguments.
-        # ⚠ LE STOCK SUIT CE QUI RESTE À DÉPLACER (17/08/2026, sa règle). Il est
-        # recalculé à CHAQUE appel, donc il décroît avec la file : sept personnes
-        # en attente demandent sept fois plus de places qu'une seule.
+        # The SECOND free slot, for the `they offer another one` case. Same
+        # source, same instant, same exclusions: two computations could not
+        # diverge since they start from the same arguments. ⚠ THE STOCK FOLLOWS
+        # WHAT REMAINS TO BE MOVED (17/08/2026, his rule). It is recomputed at
+        # EVERY call, so it shrinks with the queue: seven people waiting need
+        # seven times more slots than one.
         suite_libres = horaires.places_negociables(
             base, preferences, tranches=tranches_du_contact(base, contact),
             sauf_places=places_a_vider(base, campagne),
@@ -5202,18 +5004,18 @@ def _appeler_contact(base, planif, preferences, campagne, configuration,
                                           autres[0] if autres else None)
         if rdv_support is None:
             return _sans_place_a_proposer(base, campagne, contact)
-    # LA CONSIGNE EN TROIS PARTIES — présentation dite mot pour mot, objectif
-    # et contexte discutés librement, issues fermées. C'est elle qui part
-    # dans le champ « task » de CALL-E, et c'est elle que l'aperçu de
-    # l'étape 2 montre : un seul chemin, donc aucune divergence possible.
+    # THE THREE-PART BRIEFING — an opening spoken word for word, an objective
+    # and context discussed freely, closed outcomes. It is what goes into
+    # CALL-E's `task` field, and it is what step 2's preview shows: one path,
+    # hence no possible divergence.
     consigne_appel = consigne_de_l_appel(base, preferences, campagne,
                                          configuration, contact, mission,
                                          en_cascade, adaptee=creneaux)
     try:
-        # LA NATURE PART AVEC L'APPEL. Elle ne change RIEN au réel — CALL-E ne
-        # connaît pas nos natures, et tout ce qu'il faut dire est déjà dans la
-        # consigne. Elle dit au SIMULATEUR quels cas de figure jouer pour cette
-        # campagne : voir calle_client.SUITES_PAR_NATURE.
+        # THE KIND GOES OUT WITH THE CALL. It changes NOTHING in the real thing
+        # — CALL-E does not know our kinds, and everything that must be said is
+        # already in the briefing. It tells the SIMULATOR which cases to play
+        # for this campaign: see calle_client.SUITES_PAR_NATURE.
         if en_cascade:
             issue_appel = planif.client_appels.appeler_cascade(
                 contact["nom"], telephone, mission, campagne["creneau"],
@@ -5229,34 +5031,33 @@ def _appeler_contact(base, planif, preferences, campagne, configuration,
                          "no_answer", maintenant)
         return None
     except calle_client.ResultatEnAttente as attente:
-        # L'APPEL EST PARTI et la conversation a pu avoir lieu : c'est
-        # SEULEMENT sa réponse qui manque. On garde l'identifiant CALL-E,
-        # on écrit l'état qui dit la vérité — et rien d'autre : aucune
-        # tentative, aucun « injoignable », aucun rendez-vous touché.
-        # Puis on laisse remonter, pour que la campagne se mette en pause.
+        # THE CALL HAS GONE OUT and the conversation may have taken place: it
+        # is ONLY its answer that is missing. We keep the CALL-E id, we write
+        # the state that tells the truth — and nothing else: no attempt, no
+        # `injoignable`, no appointment touched. Then we let it propagate, so
+        # the campaign pauses.
         _noter_resultat_en_attente(base, contact_id, tentative, attente)
         journal.error("Campagne n°%d, contact n°%d : appel PARTI, résultat "
                       "pas encore connu (appel CALL-E n° %s)", campagne["id"],
                       contact_id, attente.identifiant)
         raise
     except calle_client.ResultatInvalide as refus:
-        # LA CONVERSATION A EU LIEU et nous n'avons pas su la lire. Ce n'est
-        # PAS un échec technique : la relancer ferait sonner le téléphone une
-        # seconde fois pour un échange qui a déjà abouti. Le contact part
-        # vers un humain, réponse brute conservée — puis on laisse remonter,
-        # pour que la campagne se mette en pause (le défaut frappera les
-        # suivants à l'identique).
+        # THE CONVERSATION TOOK PLACE and we could not read it. It is NOT a
+        # technical failure: retrying would ring the phone a second time for an
+        # exchange that has already concluded. The contact goes to a human, raw
+        # answer preserved — then we let it propagate, so the campaign pauses
+        # (the defect will hit the following ones identically).
         noter_reponse_illisible(base, campagne["id"], contact_id, tentative,
                                 refus)
         raise
     except calle_client.EchecDeNotreCote:
-        # LA FAUTE EST DE NOTRE CÔTÉ, PAS DE CELUI DU CONTACT (clé refusée,
-        # service en panne, crédit épuisé, réseau coupé). Son téléphone n'a
-        # même pas sonné : on n'écrit RIEN sur lui — ni tentative, ni état,
-        # ni détail — et on laisse remonter, pour que la campagne s'arrête
-        # au lieu de marquer toute la liste à tort.
+        # THE FAULT IS ON OUR SIDE, NOT THE CONTACT'S (key refused, service
+        # down, credit exhausted, network cut). Their phone did not even ring:
+        # we write NOTHING about them — no attempt, no state, no detail — and
+        # we let it propagate, so the campaign stops instead of wrongly marking
+        # the whole list.
         raise
-    except Exception as erreur:  # échec technique : jamais de résultat inventé
+    except Exception as erreur:  # technical failure: never an invented result
         journal.error("Campagne n°%d, contact n°%d : échec (%s)",
                       campagne["id"], contact_id, erreur)
         base.ajouter_appel_campagne(campagne["id"], contact_id, tentative,
@@ -5278,12 +5079,12 @@ DETAIL_RESULTAT_INCONNU = (
 
 
 def _noter_resultat_en_attente(base, contact_id, tentative, attente):
-    """Écrit l'état « appelé, résultat inconnu » et GARDE l'identifiant.
+    """Writes the state `called, result unknown` and KEEPS the id.
 
-    Trois écritures, et pas une de plus : l'identifiant de l'appel (sans
-    lui, le résultat serait perdu), l'état, le détail affiché. Aucune
-    tentative n'est ajoutée — l'appel n'a rien conclu, il ne doit pas
-    rapprocher qui que ce soit du plafond de relances.
+    Three writes, and not one more: the call's id (without it, the result would
+    be lost), the state, the detail displayed. No attempt is added — the call
+    concluded nothing, it must not bring anybody closer to the follow-up
+    ceiling.
     """
     base.definir_appel_en_attente(contact_id, attente.identifiant, tentative)
     base.changer_etat_contact_campagne(contact_id, ETAT_RESULTAT_INCONNU, None)
@@ -5292,9 +5093,9 @@ def _noter_resultat_en_attente(base, contact_id, tentative, attente):
         DETAIL_RESULTAT_INCONNU.format(identifiant=attente.identifiant or "?"))
 
 
-# L'ISSUE d'une réponse que RingBack n'a pas su lire. Ce n'est pas « échec »
-# (qui déclencherait une relance et rapprocherait du plafond) : la
-# conversation a EU LIEU, elle attend un humain.
+# THE OUTCOME of an answer RingBack could not read. It is not `échec` (which
+# would trigger a follow-up and move closer to the ceiling): the conversation
+# TOOK PLACE, it is waiting for a human.
 ISSUE_REPONSE_ILLISIBLE = "reponse_illisible"
 
 DETAIL_REPONSE_ILLISIBLE = (
@@ -5307,19 +5108,17 @@ DETAIL_REPONSE_ILLISIBLE = (
 
 
 def noter_reponse_illisible(base, campagne_id, contact_id, tentative, refus):
-    """Réponse illisible : le contact part vers un HUMAIN, rien n'est perdu.
+    """Unreadable answer: the contact goes to a HUMAN, nothing is lost.
 
-    UN SEUL endroit pour cette écriture, partagé par les campagnes de
-    l'assistant et par le moteur de campagnes classique — deux versions
-    auraient fini par diverger, et c'est justement sur ce chemin-là qu'une
-    divergence coûte une conversation.
+    ONE SINGLE place for this writing, shared by the assistant's campaigns and
+    by the classic campaign engine — two versions would have ended up
+    diverging, and it is precisely on that path that a divergence costs a
+    conversation.
 
-    Ce qui est écrit :
-    - la tentative est TRACÉE avec sa transcription (l'échange existe : le
-      jeter serait perdre une seconde fois ce que la personne a dit) ;
-    - l'état « à rappeler par un humain », terminal : aucune relance n'est
-      programmée, donc aucun rappel automatique et aucun plafond approché ;
-    - le détail affiché porte la réponse BRUTE de CALL-E, telle quelle.
+    What is written:
+    - the attempt is RECORDED with its transcript (the exchange exists: throwing it away would lose a second time what the person said);
+    - the state `à rappeler par un humain`, terminal: no follow-up is scheduled, hence no automatic call-back and no ceiling approached;
+    - the detail displayed carries CALL-E's RAW answer, as it stands.
     """
     base.ajouter_appel_campagne(campagne_id, contact_id, tentative,
                                 issue=ISSUE_REPONSE_ILLISIBLE,
@@ -5340,18 +5139,18 @@ RAISON_STOP_TELEPHONE = ("la personne a demandé au téléphone qu'on ne la "
 
 
 def _poser_ne_plus_appeler(base, campagne, contact, cible, telephone):
-    """Le 🚫 demandé PENDANT l'appel : posé sur la fiche, et dit partout.
+    """The 🚫 requested DURING the call: set on the record, and said everywhere.
 
-    ⚠ SUR LA FICHE, PAS SUR LA CAMPAGNE. Le drapeau vaut pour TOUS les appels
-    à venir, de toutes les campagnes — c'est le sens de la demande. Le mettre
-    sur le contact de campagne n'aurait protégé la personne que d'une seule
-    liste, et elle aurait été rappelée par la suivante.
+    ⚠ ON THE RECORD, NOT ON THE CAMPAIGN. The flag applies to ALL future calls,
+    of every campaign — that is the meaning of the request. Putting it on the
+    campaign contact would have protected the person from one list only, and
+    they would have been called back by the next.
 
-    ⚠ ET LES RELANCES DÉJÀ PROGRAMMÉES TOMBENT. Une relance survivante aurait
-    rappelé la personne quelques heures après qu'elle a demandé le contraire :
-    c'est précisément ce qu'elle voulait éviter.
+    ⚠ AND THE FOLLOW-UPS ALREADY SCHEDULED FALL. A surviving follow-up would
+    have called the person back a few hours after they asked for the opposite:
+    precisely what they wanted to avoid.
 
-    Rend le nombre de relances annulées.
+    Returns the number of follow-ups cancelled.
     """
     contact_id = contact["id"]
     client_id = (cible.get("client_id")
@@ -5361,9 +5160,9 @@ def _poser_ne_plus_appeler(base, campagne, contact, cible, telephone):
     annulees = base.annuler_relances_contact(contact_id)
     noter_changement(base, campagne, contact, "ne_plus_appeler",
                      client_id=client_id, raison=RAISON_STOP_TELEPHONE)
-    # Le détail écrit par l'issue est CONSERVÉ : ce qui a été convenu pendant
-    # l'appel reste vrai. Le 🚫 se lit devant, parce que c'est lui qui décide
-    # de tout ce qui vient après.
+    # The detail written by the outcome is KEPT: what was agreed during the
+    # call stays true. The 🚫 is read first, because it is what decides
+    # everything that follows.
     ancien = (base.obtenir_contact_campagne(contact_id) or {}).get("detail")
     prefixe = ("🚫 A demandé à ne plus être appelée — sa fiche est marquée "
                "« ne plus appeler », aucun appel ne partira plus pour elle")
@@ -5380,19 +5179,18 @@ def _poser_ne_plus_appeler(base, campagne, contact, cible, telephone):
 def _appliquer_resultat(base, planif, preferences, campagne, configuration,
                         contact, tentative, issue_appel, en_cascade, cible,
                         telephone, maintenant=None):
-    """Écrit tout ce qu'un appel ABOUTI produit — et rien d'autre.
+    """Writes everything a CONCLUDED call produces — and nothing else.
 
-    Sortie de _appeler_contact pour une raison précise : le geste
-    « 📥 Récupérer les résultats en attente » doit appliquer un résultat
-    arrivé en retard EXACTEMENT comme s'il était arrivé à temps
-    (rendez-vous déplacé, cahier des changements, cascade, relances). Un
-    second chemin d'écriture aurait fini par diverger du premier ; il n'y
-    en a donc qu'un seul, et c'est celui-ci.
+    Separated from _appeler_contact for a precise reason: the `📥 Récupérer les
+    résultats en attente` gesture must apply a result that arrived late EXACTLY
+    as if it had arrived on time (appointment moved, change log, cascade,
+    follow-ups). A second writing path would have ended up diverging from the
+    first; so there is only one, and this is it.
 
-    ⚠ DEUX TEMPS DEPUIS LE 10/08/2026 : l'issue, puis le 🚫 s'il a été demandé
-    au téléphone. Dans cet ordre, et jamais l'inverse — ce qui a été convenu
-    pendant l'appel doit être honoré (son rendez-vous est bien déplacé, sa
-    place bien attribuée) AVANT que la fiche cesse d'être appelable.
+    ⚠ TWO STAGES SINCE 10/08/2026: the outcome, then the 🚫 when it was
+    requested on the phone. In that order, and never the reverse — what was
+    agreed during the call must be honoured (their appointment really moved,
+    their slot really allocated) BEFORE the record stops being callable.
     """
     conclusion = _appliquer_issue(base, planif, preferences, campagne,
                                   configuration, contact, tentative,
@@ -5406,7 +5204,7 @@ def _appliquer_resultat(base, planif, preferences, campagne, configuration,
 def _appliquer_issue(base, planif, preferences, campagne, configuration,
                      contact, tentative, issue_appel, en_cascade, cible,
                      telephone, maintenant=None):
-    """L'issue elle-même : une branche par conclusion, et ce qu'elle écrit."""
+    """The outcome itself: one branch per conclusion, and what it writes."""
     options = configuration["options"]
     contact_id = contact["id"]
     nature = campagne["nature"]
@@ -5423,10 +5221,10 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
     duree = duree_lisible_tranches(preferences, tranches)
     motif_contact = champs_contact(contact).get("motif") or ""
     if issue == "accepted":
-        # ⚠ LA PLACE RETENUE, PAS FORCÉMENT CELLE EN COURS. Quand plusieurs
-        # places ont été annoncées dans le même appel, l'agent rend celle que
-        # la personne a prise. Une date qui ne figure pas parmi celles
-        # annoncées n'est PAS réservée : on ne devine pas au téléphone.
+        # ⚠ THE SLOT CHOSEN, NOT NECESSARILY THE CURRENT ONE. When several
+        # slots were announced in the same call, the agent returns the one the
+        # person took. A date that is not among those announced is NOT booked:
+        # we do not guess on the phone.
         annoncees = places_annoncees(campagne, configuration)
         place = place_retenue(resultat, annoncees, campagne.get("creneau"))
         if place is None:
@@ -5438,47 +5236,45 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
                 "réservé.",
                 resultat.get("new_datetime"), cible=cible,
                 telephone=telephone, rdv_du_contact=rdv_du_contact)
-        # Le créneau libéré a été CHOISI par l'utilisateur : on ne le juge
-        # pas sur les horaires d'ouverture, mais il reste refusé s'il est
-        # devenu fermé ou s'il a été pris entre-temps.
-        # ⚠ LES DEUX PARAMÈTRES, PAS L'UN À LA PLACE DE L'AUTRE.
-        # `place_choisie` exempte la place des horaires d'ouverture — un
-        # créneau libéré un samedi est légitime, c'est l'utilisateur qui l'a
-        # choisi. `sauf_rdv` fait ignorer le rendez-vous du contact lui-même,
-        # qu'on s'apprête à déplacer : sans lui, un créneau qui chevauche son
-        # propre rendez-vous serait déclaré « déjà pris », et le OUI obtenu au
-        # téléphone serait jeté.
+        # The freed slot was CHOSEN by the user: we do not judge it on the
+        # opening hours, but it stays refused when it has become closed or has
+        # been taken in the meantime. ⚠ BOTH PARAMETERS, NOT ONE INSTEAD OF THE
+        # OTHER. `place_choisie` exempts the slot from the opening hours — a
+        # slot freed on a Saturday is legitimate, the user chose it. `sauf_rdv`
+        # makes the contact's own appointment be ignored, the one we are about
+        # to move: without it, a slot overlapping their own appointment would
+        # be declared `already taken`, and the YES obtained on the phone would
+        # be thrown away.
         refus = horaires.refus_rendezvous_telephone(
             base, preferences, place, tranches=tranches,
             place_choisie=True,
             sauf_rdv=(rdv_du_contact["id"] if rdv_du_contact else None))
         if refus:
-            # ⚠ ET LA PLACE EST RETIRÉE SI ELLE EST MORTE POUR TOUT LE MONDE.
-            # Sans cela, elle restait « à pourvoir » et la campagne continuait
-            # de l'annoncer : mesuré dans sa base le 14/08/2026, VINGT-QUATRE
-            # personnes ont dit oui à la même place déjà prise, l'une après
-            # l'autre, et sont toutes parties « à rappeler par un humain ».
+            # ⚠ AND THE SLOT IS REMOVED WHEN IT IS DEAD FOR EVERYBODY. Without
+            # that, it stayed `to be filled` and the campaign went on
+            # announcing it: measured in his database on 14/08/2026,
+            # TWENTY-FOUR people said yes to the same already-taken slot, one
+            # after another, and all went out `à rappeler par un humain`.
             perdue = _perdre_la_place_si_prise(base, preferences, campagne,
                                                configuration, place)
             _date_refusee(base, campagne, contact, refus, place,
                           complement=perdue, cible=cible, telephone=telephone,
                           rdv_du_contact=rdv_du_contact)
-            # ⚠ ET LA BOUCLE DOIT L'APPRENDRE, pas seulement la liste. Retirer
-            # la place en base ne suffisait pas : sur une campagne à UNE place,
-            # rien ne relisait la campagne et les suivants étaient appelés pour
-            # cette place morte (voir CONCLUSION_PLACE_PERDUE).
+            # ⚠ AND THE LOOP MUST LEARN IT, not only the list. Removing the
+            # slot from the database was not enough: on a campaign with ONE
+            # slot, nothing read the campaign back and the following ones were
+            # called about that dead slot (see CONCLUSION_PLACE_PERDUE).
             return CONCLUSION_PLACE_PERDUE if perdue else None
         client_id = (cible["client_id"]
                      or base.client_pour_contact(contact["nom"], telephone))
         motif = motif_contact or "Créneau libéré attribué"
-        # ⚠ ON DÉPLACE SA LIGNE, ON N'EN CRÉE PAS UNE SECONDE (14/08/2026).
-        # `_liberer_ancien_rendezvous` change l'heure de SON rendez-vous et le
-        # confirme ; il ne reste donc qu'une ligne d'agenda, à la nouvelle
-        # date. Ce n'est que pour quelqu'un qui n'avait AUCUN rendez-vous —
-        # les gens qui attendent une place — qu'on en crée un.
-        #
-        # ⚠ ET LE CAHIER PORTE UN SEUL GESTE : la ligne ↔ du déplacement, ou
-        # l'« ajout » pour celui qui n'avait rien. Jamais les deux.
+        # ⚠ WE MOVE THEIR ROW, WE DO NOT CREATE A SECOND ONE (14/08/2026).
+        # `_liberer_ancien_rendezvous` changes the time of THEIR appointment
+        # and confirms it; so only one calendar row remains, at the new date.
+        # It is only for somebody who had NO appointment — the people waiting
+        # for a slot — that one is created.  ⚠ AND THE LOG CARRIES ONE GESTURE:
+        # the move's ↔ row, or the `ajout` for the person who had nothing.
+        # Never both.
         trace = {}
         libere = _liberer_ancien_rendezvous(base, preferences, campagne,
                                             options, contact,
@@ -5499,8 +5295,8 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
                   f"pris (rendez-vous n°{rdv_id})")
         if libere:
             detail += f" — {libere}"
-            # Le contact vient d'AVANCER son rendez-vous : la place qu'il
-            # quitte est à son tour un créneau à pourvoir.
+            # The contact has just BROUGHT FORWARD their appointment: the slot
+            # they leave becomes in turn a slot to be filled.
             place_rendue = (trace.get("ancienne_date")
                             or (rdv_du_contact or {}).get("horaire")
                             or champs_contact(contact).get("rdv_existant"))
@@ -5514,10 +5310,10 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
         return (CONCLUSION_POURVU if configuration["politique"] == "premier_oui"
             else None)
     if issue == "moved":
-        # « Oui, mais une autre date » : le trou Q7, refermé ici. Un nouveau
-        # rendez-vous est créé — et l'ANCIEN doit partir, sans quoi le client
-        # en aurait deux et une place resterait bloquée pour rien. La même
-        # mécanique que « accepted », avec sa propre raison au cahier.
+        # `Yes, but another date`: the Q7 gap, closed here. A new appointment
+        # is created — and the OLD one must go, otherwise the client would have
+        # two and a slot would stay blocked for nothing. The same mechanism as
+        # `accepted`, with its own reason in the log.
         refus = horaires.refus_rendezvous_telephone(
             base, preferences, resultat.get("new_datetime"), tranches=tranches)
         if refus:
@@ -5543,15 +5339,15 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
             base, preferences, campagne, options, contact,
             pourquoi=MOTIF_LIBERATION_AUTRE_DATE, maintenant=maintenant)
         base.changer_etat_contact_campagne(contact_id, "accepté", issue)
-        # ⚠ LA DATE CONVENUE PEUT ÊTRE UNE PLACE DE LA CAMPAGNE (14/08/2026).
-        # Quand plusieurs places sont annoncées dans le même appel, « une autre
-        # date » veut souvent dire « une autre de celles que vous venez de me
-        # citer ». Cette branche créait alors le rendez-vous dessus SANS marquer
-        # la place : elle restait « à pourvoir », était réannoncée au contact
-        # suivant, qui se la voyait refuser — puis elle était déclarée « prise
-        # entre-temps » alors que c'est CETTE campagne qui l'avait pourvue.
-        # « Pourvu par nous » n'est pas « pris ailleurs » : c'est la raison
-        # d'être des deux statuts (voir `_perdre_la_place_si_prise`).
+        # ⚠ THE AGREED DATE MAY BE ONE OF THE CAMPAIGN'S SLOTS (14/08/2026).
+        # When several slots are announced in the same call, `another date`
+        # often means `another of the ones you have just quoted me`. This
+        # branch then created the appointment on it WITHOUT marking the slot:
+        # it stayed `to be filled`, was re-announced to the next contact, who
+        # was refused it — and it was then declared `taken in the meantime`
+        # when it was THIS campaign that had filled it. `Filled by us` is not
+        # `taken elsewhere`: that is the reason both statuses exist (see
+        # `_perdre_la_place_si_prise`).
         notre_place = _place_de_la_campagne(campagne, configuration,
                                            resultat["new_datetime"])
         if notre_place:
@@ -5567,25 +5363,23 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
                       "le créneau libéré reste à pourvoir")
         if libere:
             detail += f" — {libere}"
-            # La place que le contact vient de quitter est à son tour un
-            # créneau à pourvoir : exactement la règle §8.3, la même que
-            # pour « accepted » et pour un déplacement accepté.
-            #
-            # ⚠ PAR `_rendre_la_place`, ET NON PLUS DIRECTEMENT PAR
-            # `_suite_de_cascade` (14/08/2026). Cet appel direct sautait les
-            # deux décisions du propriétaire : l'option « décaler en cascade »
-            # (il fabriquait une campagne préparée sans qu'on l'ait demandé) et
-            # le partage des deux chemins (sur une campagne à liste, la place
-            # quittée doit REJOINDRE la liste, jamais fabriquer une campagne à
-            # côté — les deux mécaniques ensemble se marchent dessus, voir
-            # `_rendre_la_place`). L'écran annonçait donc l'un et faisait
-            # l'autre.
+            # The slot the contact has just left becomes in turn a slot to be
+            # filled: exactly the §8.3 rule, the same as for `accepted` and for
+            # an accepted move.  ⚠ THROUGH `_rendre_la_place`, AND NO LONGER
+            # DIRECTLY THROUGH `_suite_de_cascade` (14/08/2026). That direct
+            # call skipped the owner's two decisions: the `shift in cascade`
+            # option (it built a prepared campaign without anybody asking) and
+            # the sharing of the two paths (on a list-based campaign, the slot
+            # left behind must JOIN the list, never build a campaign alongside
+            # — the two mechanisms together tread on each other, see
+            # `_rendre_la_place`). So the screen announced one thing and did
+            # the other.
             detail += _rendre_la_place(base, preferences, campagne,
                                        configuration, contact,
                                        ancienne_place, ancien_id)
         base.definir_detail_contact(contact_id, detail)
-        # Une place de la campagne vient d'être pourvue : la boucle doit avancer
-        # son curseur, exactement comme sur « accepted ».
+        # One of the campaign's slots has just been filled: the loop must
+        # advance its cursor, exactly as on `accepted`.
         if notre_place and configuration["politique"] == "premier_oui":
             return CONCLUSION_POURVU
         return None
@@ -5594,10 +5388,10 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
         date_rdv = champs_contact(contact).get("rdv_existant")
         detail = ("Rendez-vous existant du "
                   f"{date_courte(date_rdv)} intact" if date_rdv else "")
-        # ⚠ « ET SI AUTRE CHOSE SE LIBÈRE ? » — la réponse est écrite SUR LA
-        # FICHE, pas sur la campagne : elle vaut pour les campagnes à venir,
-        # c'est tout son intérêt. Ce drapeau n'est PAS le 🚫 : la personne
-        # reste appelable pour SES rendez-vous.
+        # ⚠ `AND IF SOMETHING ELSE COMES FREE?` — the answer is written ON THE
+        # RECORD, not on the campaign: it applies to future campaigns, which is
+        # its whole point. That flag is NOT the 🚫: the person stays callable
+        # about THEIR OWN appointments.
         if calle_client.refuse_les_autres_places(resultat):
             client_id = (cible["client_id"]
                          or base.client_pour_contact(contact["nom"], telephone))
@@ -5617,34 +5411,34 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
         detail = "Présence confirmée"
         rdv_vise = rdv_du_contact
         if nature == "deplacement" and rdv_vise is not None:
-            # DÉPLACEMENT : la campagne a annoncé au client que son
-            # rendez-vous DOIT bouger et lui a proposé des créneaux de
-            # remplacement. Son accord porte donc sur le créneau convenu —
-            # le rendez-vous est réellement DÉPLACÉ, et sa durée le suit
-            # (c'est la même ligne d'agenda qui change d'heure).
+            # MOVE: the campaign told the client their appointment MUST shift
+            # and offered them replacement slots. Their agreement therefore
+            # concerns the agreed slot — the appointment is genuinely MOVED,
+            # and its length follows (it is the same calendar row changing
+            # time).
             return _deplacer_le_rendezvous(
                 base, preferences, campagne, configuration, contact, cible,
                 rdv_vise, resultat, tranches, duree, issue)
-        # ⚠ L'ORDRE DES DEUX BRANCHES EST LE DÉFAUT (03/09/2026). Celle-ci
-        # passait la première, sur le seul fait qu'un rendez-vous soit lié au
-        # contact. Pour une PRISE de rendez-vous chargée depuis « rendez-vous
-        # annulés, manqués et en attente » — son usage le plus évident — le
-        # rendez-vous lié est celui qu'on REMPLACE : le confirmer ressuscitait
-        # une date annulée et jetait celle convenue au téléphone. La personne
-        # se croyait attendue le 13 ; le planning montrait le 24 du mois
-        # précédent, marqué « confirmé ».
+        # ⚠ THE ORDER OF THE TWO BRANCHES IS THE DEFECT (03/09/2026). This one
+        # came first, on the sole fact that an appointment was linked to the
+        # contact. For a BOOKING loaded from `cancelled, missed and waiting
+        # appointments` — its most obvious use — the linked appointment is the
+        # one being REPLACED: confirming it resurrected a cancelled date and
+        # threw away the one agreed on the phone. The person believed they were
+        # expected on the 13th; the schedule showed the 24th of the previous
+        # month, marked `confirmé`.
         if rdv_vise is not None and nature not in ("prise_rdv",
                                                    "contact_unique"):
-            # Rappel et confirmation : l'horaire ne bouge PAS — rien à
-            # vérifier, la place est déjà la sienne, on ne fait que
-            # confirmer sa présence. Aucune ligne au cahier : une présence
-            # confirmée ne change rien au planning de l'établissement.
+            # Reminder and confirmation: the time does NOT move — nothing to
+            # check, the slot is already theirs, we only confirm their
+            # attendance. No row in the log: a confirmed attendance changes
+            # nothing in the establishment's schedule.
             base.mettre_a_jour_rendezvous(rdv_vise["id"], statut="confirmé")
             detail = (f"Rendez-vous du {date_courte(rdv_vise['horaire'])} "
                       "confirmé")
-        # « contact_unique » ne se crée plus (retirée le 03/08/2026), mais une
-        # base existante peut porter une campagne de cette nature dont le
-        # résultat arrive en retard : la branche doit continuer de l'appliquer.
+        # `contact_unique` is no longer created (removed on 03/08/2026), but an
+        # existing database may carry a campaign of that kind whose result
+        # arrives late: the branch must go on applying it.
         elif nature in ("prise_rdv", "contact_unique"):
             refus = horaires.refus_rendezvous_telephone(
                 base, preferences, resultat.get("new_datetime"))
@@ -5673,10 +5467,10 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
     if issue == "rescheduled":
         rdv_vise = rdv_du_contact
         if rdv_vise is not None:
-            # ⚠ LE MÊME CHEMIN QUE « confirmed », depuis le 17/08/2026 : une
-            # date convenue au téléphone DÉPLACE la ligne existante, elle n'en
-            # crée jamais une seconde. Seule la raison portée au cahier dit
-            # laquelle des deux façons d'accepter c'était.
+            # ⚠ THE SAME PATH AS `confirmed`, since 17/08/2026: a date agreed
+            # on the phone MOVES the existing row, it never creates a second
+            # one. Only the reason carried into the log says which of the two
+            # ways of accepting it was.
             return _deplacer_le_rendezvous(
                 base, preferences, campagne, configuration, contact, cible,
                 rdv_vise, resultat, tranches, duree, issue,
@@ -5690,9 +5484,9 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
         client_id = (cible["client_id"]
                      or base.client_pour_contact(contact["nom"], telephone))
         motif = motif_contact or "Rendez-vous convenu par téléphone"
-        # « confirmé » : la personne a dit oui au téléphone. C'est un accord,
-        # pas une simple prévision — et c'est ce que l'autre façon d'accepter
-        # écrivait déjà (sa décision du 17/08/2026).
+        # `confirmé`: the person said yes on the phone. It is an agreement, not
+        # a mere forecast — and that is what the other way of accepting already
+        # wrote (his decision of 17/08/2026).
         rdv_id = base.ajouter_rendezvous(
             client_id, resultat["new_datetime"], motif,
             duree_tranches=tranches, statut="confirmé")
@@ -5708,30 +5502,30 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
         return (CONCLUSION_POURVU if configuration["politique"] == "premier_oui"
             else None)
     if issue == "canceled":
-        # ANNULATION SANS REPLACEMENT. Quand le client accepte une autre date
-        # pendant l'échange, l'agent ne rend pas « canceled » mais
-        # « rescheduled » : c'est alors un simple DÉPLACEMENT, traité plus
-        # haut, avec sa ligne ↔ au cahier. Ici, rien n'a été replacé — donc
-        # c'est LE CLIENT qui reprendra contact. Aucune relance n'est
-        # programmée (on n'en programme que pour les non-joints), et son état
-        # ne débouche sur aucune campagne : voir etats_clients.SANS_CAMPAGNE.
+        # CANCELLATION WITH NO REBOOKING. When the client accepts another date
+        # during the exchange, the agent returns not `canceled` but
+        # `rescheduled`: it is then a plain MOVE, handled above, with its ↔ row
+        # in the log. Here nothing was rebooked — so it is THE CLIENT who will
+        # get back in touch. No follow-up is scheduled (we only schedule them
+        # for those not reached), and their state leads to no campaign: see
+        # etats_clients.SANS_CAMPAGNE.
         pouvait_proposer = bool(options.get(CLE_REPLACER_ANNULATION))
         detail = ("Annulé pendant l'appel — c'est le client qui nous "
                   "rappellera : aucune relance, aucune campagne")
         rdv_vise = rdv_du_contact
         if rdv_vise is not None and rdv_vise["statut"] in ("prévu", "confirmé",
                                                            "manqué"):
-            # LE SEUIL DU PROPRIÉTAIRE (12 h par défaut, réglable). Au-delà,
-            # le rendez-vous est SUPPRIMÉ : sa place redevient libre et on
-            # PROPOSE une campagne pour la remplir. En deçà, il reste
-            # « annulé » et l'écran dit pourquoi on ne peut pas remplacer.
+            # THE OWNER'S THRESHOLD (12 h by default, configurable). Beyond it,
+            # the appointment is DELETED: its slot becomes free again and we
+            # OFFER a campaign to fill it. Within it, it stays `annulé` and the
+            # screen says why we cannot replace it.
             decision = horaires.decision_annulation(
                 preferences, rdv_vise["horaire"], maintenant)
             base.mettre_a_jour_rendezvous(rdv_vise["id"],
                                           statut=decision["statut"])
-            # ⚠ LE GENRE SUIT LE STATUT ÉCRIT (voir `genre_de_retrait`) : il
-            # était « suppression » dans les deux cas, y compris quand le
-            # rendez-vous restait « annulé » et sa place bloquée.
+            # ⚠ THE KIND FOLLOWS THE STATUS WRITTEN (see `genre_de_retrait`):
+            # it was `suppression` in both cases, including when the
+            # appointment stayed `annulé` and its slot blocked.
             noter_changement(base, campagne, contact,
                              horaires.genre_de_retrait(decision["statut"]),
                              client_id=rdv_vise.get("client_id"),
@@ -5746,10 +5540,10 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
                 detail += (f" — le rendez-vous du "
                            f"{date_courte(rdv_vise['horaire'])} est SUPPRIMÉ, "
                            "sa place redevient libre")
-                # L'option de cascade PRÉPARE la campagne de compensation
-                # (état « prête », aucun appel) ; sans elle, le récapitulatif
-                # de la campagne la PROPOSE en un clic. Dans les deux cas,
-                # rien ne part sans le geste de l'opérateur.
+                # The cascade option PREPARES the compensating campaign (state
+                # `prête`, no calls); without it, the campaign's summary OFFERS
+                # it in one click. In both cases, nothing goes out without the
+                # operator's gesture.
                 detail += _suite_de_cascade(base, preferences, campagne,
                                             configuration, contact["nom"],
                                             rdv_vise["horaire"],
@@ -5758,57 +5552,54 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
                 detail += (f" — le rendez-vous du "
                            f"{date_courte(rdv_vise['horaire'])} reste "
                            f"« annulé » : {decision['pourquoi']}")
-        # La CONSIGNE que portait le message, pour que l'écran dise ce que
-        # l'agent avait le droit de faire (c'est lisible dans la campagne,
-        # ce n'est pas une déduction sur ce qui s'est dit au téléphone).
+        # The BRIEFING the message carried, so the screen can say what the
+        # agent was allowed to do (it is readable in the campaign, it is not a
+        # deduction about what was said on the phone).
         detail += (" · consigne de la campagne : proposer une autre date"
                    if pouvait_proposer
                    else " · consigne de la campagne : ne proposer aucune date")
         base.changer_etat_contact_campagne(contact_id, ETAT_RAPPELLERA, issue)
         base.definir_detail_contact(contact_id, detail)
         return None
-    # to_reschedule : rien n'a été conclu au téléphone. CE QUI SUIT DÉPEND DE LA
-    # NATURE depuis le 11/08/2026 — voir _rien_de_conclu.
+    # to_reschedule: nothing was concluded on the phone. WHAT FOLLOWS DEPENDS
+    # ON THE KIND since 11/08/2026 — see _rien_de_conclu.
     return _rien_de_conclu(base, preferences, campagne, contact, cible,
                            telephone, rdv_du_contact, resultat, issue,
                            motif_contact, maintenant)
 
 
-# ⚠ LE RAPPEL PAR UN HUMAIN N'EST PLUS OFFERT PARTOUT (décision du propriétaire,
-# 11/08/2026) : « nous allons permettre le rappel par un humain uniquement en cas
-# de déplacement de rendez-vous ou de prise de rendez-vous ».
-#
-# POURQUOI CES DEUX-LÀ ET PAS LES AUTRES. Sur un déplacement ou une prise de
-# rendez-vous, il RESTE quelque chose à conclure : une date à trouver. Un humain
-# a donc un travail réel à faire, et rappeler a du sens.
-#
-# Sur un créneau libéré, non — et c'est le propriétaire qui l'a dit : « le
-# créneau est certainement attribué à quelqu'un d'autre, alors ce sera contacter
-# quelqu'un pour lui dire "en fait on voulait vous demander quelque chose, mais
-# ce n'est plus d'actualité" ». Rappeler serait déranger pour rien.
+# ⚠ THE HUMAN CALL-BACK IS NO LONGER OFFERED EVERYWHERE (owner's decision,
+# 11/08/2026): `we are going to allow the human call-back only in the case of
+# an appointment move or a booking`.  WHY THOSE TWO AND NOT THE OTHERS. On a
+# move or a booking, something REMAINS to be concluded: a date to be found. So
+# a human has real work to do, and calling back makes sense.  On a freed slot,
+# no — and it is the owner who said it: `the slot has certainly been given to
+# somebody else, so it would mean contacting somebody to tell them "actually we
+# wanted to ask you something, but it no longer applies"`. Calling back would
+# be disturbing them for nothing.
 NATURES_RAPPEL_HUMAIN = ("deplacement", "prise_rdv")
 
 
 def _rien_de_conclu(base, preferences, campagne, contact, cible, telephone,
                     rdv_du_contact, resultat, issue, motif_contact,
                     maintenant=None):
-    """« Je ne peux pas vous dire là » : trois sorts, selon la nature.
+    """`I cannot tell you right now`: three fates, according to the kind.
 
-    · déplacement, prise de rendez-vous → À RAPPELER PAR UN HUMAIN. Il reste une
-      date à trouver, quelqu'un doit la trouver (voir NATURES_RAPPEL_HUMAIN).
+    · move, booking → TO BE CALLED BACK BY A HUMAN. A date remains to be found,
+    somebody must find it (see NATURES_RAPPEL_HUMAIN).
 
-    · créneau libéré → REFUSÉ, et son rendez-vous est CONSERVÉ et passé en
-      CONFIRMÉ. Mots du propriétaire : « on n'a pas pu définir si vous êtes
-      intéressé, alors il conserve son rendez-vous, et le rendez-vous passe en
-      confirmé ». La place, elle, part à quelqu'un d'autre — d'où « refusé »,
-      qui dit la vérité sur la PLACE sans rien affirmer sur la personne (c'est
-      le détail qui le dit, en clair).
+    · freed slot → REFUSED, and their appointment is KEPT and moved to
+    CONFIRMED. The owner's words: `we could not establish whether you are
+    interested, so they keep their appointment, and the appointment moves to
+    confirmed`. The slot, for its part, goes to somebody else — hence `refusé`,
+    which tells the truth about the SLOT without asserting anything about the
+    person (it is the detail that says so, in clear).
 
-    · rappel, confirmation → LE CLIENT RAPPELLERA. Ici le rendez-vous dont on
-      parle est LE SIEN : il peut vraiment nous rappeler à son sujet, et aucun
-      travail ne reste en attente de notre côté. Son rendez-vous n'est PAS
-      touché — le confirmer d'office sur une campagne de confirmation
-      inventerait la confirmation qu'on n'a justement pas obtenue.
+    · reminder, confirmation → THE CLIENT WILL CALL BACK. Here the appointment
+    being discussed is THEIRS: they really can call us back about it, and no
+    work is left pending on our side. Their appointment is NOT touched —
+    confirming it outright on a confirmation campaign would invent the very
+    confirmation we did not obtain.
     """
     contact_id = contact["id"]
     nature = campagne["nature"]
@@ -5832,18 +5623,16 @@ def _rien_de_conclu(base, preferences, campagne, contact, cible, telephone,
         detail += confirme if confirme else "."
         base.definir_detail_contact(contact_id, detail)
         return None
-    # Rappel de rendez-vous, confirmation : c'est le client qui reprendra
-    # contact — et son rendez-vous est ANNULÉ.
-    #
-    # ⚠ SA RÈGLE, DU 17/08/2026 : « si la personne doit rappeler, le rendez-vous
-    # est simplement annulé ». Avant, le rendez-vous n'était PAS touché : le
-    # créneau restait bloqué pour quelqu'un qui vient de dire qu'il ne viendrait
-    # pas comme prévu. Le cabinet gardait un trou qu'il ne savait pas avoir.
-    #
-    # « Annulé », pas « supprimé » : la ligne reste au planning, visible, et sa
-    # place redevient libre. C'est la même écriture que pour un refus au
-    # téléphone (planificateur._appliquer_issue, statut « canceled »), et c'est
-    # ce qui permet à une campagne de créneau libéré de la reprendre.
+    # Appointment reminder, confirmation: it is the client who will get back in
+    # touch — and their appointment is CANCELLED.  ⚠ HIS RULE, OF 17/08/2026:
+    # `if the person has to call back, the appointment is simply cancelled`.
+    # Before, the appointment was NOT touched: the slot stayed blocked for
+    # somebody who had just said they would not come as planned. The practice
+    # kept a gap it did not know it had.  `Annulé`, not `supprimé`: the row
+    # stays on the schedule, visible, and its slot becomes free again. It is
+    # the same writing as for a refusal on the phone
+    # (planificateur._appliquer_issue, status `canceled`), and it is what lets
+    # a freed-slot campaign take it up.
     base.changer_etat_contact_campagne(contact_id, ETAT_RAPPELLERA, issue)
     detail = ("Rien n'a été conclu au téléphone : c'est cette personne qui "
               f"rappellera. Ce qu'elle a dit : « {demande} »")
@@ -5856,35 +5645,36 @@ def _rien_de_conclu(base, preferences, campagne, contact, cible, telephone,
 
 def _annuler_le_rendezvous(base, campagne, contact, rdv_du_contact, demande,
                            raison=None, journal_dit="le client rappellera"):
-    """Passe le rendez-vous du contact en « annulé » ; rend la phrase à afficher.
+    """Moves the contact's appointment to `annulé`; returns the sentence to
+    display.
 
-    Rend "" s'il n'y a aucun rendez-vous à annuler — on ne prétend pas avoir
-    touché à quelque chose qui n'existe pas.
+    Returns "" when there is no appointment to cancel — we do not claim to have
+    touched something that does not exist.
 
-    ⚠ UNE LIGNE AU CAHIER, TOUJOURS. L'opérateur a ce changement à reporter
-    dans son propre logiciel : une annulation muette lui ferait garder le
-    créneau bloqué. Même raison que le genre « confirmation », ajouté le
-    11/08/2026 pour le changement de statut inverse.
+    ⚠ ONE ROW IN THE LOG, ALWAYS. The operator has that change to carry over
+    into their own software: a silent cancellation would leave them with the
+    slot blocked. The same reason as the `confirmation` kind, added on
+    11/08/2026 for the reverse status change.
 
-    ⚠ `raison` EST UN PARAMÈTRE DEPUIS LE 20/08/2026, et sa valeur par défaut
-    est le texte d'avant, mot pour mot. Il y a maintenant DEUX façons d'arriver
-    ici — « le client rappellera » et « le déplacement n'a pas pu se faire » —
-    et le cahier des changements doit dire LAQUELLE : c'est lui qu'il relit
-    pour reporter dans son propre logiciel.
+    ⚠ `raison` HAS BEEN A PARAMETER SINCE 20/08/2026, and its default value is
+    the previous text, word for word. There are now TWO ways of arriving here —
+    `the client will call back` and `the move could not be done` — and the
+    change log must say WHICH: it is what he rereads to carry things over into
+    his own software.
     """
     if not rdv_du_contact:
         return ""
     if rdv_du_contact.get("statut") == "annulé":
-        return ""          # déjà annulé : ni seconde ligne au cahier, ni bruit
+        return ""  # already cancelled: neither a second log row, nor noise
     horaire = rdv_du_contact.get("horaire")
     base.mettre_a_jour_rendezvous(rdv_du_contact["id"], statut="annulé")
-    # ⚠ LA LIGNE DU CAHIER PORTE SON RENDEZ-VOUS (21/08/2026, son signalement).
-    # Sans `rendezvous_id`, l'annulation entrait au cahier SANS lien vers la
-    # place qu'elle venait de libérer — et le panneau « Compenser une absence »
-    # l'ignorait : il n'accepte que les changements qui désignent un
-    # rendez-vous. Mesuré sur sa campagne n° 119 : trois rendez-vous annulés au
-    # cahier, DEUX places proposées à la compensation. La troisième se libérait
-    # en silence, et son écran le laissait croire à une incohérence.
+    # ⚠ THE LOG ROW CARRIES THEIR APPOINTMENT (21/08/2026, his report). Without
+    # `rendezvous_id`, the cancellation entered the log WITH no link to the
+    # slot it had just freed — and the `Compenser une absence` panel ignored
+    # it: it only accepts changes that designate an appointment. Measured on
+    # his campaign no. 119: three appointments cancelled in the log, TWO slots
+    # offered for compensation. The third came free in silence, and his screen
+    # let him believe it was an inconsistency.
     noter_changement(base, campagne, contact, "annulation",
                      rendezvous_id=rdv_du_contact["id"],
                      ancienne_date=horaire,
@@ -5898,45 +5688,39 @@ def _annuler_le_rendezvous(base, campagne, contact, rdv_du_contact, demande,
             "redevient libre.")
 
 
-# ------------------------- un déplacement qui n'a pas eu lieu finit ANNULÉ
-# ⚠ SA RÈGLE, DU 20/08/2026, mot pour mot : « lorsqu'on demande de déplacer un
-# rendez-vous et que, pour une raison ou une autre, nous n'avons pas pu le
-# déplacer : celui-ci est alors annulé. C'est après les recontacts, ou alors le
-# client qui doit rappeler, pour fixer un rendez-vous. »
-#
-# La raison est simple : une campagne de déplacement dit « ce créneau doit être
-# vidé ». Il ne l'est qu'à moitié si les rendez-vous qu'on n'a pas su déplacer
-# y restent — et il croyait sa journée vide. Mesuré sur sa base le 20/08 :
-# il vide un jeudi après-midi, 2 rendez-vous sur 6 restent au planning.
-#
-# ⚠ QUAND — SON CHOIX DU 20/08 : quand RingBack a FINI D'ESSAYER, pas au
-# premier appel raté. Tant qu'une relance est armée, on va rappeler pour
-# déplacer : annuler d'avance ferait parler d'un rendez-vous qui n'existe plus.
-#
-# ⚠ QUI — SON CHOIX DU 20/08 : ceux qu'on n'a JAMAIS pu appeler aussi (🚫, sans
-# numéro, fiche disparue). Il n'est pas là ce jour-là : leur rendez-vous ne
-# tient pas davantage. Ils sont dans sa liste de rappels humains, c'est en les
-# appelant qu'il refixera.
-#
-# ⚠ ET « NOUS N'AVONS PAS PU » N'EST PAS « NOUS N'AVONS PAS VOULU ». Ma première
-# version confondait les deux, et le banc l'a arrêtée sur la cascade : une
-# campagne « arrêt au premier oui » ÉPARGNE volontairement tous ceux qui
-# suivent le premier accord — leur rendez-vous n'a aucune raison de bouger, on
-# ne leur a rien demandé. Elle annulait trois rendez-vous par campagne, et la
-# chaîne de cascade mourait au premier maillon.
+# ------------------------- a move that did not happen ends up CANCELLED ⚠ HIS
+# RULE, OF 20/08/2026, word for word: `when we ask to move an appointment and,
+# for one reason or another, we could not move it: it is then cancelled. It is
+# after the re-contacts, or else the client who has to call back, to set an
+# appointment.`  The reason is simple: a move campaign says `this slot must be
+# emptied`. It is only half emptied if the appointments we could not move stay
+# in it — and he believed his day was empty. Measured in his database on 20/08:
+# he empties a Thursday afternoon, 2 appointments out of 6 stay on the
+# schedule.  ⚠ WHEN — HIS CHOICE OF 20/08: when RingBack has FINISHED TRYING,
+# not at the first failed call. As long as a follow-up is armed, we are going
+# to call back to move it: cancelling in advance would mean talking about an
+# appointment that no longer exists.  ⚠ WHO — HIS CHOICE OF 20/08: those we
+# could NEVER call too (🚫, no number, record gone). He is not there that day:
+# their appointment holds no better. They are in his list of human call-backs,
+# and it is by calling them that he will rebook.  ⚠ AND `WE COULD NOT` IS NOT
+# `WE DID NOT WANT TO`. My first version confused the two, and the bench
+# stopped it on the cascade: a `stop at the first yes` campaign deliberately
+# SPARES everybody after the first agreement — their appointment has no reason
+# to move, we asked them nothing. It cancelled three appointments per campaign,
+# and the cascade chain died at the first link.
 ETATS_ENCORE_A_APPELER = (
     "à appeler",
     "en cours",
-    # L'appel EST parti, sa réponse n'est pas revenue : « 📥 Récupérer les
-    # résultats en attente » peut encore la ramener, et cette personne a très
-    # bien pu accepter. RingBack n'a pas fini d'essayer.
+    # The call HAS gone out, its answer has not come back: `📥 Récupérer les
+    # résultats en attente` can still bring it, and that person may very well
+    # have accepted. RingBack has not finished trying.
     ETAT_RESULTAT_INCONNU,
 )
 
-# Les états où le rendez-vous a bel et bien trouvé une suite — ou n'avait
-# aucune raison d'en changer. « accepté » l'a déplacé ; « le client
-# rappellera » l'a DÉJÀ annulé par le chemin du 17/08 ; « épargné » (affiché
-# « pas appelé ») est une décision de la campagne, pas un échec.
+# The states where the appointment did find a resolution — or had no reason to
+# change. `accepté` moved it; `le client rappellera` has ALREADY cancelled it
+# through the 17/08 path; `épargné` (shown as `pas appelé`) is a decision of
+# the campaign, not a failure.
 ETATS_DEPLACEMENT_REGLES = ("accepté", ETAT_RAPPELLERA, "épargné")
 
 RAISON_DEPLACEMENT_MANQUE = (
@@ -5945,20 +5729,20 @@ RAISON_DEPLACEMENT_MANQUE = (
 
 
 def cloturer_les_deplacements_non_faits(base, campagne, maintenant=None):
-    """Annule les rendez-vous d'une campagne de déplacement restés en place.
+    """Cancels the appointments of a move campaign that stayed in place.
 
-    ⚠ UN SEUL ENDROIT, ET IL EST REJOUABLE. Un contact peut cesser d'être
-    « en cours d'essai » à trois moments : la campagne se termine, une relance
-    s'achève sans rien conclure, ou la campagne est close à la main. Trois
-    écritures séparées auraient fini par diverger. Celle-ci se rejoue sans
-    dommage : un rendez-vous déjà annulé n'est pas retouché, et aucune seconde
-    ligne n'entre au cahier.
+    ⚠ ONE SINGLE PLACE, AND IT IS REPLAYABLE. A contact may stop being `being
+    tried` at three moments: the campaign finishes, a follow-up ends without
+    concluding anything, or the campaign is closed by hand. Three separate
+    writings would have ended up diverging. This one replays harmlessly: an
+    appointment already cancelled is not touched again, and no second row
+    enters the log.
 
-    Rend le nombre de rendez-vous annulés.
+    Returns the number of appointments cancelled.
     """
     if (campagne or {}).get("nature") != "deplacement":
         return 0
-    # Les contacts pour qui une tentative est ENCORE À VENIR, lus en une fois.
+    # The contacts for whom an attempt is STILL TO COME, read in one pass.
     attendus = {r["contact_id"] for r in base.relances_de_campagne(campagne["id"])
                 if r["statut"] == "planifiée"}
     annules = 0
@@ -5966,15 +5750,15 @@ def cloturer_les_deplacements_non_faits(base, campagne, maintenant=None):
         if contact["etat"] in ETATS_ENCORE_A_APPELER:
             continue                       # on va encore l'appeler
         if contact["etat"] in ETATS_DEPLACEMENT_REGLES:
-            continue                       # déplacé, ou déjà annulé le 17/08
+            continue  # moved, or already cancelled on 17/08
         if contact["id"] in attendus:
-            continue                       # une tentative est encore à venir
+            continue  # an attempt is still to come
         rdv = _rendezvous_vise(base, contact,
                                base.telephone_contact_campagne(contact["id"]))
-        # ⚠ SEULEMENT CE QUI OCCUPE ENCORE LA PLACE (« prévu », « confirmé »).
-        # Un rendez-vous déjà annulé, supprimé, déplacé ou manqué ne bloque
-        # plus le créneau qu'il voulait vider : l'annuler une seconde fois
-        # n'apporterait rien et salirait le cahier des changements.
+        # ⚠ ONLY WHAT STILL OCCUPIES THE SLOT (`prévu`, `confirmé`). An
+        # appointment already cancelled, deleted, moved or missed no longer
+        # blocks the slot it was meant to empty: cancelling it a second time
+        # would bring nothing and would dirty the change log.
         if rdv is None or rdv["statut"] not in horaires.STATUTS_OCCUPANTS:
             continue
         phrase = _annuler_le_rendezvous(
@@ -5998,16 +5782,18 @@ def cloturer_les_deplacements_non_faits(base, campagne, maintenant=None):
 
 def _confirmer_le_rendezvous(base, campagne, contact, cible, telephone,
                              rdv_du_contact, demande):
-    """Passe le rendez-vous du contact en « confirmé ». Rend la phrase à afficher.
+    """Moves the contact's appointment to `confirmé`. Returns the sentence to
+    display.
 
-    ⚠ SEULEMENT SUR UN CRÉNEAU LIBÉRÉ, et seulement quand le rendez-vous existe
-    VRAIMENT dans l'agenda. Sans rendez-vous connu il n'y a rien à confirmer, et
-    en inventer un serait pire que de ne rien écrire : la phrase le dit alors.
+    ⚠ ONLY ON A FREED SLOT, and only when the appointment REALLY exists in the
+    calendar. With no known appointment there is nothing to confirm, and
+    inventing one would be worse than writing nothing: the sentence then says
+    so.
 
-    Pourquoi « confirmé » est juste ici : la personne a DÉCROCHÉ, on lui a parlé,
-    et elle n'a pas annulé. Son rendez-vous tient — c'est exactement ce que dit
-    ce statut. Rien n'est déduit d'un silence : sans conversation, on ne passe
-    jamais par ici (une non-réponse suit le chemin des injoignables).
+    Why `confirmé` is right here: the person PICKED UP, we spoke to them, and
+    they did not cancel. Their appointment holds — which is exactly what that
+    status says. Nothing is inferred from silence: with no conversation, we
+    never come through here (a non-answer follows the unreachable path).
     """
     if rdv_du_contact is None:
         return (" — aucun rendez-vous connu dans l'agenda de RingBack, "
@@ -6040,43 +5826,41 @@ RAISON_AUTRE_DATE = "autre date convenue au téléphone"
 def _deplacer_le_rendezvous(base, preferences, campagne, configuration,
                             contact, cible, rdv_vise, resultat, tranches,
                             duree, issue, raison=RAISON_CRENEAU_PROPOSE):
-    """📆 Le client accepte de bouger : son rendez-vous est VRAIMENT déplacé.
+    """📆 The client agrees to move: their appointment is GENUINELY moved.
 
-    ⚠ LES DEUX FAÇONS D'ACCEPTER PASSENT ICI, et c'est tout l'enjeu (corrigé le
-    17/08/2026 au soir). Au téléphone, un client peut accepter de deux manières :
-    prendre le créneau qu'on lui propose (l'agent rend « confirmed »), ou
-    convenir d'une autre date (« rescheduled »). Pour lui, c'est le MÊME
-    événement — l'écran écrit d'ailleurs « ✅ accepté » dans les deux cas. Seule
-    `raison` change : elle dit laquelle des deux, dans le cahier.
+    ⚠ BOTH WAYS OF ACCEPTING COME THROUGH HERE, and that is the whole point
+    (fixed on the evening of 17/08/2026). On the phone, a client can accept in
+    two ways: taking the slot offered (the agent returns `confirmed`), or
+    agreeing another date (`rescheduled`). For them it is the SAME event — the
+    screen writes `✅ accepté` in both cases, in fact. Only `raison` changes: it
+    says which of the two, in the log.
 
-    CE QUE ÇA COÛTAIT : la seconde façon passait par une autre mécanique, qui
-    laissait l'ancienne ligne sur la journée en « déplacé » et en créait une
-    SECONDE à la date convenue. Mesuré sur sa journée du 18/08 : sur onze
-    personnes, quatre lignes se déplaçaient proprement et deux restaient là,
-    plus deux nouvelles nées ailleurs. D'où son constat : « le premier
-    rendez-vous n'a pas été annulé, mais on l'a bien ajouté pour le
-    lendemain ». Sa journée ne se vidait qu'à moitié.
+    WHAT THAT COST: the second way went through another mechanism, which left
+    the old row on the day as `déplacé` and created a SECOND one at the agreed
+    date. Measured on his day of 18/08: out of eleven people, four rows moved
+    cleanly and two stayed, plus two new ones born elsewhere. Hence his
+    observation: `the first appointment was not cancelled, but we did indeed
+    add it for the next day`. His day only half emptied.
 
-    ⚠ ET LA DÉCISION ÉTAIT DÉJÀ PRISE, par lui, le 14/08/2026 : « tu déplaces un
-    rendez-vous d'une date à une autre, c'est ultra simple ». Elle avait été
-    appliquée à la cascade (`_rendre_la_place`) et à l'accord sur créneau
-    proposé — pas à celui-ci. Corriger le chemin signalé et laisser les autres,
-    c'est la demi-correction qui fait revenir le même défaut sous un autre nom.
+    ⚠ AND THE DECISION HAD ALREADY BEEN TAKEN, by him, on 14/08/2026: `you move
+    an appointment from one date to another, it's dead simple`. It had been
+    applied to the cascade (`_rendre_la_place`) and to agreement on an offered
+    slot — not to this one. Fixing the path reported and leaving the others is
+    the half-correction that brings the same defect back under another name.
 
-    Le créneau convenu passe par les vérifications déjà en place
-    (horaires.refus_rendezvous_telephone : jour fermé, hors horaires, place
-    prise, durée qui ne tient pas) — celles de la saisie à la main, jamais
-    dupliquées. La durée SUIT le rendez-vous : c'est la même ligne d'agenda
-    qui change d'heure, `duree_tranches` n'est pas touché.
+    The agreed slot goes through the checks already in place
+    (horaires.refus_rendezvous_telephone: closed day, outside hours, slot
+    taken, length that does not fit) — those of manual input, never duplicated.
+    The length FOLLOWS the appointment: it is the same calendar row changing
+    time, `duree_tranches` is not touched.
 
-    En cas de refus, le contact part en « à rappeler par un humain » avec la
-    date demandée en clair — rien n'est écrit qu'on n'ait pu honorer.
+    On a refusal, the contact goes to `à rappeler par un humain` with the
+    requested date in clear — nothing is written that we could not honour.
 
-    Quand le déplacement ABOUTIT, la place qu'il libère devient le créneau
-    d'une nouvelle campagne, préparée « prête » si l'option de cascade est
-    réglée (§8.3) — jamais lancée. Elle le devient désormais dans les DEUX
-    façons d'accepter : une place libérée est une place libérée, quelle que
-    soit la phrase qui l'a libérée.
+    When the move CONCLUDES, the slot it frees becomes the slot of a new
+    campaign, prepared `prête` when the cascade option is set (§8.3) — never
+    launched. It now does so in BOTH ways of accepting: a freed slot is a freed
+    slot, whatever the sentence that freed it.
     """
     contact_id = contact["id"]
     nouvelle = resultat.get("new_datetime")
@@ -6109,75 +5893,68 @@ def _deplacer_le_rendezvous(base, preferences, campagne, configuration,
 
 def _rendre_la_place(base, preferences, campagne, configuration, contact,
                      place_rendue, rendezvous_id):
-    """Ce que devient la place qu'un contact vient de quitter.
+    """What becomes of the slot a contact has just left.
 
-    ⚠ DEUX CHEMINS, ET UN SEUL À LA FOIS (décision du propriétaire du
-    03/08/2026) :
+    ⚠ TWO PATHS, AND ONLY ONE AT A TIME (owner's decision of 03/08/2026):
 
-    · la campagne porte une LISTE de places → la place rendue REJOINT cette
-      liste. La campagne continuera d'elle-même sur ce nouveau trou, avec les
-      personnes qui restent. Pas de campagne « prête » séparée.
-    · la campagne n'a qu'UN créneau → le décalage en cascade d'origine, qui
-      prépare une campagne suivante. Rien n'y change.
+    · the campaign carries a LIST of slots → the slot given back JOINS that
+    list. The campaign will carry on by itself on that new gap, with the people
+    who remain. No separate `prête` campaign. · the campaign has only ONE slot
+    → the original cascading shift, which prepares a following campaign.
+    Nothing changes there.
 
-    Pourquoi ne pas faire les deux : la convergence de la cascade repose sur
-    le fait que chaque maillon est STRICTEMENT plus tard que le précédent
-    (voir `resserrer_sur_le_creneau`). Avec une liste, une place rendue peut
-    être plus TÔT qu'un créneau encore à pourvoir : le raisonnement tombe, et
-    les deux mécaniques ensemble se marcheraient dessus. Ici la campagne ne
-    peut pas tourner en rond — un contact n'est appelé qu'une fois, la file
-    finit toujours par se vider.
+    Why not both: the cascade's convergence rests on each link being STRICTLY
+    later than the previous one (see `resserrer_sur_le_creneau`). With a list,
+    a slot given back may be EARLIER than a slot still to be filled: the
+    reasoning falls, and the two mechanisms together would tread on each other.
+    Here the campaign cannot go round in circles — a contact is called only
+    once, and the queue always ends up emptying.
 
-    ⚠ ET LES DEUX CHEMINS SONT SOUS LA MÊME OPTION DEPUIS LE 14/08/2026.
-    Décision du propriétaire, mot pour mot : « seulement si l'option du
-    traitement en cascade est demandé : c'est une option, pas une obligation ».
+    ⚠ AND BOTH PATHS ARE UNDER THE SAME OPTION SINCE 14/08/2026. Owner's
+    decision, word for word: `only if the cascade handling option is requested:
+    it is an option, not an obligation`.
 
-    LE DÉFAUT QUI L'A FAIT DÉCIDER, MESURÉ DANS SA BASE : le chemin « liste »
-    ajoutait la place rendue SANS RIEN DEMANDER. Il avait choisi CINQ places ;
-    sa campagne en a compté TRENTE-SEPT, en a pourvu trente-deux, et lui a
-    laissé trente-cinq lignes à reporter dans son logiciel de planification.
-    Chaque personne avancée creuse un trou plus loin, qu'on comble en creusant
-    encore : cela ne s'arrête pas aux places qu'il a choisies, mais quand plus
-    personne n'est intéressé. Décochée, l'option laisse le trou VISIBLE sur le
-    planning — et c'est lui qui décide d'en faire une campagne, ou pas.
+    THE DEFECT THAT MADE HIM DECIDE, MEASURED IN HIS DATABASE: the `list` path
+    added the slot given back WITHOUT ASKING ANYTHING. He had chosen FIVE
+    slots; his campaign counted THIRTY-SEVEN, filled thirty-two of them, and
+    left him thirty-five rows to carry over into his scheduling software. Every
+    person brought forward digs a gap further out, which is filled by digging
+    again: it does not stop at the slots he chose, but when nobody is
+    interested any more. Unticked, the option leaves the gap VISIBLE on the
+    schedule — and it is he who decides whether to make a campaign of it, or
+    not.
     """
     if not place_rendue:
         return ""
-    # ⚠ L'OPTION COMMANDE LES DEUX CHEMINS. Décochée, rien à dire de plus — la
-    # phrase qui précède annonce déjà que sa place redevient libre, et le trou
-    # est sur le planning.
+    # ⚠ THE OPTION COMMANDS BOTH PATHS. Unticked, nothing more to say — the
+    # preceding sentence already announces that their slot becomes free again,
+    # and the gap is on the schedule.
     options = configuration["options"]
     if not options.get("cascade"):
         return ""
-    # ⚠ UNE PLACE OU PLUSIEURS : LA PLACE QUITTÉE REJOINT LA CAMPAGNE
-    # (15/08/2026). C'est SA mécanique, décrite par lui après trois jours de
-    # signalements que je n'arrivais pas à traduire :
-    #
-    #   « 30 appels autorisés, on en consomme 8 pour occuper le créneau, on
-    #   ajoute le nouveau créneau libéré à cause du décalage […] puis quand on
-    #   est sur un créneau en cascade, alors on recharge la liste des
-    #   contacts […] on les appelle. »
-    #
-    # AVANT, une campagne à UNE place — c'est-à-dire TOUTES les siennes, je l'ai
-    # vérifié dans sa base — préparait à côté une campagne « prête » qu'il
-    # fallait lancer à la main. Sa n°12 : plafond 30, SEPT personnes appelées,
-    # vingt-trois épargnées, campagne terminée, et une n°13 posée à côté. De
-    # son poste cela s'appelle « la cascade ne fonctionne pas », et il a raison :
-    # la campagne s'arrête alors qu'elle a du budget et une place à pourvoir.
-    #
-    # La convergence tient toujours — c'était l'objection du 03/08 : sur une
-    # place unique, la place rendue est TOUJOURS strictement plus tard (on
-    # n'avance quelqu'un que vers plus tôt). S'y ajoutent deux bornes dures :
-    # la date limite réglée ci-dessous, et le plafond d'appels tenu par la
-    # boucle (voir `executer_campagne`).
+    # ⚠ ONE SLOT OR SEVERAL: THE SLOT LEFT BEHIND JOINS THE CAMPAIGN
+    # (15/08/2026). It is HIS mechanism, described by him after three days of
+    # reports I could not translate:  `30 calls allowed, we use 8 to fill the
+    # slot, we add the new slot freed by the shift […] then when we are on a
+    # cascading slot, we reload the contact list […] we call them.`  BEFORE, a
+    # campaign with ONE slot — that is, ALL of his, I checked in his database —
+    # prepared a `prête` campaign alongside that had to be launched by hand.
+    # His no. 12: ceiling 30, SEVEN people called, twenty-three spared,
+    # campaign finished, and a no. 13 sitting beside it. From where he sits
+    # that is called `the cascade does not work`, and he is right: the campaign
+    # stops while it has budget and a slot to fill.  Convergence still holds —
+    # that was the objection of 03/08: on a single slot, the slot given back is
+    # ALWAYS strictly later (you only bring somebody forward, towards earlier).
+    # Two hard bounds are added to it: the cut-off date configured below, and
+    # the call ceiling held by the loop (see `executer_campagne`).
     if not configuration.get("liste_de_places"):
         journal.info("Campagne n°%d : place unique — la place quittée du %s "
                      "rejoint la campagne au lieu d'en préparer une autre",
                      campagne["id"], place_rendue)
-    # ⚠ ET SA DATE LIMITE, QUAND ELLE EST RÉGLÉE, BORNE AUSSI CE CHEMIN-CI.
-    # C'est ce qui empêche une campagne de marcher indéfiniment vers le futur :
-    # chaque personne avancée creuse un trou plus loin, et sans butée on comble
-    # en creusant encore.
+    # ⚠ AND ITS CUT-OFF DATE, WHEN CONFIGURED, BOUNDS THIS PATH TOO. That is
+    # what stops a campaign walking indefinitely into the future: every person
+    # brought forward digs a gap further out, and with no stop we fill it by
+    # digging again.
     limite = cascade_reglee(options)
     if limite and place_rendue[:10] > limite:
         return (f" — sa place du {date_courte(place_rendue)} reste libre sur "
@@ -6193,12 +5970,12 @@ def _rendre_la_place(base, preferences, campagne, configuration, contact,
 
 def _suite_de_cascade(base, preferences, campagne, configuration, demandeur,
                       creneau_libere, rendezvous_bouge=None):
-    """Le maillon suivant, quand l'option est réglée ; rend le texte à afficher.
+    """The next link, when the option is set; returns the text to display.
 
-    N'agit QUE si l'option « décaler en cascade » a été cochée : sans elle,
-    rien n'est préparé et rien n'est dit — on ne répond pas à une question
-    qui n'a pas été posée. Avec elle, ou bien une campagne est préparée et
-    l'écran dit laquelle, ou bien la chaîne s'arrête et l'écran dit pourquoi.
+    It ONLY acts when the `shift in cascade` option was ticked: without it,
+    nothing is prepared and nothing is said — we do not answer a question that
+    was not asked. With it, either a campaign is prepared and the screen says
+    which, or the chain stops and the screen says why.
     """
     if not configuration["options"].get("cascade"):
         return ""
@@ -6220,28 +5997,17 @@ def _suite_de_cascade(base, preferences, campagne, configuration, demandeur,
 
 
 def mettre_en_pause_sur_panne(base, campagne_id, panne, contact=None):
-    """Panne DE NOTRE CÔTÉ : la campagne s'arrête NET, personne n'est marqué.
+    """A failure ON OUR SIDE: the campaign stops DEAD, nobody is marked.
 
-    Ce que fait cette fonction, et surtout ce qu'elle NE fait PAS :
-    - le contact qu'on s'apprêtait à appeler redevient « à appeler » (il
-      était passé « en cours ») : aucune tentative ne lui est comptée,
-      aucun détail ne lui est collé — son téléphone n'a pas sonné ;
-    - la campagne passe « en pause », JAMAIS « terminée » : elle se reprend
-      telle quelle une fois la panne réparée, sans perdre personne ;
-    - la RAISON est écrite en français, avec la marche à suivre, pour être
-      affichée sur la fiche.
-    Avec une liste de vingt personnes et une clé refusée, les vingt seraient
-    sinon passées « injoignables » à tort : c'est exactement ce qui a été
-    constaté le 01/08/2026, et c'est ce que ces trois lignes empêchent.
+    What this function does, and above all what it does NOT do:
+    - the contact we were about to call becomes `à appeler` again (they had moved to `en cours`): no attempt is counted against them, no detail is pinned on them — their phone did not ring;
+    - the campaign becomes `en pause`, NEVER `terminée`: it is resumed as it stands once the failure is fixed, without losing anybody;
+    - the REASON is written in French, with what to do, to be displayed on the record.
+    With a list of twenty people and a refused key, all twenty would otherwise have wrongly become `injoignables`: that is exactly what was observed on 01/08/2026, and it is what these three lines prevent.
 
-    DEUX EXCEPTIONS, et pas une de plus — les deux cas où le TÉLÉPHONE A
-    SONNÉ. Remettre ces contacts « à appeler » les ferait sonner une seconde
-    fois pour une conversation qui a déjà eu lieu :
-    - ResultatEnAttente : l'appel est parti, son résultat manque encore. Son
-      état « appelé, résultat inconnu » vient d'être écrit ;
-    - ResultatInvalide : la réponse est arrivée et RingBack n'a pas su la
-      lire. Son état « à rappeler par un humain » vient d'être écrit, avec
-      la réponse brute — c'est un humain qui reprend, jamais la machine.
+    TWO EXCEPTIONS, and not one more — the two cases where the PHONE RANG. Putting those contacts back to `à appeler` would ring them a second time for a conversation that has already taken place:
+    - ResultatEnAttente: the call went out, its result is still missing. Their state `called, result unknown` has just been written;
+    - ResultatInvalide: the answer arrived and RingBack could not read it. Their state `à rappeler par un humain` has just been written, with the raw answer — it is a human who takes over, never the machine.
     """
     APPEL_PARTI = (calle_client.ResultatEnAttente, calle_client.ResultatInvalide)
     if contact is not None and not isinstance(panne, APPEL_PARTI):
@@ -6257,46 +6023,45 @@ RAISON_SANS_INTERET = ("aucune des places qui restaient n'est plus tôt que "
 
 
 def _terminer(base, campagne_id):
-    """Termine la campagne — et dit d'abord POURQUOI ses places restent vides.
+    """Ends the campaign — and first says WHY its slots stay empty.
 
-    ⚠ UN SEUL POINT DE PASSAGE, EXPRÈS. Une campagne se termine à CINQ endroits
-    de `executer_campagne` (place pourvue, place perdue, plus personne à
-    appeler, plafond atteint, file vide). Écrire l'explication à quatre d'entre
-    eux et l'oublier au cinquième, c'est exactement la demi-correction qui a
-    fait tourner ce chantier en rond pendant trois jours.
+    ⚠ ONE SINGLE CHECKPOINT, ON PURPOSE. A campaign ends in FIVE places in
+    `executer_campagne` (slot filled, slot lost, nobody left to call, ceiling
+    reached, queue empty). Writing the explanation in four of them and
+    forgetting the fifth is exactly the half-correction that had this project
+    going round in circles for three days.
     """
     dire_pourquoi_les_places_restent(base, campagne_id)
-    # ⚠ ET LES DÉPLACEMENTS QU'ON N'A PAS SU FAIRE SONT ANNULÉS (20/08/2026).
-    # Ici, parce que c'est déjà le seul point de passage de la fin de campagne :
-    # une campagne se termine à cinq endroits, et l'oublier à l'un d'eux aurait
-    # laissé des rendez-vous au planning d'une journée qu'il croit vide.
+    # ⚠ AND THE MOVES WE COULD NOT MAKE ARE CANCELLED (20/08/2026). Here,
+    # because it is already the single checkpoint at the end of a campaign: a
+    # campaign ends in five places, and forgetting it at one of them would have
+    # left appointments on the schedule of a day he believes empty.
     cloturer_les_deplacements_non_faits(base,
                                         base.obtenir_campagne(campagne_id))
     base.changer_statut_campagne(campagne_id, "terminée")
 
 
 def dire_pourquoi_les_places_restent(base, campagne_id):
-    """Écrit sur chaque place encore « à pourvoir » POURQUOI elle l'est restée.
+    """Writes on every slot still `to be filled` WHY it stayed that way.
 
-    ⚠ SON SIGNALEMENT DU 15/08/2026 : « la cascade s'arrête à la deuxième
-    occurrence ; normalement cela doit continuer jusqu'à la date limite ». La
-    mécanique, elle, était juste — mesuré dans sa base : la chaîne s'arrêtait
-    sur la place du 06/11 parce qu'il aurait fallu un rendez-vous au 06/12 ou
-    après pour y gagner trente jours, et que ses rendez-vous s'arrêtent au
-    23/11. Il n'y avait tout simplement PERSONNE à appeler.
+    ⚠ HIS REPORT OF 15/08/2026: `the cascade stops at the second occurrence;
+    normally it should carry on to the cut-off date`. The mechanism itself was
+    right — measured in his database: the chain stopped on the 06/11 slot
+    because an appointment on 06/12 or later would have been needed to gain
+    thirty days from it, and his appointments stop on 23/11. There was simply
+    NOBODY to call.
 
-    Le défaut n'était donc pas le moteur : c'était le SILENCE. La place restait
-    « à pourvoir », sans un mot, et la seule explication vivait dans une note
-    interne (« regle_jouee ») qu'aucun écran ne met en avant. Face à un arrêt
-    muet, on conclut que le produit est cassé — et on a raison de le croire.
+    The defect was therefore not the engine: it was the SILENCE. The slot
+    stayed `to be filled`, without a word, and the only explanation lived in an
+    internal note (`regle_jouee`) that no screen brings forward. Faced with a
+    silent stop, you conclude the product is broken — and you are right to
+    think so.
 
-    Trois causes possibles, dites dans cet ordre, parce que c'est l'ordre dans
-    lequel elles arrêtent vraiment la chaîne :
-      ① le plafond d'appels est atteint ;
-      ② la date limite du décalage est dépassée ;
-      ③ personne n'a de rendez-vous assez lointain — et on donne alors LA date
-        qu'il aurait fallu, plus le rappel que la date limite, elle, n'y est
-        pour rien.
+    Three possible causes, stated in this order, because it is the order in
+    which they really stop the chain: ① the call ceiling is reached; ② the
+    shift's cut-off date is passed; ③ nobody has an appointment far enough out
+    — and we then give THE date that would have been needed, plus the reminder
+    that the cut-off date has nothing to do with it.
     """
     campagne = base.obtenir_campagne(campagne_id)
     if not campagne:
@@ -6342,43 +6107,43 @@ def dire_pourquoi_les_places_restent(base, campagne_id):
 
 
 def campagne_a_des_places(campagne):
-    """Cette campagne ANNONCE-t-elle des places à pourvoir au téléphone ?
+    """Does this campaign ANNOUNCE slots to be filled on the phone?
 
-    ⚠ CE N'EST PAS « PORTE-T-ELLE UN CRÉNEAU EN BASE ». Un maillon de cascade
-    de nature « déplacement » porte la place libérée comme TRACE (règle §8.3,
-    et l'anti-doublon s'en sert), mais son message annonce des créneaux de
-    REMPLACEMENT calculés — jamais cette place. Confondre les deux faisait
-    « avancer le curseur » sur une place que personne ne proposait, et
-    affichait aux contacts restants une raison qui ne correspondait à rien.
+    ⚠ IT IS NOT `DOES IT CARRY A SLOT IN THE DATABASE`. A cascade link of the
+    `déplacement` kind carries the freed slot as a TRACE (the §8.3 rule, and
+    the anti-duplicate check uses it), but its message announces COMPUTED
+    REPLACEMENT slots — never that slot. Confusing the two made the cursor
+    `advance` on a slot nobody was offering, and showed the remaining contacts
+    a reason that matched nothing.
 
-    `INFO_CRENEAU_PAR_NATURE` est le seul endroit qui sache lesquelles ont un
-    champ d'étape 2 portant leur place : c'est donc lui qui répond.
+    `INFO_CRENEAU_PAR_NATURE` is the only place that knows which kinds have a
+    step-2 field carrying their slot: so it is the one that answers.
     """
     return (campagne or {}).get("nature") in INFO_CRENEAU_PAR_NATURE
 
 
 def _place_perdue(base, preferences, campagne, configuration):
-    """La place que la campagne propose est-elle encore libre ? Rend la raison.
+    """Is the slot the campaign offers still free? Returns the reason.
 
-    Rend "" quand tout va bien — donc quand il n'y a rien à empêcher.
+    Returns "" when all is well — hence when there is nothing to prevent.
 
-    ⚠ NE VAUT QUE POUR LES CAMPAGNES QUI PROPOSENT UNE PLACE. Une campagne de
-    rappel ou de confirmation ne réserve rien : elle n'a pas de place à perdre,
-    et la lui chercher l'arrêterait sans raison.
+    ⚠ IT ONLY APPLIES TO CAMPAIGNS THAT OFFER A SLOT. A reminder or a
+    confirmation campaign books nothing: it has no slot to lose, and looking
+    for one would stop it for no reason.
 
-    ⚠ LA DURÉE MINIMALE, UNE TRANCHE. On répond ici à « cette place existe-t-elle
-    encore », pas à « tient-elle pour telle personne » : un rendez-vous de deux
-    tranches peut être refusé sur une place libre d'une seule, et ce refus-là
-    concerne UN contact, pas la campagne. Le juger avec la durée du premier
-    contact aurait arrêté la campagne pour tous les autres.
+    ⚠ THE MINIMUM LENGTH, ONE SLOT. What is answered here is `does this slot
+    still exist`, not `does it fit for such and such a person`: an appointment
+    of two slots may be refused on a free slot of one, and that refusal
+    concerns ONE contact, not the campaign. Judging it with the first contact's
+    length would have stopped the campaign for everybody else.
 
-    ⚠ ET SEULEMENT LA PLACE ENCORE « À POURVOIR ». Première version : elle
-    retombait sur `campagne["creneau"]` quand la liste ne rendait plus rien — donc
-    sur la place que la campagne venait ELLE-MÊME de pourvoir. Sur une campagne
-    réglée « appeler toute la liste », le premier oui réservait la place, la
-    place devenait occupée, et le garde-fou arrêtait tout : vingt contrôles du
-    banc sont tombés là-dessus. « Pourvu par nous » et « pris ailleurs » ne sont
-    pas la même chose — c'est même la raison d'être des deux statuts.
+    ⚠ AND ONLY THE SLOT STILL `TO BE FILLED`. First version: it fell back on
+    `campagne["creneau"]` when the list returned nothing — hence on the slot
+    the campaign had JUST filled itself. On a campaign set to `call the whole
+    list`, the first yes booked the slot, the slot became occupied, and the
+    guard stopped everything: twenty bench checks fell on that. `Filled by us`
+    and `taken elsewhere` are not the same thing — that is in fact why both
+    statuses exist.
     """
     if campagne["nature"] not in INFO_CRENEAU_PAR_NATURE:
         return ""
@@ -6389,48 +6154,43 @@ def _place_perdue(base, preferences, campagne, configuration):
                                                tranches=1) or ""
 
 
-# ============================ LES ÉTATS DITS EN MOTS CLAIRS
-# ⚠ « ÉPARGNÉ » NE VOULAIT RIEN DIRE POUR SON LECTEUR (11/08/2026) : « je ne sais
-# pas ce que veut dire l'état "épargné" ». Le mot était juste dans l'intention —
-# on lui a épargné un appel inutile — mais il n'est pas dans le vocabulaire de
-# quelqu'un qui regarde une liste d'appels.
-#
-# ⚠ ON CHANGE LE MOT AFFICHÉ, PAS LE CODE ÉCRIT EN BASE. Des milliers de lignes
-# portent déjà « épargné » ; les récrire serait une migration de données, alors
-# que le produit ne fait que des migrations ADDITIVES. Le code reste, seul son
-# libellé change — et il ne change qu'à UN endroit.
-#
-# ⚠ ET IL S'APPELLE `mot_etat`, PAS `libelle_etat` : `etats_clients.libelle_etat`
-# existe déjà et parle d'un TOUT AUTRE vocabulaire (les états d'un client, pas
-# ceux d'un contact de campagne). Deux fonctions du même nom pour deux
-# vocabulaires, c'est la confusion garantie à la première relecture.
+# ============================ THE STATES SAID IN PLAIN WORDS ⚠ `ÉPARGNÉ` MEANT
+# NOTHING TO ITS READER (11/08/2026): `I do not know what the state "épargné"
+# means`. The word was right in intent — they were spared a useless call — but
+# it is not in the vocabulary of somebody looking at a call list.  ⚠ WE CHANGE
+# THE DISPLAYED WORD, NOT THE CODE WRITTEN IN THE DATABASE. Thousands of rows
+# already carry `épargné`; rewriting them would be a data migration, while the
+# product only does ADDITIVE migrations. The code stays, only its label changes
+# — and it changes in ONE place.  ⚠ AND IT IS CALLED `mot_etat`, NOT
+# `libelle_etat`: `etats_clients.libelle_etat` already exists and speaks a
+# COMPLETELY DIFFERENT vocabulary (a client's states, not a campaign
+# contact's). Two functions with the same name for two vocabularies is
+# guaranteed confusion at the first rereading.
 MOTS_ETAT = {
     "épargné": "pas appelé",
-    # ⚠ SA DEMANDE DU 21/08/2026 : « renomme l'état en "❌ annulé — le client
-    # rappellera" ». « Le client rappellera » était vrai mais taisait le FAIT :
-    # le rendez-vous est ANNULÉ. Sur sa campagne n° 119, trois personnes
-    # portaient ce mot et il a compté deux annulations là où il y en avait
-    # trois. Le mot dit maintenant ce qui est arrivé, puis ce qui suit.
-    #
-    # ⚠ LE CODE ÉCRIT EN BASE NE BOUGE PAS — même règle que pour « épargné » :
-    # des centaines de lignes le portent, les récrire serait une migration de
-    # données. Seul le libellé change, et il ne change qu'ICI.
+    # ⚠ HIS REQUEST OF 21/08/2026: `rename the state to "❌ annulé — le client
+    # rappellera"`. `The client will call back` was true but kept quiet about
+    # the FACT: the appointment is CANCELLED. On his campaign no. 119, three
+    # people carried that word and he counted two cancellations where there
+    # were three. The word now says what happened, then what follows.  ⚠ THE
+    # CODE WRITTEN IN THE DATABASE DOES NOT MOVE — the same rule as for
+    # `épargné`: hundreds of rows carry it, rewriting them would be a data
+    # migration. Only the label changes, and it changes only HERE.
     ETAT_RAPPELLERA: "annulé — le client rappellera",
 }
 
 
 def mot_etat(etat):
-    """Le mot à AFFICHER pour cet état de contact. Le code ne bouge pas."""
+    """The word to DISPLAY for this contact state. The code does not move."""
     return MOTS_ETAT.get(etat, etat)
 
 
-# ⚠ MÊME PRINCIPE POUR LES DÉTAILS DÉJÀ ÉCRITS EN BASE (21/08/2026).
-# « Plafond atteint » est devenu « maximum de rappels atteint » — mais des
-# centaines de lignes portent déjà l'ancien texte, gelé au moment de l'appel.
-# Mesuré sur sa base : 39 contacts. Les récrire serait une MIGRATION DE
-# DONNÉES, alors que le produit n'en fait que des additives ; et ce sont des
-# archives, pas des libellés. On les traduit donc À L'AFFICHAGE, au seul
-# endroit qui les montre.
+# ⚠ THE SAME PRINCIPLE FOR THE DETAILS ALREADY WRITTEN IN THE DATABASE
+# (21/08/2026). `Plafond atteint` has become `maximum de rappels atteint` — but
+# hundreds of rows already carry the old text, frozen at call time. Measured in
+# his database: 39 contacts. Rewriting them would be a DATA MIGRATION, while
+# the product only does additive ones; and they are archives, not labels. So we
+# translate them AT DISPLAY TIME, in the only place that shows them.
 ANCIENS_MOTS_DETAIL = (
     ("— plafond atteint", "— maximum de rappels atteint"),
     ("plafond de tentatives atteint", "maximum de rappels atteint"),
@@ -6438,9 +6198,10 @@ ANCIENS_MOTS_DETAIL = (
 
 
 def mot_detail(detail):
-    """Le détail à AFFICHER : l'ancien vocabulaire traduit, rien de plus.
+    """The detail to DISPLAY: the old vocabulary translated, nothing more.
 
-    Le texte en base n'est jamais touché — c'est ce qui a été écrit ce jour-là.
+    The text in the database is never touched — it is what was written that
+    day.
     """
     texte = detail or ""
     for ancien, neuf in ANCIENS_MOTS_DETAIL:
@@ -6448,41 +6209,37 @@ def mot_detail(detail):
     return texte
 
 
-# ================== FORCER L'HEURE — EN SIMULATION, ET NULLE PART AILLEURS
-# Demande du propriétaire du 13/08/2026 : « lorsqu'il y a l'erreur qui nous
-# indique qu'on est en dehors du créneau autorisé lors de l'exécution d'une
-# campagne, il faut afficher un bouton pour forcer la simulation malgré
-# l'heure (uniquement pour la version en simulation c'est très important) ».
-#
-# LA RAISON EST NETTE : en simulation, AUCUN téléphone ne sonne. Le garde-fou
-# de politesse protège des gens ; à 22 h, sur une campagne simulée, il ne
-# protège personne et il empêche seulement d'essayer le produit. En appels
-# RÉELS il protège quelqu'un — il ne se force donc jamais.
-#
-# ⚠ LE DRAPEAU ENREGISTRÉ NE SUFFIT JAMAIS À LUI SEUL. Il est relu avec le
-# mode DU MOMENT (voir `heure_forcee`) : une campagne forcée en simulation,
-# puis reprise en appels réels, retrouve le garde-fou intact — sans qu'aucun
-# ménage n'ait à passer derrière, et sans qu'on ait à faire confiance à ce
-# qui est écrit en base.
+# ================== FORCING THE HOUR — IN SIMULATION, AND NOWHERE ELSE Owner's
+# request of 13/08/2026: `when there is the error telling us we are outside the
+# permitted window while running a campaign, we must show a button to force the
+# simulation despite the hour (only for the simulation version, that is very
+# important)`.  THE REASON IS CLEAR: in simulation, NO phone rings. The
+# politeness guard protects people; at 10pm, on a simulated campaign, it
+# protects nobody and only prevents the product from being tried. In REAL calls
+# it protects somebody — so it is never forced.  ⚠ THE SAVED FLAG IS NEVER
+# ENOUGH ON ITS OWN. It is read back with the CURRENT mode (see
+# `heure_forcee`): a campaign forced in simulation, then resumed in real calls,
+# finds the guard intact — with no clean-up needed behind it, and without
+# having to trust what is written in the database.
 CLE_HORAIRE_FORCE = "horaire_force"
 
 
 def heure_forcee(configuration, mode_reel):
-    """Cette campagne tourne-t-elle hors plage d'appel — et en a-t-elle le droit ?
+    """Is this campaign running outside the calling window — and is it allowed to?
 
-    Deux conditions, jamais une seule : le geste a été fait sur CETTE
-    campagne, ET l'on est en simulation. Voir le commentaire ci-dessus.
+    Two conditions, never one: the gesture was made on THIS campaign, AND we
+    are in simulation. See the comment above.
     """
     return bool(configuration.get(CLE_HORAIRE_FORCE)) and not mode_reel
 
 
 def noter_heure_forcee(base, campagne_id):
-    """Écrit sur la campagne que l'heure a été forcée (geste explicite).
+    """Writes on the campaign that the hour was forced (an explicit gesture).
 
-    Sur la campagne, pas dans une variable de passage : le fil d'exécution
-    revérifie la plage ENTRE CHAQUE APPEL (une campagne lancée à 18 h 59
-    s'arrêterait sinon au premier contact suivant), et l'écran doit pouvoir
-    dire, longtemps après, que celle-ci a tourné hors des heures permises.
+    On the campaign, not in a passing variable: the execution thread rechecks
+    the window BETWEEN EVERY CALL (a campaign launched at 18:59 would otherwise
+    stop at the next contact), and the screen must be able to say, long
+    afterwards, that this one ran outside the permitted hours.
     """
     campagne = base.obtenir_campagne(campagne_id)
     if campagne is None:
@@ -6494,43 +6251,44 @@ def noter_heure_forcee(base, campagne_id):
 
 
 def executer_campagne(application, campagne_id):
-    """Le corps du fil d'exécution lancé par ▶ Démarrer.
+    """The body of the execution thread launched by ▶ Start.
 
-    Un contact à la fois, dans l'ordre choisi ; ENTRE deux appels, la
-    commande ⏸ Pause / ⏹ Arrêter est relue (un appel en cours va toujours
-    à son terme) et la plage horaire + la période interdite sont re-vérifiées.
-    Politique « premier oui » : le premier OUI épargne tous les suivants et
-    annule les relances de la campagne (l'objectif est atteint).
+    One contact at a time, in the chosen order; BETWEEN two calls, the ⏸ Pause
+    / ⏹ Stop command is read back (a call in progress always runs to its end)
+    and the time window + the forbidden period are re-checked. `First yes`
+    policy: the first YES spares everybody after it and cancels the campaign's
+    follow-ups (the objective is met).
 
-    UNE PANNE DE NOTRE CÔTÉ (clé refusée, service en panne, crédit épuisé)
-    met la campagne EN PAUSE dès le premier appel touché : inutile
-    d'infliger la même panne aux dix-neuf personnes suivantes, et surtout
-    pas question de les marquer « injoignables » pour une faute qui est la
-    nôtre (voir mettre_en_pause_sur_panne).
+    A FAILURE ON OUR SIDE (key refused, service down, credit exhausted) PAUSES
+    the campaign at the first call affected: no point inflicting the same
+    failure on the following nineteen people, and above all no question of
+    marking them `injoignables` for a fault that is ours (see
+    mettre_en_pause_sur_panne).
     """
     base = application.base
     planif = application.planif
     preferences = application.preferences
-    # On repart pour de bon : la raison d'une pause SUBIE (panne de notre
-    # côté) est effacée ici, quel que soit le chemin par lequel on relance.
-    # Une explication périmée ne doit jamais rester sous les yeux.
+    # We are starting again for real: the reason for an ENDURED pause (a
+    # failure on our side) is erased here, whatever the path used to restart. A
+    # stale explanation must never stay in front of the user.
     base.definir_raison_pause_campagne(campagne_id, None)
     try:
         campagne = base.obtenir_campagne(campagne_id)
         configuration = configuration_campagne(campagne)
-        # ⚠ UNE FILE RELUE, PAS UNE LISTE FIGÉE. La boucle « for » d'avant ne
-        # pouvait pas se recharger : réaffecter la liste n'affecte pas
-        # l'itération en cours, et découper « restants[indice + 1:] » aurait
-        # indexé une AUTRE liste — des contacts jamais appelés et jamais
-        # marqués, ou marqués « épargné » à tort. Avec une file relue à chaque
-        # tour, une place qui s'ajoute ou une liste qui se régénère sont vues
-        # tout de suite.
-        # `traites` est la ceinture : un contact dont l'état ne bougerait pas
-        # ferait tourner la boucle sans fin.
+        # ⚠ A QUEUE READ BACK, NOT A FROZEN LIST. The previous `for` loop could
+        # not reload itself: reassigning the list does not affect the iteration
+        # in progress, and slicing `restants[indice + 1:]` would have indexed
+        # ANOTHER list — contacts never called and never marked, or wrongly
+        # marked `épargné`. With a queue read back at every turn, a slot being
+        # added or a list being regenerated are seen at once. `traites` is the
+        # belt: a contact whose state did not move would make the loop spin for
+        # ever.
         traites = set()
 
         def file_a_appeler():
-            """Ce qu'il reste à appeler, relu en base, dans l'ordre choisi."""
+            """What is left to call, read back from the database, in the chosen
+            order.
+            """
             attente = [c for c in base.contacts_de_campagne(campagne_id)
                        if c["etat"] in ("à appeler", "en cours")
                        and c["id"] not in traites]
@@ -6538,23 +6296,22 @@ def executer_campagne(application, campagne_id):
                                      campagne.get("creneau"))
 
         def file_utile():
-            """La file, moins ceux à qui les places restantes n'apportent rien.
+            """The queue, minus those the remaining slots bring nothing to.
 
-            ⚠ ON NE LES MARQUE PAS : le filtre est rejoué à chaque tour. Une
-            place RENDUE par quelqu'un qui accepte peut être plus TÔT que la
-            place en cours et les rendre de nouveau pertinents — les marquer
-            « épargné » les aurait exclus pour de bon.
+            ⚠ WE DO NOT MARK THEM: the filter is replayed at every turn. A slot
+            GIVEN BACK by somebody who accepts may be EARLIER than the current
+            slot and make them relevant again — marking them `épargné` would
+            have excluded them for good.
 
-            ⚠ ET SEULEMENT SUR UNE CAMPAGNE À LISTE. Celle qui n'a qu'une
-            place garde son comportement d'avant, à la lettre : sa liste est
-            déjà resserrée à la création, et son curseur ne bouge jamais.
+            ⚠ AND ONLY ON A LIST-BASED CAMPAIGN. The one with a single slot
+            keeps its previous behaviour, to the letter: its list is already
+            narrowed at creation, and its cursor never moves.
 
-            ⚠ LE GAIN MINIMUM SUIT LA PLACE EN COURS (15/08/2026). La règle
-            charge la liste au seuil de la PREMIÈRE place ; sans cela, quelqu'un
-            retenu pour un gain de 35 jours sur la place du 15/08 se voyait
-            proposer, une fois la campagne avancée jusqu'au 15/09, une place qui
-            ne lui faisait plus gagner que deux jours. Voir
-            `place_utile_au_contact`.
+            ⚠ THE MINIMUM GAIN FOLLOWS THE CURRENT SLOT (15/08/2026). The rule
+            loads the list at the FIRST slot's threshold; without this,
+            somebody kept for a 35-day gain on the 15/08 slot was offered, once
+            the campaign had advanced to 15/09, a slot that only gained them
+            two days. See `place_utile_au_contact`.
             """
             if not configuration.get("liste_de_places"):
                 return file_a_appeler()
@@ -6565,40 +6322,38 @@ def executer_campagne(application, campagne_id):
                                                gain=gain)]
 
         def epargner_le_reste(obtenu):
-            """Les non-appelés sont ÉPARGNÉS, avec la raison en clair."""
+            """Those not called are SPARED, with the reason in clear."""
             for suivant in file_a_appeler():
                 base.changer_etat_contact_campagne(suivant["id"], "épargné",
                                                    None)
                 base.definir_detail_contact(
                     suivant["id"], f"Jamais appelé — {obtenu}")
 
-        # ⚠ SIMULATION SEULEMENT : la campagne qui démarre rejoue depuis le
-        # début la liste des cas de figure de SA nature. On donne le nombre de
-        # personnes à appeler pour que la liste TIENNE dedans : sans ce nombre,
-        # une campagne de cinq contacts s'arrêtait avant le dernier cas et la
-        # place n'était jamais pourvue. Le client réel ne fait rien de cet
-        # appel (voir calle_client.ClientAppels.recommencer_les_cas).
+        # ⚠ SIMULATION ONLY: the campaign starting replays its kind's list of
+        # cases from the beginning. We give the number of people to call so the
+        # list FITS inside it: without that number, a five-contact campaign
+        # stopped before the last case and the slot was never filled. The real
+        # client does nothing with this call (see
+        # calle_client.ClientAppels.recommencer_les_cas).
         planif.client_appels.recommencer_les_cas(campagne["nature"],
                                                 len(file_utile()))
 
-        # ⚠ LA PLACE EXISTE-T-ELLE ENCORE ? RELUE AU DÉMARRAGE (11/08/2026).
-        # LE DÉFAUT, MESURÉ : une campagne dont la place était déjà occupée a
-        # passé TRENTE appels pour rien et envoyé QUATORZE personnes « à rappeler
-        # par un humain » — chacune s'étant entendu dire au téléphone que la
-        # place était pour elle. Le produit ne s'en apercevait qu'APRÈS l'appel,
-        # une fois par personne, en refusant d'écrire le rendez-vous.
-        #
-        # Même doctrine que mettre_en_pause_sur_panne : inutile d'infliger le
-        # même échec aux dix-neuf suivants. Et c'est pire qu'une panne — ici on
-        # aurait PROMIS une place à quatorze personnes.
-        #
-        # ⚠ AU DÉMARRAGE, PAS AVANT CHAQUE APPEL. Première version : elle
-        # relisait la place à chaque tour de boucle, et arrêtait donc une campagne
-        # réglée « appeler toute la liste » dès que quelqu'un avait pris la place
-        # — alors que ce cas-là a déjà sa mécanique (la place passe « pourvue »,
-        # le curseur avance). Vingt contrôles du banc l'ont dit. Ce qu'il fallait
-        # empêcher, c'est de PARTIR sur une place qui n'existe plus ; pendant la
-        # campagne, la vérification par appel (`place_retenue`) fait le reste.
+        # ⚠ DOES THE SLOT STILL EXIST? READ BACK AT START-UP (11/08/2026). THE
+        # DEFECT, MEASURED: a campaign whose slot was already occupied placed
+        # THIRTY calls for nothing and sent FOURTEEN people to `à rappeler par
+        # un humain` — each having been told on the phone that the slot was
+        # theirs. The product only noticed AFTER the call, once per person, by
+        # refusing to write the appointment.  The same doctrine as
+        # mettre_en_pause_sur_panne: no point inflicting the same failure on
+        # the following nineteen. And it is worse than a failure — here we
+        # would have PROMISED a slot to fourteen people.  ⚠ AT START-UP, NOT
+        # BEFORE EVERY CALL. First version: it read the slot back at every turn
+        # of the loop, and therefore stopped a campaign set to `call the whole
+        # list` as soon as somebody had taken the slot — whereas that case
+        # already has its own mechanism (the slot becomes `pourvue`, the cursor
+        # advances). Twenty bench checks said so. What had to be prevented was
+        # SETTING OFF on a slot that no longer exists; during the campaign, the
+        # per-call check (`place_retenue`) does the rest.
         while True:
             perdue = _place_perdue(base, preferences, campagne, configuration)
             if not perdue:
@@ -6619,13 +6374,12 @@ def executer_campagne(application, campagne_id):
                 _terminer(base, campagne_id)
                 return
 
-        # ⚠ LE PLAFOND EST UN BUDGET D'APPELS, ET C'EST ICI QU'IL SE TIENT
-        # (15/08/2026). Avant, il ne bornait que la TAILLE de la liste : comme
-        # personne ne s'ajoutait en cours de route, cela suffisait. Depuis que
-        # la cascade recharge des contacts sur ses places (voir
-        # `regenerer_la_liste`), la liste peut grossir — et c'est la boucle qui
-        # doit compter. Sans cette garde, un plafond de trente aurait laissé
-        # partir cinquante appels.
+        # ⚠ THE CEILING IS A BUDGET OF CALLS, AND IT IS HERE THAT IT IS HELD
+        # (15/08/2026). Before, it only bounded the SIZE of the list: since
+        # nobody was added along the way, that was enough. Since the cascade
+        # reloads contacts onto its slots (see `regenerer_la_liste`), the list
+        # can grow — and it is the loop that must count. Without this guard, a
+        # ceiling of thirty would have let fifty calls go out.
         plafond_appels = plafond_de(configuration)
 
         while True:
@@ -6643,10 +6397,10 @@ def executer_campagne(application, campagne_id):
                 break
             file = file_utile()
             if not file:
-                # ⚠ IL PEUT RESTER DU MONDE : ceux à qui aucune des places
-                # restantes n'apporte rien. Les laisser « à appeler » sur une
-                # campagne terminée aurait laissé croire à un travail en
-                # suspens — ils sont épargnés, avec la raison en clair.
+                # ⚠ PEOPLE MAY BE LEFT: those none of the remaining slots
+                # brings anything to. Leaving them `à appeler` on a finished
+                # campaign would have suggested pending work — they are spared,
+                # with the reason in clear.
                 if file_a_appeler():
                     epargner_le_reste(RAISON_SANS_INTERET)
                 break
@@ -6663,22 +6417,22 @@ def executer_campagne(application, campagne_id):
                 journal.info("Campagne n°%d ARRÊTÉE entre deux appels",
                              campagne_id)
                 return
-            # ⚠ LA PÉRIODE INTERDITE, ELLE, NE SE FORCE JAMAIS — dans aucun
-            # mode. Décision du propriétaire : elle vaut pour tout, sans
-            # dérogation. Seule la plage horaire se lève, et seulement en
-            # simulation (voir `heure_forcee`).
+            # ⚠ THE FORBIDDEN PERIOD, THOUGH, IS NEVER FORCED — in any mode.
+            # Owner's decision: it applies to everything, without exemption.
+            # Only the time window is lifted, and only in simulation (see
+            # `heure_forcee`).
             blocage = dans_periode_interdite(preferences)
             if not blocage and not heure_forcee(configuration,
                                                 application.mode_reel):
                 blocage = themes.hors_plage(preferences)
             if blocage:
-                # ⚠ ET LA RAISON EST ÉCRITE (14/08/2026, audit croisé). Une
-                # campagne démarrée à 18 h 55 s'arrêtait à 19 h au milieu de sa
-                # liste, statut « en pause » et RIEN d'autre : ni sur la fiche,
-                # ni ailleurs. L'opérateur ne l'apprenait qu'en recliquant sur
-                # ▶ Reprendre, qui lui renvoyait alors le refus. C'est le même
-                # devoir que la pause SUBIE d'une panne, qui l'écrit depuis le
-                # début (voir mettre_en_pause_sur_panne).
+                # ⚠ AND THE REASON IS WRITTEN (14/08/2026, cross audit). A
+                # campaign started at 18:55 stopped at 19:00 in the middle of
+                # its list, status `en pause` and NOTHING else: neither on the
+                # record nor anywhere. The operator only learned it by clicking
+                # ▶ Reprendre again, which then returned the refusal. It is the
+                # same duty as the ENDURED pause of a failure, which writes it
+                # from the start (see mettre_en_pause_sur_panne).
                 base.definir_raison_pause_campagne(campagne_id, blocage)
                 base.changer_statut_campagne(campagne_id, "en pause")
                 journal.info("Campagne n°%d mise en pause : %s",
@@ -6694,14 +6448,13 @@ def executer_campagne(application, campagne_id):
                 return
             if conclusion in (CONCLUSION_POURVU, CONCLUSION_PLACE_PERDUE) \
                     and not campagne_a_des_places(campagne):
-                # ⚠ CETTE NATURE N'ANNONCE AUCUNE PLACE (14/08/2026, audit
-                # croisé). Un maillon de cascade de nature « déplacement » porte
-                # bien la place libérée — c'est la trace §8.3, et l'anti-doublon
-                # s'en sert — mais son message, lui, annonce des créneaux de
-                # REMPLACEMENT. Faire « avancer le curseur » sur cette place
-                # recalait le message sur elle et affichait aux contacts
-                # restants une raison qui ne correspondait à rien. Ici, un oui
-                # conclut : c'est tout.
+                # ⚠ THIS KIND ANNOUNCES NO SLOT (14/08/2026, cross audit). A
+                # cascade link of the `déplacement` kind does carry the freed
+                # slot — it is the §8.3 trace, and the anti-duplicate check
+                # uses it — but its message announces REPLACEMENT slots. Making
+                # the cursor `advance` on that slot realigned the message onto
+                # it and showed the remaining contacts a reason that matched
+                # nothing. Here a yes concludes: that is all.
                 epargner_le_reste(
                     "arrêt au premier oui (le rendez-vous a été déplacé)")
                 annulees = base.annuler_relances_campagne(campagne_id)
@@ -6711,11 +6464,11 @@ def executer_campagne(application, campagne_id):
                 _terminer(base, campagne_id)
                 return
             if conclusion == CONCLUSION_PLACE_PERDUE:
-                # ⚠ LA PLACE VIENT DE MOURIR PENDANT LA CAMPAGNE. Le contrôle
-                # du démarrage ne pouvait rien voir : elle était libre quand on
-                # a commencé. On fait donc ici exactement ce qu'il fait —
-                # avancer sur la place suivante, ou épargner le reste — au lieu
-                # de continuer à appeler pour une place qui n'existe plus.
+                # ⚠ THE SLOT HAS JUST DIED DURING THE CAMPAIGN. The start-up
+                # check could see nothing: it was free when we began. So here
+                # we do exactly what it does — advance to the next slot, or
+                # spare the rest — instead of going on calling about a slot
+                # that no longer exists.
                 campagne, configuration, suivante, raison = (
                     avancer_sur_la_place_suivante(
                         base, preferences, campagne, configuration))
@@ -6732,19 +6485,19 @@ def executer_campagne(application, campagne_id):
                 obtenu = ("le rendez-vous a été déplacé"
                           if campagne["nature"] == "deplacement"
                           else "le créneau est pourvu")
-                # ⚠ UNE PLACE POURVUE N'ARRÊTE PLUS FORCÉMENT LA CAMPAGNE
-                # (03/08/2026) : s'il en reste une à pourvoir, on relit la
-                # campagne — donc son NOUVEAU créneau et son message recalé —
-                # et l'on continue avec les personnes qui restent.
+                # ⚠ A FILLED SLOT NO LONGER NECESSARILY STOPS THE CAMPAIGN
+                # (03/08/2026): when one is left to fill, we read the campaign
+                # back — hence its NEW slot and its realigned message — and
+                # carry on with the people who remain.
                 campagne, configuration, suivante, raison = (
                     avancer_sur_la_place_suivante(
                         base, preferences, campagne, configuration))
                 if suivante is not None:
                     continue
-                # ⚠ LA RAISON EXACTE, pas la raison habituelle. Quand il
-                # reste des places et que le message ne peut pas suivre,
-                # écrire « arrêt au premier oui » serait faux — et c'est
-                # justement ce qu'un opérateur relirait pour comprendre.
+                # ⚠ THE EXACT REASON, not the usual one. When slots are left
+                # and the message cannot follow, writing `stop at the first
+                # yes` would be false — and it is precisely what an operator
+                # would reread to understand.
                 epargner_le_reste(
                     f"arrêt au premier oui ({obtenu})"
                     if raison == "toutes les places sont pourvues"
@@ -6766,18 +6519,18 @@ def executer_campagne(application, campagne_id):
 
 def executer_relance(base, planif, preferences, campagne, relance, contact,
                      maintenant=None):
-    """Une relance due d'une campagne de l'assistant — même moteur, mêmes
-    états. Appelée par le GESTE « Lancer les relances dues » (campagnes.
-    executer_relances_dues) ; l'exécution AUTOMATIQUE reste « à venir ».
+    """One due follow-up of an assistant campaign — the same engine, the same
+    states. Called by the GESTURE `Lancer les relances dues`
+    (campagnes.executer_relances_dues); AUTOMATIC execution remains `à venir`.
 
-    ⚠ LA RÈGLE DE L'INTÉRÊT EST REJOUÉE ICI (10/08/2026). Elle filtrait la file
-    de la campagne, mais pas le départ d'une relance : quelqu'un dont le
-    rendez-vous est déjà plus tôt que toutes les places restantes était rappelé
-    pour une place qui ne l'avançait plus. Le même contrôle décide aussi du
-    consentement — voir `interesse_par_une_place`.
+    ⚠ THE RULE OF INTEREST IS REPLAYED HERE (10/08/2026). It filtered the
+    campaign's queue, but not the departure of a follow-up: somebody whose
+    appointment is already earlier than every remaining slot was called back
+    about a slot that no longer brought them forward. The same check also
+    decides consent — see `interesse_par_une_place`.
 
-    Le téléphone ne sonne alors PAS, et le contact passe 💤 épargné avec la
-    raison en clair : la relance est consommée, elle ne reviendra pas.
+    The phone then does NOT ring, and the contact becomes 💤 spared with the
+    reason in clear: the follow-up is used up, it will not come back.
     """
     configuration = configuration_campagne(campagne)
     if configuration.get("liste_de_places"):
@@ -6807,28 +6560,27 @@ def executer_relance(base, planif, preferences, campagne, relance, contact,
             "abouti": abouti, "etat": contact_frais["etat"]}
 
 
+# --------------------------------------------------------------------------- 📥
+# RETRIEVE THE PENDING RESULTS — without calling anybody back
 # ---------------------------------------------------------------------------
-# 📥 RÉCUPÉRER LES RÉSULTATS EN ATTENTE — sans rappeler personne
-# ---------------------------------------------------------------------------
-# Le geste qui répare la perte du 01/08/2026. Il ne compose AUCUN numéro :
-# pour chaque appel déjà parti dont le résultat manque, il fait UNE lecture
-# (GET /v1/calls/{identifiant}) et applique l'issue par le MÊME chemin que si
-# elle était arrivée à temps (_appliquer_resultat) — rendez-vous déplacé,
-# cahier des changements, cascade, relances, tout.
-#
-# Les trois verrous du mode réel ne sont pas concernés : ils gardent la
-# CRÉATION d'appels, et il n'y a pas une ligne ici qui puisse en créer un.
+# The gesture that repairs the loss of 01/08/2026. It dials NO number: for
+# every call already gone out whose result is missing, it makes ONE read (GET
+# /v1/calls/{identifiant}) and applies the outcome through the SAME path as if
+# it had arrived on time (_appliquer_resultat) — appointment moved, change log,
+# cascade, follow-ups, everything.  The three real-mode locks are not
+# concerned: they guard the CREATION of calls, and there is not a line here
+# that could create one.
 GESTE_SANS_APPEL = ("Ce geste ne compose AUCUN numéro : il ne fait que LIRE, "
                     "chez CALL-E, le résultat d'appels déjà passés.")
 
 
 def _echec_de_lecture(erreur):
-    """Le message d'une LECTURE qui a échoué — cadré comme une lecture.
+    """The message of a READ that failed — framed as a read.
 
-    Le texte d'origine parle de campagne et d'appels facturés (il a été écrit
-    pour un appel qui part). Ici rien n'est parti : on le dit d'abord, puis
-    on cite le constat tel quel. Sans ce cadrage, l'écran laisserait croire
-    qu'un appel vient d'être tenté.
+    The original text talks about a campaign and billed calls (it was written
+    for a call that goes out). Here nothing went out: we say so first, then
+    quote the observation as it stands. Without that framing, the screen would
+    suggest a call had just been attempted.
     """
     constat = getattr(erreur, "constat", None) or str(erreur)
     quoi_faire = getattr(erreur, "quoi_faire", "")
@@ -6840,7 +6592,8 @@ def _echec_de_lecture(erreur):
 
 
 def _resume_recuperation(comptes):
-    """La phrase de bilan affichée après le geste — jamais un compte inventé."""
+    """The summary sentence displayed after the gesture — never an invented count.
+    """
     if not comptes:
         return ("Aucun appel en attente de résultat : il n'y avait rien à "
                 "récupérer. " + GESTE_SANS_APPEL)
@@ -6869,21 +6622,15 @@ def _resume_recuperation(comptes):
 
 
 def recuperer_resultats_en_attente(application, campagne_id, maintenant=None):
-    """📥 Va LIRE chez CALL-E le résultat des appels déjà passés. AUCUN APPEL.
+    """📥 Goes and READS at CALL-E the result of calls already placed. NO CALLS.
 
-    Pour chaque contact « appelé, résultat inconnu » de cette campagne :
-    - CALL-E dit « terminé » → le résultat est appliqué EXACTEMENT comme
-      s'il était arrivé à temps (_appliquer_resultat : rendez-vous, cahier
-      des changements, cascade, relances) ;
-    - CALL-E dit « encore en cours » → RIEN n'est écrit, on le dit, et on
-      réessaiera plus tard ;
-    - CALL-E dit « personne n'a décroché » → c'est un fait sur le contact :
-      la tentative est comptée et la relance programmée, comme d'habitude ;
-    - la lecture elle-même échoue (clé refusée, service muet) → rien n'est
-      écrit, l'identifiant est CONSERVÉ, et la fournée s'arrête là (la même
-      panne frapperait les suivants).
+    For every `called, result unknown` contact of this campaign:
+    - CALL-E says `finished` → the result is applied EXACTLY as if it had arrived on time (_appliquer_resultat: appointment, change log, cascade, follow-ups);
+    - CALL-E says `still in progress` → NOTHING is written, we say so, and we will try again later;
+    - CALL-E says `nobody picked up` → it is a fact about the contact: the attempt is counted and the follow-up scheduled, as usual;
+    - the read itself fails (key refused, service silent) → nothing is written, the id is KEPT, and the batch stops there (the same failure would hit the following ones).
 
-    Rend la liste des comptes rendus [{"contact", "sort", "message"}].
+    Returns the list of reports [{"contact", "sort", "message"}].
     """
     base = application.base
     planif = application.planif
@@ -6911,11 +6658,11 @@ def recuperer_resultats_en_attente(application, campagne_id, maintenant=None):
             lecture = planif.client_appels.lire_resultat(identifiant,
                                                          cascade=en_cascade)
         except calle_client.ResultatInvalide as refus:
-            # La réponse est bien arrivée : c'est RingBack qui ne sait pas la
-            # lire. Réessayer rendrait la MÊME réponse illisible — laisser ce
-            # contact « en attente » le ferait attendre pour toujours. On
-            # conclut donc ici : vers un humain, réponse brute conservée, et
-            # l'identifiant est effacé (il n'y a plus rien à récupérer).
+            # The answer did arrive: it is RingBack that cannot read it.
+            # Retrying would give the SAME unreadable answer — leaving that
+            # contact `pending` would make them wait for ever. So we conclude
+            # here: to a human, raw answer preserved, and the id is erased
+            # (there is nothing left to retrieve).
             tentative = contact.get("appel_externe_tentative")
             if tentative is None:
                 tentative = len(base.appels_du_contact_campagne(contact["id"]))
@@ -6926,8 +6673,8 @@ def recuperer_resultats_en_attente(application, campagne_id, maintenant=None):
                             "message": str(refus)})
             continue
         except calle_client.EchecDeNotreCote as panne:
-            # Rien n'est écrit et l'identifiant reste : on pourra réessayer
-            # dès que la panne sera réparée. La fournée s'arrête ici.
+            # Nothing is written and the id stays: we will be able to try again
+            # as soon as the failure is fixed. The batch stops here.
             comptes.append({"contact": nom, "sort": "panne",
                             "message": _echec_de_lecture(panne)})
             journal.error("Récupération interrompue pour le contact n°%d — %s",
@@ -6942,10 +6689,10 @@ def recuperer_resultats_en_attente(application, campagne_id, maintenant=None):
         comptes.append(_appliquer_lecture(
             base, planif, preferences, campagne, configuration, contact,
             lecture, en_cascade, identifiant, maintenant))
-    # Plus rien en attente : l'explication de la pause est PÉRIMÉE. La même
-    # règle qu'au redémarrage d'une campagne — une raison qui ne vaut plus
-    # ne doit jamais rester sous les yeux. La campagne, elle, reste en pause :
-    # c'est à l'opérateur de décider de la reprendre.
+    # Nothing pending any more: the pause's explanation is STALE. The same rule
+    # as at a campaign's restart — a reason that no longer holds must never
+    # stay in front of the user. The campaign, though, stays paused: it is for
+    # the operator to decide to resume it.
     if comptes and not base.contacts_en_attente_de_resultat(campagne_id):
         base.definir_raison_pause_campagne(campagne_id, None)
     return comptes
@@ -6954,27 +6701,27 @@ def recuperer_resultats_en_attente(application, campagne_id, maintenant=None):
 def _appliquer_lecture(base, planif, preferences, campagne, configuration,
                        contact, lecture, en_cascade, identifiant,
                        maintenant=None):
-    """Applique CE que CALL-E a répondu pour un appel déjà passé."""
+    """Applies WHAT CALL-E answered for a call already placed."""
     contact_id = contact["id"]
     nom = contact["nom"]
     options = configuration["options"]
-    # La tentative de l'appel PARTI, telle qu'elle avait été notée : c'est
-    # elle qui doit figurer dans l'historique, pas une valeur recalculée.
+    # The attempt of the call that WENT OUT, as it had been recorded: it is
+    # that which must appear in the history, not a recomputed value.
     tentative = contact.get("appel_externe_tentative")
     if tentative is None:
         tentative = len(base.appels_du_contact_campagne(contact_id))
     if lecture["etat"] == "en_cours":
-        # RIEN n'est écrit : ni tentative, ni état, ni détail. L'appel garde
-        # son identifiant et le contact garde son état d'attente.
+        # NOTHING is written: no attempt, no state, no detail. The call keeps
+        # its id and the contact keeps its waiting state.
         return {"contact": nom, "sort": "en_cours",
                 "message": (f"L'appel n° {identifiant} est ENCORE EN COURS "
                             f"chez CALL-E (statut « {lecture['statut_api']} ») "
                             ": rien n'a été écrit sur cette personne. "
                             "Réessayez dans un moment.")}
     if lecture["etat"] in ("sans_reponse", "echoue"):
-        # L'appel est bien allé au bout, et il n'a produit aucune
-        # conversation : c'est le chemin NORMAL d'un non-joint, exactement
-        # celui qu'aurait suivi la réponse arrivée à temps.
+        # The call did run to its end, and it produced no conversation: it is
+        # the NORMAL path of somebody not reached, exactly the one the answer
+        # would have followed had it arrived on time.
         issue = "no_answer" if lecture["etat"] == "sans_reponse" else "echec"
         base.ajouter_appel_campagne(campagne["id"], contact_id, tentative,
                                     issue=issue)
@@ -6985,8 +6732,8 @@ def _appliquer_lecture(base, planif, preferences, campagne, configuration,
         return {"contact": nom, "sort": lecture["etat"],
                 "message": (f"CALL-E a répondu « {lecture['statut_api']} » : "
                             f"le contact passe « {contact_frais['etat']} ».")}
-    # « terminé » : LE MÊME chemin d'écriture que si la réponse était
-    # arrivée à temps — un seul code, donc aucune divergence possible.
+    # `terminé`: THE SAME writing path as if the answer had arrived on time —
+    # one piece of code, hence no possible divergence.
     cible = base.cible_appel_contact(contact_id)
     telephone = (cible["telephone"]
                  or base.telephone_contact_campagne(contact_id) or "")
