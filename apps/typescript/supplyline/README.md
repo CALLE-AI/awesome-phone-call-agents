@@ -9,18 +9,23 @@ bidder using the competing quote as leverage.**
 SupplyLine takes a freight load (origin, destination, equipment type, weight,
 pickup date) and:
 
-1. **Round 1 — Sourcing:** Places live outbound calls to multiple carriers in
-   parallel via CALL-E, asking each for availability and an all-in rate quote.
+1. **Round 1 — Sourcing:** Places live outbound calls to multiple carriers
+   sequentially via CALL-E (CALL-E's default outbound concurrency limit is 1
+   call at a time — calls queue and dial one after another), asking each for
+   availability and an all-in rate quote.
 2. **Comparison:** Once quotes are in, SupplyLine checks for a meaningful gap
    between them.
-3. **Round 2 — Negotiation:** If a gap exists, SupplyLine places a second live
+3. **Round 2 — Negotiation:** If a gap exists, the broker clicks
+   **"Negotiate Best Rate"** in the UI, and SupplyLine places a second live
    call to the higher-priced carrier, presenting the lower competing quote and
    asking them to match or beat it.
 4. **Recommendation + booking:** A plain-language recommendation summarizes
    the outcome, and the broker can confirm and book the negotiated rate.
 
-This demonstrates a full autonomous phone-based negotiation loop — not a
-single-shot call, but a call → compare → call-back → decide workflow.
+This demonstrates a full phone-based negotiation loop — not a single-shot
+call, but a call → compare → call-back → decide workflow. Each round is
+initiated by an explicit user action (clicking **"Source Carriers"** or
+**"Negotiate Best Rate"**), not a fully autonomous callback.
 
 ## Why this is useful for AI-agent phone-call workflows
 
@@ -103,6 +108,12 @@ This app does not currently support cancelling an in-flight call once
 longer than expected, wait for CALL-E's own call timeout to resolve it, or
 stop the local dev server (calls already placed will still run to completion
 on CALL-E's side regardless of whether the local app is running).
+
+## Known limitations
+
+- **Booking is local in-memory state only** — it does not persist across server
+  restarts, and does not represent a real confirmed booking with the carrier
+  (no carrier-side confirmation call or system-of-record integration exists).
 
 ## Tech stack
 
