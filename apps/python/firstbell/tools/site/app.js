@@ -140,14 +140,26 @@ function wireRail() {
   const links = [...document.querySelectorAll('.rail a')];
   const acts = links.map((a) => document.querySelector(a.getAttribute('href'))).filter(Boolean);
   if (!acts.length) return;
-  const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      const i = acts.indexOf(e.target);
-      links.forEach((a, k) => a.setAttribute('aria-current', k === i ? 'true' : 'false'));
-    }
-  }, { rootMargin: '-45% 0px -45% 0px' });
+  /* Which act is the reader in? The one painted at the middle of the viewport.
+   *
+   * This used to mark whichever act had just entered a band across the middle, and
+   * ignored the ones leaving. Act 0 is sticky on desktop, so it covers that band at every
+   * scroll position: it never leaves, so it never enters a second time, and scrolling to
+   * the bottom and back to the top left the rail still pointing at act 2. Reading what is
+   * actually painted answers in both directions, and it is the same rule the reader's eye
+   * uses, since the act on top is the act you are looking at. */
+  const mark = () => {
+    const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    const here = hit && hit.closest('section[id^="act-"]');
+    const i = here ? acts.indexOf(here) : -1;
+    if (i < 0) return;   // between acts, or over something that is not one: keep the last
+    links.forEach((a, k) => a.setAttribute('aria-current', k === i ? 'true' : 'false'));
+  };
+  // The observer is only the trigger now, so it fires on leaving as well as entering, and
+  // costs one hit test per crossing rather than one per frame.
+  const io = new IntersectionObserver(mark, { rootMargin: '-45% 0px -45% 0px' });
   acts.forEach((a) => io.observe(a));
+  mark();
   if (players[0]) paintRail(players[0]);
 }
 
