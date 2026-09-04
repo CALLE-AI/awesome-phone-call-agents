@@ -208,7 +208,7 @@ class TestSecondRubric(unittest.TestCase):
 
 
 class TestReviewRegressions(unittest.TestCase):
-    """Findings from maintainer review of PR #303. Each held a documented promise."""
+    """Findings from maintainer review. Each held a documented promise."""
 
     def test_credential_never_leaves_a_trusted_https_origin(self):
         from concord.calle import CalleAPIError, CalleClient
