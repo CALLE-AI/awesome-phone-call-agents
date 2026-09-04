@@ -8,6 +8,7 @@ structured answer" problem unchanged.
 
 from __future__ import annotations
 
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -48,6 +49,22 @@ AI_DISCLOSURE = (
 )
 
 
+def _cited(text: str, *, indent: int) -> list[str]:
+    """A citation nobody can read is decoration, so it wraps to the block's width.
+
+    The URL is held back and printed whole on its own line, however long that line ends
+    up. Wrapping a URL breaks the one part of a citation a reader might actually act on,
+    and a reader who cannot open the source is being shown a number, not a source.
+    """
+    pad = " " * indent
+    head, sep, url = text.partition("http")
+    out = [pad + line for line in
+           textwrap.wrap(head.strip(), width=96 - indent, break_on_hyphens=False)]
+    if sep:
+        out.append(pad + sep + url.strip())
+    return out
+
+
 @dataclass(frozen=True)
 class FundingRate:
     """Per-student, per-day funding attached to attendance.
@@ -77,6 +94,70 @@ class FundingRate:
     def cite(self) -> str:
         return (f"{self.currency}{self.amount:,.2f} per student per day, "
                 f"{self.jurisdiction}, {self.year}. Source: {self.source} {self.source_url}")
+
+@dataclass(frozen=True)
+class StaffCost:
+    """What an hour of the office's time costs, for the labour a run takes off the desk.
+
+    Unlike `FundingRate` this has a named default, because the wage of a school office is
+    a national statistic rather than a property of one district. The default is allowed
+    only because it carries its own citation and prints it beside every number derived
+    from it.
+    """
+
+    annual: float
+    currency: str
+    hours_per_year: int
+    occupation: str
+    industry: str
+    source: str
+    source_url: str
+    year: int
+
+    def __post_init__(self) -> None:
+        if self.annual <= 0:
+            raise ValueError("A staff cost must be positive.")
+        if self.hours_per_year <= 0:
+            raise ValueError("Hours per year must be positive.")
+        for field_name in ("source", "occupation", "industry"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(
+                    f"StaffCost.{field_name} is required. A wage without a source is not "
+                    "usable in a judge-facing claim."
+                )
+
+    @classmethod
+    def us_school_office(cls) -> "StaffCost":
+        """The median US school-office wage, and two reasons it understates the saving.
+
+        2,080 hours is a full working year, so it reads a ten-month school contract as
+        cheaper per hour than it really is. The figure is salary, so it excludes the
+        benefits an employer pays on top. Both errors point the same way: they make the
+        desk look cheaper and this app look worse.
+        """
+        return cls(
+            annual=48_980.0,
+            currency="$",
+            hours_per_year=2_080,
+            occupation="Secretaries and administrative assistants",
+            industry="Educational services; state, local, and private",
+            source="US Bureau of Labor Statistics, Occupational Outlook Handbook",
+            source_url=(
+                "https://www.bls.gov/ooh/office-and-administrative-support/"
+                "secretaries-and-administrative-assistants.htm"
+            ),
+            year=2025,
+        )
+
+    @property
+    def hourly(self) -> float:
+        return self.annual / self.hours_per_year
+
+    def cite(self) -> str:
+        where = f"{self.source} {self.source_url}".strip()
+        return (f"{self.currency}{self.hourly:,.2f}/hour, from {self.currency}"
+                f"{self.annual:,.0f} over {self.hours_per_year:,} h. {self.occupation}, "
+                f"{self.industry}, {self.year}. Source: {where}")
 
 
 def build_task(item: WorkItem) -> str:
@@ -119,6 +200,9 @@ class ImpactSummary:
     calls_unknown_provenance: int = 0
     live: bool = False
     rate: FundingRate | None = None
+    staff: StaffCost | None = None
+    attempts_resolved: int = 0
+    attempts_open: int = 0
     resolved_by_language: dict[str, int] = field(default_factory=dict)
     open_by_language: dict[str, int] = field(default_factory=dict)
 
@@ -135,6 +219,24 @@ class ImpactSummary:
     @property
     def languages_covered(self) -> list[str]:
         return sorted({loc for loc in self.resolved_by_language if loc})
+
+    @property
+    def break_even_per_call_minute(self) -> float | None:
+        """The call price at which this run stops being cheaper than the desk.
+
+        Returns money per call, per minute that one manual attempt takes. It is a rate
+        rather than a flat saving because the two quantities a school actually knows are
+        its own wage bill and how long a call takes its own staff. What CALL-E charges is
+        unpublished, so the honest move is to report the ceiling and let the reader supply
+        the price.
+
+        The run is charged for every attempt it billed and credited only for the attempts
+        behind records it actually closed. An undetermined or failed attempt is still on
+        somebody's desk, so it is not a saving.
+        """
+        if self.staff is None or not self.calls_placed:
+            return None
+        return (self.attempts_resolved / self.calls_placed) * (self.staff.hourly / 60.0)
 
     @property
     def funding_recovered(self) -> float | None:
@@ -193,9 +295,10 @@ class ImpactSummary:
                 "  funding recovered    not claimed",
                 "                       Explaining an absence does not make a student",
                 "                       present, so no attendance funding is recovered by",
-                "                       this call. Only 5 US states fund on daily",
-                "                       attendance at all. Pass --funding-rate with a",
-                "                       source if your jurisdiction is one of them.",
+                "                       this call. Seven US states funded on daily",
+                "                       attendance as of 2022 (PPIC, citing the Urban",
+                "                       Institute). Pass --funding-rate with a source",
+                "                       if your jurisdiction is one of them.",
             ]
         else:
             assert self.rate is not None
@@ -203,13 +306,39 @@ class ImpactSummary:
                 "",
                 f"  funding recovered    {self.rate.currency}{recovered:,.2f}",
                 f"                       {self.resolved} resolved x {self.rate.currency}{self.rate.amount:,.2f}",
-                f"                       {self.rate.cite()}",
+            ] + _cited(self.rate.cite(), indent=23)
+
+        ceiling = self.break_even_per_call_minute
+        if ceiling is None:
+            out += [
+                "",
+                "  staff time avoided   not computed",
+                "                       Either no staff cost was supplied, or this run",
+                "                       billed no attempts. Pass --staff-annual to set",
+                "                       the wage this is computed from.",
             ]
+        else:
+            assert self.staff is not None
+            cur = self.staff.currency
+            out += [
+                "",
+                "  staff time avoided",
+                f"    attempts billed     {self.calls_placed}",
+                f"    attempts removed    {self.attempts_resolved}   behind the "
+                f"{self.resolved} record(s) this run closed",
+                f"    attempts still open {self.attempts_open}   on somebody's desk, so "
+                "not counted as saved",
+                f"    break-even          {cur}{ceiling:,.2f} per call, for every minute "
+                "one manual attempt takes",
+                f"                        so cheaper than the desk below {cur}"
+                f"{ceiling * 3:,.2f} a call at 3 minutes an attempt",
+            ] + _cited(self.staff.cite(), indent=24)
         return out
 
 
 def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
-              live: bool = False, rate: FundingRate | None = None) -> ImpactSummary:
+              live: bool = False, rate: FundingRate | None = None,
+              staff: StaffCost | None = None) -> ImpactSummary:
     """`calls_placed` is derived unless a caller overrides it.
 
     A call an idempotency key replayed was not placed by this run, was not billed, and
@@ -241,6 +370,11 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         calls_unknown_provenance=buckets[None],
         live=live,
         rate=rate,
+        staff=staff,
+        attempts_resolved=sum(r.attempts_made for r in results
+                              if r.resolution is Resolution.RESOLVED),
+        attempts_open=sum(r.attempts_made for r in results
+                          if r.resolution.needs_a_human),
         resolved_by_language=resolved_by_language,
         open_by_language=open_by_language,
     )

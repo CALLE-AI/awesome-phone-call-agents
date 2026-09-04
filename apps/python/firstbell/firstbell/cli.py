@@ -33,7 +33,7 @@ from dispatch import (
     default_idempotency_key,
 )
 
-from .domain import RESULT_SCHEMA, FundingRate, build_task, summarise
+from .domain import RESULT_SCHEMA, FundingRate, StaffCost, build_task, summarise
 
 BANNER_OFFLINE = "OFFLINE. No call will be placed. No CALL-E account is needed."
 
@@ -104,6 +104,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--funding-source", default="")
     parser.add_argument("--funding-url", default="")
     parser.add_argument("--funding-year", type=int, default=date.today().year)
+    parser.add_argument("--staff-annual", type=float, default=None,
+                        help="Annual cost of one office post, for the staff-time "
+                             "arithmetic. Defaults to a sourced US school-office "
+                             "median. Your own figure is not sourced by this tool and "
+                             "the output says so.")
+    parser.add_argument("--staff-hours", type=int, default=None,
+                        help="Paid hours a year behind --staff-annual. Default 2,080, "
+                             "which reads a ten-month contract as cheaper than it is.")
+    parser.add_argument("--no-staff-cost", action="store_true",
+                        help="Leave the staff-time arithmetic out of the summary.")
     parser.add_argument("--receipt", type=Path, default=None,
                         help="Write a JSON receipt of the run to this path.")
     parser.add_argument("--include-transcript", action="store_true",
@@ -133,6 +143,31 @@ def _rate_from(args: argparse.Namespace) -> FundingRate | None:
         amount=args.funding_rate, currency=args.funding_currency,
         jurisdiction=args.funding_jurisdiction, source=args.funding_source,
         source_url=args.funding_url, year=args.funding_year,
+    )
+
+
+def _staff_from(args: argparse.Namespace) -> StaffCost | None:
+    """The default is sourced. An override is labelled as unsourced, not refused.
+
+    A judge who wants to try their own district's wage should not have to produce a
+    citation to do it, but the printed provenance must never claim a source the number
+    does not have.
+    """
+    if args.no_staff_cost:
+        return None
+    default = StaffCost.us_school_office()
+    if args.staff_annual is None and args.staff_hours is None:
+        return default
+    return StaffCost(
+        annual=args.staff_annual if args.staff_annual is not None else default.annual,
+        currency=default.currency,
+        hours_per_year=(args.staff_hours if args.staff_hours is not None
+                        else default.hours_per_year),
+        occupation=default.occupation,
+        industry=default.industry,
+        source="supplied on the command line, not sourced by this tool",
+        source_url="",
+        year=date.today().year,
     )
 
 
@@ -255,11 +290,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     report = dispatcher.run(items)
 
-    summary = summarise(report.results, live=mode.reached_production, rate=rate)
+    summary = summarise(report.results, live=mode.reached_production, rate=rate,
+                        staff=_staff_from(args))
 
     if args.json:
-        print(json.dumps({"counts": report.counts(),
-                          "funding_recovered": summary.funding_recovered}, indent=2))
+        print(json.dumps({
+            "counts": report.counts(),
+            "funding_recovered": summary.funding_recovered,
+            "attempts_billed": summary.calls_placed,
+            "attempts_removed": summary.attempts_resolved,
+            "attempts_still_open": summary.attempts_open,
+            "break_even_per_call_minute": summary.break_even_per_call_minute,
+        }, indent=2))
     else:
         _print_human(report, summary)
 

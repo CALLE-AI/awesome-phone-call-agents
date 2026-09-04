@@ -42,7 +42,7 @@ numbers can be checked against the six rows in `examples/absences.csv`.
 
 ```
 OFFLINE. No call will be placed. No CALL-E account is needed.
-6 row(s) from examples/absences.csv, concurrency 3.
+6 row(s) from examples\absences.csv, concurrency 3.
 
   [ok   ] S-1041       schema-valid answer received
   [ok   ] S-1042       schema-valid answer received
@@ -69,6 +69,25 @@ What this run was worth
   still open, by language
     ta-IN              2   needs a person
 
+  funding recovered    not claimed
+                       Explaining an absence does not make a student
+                       present, so no attendance funding is recovered by
+                       this call. Seven US states funded on daily
+                       attendance as of 2022 (PPIC, citing the Urban
+                       Institute). Pass --funding-rate with a source
+                       if your jurisdiction is one of them.
+
+  staff time avoided
+    attempts billed     7
+    attempts removed    4   behind the 3 record(s) this run closed
+    attempts still open 3   on somebody's desk, so not counted as saved
+    break-even          $0.22 per call, for every minute one manual attempt takes
+                        so cheaper than the desk below $0.67 a call at 3 minutes an attempt
+                        $23.55/hour, from $48,980 over 2,080 h. Secretaries and administrative
+                        assistants, Educational services; state, local, and private, 2025.
+                        Source: US Bureau of Labor Statistics, Occupational Outlook Handbook
+                        https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm
+
 2 case(s) need a person. Nothing here is closed:
   S-1044       the call completed but returned no structured result
   S-1046       nobody answered after trying 2 number(s)
@@ -77,6 +96,41 @@ What this run was worth
 Five students were attempted and seven calls were placed, because two of them needed a
 second guardian's number. CALL-E bills per call, not per student, so the number that
 matters to a budget is the seven.
+
+## Why the last number is a ceiling and not a saving
+
+CALL-E does not publish a price per call. Any figure this app printed for what a run cost
+would therefore be invented, and an invented cost is the fastest way to lose a reader who
+knows the real one. So the run reports the other side of the same equation: the price at
+which it stops being cheaper than a person doing the work.
+
+The arithmetic charges the app for every attempt it billed and credits it only for the
+attempts behind records it actually closed:
+
+```
+attempts billed     7
+attempts removed    4   behind the 3 record(s) this run closed
+attempts still open 3   on somebody's desk, so not counted as saved
+break-even          $0.22 per call, for every minute one manual attempt takes
+```
+
+Three attempts reached nobody useful, so a person still has to make them. Counting those
+as saved would be the same error as counting a null result as an answer, which is the
+defect the whole app is built around. They are charged and not credited.
+
+That leaves one unknown, and it is deliberately the one a school office can answer better
+than anybody else: how long one of these calls takes its own staff. At three minutes an
+attempt the run is cheaper than the desk below **$0.67 a call**. Substitute your own
+minute count, or your own wage with `--staff-annual`, and the number moves with it.
+
+The wage behind it is sourced rather than assumed: **$48,980**, the median for secretaries
+and administrative assistants in educational services, [US Bureau of Labor Statistics,
+Occupational Outlook Handbook, May
+2025](https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm).
+Two things about that figure understate the saving rather than flatter it. Dividing by
+2,080 hours treats a ten-month school contract as cheaper per hour than it is, and a
+salary excludes the benefits an employer pays on top. Both errors make this app look
+worse, which is the direction an unverifiable assumption should point.
 
 ## Three outcomes, not two
 
@@ -214,7 +268,7 @@ each one is worth.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 88 tests
+python -m pytest tests/ -q          # 100 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -235,9 +289,11 @@ calls were of the second kind.
 ## What this does not claim
 
 - **No money figure.** Explaining an absence does not make a student present, so no
-  attendance funding is recovered by these calls. Only five US states fund schools on
-  daily attendance at all; England and Australia fund on enrolment census dates. If your
-  jurisdiction is one of the five, `--funding-rate` computes a figure, and it refuses to
+  attendance funding is recovered by these calls. Seven US states funded schools on daily
+  attendance as of 2022 ([PPIC](https://www.ppic.org/blog/who-stands-to-gain-from-changes-in-school-enrollment-funding/),
+  citing the [Urban Institute](https://www.urban.org/urban-wire/how-are-states-funding-school-districts-wake-changing-enrollments-caused-covid-19));
+  England and Australia fund on enrolment census dates. If your jurisdiction is one of
+  them, `--funding-rate` computes a figure, and it refuses to
   run without `--funding-source`, `--funding-url` and `--funding-jurisdiction`, because a
   money number without a citation is worth less than no number.
 - **The Title VI reading is an extension.** The 2015 Dear Colleague Letter names

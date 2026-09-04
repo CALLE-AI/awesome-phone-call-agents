@@ -26,8 +26,12 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 16 | Blank `api_base_url` on a receipt that still claims `reached_production_api` | 1 |
 | 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
 | 18 | Compute `reached_production_api` from the configured base URL alone, so a run that exchanged no bytes with CALL-E still reports that it reached production | 1 |
+| 19 | Credit every attempt to the machine instead of only the attempts behind records it closed, so calls that left a family unreached still count as staff time saved | 3 |
+| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 1 |
+| 21 | Wrap the citation like prose, so the source URL breaks mid-path and the reader cannot open the thing the number came from | 3 |
+| 22 | Drop `source` from the wage validation, so a staff cost can be asserted with no provenance at all | 1 |
 
-## Why these eighteen
+## Why these twenty-two
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
@@ -45,6 +49,11 @@ would otherwise have to check by hand:
   task, not a reason.
 - **8, 9, 10 and 11** are the classification rules, and three of the four exist because a
   real call proved the original version wrong. See `evidence/README.md`.
+- **19 to 22** protect the one arithmetic claim this app makes about money. 19 is the
+  important one: the difference between charging for every call and crediting only the
+  records actually closed is the difference between an honest ratio and a brochure. 20
+  keeps could-not-compute from collapsing into a number that reads as free. 22 holds the
+  wage to the same sourcing rule as the funding rate.
 
 ## What is not covered
 

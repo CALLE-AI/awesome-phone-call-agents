@@ -661,3 +661,134 @@ def test_a_run_that_reaches_nothing_says_so(double):
 
     assert dispatcher.api_responded is False, "nothing answered, so nothing was reached"
     assert report.results[0].resolution is not Resolution.RESOLVED
+
+
+# --- What a run took off the desk -------------------------------------------------
+#
+# The claim these tests defend: this run is cheaper than a person below some price per
+# call. That claim is only honest if the arithmetic charges for every attempt the run
+# billed and credits only the attempts behind records it actually closed. Each test below
+# was made to fail once before it was kept.
+
+
+def _ledger():
+    """Three closed records costing four attempts, two open ones costing three."""
+    from dispatch import ItemResult, Resolution, WorkItem
+    def r(name, resolution, attempts):
+        return ItemResult(item=WorkItem(id=name, phones=(IN_A,)), resolution=resolution,
+                          attempts_made=attempts, placed_by_this_run=True)
+    return [
+        r("closed-1", Resolution.RESOLVED, 1),
+        r("closed-2", Resolution.RESOLVED, 1),
+        r("closed-3", Resolution.RESOLVED, 2),
+        r("open-1", Resolution.UNDETERMINED, 1),
+        r("open-2", Resolution.FAILED, 2),
+    ]
+
+
+def test_the_attempt_ledger_balances():
+    """Every attempt billed is either removed from the desk or still on it."""
+    from firstbell.domain import StaffCost, summarise
+    s = summarise(_ledger(), live=True, staff=StaffCost.us_school_office())
+    assert s.calls_placed == 7
+    assert s.attempts_resolved + s.attempts_open == s.calls_placed
+
+
+def test_break_even_charges_every_attempt_and_credits_only_the_closed_ones():
+    from firstbell.domain import StaffCost, summarise
+    staff = StaffCost.us_school_office()
+    s = summarise(_ledger(), live=True, staff=staff)
+    assert s.break_even_per_call_minute == (4 / 7) * (staff.hourly / 60.0)
+
+
+def test_an_open_attempt_is_never_counted_as_a_saving():
+    """Crediting the three open attempts would inflate the ceiling by 75 percent.
+
+    This is the mutation that matters. A pipeline that treats "we called them" as "the
+    work is done" is the exact failure this app exists to refuse, and it would show up
+    here as a bigger, better-looking number.
+    """
+    from firstbell.domain import StaffCost, summarise
+    staff = StaffCost.us_school_office()
+    honest = summarise(_ledger(), live=True, staff=staff).break_even_per_call_minute
+    if_all_credited = (7 / 7) * (staff.hourly / 60.0)
+    assert honest < if_all_credited
+    assert honest == (4 / 7) * (staff.hourly / 60.0)
+
+
+def test_a_run_that_placed_no_calls_reports_no_ceiling_rather_than_zero():
+    """Third outcome. A replayed run billed nothing, so the ratio has no denominator."""
+    from dispatch import ItemResult, Resolution, WorkItem
+    from firstbell.domain import StaffCost, summarise
+    replayed = ItemResult(item=WorkItem(id="a", phones=(IN_A,)),
+                          resolution=Resolution.RESOLVED, attempts_made=2,
+                          placed_by_this_run=False)
+    s = summarise([replayed], live=True, staff=StaffCost.us_school_office())
+    assert s.calls_placed == 0
+    assert s.break_even_per_call_minute is None
+    assert "staff time avoided   not computed" in "\n".join(s.lines())
+
+
+def test_no_staff_cost_means_the_block_is_absent_not_zero():
+    from firstbell.domain import summarise
+    s = summarise(_ledger(), live=True, staff=None)
+    assert s.break_even_per_call_minute is None
+    assert "not computed" in "\n".join(s.lines())
+
+
+def test_a_wage_without_a_source_is_refused():
+    from firstbell.domain import StaffCost
+    with pytest.raises(ValueError, match="source"):
+        StaffCost(annual=50_000.0, currency="$", hours_per_year=2_080,
+                  occupation="Clerk", industry="Schools", source="   ",
+                  source_url="", year=2026)
+
+
+def test_a_wage_that_is_not_positive_is_refused():
+    from firstbell.domain import StaffCost
+    with pytest.raises(ValueError):
+        StaffCost(annual=0.0, currency="$", hours_per_year=2_080, occupation="Clerk",
+                  industry="Schools", source="s", source_url="", year=2026)
+    with pytest.raises(ValueError):
+        StaffCost(annual=1.0, currency="$", hours_per_year=0, occupation="Clerk",
+                  industry="Schools", source="s", source_url="", year=2026)
+
+
+def test_the_default_wage_prints_where_it_came_from():
+    """A number in judge-facing output has to carry its provenance to the same screen."""
+    from firstbell.domain import StaffCost, summarise
+    staff = StaffCost.us_school_office()
+    assert staff.annual == 48_980.0
+    assert staff.hours_per_year == 2_080
+    text = "\n".join(summarise(_ledger(), live=True, staff=staff).lines())
+    assert "Bureau of Labor Statistics" in text
+    assert "bls.gov" in text
+    assert "Educational services" in text
+
+
+def test_the_citation_wraps_instead_of_running_off_the_terminal():
+    """One exemption, and it is deliberately narrow: a line that is only a URL.
+
+    A wrapped URL cannot be opened, so it is allowed to overrun. The exemption is
+    written as "the whole line is a single http token" rather than "long lines are fine",
+    so it cannot quietly start covering ordinary prose.
+    """
+    from firstbell.domain import StaffCost, summarise
+    lines = summarise(_ledger(), live=True, staff=StaffCost.us_school_office()).lines()
+    assert lines, "expected a summary"
+    bare_url = [ln for ln in lines if ln.strip().startswith("http")
+                and " " not in ln.strip()]
+    assert len(bare_url) == 1, "expected exactly one URL line to exempt"
+    for line in lines:
+        if line in bare_url:
+            continue
+        assert len(line) <= 96, line
+
+
+def test_the_source_url_is_never_split_across_lines():
+    """The regression this guards: textwrap broke the BLS URL mid-path."""
+    from firstbell.domain import StaffCost, summarise
+    staff = StaffCost.us_school_office()
+    lines = summarise(_ledger(), live=True, staff=staff).lines()
+    whole = [ln.strip() for ln in lines if ln.strip().startswith("http")]
+    assert whole == [staff.source_url]

@@ -6,9 +6,11 @@ drift fail the suite.
 
 The count comes from pytest's own collection, not from counting `def test_` in the source.
 The README states what `pytest -q` prints, and parametrised tests make those two numbers
-differ: 78 functions collect as 84 cases here. Counting the source would have compared the
-README against a number no reader ever sees, which is the same class of error as measuring
-the wrong property and calling it a gate.
+differ, so counting the source would compare the README against a number no reader ever
+sees: the same class of error as measuring the wrong property and calling it a gate.
+
+No count is written down here. A file whose job is to catch drift should not carry a
+figure that drifts, and an earlier version of this docstring did exactly that.
 
 `--collect-only` imports the modules but runs nothing, so calling it from inside the suite
 terminates.
@@ -40,6 +42,72 @@ def test_the_readme_states_the_real_number_of_tests():
     claimed = re.search(r"pytest tests/ -q\s*#\s*(\d+) tests", readme)
     assert claimed, "the README no longer states a test count where this test looks for it"
     assert int(claimed.group(1)) == _collected_test_count()
+
+
+def test_the_readme_sample_is_what_the_program_actually_prints():
+    """The sample run had drifted by a whole output block before this gate existed.
+
+    It compares rather than regenerates. A gate that produced the artifact it checks
+    would pass by construction and prove nothing, so regeneration stays a separate,
+    deliberate act and this only ever reports a mismatch.
+
+    The offline double is deterministic, so a difference here is a real difference and
+    not thread ordering.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```\n(OFFLINE\..*?)```", readme, re.S)
+    assert len(blocks) == 1, "expected exactly one sample run in the README"
+    run = subprocess.run(
+        [sys.executable, "-m", "firstbell", "--work-file", "examples/absences.csv"],
+        cwd=APP, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    assert run.returncode == 0, run.stderr[-400:]
+    printed = run.stdout.replace("\r\n", "\n").strip()
+    assert blocks[0].strip() == printed, (
+        "The README sample no longer matches the program. Regenerate it rather than "
+        "editing it by hand."
+    )
+
+
+def test_the_prose_numbers_match_the_program_too():
+    """The excerpt and the derived figure in the README are quoted by hand.
+
+    The generated sample block sits directly above them, which makes them look as though
+    something checks them. Until this test, nothing did.
+
+    `$0.67` is not printed as a bare string anywhere: it is the three-minute case of the
+    per-minute ceiling, so it is recomputed here rather than searched for.
+    """
+    from firstbell.domain import StaffCost
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    run = subprocess.run(
+        [sys.executable, "-m", "firstbell", "--work-file", "examples/absences.csv"],
+        cwd=APP, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    assert run.returncode == 0, run.stderr[-400:]
+    printed = run.stdout.replace("\r\n", "\n")
+
+    quoted = [
+        "attempts billed     7",
+        "attempts removed    4",
+        "attempts still open 3",
+        "break-even          $0.22 per call, for every minute one manual attempt takes",
+    ]
+    for line in quoted:
+        assert line in printed, "the README quotes a line the program no longer prints: " + line
+        assert line in readme, "the program prints a line the README no longer quotes: " + line
+
+    # The derived three-minute figure, recomputed from the same inputs.
+    staff = StaffCost.us_school_office()
+    ceiling = (4 / 7) * (staff.hourly / 60.0)
+    assert f"**${ceiling * 3:,.2f} a call**" in readme, (
+        "the README's three-minute break-even no longer matches the arithmetic"
+    )
+    assert f"**${staff.annual:,.0f}**" in readme, (
+        "the README's wage no longer matches the sourced figure"
+    )
+    assert staff.source_url in readme
 
 
 def test_the_mutation_table_is_numbered_without_gaps():
