@@ -11,7 +11,6 @@ was not produced from the thing it describes goes stale the moment either one ch
 | `proof-call-site.png` | The exact line that calls CALL-E, boxed, with file and line number | `node tools/gates/capture-stills.mjs` |
 | `proof-terminal-outcomes.png` | A real offline run producing all three outcomes: resolved, undetermined, failed | `node tools/gates/capture-stills.mjs` |
 | `proof-classification.png` | `_classify()`, the one function that turns an API response into an outcome | `node tools/gates/capture-stills.mjs` |
-| `evidence-page-billing-check.png` | The built evidence page, "check us against your billing" section | `node tools/gates/run.mjs` (screenshot gate) |
 
 ## Regenerating everything
 
@@ -24,8 +23,7 @@ node capture-stills.mjs                             # writes the three proof-*.p
 
 `run.mjs` serves `out/` over gzip and drives system Chrome through `puppeteer-core`; its
 screenshot gate writes one PNG per section of the evidence page to `tools/gates/shots/`,
-which is not committed. `evidence-page-billing-check.png` in this directory is a copy of
-`tools/gates/shots/desktop-act-04.png` from that run.
+none of which is committed. Nothing in this directory comes from it.
 
 `capture-stills.mjs` is a separate script; it does not modify `run.mjs`. The two code stills
 read the exact bytes of `dispatch/scheduler.py` at the line ranges they show, and the
@@ -38,10 +36,13 @@ captures its real stdout. Nothing in any of the three is retyped from memory.
 viewports, 18 files total. None of them are committed, for two reasons found while building
 this set:
 
-1. Most sections that show the hero call player also show transcript text from the demo
-   calls. The two scripted, consented demo calls in this repository are fine to publish on
-   the built page itself, but a committed image of call transcript text is a wider
-   distribution of that text than this directory should make on its own.
+1. The evidence page is built from the call recordings, so every screenshot of it is a
+   real-call artifact in a format no text check can read. That is not a judgement call: one
+   of them, showing twelve real API call ids and twelve real thirty-two-character billing
+   ids in a table, was committed to this repository and passed every privacy check in
+   `tests/test_privacy.py`, because a PNG is not text. It has been removed, and
+   `test_no_committed_image_was_rendered_from_the_call_recordings` now byte-compares every
+   committed image against the renders made from the recordings. Mutation 30 is that gate.
 2. The screenshot for a given section is taken by scrolling that section's element into
    view and screenshotting its bounding box. On this page, sections pin and transform during
    scroll (the whole point of the scrollytelling build), and at least one such screenshot,
@@ -50,9 +51,12 @@ this set:
    filename in that directory cannot be trusted to describe its own content without opening
    the file.
 
-`evidence-page-billing-check.png` was picked out of that set of 18 only after being opened
-and checked against both problems: it shows no transcript text, and its content matches its
-filename.
+An image is committable here because of where its content came from, not because someone
+looked at it and thought it seemed fine. `capture-stills.mjs` reads source files and runs
+the offline CLI, and `test_the_tool_that_makes_the_stills_cannot_see_a_recording` fails if
+it ever reaches for the receipts directory, the deployed page, or the built page under
+`out/`. Reviewing a picture is the only way to check its content, and the three checks in
+`tests/test_privacy.py` exist because that review is the step which failed once already.
 
 ## Verification
 

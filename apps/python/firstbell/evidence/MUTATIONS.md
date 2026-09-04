@@ -37,8 +37,11 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 27 | Put the extracted result back on the recipient when no per-recipient schema was asked for | 1 |
 | 28 | Drop two task-level fields the production API returns on every response | 3 |
 | 29 | Give an attempt our symbolic name for the outcome instead of the wire code the API sends | 6 |
+| 30 | Commit an image rendered from the call recordings, which no text check can read | 1 |
+| 31 | Store a vendor error message unchanged, when that message quotes the number it rejected | 2 |
+| 32 | Leave the completion poll unprotected, so one failed read discards a call that was placed | 2 |
 
-## Why these twenty-nine
+## Why these thirty-two
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
@@ -62,6 +65,14 @@ would otherwise have to check by hand:
   looked weak when the mutation was at fault. Deleting the section properly fails two
   tests. The check asserts a minimum number of anchors as well as their correctness,
   because a rule that says "every citation resolves" is satisfied by having none.
+- **30 to 32** are the three this project got wrong in public and had to be told about.
+  30 is the one worth reading twice: a screenshot of the evidence page was committed here,
+  displaying twelve real call ids and twelve real billing ids, and every privacy check
+  passed it, because a text scanner cannot read a picture. The gate that replaced it
+  compares committed images byte for byte against the renders made from the recordings,
+  which is the way it actually happened rather than the way it might. 31 and 32 came from
+  a review that reproduced both: a number arriving from the vendor's own error text, and a
+  call that was placed being reported as a call that never happened.
 - **27 to 29** protect the double's likeness to the thing it stands in for, which is the
   load-bearing assumption under every other number here. They were added after a shape
   comparison against recorded production responses found the double wrong in three places

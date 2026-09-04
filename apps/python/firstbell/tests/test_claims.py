@@ -166,6 +166,7 @@ def test_the_mutation_table_is_numbered_without_gaps():
 NUMBER_WORDS = {
     13: "thirteen", 18: "eighteen", 22: "twenty-two", 26: "twenty-six",
     27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty",
+    33: "thirty-three", 34: "thirty-four",
     31: "thirty-one", 32: "thirty-two",
 }
 

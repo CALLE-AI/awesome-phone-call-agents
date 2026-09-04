@@ -41,6 +41,7 @@ from .models import (
     Resolution,
     WorkItem,
     mask,
+    redact,
 )
 from .validation import assert_supported, problems
 
@@ -57,6 +58,20 @@ class RetryPolicy:
 
     def delay_for(self, attempt: int) -> float:
         return min(self.base_delay_seconds * (2 ** (attempt - 1)), self.max_delay_seconds)
+
+
+class PollFailed(Exception):
+    """The call was created and its outcome could not be read back.
+
+    A distinct type because the difference between this and any other exception is the
+    difference between a call that was placed and one that was not. Caught generically,
+    it reported a billable call as never having happened.
+    """
+
+    def __init__(self, call_id: str, why: str) -> None:
+        super().__init__(why)
+        self.call_id = call_id
+        self.why = why
 
 
 class Cancelled(Exception):
@@ -161,11 +176,22 @@ class WaveDispatcher:
                         item=item, resolution=Resolution.SKIPPED,
                         reason="cancelled before dispatch",
                     ))
+                except PollFailed as failure:
+                    # Reachable only if a poll failure escapes _handle, which it should
+                    # not. Kept because the alternative is the generic catch below
+                    # turning a placed call into "the call did not happen".
+                    report.results.append(ItemResult(
+                        item=item, resolution=Resolution.UNDETERMINED,
+                        call_id=failure.call_id,
+                        reason=f"the call was placed and its outcome could not be read "
+                               f"back: {redact(failure.why)}",
+                    ))
                 except Exception as exc:  # noqa: BLE001 - one item must not kill the run
                     log.exception("item %s raised", item.id)
                     report.results.append(ItemResult(
                         item=item, resolution=Resolution.FAILED,
-                        reason=f"dispatcher error: {type(exc).__name__}: {exc}",
+                        reason=f"dispatcher error: {type(exc).__name__}: "
+                               f"{redact(str(exc))}",
                     ))
 
         report.results.sort(key=lambda r: [i.id for i in items].index(r.item.id))
@@ -193,9 +219,20 @@ class WaveDispatcher:
 
         try:
             final = self._await_terminal(call_id)
-        finally:
-            with self._lock:
-                self._in_flight.discard(call_id)
+        except PollFailed as failure:
+            # Deliberately not discarded from _in_flight. The report's not_recallable list
+            # is exactly the channel for a call this run placed and cannot account for,
+            # and it is already printed, so a reader sees the id rather than a wrong
+            # verdict. Reporting FAILED here would state that no call happened, when one
+            # did and will be billed.
+            return ItemResult(
+                item=item, resolution=Resolution.UNDETERMINED, call_id=call_id,
+                placed_by_this_run=self._was_placed_now(call),
+                reason=f"the call was placed and its outcome could not be read back: "
+                       f"{redact(failure.why)}",
+            )
+        with self._lock:
+            self._in_flight.discard(call_id)
 
         return self._classify(item, final)
 
@@ -221,7 +258,9 @@ class WaveDispatcher:
                 )
             except CalleAPIError as err:
                 self._api_responded = True
-                last = f"{err.code}: {err}"
+                # redact, not str(err) alone. `invalid_phone` quotes the number it
+                # rejected, and this string is stored on the result and printed.
+                last = f"{err.code}: {redact(str(err))}"
                 if err.code in FATAL_ERRORS:
                     with self._lock:
                         self._fatal = err.code
@@ -238,9 +277,35 @@ class WaveDispatcher:
         return ItemResult(item=item, resolution=Resolution.FAILED, reason=last)
 
     def _await_terminal(self, call_id: str) -> dict[str, Any]:
+        """Poll until the call reaches a terminal status, retrying a failed read.
+
+        The retry is the point. Creation is already retried, and this was not, so a single
+        transient error here discarded an existing call's id and reported it as never
+        having happened. The budget is the same `RetryPolicy` creation uses, and a
+        successful read resets it, because five failures spread over a long call are not
+        the same thing as five in a row.
+        """
         deadline = time.monotonic() + self._call_timeout
+        consecutive_failures = 0
         while True:
-            call = self._client.calls.get(call_id)
+            # No cancellation check here, deliberately. Once a call is accepted the phone
+            # is going to ring, and abandoning the poll would leave the run unable to say
+            # what happened to a call it placed. Cancelling stops new dispatch; it does
+            # not un-ring a phone. `test_cancel_stops_new_dispatch_and_names_what_could_
+            # not_be_recalled` fails if this changes.
+            try:
+                call = self._client.calls.get(call_id)
+            except Exception as exc:  # noqa: BLE001 - the call exists; do not lose it
+                consecutive_failures += 1
+                if (consecutive_failures >= self._retry.max_attempts
+                        or time.monotonic() > deadline):
+                    raise PollFailed(
+                        call_id,
+                        f"{consecutive_failures} consecutive read(s) failed, last "
+                        f"{type(exc).__name__}: {exc}") from exc
+                self._sleep(self._retry.delay_for(consecutive_failures))
+                continue
+            consecutive_failures = 0
             if call.get("status") in TERMINAL:
                 return call
             if time.monotonic() > deadline:
@@ -437,5 +502,6 @@ def default_idempotency_key(prefix: str, day: str) -> Callable[[WorkItem], str]:
 
 
 __all__ = [
-    "WaveDispatcher", "RetryPolicy", "Cancelled", "default_idempotency_key", "mask",
+    "WaveDispatcher", "RetryPolicy", "Cancelled", "PollFailed",
+    "default_idempotency_key", "mask",
 ]

@@ -289,6 +289,132 @@ def test_no_number_in_the_source_could_ring_a_real_person(tracked):
     )
 
 
+# ---------------------------------------------------------------------------
+# Images, and the one thing every check above cannot do
+# ---------------------------------------------------------------------------
+#
+# Nothing above can read a picture. Every check in this module reads text, and a phone
+# number, a provider id or a whole transcript rendered into pixels walks past all of them.
+#
+# That is not hypothetical either. A screenshot of the deployed evidence page was committed
+# to this repository and passed every check here, while displaying twelve real API call ids
+# and twelve real thirty-two-character billing ids in a table. The text scanner reported the
+# tree clean because a PNG is not text.
+#
+# So the control for images is provenance rather than content. An image may be committed if
+# it was produced from things that are already in this repository, and the one tool that
+# does that, tools/gates/capture-stills.mjs, reads source files and runs the offline CLI.
+# What may not be committed is anything rendered from the call recordings, which in practice
+# means the output of tools/judge_page.py under out/ and the gate harness's screenshots
+# under tools/gates/shots/.
+#
+# The limitation is stated rather than papered over: these checks would not catch a
+# hand-edited PNG. What they catch is the way it actually happened.
+
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".mp4", ".webm")
+IMAGE_HOME = "docs/images/"
+STILL_TOOL = "tools/gates/capture-stills.mjs"
+RECEIPT_DERIVED_DIRS = ("out", "tools/gates/shots")
+
+
+def test_every_committed_image_is_declared(tracked):
+    """A picture nothing describes is a picture nobody checked.
+
+    Adding an image has to be a visible act, because the reviewer is the only thing that
+    can read one. `docs/images/README.md` says what each shows and the command that
+    regenerates it, and this fails on an image that is not in it.
+    """
+    images = [p for p in tracked if p.suffix.lower() in IMAGE_SUFFIXES]
+    index = APP / "docs" / "images" / "README.md"
+    if not images:
+        pytest.skip("no images are committed yet")
+    assert index.exists(), (
+        f"{len(images)} image(s) are committed and docs/images/README.md does not exist, "
+        "so nothing says what any of them show"
+    )
+    listed = index.read_text(encoding="utf-8")
+    problems = []
+    for path in images:
+        relative = path.as_posix().split("firstbell/")[-1]
+        if not relative.startswith(IMAGE_HOME):
+            problems.append(f"{relative}: images live under {IMAGE_HOME}")
+        elif path.name not in listed:
+            problems.append(f"{relative}: not described in docs/images/README.md")
+    assert not problems, "\n  ".join([""] + sorted(problems))
+
+
+def test_no_committed_image_was_rendered_from_the_call_recordings(tracked):
+    """The exact way a real artifact got in here, turned into a check.
+
+    The evidence page is built from the recordings, so a screenshot of it is a real-call
+    artifact in a format no text scanner can read. Byte-comparing every committed image
+    against the two directories that hold receipt-derived renders catches that, which is
+    the specific mistake this repository already made once.
+    """
+    import hashlib
+
+    images = [p for p in tracked if p.suffix.lower() in IMAGE_SUFFIXES]
+    if not images:
+        pytest.skip("no images are committed yet")
+
+    # `tools/gates/shots/` holds two unrelated things, which is why this is a prefix rule
+    # and not a directory rule. `still-*.png` are the working copies of the annotated
+    # stills, built by capture-stills.mjs from source files and the offline CLI, and they
+    # are the same bytes as the committed ones by design. Everything else there is an act
+    # screenshot of the page the recordings produced.
+    derived: dict[str, str] = {}
+    for directory in RECEIPT_DERIVED_DIRS:
+        root = APP / Path(directory)
+        if not root.is_dir():
+            continue
+        for candidate in root.rglob("*"):
+            if not candidate.is_file() or candidate.suffix.lower() not in IMAGE_SUFFIXES:
+                continue
+            if candidate.parent.name == "shots" and candidate.name.startswith("still-"):
+                continue
+            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+            derived[digest] = candidate.as_posix().split("firstbell/")[-1]
+
+    if not derived:
+        pytest.skip("no locally built page or gate screenshots to compare against")
+
+    offenders = []
+    for path in images:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest in derived:
+            offenders.append(
+                f"{path.name} is byte-identical to {derived[digest]}, which is rendered "
+                "from the call recordings")
+    assert not offenders, "\n  ".join([""] + sorted(offenders))
+
+
+def test_the_tool_that_makes_the_stills_cannot_see_a_recording(tracked):
+    """Provenance, checked at the source rather than taken on trust.
+
+    An image is committable because of where its content came from. This is the check on
+    that: the still-capture tool must not read the receipts directory, the deployed page,
+    or the built page under out/. It reads source files and runs the offline CLI, and if
+    that ever stops being true this fails before an image can be produced from a call.
+    """
+    tool = APP / Path(STILL_TOOL)
+    if not tool.exists():
+        pytest.skip(f"{STILL_TOOL} is not present")
+    body = tool.read_text(encoding="utf-8")
+    code = "\n".join(line for line in body.splitlines()
+                     if not line.lstrip().startswith(("*", "//", "/*")))
+    forbidden = {
+        "FIRSTBELL_RECEIPTS": "the receipts directory",
+        "--receipts": "the receipts directory",
+        "firstbell-evidence.vercel.app": "the deployed page",
+        "judge_page": "the page built from the recordings",
+    }
+    found = [f"{needle} ({why})" for needle, why in forbidden.items() if needle in code]
+    assert not found, (
+        f"{STILL_TOOL} reaches for " + ", ".join(sorted(found))
+        + ", so an image it produces could carry real-call content"
+    )
+
+
 def test_the_authored_fixtures_are_what_the_generator_produces(tracked):
     """The fixtures are generated, so a hand edit to one has to be a failure.
 

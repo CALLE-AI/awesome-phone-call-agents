@@ -843,3 +843,107 @@ def test_the_source_url_is_never_split_across_lines():
     lines = summarise(_ledger(), live=True, staff=staff).lines()
     whole = [ln.strip() for ln in lines if ln.strip().startswith("http")]
     assert whole == [staff.source_url]
+
+# -- what the run says happened, when it cannot tell ------------------------
+#
+# Both of these were found by a code review that reproduced them, and both live in the
+# reporting path rather than the calling path, which is why the rest of the suite missed
+# them. A wrong number in a receipt and a placed call reported as never placed are the two
+# ways this app can lie about what it did.
+
+def test_a_vendors_error_message_cannot_leak_the_number_it_rejected(double):
+    """Numbers are masked on the way out. This is the way in.
+
+    CALL-E's `invalid_phone` quotes the number it refused, and the reason string built from
+    that message is printed to stdout and written to the receipt. Every masking test in
+    this suite uses a number that validates, so none of them ever reaches this path.
+    """
+    double.fail_next_request("invalid_phone", "'0412345678' is not E.164.")
+    report = make(double).run([WorkItem(id="s1", phones=("+915550000001",))])
+
+    reason = report.results[0].reason
+    assert "0412345678" not in reason, (
+        f"the rejected number survived into the reason: {reason!r}. This string reaches "
+        "stdout and the receipt."
+    )
+    # The useful half has to survive, or the fix is just deletion.
+    assert "invalid_phone" in reason, reason
+    assert "E.164" in reason, (
+        f"masking ate the diagnosis as well as the number: {reason!r}"
+    )
+
+
+def test_a_long_digit_run_in_any_error_is_masked_whatever_it_is(double):
+    """The rule has no exceptions, which is the reason it can be relied on.
+
+    A vendor is free to put a number anywhere in a message, in any format. Rather than
+    guess which fields quote input, every phone-shaped digit run in text this app did not
+    write is masked.
+    """
+    double.fail_next_request("invalid_request", "recipient 09 8765 4321 was refused")
+    report = make(double).run([WorkItem(id="s1", phones=("+915550000001",))])
+    reason = report.results[0].reason
+    for fragment in ("09 8765 4321", "0987654321", "8765"):
+        assert fragment not in reason, f"{fragment!r} survived in {reason!r}"
+
+
+def test_a_call_that_was_placed_is_never_reported_as_one_that_was_not(double):
+    """A transient read failure after creation used to lose the call entirely.
+
+    `Resolution.FAILED` means, in its own docstring, that the call did not happen. One
+    network error while polling produced exactly that verdict for a call that had been
+    created and would be billed, with `call_id` dropped on the floor. The id is the only
+    way anybody could go and find out what really happened.
+    """
+    double.set_default_outcome(Outcome.answered(GOOD, TALK))
+    dispatcher = make(double, retry=RetryPolicy(max_attempts=2, base_delay_seconds=0))
+
+    real_get = dispatcher._client.calls.get
+
+    def always_fails(call_id):
+        raise ConnectionError("connection reset by peer")
+
+    dispatcher._client.calls.get = always_fails
+    try:
+        report = dispatcher.run([WorkItem(id="s1", phones=("+915550000001",))])
+    finally:
+        dispatcher._client.calls.get = real_get
+
+    result = report.results[0]
+    assert result.resolution is Resolution.UNDETERMINED, (
+        f"got {result.resolution.name}: a call that was created and could not be read "
+        "back is unknown, not absent"
+    )
+    assert result.resolution.needs_a_human
+    assert result.call_id, "the id of a placed call was lost, so nobody can look it up"
+    assert "could not be read back" in result.reason, result.reason
+    assert result.call_id in report.not_recallable, (
+        "a call this run placed and cannot account for belongs in not_recallable, which "
+        "is the list the summary already prints"
+    )
+
+
+def test_one_failed_read_does_not_condemn_a_call_that_answers_on_the_next(double):
+    """The retry has to actually retry, or the fix is only a better error message."""
+    double.set_default_outcome(Outcome.answered(GOOD, TALK))
+    dispatcher = make(double, retry=RetryPolicy(max_attempts=3, base_delay_seconds=0))
+
+    real_get = dispatcher._client.calls.get
+    failures = {"left": 1}
+
+    def fails_once(call_id):
+        if failures["left"]:
+            failures["left"] -= 1
+            raise ConnectionError("connection reset by peer")
+        return real_get(call_id)
+
+    dispatcher._client.calls.get = fails_once
+    try:
+        report = dispatcher.run([WorkItem(id="s1", phones=("+915550000001",))])
+    finally:
+        dispatcher._client.calls.get = real_get
+
+    assert failures["left"] == 0, "the injected failure never fired"
+    assert report.results[0].resolution is Resolution.RESOLVED, report.results[0].reason
+    assert report.not_recallable == [], "a call that completed is not unaccounted for"
+

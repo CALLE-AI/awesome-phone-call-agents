@@ -12,6 +12,7 @@ allowed to collapse the third into either of the other two.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -116,6 +117,34 @@ def mask(phone: str) -> str:
     if len(phone) <= 5:
         return "*" * len(phone)
     return f"{phone[:3]}{'*' * (len(phone) - 5)}{phone[-2:]}"
+
+
+# Seven digits, because that is shorter than any diallable number and longer than anything
+# this app wants to keep: a SIP code is three, an HTTP status is three, and "E.164" is
+# three. Separators are allowed inside the run so that a number written 04 1234 5678 or
+# (04) 1234-5678 is still caught.
+_LONG_DIGIT_RUN = re.compile(r"\+?\d[\d\s().\-]{5,}\d")
+
+
+def redact(text: str) -> str:
+    """Mask any phone-shaped digit run in text this app did not write.
+
+    `mask` is applied to numbers on the way out. This is the same rule applied to numbers
+    on the way in, which is the direction that leaked: CALL-E's `invalid_phone` message
+    quotes the number it rejected, and storing that message unchanged put a real number in
+    stdout and in a receipt.
+
+    It is deliberately blunt. A long digit run in a vendor error message or an exception is
+    masked whether or not it is a phone number, so a timestamp inside one loses its digits
+    too. That costs a little readability in a line nobody reads unless something broke, and
+    it buys a rule with no exceptions to get wrong. The `code` beside it is a fixed
+    vocabulary and is never touched, so the useful half survives.
+    """
+    def hide(match: re.Match[str]) -> str:
+        digits = re.sub(r"[^\d+]", "", match.group())
+        return mask(digits) if len(re.sub(r"\D", "", digits)) >= 7 else match.group()
+
+    return _LONG_DIGIT_RUN.sub(hide, text)
 
 
 @dataclass
