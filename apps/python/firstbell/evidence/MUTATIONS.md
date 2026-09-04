@@ -22,8 +22,11 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 12 | Report `placed` when the response carries no usable `created_at`, instead of reporting unknown | 1 |
 | 13 | Drop the clock-skew guard, so a service clock hours ahead reads as a freshly placed call | 1 |
 | 14 | Read `provider_call_id` off the first attempt instead of the last, so a call that fell back to a second number cites the id of the attempt that did not connect | 1 |
+| 15 | Change the test count stated in the README, which is what a reader runs and compares | 1 |
+| 16 | Blank `api_base_url` on a receipt that still claims `reached_production_api` | 1 |
+| 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
 
-## Why these fourteen
+## Why these seventeen
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

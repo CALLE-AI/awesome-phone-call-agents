@@ -1,6 +1,6 @@
 # Evidence
 
-Four receipts from real calls placed against `api.heycall-e.com` on 2026-09-04. Every one
+Six receipts from real calls placed against `api.heycall-e.com` on 2026-09-04. Every one
 carries `"reached_production_api": true`, a real `call_id` you can look up, and CALL-E's
 own returned transcript.
 
@@ -15,6 +15,9 @@ file. `--include-transcript` is off by default for exactly that reason, and
 | `02-idempotent-replay-no-calls.json` | The same command run again. `calls placed 0, calls replayed 2`. No phone rang and the account was not charged, which the vendor's own usage page confirms independently. |
 | `03-unanswered-call.json` | A call nobody answered. See below: the platform's account of it and the operator's do not agree. |
 | `04-defect-a-refusal-scored-resolved.json` | **A receipt of this app getting it wrong.** Kept on purpose. |
+| `05-locale-pilot.json` | The pilot call of the locale experiment, run alone so a structural mistake would cost one call and not eight. |
+| `06-locale-matched-pairs.json` | Seven calls completing four matched pairs, the same scenario in `en-IN` and `ta-IN`. |
+| `07-locale-experiment.md` | The pre-registration, the twelve comparisons, the result, and every call mapped to CALL-E's own usage page by `provider_call_id`. |
 
 ## What each one is actually worth
 

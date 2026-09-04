@@ -201,7 +201,7 @@ export CALLE_BASE_URL=http://127.0.0.1:8787
 
 ## Evidence from real calls
 
-`evidence/` holds four receipts from calls placed against `api.heycall-e.com`, each with
+`evidence/` holds six receipts from calls placed against `api.heycall-e.com`, each with
 `reached_production_api: true`, a real `call_id` and CALL-E's own returned transcript. One
 command producing two calls in two languages with identical results, a re-run that placed
 no calls at all, an unanswered call whose three accounts of itself disagree, and a receipt
@@ -212,7 +212,7 @@ each one is worth.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 64 tests
+python -m pytest tests/ -q          # 84 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
