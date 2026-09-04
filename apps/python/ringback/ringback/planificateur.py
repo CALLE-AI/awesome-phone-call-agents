@@ -353,11 +353,43 @@ class Planificateur:
                 continue
             self.base.terminer_appel(appel_id, "terminé", issue.resultat,
                                      issue.transcription)
+            self._honorer_ne_plus_appeler(issue.resultat, rdv.get("client_id"),
+                                          rdv["nom"], telephone)
             note = self._appliquer_issue(rdv, issue.resultat)
             if note:
                 self.base.noter_appel(appel_id, note)
             traites.append(appel_id)
         return traites
+
+    def _honorer_ne_plus_appeler(self, resultat, client_id, nom, telephone):
+        """Le 🚫 demandé PENDANT l'appel — sur la fiche, tout de suite.
+
+        ⚠ LA PROMESSE EST DITE SUR TOUS LES CHEMINS, PAS SEULEMENT EN
+        CAMPAGNE (03/09/2026). La consigne dictée à l'agent contient toujours
+        « c'est noté, vous ne serez plus appelé » ; le champ `do_not_call`
+        est toujours demandé dans le schéma. Mais seul l'assistant le lisait :
+        depuis la file d'appels ou la cascade directe, la personne s'entendait
+        promettre qu'on ne la rappellerait plus, et rien n'était écrit. Elle
+        était rappelée le lendemain. Promettre sans tenir est pire que ne rien
+        promettre — et ce n'est pas qu'une question de courtoisie.
+
+        ⚠ SUR LA FICHE DU CLIENT, comme le fait l'assistant : le drapeau vaut
+        pour TOUS les appels à venir, pas seulement pour cette file-là.
+
+        Rend Vrai si le drapeau a été posé.
+        """
+        if not calle_client.ne_plus_appeler_demande(resultat):
+            return False
+        cible = client_id or self.base.client_pour_contact(nom, telephone)
+        if not cible:
+            journal.warning("🚫 demandé au téléphone mais aucune fiche "
+                            "trouvée pour « %s » — rien n'a pu être marqué",
+                            nom)
+            return False
+        self.base.definir_ne_plus_appeler(cible, True)
+        journal.info("🚫 demandé au téléphone : fiche n°%d marquée "
+                     "« ne plus appeler »", cible)
+        return True
 
     def _refus_avant_composition(self, rdv):
         """Le FILET DE SÉCURITÉ, relu à l'instant même de composer.
@@ -653,6 +685,7 @@ class Planificateur:
                     cascade_id, rang, nom, telephone, etat="appelé", issue="echec")
                 continue
             outcome = issue.resultat["outcome"]
+            self._honorer_ne_plus_appeler(issue.resultat, None, nom, telephone)
             libere_id, note_libere = None, None
             if outcome == "accepted":
                 # Créneau CHOISI par l'utilisateur : jugé sur le jour fermé

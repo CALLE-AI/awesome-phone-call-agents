@@ -5776,8 +5776,13 @@ _NOM_DATE = r"(\d{1,2}/\d{1,2}(?:/\d{2,4})?)"
 _NOM_CONFIRMATION = re.compile(
     r"^Confirmation de rendez-vous du " + _NOM_DATE +
     r" \((\d+) contact\(s\)\) — " + _NOM_DATE + r"(.*)$")
+# ⚠ LA CONFIRMATION MANQUAIT (03/09/2026). Elle a DEUX formes de nom : « du
+# <date> » quand elle vise un jour, « de N journées, dès le <date> » quand elle
+# en couvre plusieurs. Seule la première était couverte, et une campagne sur
+# trois gardait donc son nom français sur le premier écran.
 _NOM_JOURNEES = re.compile(
-    r"^(Rappel de rendez-vous|Prise de rendez-vous|Déplacement de rendez-vous)"
+    r"^(Rappel de rendez-vous|Prise de rendez-vous|Déplacement de rendez-vous"
+    r"|Confirmation de rendez-vous)"
     r" de (\d+) journées, dès le " + _NOM_DATE +
     r" \((\d+) contact\(s\)\) — " + _NOM_DATE + r"(.*)$")
 _NOM_CRENEAU = re.compile(
@@ -5787,6 +5792,7 @@ _NATURE_EN = {
     "Rappel de rendez-vous": "Appointment reminder",
     "Prise de rendez-vous": "Appointment booking",
     "Déplacement de rendez-vous": "Appointment rescheduling",
+    "Confirmation de rendez-vous": "Appointment confirmation",
 }
 
 
@@ -5965,6 +5971,22 @@ MOTIFS_CLE = (
      f"Another key is set in the CALLE_API_KEY environment variable, and it "
      f"wins over the file. The one you saved here ({t.group(1)} characters) "
      f"is set aside. For it to be used: close RingBack, remove the variable"),
+)
+
+
+# --- L'AVANCEMENT D'UNE CAMPAGNE, en tête de la liste ----------------------
+#
+# ⚠ SUR LE PREMIER ÉCRAN, ET RESTÉ FRANÇAIS JUSQU'AU 03/09/2026. Il porte trois
+# nombres, donc il n'existe que sur une base peuplée ET déroulée : aucune de
+# mes mesures n'avait fait tourner une campagne. C'est l'œil, en préparant des
+# captures d'écran, qui l'a vu.
+_AVANCEMENT = re.compile(
+    r"^(\d+)/(\d+) appelé\(s\) · (\d+) accepté\(s\) · (\d+) relance\(s\)$")
+
+MOTIFS_AVANCEMENT = (
+    (_AVANCEMENT, lambda t, _:
+     f"{t.group(1)}/{t.group(2)} called · {t.group(3)} accepted · "
+     f"{t.group(4)} follow-up(s)"),
 )
 
 
@@ -6240,7 +6262,7 @@ def _file_simulee(trouve, _table):
             f"{'call' if combien == 1 else 'calls'} in simulation")
 
 
-MOTIFS_EN = MOTIFS_CLE + MOTIFS_GABARITS + MOTIFS_DERNIERS + MOTIFS_CAMPAGNE + MOTIFS_ASSEMBLES + (
+MOTIFS_EN = MOTIFS_AVANCEMENT + MOTIFS_CLE + MOTIFS_GABARITS + MOTIFS_DERNIERS + MOTIFS_CAMPAGNE + MOTIFS_ASSEMBLES + (
     (_ECARTES_GAIN, _ecartes_gain),
     (_ECARTES_RIEN, _ecartes_rien),
     (_FILE_REELLE, _file_reelle),
@@ -6438,8 +6460,14 @@ CONSIGNE_FR_VERS_EN = {
         'Please remember: [consigne].',
     'Pensez-y : [consignes].':
         'Keep in mind: [consignes].',
+    'Personne appelée':
+        'Person being called',
     'Personne appelée : [identite].':
         'Person called: [identite].',
+    'Place proposée':
+        'Slot offered',
+    'Place qui vient de se libérer':
+        'Slot that has just become free',
     "Places libres à proposer en cas d'annulation (calculées ; vide = l'agent n'annonce aucune date)":
         'Free slots to offer in case of a cancellation (calculated; empty = the agent announces no date)',
     "Places libres à proposer en cas d'annulation : [creneaux_annulation].":
@@ -6468,6 +6496,8 @@ CONSIGNE_FR_VERS_EN = {
         'Current appointment (date + time)',
     'Rendez-vous actuel : [rdv_existant].':
         'Current appointment: [rdv_existant].',
+    'Rendez-vous concerné':
+        'Appointment concerned',
     'Rendez-vous existant (date + heure)':
         'Existing appointment (date + time)',
     'Rendez-vous existant : [rdv_existant].':
@@ -6560,6 +6590,10 @@ CONSIGNE_FR_VERS_EN = {
         'give no medical information, and no detail that is not written in « what you know » above;',
     'obtenir une réponse FERME : la personne sera-t-elle présente à son rendez-vous, oui ou non':
         'obtain a FIRM answer: will the person be there for their appointment, yes or no',
+    'obtenir une réponse claire sur le rendez-vous dont parle ta présentation':
+        'get a clear answer about the appointment your introduction mentions',
+    'obtenir une réponse claire sur le rendez-vous dont parle ta présentation ci-dessus':
+        'get a clear answer about the appointment your introduction mentions above',
     "pendant nos heures d'ouverture":
         'during our opening hours',
     "pose D'ABORD ta question et attends la réponse : sera-t-elle présente, oui ou non ? Ne cite AUCUNE date tant qu'elle n'a pas répondu ;":
@@ -6574,10 +6608,14 @@ CONSIGNE_FR_VERS_EN = {
         'repeating what you know is NEVER a reason to hand over: if you are asked to repeat the date, the time, the place, the duration or the reason, simply say them again, as often as needed — they are written in « what you know » above;',
     'replacer_annulation':
         'replacer_annulation',
+    'savoir si la personne prend la place qui vient de se libérer':
+        'find out whether the person takes the slot that has just become free',
     'savoir si la personne prend la place qui vient de se libérer, à la place de son rendez-vous actuel':
         'find out whether the person takes the slot that has just become free, instead of their current appointment',
     "si elle confirme sa présence, remercie et conclus : il n'y a rien d'autre à obtenir, et proposer une autre date sèmerait le doute ;":
         'if they confirm they will be there, thank them and conclude: there is nothing else to obtain, and offering another date would sow doubt;',
+    "si elle demande ce que tu as d'autre — « avez-vous d'autres dates ? », « qu'est-ce qui reste ? » — NE RÉCITE PAS la liste : réponds « oui, j'ai d'autres disponibilités » et enchaîne tout de suite sur la question suivante. Une liste récitée n'aide personne à choisir ;":
+        'if they ask what else you have — « do you have other dates? », « what is left? » — DO NOT RECITE the list: answer « yes, I have other openings » and move straight on to the next question. A recited list helps nobody choose;',
     "si elle ne convient pas, demande quels JOURS de la semaine l'arrangeraient ;":
         'if it does not suit them, ask which DAYS of the week would work for them;',
     'si elle ne peut pas venir ET que « ce que tu sais » porte des places libres, propose-lui UNE date pour commencer — la plus proche, pas la liste ;':

@@ -174,13 +174,6 @@ CALL-E*: paste your key there, or skip it and keep exploring in simulation.
 To place **real** calls you additionally need a CALL-E account and API key, plus the
 three deliberate gestures described under *Dry-run* below.
 
-> ⚠ **Register that CALL-E account with a Google address.** As of 3 September
-> 2026 CALL-E has disabled API access for accounts registered with non-Google
-> e-mail addresses — a temporary measure after attacks on their service. With
-> such an account **every call returns `403 forbidden`**, whatever you do here.
-> See *If every call comes back `403 forbidden`* below. Simulation is
-> unaffected: the whole product, demo data included, runs with no key at all.
-
 Files written by the application, all under `donnees/`:
 
 | File | What it holds |
@@ -235,15 +228,10 @@ you are looking at:
 | `401 Invalid or missing API key` | the **key**: absent, mistyped, or revoked |
 | `403 This account is not allowed…` | the **account**: the key authenticated, then was refused |
 
-A `403` therefore *proves* the key was recognised. Re-pasting it or creating a
-new one cannot help.
-
-⚠ **One known cause, current as of 3 September 2026.** CALL-E told us: *"CALL-E
-has recently been targeted by attacks. As a temporary security measure, we
-disabled CALL-E access for accounts registered with non-Google email
-addresses."* If you registered your CALL-E account with anything other than a
-Google address, **every call will return 403** until that measure is lifted —
-whatever you do in RingBack. Register with a Google address, or ask CALL-E.
+A `403` therefore *proves* the key was recognised: re-pasting it or creating a
+new one cannot help. It is something to sort out with CALL-E — an account that
+is suspended, out of credit, still to be activated, or restricted for a reason
+of their own. Nothing you change in RingBack will lift it.
 
 Everything else in RingBack still works with no key at all: the whole product
 runs in **simulation** by default, with a full demo data set (⚙ Settings →

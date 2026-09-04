@@ -979,9 +979,35 @@ def creneaux_lisibles(base, preferences, tranches=1, depuis=None, limite=6):
 # ⚠ CE N'EST PAS UN TEXTE À LIRE AU TÉLÉPHONE. Personne n'écoute vingt dates :
 # le stock vit dans « ce que tu sais », et le message d'ouverture n'en nomme
 # qu'UNE (voir `creneau_le_plus_proche` et la conduite de la nature).
-PROCHES_DABORD = 3          # les places les plus proches, prises telles quelles
+
+# ⚠ CES TROIS CHIFFRES ONT ÉTÉ REVUS ENSEMBLE LE 04/09/2026, sur sa demande et
+# sur SA base. Le défaut qu'il a vu : une campagne de déplacement avec UN
+# rendez-vous à sortir proposait sept créneaux, dont cinq le même samedi.
+# « Tout est le samedi alors qu'il faut qu'il y ait plein de jours différents
+# et matin et après-midi. »
+#
+# Mesuré sur sa base avant de changer quoi que ce soit :
+#
+#   facteur  par demi-journée  proches d'abord │  1 rdv      3 rdv
+#       7           2                 3        │  2 jours    6 jours
+#      10           2                 3        │  3 jours    8 jours
+#      10           1                 1        │  5 jours   15 jours   ← retenu
+#
+# ⚠ ET C'EST « PAR DEMI-JOURNÉE » QUI ÉTALE, pas le facteur. Passer de 7 à 10
+# ne gagnait qu'un jour : un jour ouvré donnait toujours quatre places (deux le
+# matin, deux l'après-midi), donc dix places tenaient encore en trois jours.
+# À une place par demi-journée, un jour n'en donne plus que deux — et dix
+# places couvrent cinq jours.
+#
+# ⚠ « LE PLUS PROCHE D'ABORD » N'A BESOIN QUE D'UNE PLACE. Trois places prises
+# telles quelles tombaient dans la même matinée (trois créneaux consécutifs de
+# vingt minutes) et déséquilibraient le matin contre l'après-midi. La règle
+# voulait dire « propose d'abord ce qui est le plus tôt » : une seule place
+# suffit à la tenir.
+
+PROCHES_DABORD = 1          # LA place la plus proche, prise telle quelle
 JOURS_COUVERTS_NEGO = 5     # jours ouvrés distincts à couvrir ensuite
-PAR_DEMI_JOURNEE = 2        # créneaux gardés le matin, et autant l'après-midi
+PAR_DEMI_JOURNEE = 1        # UNE place par demi-journée : c'est ce qui étale
 HEURE_BASCULE_MIDI = 13     # avant 13 h = matin, à partir de 13 h = après-midi
 
 # ⚠ LE CHOIX OFFERT SUIT LE NOMBRE DE RENDEZ-VOUS À DÉPLACER (sa demande du
@@ -1000,7 +1026,7 @@ HEURE_BASCULE_MIDI = 13     # avant 13 h = matin, à partir de 13 h = après-mid
 # deux lectures possibles (7 × 7 = 49) ; l'autre — un facteur égal au nombre —
 # serait quadratique, soit 900 places pour trente rendez-vous. Une constante
 # nommée : un seul chiffre à changer s'il la veut autrement.
-PAR_RENDEZVOUS_A_DEPLACER = 7
+PAR_RENDEZVOUS_A_DEPLACER = 10
 
 # ⚠ JUSQU'OÙ CHERCHER UNE PLACE — MESURÉ DANS SA BASE LE 17/08/2026.
 # Son agenda est COMPLET sur les 21 jours de l'horizon : zéro créneau libre. Au
@@ -1172,6 +1198,30 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
     cible = max(0, int(a_deplacer or 0)) * PAR_RENDEZVOUS_A_DEPLACER
     retenues = list(libres[:PROCHES_DABORD])
     deja = set(retenues)
+    # ⚠ LES PLUS PROCHES CONSOMMENT LEUR QUOTA (04/09/2026). Elles sont prises
+    # telles quelles — c'est voulu, on propose d'abord ce qui est le plus tôt —
+    # mais elles n'étaient inscrites NI dans le compte par demi-journée, NI
+    # dans les jours déjà vus. La première demi-journée pouvait donc en
+    # recevoir `PAR_DEMI_JOURNEE` de PLUS : le premier jour ramassait 3 + 2 + 2
+    # = sept places au lieu de quatre, et avec une cible de sept — un seul
+    # rendez-vous à déplacer — la boucle s'arrêtait avant d'avoir vu le
+    # deuxième jour.
+    #
+    # ⚠ CONSTATÉ SUR SA VRAIE BASE : « au lieu de faire un tirage de plein de
+    # dates, il n'en a sélectionné qu'une seule ». Sept fois le même samedi
+    # n'est pas sept propositions — l'agent n'avait rien à négocier, ce qui est
+    # exactement le défaut que cet étalement existe pour éviter.
+    comptes, jours_vus = {}, []
+    for horaire in retenues:
+        try:
+            quand = datetime.datetime.fromisoformat(horaire)
+        except (TypeError, ValueError):
+            continue
+        jour = quand.date().isoformat()
+        if jour not in jours_vus:
+            jours_vus.append(jour)
+        demi = "matin" if quand.hour < HEURE_BASCULE_MIDI else "apres"
+        comptes[(jour, demi)] = comptes.get((jour, demi), 0) + 1
     # ⚠ ON COMPTE LES JOURS, PAS LES CRÉNEAUX. Compter les créneaux ramenait
     # tout le stock sur les deux premières journées ouvertes — exactement le
     # défaut qu'on corrige.
@@ -1184,7 +1234,6 @@ def places_negociables(base, preferences, tranches=1, depuis=None,
     # sur plusieurs semaines au lieu de s'entasser sur la première.
     jours_vises = max(JOURS_COUVERTS_NEGO,
                       -(-cible // (PAR_DEMI_JOURNEE * 2)) if cible else 0)
-    comptes, jours_vus = {}, []
     for horaire in libres[PROCHES_DABORD:]:
         if cible and len(retenues) >= cible:
             break

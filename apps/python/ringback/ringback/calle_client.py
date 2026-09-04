@@ -59,7 +59,8 @@ import time
 import urllib.error
 import urllib.request
 
-from . import consigne as consigne_module, themes
+from . import (consigne as consigne_module,
+               langue as mod_langue, themes)
 from .db import masquer_telephone
 
 journal = logging.getLogger("ringback.calle")
@@ -681,6 +682,15 @@ CODES_CONNUS = {
           "(code 429 : trop d'appels en trop peu de temps)",
           QUOI_FAIRE_CADENCE),
 }
+
+
+
+# ⚠ LA FRONTIÈRE : ce qui est arrivé À LA PERSONNE, et ce qui nous est arrivé
+# à NOUS. Ces deux exceptions-là disent un fait sur l'appelé — elle n'a pas
+# décroché, l'agent n'a rien pu tirer de l'échange — et se comptent donc sur
+# elle. Toutes les autres, une fois l'appel parti, sont nos pannes à nous et
+# ne doivent jamais lui être imputées.
+IMPUTABLES_AU_CONTACT = (PasDeReponse, LectureImpossible)
 
 
 def _echec_de_reponse(code, methode, chemin, creation=False):
@@ -1362,7 +1372,7 @@ def _date_attendue(consigne, cle):
     return (issues.get(cle) or {}).get("date", "obligatoire") != "vide"
 
 
-def _formater(horaire):
+def _formater(horaire, langue_code="fr"):
     """« le mardi 25 août 2026 à 9 heures » — la forme DITE au téléphone.
 
     ⚠ DEUX EMPLOIS, ET LES DEUX VEULENT CETTE FORME (24/08/2026) : la consigne
@@ -1376,7 +1386,12 @@ def _formater(horaire):
     janvier est ambiguë — et personne ne s'en aperçoit avant que quelqu'un se
     présente onze mois trop tôt.
     """
-    return f"le {themes.date_parlee(horaire.isoformat(timespec='minutes'))}"
+    iso = horaire.isoformat(timespec="minutes")
+    # ⚠ ET L'ARTICLE CHANGE AVEC LA LANGUE : « on Monday 24 August », jamais
+    # « le Monday ». Même règle que `horaires._en_toutes_lettres`.
+    if langue_code == "en":
+        return f"on {themes.date_parlee(iso, 'en')}"
+    return f"le {themes.date_parlee(iso)}"
 
 
 def _issue_forcee(telephone):
@@ -2361,6 +2376,17 @@ class AppelReel(ClientAppels):
         mots. C'est pourquoi il suit la consigne au lieu d'être écrit en dur :
         les deux se décident au même endroit, le réglage de langue.
         """
+        return self.LOCALES.get(self._code_langue(), self.LOCALES["fr"])
+
+    def _code_langue(self):
+        """« fr » ou « en » pour CE départ d'appel — relu à chaque fois.
+
+        ⚠ UN SEUL CALCUL POUR LA VOIX ET POUR LES MOTS (03/09/2026). Il y en
+        avait un pour la voix, et rien pour la consigne : le même POST
+        commandait une voix anglaise et lui donnait un mode d'emploi français.
+        Deux calculs qui divergent, c'est un agent qui se contredit ; un seul
+        ne le peut pas.
+        """
         valeur = self.langue_appel
         if callable(valeur):
             try:
@@ -2370,8 +2396,8 @@ class AppelReel(ClientAppels):
         # ⚠ `str()` D'ABORD : un reglage relu d'un fichier JSON abime peut
         # rendre un nombre, une liste, n'importe quoi. Un appel ne doit pas
         # echouer sur le TYPE d'un reglage de langue.
-        return self.LOCALES.get(str(valeur or "").strip().lower()
-                                or "fr", self.LOCALES["fr"])
+        code = str(valeur or "").strip().lower() or "fr"
+        return code if code in self.LOCALES else "fr"
 
     def _numero_impose(self):
         """Le numéro qui REMPLACE celui du contact, ou "" — RELU À CHAQUE APPEL.
@@ -2549,7 +2575,24 @@ class AppelReel(ClientAppels):
         self.dernier_identifiant = identifiant
         try:
             return self._attendre_le_resultat(identifiant, validateur)
-        except EchecDeNotreCote as panne:
+        except IMPUTABLES_AU_CONTACT:
+            # ⚠ CES DEUX-LÀ SONT DES FAITS SUR LA PERSONNE, pas des pannes :
+            # elle n'a pas décroché, ou l'agent n'a rien pu tirer de
+            # l'échange. Les reclasser « résultat en attente » effacerait un
+            # fait réel et laisserait le contact attendre un résultat qui
+            # n'arrivera jamais. Elles remontent telles quelles.
+            raise
+        # ⚠ ET TOUT LE RESTE EST RECLASSÉ (03/09/2026). Le commentaire
+        # ci-dessus annonçait déjà la règle — « tout ce qui échoue à partir de
+        # cette ligne » — mais le rattrapage ne couvrait que `EchecDeNotreCote`.
+        # Une réponse de suivi qui n'est pas du JSON (page d'erreur d'une
+        # passerelle, corps tronqué) ou un code HTTP inconnu lèvent un
+        # `ErreurApi` NU : ni un fait sur la personne, ni une panne reconnue.
+        # Il passait au travers — la tentative était comptée sur elle, une
+        # relance armée (le téléphone sonnait une SECONDE fois pour un échange
+        # déjà conclu), et l'identifiant CALL-E perdu, donc le résultat
+        # irrécupérable.
+        except ErreurApi as panne:
             raise _en_attente_apres_lancement(panne, identifiant) from panne
 
     def _attendre_le_resultat(self, identifiant, validateur):
@@ -2687,8 +2730,7 @@ class AppelReel(ClientAppels):
                 appel_lance=(True if appel_lance else APPEL_INCERTAIN)
                 ) from erreur
 
-    @staticmethod
-    def _tache(nom_client, rendezvous, mission=None, consigne=None):
+    def _tache(self, nom_client, rendezvous, mission=None, consigne=None):
         """LA CONSIGNE dictée à l'agent — sans JAMAIS y inscrire le numéro.
 
         consigne : les trois parties déjà construites par une campagne de
@@ -2707,40 +2749,63 @@ class AppelReel(ClientAppels):
         # (_creneau_propose) : quand l'appelant a choisi une place réellement
         # libre, c'est ELLE qui est dictée à l'agent — jamais une date
         # obtenue par formule qui pourrait tomber dans le passé.
+        code = self._code_langue()
+        dire = mod_langue.traducteur(code)
+        # ⚠ « : » COLLE EN ANGLAIS, l'espace insécable est une règle française.
+        sep = ": " if code == "en" else " : "
         horaire, propose = _creneau_propose(rendezvous)
-        faits = [f"Personne appelée : {nom_client}.",
-                 f"Motif : {rendezvous['motif']}.",
-                 f"Rendez-vous concerné : {_formater(horaire)}.",
-                 f"Place proposée : {_formater(propose)}."]
+        faits = [f"{dire('Personne appelée')}{sep}{nom_client}.",
+                 f"{dire('Motif')}{sep}{rendezvous['motif']}.",
+                 f"{dire('Rendez-vous concerné')}{sep}"
+                 f"{_formater(horaire, code)}.",
+                 f"{dire('Place proposée')}{sep}{_formater(propose, code)}."]
         if mission:
             presentation = mission
-            objectif = ("obtenir une réponse claire sur le rendez-vous dont "
-                        "parle ta présentation ci-dessus")
+            objectif = dire("obtenir une réponse claire sur le "
+                            "rendez-vous dont parle ta présentation "
+                            "ci-dessus")
         else:
             presentation = (
                 f"Bonjour {nom_client}, je suis l'assistant téléphonique du "
-                f"cabinet. Vous aviez rendez-vous {_formater(horaire)} pour "
+                f"cabinet. Vous aviez rendez-vous "
+                f"{_formater(horaire, code)} pour "
                 f"« {rendezvous['motif']} » et nous n'avons pas pu vous "
                 f"accueillir. Je vous propose un nouveau créneau "
-                f"{_formater(propose)} : est-ce que cela vous convient ?")
-            objectif = ("savoir si la personne accepte le nouveau créneau que "
-                        "tu proposes, à la place du rendez-vous manqué")
-        return consigne_module.Consigne(presentation, objectif, faits).texte()
+                f"{_formater(propose, code)} : est-ce que cela vous convient ?")
+            objectif = dire("savoir si la personne accepte le nouveau "
+                            "créneau que tu proposes, à la place du "
+                            "rendez-vous manqué")
+        return consigne_module.Consigne(
+            presentation, objectif, faits,
+            dire=mod_langue.traducteur(code),
+            civilites=mod_langue.civilites_de(
+                code, consigne_module._DEVELOPPE)).texte()
 
-    @staticmethod
-    def _tache_cascade(nom_client, mission, creneau, consigne=None):
+    def _tache_cascade(self, nom_client, mission, creneau, consigne=None):
         """La consigne de cascade — sans JAMAIS y mettre le numéro."""
         if consigne is not None:
             return consigne.texte()
         creneau_dt = datetime.datetime.fromisoformat(creneau)
+        code = self._code_langue()
+        dire = mod_langue.traducteur(code)
+        sep = ": " if code == "en" else " : "
+        dit = _formater(creneau_dt, code)
+        ouverture = (f"Bonjour {nom_client}, une place vient de se libérer "
+                     f"{dit}. Cela vous intéresse-t-il ?")
+        if code == "en":
+            ouverture = (f"Hello {nom_client}, a slot has just become free "
+                         f"{dit}. Would that be of interest to you?")
         return consigne_module.Consigne(
-            mission or (f"Bonjour {nom_client}, une place vient de se libérer "
-                        f"{_formater(creneau_dt)}. Cela vous intéresse-t-il ?"),
-            "savoir si la personne prend la place qui vient de se libérer",
-            [f"Personne appelée : {nom_client}.",
-             f"Place qui vient de se libérer : {_formater(creneau_dt)}."],
+            mission or ouverture,
+            dire("savoir si la personne prend la place qui vient de "
+                 "se libérer"),
+            [f"{dire('Personne appelée')}{sep}{nom_client}.",
+             f"{dire('Place qui vient de se libérer')}{sep}{dit}."],
             issues=consigne_module.ISSUES_DEFAUT_CASCADE,
-            genre=consigne_module.GENRE_CASCADE).texte()
+            genre=consigne_module.GENRE_CASCADE,
+            dire=mod_langue.traducteur(code),
+            civilites=mod_langue.civilites_de(
+                code, consigne_module._DEVELOPPE)).texte()
 
     def _auditer(self, telephone_masque, statut, detail="", genre=None,
                  reponse_brute=""):

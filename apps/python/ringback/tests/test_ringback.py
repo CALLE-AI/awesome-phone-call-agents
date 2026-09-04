@@ -4509,7 +4509,7 @@ class TestDeplacementNegocie(unittest.TestCase):
         self.assertIn("proposer le 17/08/2026 à 09h00", dit)
         self.assertNotIn("le le ", dit)
 
-    def test_la_conduite_deroule_les_six_temps_puis_passe_la_main(self):
+    def test_la_conduite_deroule_les_sept_temps_puis_passe_la_main(self):
         """⚠ SA MÉCANIQUE, dans l'ordre — et la borne des TROIS refus.
 
         ⚠ SIX TEMPS DEPUIS LE 31/08/2026, cinq auparavant. Le temps ajouté est
@@ -4524,8 +4524,14 @@ class TestDeplacementNegocie(unittest.TestCase):
         qui compte `len(_ENTONNOIR) + 2` ne peut pas échouer.
         """
         conduite = assistant.NATURES["deplacement"]["conduite"]
-        self.assertEqual(len(conduite), 6)
-        attendus = ("LA date la plus proche", "JOURS de la semaine",
+        # ⚠ SEPT TEMPS DEPUIS LE 04/09/2026, six auparavant. Le temps ajouté
+        # est la DEMANDE DE LISTE : « avez-vous d'autres dates ? » n'est pas un
+        # refus, donc l'entonnoir ne se déclenchait pas — et l'agent récitait
+        # les dix créneaux, alors que le champ qui les porte s'appelle « stock,
+        # NON RÉCITÉ ». Constaté sur un appel réel du propriétaire.
+        self.assertEqual(len(conduite), 7)
+        attendus = ("LA date la plus proche", "NE RÉCITE PAS la liste",
+                    "JOURS de la semaine",
                     "MATIN ou l'APRÈS-MIDI", "propose alors UNE SEULE heure",
                     "REPRENDS LE FILTRE", "TROIS propositions refusées")
         for rang, marque in enumerate(attendus):
@@ -4555,8 +4561,10 @@ class TestDeplacementNegocie(unittest.TestCase):
         self.assertIn(consigne.TITRE_CONDUITE, texte)
         self.assertIn("1. commence par proposer LA date la plus proche",
                       texte)
-        self.assertIn("5. ⚠ à chaque refus, REPRENDS LE FILTRE", texte)
-        self.assertIn("6. au bout de TROIS propositions refusées", texte)
+        self.assertIn("6. ⚠ à chaque refus, REPRENDS LE FILTRE", texte)
+        # ⚠ ET LA MARCHE AJOUTÉE LE 04/09 EST BIEN NUMÉROTÉE, elle aussi.
+        self.assertIn("2. si elle demande ce que tu as d'autre", texte)
+        self.assertIn("7. au bout de TROIS propositions refusées", texte)
         self.assertIn("une personne de Cabinet Val Fleuri va vous rappeler",
                       texte)
         self.assertNotIn("[entreprise]", texte)
@@ -7384,6 +7392,35 @@ class TestConsoleEtCheminDesReglages(unittest.TestCase):
         finally:
             builtins.input, sys.stdout = sauve_input, sauve_sortie
         return accepte, tampon.texte
+
+
+    def test_le_verrou_accepte_les_deux_mots_et_parle_les_deux_langues(self):
+        """⚠ SA DEMANDE DU 04/09/2026 : « peu importe d'où tu viens ».
+
+        Le message était entièrement en français, y compris l'avertissement
+        sur le renvoi d'essai — un membre du jury anglophone lisait « Taper
+        exactement APPELER » et ne savait pas quoi faire. La console tourne
+        AVANT l'application : on ne peut pas s'appuyer sur le réglage de
+        langue, qu'il n'a peut-être jamais ouvert.
+        """
+        sauve = serveur.CHEMIN_BASE
+        serveur.CHEMIN_BASE = self.chemin_base
+        self.addCleanup(setattr, serveur, "CHEMIN_BASE", sauve)
+
+        accepte, imprime = self._confirmer("APPELER")
+        self.assertTrue(accepte)
+        # ⚠ LES DEUX LANGUES, CÔTE À CÔTE, dans l'avertissement ET la question.
+        self.assertIn("Les appels partiront VRAIMENT", imprime)
+        self.assertIn("Calls will REALLY be placed", imprime)
+
+        for mot in ("CALL", "call", "appeler", "  CALL  "):
+            with self.subTest(mot=mot):
+                self.assertTrue(self._confirmer(mot)[0],
+                                f"« {mot} » devrait être accepté")
+        for mot in ("", "oui", "yes", "APPELE", "CALLS"):
+            with self.subTest(mot=mot):
+                self.assertFalse(self._confirmer(mot)[0],
+                                 f"« {mot} » ne devrait PAS être accepté")
 
     def test_la_console_annonce_le_renvoi_avant_la_question(self):
         sauve = serveur.CHEMIN_BASE
@@ -17550,7 +17587,7 @@ class TestCeQuOnDemandeALAgentEstAccepte(unittest.TestCase):
         vide ». L'accord revenait sans date, la vérification le refusait, et le
         rendez-vous ne bougeait pas d'une minute."""
         self.assertEqual(consigne.ISSUES_DEFAUT["oui"]["date"], "obligatoire")
-        dit = calle_client.AppelReel._tache(
+        dit = calle_client.AppelReel(cle_api="cle-de-test-0123456789")._tache(
             "Mme Martin", {"horaire": "2026-09-14T10:20", "motif": "séance"})
         ligne = [l for l in dit.splitlines() if l.startswith("- OUI")]
         self.assertTrue(ligne)
@@ -27802,7 +27839,8 @@ class TestTacheHorsCampagne(unittest.TestCase):
     RDV = {"horaire": "2026-09-20T10:00", "motif": "Séance d'essai"}
 
     def test_la_tache_de_repli_a_trois_parties_et_des_issues_fermees(self):
-        tache = calle_client.AppelReel._tache("M. Ludovic", dict(self.RDV))
+        tache = calle_client.AppelReel(cle_api="cle-de-test-0123456789")._tache(
+            "M. Ludovic", dict(self.RDV))
         self.assertIn(consigne.TITRE_PRESENTATION, tache)
         self.assertIn(consigne.TITRE_CONTEXTE, tache)
         self.assertIn(consigne.TITRE_ISSUES, tache)
@@ -27815,7 +27853,7 @@ class TestTacheHorsCampagne(unittest.TestCase):
         self.assertNotIn("[plage_rappel]", tache)
 
     def test_la_tache_de_cascade_a_les_issues_de_cascade(self):
-        tache = calle_client.AppelReel._tache_cascade(
+        tache = calle_client.AppelReel(cle_api="cle-de-test-0123456789")._tache_cascade(
             "M. Ludovic", "Bonjour, une place s'est libérée.",
             "2026-09-07T09:00")
         self.assertIn(consigne.TITRE_ISSUES, tache)
@@ -27827,7 +27865,7 @@ class TestTacheHorsCampagne(unittest.TestCase):
     def test_une_consigne_deja_construite_part_telle_quelle(self):
         fixee = consigne.Consigne("Bonjour, ceci est ma présentation.",
                                   "vérifier que rien n'est retouché")
-        self.assertEqual(calle_client.AppelReel._tache(
+        self.assertEqual(calle_client.AppelReel(cle_api="cle-de-test-0123456789")._tache(
             "M. Ludovic", dict(self.RDV), consigne=fixee), fixee.texte())
 
 
@@ -27872,6 +27910,386 @@ class TestEcranCleCalle(_TestAvecServeurWeb):
         self.assertIn("Réglages", page)
         self.assertNotIn("PAS celle qui sert", page)
         self.assertNotIn(self.MARQUE, page)
+
+
+
+class TestConsigneDeRepliSuitLaLangue(unittest.TestCase):
+    """La consigne construite SANS l'assistant doit suivre la langue.
+
+    ⚠ TROUVÉ PAR L'AUDIT DU 03/09/2026, et confirmé par exécution. Deux
+    chemins ne passent pas de consigne toute faite au client d'appel — la
+    file d'appels (« ▶ Exécuter la file », le bouton « Rappeler ») et la
+    cascade directe. `AppelReel._tache` la reconstruit alors lui-même, avec
+    les valeurs par défaut de `Consigne` : pas de traducteur, et la table de
+    civilités FRANÇAISE.
+
+    ⚠ ET LA VOIX, ELLE, SUIVAIT DÉJÀ LA LANGUE. Le même POST posait
+    `region: "GB"`, `locale: "en-GB"`. Une voix anglaise lisait donc un mode
+    d'emploi français, et disait « monsieur Smith » à un patient anglophone.
+    C'est pire que tout en français : les deux moitiés se contredisent.
+    """
+
+    RDV = {"horaire": "2026-09-10T14:30", "motif": "check-up"}
+
+    def _tache(self, langue_code):
+        client = calle_client.AppelReel(cle_api="cle-de-test-0123456789",
+                                        langue_appel=langue_code)
+        return client._tache("Mr Smith", self.RDV,
+                             mission="Hello Mr Smith, I am calling on behalf "
+                                     "of Dr Martin about your appointment.")
+
+    def test_la_consigne_de_la_file_suit_la_langue(self):
+        anglaise = self._tache("en")
+        # ⚠ CE QUI EST DIT AU TÉLÉPHONE, pas seulement les titres.
+        self.assertNotIn("Tu es un assistant téléphonique français", anglaise)
+        self.assertNotIn("Je préfère ne pas vous dire de bêtise", anglaise)
+        self.assertNotIn("tu discutes librement, en français", anglaise)
+        # ⚠ ET LES CIVILITÉS NE SE DÉVELOPPENT PAS EN ANGLAIS : « Mr Smith »
+        # se lit très bien ; « monsieur Smith » est une faute dite à voix haute.
+        self.assertNotIn("monsieur Smith", anglaise)
+        self.assertNotIn("docteur Martin", anglaise)
+        self.assertIn("Mr Smith", anglaise)
+        # ⚠ ET LES TROIS LIGNES QUI DÉCIDENT DU RÉSULTAT. Ce sont elles qui
+        # disent à l'agent QUAND choisir quelle issue : laissées en français,
+        # l'agent anglophone conclut au jugé. La contre-épreuve du 03/09 a
+        # montré que sans cette vérification, l'essai passait au vert alors
+        # que ces trois lignes restaient françaises.
+        for morceau in ("la personne accepte", "elle refuse", "tout le reste"):
+            self.assertNotIn(morceau, anglaise, morceau)
+
+    def test_le_français_ne_bouge_pas(self):
+        """⚠ L'AUTRE MOITIÉ : le produit d'origine ne doit pas régresser."""
+        francaise = self._tache("fr")
+        self.assertIn("Tu es un assistant téléphonique français", francaise)
+        # En français, les civilités SE développent — c'est voulu.
+        self.assertIn("monsieur Smith", francaise)
+
+    def test_la_cascade_aussi(self):
+        client = calle_client.AppelReel(cle_api="cle-de-test-0123456789",
+                                        langue_appel="en")
+        tache = client._tache_cascade("Mr Smith", "", "2026-09-10T14:30")
+        self.assertNotIn("Tu es un assistant téléphonique français", tache)
+        self.assertNotIn("une place vient de se libérer", tache)
+        # ⚠ LES ISSUES DE CASCADE, elles, sont passées EXPLICITEMENT : elles
+        # tombaient donc dans l'autre branche et restaient françaises.
+        for morceau in ("la personne prend la place", "elle décline",
+                        "tout le reste"):
+            self.assertNotIn(morceau, tache, morceau)
+
+    def test_la_date_dite_suit_la_langue(self):
+        """Sans mission, la présentation porte une date — elle est DITE."""
+        client = calle_client.AppelReel(cle_api="cle-de-test-0123456789",
+                                        langue_appel="en")
+        tache = client._tache("Mr Smith", self.RDV)
+        for mot in ("jeudi", "septembre", "heures"):
+            self.assertNotIn(mot, tache, tache[:200])
+
+
+
+class TestPriseRdvAvecAncienRendezVous(_CampagneAssistant):
+    """Une prise de rendez-vous chargée depuis les rendez-vous à recaser.
+
+    ⚠ TROUVÉ PAR L'AUDIT DU 03/09/2026. C'est l'usage le plus évident de
+    cette nature : rappeler les gens dont le rendez-vous a été annulé ou
+    manqué, pour leur en fixer un nouveau. Le contact porte alors le lien
+    vers son ANCIEN rendez-vous.
+
+    ⚠ ET CE LIEN FAISAIT TOUT PERDRE. La branche « le contact a un
+    rendez-vous » passait AVANT celle qui crée le nouveau : l'ancien
+    rendez-vous annulé repassait « confirmé », et la date convenue au
+    téléphone était jetée. La personne se croyait attendue le mardi 13 ;
+    le planning montrait l'ancienne date, marquée confirmée.
+    """
+
+    def _monter(self):
+        base = self.application.base
+        prefs = self.application.preferences
+        # ⚠ LA PLAGE D'APPEL OUVERTE : sans cela l'essai ne mesure rien passé
+        # 19 h — le garde-fou de politesse refuse l'appel et l'issue devient
+        # « échec ». Un essai dont le résultat dépend de l'heure qu'il est ne
+        # mesure pas le produit.
+        prefs.definir(themes.CLE_PLAGE_DEBUT, "00:00")
+        prefs.definir(themes.CLE_PLAGE_FIN, "23:59")
+        # Un rendez-vous ANNULÉ, dans le passé : le cas d'usage exact.
+        passe = (datetime.datetime.now() - datetime.timedelta(days=10)
+                 ).replace(hour=9, minute=0, second=0, microsecond=0)
+        client_id = base.ajouter_client("M. Demandeur", "+33 6 00 00 00 51")
+        ancien = base.ajouter_rendezvous(
+            client_id, passe.isoformat(timespec="minutes"), "bilan",
+            statut="annulé")
+        definition = assistant.NATURES["prise_rdv"]
+        contacts, _ = assistant.contacts_depuis_base(
+            base, "a_recaser", definition["champs"], ())
+        self.assertTrue(contacts, "le montage n'a produit aucun contact")
+        # ⚠ LE LIEN VERS L'ANCIEN RENDEZ-VOUS EST BIEN LÀ : c'est lui qui
+        # déclenche le défaut. Si un jour il disparaît, cet essai ne mesure
+        # plus rien — d'où la vérification.
+        self.assertEqual(contacts[0].get("rendezvous_id"), ancien)
+        infos = {info["code"]: (info.get("exemple") or "Cabinet Essai")
+                 for info in definition["infos"]}
+        campagne_id = assistant.creer_campagne_prete(base, {
+            "nature": "prise_rdv", "infos": infos, "infos_auto": {},
+            "politique": "tous", "ordre": "liste", "options": {},
+            "champs": [dict(c) for c in definition["champs"]],
+            "mission": assistant.construire_mission("prise_rdv", infos,
+                                                    prefs, {}),
+            "recette": {"apports": [{"mode": "base", "source": "a_recaser"}],
+                        "a_la_main": True},
+            "contacts": contacts}, prefs)
+        return base, ancien, campagne_id
+
+    def test_la_date_convenue_cree_un_rendez_vous(self):
+        base, ancien, campagne_id = self._monter()
+        self._derouler(campagne_id)
+
+        avant = base.obtenir_rendezvous(ancien)
+        tous = base.tous_les_rendezvous()
+        neufs = [r for r in tous if r["id"] != ancien]
+
+        # ① La date convenue au téléphone existe quelque part.
+        self.assertTrue(neufs, "aucun rendez-vous créé : la date convenue au "
+                               "téléphone a été jetée")
+        # ② Et l'ancien rendez-vous ANNULÉ n'est pas ressuscité « confirmé ».
+        self.assertNotEqual(avant["statut"], "confirmé",
+                            "un rendez-vous annulé est revenu « confirmé »")
+
+
+
+class TestNePlusAppelerHorsCampagne(unittest.TestCase):
+    """La promesse faite au téléphone est tenue sur TOUS les chemins.
+
+    ⚠ TROUVÉ PAR L'AUDIT DU 03/09/2026. La consigne dictée à l'agent contient
+    toujours : « si la personne demande qu'on ne la rappelle plus, réponds
+    "C'est noté, vous ne serez plus appelé" et rends do_not_call = yes ».
+    Cette phrase part dans la file d'appels comme dans une campagne.
+
+    ⚠ MAIS UN SEUL CHEMIN LA LISAIT. `ne_plus_appeler_demande` n'était appelée
+    que par l'assistant : depuis la file d'appels ou la cascade directe, la
+    personne s'entendait promettre qu'on ne la rappellerait plus, et rien
+    n'était écrit sur sa fiche. Elle était rappelée le lendemain.
+    """
+
+    def setUp(self):
+        self.base = db.Base(":memory:")
+        self.addCleanup(self.base.fermer)
+        self.client_id = self.base.ajouter_client("M. Durand",
+                                                  "+33 6 00 00 00 42")
+
+    def test_la_file_d_appels_honore_le_refus(self):
+        planif = planificateur.Planificateur(self.base,
+                                             _ClientQuiRefuseTout())
+        planif.dry_run = False
+        planif.confirmer_appels_reels()
+        horaire = (datetime.datetime.now() - datetime.timedelta(days=2)
+                   ).replace(hour=9, minute=0, second=0, microsecond=0)
+        rdv_id = self.base.ajouter_rendezvous(
+            self.client_id, horaire.isoformat(timespec="minutes"),
+            "séance", statut="manqué")
+        planif.programmer(rdv_id)
+        planif.executer()
+        fiche = self.base.obtenir_client(self.client_id)
+        self.assertTrue(fiche["ne_plus_appeler"],
+                        "la promesse faite au téléphone n'a pas été tenue : "
+                        "la fiche n'est pas marquée « ne plus appeler »")
+
+
+class _ClientQuiRefuseTout:
+    """Un client d'appel qui rend TOUJOURS « ne me rappelez plus ».
+
+    ⚠ PAS UN FAUX RÉSULTAT : c'est exactement la forme que `valider_resultat`
+    accepte, et exactement ce que la consigne demande à l'agent de rendre
+    quand la personne le demande.
+    """
+
+    dernier_identifiant = ""
+
+    def appeler(self, nom, telephone, rendezvous, mission=None,
+                consigne=None):
+        return calle_client.IssueAppel(
+            resultat={"appointment_status": "canceled", "new_datetime": "",
+                      "notes": "ne souhaite plus être appelée",
+                      "do_not_call": "yes"},
+            transcription="Contact : ne me rappelez plus.")
+
+
+
+class TestPanneApresLancementGardeLIdentifiant(unittest.TestCase):
+    """Le téléphone a sonné : aucune panne d'après ne doit être mise sur elle.
+
+    ⚠ TROUVÉ PAR L'AUDIT DU 03/09/2026. Le code dit son intention en toutes
+    lettres à la ligne qui suit la création : « ICI L'APPEL EST PARTI. Tout ce
+    qui échoue à partir de cette ligne sera reclassé "résultat en attente" et
+    gardera CET identifiant ». Mais le `except` ne rattrapait qu'une PARTIE de
+    la famille — `EchecDeNotreCote`. Une réponse de suivi qui n'est pas du
+    JSON (page d'erreur d'un intermédiaire, corps tronqué) lève un `ErreurApi`
+    NU, qui passait au travers.
+
+    ⚠ CE QUE ÇA COÛTE À QUELQU'UN : la conversation a eu lieu et a abouti ;
+    RingBack compte une tentative ratée, arme une relance — le téléphone sonne
+    une seconde fois pour un échange déjà conclu — et l'identifiant CALL-E
+    n'est écrit nulle part, donc « 📥 Récupérer les résultats en attente » ne
+    peut plus le retrouver. Le résultat est perdu ET la personne est dérangée.
+    """
+
+    CLE = "cle-de-test-0123456789"
+
+    def setUp(self):
+        etat = {"appels": 0}
+
+        class FauxCoupeApresLancement(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                pass
+
+            def do_POST(self):
+                # La création réussit : l'appel PART, et son identifiant existe.
+                corps = json.dumps({"id": "appel-parti-1",
+                                    "status": "queued"}).encode("utf-8")
+                self.send_response(201)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(corps)))
+                self.end_headers()
+                self.wfile.write(corps)
+
+            def do_GET(self):
+                # Le suivi rend du HTML : c'est ce que renvoie une passerelle
+                # en panne, et ce n'est pas du JSON.
+                etat["appels"] += 1
+                corps = b"<html><body>502 Bad Gateway</body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(corps)))
+                self.end_headers()
+                self.wfile.write(corps)
+
+        self.serveur = HTTPServer(("127.0.0.1", 0), FauxCoupeApresLancement)
+        threading.Thread(target=self.serveur.serve_forever,
+                         daemon=True).start()
+        self.addCleanup(self.serveur.server_close)
+        self.addCleanup(self.serveur.shutdown)
+        self.url = f"http://127.0.0.1:{self.serveur.server_address[1]}"
+
+    def test_la_panne_du_suivi_garde_l_identifiant(self):
+        client = calle_client.AppelReel(
+            cle_api=self.CLE, url_base=self.url, delai_total=2.0,
+            intervalle=0.01, delai_requete=2.0)
+        with self.assertRaises(calle_client.ErreurApi) as vu:
+            client.appeler("M. Un Contact", "+33 6 00 00 00 42",
+                           {"horaire": "2026-09-10T14:30", "motif": "séance"},
+                           mission="Bonjour.")
+        erreur = vu.exception
+        # ① L'identifiant de l'appel est conservé : c'est la seule chose qui
+        # permet de retrouver ce que la conversation a donné.
+        self.assertEqual(getattr(erreur, "identifiant", ""), "appel-parti-1")
+        # ② Et l'échec ne doit PAS se lire comme un appel qui n'est pas parti.
+        self.assertTrue(getattr(erreur, "appel_lance", False),
+                        "l'appel est parti : le dire est ce qui empêche de "
+                        "compter une tentative et d'armer une relance")
+
+
+
+class TestLesProchesConsommentLeurQuota(unittest.TestCase):
+    """Les places « les plus proches » comptent dans le quota de leur demi-journée.
+
+    ⚠ TROUVÉ PAR SON ESSAI RÉEL DU 04/09/2026, sur sa vraie base : une campagne
+    de déplacement avec UN rendez-vous à sortir s'est vu proposer sept créneaux
+    — **tous le même samedi**, de 8 h 20 à 14 h 40. Sa remarque, mot pour mot :
+    « au lieu de faire un tirage de plein de dates, il n'en a sélectionné
+    qu'une seule ».
+
+    ⚠ LA CAUSE : `PROCHES_DABORD` prend les trois places les plus proches
+    telles quelles — c'est voulu — mais elles n'étaient PAS inscrites dans le
+    compte par demi-journée. La demi-journée pouvait donc en recevoir
+    `PAR_DEMI_JOURNEE` DE PLUS, et le premier jour ramassait 3 + 2 + 2 = sept
+    places au lieu de quatre. Avec une cible de sept (un rendez-vous à
+    déplacer), la boucle s'arrêtait avant d'avoir vu le deuxième jour.
+
+    ⚠ ET L'AGENT N'AVAIT DONC RIEN À NÉGOCIER : sept fois le même samedi, ce
+    n'est pas sept propositions, c'est une seule. C'est exactement le défaut
+    que l'étalement existe pour éviter.
+    """
+
+    def _prefs(self):
+        prefs = generation.Preferences()
+        for jour in range(5):
+            horaires.basculer_periode(prefs, jour, 9 * 60, 12 * 60 + 30,
+                                      "ouvrir")
+            horaires.basculer_periode(prefs, jour, 14 * 60, 18 * 60 + 30,
+                                      "ouvrir")
+        return prefs
+
+    LUNDI = datetime.datetime(2026, 8, 17, 8, 0)
+
+    def _par_jour(self, places):
+        compte = {}
+        for horaire in places:
+            compte[horaire[:10]] = compte.get(horaire[:10], 0) + 1
+        return compte
+
+    def test_un_seul_rendez_vous_a_deplacer_couvre_plusieurs_jours(self):
+        base = db.Base(":memory:")
+        self.addCleanup(base.fermer)
+        places = horaires.places_negociables(base, self._prefs(),
+                                             depuis=self.LUNDI, a_deplacer=1)
+        self.assertTrue(places)
+        jours = self._par_jour(places)
+        self.assertGreater(
+            len(jours), 1,
+            f"les {len(places)} places tombent toutes le même jour : "
+            f"{jours} — l'agent n'a rien à négocier")
+
+    def test_le_stock_s_etale_sur_les_jours_ET_les_demi_journees(self):
+        """⚠ SA RÈGLE, mot pour mot : « plein de jours différents et matin et
+        après-midi » (04/09/2026).
+
+        ⚠ ET PAS UN PLAFOND DUR PAR DEMI-JOURNÉE : une première version de cet
+        essai l'affirmait, et elle avait tort. Le SECOND TOUR de
+        `places_negociables` a le droit de dépasser le quota, et c'est écrit
+        dans le code : « mieux vaut deux places de plus le même matin que sept
+        personnes sans date ». Il ne s'active que quand la cible dépasse ce
+        que l'agenda peut donner en respectant le quota — ce qui arrive dès
+        sept rendez-vous à déplacer. Un essai qui interdit ce repli
+        interdirait au produit de servir tout le monde.
+
+        Ce qui se garde, c'est l'ÉTALEMENT : plus il y a de monde à replacer,
+        plus l'offre couvre de jours — et jamais un seul.
+        """
+        base = db.Base(":memory:")
+        self.addCleanup(base.fermer)
+        vus = {}
+        for a_deplacer, jours_attendus in ((1, 4), (3, 10)):
+            with self.subTest(a_deplacer=a_deplacer):
+                places = horaires.places_negociables(
+                    base, self._prefs(), depuis=self.LUNDI,
+                    a_deplacer=a_deplacer)
+                jours, demies = set(), set()
+                for horaire in places:
+                    quand = datetime.datetime.fromisoformat(horaire)
+                    jours.add(horaire[:10])
+                    demies.add("matin"
+                               if quand.hour < horaires.HEURE_BASCULE_MIDI
+                               else "apres")
+                vus[a_deplacer] = len(jours)
+                self.assertGreaterEqual(
+                    len(jours), jours_attendus,
+                    f"{len(places)} places sur seulement {len(jours)} jour(s)")
+                # ⚠ MATIN **ET** APRÈS-MIDI : la moitié de sa règle.
+                self.assertEqual(demies, {"matin", "apres"},
+                                 f"une seule demi-journée servie : {demies}")
+        # ⚠ ET L'ÉTALEMENT SUIT LA CHARGE : trois personnes à replacer
+        # couvrent plus de jours qu'une seule.
+        self.assertGreater(vus[3], vus[1])
+
+    def test_les_plus_proches_restent_les_premieres(self):
+        """La non-régression : l'ordre « le plus proche d'abord » ne bouge pas."""
+        base = db.Base(":memory:")
+        self.addCleanup(base.fermer)
+        prefs = self._prefs()
+        toutes = [e["horaire"] for e in horaires.creneaux_proposables(
+            base, prefs, depuis=self.LUNDI) if not e["occupe"]]
+        places = horaires.places_negociables(base, prefs, depuis=self.LUNDI,
+                                             a_deplacer=1)
+        self.assertEqual(places[:horaires.PROCHES_DABORD],
+                         toutes[:horaires.PROCHES_DABORD])
 
 
 if __name__ == "__main__":

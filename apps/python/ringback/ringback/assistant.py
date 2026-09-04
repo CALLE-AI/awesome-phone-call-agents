@@ -228,6 +228,17 @@ SANS_AUTRE_DATE = (" Si vous ne pouvez plus venir, j'annule votre "
 # diverge à la première retouche : on l'a mesuré assez souvent dans ce projet
 # pour ne plus recommencer.
 _ENTONNOIR = (
+    # ⚠ LA DEMANDE DE LISTE EST LE CAS LE PLUS COURANT, et il manquait
+    # (04/09/2026). Son essai réel : « Avez-vous d'autres rendez-vous ? » —
+    # ce n'est PAS un refus, donc l'entonnoir ne se déclenchait pas. L'agent a
+    # appliqué la règle voisine (« redire ce que tu sais n'est jamais une
+    # raison de passer la main ») et a récité les dix créneaux, alors que le
+    # champ qui les porte s'appelle « stock, NON RÉCITÉ ». Deux instructions se
+    # contredisaient ; il a tranché, et il n'avait pas tort.
+    "si elle demande ce que tu as d'autre — « avez-vous d'autres dates ? », "
+    "« qu'est-ce qui reste ? » — NE RÉCITE PAS la liste : réponds « oui, j'ai "
+    "d'autres disponibilités » et enchaîne tout de suite sur la question "
+    "suivante. Une liste récitée n'aide personne à choisir ;",
     "si elle ne convient pas, demande quels JOURS de la semaine "
     "l'arrangeraient ;",
     "demande ensuite si elle préfère le MATIN ou l'APRÈS-MIDI ;",
@@ -5614,7 +5625,16 @@ def _appliquer_issue(base, planif, preferences, campagne, configuration,
             return _deplacer_le_rendezvous(
                 base, preferences, campagne, configuration, contact, cible,
                 rdv_vise, resultat, tranches, duree, issue)
-        if rdv_vise is not None:
+        # ⚠ L'ORDRE DES DEUX BRANCHES EST LE DÉFAUT (03/09/2026). Celle-ci
+        # passait la première, sur le seul fait qu'un rendez-vous soit lié au
+        # contact. Pour une PRISE de rendez-vous chargée depuis « rendez-vous
+        # annulés, manqués et en attente » — son usage le plus évident — le
+        # rendez-vous lié est celui qu'on REMPLACE : le confirmer ressuscitait
+        # une date annulée et jetait celle convenue au téléphone. La personne
+        # se croyait attendue le 13 ; le planning montrait le 24 du mois
+        # précédent, marqué « confirmé ».
+        if rdv_vise is not None and nature not in ("prise_rdv",
+                                                   "contact_unique"):
             # Rappel et confirmation : l'horaire ne bouge PAS — rien à
             # vérifier, la place est déjà la sienne, on ne fait que
             # confirmer sa présence. Aucune ligne au cahier : une présence

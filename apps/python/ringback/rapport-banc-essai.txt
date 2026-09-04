@@ -1,6 +1,6 @@
 ==============================================================================
   RINGBACK — BANC D'ESSAI DE BOUT EN BOUT (simulation uniquement)
-  Rapport du 03/09/2026
+  Rapport du 04/09/2026
 ==============================================================================
 
 EN UNE LIGNE : TOUT PASSE — 661/661 contrôles, 121/121 combinaisons parcourues.
@@ -181,7 +181,7 @@ Déplacer une JOURNÉE entière (son parcours entier)          ✅   ⬜   ✅  
   • Jeu de données : celui du produit (ringback/jeu_essai.py),
     75 clients et 112 rendez-vous, numéros de fiction
     Arcep — aucun ne peut sonner chez quelqu'un.
-  • Date de référence : 03/09/2026 à 12 h 00. C'est la
+  • Date de référence : 04/09/2026 à 12 h 00. C'est la
     SEULE date relative ; tout le reste en découle. Le rapport ne
     porte pas d'heure, pour être comparable d'une exécution à
     l'autre le même jour.

@@ -11304,6 +11304,27 @@ def creer_serveur(port=PORT, chemin_base=None, appels_reels=False):
     return ServeurWeb(("127.0.0.1", port), GestionnaireLie)
 
 
+
+# ⚠ LE 3ᵉ VERROU PARLE LES DEUX LANGUES, CÔTE À CÔTE (04/09/2026). Sa demande :
+# « peu importe d'où tu viens, tu comprends ». La console tourne AVANT
+# l'application — le réglage de langue n'est pas forcément lu, et un membre du
+# jury qui n'a pas encore ouvert l'interface n'a rien réglé du tout. Afficher
+# les deux ne dépend de rien.
+#
+# ⚠ ET LES DEUX MOTS SONT ACCEPTÉS, dans les deux langues : « APPELER » reste
+# donc vrai partout où il est écrit — README publié, texte Devpost, proposition
+# d'ajout. Aucun document ne devient faux, ce qui était le coût caché de toutes
+# les autres solutions envisagées.
+#
+# ⚠ LA CASSE EST TOLÉRÉE, l'orthographe non. Refuser « call » en minuscules
+# n'ajoute aucune sécurité : le geste délibéré, c'est d'écrire le mot ENTIER,
+# pas de tenir la touche majuscule. Un refus sur la casse ferait seulement
+# croire que le produit est cassé.
+MOT_CONFIRMATION = "APPELER"
+MOT_CONFIRMATION_EN = "CALL"
+MOTS_CONFIRMATION = (MOT_CONFIRMATION, MOT_CONFIRMATION_EN)
+
+
 def _confirmation_tapee():
     """Verrou 3 : l'opérateur tape « APPELER » à chaque lancement en mode réel.
 
@@ -11315,6 +11336,7 @@ def _confirmation_tapee():
     chemin_preferences.
     """
     print("ATTENTION : --appels-reels demandé. Les appels partiront VRAIMENT.")
+    print("WARNING: --appels-reels requested. Calls will REALLY be placed.")
     etat = essai_reel.etat_du_renvoi(
         generation.Preferences(chemin_preferences(CHEMIN_BASE)))
     if etat["actif"]:
@@ -11322,15 +11344,25 @@ def _confirmation_tapee():
               f"{etat['masque']} (votre numéro d'essai). AUCUN contact ne sera "
               "appelé sur son propre numéro ; leur identité, elle, part "
               "inchangée.")
+        print(f"🧪 TEST REDIRECT ACTIVE: every call will go to "
+              f"{etat['masque']} (your test number). NO contact will be called "
+              "on their own number; their identity is sent unchanged.")
     elif etat["incoherent"]:
         print("⚠ « Toujours utiliser mon numéro » est coché, mais le numéro "
               "enregistré n'est pas composable : AUCUN appel ne pourra "
               "partir. Corrigez-le dans ⚙ Réglages → 🧪 Essais → Jeu d'essai.")
+        print("⚠ « Always use my number » is ticked, but the saved number "
+              "cannot be dialled: NO call will be able to go out. Fix it in "
+              "⚙ Settings → 🧪 Trial → Demo data.")
     try:
-        reponse = input("Taper exactement APPELER pour confirmer (autre chose = simulation) : ")
+        reponse = input(
+            f"Taper {MOT_CONFIRMATION} pour confirmer "
+            f"(autre chose = simulation) / "
+            f"Type {MOT_CONFIRMATION_EN} to confirm "
+            f"(anything else = simulation) : ")
     except EOFError:  # lancement non interactif : refus par défaut
         reponse = ""
-    return reponse.strip() == "APPELER"
+    return reponse.strip().upper() in MOTS_CONFIRMATION
 
 
 def principal(arguments=None):

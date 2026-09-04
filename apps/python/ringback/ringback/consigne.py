@@ -386,14 +386,31 @@ class Consigne:
         self.presentation = presentation or ""
         self.objectif = objectif or ""
         self.faits = list(faits)
-        self.contraintes = list(CONTRAINTES if contraintes is None
-                                else contraintes)
-        self.issues = dict(issues or ISSUES_DEFAUT)
+        self.dire = dire or (lambda texte: texte)
+        # ⚠ LES CONTRAINTES PAR DÉFAUT SE TRADUISENT ICI (03/09/2026).
+        # L'assistant les traduisait lui-même avant de les passer ; le chemin
+        # de repli — file d'appels, bouton « Rappeler », cascade directe — ne
+        # passe rien, et gardait donc les dix règles en français pendant que
+        # la voix, elle, parlait anglais. Traduire au point de PASSAGE, pas
+        # chez chaque appelant : le prochain appelant ne retombera pas dedans.
+        self.contraintes = ([self.dire(ligne) for ligne in CONTRAINTES]
+                            if contraintes is None else list(contraintes))
+        # ⚠ LES ISSUES PAR DÉFAUT AUSSI (03/09/2026), même raison que les
+        # contraintes juste au-dessus : l'assistant traduit les siennes avant
+        # de les passer, le chemin de repli n'en passe aucune. Sans cela, les
+        # trois lignes qui disent à l'agent QUAND choisir quelle issue —
+        # les seules qui décident du résultat — restaient en français.
+        # ⚠ QUELLE QUE SOIT LEUR ORIGINE, et c'est voulu : la cascade passe
+        # les siennes explicitement, l'assistant passe les siennes déjà
+        # traduites. Traduire ici couvre les trois cas — et sur un texte déjà
+        # anglais l'opération ne fait rien, puisqu'il n'est pas au
+        # dictionnaire français.
+        self.issues = {cle: dict(fixee, quand=self.dire(fixee["quand"]))
+                       for cle, fixee in (issues or ISSUES_DEFAUT).items()}
         self.genre = genre
         self.entete = entete
         # Propre à la nature, et souvent vide : voir TITRE_CONDUITE.
         self.conduite = list(conduite or ())
-        self.dire = dire or (lambda texte: texte)
         self.civilites = _DEVELOPPE if civilites is None else civilites
 
     # ------------------------------------------------------- substitution
