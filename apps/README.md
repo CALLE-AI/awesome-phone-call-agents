@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/e-mploye-for-calle`](typescript/e-mploye-for-calle/) | TypeScript | Human-approved virtual employee for appointment, lead follow-up, and shift coordination workflows, with a fake-only public mode and opt-in CALL-E SDK integration. |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
 | [`web/fieldclose`](web/fieldclose/) | TypeScript / Next.js | Human-approved commercial HVAC closeout workflow with a fake-only public path, durable recipient suppression, one-attempt duplicate protection, structured CALL-E results, and explicit human disposition. |
 | [`typescript/kincall`](typescript/kincall/) | TypeScript | Consent-first check-in and trusted-circle coordination: a stated request for help overrides the agent's own judgement, contacts are called one at a time until somebody commits, and the monitored person is called back with the outcome. |
