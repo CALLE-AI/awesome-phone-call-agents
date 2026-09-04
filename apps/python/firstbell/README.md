@@ -11,6 +11,33 @@ pip install -r requirements.txt
 python -m firstbell --work-file examples/absences.csv
 ```
 
+## If you have ten minutes
+
+Read these five files in this order. Between them they contain every claim this directory
+makes, and each one can be checked without an API key.
+
+| # | File | What it settles | Time |
+| --- | --- | --- | --- |
+| 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
+| 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
+| 3 | [`evidence/README.md`](evidence/README.md) | Six receipts from real calls, each with a `call_id` you can match against CALL-E's own usage page, and a plain statement of whose phone answered | 2 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-two gates broken on purpose, with how many tests noticed each one | 2 min |
+| 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
+
+### Where CALL-E is called at runtime
+
+Four lines do all of it. Every anchor below is checked by a test, so a line number here
+cannot quietly rot.
+
+- The client is constructed on the live path only: `from calle import CalleClient` at
+  `firstbell/cli.py:193`. The offline default never reaches it.
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:211`, with
+  the whole phone fallback chain and the per-family `locale` in one request.
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:243`, under a
+  hard ceiling rather than an open loop.
+- Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
+  `dispatch/scheduler.py:203`, rather than as a string match on a message.
+
 ## The problem
 
 A child does not arrive. The school has a duty of care that stays open until someone knows
@@ -297,7 +324,7 @@ data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 100 tests
+python -m pytest tests/ -q          # 102 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

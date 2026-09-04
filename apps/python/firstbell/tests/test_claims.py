@@ -110,6 +110,51 @@ def test_the_prose_numbers_match_the_program_too():
     assert staff.source_url in readme
 
 
+ANCHOR = re.compile(r"`([^`]+)` at\s*\n?\s*`([a-z_/]+\.py):(\d+)`")
+
+
+def test_every_cited_line_number_still_says_what_the_readme_claims():
+    """A line number in prose rots the first time anything above it moves.
+
+    The README points a reader at four exact lines for where CALL-E is called. Each
+    citation names the symbol it expects to find there, so this can check the pair rather
+    than just that the file exists.
+
+    The count assertion is the important half. Without it, deleting every anchor would
+    make this test pass on an empty list, which is the way a check like this usually dies.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    pairs = ANCHOR.findall(readme)
+    assert len(pairs) >= 4, (
+        f"expected at least 4 runtime anchors in the README, found {len(pairs)}. "
+        "If they were removed on purpose, lower this number deliberately."
+    )
+    for symbol, path, line in pairs:
+        target = APP / path
+        assert target.exists(), f"the README cites {path}, which does not exist"
+        lines = target.read_text(encoding="utf-8").splitlines()
+        number = int(line)
+        assert number <= len(lines), (
+            f"the README cites {path}:{number} but the file has {len(lines)} lines"
+        )
+        assert symbol in lines[number - 1], (
+            f"the README says {symbol!r} is at {path}:{number}, but that line is "
+            f"{lines[number - 1].strip()!r}"
+        )
+
+
+def test_the_ten_minute_reading_order_points_at_files_that_exist():
+    """Five links on the first screen. A dead one there is worse than no list."""
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    order = readme.split("## If you have ten minutes", 1)
+    assert len(order) == 2, "the README no longer has a reading order"
+    table = order[1].split("### Where CALL-E is called", 1)[0]
+    linked = re.findall(r"\]\(([^)]+)\)", table)
+    assert len(linked) == 5, f"expected five files in the reading order, found {len(linked)}"
+    for rel in linked:
+        assert (APP / rel).exists(), f"the reading order points at {rel}, which does not exist"
+
+
 def test_the_mutation_table_is_numbered_without_gaps():
     """Rows are numbered by hand, so a row inserted in the middle silently duplicates an id."""
     table = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")

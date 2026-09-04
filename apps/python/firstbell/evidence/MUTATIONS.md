@@ -30,8 +30,12 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 1 |
 | 21 | Wrap the citation like prose, so the source URL breaks mid-path and the reader cannot open the thing the number came from | 3 |
 | 22 | Drop `source` from the wage validation, so a staff cost can be asserted with no provenance at all | 1 |
+| 23 | Shift one cited line number by one, the way any edit above it would | 1 |
+| 24 | Keep a cited line number and change the symbol the sentence claims is on it | 1 |
+| 25 | Point the ten-minute reading order at a file that does not exist | 1 |
+| 26 | Delete the runtime anchors entirely, which a check written as "every anchor resolves" passes on an empty list | 2 |
 
-## Why these twenty-two
+## Why these twenty-six
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
@@ -49,6 +53,12 @@ would otherwise have to check by hand:
   task, not a reason.
 - **8, 9, 10 and 11** are the classification rules, and three of the four exist because a
   real call proved the original version wrong. See `evidence/README.md`.
+- **23 to 26** protect the first screen, which is the only part of this directory most
+  readers will see. 26 is the one worth explaining: the first version of that mutation
+  deleted the anchors badly and left them in place, so the suite stayed green and the gate
+  looked weak when the mutation was at fault. Deleting the section properly fails two
+  tests. The check asserts a minimum number of anchors as well as their correctness,
+  because a rule that says "every citation resolves" is satisfied by having none.
 - **19 to 22** protect the one arithmetic claim this app makes about money. 19 is the
   important one: the difference between charging for every call and crediting only the
   records actually closed is the difference between an honest ratio and a brochure. 20
