@@ -146,4 +146,8 @@ hiding under a benign subject, and a full number reaching an output.
 
 This is a focused, self-contained proof of the instrument. The complete application —
 the eight-station workbench, form definitions, ethics configuration, web interface and the
-live CALL-E transport — lives at <https://github.com/ellmos-ai/researchcall>.
+live CALL-E transport — lives at <https://github.com/ellmos-ai/researchcall>. It has since
+been field-tested twice against the real CALL-E service (2026-08-11 and 2026-08-22), with a
+live-verified withdrawal path -- a spoken deletion announcement, the local record actually
+cleared, the number added to a do-not-call registry; its README carries a "How We Tested"
+section, and its test suite currently stands at 293 passing.

@@ -1,0 +1,32 @@
+{
+  "name": "delivery-confirmation (before)",
+  "task": "You are calling on behalf of Northwind Logistics about tomorrow's delivery. Ask whether the customer wants to keep the 09:00 to 12:00 window, and thank them before ending the call.",
+  "result_schema": {
+    "type": "object",
+    "properties": {
+      "confirmed": {
+        "type": "boolean",
+        "description": "Whether the customer confirmed the delivery window."
+      },
+      "notes": {
+        "type": "string",
+        "description": "Anything else the customer mentioned."
+      }
+    },
+    "required": ["confirmed"]
+  },
+  "fields": {
+    "decision": "confirmed"
+  },
+  "decision_rule": {
+    "expression": "confirmed != false",
+    "on_true": {
+      "action": "dispatch the courier",
+      "side_effect": true
+    },
+    "on_false": {
+      "action": "hold the order and re-contact the customer",
+      "side_effect": false
+    }
+  }
+}

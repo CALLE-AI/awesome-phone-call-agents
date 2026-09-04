@@ -1,0 +1,17 @@
+{
+  "name": "clinic-appointment-concierge",
+  "version": "1.0.0",
+  "description": "CALL-E workflow plugin that calls a clinic to book a patient appointment, with a safe dry-run default and explicit live-call confirmation.",
+  "main": "appointment-concierge.js",
+  "bin": {
+    "clinic-appointment-concierge": "./appointment-concierge.js"
+  },
+  "scripts": {
+    "start": "node appointment-concierge.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}

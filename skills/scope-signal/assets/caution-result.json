@@ -1,0 +1,25 @@
+{
+  "schema_version": "2.0",
+  "approval_digest": "sha256:11f7a7c08ae80b6da54d438f6811ffae2f3a9350d1eb84da3783635f8bd167df",
+  "idempotency_key": "scope-signal:11f7a7c08ae80b6da54d438f6811ffae",
+  "status": "COMPLETED",
+  "run_id": "run-fictional-caution",
+  "transcript": [
+    {"speaker": "callee", "text": "I am Morgan Reed. I am the Product Lead. Yes, I can make the final project decision. The deliverables are a microsite and six content templates. The exclusions are paid advertising and translation. I do not know the budget currency yet. Payment will be by invoice. The funding decision is still pending. Payment is due thirty days after each approved invoice. The deadline is November 15 in Europe London time. We must provide brand files and CMS access. The acceptance criteria are not stated yet. The main unresolved risk is final legal review."}
+  ],
+  "result": {
+    "contact_identity": {"value": "Morgan Reed", "quote": "I am Morgan Reed."},
+    "contact_role": {"value": "Product Lead", "quote": "I am the Product Lead."},
+    "decision_authority": {"value": "Yes, I can make the final project decision", "quote": "Yes, I can make the final project decision."},
+    "deliverables": {"value": "A microsite and six content templates", "quote": "The deliverables are a microsite and six content templates."},
+    "exclusions": {"value": "Paid advertising and translation", "quote": "The exclusions are paid advertising and translation."},
+    "budget_range_currency": {"value": "unknown", "quote": "I do not know the budget currency yet."},
+    "payment_method": {"value": "Invoice", "quote": "Payment will be by invoice."},
+    "funding_or_deposit_status": {"value": "PENDING", "quote": "The funding decision is still pending."},
+    "payment_timing": {"value": "Thirty days after each approved invoice", "quote": "Payment is due thirty days after each approved invoice."},
+    "deadline_timezone": {"value": "November 15, Europe London", "quote": "The deadline is November 15 in Europe London time."},
+    "access_prerequisites": {"value": "Brand files and CMS access", "quote": "We must provide brand files and CMS access."},
+    "acceptance_criteria": {"value": "unknown", "quote": "The acceptance criteria are not stated yet."},
+    "unresolved_risks": {"value": "Final legal review", "quote": "The main unresolved risk is final legal review."}
+  }
+}

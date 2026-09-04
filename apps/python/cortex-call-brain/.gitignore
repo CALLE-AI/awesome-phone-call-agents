@@ -1,0 +1,12 @@
+# Never commit secrets or the brain (raw numbers, transcripts, private summaries)
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+cortex.db
+
+__pycache__/
+*.pyc
+.venv/

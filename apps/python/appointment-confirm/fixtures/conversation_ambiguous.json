@@ -1,0 +1,31 @@
+{
+  "call_id": "call_mock_ambiguous",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.41,
+    "label": "low"
+  },
+  "description": "Unclear answer plus low confidence must fail closed to needs_human.",
+  "transcript_turns": [
+    {
+      "offset_seconds": 0,
+      "speaker": "bot",
+      "text": "Can you attend Thursday at 10:00?"
+    },
+    {
+      "offset_seconds": 4,
+      "speaker": "user",
+      "text": "Maybe, I will have to see."
+    }
+  ],
+  "expected_structured_result": {
+    "can_attend": "unknown",
+    "confirmed_time": "",
+    "requested_time": "",
+    "disposition": "needs_human"
+  },
+  "evidence": [
+    "Maybe, I will have to see."
+  ]
+}

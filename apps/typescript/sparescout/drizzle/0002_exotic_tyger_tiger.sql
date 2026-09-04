@@ -1,0 +1,2 @@
+ALTER TABLE `sourcing_requests` ADD `recipient_consent_confirmed` integer DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE `sourcing_requests` ADD `authorized_call_window` text DEFAULT 'No live call — fixture' NOT NULL;

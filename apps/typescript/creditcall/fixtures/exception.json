@@ -1,0 +1,11 @@
+{
+  "packetId": "PP-2086",
+  "invoiceId": "INV-25791",
+  "supplierReference": "Demo Supplier",
+  "item": "monitor arms",
+  "quantity": 8,
+  "orderedUnitPrice": 94,
+  "invoiceUnitPrice": 119,
+  "currency": "CAD",
+  "recordsAreFictional": true
+}

@@ -1,0 +1,49 @@
+{
+  "request_id": "PL-1042",
+  "requester": "Maya Chen",
+  "facility": "Northstar Packaging, Line 4",
+  "part_number": "6205-2RS-C3",
+  "manufacturer": "Fictional Bearing Co.",
+  "description": "Deep-groove ball bearing for the Line 4 drive assembly",
+  "quantity": 6,
+  "acceptable_alternatives": true,
+  "required_specs": [
+    "25 mm bore",
+    "52 mm outside diameter",
+    "15 mm width",
+    "double rubber seal",
+    "C3 internal clearance"
+  ],
+  "need_by": "2026-08-31T15:00:00-05:00",
+  "call_window": {
+    "timezone": "America/Chicago",
+    "start": "09:00",
+    "end": "16:30"
+  },
+  "suppliers": [
+    {
+      "name": "Acme Industrial Supply",
+      "phone": "+1555010101",
+      "region": "US",
+      "locale": "en-US",
+      "authorized_contact": true,
+      "authorization_reference": "supplier allowlist 2026-08"
+    },
+    {
+      "name": "Central Motion Components",
+      "phone": "+1555010102",
+      "region": "US",
+      "locale": "en-US",
+      "authorized_contact": true,
+      "authorization_reference": "supplier allowlist 2026-08"
+    },
+    {
+      "name": "Lakeside Bearings",
+      "phone": "+1555010103",
+      "region": "US",
+      "locale": "en-US",
+      "authorized_contact": true,
+      "authorization_reference": "supplier allowlist 2026-08"
+    }
+  ]
+}

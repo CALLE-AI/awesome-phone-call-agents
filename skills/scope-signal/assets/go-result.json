@@ -1,0 +1,26 @@
+{
+  "schema_version": "2.0",
+  "approval_digest": "sha256:771896fde11488bfa487090e24f7740867d781b5a21aa4f3284d992d5b7ce3d3",
+  "idempotency_key": "scope-signal:771896fde11488bfa487090e24f77408",
+  "status": "COMPLETED",
+  "run_id": "run-fictional-go",
+  "transcript": [
+    {"speaker": "agent", "text": "I am calling to verify the fictional project brief; nothing is accepted on this call."},
+    {"speaker": "callee", "text": "I am Jordan Lee. I am the Operations Director. Yes, I have final decision authority for this project. The deliverables are five responsive pages, a contact form, and launch support. The exclusions are copywriting, hosting, and paid media. The approved budget range is USD 12000 to USD 15000. Payment will be by business invoice and bank transfer. The project deposit has been funded. Payment timing is forty percent after signature, thirty percent at design approval, and thirty percent at launch. The deadline is October 30 in America New York time. Access prerequisites are the brand files, CMS account, and analytics invitation. Acceptance requires responsive review, form testing, and written stakeholder sign-off. There are no unresolved risks."}
+  ],
+  "result": {
+    "contact_identity": {"value": "Jordan Lee", "quote": "I am Jordan Lee."},
+    "contact_role": {"value": "Operations Director", "quote": "I am the Operations Director."},
+    "decision_authority": {"value": "Yes, I have final decision authority", "quote": "Yes, I have final decision authority for this project."},
+    "deliverables": {"value": "Five responsive pages, a contact form, and launch support", "quote": "The deliverables are five responsive pages, a contact form, and launch support."},
+    "exclusions": {"value": "Copywriting, hosting, and paid media", "quote": "The exclusions are copywriting, hosting, and paid media."},
+    "budget_range_currency": {"value": "USD 12000 to USD 15000", "quote": "The approved budget range is USD 12000 to USD 15000."},
+    "payment_method": {"value": "Business invoice and bank transfer", "quote": "Payment will be by business invoice and bank transfer."},
+    "funding_or_deposit_status": {"value": "FUNDED", "quote": "The project deposit has been funded."},
+    "payment_timing": {"value": "Forty percent after signature, thirty percent at design approval, and thirty percent at launch", "quote": "Payment timing is forty percent after signature, thirty percent at design approval, and thirty percent at launch."},
+    "deadline_timezone": {"value": "October 30 in America New York time", "quote": "The deadline is October 30 in America New York time."},
+    "access_prerequisites": {"value": "The brand files, CMS account, and analytics invitation", "quote": "Access prerequisites are the brand files, CMS account, and analytics invitation."},
+    "acceptance_criteria": {"value": "Responsive review, form testing, and written stakeholder sign-off", "quote": "Acceptance requires responsive review, form testing, and written stakeholder sign-off."},
+    "unresolved_risks": {"value": "none stated", "quote": "There are no unresolved risks."}
+  }
+}

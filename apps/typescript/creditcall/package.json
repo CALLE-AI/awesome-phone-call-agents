@@ -1,0 +1,22 @@
+{
+  "name": "creditcall",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A human-approved CALL-E workflow for resolving invoice exceptions by phone.",
+  "scripts": {
+    "demo": "node src/cli.mjs demo",
+    "plan": "node src/cli.mjs plan",
+    "run": "node src/cli.mjs run",
+    "status": "node src/cli.mjs status",
+    "recover": "node src/cli.mjs recover",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@call-e/cli": "^0.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

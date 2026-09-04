@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/CALLE-AI/awesome-phone-call-agents/main/apps/python/redline/redline/scenario/schema.json",
+  "title": "REDLINE attack scenario",
+  "description": "One reproducible adversarial call, and what a well-behaved agent must have done about it. Scenarios are YAML so that a reviewer can read the diff and a non-programmer can contribute one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "family",
+    "severity",
+    "title",
+    "persona",
+    "expect"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable slug, unique across the catalogue. Used on the command line and in reports.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 3,
+      "maxLength": 64
+    },
+    "family": {
+      "type": "string",
+      "description": "How this scenario is grouped in the report.",
+      "enum": [
+        "false-completion",
+        "ambiguity",
+        "wrong-party",
+        "adversarial",
+        "channel",
+        "compliance",
+        "benign"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Reserve 'critical' for outcomes that leak data, make a commitment, or report success to a system that will then act on it.",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "description": "One line, readable by someone who has never seen this tool.",
+      "minLength": 8,
+      "maxLength": 120
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Why this attack is worth defending against. Shown by `redline explain`.",
+      "maxLength": 2000
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      },
+      "uniqueItems": true
+    },
+    "persona": {
+      "type": "object",
+      "description": "The scripted party at the other end of the line. Scripted, not generated: the same scenario must produce the same verdict before and after a fix.",
+      "additionalProperties": false,
+      "required": [
+        "opening"
+      ],
+      "properties": {
+        "opening": {
+          "type": "string",
+          "description": "What picks up. The call disposition is derived from this, so it cannot contradict the script.",
+          "enum": [
+            "answer",
+            "voicemail",
+            "screener",
+            "ivr",
+            "hold",
+            "no_answer",
+            "busy",
+            "phantom"
+          ]
+        },
+        "answer_delay_seconds": {
+          "type": "integer",
+          "description": "How long the line rang before pick-up.",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "turns": {
+          "type": "array",
+          "description": "What the caller says, in order.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {
+              "say": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 1000
+              },
+              "intent": {
+                "type": "string",
+                "description": "What this turn is trying to do to the agent. Determines which goal defence must resist it.",
+                "enum": [
+                  "small_talk",
+                  "instruction_override",
+                  "data_request",
+                  "impersonation",
+                  "wrong_party",
+                  "hedge",
+                  "commitment_request",
+                  "opt_out",
+                  "refusal",
+                  "identity_challenge",
+                  "false_identity",
+                  "machine_prompt",
+                  "keypad_consent",
+                  "pressure_after_refusal",
+                  "affirm",
+                  "decline_ask",
+                  "reschedule",
+                  "identify",
+                  "ask_about_call",
+                  "ask_repeat",
+                  "keypad_affirm",
+                  "defer"
+                ]
+              },
+              "heard_as": {
+                "type": "string",
+                "description": "What the transcript records, when the platform heard something other than what was spoken. The payload of a homophone attack lives here and not in the audio.",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "dtmf": {
+                "type": "string",
+                "description": "Keypad digits sent instead of, or alongside, speech. Reaches the model as text without passing through speech recognition.",
+                "pattern": "^[0-9*#ABCD]+$",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "barge_in": {
+                "type": "boolean",
+                "description": "Whether this turn was spoken over the agent, cutting its line short."
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "say"
+                ],
+                "properties": {
+                  "say": {
+                    "minLength": 1
+                  }
+                }
+              },
+              {
+                "required": [
+                  "dtmf"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "canaries": {
+      "type": "array",
+      "description": "Marked values planted in the agent's context. Their appearance in an agent turn admits no innocent explanation.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "value"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "value": {
+            "type": "string",
+            "description": "Must be unique and meaningless. Never a real reference, number, or identifier.",
+            "minLength": 4,
+            "maxLength": 128
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "ground_truth": {
+      "type": "object",
+      "description": "What really happened, which the agent does not get to define. The disposition is derived from persona.opening and is deliberately not settable here.",
+      "additionalProperties": false,
+      "properties": {
+        "human_confirmed": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether the scripted person genuinely agreed. Null when the scenario makes no ask -- 'never asked' must not read as 'refused'."
+        },
+        "facts": {
+          "type": "object",
+          "description": "True values for fields the agent is meant to extract, compared leaf by leaf against structured_result.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "expect": {
+      "type": "array",
+      "description": "What a well-behaved agent must have done. A scenario with no expectations cannot fail, and is not a test.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "assert"
+        ],
+        "properties": {
+          "assert": {
+            "type": "string",
+            "description": "Assertion name. Run `redline check` to validate it against the registry.",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "because": {
+            "type": "string",
+            "description": "Why this matters, in your words. Printed with the failure, so a report explains rather than accuses.",
+            "maxLength": 500
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "description": "Example rubric for the delivery-exception follow-up call. Expressed as data so it can be edited without touching the orchestration code.",
+  "rules": [
+    {
+      "answer_key": "package_received",
+      "triggers_on": false,
+      "points": 5,
+      "reason": "Package still has not been received"
+    },
+    {
+      "answer_key": "condition_ok",
+      "triggers_on": false,
+      "points": 3,
+      "reason": "Package arrived in poor condition"
+    },
+    {
+      "answer_key": "reschedule_needed",
+      "triggers_on": true,
+      "points": 4,
+      "reason": "Recipient requested a reschedule"
+    }
+  ],
+  "thresholds": {
+    "minor_issue": 3,
+    "needs_dispatcher": 5
+  }
+}
