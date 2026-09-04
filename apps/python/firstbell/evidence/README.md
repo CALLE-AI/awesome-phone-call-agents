@@ -18,6 +18,7 @@ file. `--include-transcript` is off by default for exactly that reason, and
 | `05-locale-pilot.json` | The pilot call of the locale experiment, run alone so a structural mistake would cost one call and not eight. |
 | `06-locale-matched-pairs.json` | Seven calls completing four matched pairs, the same scenario in `en-IN` and `ta-IN`. |
 | `07-locale-experiment.md` | The pre-registration, the twelve comparisons, the result, and every call mapped to CALL-E's own usage page by `provider_call_id`. |
+| `provider-ids.json` | Every API call id mapped to the id CALL-E's own dashboard and usage page are keyed on, so any call here can be checked against the vendor's billing. Rebuild with `tools/recover_provider_ids.py`, which only reads. |
 
 ## What each one is actually worth
 

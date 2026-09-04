@@ -1,5 +1,7 @@
 # firstbell
 
+**[Evidence page](https://firstbell-evidence.vercel.app)** &middot; every real call, every broken rule, and the offline run, generated from the files in this directory by `tools/judge_page.py`.
+
 Phones the families whose absence notification went unanswered, in the language that
 family speaks, and brings back a structured reason a school office can act on. Offline by
 default: the demo below dials nobody and needs no CALL-E account.
