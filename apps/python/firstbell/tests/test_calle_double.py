@@ -13,6 +13,7 @@ import pytest
 
 from calle_double import (
     API_ERROR_CODES,
+    ATTEMPT_SIP_CODES,
     ATTEMPT_STATUSES,
     CALL_STATUSES,
     RECIPIENT_STATUSES,
@@ -76,15 +77,27 @@ def test_calling_code_resolution_prefers_the_longer_prefix():
 # --------------------------------------------------------------------------
 
 def test_answered_returns_a_schema_valid_result(double, client):
+    """Where the result lands is decided by which schema the request carried.
+
+    This test used to send no schema at all and still assert that a schema-valid result
+    came back, off the per-recipient field. Both halves were wrong, and the double was
+    covering for them: there is nothing to extract against without a schema, and the
+    per-recipient field belongs to `recipient_result_schema`, which this call does not send.
+    Every call this project places sends `result_schema`, so this is the shape that matters.
+    """
     double.set_outcome("+9155500001", Outcome.answered(CONFIRMED, CHAT))
     created = client.calls.create(
         task="Ask why the student is absent.",
         recipient={"phone": "+9155500001"},
+        result_schema={"type": "object", "required": ["reason"]},
     )
     final = client.calls.wait_for_result(created["id"], interval_seconds=0)
 
     assert final["status"] == "completed"
-    assert final["recipients"][0]["structured_result"] == CONFIRMED
+    assert final["structured_result"] == CONFIRMED
+    assert final["recipients"][0]["structured_result"] is None, (
+        "no recipient_result_schema was sent, so there is no per-recipient result to give"
+    )
     turns = final["recipients"][0]["attempts"][0]["transcript_turns"]
     assert [t["speaker"] for t in turns] == ["bot", "user"]
     assert turns[1]["text"].startswith("He is unwell")
@@ -97,7 +110,11 @@ def test_no_answer_is_a_failure_not_an_empty_success(double, client):
 
     assert final["status"] == "failed"
     assert final["recipients"][0]["status"] == "failed"
-    assert final["recipients"][0]["attempts"][0]["failure_code"] == "no_answer"
+    # An attempt carries the numeric SIP code, not our symbolic name for the outcome. The
+    # one unanswered call this project recorded came back 603, and the double said
+    # "no_answer" here until the two were compared.
+    assert final["recipients"][0]["attempts"][0]["failure_code"] == "603"
+    assert final["failure_code"] == "call_failed", "the task level speaks the other vocabulary"
 
 
 def test_completed_with_null_result_is_a_distinct_third_outcome(double, client):
@@ -133,7 +150,7 @@ def test_second_guardian_answers_when_the_first_does_not(double, client):
     recipient = final["recipients"][0]
     assert recipient["status"] == "completed"
     assert len(recipient["attempts"]) == 2
-    assert recipient["attempts"][0]["failure_code"] == "no_answer"
+    assert recipient["attempts"][0]["failure_code"] == "603"
     assert recipient["attempts"][1]["status"] == "completed"
     assert double.dialled == ["+9155500001", "+9155500002"]
 
@@ -320,10 +337,14 @@ def test_the_http_server_serves_the_real_sdk_over_the_wire():
     try:
         client = CalleClient(api_key="iams_test_anything",
                              base_url=f"http://127.0.0.1:{port}")
-        created = client.calls.create(task="Ask.", recipient={"phone": "+9155500001"})
+        created = client.calls.create(
+            task="Ask.", recipient={"phone": "+9155500001"},
+            result_schema={"type": "object", "required": ["reason"]})
         final = client.calls.wait_for_result(created["id"], interval_seconds=0)
         assert final["status"] == "completed"
-        assert final["recipients"][0]["structured_result"] == CONFIRMED
+        # Task level, because the request carries result_schema and not
+        # recipient_result_schema. Same rule over a real socket as in process.
+        assert final["structured_result"] == CONFIRMED
         assert engine.dialled == ["+9155500001"]
     finally:
         server.shutdown()
@@ -433,4 +454,103 @@ def test_an_uncapped_dispatcher_is_caught_by_the_same_check():
     assert engine.peak_in_flight > 4, (
         "an uncapped dispatcher should blow past a cap of 4; if this fails the "
         "peak_in_flight metric is not measuring anything"
+    )# --------------------------------------------------------------------------
+# Does this double still look like the real thing
+# --------------------------------------------------------------------------
+
+def test_the_double_emits_every_field_the_real_api_returns():
+    """The shape of the double, checked against the shape production actually sent.
+
+    `test_enums_match_the_real_sdk` next door does this for the vocabulary. This does it
+    for the response body, and it is here because the answer was no. Four task-level
+    fields the API returns on every response were missing from the double, one of them
+    (`failure_code`) asserted on by a test that could therefore only ever run against a
+    recorded response. Offline, nothing noticed for the life of the project.
+
+    The comparison is deliberately lopsided. The left side is computed now, by driving
+    this double through every outcome it has. The right side is read from
+    `evidence/api-shape.json`, which was recorded from real responses held outside this
+    repository. So the recorded half is data and the live half is the thing under test,
+    and editing the double cannot make its own gate agree with it. A record that also
+    supplied the current behaviour would pass forever.
+
+    Extra paths in the double are fine: it models more than any eleven responses reached.
+    A path production returns and the double never emits is not fine, because code can
+    depend on it and every offline test would still be green.
+    """
+    import json
+    from pathlib import Path
+    import sys
+
+    app = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(app))
+    from tools.double_conformance import double_paths
+
+    record_path = app / "evidence" / "api-shape.json"
+    assert record_path.exists(), (
+        "evidence/api-shape.json is the recorded shape of the production API and this "
+        "test has nothing to check against without it"
     )
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    recorded = record["api_paths"]
+    assert len(recorded) > 20, (
+        f"only {len(recorded)} recorded paths, which is too few to be the real response "
+        "shape; the record was probably regenerated against an empty sample"
+    )
+    assert record["responses_compared"] >= 11, (
+        "the record claims fewer responses than were recorded, so it is not the one "
+        "this project measured"
+    )
+
+    mine = {path: sorted(types) for path, types in double_paths().items()}
+
+    missing = sorted(set(recorded) - set(mine))
+    assert not missing, (
+        "the production API returns these and the double never emits them, so no offline "
+        f"test can reach them: {missing}"
+    )
+
+    disagreed = sorted(
+        f"{path}: API sent {recorded[path]}, double sends {mine[path]}"
+        for path in set(recorded) & set(mine)
+        if not set(recorded[path]) & set(mine[path])
+    )
+    assert not disagreed, disagreed
+
+
+def test_an_attempt_carries_a_sip_code_and_the_task_carries_a_name(double, client):
+    """Two vocabularies, one per level, and the double used to speak only one.
+
+    A path-and-type comparison cannot catch this: both levels hold a string either way.
+    The double sent its own symbolic name on the attempt where production sends a numeric
+    SIP code, and the dispatcher's SIP table missed it, so the same unanswered call
+    produced one message offline and a different one against the real response.
+    """
+    double.set_outcome("+9155500001", Outcome.no_answer())
+    created = client.calls.create(task="Ask.", recipient={"phone": "+9155500001"},
+                                  result_schema={"type": "object", "required": ["reason"]})
+    final = client.calls.wait_for_result(created["id"], interval_seconds=0)
+
+    attempt_code = final["recipients"][0]["attempts"][0]["failure_code"]
+    assert attempt_code.isdigit(), (
+        f"an attempt should carry a numeric SIP code, not {attempt_code!r}"
+    )
+    assert final["failure_code"] == "call_failed"
+    assert final["failure_code"] not in ATTEMPT_SIP_CODES, (
+        "the task level speaks the symbolic vocabulary, not the wire one"
+    )
+
+
+def test_a_busy_line_and_a_switched_off_handset_can_still_be_modelled(double, client):
+    """One recorded code is one recorded code, so the others stay reachable and unclaimed.
+
+    Everything this project received back was 603. The API documents more, the dispatcher
+    translates more, and a double that could only produce the one code we happened to get
+    would make those translations untestable.
+    """
+    double.set_outcome("+9155500001", Outcome.no_answer(sip_code="486"))
+    created = client.calls.create(task="Ask.", recipient={"phone": "+9155500001"},
+                                  result_schema={"type": "object", "required": ["reason"]})
+    final = client.calls.wait_for_result(created["id"], interval_seconds=0)
+    assert final["recipients"][0]["attempts"][0]["failure_code"] == "486"
+

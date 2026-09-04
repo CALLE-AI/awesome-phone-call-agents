@@ -34,8 +34,11 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 24 | Keep a cited line number and change the symbol the sentence claims is on it | 1 |
 | 25 | Point the ten-minute reading order at a file that does not exist | 1 |
 | 26 | Delete the runtime anchors entirely, which a check written as "every anchor resolves" passes on an empty list | 2 |
+| 27 | Put the extracted result back on the recipient when no per-recipient schema was asked for | 1 |
+| 28 | Drop two task-level fields the production API returns on every response | 3 |
+| 29 | Give an attempt our symbolic name for the outcome instead of the wire code the API sends | 6 |
 
-## Why these twenty-six
+## Why these twenty-nine
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
@@ -59,6 +62,15 @@ would otherwise have to check by hand:
   looked weak when the mutation was at fault. Deleting the section properly fails two
   tests. The check asserts a minimum number of anchors as well as their correctness,
   because a rule that says "every citation resolves" is satisfied by having none.
+- **27 to 29** protect the double's likeness to the thing it stands in for, which is the
+  load-bearing assumption under every other number here. They were added after a shape
+  comparison against recorded production responses found the double wrong in three places
+  at once: it omitted four task-level fields the API always returns, it put the extracted
+  result where nothing had asked for it, and it spoke its own vocabulary on an attempt
+  where the API sends a numeric SIP code. 29 fails six tests, two of which are about the
+  words an administrator reads, so the divergence reached the product and not just the
+  fixtures. None of the twenty-six gates before them noticed any of it, because all
+  twenty-six were measured against the same wrong model.
 - **19 to 22** protect the one arithmetic claim this app makes about money. 19 is the
   important one: the difference between charging for every call and crediting only the
   records actually closed is the difference between an honest ratio and a brochure. 20

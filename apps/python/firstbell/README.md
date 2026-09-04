@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | Six receipts from real calls, each with a `call_id` you can match against CALL-E's own usage page, and a plain statement of whose phone answered | 2 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-six gates broken on purpose, with how many tests noticed each one | 2 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-nine gates broken on purpose, with how many tests noticed each one | 2 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -324,7 +324,7 @@ data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 103 tests
+python -m pytest tests/ -q          # 106 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

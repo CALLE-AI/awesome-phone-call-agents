@@ -53,6 +53,16 @@ FAILURE_CODES = (
     "result_failed", "result_invalid", "result_unavailable",
 )
 
+# What the API puts on an individual attempt. Not the vocabulary above: production sends a
+# numeric SIP response code there, and the symbolic names belong to the task level. The
+# double emitted symbolic names on attempts until a real response was compared against it.
+#
+# Only one of these has been seen from production. An unanswered call, watched ringing out
+# by the operator holding the phone, came back 603, which SIP calls "Decline". So the
+# platform does not distinguish a refusal from a ring-out, and neither does this double.
+ATTEMPT_SIP_CODES = ("603", "486", "480", "487", "503")
+OBSERVED_ATTEMPT_SIP_CODE = "603"
+
 
 class DoubleError(Exception):
     """Raised for a request the real API would reject. Carries a real error code."""
@@ -80,7 +90,12 @@ class Outcome:
     answers_on: int | None = 0
     structured_result: dict[str, Any] | None = None
     transcript: tuple[tuple[str, str], ...] = ()
+    # Why the failure is described twice. `failure_code` is what the outcome means, and the
+    # double uses it to decide the task's state. `sip_code` is what the API actually puts
+    # on the attempt. Keeping one field for both is how the double came to send a name
+    # production never sends.
     failure_code: str | None = None
+    sip_code: str = OBSERVED_ATTEMPT_SIP_CODE
     summary: str | None = None
 
     @staticmethod
@@ -90,12 +105,24 @@ class Outcome:
                        transcript=tuple(transcript), summary=summary)
 
     @staticmethod
-    def no_answer() -> "Outcome":
-        return Outcome(answers_on=None, failure_code="no_answer")
+    def no_answer(*, sip_code: str = OBSERVED_ATTEMPT_SIP_CODE) -> "Outcome":
+        """Nobody picks up. The wire code defaults to the one production was seen to send.
+
+        Pass `sip_code` to model a line that is busy (486) or a handset that is switched
+        off (480). Those codes are in the API's documented range and this project has not
+        received either, so they are available and not assumed.
+        """
+        return Outcome(answers_on=None, failure_code="no_answer", sip_code=sip_code)
 
     @staticmethod
-    def declined() -> "Outcome":
-        return Outcome(answers_on=None, failure_code="declined")
+    def declined(*, sip_code: str = OBSERVED_ATTEMPT_SIP_CODE) -> "Outcome":
+        """Someone actively refuses.
+
+        Indistinguishable from `no_answer` on the wire in everything recorded so far: both
+        arrive as 603. The two constructors are kept apart because they mean different
+        things to a school office, not because the platform tells them apart.
+        """
+        return Outcome(answers_on=None, failure_code="declined", sip_code=sip_code)
 
     @staticmethod
     def ambiguous(transcript: Iterable[tuple[str, str]],
@@ -182,6 +209,14 @@ class _CallTask:
     status: str = "queued"
     events: list[dict[str, Any]] = field(default_factory=list)
     canceled: bool = False
+    # Task-level fields the production API returns on every response, populated when the
+    # task finishes. They were missing here until a shape comparison against recorded
+    # responses found them: see tools/double_conformance.py and evidence/api-shape.json.
+    completed_at: datetime | None = None
+    summary: str | None = None
+    structured_result: dict[str, Any] | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         done = [r for r in self.recipients if r.status == "completed"]
@@ -199,11 +234,18 @@ class _CallTask:
                 {"score": 0.9, "label": "high"} if self.status == "completed" else None
             ),
             "evidence": [r.summary for r in done if r.summary],
-            "structured_result": (
-                self.recipients[0].structured_result if self.recipients else None
-            ),
+            # Not derived from the recipients. In all 11 recorded production responses the
+            # extracted result sits here and the per-recipient field is null, so reading it
+            # off recipient zero was a guess that happened to match the first version of
+            # our own reader. Both were wrong in the same direction, which is why the
+            # offline suite could not see it.
+            "structured_result": self.structured_result,
             "recipients": [r.to_json() for r in self.recipients],
             "metadata": self.metadata,
+            "summary": self.summary,
+            "completed_at": _iso(self.completed_at),
+            "failure_code": self.failure_code,
+            "failure_message": self.failure_message,
         }
 
 
@@ -220,7 +262,7 @@ class CalleDouble:
     """
 
     def __init__(self, *, auto_advance: bool = True, now: datetime | None = None,
-                 latency_seconds: float = 0.0) -> None:
+                          latency_seconds: float = 0.0) -> None:
         """`latency_seconds` makes each request take real time.
 
         Left at zero the double answers in microseconds, which is fine for logic tests
@@ -481,7 +523,11 @@ class CalleDouble:
             attempt.transcript = outcome.transcript
             attempt.summary = outcome.summary or "Reached the contact."
             recipient.status = "completed"
-            recipient.structured_result = outcome.structured_result
+            # A per-recipient result exists only if one was asked for. Every call this
+            # project places sends `result_schema` and not `recipient_result_schema`,
+            # which is the whole reason the recorded responses carry null here.
+            if call.recipient_result_schema is not None:
+                recipient.structured_result = outcome.structured_result
             recipient.summary = attempt.summary
             if outcome.structured_result is None:
                 self._log(call, "warning", "call.result_validation_failed",
@@ -491,8 +537,9 @@ class CalleDouble:
         # Nobody home on this number. Walk the fallback chain.
         attempt.status = "failed"
         attempt.completed_at = self._now + timedelta(seconds=25)
-        attempt.failure_code = outcome.failure_code or "no_answer"
-        attempt.failure_message = "The call was not answered."
+        # The wire code, not the meaning. See ATTEMPT_SIP_CODES.
+        attempt.failure_code = outcome.sip_code
+        attempt.failure_message = f"calling task status=DECLINED (code {outcome.sip_code})"
         recipient._cursor += 1
         if recipient._cursor >= len(recipient.phones):
             recipient.status = "failed"
@@ -502,6 +549,20 @@ class CalleDouble:
         self._in_flight.discard(call.id)
         any_completed = any(r.status == "completed" for r in call.recipients)
         call.status = "completed" if any_completed else "failed"
+        call.completed_at = self._now
+        answered = [r for r in call.recipients if r.status == "completed"]
+        # One recipient answering means the task result is unambiguously theirs, which is
+        # what every recorded response shows. Several answering means the API has no way to
+        # say whose answer this is, and no recorded response covers it, so the double leaves
+        # it null rather than picking one. The dispatcher refuses to attribute it either.
+        if call.result_schema is not None and len(answered) == 1:
+            call.structured_result = answered[0].outcome.structured_result
+        if any_completed:
+            call.summary = f"Reached {len(answered)} of {len(call.recipients)} recipient(s)."
+        else:
+            call.summary = "No recipient was reached."
+            call.failure_code = "call_failed"
+            call.failure_message = "The call task did not reach any recipient."
         self._log(call, "info", f"call.{call.status}", {})
         if call.webhook_url:
             unresolved = [

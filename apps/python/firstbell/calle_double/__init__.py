@@ -9,6 +9,7 @@
 
 from .engine import (
     API_ERROR_CODES,
+    ATTEMPT_SIP_CODES,
     ATTEMPT_STATUSES,
     CALL_STATUSES,
     FAILURE_CODES,
@@ -16,6 +17,7 @@ from .engine import (
     WEBHOOK_EVENTS,
     CalleDouble,
     DoubleError,
+    OBSERVED_ATTEMPT_SIP_CODE,
     Outcome,
 )
 from .transport import build_client, build_transport
@@ -25,4 +27,5 @@ __all__ = [
     "build_client", "build_transport",
     "CALL_STATUSES", "RECIPIENT_STATUSES", "ATTEMPT_STATUSES",
     "WEBHOOK_EVENTS", "API_ERROR_CODES", "FAILURE_CODES",
+    "ATTEMPT_SIP_CODES", "OBSERVED_ATTEMPT_SIP_CODE",
 ]
