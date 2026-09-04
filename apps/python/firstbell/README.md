@@ -219,11 +219,16 @@ The suite covers the double's fidelity to the documented API, the dispatcher's
 classification and cancellation, consent, masking, and the live branch end to end against
 the double's HTTP server so that branch is not dead code.
 
-Each gate was checked by breaking it on purpose and confirming it fails. Removing the
-concurrency cap fails 4 tests, disabling the consent check fails 3, dropping one real
-error code from the double fails 3, and matching the production host by substring instead
-of hostname fails the mode test on a look-alike domain. A gate that has never been
-observed to fail has not been shown to test anything.
+Each gate was checked by breaking it on purpose and confirming it fails. Thirteen of them,
+listed one by one in `evidence/MUTATIONS.md` with the change made and the number of tests
+that caught it: removing the concurrency cap fails 4, disabling the consent check fails 3,
+dropping one real error code from the double fails 3, and matching the production host by
+substring instead of hostname passes a look-alike domain and fails the mode test.
+
+A gate that has never been observed to fail has not been shown to test anything. What
+mutation testing does not cover is written down in that file too: it shows a test notices a
+change, not that the rule is the right rule. Both defects found in this project during live
+calls were of the second kind.
 
 ## What this does not claim
 
