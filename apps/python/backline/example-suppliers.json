@@ -1,0 +1,10 @@
+{
+  "item": "oat milk, 1L bottles, 12 to a case",
+  "qty": "6",
+  "unit": "case",
+  "suppliers": [
+    {"name": "Northgate Dairy Supply", "phone_e164": "+15550100", "language": "English", "region": "US"},
+    {"name": "Riverside Wholesale Foods", "phone_e164": "+15550101", "language": "English", "region": "US"},
+    {"name": "Old Mill Distributors", "phone_e164": "555-0102", "language": "English", "region": "US"}
+  ]
+}
