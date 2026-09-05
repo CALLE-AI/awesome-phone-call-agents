@@ -20,19 +20,26 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-Thirty-four rows were re-measured on 5 September 2026 by applying each change, running the
-suite and restoring: rows 1 to 15, 18 to 20, 22 to 24, 29, 31, 32, 34 to 40 and 42 to 44.
-Twenty-seven matched. Seven did not and are corrected above: row 2 (three to five), row 3
+Thirty-seven rows were re-measured on 5 September 2026 by applying each change, running the
+suite and restoring: rows 1 to 15, 18 to 24, 27 to 29, 31, 32, 34 to 40 and 42 to 44.
+Twenty-eight matched. Nine did not and are corrected above: row 2 (three to five), row 3
 (three to four), row 7 (one to three), row 8 (one to twenty, because removing the task-level
 fallback stops the demonstration answering at all), row 19 (three to four), row 20 (one to
-three) and row 29 (six to seven). The remaining ten rows have not been re-measured: 16, 17,
-21, 25, 26, 27, 28, 30, 33 and 41.
+three), row 27 (one to two), row 28 (three to two) and row 29 (six to seven). The remaining
+seven rows have not been re-measured: 16, 17, 25, 26, 30, 33 and 41.
 
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
 the published number was right: the row says the poll is left *unprotected*, and catching
 nothing at all is the faithful reading. A count below what is published usually means the
 change made was narrower than the words describing it, not that the row is wrong.
+
+Row 28 is the case where a lower number was the right one. Dropping `task_completed` and
+`completion_confidence` fails two tests, not the three published, and both of them belong to
+the rule: one asks whether the double emits every field the real API returns, the other
+whether the authored fixtures match what the generator produces. Those two fields are the
+ones the row names because both appear in all three recorded production responses under
+`tests/data`. The published three had been written when the suite was shaped differently.
 
 A measured zero is a different thing again, and it means the change was not made where the
 row says. Two of the rows above returned zero on a first attempt at reproducing them. Row 7
@@ -69,8 +76,8 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 24 | Keep a cited line number and change the symbol the sentence claims is on it | 1 |
 | 25 | Point the ten-minute reading order at a file that does not exist | 1 |
 | 26 | Delete the runtime anchors entirely, which a check written as "every anchor resolves" passes on an empty list | 2 |
-| 27 | Put the extracted result back on the recipient when no per-recipient schema was asked for | 1 |
-| 28 | Drop two task-level fields the production API returns on every response | 3 |
+| 27 | Put the extracted result back on the recipient when no per-recipient schema was asked for | 2 |
+| 28 | Drop two task-level fields the production API returns on every response | 2 |
 | 29 | Give an attempt our symbolic name for the outcome instead of the wire code the API sends | 7 |
 | 30 | Commit an image rendered from the call recordings, which no text check can read | 1 |
 | 31 | Store a vendor error message unchanged, when that message quotes the number it rejected | 2 |
