@@ -441,21 +441,27 @@ canvas[data-waveform] {
   gap: 0 0.75rem;
   padding: 0.45rem 0;
   border-top: 1px solid var(--line);
-  transition: opacity var(--dur-micro) var(--ease-both);
+  border-left: 2px solid transparent;
+  padding-left: 0.5rem;
+  transition: border-left-color var(--dur-micro) var(--ease-both),
+              transform var(--dur-micro) var(--ease-both);
 }
-.turns li { opacity: 0.42; }
-.turns li[data-rel="ahead"] { opacity: 0.42; }
-html:not([data-ready]) .turns li { opacity: 0.72; }
+/* Opacity is not the channel for this. The dimming pointed at the line being spoken, and
+ * it was first fixed only for the build with no audio, where no playhead runs and every
+ * line sat dim forever. That left the build a judge actually opens, the one with the
+ * recordings, still dimming its own evidence: turn-at measured 1.77 and a Tamil turn 2.49,
+ * against a floor of 4.5. It cannot be tuned back into range either. --ink-3 on paper is
+ * 5.10 at full strength, so the least dim that still clears AA is 0.94, which is not a
+ * state anyone can see. The tracking cue moves to the marker below, which carries no text.
+ * Both builds now read the same, and the transcript is legible at every playhead position. */
+.turns li { opacity: 1; }
 
-/* Unless there is nothing to play. The dimming exists to point at the line being spoken,
- * and every line is marked ahead until a playhead passes it. With the recordings out of
- * the repository no playhead ever runs, so every line of every transcript sat at 0.42
- * forever: 1.07 against the paper, where 4.5 is the floor. The transcript is the evidence
- * this page is built on, so with no audio it is set to be read rather than tracked. */
-html[data-audio="absent"] .turns li,
-html[data-audio="absent"] .turns li[data-rel="ahead"] { opacity: 1; }
-.turns li[data-rel="past"]  { opacity: 0.72; }
-.turns li[data-rel="now"]   { opacity: 1; }
+/* The live colour, used the same way the filing list uses it: this is the line being
+ * spoken. A border and a nudge, so nothing about the text itself changes as it plays. */
+.turns li[data-rel="now"] {
+  border-left-color: var(--live-mark);
+  transform: translateX(3px);
+}
 .turns li[data-who="bot"] .turn-who { color: var(--ink-3); }
 .turn-at  { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3); padding-top: 0.15em; }
 .turn-who {
