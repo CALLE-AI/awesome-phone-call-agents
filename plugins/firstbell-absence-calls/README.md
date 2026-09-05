@@ -49,15 +49,32 @@ and returns shaped responses that include both of the awkward outcomes above, so
 routing can be seen working before anything rings.
 
 ```
-node --test examples/classify.test.mjs     # 14 passing
-node examples/build-workflow.mjs           # regenerate the workflow
+node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 21 passing
+node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
+
+Name both files. `node --test examples/` resolves the directory as a module on node 22.23.2
+and fails before it reads a test, which looks exactly like a broken suite and is not one.
 
 The workflow JSON is generated rather than hand-edited. `examples/classify.mjs` holds the
 classifier so it can be run by `node --test` with no n8n installed, and
 `build-workflow.mjs` inlines it into the `Classify Outcome` node. One of the tests fails if
 the shipped workflow and the tested module ever drift apart, because otherwise they are two
 things that merely started out the same.
+
+## What the shape tests do and do not prove
+
+The other seven tests read the generated workflow the way n8n's importer does. They check the
+two collections it loads from, the five fields it draws each node with, that no connection
+names a node that is not in the file, that something can start the workflow, that no node is
+stranded, and that no credential is baked in. A workflow can be well-formed JSON, pass every
+classifier test, and still be refused on load because a node was renamed and one reference
+was missed.
+
+They do not prove it imports. Only an n8n instance proves that, and there is none here. What
+they rule out is the class of defect that would stop an import and can rot quietly while
+nobody is looking. Each of the five was confirmed by breaking the workflow that way and
+watching the suite go red.
 
 ## Install
 
