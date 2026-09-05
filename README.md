@@ -214,6 +214,8 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/callsweep`](apps/typescript/callsweep/) | TypeScript | Calls many local businesses, haggles each one down toward your budget on the call, ranks their offers by the best overall deal (price, what's included, availability), and books the one you pick. Dry-run no-call path by default with fictional sample shops. |
 | [`apps/python/casechaser`](apps/python/casechaser/) | Python | Chases an open claim, refund, repair, or delivery case to closure: every company promise becomes a dated, quoted commitment, broken ones climb a fixed escalation ladder, offers and denials stop at the customer, and a masked evidence pack is ready for the written complaint. Fixture mode by default. |
 
+- [VERIFY](https://github.com/DivineDomokuma10/verifyam) - Disclosed listing-verification app that calls the agent or landlord behind a rental ad and returns a schema-validated transcript-backed claim (Verified/Warning/Inconclusive) with transcript evidence and an optional mock mode. Verdicts represent transcript-supported assessments, not independent authority verification.
+
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
 ### Plugins
