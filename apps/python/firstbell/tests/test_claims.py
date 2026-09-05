@@ -449,3 +449,64 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
     # And the same commit is the first one touching this directory, asked a second way, so
     # the claim is about this app rather than about whatever the pathspec happens to name.
     assert _first_commit_touching(".", APP).split()[0] == claimed_hash
+# Every test allowed to skip, and why. A skip is a real third outcome in this project and it
+# is the one that hides: under `-q` it prints the same dot a pass does. Both entries below
+# need an artifact that is deliberately not in the repository, so they cannot be made to run
+# on a clean checkout without committing the thing the privacy rules keep out.
+GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # This one skips on a clean checkout today.
+    "test_every_real_result_the_readme_promises_is_on_the_page":
+        "reads out/index.html, which is built from receipts held outside this repository",
+    # These three guard the committed images, so they go quiet exactly when there are none
+    # to guard, which is the moment an image gate is easiest to lose by accident. Only the
+    # second one skipped in the run this register was written against, and it has two
+    # separate skip conditions rather than one.
+    "test_every_committed_image_is_declared":
+        "skips when no image is committed, which is the state it exists to stop returning to",
+    "test_no_committed_image_was_rendered_from_the_call_recordings":
+        "skips when no image is committed, and again when there is no locally built page or "
+        "gate screenshot to compare against; this is the gate written after a committed "
+        "screenshot published twelve real call ids and twelve real billing ids",
+    "test_the_tool_that_makes_the_stills_cannot_see_a_recording":
+        "skips when the still tool is absent, so deleting the tool would silence it",
+}
+
+
+def test_no_gate_skips_without_saying_so():
+    """A new silent skip cannot be added without this failing.
+
+    The suite reports `237 passed, 2 skipped` and a reviewer reading `-q` output sees 239
+    dots. That is the shape of a gate that quietly stopped running, which is the failure this
+    whole project is written against, so the two that cannot run are named above and any
+    third one has to be argued for rather than merely added.
+    """
+    import ast
+
+    skipping = {}
+    for path in sorted((APP / "tests").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for inner in ast.walk(node):
+                call = inner.value if isinstance(inner, ast.Expr) else inner
+                if not isinstance(call, ast.Call):
+                    continue
+                func = call.func
+                name = (f"{func.value.id}.{func.attr}"
+                        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
+                        else getattr(func, "id", ""))
+                if name in ("pytest.skip", "skip"):
+                    skipping.setdefault(node.name, path.name)
+
+    undeclared = sorted(set(skipping) - set(GATES_THAT_CANNOT_ALWAYS_RUN))
+    assert not undeclared, (
+        "these tests can skip and no reason is recorded for them: "
+        + ", ".join(f"{n} ({skipping[n]})" for n in undeclared)
+    )
+
+    stale = sorted(set(GATES_THAT_CANNOT_ALWAYS_RUN) - set(skipping))
+    assert not stale, (
+        "these are declared as unable to run and no longer skip, so the note is now wrong: "
+        + ", ".join(stale)
+    )

@@ -20,6 +20,25 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
+**Every machine-applicable row was re-measured again on 6 September 2026**, against a suite
+that had grown to 239 tests. Thirty-seven rows can be applied by a script. Twenty-nine came
+back exactly as published. Eight had moved, all upward: row 2 (five to eight), row 4 (one to
+two), row 7 (three to seven), row 8 (twenty to twenty-two), row 20 (three to four), row 32
+(two to four), row 39 (one to three) and row 40 (one to two). Every one of the eight is the
+suite growing, not a rule changing. Five of the thirty-seven had to be re-anchored first,
+because the exact line each one mutates had been rewritten since the row was written; the
+rules themselves are all still present and still gated.
+
+That run is worth reading twice, because the first attempt at it was wrong in a way this
+table exists to catch. An earlier interrupted run had left one mutation applied in the working
+tree, so the suite was already two tests red before anything was changed. The harness captured
+that file as its own baseline, reported that all thirty-one measurable rows had moved and
+every one upward, and printed "all files restored: True". All of it was the leftover mutation.
+A restore check that compares against your own capture cannot see a defect that was already
+there when you captured it. Re-run against a green baseline, twenty-nine of the thirty-seven
+rows reproduced their published values exactly. The table had been right, and publishing that
+first result would have replaced twenty-nine correct numbers with wrong ones.
+
 **Rows 1 to 44 were all re-measured on 5 September 2026** by applying each change,
 running the suite and restoring. Thirty-four matched what was published. Ten did not and are
 corrected above: row 2 (three to five), row 3 (three to four), row 7 (one to three), row 8
@@ -63,13 +82,13 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | # | The change | Tests that failed |
 |---|---|---|
 | 1 | `max_workers=self._concurrency` becomes `max_workers=None`, removing the concurrency cap | 4 |
-| 2 | `if not item.consented:` becomes `if False:`, disabling the consent gate | 5 |
+| 2 | `if not item.consented:` becomes `if False:`, disabling the consent gate | 8 |
 | 3 | Drop `insufficient_balance` from the double's `API_ERROR_CODES` | 4 |
-| 4 | Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 1 |
+| 4 | Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 2 |
 | 5 | Write the transcript into every receipt instead of only when `--include-transcript` is given | 1 |
 | 6 | Prefer the attempt's raw SIP code over the task's symbolic one, putting `603` in front of an administrator | 1 |
-| 7 | Delete the SIP translation table, so a queue row reads `the call failed with 603` | 3 |
-| 8 | Stop falling back to the task-level `structured_result`, which is the defect a real call exposed | 20 |
+| 7 | Delete the SIP translation table, so a queue row reads `the call failed with 603` | 7 |
+| 8 | Stop falling back to the task-level `structured_result`, which is the defect a real call exposed | 22 |
 | 9 | Allow that fallback for fan-out too, which would file one family's answer against another family's child | 1 |
 | 10 | Remove the check for a result whose required fields are all uninformative | 1 |
 | 11 | Flag a result if *any* required field is unknown rather than *all* of them | 1 |
@@ -81,7 +100,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
 | 18 | Compute `reached_production_api` from the configured base URL alone, so a run that exchanged no bytes with CALL-E still reports that it reached production | 1 |
 | 19 | Credit every attempt to the machine instead of only the attempts behind records it closed, so calls that left a family unreached still count as staff time saved | 4 |
-| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 3 |
+| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 4 |
 | 21 | Wrap the citation like prose, so the source URL breaks mid-path and the reader cannot open the thing the number came from | 3 |
 | 22 | Drop `source` from the wage validation, so a staff cost can be asserted with no provenance at all | 1 |
 | 23 | Shift one cited line number by one, the way any edit above it would | 1 |
@@ -93,15 +112,15 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 29 | Give an attempt our symbolic name for the outcome instead of the wire code the API sends | 7 |
 | 30 | Commit an image rendered from the call recordings, which no text check can read | 1 |
 | 31 | Store a vendor error message unchanged, when that message quotes the number it rejected | 2 |
-| 32 | Leave the completion poll unprotected, so one failed read discards a call that was placed | 2 |
+| 32 | Leave the completion poll unprotected, so one failed read discards a call that was placed | 4 |
 | 33 | Put one backspace byte inside a committed source file, which no editor or diff displays | 1 |
 | 34 | Leave a real CALL-E error code in none of the three classification sets | 1 |
 | 35 | Let one dispatcher instance run twice, inheriting the first run's cancellation | 1 |
 | 36 | Accept two work items sharing an id, so one idempotency key covers both | 2 |
 | 37 | Read a service clock an hour behind ours as a definite replay rather than unknown | 1 |
 | 38 | Write the structured result to the receipt unmasked, which is how it shipped until this was fixed | 1 |
-| 39 | Drop the comma from the separator class, so a number a vendor groups with commas is left whole | 1 |
-| 40 | Let a `calls.create` timeout fall through to the catch-all, which is how it shipped until this was fixed: no retry, and a call that may have been placed recorded as FAILED | 1 |
+| 39 | Drop the comma from the separator class, so a number a vendor groups with commas is left whole | 3 |
+| 40 | Let a `calls.create` timeout fall through to the catch-all, which is how it shipped until this was fixed: no retry, and a call that may have been placed recorded as FAILED | 2 |
 | 41 | Cite in `docs/images/README.md` the line the caption used to name, which is how both stills shipped | 1 |
 | 42 | Type a window bound back into the still generator instead of looking it up | 1 |
 | 43 | Accept `RetryPolicy(max_attempts=0)`, whose create loop never runs, so every item comes back FAILED with an empty reason about a run that dialled nobody | 1 |
@@ -127,6 +146,9 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 63 | Have the README promise eight results on the page when the page carries eleven | 1 |
 | 64 | Change one `unknown` answer in the built page to `yes`, so four of the five countable non-yes answers remain | 1 |
 | 65 | Leave one whole provider id in the built page, in a comment the layout never shows, which is what a leak looks like when it is not in a visible column | 1 |
+| 66 | Teach another gate to skip and declare it nowhere, which is how a gate stops running without anybody deciding that it should | 1 |
+| 67 | Drop a gate that still skips out of the register, so the suite goes quiet about one it already knew about | 1 |
+| 68 | Declare a gate as unable to run when it runs perfectly well, because a register nobody prunes becomes a list of excuses | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -136,6 +158,14 @@ mentioning the fields existed, not that it did anything. Row 62 survived, the ga
 changed to name the assignment exactly and to read the built page rather than only the
 source that builds it, and row 62 then failed as it should. It is recorded here as a killed
 row because that is what it is now, and the paragraph is the honest part.
+
+Rows 66 to 68 cover the register of gates that cannot always run. A skipped test prints the
+same dot a passing one does under `-q`, so `240 passed` and `238 passed, 2 skipped` look
+alike to anyone not reading `-rs`. The register names every gate that can skip and why, and
+fails if a new one appears or a declared one stops skipping. It found three more than the run
+did on its first execution, because those three skip only when no image is committed and this
+tree has images. It also caught a name in its own declaration that belongs to no function in
+the suite: I had copied it out of a skip message rather than out of the code.
 
 Row 65 is the same lesson from the other side. The half of that gate which reads the built
 page rather than the source had a `\b` in its pattern that a shell heredoc turned into byte
@@ -152,7 +182,7 @@ added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every num
 repository is checked. Row 58 is the same planted number after the scope was widened. The
 pair is the proof, and neither row means anything without the other.
 
-## Why these sixty-five
+## Why these sixty-eight
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

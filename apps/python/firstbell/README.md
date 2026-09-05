@@ -13,7 +13,7 @@ python -m firstbell --work-file examples/absences.csv
 
 ## If you have fifteen minutes
 
-Read these six files in this order. Between them they contain every claim this directory
+Read these seven files in this order. Between them they contain every claim this directory
 makes, and each one can be checked without an API key.
 
 | # | File | What it settles | Time |
@@ -21,9 +21,10 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Sixty-five gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Sixty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
+| 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
 
 ### Where CALL-E is called at runtime
 
@@ -408,6 +409,22 @@ twenty-six were measured against the same wrong model. `tests/test_privacy.py` k
 recording from coming back, and found two files a manual pass had missed, one of them a
 real billing id used as an example in the documentation.
 
+You can check the first one without the recordings, and this is the command to use:
+
+```bash
+python tools/double_conformance.py --check      # PASS, exit 0, on a clean checkout
+```
+
+That reads `evidence/api-shape.json`, which is the committed record of every key path and
+JSON type the production API returned, and confirms the double still emits all of them. Path
+names and type names only, so it carries no conversation, no number and no id, which is why
+it is publishable when the responses behind it are not.
+
+Run it without `--check` and it wants the recordings, does not find them, and exits 3 saying
+`could-not-measure`. That is the correct answer to a question it cannot answer, and it is not
+a failure. A reader who takes exit 3 for a broken tool has been told the wrong thing by this
+file, which is why the command above is now written down rather than described.
+
 ### American statistics, Indian phone numbers
 
 The duty is documented in the US and England, so that is where the problem is argued from.
@@ -426,7 +443,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 239 tests
+python -m pytest tests/ -q          # 240 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -512,9 +529,10 @@ is a thing you can describe well enough to be refused.
    or Arbor reader is one class and no change to the dispatcher.
 
 3. **Platform-side call termination.** The escape hatch is instructed and not enforced
-   because CALL-E exposes no `end_call`, no `max_turns` and no maximum duration. Filed
-   upstream as a defect report; until it is answered a prompt is the only lever, and it is
-   not binding.
+   because CALL-E exposes no `end_call`, no `max_turns` and no maximum duration. Written up
+   with the other seven platform findings in
+   [`call-e-feedback.md`](call-e-feedback.md); until it is answered a prompt is the only
+   lever, and it is not binding.
 
 4. **A locale comparison that survives its own control.** A written script per language,
    agreed before dialling, and more than one speaker. The matched pairs failed on two of
