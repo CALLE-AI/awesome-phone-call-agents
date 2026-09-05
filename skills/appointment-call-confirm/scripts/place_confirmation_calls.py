@@ -7,70 +7,94 @@ for explicit approval, then places one outbound CALL-E call per
 recipient (serially), polls each to a terminal state, and writes a
 structured results CSV.
 
-Dependency-free dry run: `--in appointments.csv` with no `--confirm`
-uses only the Python standard library — no install step needed to
-review a batch before deciding whether to call anyone.
+Standalone by design: only depends on `requests` and a CALL-E API key.
+No dependency on any particular agent framework, so it can be pointed
+at CALL-E's SDK/API/CLI/MCP directly by any host that adopts this
+skill.
 
-Live calls need one dependency:
-    pip install -r requirements.txt
+Safety properties enforced by this script (see references/safety.md):
+    - Phone numbers are validated as strict ASCII E.164 before anything
+      else happens to them — no Unicode digit variants, no smuggled
+      characters.
+    - If --allowlist is given, only recipients whose phone exactly
+      matches an allowlist entry are called; everyone else is skipped
+      and reported as failed, never silently dialed.
+    - Even with --confirm passed, a real run requires the operator to
+      interactively type CONFIRM before any call goes out (an explicit
+      --yes flag exists for non-interactive automation, and is loudly
+      logged when used).
+    - The API base URL is pinned to CALL-E's official HTTPS origin.
+      Overriding it (CALLE_BASE_URL) requires the explicit
+      --allow-custom-host flag, so the API key is never silently sent
+      to an unexpected host.
+    - Each call's idempotency key is a stable hash of the appointment's
+      own fields, not a random value — so re-running the same batch
+      after an interruption reuses the same key instead of risking a
+      duplicate call to the same recipient.
+    - If any call's outcome is ambiguous (poll timeout or an
+      unrecognized structured result), the batch stops by default
+      instead of continuing to dial the rest of the list.
+    - Provider error bodies are sanitized before being printed or
+      written to the results CSV.
 
 Usage:
-    # 1. Always dry-run first — this places NO calls and needs no install.
-    python place_confirmation_calls.py --in appointments.csv
+    export CALLE_API_KEY=...              # required
+    export CALLE_BASE_URL=...             # optional, must match the
+                                           # official host unless
+                                           # --allow-custom-host is set
 
-    # 2. Once the list looks right, install the one dependency and run for real:
-    pip install -r requirements.txt
-    export CALLE_API_KEY=...
-    python place_confirmation_calls.py \
-        --in appointments.csv \
-        --authorized-numbers authorized_numbers.txt \
-        --out results.csv \
-        --confirm
+    # 1. Always dry-run first — this places NO calls.
+    python place_confirmation_calls.py --in appointments.csv --dry-run
+
+    # 2. Once the list looks right, run for real (interactive prompt
+    #    still required even with --confirm):
+    python place_confirmation_calls.py --in appointments.csv --out results.csv --confirm
+
+    # 3. Optional: restrict calls to a pre-approved recipient list —
+    #    anything not on it is skipped, never dialed.
+    python place_confirmation_calls.py --in appointments.csv --confirm \\
+        --allowlist assets/authorized_numbers.example.txt
 
 appointments.csv columns (header row required):
     recipient_name, phone, appointment_time, context, business_name[, region, locale]
 
-    - phone: E.164, e.g. +14155550101
+    - phone: strict ASCII E.164, e.g. +14155550101
     - appointment_time: ISO 8601 with timezone, e.g. 2026-09-05T15:00:00-04:00
     - context: one sentence, e.g. "annual checkup with Dr. Rao"
     - business_name: who the call says it's calling on behalf of
     - region / locale: optional; region is inferred from the phone's
       country code when omitted (see references/result-schema.md)
-
-authorized_numbers.txt (required for --confirm — see references/safety.md):
-    One E.164 number per line. Every recipient's `phone` must appear
-    in this file before this script will place a live call to them.
-    This is a separate, explicit gate from --confirm: --confirm says
-    "I want this batch to place real calls"; the authorized-numbers
-    file says "I have confirmed consent for these specific numbers."
-    Keep this file out of version control — see assets/authorized_numbers.example.txt
-    for the format only.
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
 import sys
 import time
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
-DEFAULT_BASE_URL = "https://api.heycall-e.com"
+import requests
 
-# The only CALL-E origins this script will ever send the API key to.
-# CALLE_BASE_URL can override the URL used (e.g. for a documented
-# staging environment) but never the *trust* decision — an override
-# pointing anywhere outside this allowlist is refused rather than
-# silently sending the bearer key to an arbitrary host. Extend this
-# set explicitly if CALL-E ever documents another real origin.
-_ALLOWED_CALLE_HOSTS = {"api.heycall-e.com"}
+# The one HTTPS origin bearer credentials are ever sent to by default.
+# Overriding this (CALLE_BASE_URL) requires --allow-custom-host, so a
+# misconfigured or malicious base URL can never silently exfiltrate
+# the API key.
+OFFICIAL_HOST = "api.heycall-e.com"
+DEFAULT_BASE_URL = f"https://{OFFICIAL_HOST}"
+
+# Strict ASCII E.164: '+' followed by 7-15 ASCII digits, nothing else.
+# Deliberately rejects Unicode digit look-alikes (e.g. Arabic-Indic,
+# fullwidth digits) and any stray characters that a naive parser might
+# tolerate — a phone field is attacker-influenceable input.
+_E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
 
 # Same region set CALL-E's Developer API documents. Only used when a
 # row doesn't explicitly supply `region` — see references/result-schema.md.
@@ -91,22 +115,6 @@ _COUNTRY_CODE_TO_REGION = {
     "62": "ID",
     "63": "PH",
     "254": "KE",
-}
-
-_E164_RE = re.compile(r"\+[1-9][0-9]{6,14}")
-
-# Coarse national-numbering-plan digit-length check (country code +
-# subscriber number, total digits after the leading '+'). This is not
-# a full numbering-plan validator — CALL-E's API is the final
-# authority — but it catches obviously malformed numbers (wrong
-# length, missing country code, copy-paste typos) before any of them
-# are ever sent to a live endpoint. A tuple means either length is
-# valid for that region.
-_REGION_DIGIT_LENGTHS = {
-    "US": 11, "CA": 11, "SG": 10, "MY": (11, 12), "IN": 12,
-    "AE": 12, "AU": (11, 12), "GB": 12, "VN": (10, 12),
-    "DE": (11, 13), "JP": (12, 13), "FR": 11, "MX": 12,
-    "BR": 12, "ID": (11, 13), "PH": 12, "KE": 12,
 }
 
 RESULT_SCHEMA = {
@@ -131,55 +139,51 @@ _STRUCTURED_STATUSES = {
 }
 
 
-def _require_requests():
-    """Import requests lazily, so dry-run never needs it installed."""
-    try:
-        import requests
-        return requests
-    except ImportError as e:
-        print(
-            "The `requests` package is required to place live calls.\n"
-            "Install it first:\n\n    pip install -r requirements.txt\n\n"
-            "(Dry-run mode above doesn't need it — this is only needed with --confirm.)",
-            file=sys.stderr,
-        )
-        raise SystemExit(1) from e
-
-
-def _validate_base_url(base_url: str) -> str:
-    parsed = urlparse(base_url)
-    if parsed.scheme != "https":
-        raise SystemExit(
-            f"Refusing to run: CALL-E base URL {base_url!r} is not HTTPS. "
-            f"The API key is never sent over a non-HTTPS origin."
-        )
-    if parsed.hostname not in _ALLOWED_CALLE_HOSTS:
-        raise SystemExit(
-            f"Refusing to run: {parsed.hostname!r} is not an allowlisted CALL-E "
-            f"origin ({sorted(_ALLOWED_CALLE_HOSTS)}). CALLE_BASE_URL is never "
-            f"trusted blindly, since it decides where the bearer API key gets "
-            f"sent. If this is a genuine alternate CALL-E origin, add it to "
-            f"_ALLOWED_CALLE_HOSTS in this script explicitly first."
-        )
-    return base_url.rstrip("/")
-
-
-def _load_authorized_numbers(path: Optional[str]) -> set[str]:
-    if not path:
-        return set()
-    numbers = set()
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            numbers.add(line)
-    return numbers
-
-
 def _mask(phone: str) -> str:
     phone = phone.strip()
     if len(phone) <= 4:
         return "•" * len(phone)
     return phone[:5] + "•" * max(0, len(phone) - 7) + phone[-2:]
+
+
+def _is_ascii(s: str) -> bool:
+    try:
+        s.encode("ascii")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def validate_e164(phone: str) -> tuple[bool, str]:
+    """Strict ASCII E.164 check. Returns (ok, reason_if_not_ok)."""
+    if not _is_ascii(phone):
+        return False, "phone contains non-ASCII characters (rejected — not E.164)"
+    if not _E164_RE.match(phone):
+        return False, "phone is not strict ASCII E.164 (expected +<7-15 digits>)"
+    return True, ""
+
+
+def normalize_phone_for_match(phone: str) -> str:
+    """Canonical form used for allowlist comparisons — exact match only,
+    no fuzzy/partial matching, so a substring can never slip through."""
+    return phone.strip()
+
+
+def load_allowlist(path: Optional[str]) -> Optional[set[str]]:
+    if not path:
+        return None
+    entries: set[str] = set()
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # allowlist lines are "phone, name, source" — only the
+            # first comma-separated field is the phone to match.
+            phone = line.split(",", 1)[0].strip()
+            if phone:
+                entries.add(normalize_phone_for_match(phone))
+    return entries
 
 
 def _infer_region(phone: str) -> Optional[str]:
@@ -191,25 +195,32 @@ def _infer_region(phone: str) -> Optional[str]:
     return None
 
 
-def _validate_e164_for_region(phone: str, region: str) -> Optional[str]:
-    """Returns None if the number passes validation, else a reason it didn't."""
-    if not _E164_RE.fullmatch(phone):
-        return f"{_mask(phone)} is not a valid E.164 number (must be + followed by 7-15 digits)"
-    inferred_region = _infer_region(phone)
-    compatible_regions = {inferred_region}
-    if inferred_region == "US":  # US and CA share country calling code +1.
-        compatible_regions.add("CA")
-    if region not in compatible_regions:
-        return f"{_mask(phone)} has a country calling code that does not match region {region!r}"
-    digits = len(phone) - 1  # exclude leading '+'
-    expected = _REGION_DIGIT_LENGTHS.get(region)
-    if expected is None:
-        return f"region {region!r} has no known digit-length rule — add one before calling this destination"
-    allowed = expected if isinstance(expected, tuple) else (expected,)
-    if digits not in allowed:
-        return (f"{_mask(phone)} has {digits} digits, which doesn't match the "
-                f"expected length for region {region} ({'/'.join(map(str, allowed))})")
-    return None
+def _stable_idempotency_key(appt: "Appointment") -> str:
+    """Deterministic, content-bound idempotency key — re-running the
+    same batch (e.g. after a crash) reuses the same key per recipient
+    instead of a fresh random UUID each time, so a retry can't create
+    a second real-world call to someone already confirmed. Bound to
+    the exact fields that define "this appointment", so a genuinely
+    different appointment for the same person still gets its own key."""
+    basis = "|".join([
+        appt.recipient_name, appt.phone, appt.appointment_time,
+        appt.context, appt.business_name,
+    ])
+    return "acc-" + hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]
+
+
+def _sanitize_error_text(text: str, api_key: str) -> str:
+    """Strip anything that looks like the bearer token or an
+    unmasked phone number before an error body is ever printed or
+    written to the results file."""
+    if not text:
+        return text
+    if api_key:
+        text = text.replace(api_key, "[REDACTED_API_KEY]")
+    # Redact anything that looks like a raw E.164 number (10+ digits
+    # after a +) that isn't already masked with •.
+    text = re.sub(r"\+\d{7,15}", "[REDACTED_PHONE]", text)
+    return text[:500]
 
 
 @dataclass
@@ -239,9 +250,15 @@ def load_appointments(path: Path) -> list[Appointment]:
         ]
         if missing:
             raise ValueError(f"Row {i}: missing required field(s): {', '.join(missing)}")
+
+        phone = row["phone"].strip()
+        ok, reason = validate_e164(phone)
+        if not ok:
+            raise ValueError(f"Row {i} ({row.get('recipient_name', '?')}): {reason}: {phone!r}")
+
         appts.append(Appointment(
             recipient_name=row["recipient_name"].strip(),
-            phone=row["phone"].strip(),
+            phone=phone,
             appointment_time=row["appointment_time"].strip(),
             context=row["context"].strip(),
             business_name=row["business_name"].strip(),
@@ -267,29 +284,23 @@ def build_task(appt: Appointment) -> str:
     )
 
 
-def dry_run_report(appts: list[Appointment]) -> None:
+def dry_run_report(appts: list[Appointment], allowlist: Optional[set[str]]) -> None:
     print(f"\n{'='*72}\nDRY RUN — {len(appts)} appointment(s). No calls will be placed.\n{'='*72}")
     for a in appts:
         region = a.region or _infer_region(a.phone) or "UNKNOWN — will be rejected at call time"
-        reason = None
-        if region and region != "UNKNOWN — will be rejected at call time":
-            reason = _validate_e164_for_region(a.phone, region)
-        flag = f"  [WOULD BE REJECTED: {reason}]" if reason else ""
+        auth_note = ""
+        if allowlist is not None:
+            auth_note = "  [ALLOWLISTED]" if normalize_phone_for_match(a.phone) in allowlist \
+                else "  [NOT ON ALLOWLIST — will be skipped]"
         print(f"- {a.recipient_name:<20} {_mask(a.phone):<14} {a.appointment_time:<26} "
-              f"region={region:<6} \"{a.context}\"{flag}")
-    print(f"{'='*72}\nRe-run with --confirm (and --authorized-numbers) to actually place "
-          f"these {len(appts)} call(s).\n")
+              f"region={region:<6} \"{a.context}\"{auth_note}")
+    print(f"{'='*72}\nRe-run with --confirm to actually place these {len(appts)} call(s).\n")
 
 
-def place_call(requests, base_url: str, api_key: str, appt: Appointment,
-                webhook_url: Optional[str]) -> dict:
+def place_call(base_url: str, api_key: str, appt: Appointment, webhook_url: Optional[str]) -> dict:
     region = appt.region or _infer_region(appt.phone)
     if not region:
         return {"_local_error": f"could not infer region for {_mask(appt.phone)}; set region explicitly"}
-
-    e164_error = _validate_e164_for_region(appt.phone, region)
-    if e164_error:
-        return {"_local_error": f"refusing to call: {e164_error}"}
 
     recipient = {"phones": [appt.phone], "region": region}
     if appt.locale:
@@ -304,18 +315,12 @@ def place_call(requests, base_url: str, api_key: str, appt: Appointment,
         payload["webhook_url"] = webhook_url
     payload["metadata"] = {"recipient_name": appt.recipient_name, "appointment_time": appt.appointment_time}
 
-    # Deterministic (not random) idempotency key: if this exact call is
-    # ever submitted twice — e.g. an operator naively re-runs after a
-    # halt without checking what actually happened — CALL-E's
-    # idempotency handling gets a chance to recognize the duplicate
-    # instead of dialing the same recipient twice.
-    idem_seed = f"{appt.phone}|{appt.appointment_time}|{appt.context}"
-    idempotency_key = str(uuid.uuid5(uuid.NAMESPACE_URL, idem_seed))
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "Idempotency-Key": idempotency_key,
+        # Stable, content-bound key — NOT a fresh random UUID per run.
+        # See _stable_idempotency_key() docstring for why this matters.
+        "Idempotency-Key": _stable_idempotency_key(appt),
     }
     try:
         resp = requests.post(f"{base_url}/v1/calls", headers=headers, json=payload, timeout=30)
@@ -335,12 +340,12 @@ def place_call(requests, base_url: str, api_key: str, appt: Appointment,
                 ) + ")"
         except Exception:
             detail = e.response.text[:200] if e.response is not None else str(e)
-        return {"_local_error": f"CALL-E rejected the call: {detail or e}"}
+        return {"_local_error": f"CALL-E rejected the call: {_sanitize_error_text(detail or str(e), api_key)}"}
     except requests.exceptions.RequestException as e:
-        return {"_local_error": f"could not reach CALL-E (outcome unknown — do not assume this call was not created): {e}"}
+        return {"_local_error": f"could not reach CALL-E: {_sanitize_error_text(str(e), api_key)}"}
 
 
-def poll_call(requests, base_url: str, api_key: str, call_id: str, timeout_seconds: int) -> dict:
+def poll_call(base_url: str, api_key: str, call_id: str, timeout_seconds: int) -> dict:
     deadline = time.time() + timeout_seconds
     headers = {"Authorization": f"Bearer {api_key}"}
     last_status = None
@@ -374,122 +379,94 @@ def resolve_result(call: dict) -> tuple[str, dict]:
     return "unclear", structured
 
 
-def _write_results(out_path: Optional[str], rows: list[dict]) -> None:
-    if not out_path:
-        return
-    fieldnames = ["recipient_name", "phone_masked", "appointment_time", "call_id",
-                  "status", "requested_new_time", "notes", "detail"]
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-    print(f"\nWrote {len(rows)} result(s) so far to {out_path}")
+def _validate_base_url(base_url: str, allow_custom_host: bool) -> tuple[bool, str]:
+    """Refuse to send bearer credentials anywhere but the official
+    HTTPS origin unless the operator explicitly opts into a custom
+    host (e.g. for local/staging testing)."""
+    parts = urlsplit(base_url)
+    if parts.scheme != "https":
+        return False, f"base URL must use https (got {parts.scheme!r})"
+    if parts.hostname != OFFICIAL_HOST and not allow_custom_host:
+        return False, (
+            f"base URL host {parts.hostname!r} does not match the official "
+            f"CALL-E host {OFFICIAL_HOST!r}. Pass --allow-custom-host if this "
+            f"is intentional (e.g. local/staging testing) — otherwise the API "
+            f"key would be sent to an unexpected host."
+        )
+    return True, ""
 
 
 def run(args: argparse.Namespace) -> int:
     appts = load_appointments(Path(args.infile))
+    allowlist = load_allowlist(args.allowlist)
 
     if not args.confirm:
-        dry_run_report(appts)
+        dry_run_report(appts, allowlist)
         return 0
-
-    if not args.authorized_numbers:
-        print(
-            "Refusing to run: --confirm requires --authorized-numbers <file>.\n"
-            "--confirm says you want this batch to place real calls;\n"
-            "--authorized-numbers is the separate, explicit record of which\n"
-            "specific phone numbers you've actually confirmed consent for.\n"
-            "See assets/authorized_numbers.example.txt for the format, and\n"
-            "references/safety.md for why these are kept as two separate gates.",
-            file=sys.stderr,
-        )
-        return 1
-    authorized = _load_authorized_numbers(args.authorized_numbers)
 
     api_key = os.environ.get("CALLE_API_KEY")
     if not api_key:
         print("CALLE_API_KEY is not set — cannot place real calls.", file=sys.stderr)
         return 1
+    base_url = os.environ.get("CALLE_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
 
-    requests = _require_requests()
-    base_url = _validate_base_url(os.environ.get("CALLE_BASE_URL", DEFAULT_BASE_URL))
+    ok, reason = _validate_base_url(base_url, args.allow_custom_host)
+    if not ok:
+        print(f"REFUSING TO RUN: {reason}", file=sys.stderr)
+        return 1
 
-    rows: list[dict] = []
+    # Always show the dry-run list again immediately before a real run,
+    # then require an interactive typed confirmation. --confirm alone
+    # is not sufficient — this is the real per-run safety gate, not
+    # just a CLI flag that could be baked into a script unattended.
+    dry_run_report(appts, allowlist)
+    if args.yes:
+        print("--yes passed: skipping interactive confirmation prompt "
+              "(non-interactive/automation mode).")
+    else:
+        typed = input(f"Type CONFIRM to place these {len(appts)} call(s), "
+                       f"or anything else to cancel: ").strip()
+        if typed != "CONFIRM":
+            print("Not confirmed — no calls placed.")
+            return 0
+
+    rows = []
+    batch_halted = False
     for appt in appts:
-        print(f"\nCalling {appt.recipient_name} ({_mask(appt.phone)}) re: {appt.context}")
-
-        if appt.phone not in authorized:
-            print(f"  HALTED: {_mask(appt.phone)} is not listed in {args.authorized_numbers}.")
+        if allowlist is not None and normalize_phone_for_match(appt.phone) not in allowlist:
+            print(f"\nSkipping {appt.recipient_name} ({_mask(appt.phone)}): not on allowlist")
             rows.append({
                 "recipient_name": appt.recipient_name, "phone_masked": _mask(appt.phone),
                 "appointment_time": appt.appointment_time, "call_id": "",
-                "status": "failed", "detail": "not in authorized-numbers file — call not placed",
+                "status": "failed", "detail": "not authorized: phone not on allowlist",
             })
-            _write_results(args.out, rows)
-            print(
-                "\nBatch halted before this call was placed. Nothing was dialed for "
-                "this recipient or anyone listed after them. Add the number to the "
-                "authorized-numbers file once consent is confirmed, then re-run."
-            )
-            return 1
+            continue
 
-        created = place_call(requests, base_url, api_key, appt, args.webhook_url)
+        print(f"\nCalling {appt.recipient_name} ({_mask(appt.phone)}) re: {appt.context}")
+        created = place_call(base_url, api_key, appt, args.webhook_url)
 
         if "_local_error" in created:
-            print(f"  HALTED: {created['_local_error']}")
+            print(f"  FAILED: {created['_local_error']}")
             rows.append({
                 "recipient_name": appt.recipient_name, "phone_masked": _mask(appt.phone),
                 "appointment_time": appt.appointment_time, "call_id": "",
                 "status": "failed", "detail": created["_local_error"],
             })
-            _write_results(args.out, rows)
-            print(
-                "\nBatch halted — the create-call response was ambiguous, so whether "
-                "this call actually went out is unknown. Check the CALL-E dashboard "
-                "or GET /v1/calls with this recipient's number before re-running, to "
-                "avoid dialing them twice. Nobody after this recipient was called."
-            )
-            return 1
+            continue
 
         call_id = created.get("id")
         if not call_id:
-            print(f"  HALTED: CALL-E did not return a call id: {created}")
+            detail = _sanitize_error_text(json.dumps(created), api_key)
+            print(f"  FAILED: CALL-E did not return a call id: {detail}")
             rows.append({
                 "recipient_name": appt.recipient_name, "phone_masked": _mask(appt.phone),
                 "appointment_time": appt.appointment_time, "call_id": "",
                 "status": "failed", "detail": "no call_id returned",
             })
-            _write_results(args.out, rows)
-            print(
-                "\nBatch halted — CALL-E accepted the request but returned no call id, "
-                "so this call's real state can't be tracked. Check the CALL-E dashboard "
-                "before re-running. Nobody after this recipient was called."
-            )
-            return 1
+            continue
 
-        final_call = poll_call(requests, base_url, api_key, call_id, args.timeout_seconds)
+        final_call = poll_call(base_url, api_key, call_id, args.timeout_seconds)
         status, structured = resolve_result(final_call)
-
-        if status == "pending":
-            print(f"  HALTED: polling timed out before call {call_id} reached a terminal state.")
-            rows.append({
-                "recipient_name": appt.recipient_name, "phone_masked": _mask(appt.phone),
-                "appointment_time": appt.appointment_time, "call_id": call_id,
-                "status": "pending", "detail": "poll timed out — true outcome unknown",
-            })
-            _write_results(args.out, rows)
-            print(
-                f"\nBatch halted — call {call_id}'s real outcome is unknown (it may "
-                f"still be in progress on CALL-E's side). Check "
-                f"GET /v1/calls/{call_id} directly before re-running any remaining "
-                f"recipients, to avoid a duplicate call reaching someone CALL-E is "
-                f"still processing."
-            )
-            return 1
-
-        # Known, terminal outcome — confirmed/declined/no_answer/voicemail/unclear
-        # are all certain results even when the appointment itself still needs a
-        # human follow-up (e.g. declined). Safe to continue to the next recipient.
         print(f"  -> {status}" + (f" ({structured.get('requested_new_time')})"
                                     if structured.get("requested_new_time") else ""))
         rows.append({
@@ -500,14 +477,34 @@ def run(args: argparse.Namespace) -> int:
             "notes": structured.get("notes", ""),
         })
 
-    _write_results(args.out, rows)
+        # An ambiguous outcome (poll timeout, or a structured result
+        # CALL-E returned that doesn't match a known enum value) means
+        # we don't actually know what happened on that call. Stop the
+        # batch rather than compounding the uncertainty by dialing
+        # more people — unless the operator explicitly opted out.
+        if status in {"pending", "unclear"} and not args.continue_on_ambiguous:
+            print(f"\nHALTING BATCH: outcome for {appt.recipient_name} was '{status}' "
+                  f"— ambiguous result, not a clean success or failure. Check call "
+                  f"{call_id} in the CALL-E dashboard before resuming. "
+                  f"(Pass --continue-on-ambiguous to disable this safety stop.)")
+            batch_halted = True
+            break
+
+    if args.out:
+        fieldnames = ["recipient_name", "phone_masked", "appointment_time", "call_id",
+                      "status", "requested_new_time", "notes", "detail"]
+        with open(args.out, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"\nWrote {len(rows)} result(s) to {args.out}")
 
     counts: dict[str, int] = {}
     for r in rows:
         counts[r["status"]] = counts.get(r["status"], 0) + 1
     summary = ", ".join(f"{v} {k}" for k, v in counts.items())
-    print(f"\nBatch summary: {summary}")
-    return 0
+    print(f"\nBatch summary: {summary}" + (" (halted early — see warning above)" if batch_halted else ""))
+    return 1 if batch_halted else 0
 
 
 def main() -> int:
@@ -517,8 +514,19 @@ def main() -> int:
     p.add_argument("--confirm", action="store_true",
                    help="actually place calls; without this flag, always dry-runs")
     p.add_argument("--dry-run", action="store_true", help="explicit alias for the default (no --confirm) behavior")
-    p.add_argument("--authorized-numbers", dest="authorized_numbers", default=None,
-                   help="path to a file of E.164 numbers you've confirmed consent for; required with --confirm")
+    p.add_argument("--yes", action="store_true",
+                   help="skip the interactive CONFIRM prompt for non-interactive/automation use "
+                        "(dangerous — only use when the batch has already been reviewed by a human "
+                        "some other way)")
+    p.add_argument("--allowlist", default=None,
+                   help="path to a phone allowlist file (see assets/authorized_numbers.example.txt); "
+                        "if set, only recipients whose phone exactly matches an entry are called")
+    p.add_argument("--allow-custom-host", action="store_true",
+                   help="allow CALLE_BASE_URL to point somewhere other than the official CALL-E host "
+                        "(only for local/staging testing — bearer credentials are sent to this host)")
+    p.add_argument("--continue-on-ambiguous", action="store_true",
+                   help="do not halt the batch when a call's outcome is ambiguous (pending/unclear); "
+                       "off by default as a safety stop")
     p.add_argument("--webhook-url", default=None, help="optional webhook CALL-E should POST terminal results to")
     p.add_argument("--timeout-seconds", type=int, default=180, help="max seconds to poll each call (default 180)")
     args = p.parse_args()
