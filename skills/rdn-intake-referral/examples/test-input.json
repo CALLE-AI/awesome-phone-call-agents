@@ -1,0 +1,79 @@
+{
+  "task": "Conduct a consent-based nutrition support intake. Clearly tell the recipient that you are an AI assistant. Ask whether they agree to continue. If they agree, collect their full name, reason for seeking nutrition support, whether they were referred by a healthcare professional, nutrition goals, dietary preferences or restrictions, food allergies, general service location, relevant insurance information, and preferred times for an RDN appointment. For the full name, ask the recipient to say their first and last name clearly. If you do not understand it, ask them to repeat it or spell it slowly. Do not guess a name. Read the captured name back and confirm it before completing the intake. For insurance information, ask whether they have insurance they would like noted for the referral. If they do not want to provide insurance information, accept that response and record that the information was not provided. Do not interpret unrelated statements as insurance information. Do not diagnose, prescribe treatment, interpret medical information, or provide individualized medical or nutrition advice. If the recipient asks for medical or individualized nutrition advice, explain that the AI assistant cannot provide that advice and continue with the intake if appropriate. At the end, summarize all information collected and ask the recipient to confirm that it is accurate. If any important information is unclear, ask for clarification before final confirmation. If consent is unclear, the recipient asks to stop, the wrong person answers, or an emergency is described, do not continue the routine intake.",
+  "recipients": [
+    {
+      "phones": [
+        "+1XXXXXXXXXX"
+      ],
+      "region": "US",
+      "locale": "en-US"
+    }
+  ],
+  "result_schema": {
+    "type": "object",
+    "required": [
+      "patient_name",
+      "reason_for_support",
+      "nutrition_goals",
+      "dietary_preferences_or_restrictions",
+      "location",
+      "insurance_information",
+      "preferred_appointment_times",
+      "rdn_referral_needed",
+      "patient_confirmed_information"
+    ],
+    "properties": {
+      "patient_name": {
+        "type": "string"
+      },
+      "reason_for_support": {
+        "type": "string"
+      },
+      "nutrition_goals": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "dietary_preferences_or_restrictions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "location": {
+        "type": "string"
+      },
+      "insurance_information": {
+        "type": "string"
+      },
+      "preferred_appointment_times": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "rdn_referral_needed": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ]
+      },
+      "patient_confirmed_information": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "metadata": {
+    "workflow": "rdn-intake-referral",
+    "environment": "demo"
+  }
+}
