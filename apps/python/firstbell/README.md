@@ -508,6 +508,14 @@ TCPA, which puts a call like this one inside the statute rather than beside it.
   somebody else's database.
 - **The offline run is a double, not a recording.** It reproduces the API's shape and
   failure modes. It does not reproduce what a real parent says.
+- **Nobody knows how often the safeguarding rule should fire.** On the real calls behind
+  this work it fired on nearly half of the answered ones, and the rate is stated with those
+  calls above rather than repeated here. Eleven calls to one cooperative handset is not a
+  sample a school should plan a rota from. If the true rate is anywhere near what we
+  measured, the question is whether an office can answer that many callbacks inside the
+  window, and the honest answer is that we do not know and a pilot would find out in a
+  fortnight. A rule that fires this often is either the safest thing here or the reason it
+  gets switched off.
 - **In India this calls from a United States number, and that is a deployment problem.**
   CALL-E's own supported-regions table lists India as an *International* line rather than
   a Local one, and their README says the international numbers are "primarily intended for
