@@ -1,0 +1,34 @@
+{
+  "name": "ghost-appointment",
+  "evidence": [
+    {
+      "source": "calendar",
+      "type": "structured",
+      "freshness_hours": 72,
+      "claim": "appointment confirmed 14:00 tomorrow",
+      "ambiguity": "low"
+    },
+    {
+      "source": "email",
+      "type": "human",
+      "freshness_hours": 72,
+      "claim": "I may need to cancel",
+      "ambiguity": "high"
+    },
+    {
+      "source": "follow-up",
+      "type": "absence",
+      "freshness_hours": 72,
+      "claim": "no confirmation received",
+      "ambiguity": "high"
+    }
+  ],
+  "deadline": "2026-09-11T14:00:00Z",
+  "decision_deadline_threshold_hours": 24,
+  "decision_options": {
+    "if_confirmed": "KEEP_SLOT",
+    "if_cancelled": "RELEASE_SLOT"
+  },
+  "call_phone": "+12025550123",
+  "call_task_hint": "Call the patient to confirm whether they still plan to attend their dental appointment tomorrow at 14:00, given an email where they said they might need to cancel. Ask them directly whether they will keep or cancel the appointment."
+}

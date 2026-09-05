@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: reality-resolver-demo
+    runtime: python
+    plan: free
+    buildCommand: "pip install tzdata"
+    startCommand: "python public_demo_server.py"

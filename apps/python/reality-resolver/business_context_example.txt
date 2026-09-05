@@ -1,0 +1,32 @@
+Business: Bright Smile Dental (fictional example, for demo purposes only)
+
+Hours:
+- Monday-Friday: 8:00 AM - 5:00 PM
+- Saturday: 9:00 AM - 1:00 PM
+- Closed Sundays and public holidays
+
+Services and starting prices (fictional):
+- New patient exam and cleaning: $89
+- Standard cleaning (returning patient): $65
+- Teeth whitening (in-office): $299
+- Cavity filling (per tooth, composite): $150-$250 depending on size
+- Root canal (molar): starting at $900
+- Emergency same-day visit: $50 exam fee, waived if further treatment is needed
+
+Insurance: We accept most major PPO dental insurance plans. We do not
+accept Medicaid at this location. Patients without insurance can ask
+about our in-house membership plan (details available by phone).
+
+Scheduling: New patients can typically be seen within 3-5 business
+days. Emergency visits (severe pain, broken tooth, swelling) are
+usually seen same-day if called before 2:00 PM.
+
+Location: 142 Maple Street, Suite 3, Springfield (fictional address).
+Parking is available in the lot behind the building.
+
+Frequently asked questions:
+- Do you treat children? Yes, starting at age 2.
+- Do you do same-day crowns? No, crowns are made off-site and placed
+  at a follow-up visit about 2 weeks later.
+- Can I get a payment plan? Yes, for treatment plans over $500, ask
+  about our 3-month and 6-month interest-free plans.
