@@ -1,0 +1,48 @@
+{
+ "id": "call_fx_004",
+ "object": "call_task",
+ "status": "failed",
+ "task": "Call +15550100004 and confirm the delivery window for Friday.",
+ "recipients": [
+  {
+   "id": "rcp_004",
+   "phones": [
+    "+15550100004"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "failed",
+   "structured_result": null,
+   "summary": "",
+   "attempts": [
+    {
+     "id": "att_004",
+     "phone": "+15550100004",
+     "status": "failed",
+     "started_at": "2026-09-04T15:00:00Z",
+     "completed_at": "2026-09-04T15:03:00Z",
+     "summary": "",
+     "transcript_turns": [],
+     "provider_call_id": null,
+     "failure_code": "no_answer",
+     "failure_message": null
+    }
+   ]
+  }
+ ],
+ "structured_result": null,
+ "summary": "",
+ "task_completed": false,
+ "completion_confidence": {
+  "score": 0.0,
+  "label": "low"
+ },
+ "evidence": null,
+ "metadata": {
+  "fixture": true
+ },
+ "failure_code": "no_answer",
+ "failure_message": null,
+ "created_at": "2026-09-04T14:59:30Z",
+ "completed_at": "2026-09-04T15:03:05Z"
+}

@@ -1,0 +1,92 @@
+{
+ "id": "call_fx_002",
+ "object": "call_task",
+ "status": "completed",
+ "task": "Call +15550100002 and confirm tomorrow's 9am appointment; if they cannot make it, find a new time this week.",
+ "recipients": [
+  {
+   "id": "rcp_002",
+   "phones": [
+    "+15550100002"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": {
+    "confirmed": "no",
+    "rescheduled_to": "Thursday 2pm",
+    "reason": "schedule conflict"
+   },
+   "summary": "Patient cannot make tomorrow; rescheduled to Thursday 2pm.",
+   "attempts": [
+    {
+     "id": "att_002",
+     "phone": "+15550100002",
+     "status": "completed",
+     "started_at": "2026-09-04T15:00:00Z",
+     "completed_at": "2026-09-04T15:03:00Z",
+     "summary": "Patient cannot make tomorrow; rescheduled to Thursday 2pm.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0.0,
+       "speaker": "agent",
+       "text": "Hello, this is an automated assistant from Northside Dental about your appointment tomorrow at 9 a.m."
+      },
+      {
+       "offset_seconds": 6.8,
+       "speaker": "callee",
+       "text": "Oh, I can't do tomorrow, sorry."
+      },
+      {
+       "offset_seconds": 12.4,
+       "speaker": "agent",
+       "text": "No problem. Would another day this week work?"
+      },
+      {
+       "offset_seconds": 15.1,
+       "speaker": "callee",
+       "text": "Maybe. I'd have to check my calendar."
+      },
+      {
+       "offset_seconds": 22.9,
+       "speaker": "agent",
+       "text": "Sure. I can note that you'd like to reschedule and someone will follow up."
+      },
+      {
+       "offset_seconds": 31.0,
+       "speaker": "callee",
+       "text": "Okay, that's fine."
+      },
+      {
+       "offset_seconds": 32.2,
+       "speaker": "agent",
+       "text": "Thank you. Goodbye."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ],
+ "structured_result": {
+  "confirmed": "no",
+  "rescheduled_to": "Thursday 2pm",
+  "reason": "schedule conflict"
+ },
+ "summary": "Patient cannot make tomorrow; rescheduled to Thursday 2pm.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.71,
+  "label": "medium"
+ },
+ "evidence": null,
+ "metadata": {
+  "fixture": true
+ },
+ "failure_code": null,
+ "failure_message": null,
+ "created_at": "2026-09-04T14:59:30Z",
+ "completed_at": "2026-09-04T15:03:05Z"
+}

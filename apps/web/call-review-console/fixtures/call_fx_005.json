@@ -1,0 +1,90 @@
+{
+ "id": "call_fx_005",
+ "object": "call_task",
+ "status": "completed",
+ "task": "Call +15550100005 and confirm Saturday's 10am service booking; mention to bring key fobs.",
+ "recipients": [
+  {
+   "id": "rcp_005",
+   "phones": [
+    "+15550100005"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": {
+    "confirmed": "yes",
+    "bring_key_fobs": "yes"
+   },
+   "summary": "Confirmed Saturday 10am; customer will bring key fobs.",
+   "attempts": [
+    {
+     "id": "att_005",
+     "phone": "+15550100005",
+     "status": "completed",
+     "started_at": "2026-09-04T15:00:00Z",
+     "completed_at": "2026-09-04T15:03:00Z",
+     "summary": "Confirmed Saturday 10am; customer will bring key fobs.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0.0,
+       "speaker": "agent",
+       "text": "Hello, this is an AI assistant calling from Harbor Auto to confirm your service booking for Saturday at 10."
+      },
+      {
+       "offset_seconds": 2.0,
+       "speaker": "callee",
+       "text": "Saturday at ten, yes."
+      },
+      {
+       "offset_seconds": 1.8,
+       "speaker": "agent",
+       "text": "\u2014for Saturday at ten a.m., is that still convenient?"
+      },
+      {
+       "offset_seconds": 5.5,
+       "speaker": "callee",
+       "text": "Yes. Do I need to bring the key fob?"
+      },
+      {
+       "offset_seconds": 6.0,
+       "speaker": "agent",
+       "text": "Yes, please bring both key fobs if you have them."
+      },
+      {
+       "offset_seconds": 9.1,
+       "speaker": "callee",
+       "text": "Okay, will do."
+      },
+      {
+       "offset_seconds": 9.6,
+       "speaker": "agent",
+       "text": "Thanks, see you Saturday. Goodbye."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ],
+ "structured_result": {
+  "confirmed": "yes",
+  "bring_key_fobs": "yes"
+ },
+ "summary": "Confirmed Saturday 10am; customer will bring key fobs.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.88,
+  "label": "high"
+ },
+ "evidence": null,
+ "metadata": {
+  "fixture": true
+ },
+ "failure_code": null,
+ "failure_message": null,
+ "created_at": "2026-09-04T14:59:30Z",
+ "completed_at": "2026-09-04T15:03:05Z"
+}
