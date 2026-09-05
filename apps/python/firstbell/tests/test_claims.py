@@ -486,29 +486,67 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
 def test_no_gate_skips_without_saying_so():
     """A new silent skip cannot be added without this failing.
 
-    The suite reports `237 passed, 2 skipped` and a reviewer reading `-q` output sees 239
-    dots. That is the shape of a gate that quietly stopped running, which is the failure this
-    whole project is written against, so the two that cannot run are named above and any
-    third one has to be argued for rather than merely added.
+    A skipped test prints the same dot under `-q` that a passing one prints, so a run where
+    everything passed and a run where a gate never executed look alike to anyone not reading
+    `-rs`. That is the shape of a gate that quietly stopped running, which is the failure this
+    whole project is written against, so the ones that cannot always run are named above and
+    any new one has to be argued for rather than merely added.
+
+    This started out reading function bodies for a call to `pytest.skip` and nothing else,
+    which left every other way of switching a test off invisible to it. Prepending a single
+    `@pytest.mark.skipif(True, ...)` to the test holding the safeguarding rule took that rule
+    out of the suite, and nothing went red: the collected count does not move either, because
+    a skipped test is still collected. Four shapes are read now, and the decorator ones are
+    the shapes a person reaches for first.
     """
     import ast
 
+    def dotted(node):
+        """`pytest.mark.skipif` and `skip` alike, as a string, or "" for anything else."""
+        parts = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+        elif parts:
+            return ""
+        return ".".join(reversed(parts))
+
+    SKIP_CALLS = ("pytest.skip", "skip", "pytest.importorskip", "importorskip")
+    SKIP_MARKS = ("pytest.mark.skip", "pytest.mark.skipif", "mark.skip", "mark.skipif")
+
     skipping = {}
+    module_level = []
     for path in sorted((APP / "tests").glob("test_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+
+        # A module-level `pytestmark` switches off every test in the file at once, which is
+        # the largest version of this defect and the one no per-function walk would see.
+        for node in tree.body:
+            targets = (node.targets if isinstance(node, ast.Assign)
+                       else [node.target] if isinstance(node, ast.AnnAssign) else [])
+            if any(isinstance(t, ast.Name) and t.id == "pytestmark" for t in targets):
+                module_level.append(path.name)
+
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
+
+            for decorator in node.decorator_list:
+                target = decorator.func if isinstance(decorator, ast.Call) else decorator
+                if dotted(target) in SKIP_MARKS:
+                    skipping.setdefault(node.name, path.name)
+
             for inner in ast.walk(node):
                 call = inner.value if isinstance(inner, ast.Expr) else inner
-                if not isinstance(call, ast.Call):
-                    continue
-                func = call.func
-                name = (f"{func.value.id}.{func.attr}"
-                        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
-                        else getattr(func, "id", ""))
-                if name in ("pytest.skip", "skip"):
+                if isinstance(call, ast.Call) and dotted(call.func) in SKIP_CALLS:
                     skipping.setdefault(node.name, path.name)
+
+    assert not module_level, (
+        "these files switch off every test in them from module scope, which no per-test note "
+        "can describe: " + ", ".join(sorted(set(module_level)))
+    )
 
     undeclared = sorted(set(skipping) - set(GATES_THAT_CANNOT_ALWAYS_RUN))
     assert not undeclared, (
@@ -521,6 +559,8 @@ def test_no_gate_skips_without_saying_so():
         "these are declared as unable to run and no longer skip, so the note is now wrong: "
         + ", ".join(stale)
     )
+
+
 def test_every_published_statistic_is_one_we_recorded_the_source_for():
     """The one class of number in this README that no test could reach, until now.
 
@@ -573,3 +613,47 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
         assert entry["url"] in section, (
             f"{value} is published without the source link recorded for it"
         )
+
+
+def test_the_mutation_counts_the_readme_quotes_match_the_table_it_points_at():
+    """The README names three mutations by their kill count. The table is the source.
+
+    Both of the numbers this was written for were wrong. The README said the consent gate
+    fails 3 tests and the dropped error code fails 3; the table said 8 and 4, and 8 and 4 is
+    what a measurement produces. The sentence carrying them is the one telling a reader that
+    every gate is listed "with the change made and the number of tests that caught it", which
+    makes it the worst line in the file to disagree with the table it points at.
+
+    Rows are matched on a phrase from the row rather than on a row number, because rows get
+    renumbered and a gate keyed on position goes quiet the first time one does.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    rows = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")
+
+    # (the phrase the README uses, a phrase that identifies the row it is referring to)
+    quoted = [
+        ("removing the concurrency cap fails", "concurrency cap"),
+        ("disabling the consent check fails", "disabling the consent gate"),
+        ("real error code from the double fails", "API_ERROR_CODES"),
+    ]
+
+    wrong = []
+    for phrase, row_marker in quoted:
+        found = re.search(re.escape(phrase) + r"\s+(\d+)", readme)
+        assert found, f"the README no longer says {phrase!r}, so this gate checks nothing"
+        claimed = int(found.group(1))
+
+        candidates = [line for line in rows.splitlines()
+                      if line.startswith("|") and row_marker in line]
+        assert len(candidates) == 1, (
+            f"{row_marker!r} matches {len(candidates)} rows in MUTATIONS.md, so this gate "
+            f"cannot say which row the README means"
+        )
+        measured = int(candidates[0].rsplit("|", 2)[1].strip())
+        if claimed != measured:
+            wrong.append(f"the README says {claimed} for {phrase!r}, the table says {measured}")
+
+    assert not wrong, (
+        "the README quotes kill counts the mutation table disagrees with:\n  "
+        + "\n  ".join(wrong)
+    )

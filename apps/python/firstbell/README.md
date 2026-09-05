@@ -46,7 +46,7 @@ The classification rule is not locked inside a Python CLI. The same three outcom
 an importable n8n workflow in
 [`plugins/firstbell-absence-calls`](../../../plugins/firstbell-absence-calls/), with the
 classifier extracted into a plain module so `node --test examples/classify.test.mjs` runs
-its fourteen tests without n8n installed, and the workflow regenerated from that module by
+its nineteen tests without n8n installed, and the workflow regenerated from that module by
 a committed script so the two cannot drift apart. It ships with its schedule trigger
 disabled and a dry run that places no calls and needs no API key.
 
@@ -461,7 +461,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 241 tests
+python -m pytest tests/ -q          # 242 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -470,8 +470,8 @@ the double's HTTP server so that branch is not dead code.
 
 Each gate was checked by breaking it on purpose and confirming it fails. Every one is
 listed in `evidence/MUTATIONS.md` with the change made and the number of tests that caught
-it: removing the concurrency cap fails 4, disabling the consent check fails 3, dropping one
-real error code from the double fails 3, and matching the production host by substring
+it: removing the concurrency cap fails 4, disabling the consent check fails 8, dropping one
+real error code from the double fails 4, and matching the production host by substring
 instead of hostname passes a look-alike domain and fails the mode test.
 
 A gate that has never been observed to fail has not been shown to test anything. What
