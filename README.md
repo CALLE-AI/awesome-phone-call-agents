@@ -213,6 +213,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/kept`](apps/python/kept/) | Python | Turns a payment promise made on a collections call into a validated financial record: eleven named rejection reasons stand between a spoken sentence and a ledger entry, vague amounts are refused, over-commitments are clamped to the invoice balance with the spoken figure kept beside them, and the promise is reconciled against the bank feed a week later so only the commitments that actually broke are called again. |
 | [`apps/typescript/callsweep`](apps/typescript/callsweep/) | TypeScript | Calls many local businesses, haggles each one down toward your budget on the call, ranks their offers by the best overall deal (price, what's included, availability), and books the one you pick. Dry-run no-call path by default with fictional sample shops. |
 | [`apps/python/casechaser`](apps/python/casechaser/) | Python | Chases an open claim, refund, repair, or delivery case to closure: every company promise becomes a dated, quoted commitment, broken ones climb a fixed escalation ladder, offers and denials stop at the customer, and a masked evidence pack is ready for the written complaint. Fixture mode by default. |
+| [`apps/python/runaround`](apps/python/runaround/) | Python | Chases one question across organizations that each name the other: every referral is recorded with the sentence that gave it, a number spoken on a call is not permission to dial it, and the chain stops with a quoted evidence pack the moment the referrals close on themselves. Fixture mode by default. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
@@ -248,6 +249,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Fact freshness`](apps/web/local-atlas/docs/fact-freshness.md) - Expiring a call result by outcome so failures are not cached as conclusions, keeping hedges and refusals distinct from answers, and defeating idempotent replay when a reader rechecks.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 - [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
+- [`Referral authorization`](apps/python/runaround/docs/referral-authorization.md) - Why a phone number spoken on a call is a claim rather than a permission, why an unattributed referral is refused outright, and why an organization name is not an identity for loop detection.
 
 ## Contributing
 
