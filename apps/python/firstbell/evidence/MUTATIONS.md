@@ -20,13 +20,14 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-Thirty-seven rows were re-measured on 5 September 2026 by applying each change, running the
-suite and restoring: rows 1 to 15, 18 to 24, 27 to 29, 31, 32, 34 to 40 and 42 to 44.
-Twenty-eight matched. Nine did not and are corrected above: row 2 (three to five), row 3
-(three to four), row 7 (one to three), row 8 (one to twenty, because removing the task-level
-fallback stops the demonstration answering at all), row 19 (three to four), row 20 (one to
-three), row 27 (one to two), row 28 (three to two) and row 29 (six to seven). The remaining
-seven rows have not been re-measured: 16, 17, 25, 26, 30, 33 and 41.
+Thirty-nine rows were re-measured on 5 September 2026 by applying each change, running the
+suite and restoring: rows 1 to 15, 18 to 25, 27 to 29, 31, 32, 34 to 44. Thirty matched.
+Nine did not and are corrected above: row 2 (three to five), row 3 (three to four), row 7
+(one to three), row 8 (one to twenty, because removing the task-level fallback stops the
+demonstration answering at all), row 19 (three to four), row 20 (one to three), row 27 (one
+to two), row 28 (three to two) and row 29 (six to seven). Five rows have not been
+re-measured: 16, 17, 26, 30 and 33. Each of those five changes a file rather than a line, so
+reproducing them takes a different kind of edit and not a different kind of check.
 
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
