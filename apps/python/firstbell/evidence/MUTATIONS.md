@@ -189,8 +189,8 @@ alert rate, which is published as a percentage and is therefore two numbers divi
 recomputes it from the page rather than reading it back.
 
 Rows 66 to 68 cover the register of gates that cannot always run. A skipped test prints the
-same dot a passing one does under `-q`, so `240 passed` and `238 passed, 2 skipped` look
-alike to anyone not reading `-rs`. The register names every gate that can skip and why, and
+same dot a passing one does under `-q`, so a run where everything passed and a run where
+two of them never executed look alike to anyone not reading `-rs`. The register names every gate that can skip and why, and
 fails if a new one appears or a declared one stops skipping. It found three more than the run
 did on its first execution, because those three skip only when no image is committed and this
 tree has images. It also caught a name in its own declaration that belongs to no function in

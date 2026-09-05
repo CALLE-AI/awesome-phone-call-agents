@@ -296,8 +296,10 @@ def test_the_readme_states_the_real_number_of_mutations():
     # beside the table said "Forty-four test gates and eleven browser gates" while the table
     # held sixty-eight rows, and it stayed wrong through every run of this gate because this
     # gate only ever read the app README. A checked number beside an unchecked one is the
-    # whole failure, and it happened twice in the same repository.
-    for rel in ("README.md", "evidence/README.md"):
+    # whole failure, and it happened twice in the same repository. A third file was then
+    # found saying "Thirteen rules" while the table held seventy-five, which is why this
+    # reads a list rather than a pair.
+    for rel in ("README.md", "evidence/README.md", "docs/proving-a-gate-fires.md"):
         text = (APP / rel).read_text(encoding="utf-8")
         assert f"{word.capitalize()} gates broken on purpose" in text, (
             f"MUTATIONS.md has {rows} rows, so {rel} should say "
