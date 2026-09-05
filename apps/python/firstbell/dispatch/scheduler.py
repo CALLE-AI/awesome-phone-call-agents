@@ -56,6 +56,16 @@ class RetryPolicy:
     base_delay_seconds: float = 1.0
     max_delay_seconds: float = 30.0
 
+    def __post_init__(self) -> None:
+        # `range(1, max_attempts + 1)` is empty at zero, so the create loop never runs and
+        # every item comes back FAILED with an empty reason: a run that placed no calls and
+        # blamed the families. A policy that dials nobody is a configuration mistake, and
+        # it should be one at construction rather than a queue of blank refusals.
+        if self.max_attempts < 1:
+            raise ValueError(
+                f"RetryPolicy(max_attempts={self.max_attempts}) would place no calls at "
+                f"all; one attempt is the minimum a policy can describe.")
+
     def delay_for(self, attempt: int) -> float:
         return min(self.base_delay_seconds * (2 ** (attempt - 1)), self.max_delay_seconds)
 

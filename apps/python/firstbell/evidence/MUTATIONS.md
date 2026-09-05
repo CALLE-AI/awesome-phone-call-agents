@@ -6,10 +6,24 @@ was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`.
 
+Three of the gates watch what the program prints rather than any one rule:
+`test_the_readme_sample_is_what_the_program_actually_prints`,
+`test_the_prose_numbers_match_the_program_too` and
+`test_the_demo_run_shows_all_three_outcomes`. Any change that alters the demonstration's
+output fails those as well as the test belonging to the rule, so a count here can be larger
+than the number of tests written about the rule itself. That is the honest number and it is
+what this column reports: row 2 says five because disabling consent breaks two consent
+tests and all three of those.
+
+A count also grows as the suite does. Row 2 read three until it was re-measured, having
+been written when fewer of the output gates existed, which is the same drift that put stale
+line numbers in the proof images. Reproducing a row and getting a larger number is that,
+not a disagreement about the rule.
+
 | # | The change | Tests that failed |
 |---|---|---|
 | 1 | `max_workers=self._concurrency` becomes `max_workers=None`, removing the concurrency cap | 4 |
-| 2 | `if not item.consented:` becomes `if False:`, disabling the consent gate | 3 |
+| 2 | `if not item.consented:` becomes `if False:`, disabling the consent gate | 5 |
 | 3 | Drop `insufficient_balance` from the double's `API_ERROR_CODES` | 3 |
 | 4 | Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 1 |
 | 5 | Write the transcript into every receipt instead of only when `--include-transcript` is given | 1 |
@@ -50,8 +64,9 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 40 | Let a `calls.create` timeout fall through to the catch-all, which is how it shipped until this was fixed: no retry, and a call that may have been placed recorded as FAILED | 1 |
 | 41 | Cite in `docs/images/README.md` the line the caption used to name, which is how both stills shipped | 1 |
 | 42 | Type a window bound back into the still generator instead of looking it up | 1 |
+| 43 | Accept `RetryPolicy(max_attempts=0)`, whose create loop never runs, so every item comes back FAILED with an empty reason about a run that dialled nobody | 1 |
 
-## Why these forty-two
+## Why these forty-three
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

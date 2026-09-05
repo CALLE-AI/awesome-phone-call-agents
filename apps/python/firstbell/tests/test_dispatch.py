@@ -802,6 +802,19 @@ def test_a_run_that_reaches_nothing_says_so(double):
     assert report.results[0].resolution is not Resolution.RESOLVED
 
 
+def test_a_retry_policy_that_would_place_no_calls_is_refused():
+    """Zero attempts is not a cautious setting, it is a silent one.
+
+    `for attempt in range(1, max_attempts + 1)` is empty at zero, so the create loop never
+    ran, no call was placed, and every item came back FAILED with an empty reason. A queue
+    of blank refusals reads as "we tried and nobody answered" about a run that dialled
+    nobody, which is the confusion this whole program exists to remove.
+    """
+    with pytest.raises(ValueError) as caught:
+        RetryPolicy(max_attempts=0)
+    assert "no calls" in str(caught.value)
+
+
 def test_a_timeout_creating_a_call_is_retried_and_never_called_a_failure():
     """A timeout is not an answer.
 
