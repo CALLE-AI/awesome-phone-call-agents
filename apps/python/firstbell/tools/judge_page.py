@@ -152,6 +152,26 @@ def mutation_rows() -> list[tuple[str, str, str]]:
     return re.findall(r"^\| (\d+) \| (.+?) \| (\d+) \|$", text, re.M)
 
 
+def mask_id(value: str) -> str:
+    """Show enough of an identifier to match a row against a dashboard, not the identifier.
+
+    A live call id is not a credential: another account's key cannot read our call. It is
+    still an artifact of a real call to a real number, and this repository's checklist asks
+    contributors to keep those out of what they publish. The maintainer asked for them to be
+    stripped from the linked page rather than argued about, so they are stripped.
+
+    Enough is kept that CALL-E, who hold the billing records these rows invite a check
+    against, can still line a row up with their own export. Nobody else could use a whole one.
+    """
+    if not value:
+        return value
+    head, sep, body = value.partition("_")
+    if not sep:
+        head, body = "", value
+    keep = 4 if len(body) > 10 else 2
+    return f"{head}{sep}{body[:keep]}…{body[-keep:]}"
+
+
 def recovered_provider_ids() -> dict[str, str]:
     """Receipts written before the code recorded `provider_call_id` still have one.
 
@@ -619,6 +639,13 @@ def css_for_serving(css: str) -> str:
 
 def build(has_audio: bool, repo_url: str | None = None) -> str:
     data = transcripts()
+    # Masked here rather than at each use, so a new surface that reads a call cannot
+    # reintroduce a whole identifier by reading the field the old ones read.
+    _calls = data.get("calls", {})
+    for _call in (_calls.values() if isinstance(_calls, dict) else _calls):
+        for _key in ("apiId", "providerId"):
+            if _call.get(_key):
+                _call[_key] = mask_id(_call[_key])
     recs = receipts()
     muts = mutation_rows()
     recovered = recovered_provider_ids()
@@ -638,7 +665,8 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
             seen.add(cid)
             call_rows.append((cid,
                               item.get("provider_call_id") or recovered.get(cid),
-                              item.get("resolution"), name))
+                              item.get("resolution"), name,
+                              item.get("structured_result") or {}))
     live = [(n, d) for n, d in recs if d.get("reached_production_api")]
     agree = sum(p["agree"] for p in data["pairs"])
     total = sum(p["of"] for p in data["pairs"])
@@ -741,7 +769,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     ]
     for num, label in ((test_count(), "tests"),
                        (len(muts), "rules broken on purpose to prove a test notices"),
-                       (len(call_rows), "real calls, every id checkable against CALL-E’s billing"),
+                       (len(call_rows), "real calls, each one checkable against CALL-E’s billing"),
                        ("none", "CALL-E account needed to run the demo")):
         body.append(f'<div class=cell><div class=num>{esc(num)}</div>'
                     f'<div class=lbl>{label}</div></div>')
@@ -813,19 +841,26 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     add(act("03", "Three endings", "".join(body), "act-3"))
 
     # ---- Act 4: check us
-    have = sum(1 for _c, pv, _r, _s in call_rows if pv)
+    have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
     body = [
         '<div class=split><div class=claim>',
         '<h3>04</h3><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
         '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
-        'printed here, so any row can be taken to the vendor&#8217;s records and checked '
-        'against a source with no stake in these claims.</p>',
+        'here, shortened at both ends, alongside the structured answer each call brought '
+        'back, so any row can be taken to the vendor&#8217;s records and checked against a '
+        'source with no stake in these claims.</p>',
+        '<p class=note>The identifiers are shortened on purpose. A live call id is not a '
+        'credential, because another account&#8217;s key cannot read our call, but it is an '
+        'artifact of a real call to a real number and this repository asks contributors to '
+        'keep those out of what they publish. CALL-E hold the billing records this table '
+        'invites a check against and can match a row from what is shown; the unshortened '
+        'list travels with the submission rather than on a public page.</p>',
         f'<p>{len(live)} of {len(recs)} committed receipts reached the production API and '
         f'{have} of {len(call_rows)} calls carry the provider identifier. The rest had it '
         'recovered afterwards with a <code>GET</code>, which places no call.</p>',
         '<table class=compliance><tbody>'
-        '<tr><td>call ids, transcripts, waveforms, structured results, the audio</td>'
-        '<td class=dim>served on this page only</td></tr>'
+        '<tr><td>transcripts, waveforms, the audio, and the unshortened identifiers</td>'
+        '<td class=dim>not in the repository, and not published whole</td></tr>'
         '<tr><td>the rules those calls produced, and the tests that hold them</td>'
         '<td class=ok>in the repository</td></tr>'
         '</tbody></table>',
@@ -836,13 +871,21 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>',
         '</div><div class=artifact>',
         '<table class=ids><thead><tr><th>API id</th>'
-        '<th>provider id (dashboard)</th><th>outcome</th></tr></thead><tbody>',
+        '<th>provider id (dashboard)</th>'
+        + "".join(f'<th>{esc(f)}</th>' for f in data["fieldOrder"])
+        + '<th>outcome</th></tr></thead><tbody>',
     ]
-    for call_id, provider, resolution, _src in call_rows:
+    for call_id, provider, resolution, _src, fields in call_rows:
         cls = {"resolved": "resolved", "undetermined": "undetermined"}.get(resolution or "", "failed")
-        pv = (f'<button data-copy="{esc(provider)}" title="Copy">{esc(provider)}</button>'
+        pv = (f'<span class=mono>{esc(mask_id(provider))}</span>'
               if provider else '<span class=dim>not recorded</span>')
-        body.append(f'<tr><td class=mono>{esc(call_id)}</td><td class=mono>{pv}</td>'
+        cells = "".join(
+            f'<td data-field="{esc(f)}">'
+            + (esc(fields[f]) if fields.get(f) else '<span class=dim>&#183;</span>')
+            + '</td>'
+            for f in data["fieldOrder"])
+        body.append(f'<tr><td class=mono>{esc(mask_id(call_id))}</td><td>{pv}</td>'
+                    f'{cells}'
                     f'<td><span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
     body.append('</tbody></table></div></div>')
     add(act("04", "Check us against your billing", "".join(body)))

@@ -569,3 +569,113 @@ def test_no_committed_file_carries_anything_shaped_like_a_key(tracked):
     assert not offenders, NEWLINE_INDENT.join(
         ["these look like real API keys:"] + sorted(offenders))
 
+
+
+def test_no_whole_call_identifier_can_reach_the_page():
+    """The maintainer asked for live identifiers to be off the published page.
+
+    They were on it, in two places that looked unrelated: a table column and the JSON the
+    scenes are drawn from. Fixing one and missing the other is the obvious way to fix this
+    badly, so this checks the shortener itself and then checks that nothing in the builder
+    writes a raw identifier into the page.
+
+    A call id is not a credential. Another account's key cannot read our call. It is still
+    an artifact of a real call to a real number, which is what the checklist covers.
+    """
+    import sys as _sys
+
+    _sys.path.insert(0, str(APP / "tools"))
+    try:
+        from judge_page import mask_id
+    finally:
+        _sys.path.pop(0)
+
+    real = [
+        "call_x_aaaaaaaaaaaaaaaaaaaa",
+        "call_-bbbbbbbbbbbbbbbbbbbbb",
+        "cccccccc11111111dddddddd22222222",
+    ]
+    for value in real:
+        short = mask_id(value)
+        assert value not in short, f"{value} survives its own shortening"
+        assert len(short) < len(value), f"{value} was not shortened at all"
+        assert "\u2026" in short, f"{short} does not show that anything was removed"
+        assert short.startswith(value[:4]), (
+            f"{short} keeps nothing of the front, so CALL-E cannot match it to a record"
+        )
+        assert short.endswith(value[-4:]), f"{short} keeps nothing of the end"
+
+    assert mask_id("") == "", "an absent identifier must stay absent, not become an ellipsis"
+
+    source = (APP / "tools" / "judge_page.py").read_text(encoding="utf-8")
+    build = source.split("def build(", 1)[1]
+    # The masking loop names both fields through a variable, so it is the one place they
+    # may appear without mask_id beside them. Excluding it by name rather than by line
+    # number keeps this from flagging the very code it is asking for.
+    assert 'for _key in ("apiId", "providerId"):' in build, (
+        "the loop that shortens every embedded identifier is gone"
+    )
+    # The assignment is named exactly. Excluding the loop by the variable it uses let a
+    # mutation to `_call[_key] = _call[_key]` pass this test while every embedded id went
+    # out whole, which is the leak this file exists to stop.
+    assert "_call[_key] = mask_id(_call[_key])" in build, (
+        "the embedded call data is no longer shortened before it is written into the page"
+    )
+    for field in ("apiId", "providerId"):
+        emitted = [ln for ln in build.splitlines()
+                   if field in ln and "mask_id" not in ln and "_key" not in ln]
+        assert not emitted, (
+            f"{field} is read in build() without mask_id on the same line: {emitted}"
+        )
+    for column in ("mask_id(call_id)", "mask_id(provider)"):
+        assert column in build, f"the identifier table no longer shortens with {column}"
+
+
+def test_every_real_result_the_readme_promises_is_on_the_page():
+    """The README tells a judge the page carries all eleven, so the five are countable.
+
+    It said that while the page carried eight, because the page drew its structured results
+    from the transcripts file and the eleven live in the receipts. The sentence was checkable
+    and false, which is worse than a sentence that promises less.
+    """
+    page = APP / "out" / "index.html"
+    if not page.exists():
+        pytest.skip("the page has not been built in this checkout")
+
+    html = page.read_text(encoding="utf-8")
+
+    # The functional half. The checks above read the builder's source; this reads what the
+    # builder actually produced, which is the only artifact a judge sees.
+    whole_call_ids = set(re.findall(r"call_[A-Za-z0-9_-]{15,}", html))
+    # Bounded with lookarounds rather than a word-boundary escape. A backslash-b typed
+    # into this file through a shell heredoc arrives as byte 0x08, and the pattern then
+    # matches nothing while still passing, which is how this line spent its first run
+    # testing nothing at all.
+    whole_provider_ids = set(re.findall("(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])", html))
+    assert not whole_call_ids, f"{len(whole_call_ids)} whole call ids are on the page"
+    assert not whole_provider_ids, (
+        f"{len(whole_provider_ids)} whole provider ids are on the page"
+    )
+
+    table = re.search(r"<table class=ids>.*?</table>", html, re.S)
+    assert table, "the page no longer has the identifier table the README points at"
+
+    values = re.findall(
+        r'data-field="parent_confirmed_aware">(?:<span class=dim>)?([^<]*)', table.group(0)
+    )
+    answered = [v.strip() for v in values if v.strip() and v.strip() != "&#183;"]
+    not_yes = [v for v in answered if v != "yes"]
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    claim = re.search(r"all (\w+) results are on the\s*\n?\s*\[evidence page\]", readme)
+    assert claim, "the README no longer makes the claim this test exists to hold"
+    words = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13}
+    promised = words[claim.group(1)]
+
+    assert len(answered) == promised, (
+        f"the README promises {promised} results on the page and the table carries "
+        f"{len(answered)}"
+    )
+    assert len(not_yes) == 5, (
+        f"the README says five are countable and the page shows {len(not_yes)}: {not_yes}"
+    )

@@ -121,6 +121,28 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 57 | Plant an assignable Indian mobile in `plugins/firstbell-absence-calls/` with the privacy gate scoped to `apps/python/firstbell` as it was, which is the state this contribution shipped in | 0 |
 | 58 | The same number with the gate scoped to every path this contribution adds | 1 |
 | 59 | Point `CONTRIBUTION_PATHS` at a directory that no longer exists, which is what a rename looks like from inside the gate. Reported as 10 errors rather than 10 failures, because the guard sits in the helper every one of them calls | 10 |
+| 60 | Have `mask_id` hand back the identifier it was given, so every call id on the page is whole again | 1 |
+| 61 | Print the API id straight into the identifier table, shortening only the provider id beside it | 1 |
+| 62 | Assign `_call[_key] = _call[_key]` in the loop that shortens the embedded call data, which is a masking loop that masks nothing | 1 |
+| 63 | Have the README promise eight results on the page when the page carries eleven | 1 |
+| 64 | Change one `unknown` answer in the built page to `yes`, so four of the five countable non-yes answers remain | 1 |
+| 65 | Leave one whole provider id in the built page, in a comment the layout never shows, which is what a leak looks like when it is not in a visible column | 1 |
+
+Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
+gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
+allowed any line naming the masking loop's own variable, so a loop rewritten to mask nothing
+passed it while every embedded identifier went out whole. The gate was checking that code
+mentioning the fields existed, not that it did anything. Row 62 survived, the gate was
+changed to name the assignment exactly and to read the built page rather than only the
+source that builds it, and row 62 then failed as it should. It is recorded here as a killed
+row because that is what it is now, and the paragraph is the honest part.
+
+Row 65 is the same lesson from the other side. The half of that gate which reads the built
+page rather than the source had a `\b` in its pattern that a shell heredoc turned into byte
+0x08, so it searched the page for a backspace character, found none, and passed. Rows 60 to
+64 all passed while it was dead, because every one of them is caught by the source half.
+Only a mutation that plants a whole identifier in the built artifact could tell the two
+halves apart, and row 65 is that mutation. A gate with two halves needs a row per half.
 
 Row 57 is the only row in this table whose measured value is **zero on purpose**. Every other
 zero in this project's history meant the change had been made in the wrong place. This one is
@@ -130,7 +152,7 @@ added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every num
 repository is checked. Row 58 is the same planted number after the scope was widened. The
 pair is the proof, and neither row means anything without the other.
 
-## Why these fifty-nine
+## Why these sixty-five
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
