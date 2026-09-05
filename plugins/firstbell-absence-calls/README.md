@@ -49,7 +49,7 @@ and returns shaped responses that include both of the awkward outcomes above, so
 routing can be seen working before anything rings.
 
 ```
-node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 21 passing
+node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 26 passing
 node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
 
@@ -61,6 +61,26 @@ classifier so it can be run by `node --test` with no n8n installed, and
 `build-workflow.mjs` inlines it into the `Classify Outcome` node. One of the tests fails if
 the shipped workflow and the tested module ever drift apart, because otherwise they are two
 things that merely started out the same.
+
+## The parent who did not know
+
+A call can come back schema-valid and complete and still not be finished with. If the parent
+did not confirm they already knew their child was absent, this recipe marks the record
+`safeguarding`, keeps it out of the closed count, and sorts it to the top of the queue with a
+30 minute callback window.
+
+It is a second axis, not a fourth outcome. A safeguarding call is still `resolved`, because
+the answer did arrive and it was valid. Making it a fourth value of `resolution` would put a
+call in two buckets or in none, and the three outcomes exist to be counted.
+
+The rule fails closed. Anything that is not an explicit `yes`, including a missing field, an
+`unknown`, or a value nobody anticipated, escalates. The cost of escalating a call that did
+not need it is a phone call, and the cost of the other mistake is a child nobody looked for.
+
+On the eleven real calls behind this work the rule changed no filing, because every call it
+flagged was already going to a person for a different reason. It fired on five of the eleven.
+An alert rate near half is a staffing question, and it is written down here rather than left
+for a school to discover in week two.
 
 ## What the shape tests do and do not prove
 

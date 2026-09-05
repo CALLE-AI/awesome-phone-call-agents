@@ -17,15 +17,29 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { classifyRecipient, maskNumber, summariseWave } from "./classify.mjs";
+import {
+  SAFEGUARDING_CALLBACK_MINUTES,
+  classifyRecipient,
+  maskNumber,
+  safeguardingEscalation,
+  summariseWave,
+} from "./classify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+// The default is a call where the parent confirmed they already knew. Before the
+// safeguarding rule existed this field was absent and the fixture still read as an ordinary
+// closed call. It cannot any more: the rule fails closed, so an absent field escalates, and
+// leaving the fixture alone would have meant weakening the rule to keep an old test green.
 function recipient(overrides = {}) {
   return {
     status: "completed",
     attempts: [{ provider_call_id: "pc_1" }],
-    structured_result: { reason_category: "illness", expected_return: "tomorrow" },
+    structured_result: {
+      parent_confirmed_aware: "yes",
+      reason_category: "illness",
+      expected_return: "tomorrow",
+    },
     ...overrides,
   };
 }
@@ -163,4 +177,69 @@ test("the workflow embeds exactly the code these tests just ran", async () => {
     "the Classify Outcome node no longer contains the contents of classify.mjs. "
       + "Regenerate it with: node examples/build-workflow.mjs",
   );
+});
+test("a parent who did not know is escalated, and is still resolved", () => {
+  const out = classifyRecipient(recipient({
+    structured_result: {
+      parent_confirmed_aware: "no",
+      reason_category: "illness",
+      expected_return: "tomorrow",
+    },
+  }));
+  // The answer arrived and it was schema-valid, so the resolution does not change. What
+  // changes is that nobody may close it without a person looking at it.
+  assert.equal(out.resolution, "resolved");
+  assert.equal(out.escalation, "safeguarding");
+  assert.equal(out.needsAHuman, true);
+  assert.match(out.reason, /safeguarding/);
+});
+
+test("escalation is a second axis and never a fourth resolution", () => {
+  // If this ever becomes a fourth value, every count in summariseWave is wrong: a call would
+  // be in two buckets or in none, and the three outcomes exist to be counted.
+  const escalated = classifyRecipient(recipient({
+    structured_result: { parent_confirmed_aware: "no", reason_category: "illness" },
+  }));
+  assert.ok(["resolved", "undetermined", "failed"].includes(escalated.resolution));
+  assert.notEqual(escalated.resolution, "safeguarding");
+});
+
+test("the rule fails closed on anything that is not an explicit yes", () => {
+  for (const value of [undefined, null, "", "no", "unknown", "YES?", "y", 0, "maybe"]) {
+    assert.equal(safeguardingEscalation({ parent_confirmed_aware: value }), "safeguarding",
+      `${JSON.stringify(value)} should not close a call`);
+  }
+  for (const value of ["yes", "YES", " Yes "]) {
+    assert.equal(safeguardingEscalation({ parent_confirmed_aware: value }), "none",
+      `${JSON.stringify(value)} is a confirmation`);
+  }
+  assert.equal(safeguardingEscalation(null), "safeguarding");
+  assert.equal(safeguardingEscalation("not an object"), "safeguarding");
+});
+
+test("an escalated call is not counted as closed", () => {
+  const summary = summariseWave([
+    { id: "A", resolution: "resolved", escalation: "none", attempts: 1, needsAHuman: false },
+    { id: "B", resolution: "resolved", escalation: "safeguarding", attempts: 3, needsAHuman: true },
+  ]);
+  assert.equal(summary.counts.resolved, 2);
+  assert.equal(summary.escalated, 1);
+  assert.equal(summary.closed, 1);
+  // Two resolved out of two attempted would read as 100%. One of them is not finished with.
+  assert.equal(summary.resolutionRate, 0.5);
+  // B's three attempts are still somebody's work, so they are not counted as saved.
+  assert.equal(summary.attemptsResolved, 1);
+  assert.equal(summary.attemptsOpen, 3);
+  assert.equal(summary.safeguardingCallbackMinutes, SAFEGUARDING_CALLBACK_MINUTES);
+});
+
+test("safeguarding rows sort to the top of the human queue", () => {
+  const summary = summariseWave([
+    { id: "A", resolution: "failed", escalation: "none", attempts: 2, needsAHuman: true },
+    { id: "B", resolution: "undetermined", escalation: "none", attempts: 1, needsAHuman: true },
+    { id: "C", resolution: "resolved", escalation: "safeguarding", attempts: 1, needsAHuman: true },
+  ]);
+  assert.equal(summary.queue.length, 3);
+  assert.equal(summary.queue[0].id, "C", "the safeguarding case must be worked first");
+  assert.equal(summary.queue[0].escalation, "safeguarding");
 });

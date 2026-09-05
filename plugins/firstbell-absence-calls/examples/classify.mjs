@@ -13,6 +13,15 @@
  *                 `structured_result` is null, or every required field is uninformative.
  *   failed        Nobody was reached on any number.
  *
+ * A second, independent axis rides alongside those three:
+ *
+ *   escalation    "safeguarding" when the parent did not confirm they already knew their
+ *                 child was absent. It is not a fourth resolution. Making it one would mean
+ *                 a call could be counted in two buckets or in neither, and the three
+ *                 outcomes above exist to be counted. A safeguarding call is still
+ *                 `resolved`: the answer arrived and it was schema-valid. What changes is
+ *                 that it is not closed automatically and a person owes it a callback.
+ *
  * The middle outcome is the point. A pipeline with two buckets has to file
  * "the call connected but we learned nothing" somewhere, and filing it with the
  * successes is how a dashboard reports full coverage for a child nobody heard about.
@@ -86,9 +95,34 @@ function attemptCount(recipient) {
 }
 
 /**
+ * Minutes a school has to return a safeguarding call before the window is missed.
+ *
+ * Not a legal figure. It is the number this recipe prints so the queue carries a deadline
+ * instead of an adjective, and a school with a different policy should change it here.
+ */
+export const SAFEGUARDING_CALLBACK_MINUTES = 30;
+
+/**
+ * Did the parent confirm they already knew their child was not in school?
+ *
+ * Fails closed. Anything that is not an explicit "yes", including a missing field, an
+ * "unknown", or a value nobody anticipated, escalates. The cost of escalating a call that
+ * did not need it is a phone call. The cost of the other mistake is a child nobody looked
+ * for, so the two errors are not worth trading against each other.
+ */
+export function safeguardingEscalation(result) {
+  const confirmed = isObject(result) ? result.parent_confirmed_aware : undefined;
+  return String(confirmed === undefined || confirmed === null ? "" : confirmed)
+    .trim()
+    .toLowerCase() === "yes"
+    ? "none"
+    : "safeguarding";
+}
+
+/**
  * Classify one recipient of one call.
  *
- * Returns { resolution, reason, attempts, providerCallId, needsAHuman }.
+ * Returns { resolution, reason, attempts, providerCallId, escalation, needsAHuman }.
  */
 export function classifyRecipient(recipient) {
   const attempts = attemptCount(recipient);
@@ -105,6 +139,7 @@ export function classifyRecipient(recipient) {
       reason: `nobody answered after trying ${attempts} number(s)`,
       attempts,
       providerCallId,
+      escalation: "none",
       needsAHuman: true,
     };
   }
@@ -117,6 +152,7 @@ export function classifyRecipient(recipient) {
       reason: "the call completed but returned no structured result",
       attempts,
       providerCallId,
+      escalation: "none",
       needsAHuman: true,
     };
   }
@@ -127,16 +163,22 @@ export function classifyRecipient(recipient) {
       reason: "every required field came back unknown, so nothing was learned",
       attempts,
       providerCallId,
+      escalation: "none",
       needsAHuman: true,
     };
   }
 
+  const escalation = safeguardingEscalation(result);
+
   return {
     resolution: "resolved",
-    reason: "schema-valid answer received",
+    reason: escalation === "safeguarding"
+      ? "schema-valid answer received, escalated as safeguarding and not closed automatically"
+      : "schema-valid answer received",
     attempts,
     providerCallId,
-    needsAHuman: false,
+    escalation,
+    needsAHuman: escalation !== "none",
   };
 }
 
@@ -161,6 +203,7 @@ export function summariseWave(rows) {
   const queue = [];
   let attemptsBilled = 0;
   let attemptsResolved = 0;
+  let escalated = 0;
 
   for (const row of Array.isArray(rows) ? rows : []) {
     const resolution = row && row.resolution;
@@ -168,24 +211,41 @@ export function summariseWave(rows) {
       continue;
     }
     counts[resolution] += 1;
+    const isEscalated = row.escalation === "safeguarding";
+    if (isEscalated) {
+      escalated += 1;
+    }
     const attempts = Number.isInteger(row.attempts) ? row.attempts : 0;
     attemptsBilled += attempts;
-    if (resolution === "resolved") {
+    // An escalated call is resolved and is not closed, so its attempts are still somebody's
+    // work. Counting them as saved would report a saving on the calls that cost the most.
+    if (resolution === "resolved" && !isEscalated) {
       attemptsResolved += attempts;
     }
     if (row.needsAHuman) {
-      queue.push({ id: row.id, reason: row.reason });
+      queue.push({ id: row.id, reason: row.reason, escalation: row.escalation || "none" });
     }
   }
 
+  // Safeguarding cases sort to the top of the queue. A list where the urgent row is third
+  // is a list that gets worked from the top.
+  queue.sort((a, b) => (b.escalation === "safeguarding") - (a.escalation === "safeguarding"));
+
   const attempted = counts.resolved + counts.undetermined + counts.failed;
+  // `closed` is the honest numerator. `resolved` counts every schema-valid answer, and an
+  // escalated one is not finished with, so a rate computed from `resolved` would rise every
+  // time the recipe found something serious.
+  const closed = counts.resolved - escalated;
   return {
     counts,
     attempted,
+    escalated,
+    closed,
+    safeguardingCallbackMinutes: SAFEGUARDING_CALLBACK_MINUTES,
     attemptsBilled,
     attemptsResolved,
     attemptsOpen: attemptsBilled - attemptsResolved,
-    resolutionRate: attempted === 0 ? null : counts.resolved / attempted,
+    resolutionRate: attempted === 0 ? null : closed / attempted,
     queue,
   };
 }
