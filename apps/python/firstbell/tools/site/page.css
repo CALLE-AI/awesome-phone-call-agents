@@ -613,6 +613,42 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 @media (min-width: 60rem) and (prefers-reduced-motion: no-preference) {
   html[data-curtain] .act-00 { position: sticky; top: 0; z-index: 0; }
 }
+/* The masthead. A blind reviewer read the first viewport, could not name the product and
+ * could not say who buys it. Both were the page's fault: `firstbell` was in the browser
+ * tab and in one shell command nine screens down, and the one sentence that answers the
+ * question lived in README.md.
+ *
+ * It sits above the eyebrow and stays quiet. The headline is still the loudest thing on
+ * the screen, because the register underneath it is the argument; this block only has to
+ * make sure a reader knows what they are looking at before they start looking. */
+/* Stacked, and measured in rem.
+ *
+ * The first version put the wordmark and the sentence on one row with `flex-wrap` and a
+ * `44ch` measure, and the CLS gate caught it at 0.00174 against a 0.001 ceiling: `ch` is a
+ * property of the loaded font, so the fallback and the real face resolve it to different
+ * widths, the sentence wraps to a different number of lines, and everything below the
+ * masthead moves once the webfont arrives. A row that can reflow above 140 screens of
+ * content is a bad trade for one saved line. */
+.masthead {
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.wordmark {
+  font-family: var(--display); font-size: var(--size-6); line-height: 1.1;
+  margin: 0 0 var(--space-2); color: var(--ink-1); letter-spacing: -0.012em;
+}
+.standfirst {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.45;
+  margin: 0; color: var(--ink-2);
+  max-width: 30rem;
+}
+.source-link {
+  font-family: var(--ui); font-size: var(--size-2); margin: var(--space-2) 0 0;
+}
+.source-link a { color: var(--ink-2); }
+footer .source-link { margin-top: var(--space-3); }
+
 .eyebrow {
   font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.09em;
   text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-3);

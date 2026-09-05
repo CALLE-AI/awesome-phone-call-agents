@@ -545,6 +545,22 @@ def endings_markup(data: dict, cid: str, run: dict) -> str:
     return "".join(out)
 
 
+def repo_link_markup(repo_url: str | None) -> str:
+    """The source link, or nothing.
+
+    This page argues that every number on it can be checked, and until now it offered no
+    way to leave: nine links, every one an in-page anchor. The reason it had none is that
+    the branch is not pushed, and a link to a repository that does not exist yet is worse
+    than no link, so the URL is a build input rather than a constant. Rebuild with
+    `--repo-url` once there is something to point at.
+    """
+    if not repo_url:
+        return ""
+    safe = html.escape(repo_url, quote=True)
+    return (f'<p class=source-link><a href="{safe}" rel="noopener">'
+            f'Source, tests and receipts on GitHub</a></p>')
+
+
 def act(num: str, title: str, body: str, classes: str = "") -> str:
     # One reveal target per act. The hero never reveals: it is the first paint and it is
     # already choreographed on load.
@@ -601,7 +617,7 @@ def css_for_serving(css: str) -> str:
 
 # ---- the page ---------------------------------------------------------------------------
 
-def build(has_audio: bool) -> str:
+def build(has_audio: bool, repo_url: str | None = None) -> str:
     data = transcripts()
     recs = receipts()
     muts = mutation_rows()
@@ -687,7 +703,18 @@ def build(has_audio: bool) -> str:
     hero = "S-4105"
     rows = [pair["en"] for pair in data["pairs"]]
     cue = cue_for(calls[hero], "left for school")
+    # A blind reviewer read the first viewport and could not name the product. They were
+    # right to be unable to: `firstbell` appeared in the visible text of this page exactly
+    # twice, in the browser tab and in a shell command nine screens down. The best sentence
+    # in the entry was in README.md and had never been on the page a judge opens first.
     body = [
+        '<div class=masthead>',
+        '<p class=wordmark>firstbell</p>',
+        '<p class=standfirst>Phones the families whose absence notification went '
+        'unanswered, in the language that family speaks, and brings back a structured '
+        'reason a school office can act on.</p>',
+        repo_link_markup(repo_url),
+        '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
         register_markup(data, rows, hero, has_audio),
@@ -916,7 +943,8 @@ def build(has_audio: bool) -> str:
         'them. If that commit is not the tip of the branch, this page is behind it, and '
         'you can see that for yourself rather than being told. Contrast is measured by '
         '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
-        'so that an unmeasured pair cannot read as a pass.</p></footer>')
+        'so that an unmeasured pair cannot read as a pass.</p>'
+        + repo_link_markup(repo_url) + '</footer>')
 
     add(f'<script id=call-data type=application/json>{script_json(data)}</script>')
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
@@ -933,6 +961,10 @@ def main() -> int:
                     help="directory holding <row-id>.m4a clips, outside this repository")
     ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
                     help="directory holding the call recordings, outside this repository")
+    ap.add_argument("--repo-url", default=os.environ.get("FIRSTBELL_REPO_URL"),
+                    help="public URL of the source repository. Omitted rather than "
+                         "guessed: a link to a repository that is not published yet "
+                         "is worse than no link at all")
     args = ap.parse_args()
 
     # No recordings, no page, and no half-built one either. This tool turns recordings into
@@ -971,7 +1003,7 @@ def main() -> int:
         shutil.copy2(SITE / asset, out / asset)
 
     page = out / "index.html"
-    page.write_text(build(has_audio), encoding="utf-8", newline="\n")
+    page.write_text(build(has_audio, args.repo_url), encoding="utf-8", newline="\n")
 
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     print(f"{page}  {page.stat().st_size / 1024:.1f} KB")
