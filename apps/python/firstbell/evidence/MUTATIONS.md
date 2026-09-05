@@ -20,14 +20,21 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-Thirty-nine rows were re-measured on 5 September 2026 by applying each change, running the
-suite and restoring: rows 1 to 15, 18 to 25, 27 to 29, 31, 32, 34 to 44. Thirty matched.
-Nine did not and are corrected above: row 2 (three to five), row 3 (three to four), row 7
-(one to three), row 8 (one to twenty, because removing the task-level fallback stops the
-demonstration answering at all), row 19 (three to four), row 20 (one to three), row 27 (one
-to two), row 28 (three to two) and row 29 (six to seven). Five rows have not been
-re-measured: 16, 17, 26, 30 and 33. Each of those five changes a file rather than a line, so
-reproducing them takes a different kind of edit and not a different kind of check.
+**All forty-four rows were re-measured on 5 September 2026** by applying each change,
+running the suite and restoring. Thirty-four matched what was published. Ten did not and are
+corrected above: row 2 (three to five), row 3 (three to four), row 7 (one to three), row 8
+(one to twenty, because removing the task-level fallback stops the demonstration answering
+at all), row 19 (three to four), row 20 (one to three), row 26 (two to one), row 27 (one to
+two), row 28 (three to two) and row 29 (six to seven).
+
+Rows 16, 17, 26, 30 and 33 went last because each changes a file rather than a line, which
+takes a different kind of edit and not a different kind of check. Four of the five agreed
+with what was published. Only row 26 moved.
+
+Ten wrong numbers in forty-four is worth stating plainly rather than burying: this table was
+published before it was verified, and verifying it is what found them. None of the ten
+changed whether a gate fires, which is what the table is for. All ten changed how loudly it
+fires, which is what a reader would have checked us on.
 
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
@@ -76,7 +83,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 23 | Shift one cited line number by one, the way any edit above it would | 1 |
 | 24 | Keep a cited line number and change the symbol the sentence claims is on it | 1 |
 | 25 | Point the ten-minute reading order at a file that does not exist | 1 |
-| 26 | Delete the runtime anchors entirely, which a check written as "every anchor resolves" passes on an empty list | 2 |
+| 26 | Delete the runtime anchors entirely, which a check written as "every anchor resolves" passes on an empty list | 1 |
 | 27 | Put the extracted result back on the recipient when no per-recipient schema was asked for | 2 |
 | 28 | Drop two task-level fields the production API returns on every response | 2 |
 | 29 | Give an attempt our symbolic name for the outcome instead of the wire code the API sends | 7 |
