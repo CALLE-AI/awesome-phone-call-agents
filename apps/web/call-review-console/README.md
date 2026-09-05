@@ -2,6 +2,8 @@
 
 **Review a CALL-E call before you act on it.** A terminal call task says `task_completed: true` with a structured result. Before that result books an appointment, closes a ticket or updates a CRM, someone — or an agent — should check that the transcript actually supports it, that the callee was told they were talking to an AI, that a "stop calling me" was honoured, and that the conversation was not a wall of six-second silences. This console does that, per call and across every call on file.
 
+Live demo (fixtures only, no key, no calls): https://call-review-console-q62ufgdryq-uc.a.run.app
+
 Roadmap item: `apps/web/call-review-console` ("Review call results, summaries, recordings, transcripts, and follow-up status").
 
 ## What it checks
