@@ -148,6 +148,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [FieldLine](https://github.com/xiehuanyi/fieldline) - Lone-worker safety net that schedules check-in calls, detects a silent duress phrase, and runs an escalation call cascade ending in a structured incident brief.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [GridGuard Voice Escalation Agent](https://github.com/draculess99/gridguard-voice-escalation-agent) - Approval-gated grid-risk escalation app using CALL-E with disclosed calls, two human confirmations, structured escalation packets, and a dry-run/no-call default. [Demo](https://gridguard-voice-escalation-agent-production.up.railway.app/)
@@ -179,6 +180,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/call-on-behalf`](apps/typescript/call-on-behalf/) | TypeScript | Delegated errand caller with a disclosure budget: says only the details the person authorized, commits only inside authorized windows, and returns the answers plus the transcript. |
 | [`apps/typescript/lost-line-coordinator`](apps/typescript/lost-line-coordinator/) | TypeScript | Consent-first lost-property route coordinator with inspectable calls, locally validated feature evidence, adaptive early stopping, and privacy-minimized results. |
 | [`apps/typescript/surplus-signal`](apps/typescript/surplus-signal/) | TypeScript | Consent-first surplus-food pickup confirmations with strict structured results and a redacted candidate manifest that still requires human dispatch approval. |
+| [`apps/python/fieldline`](apps/python/fieldline/) | Python | Demo-first lone-worker check-ins with silent duress detection, an escalation ladder, masked phone output, and human-owned emergency response. |
 | [`apps/python/accessline`](apps/python/accessline/) | Python | Consent-first venue accessibility verification with disclosed automation, three fixed factual questions, CALL-E REST polling, schema-valid structured results, uncertainty preservation, and a no-call mock CLI by default. |
 | [`apps/python/appointment-confirm`](apps/python/appointment-confirm/) | Python | Consent-first appointment confirmation with a no-call preview, fixture mock, and one-shot CALL-E execute path that returns yes/no + time as fail-closed JSON. |
 | [`apps/python/blood-bank-dispatch`](apps/python/blood-bank-dispatch/) | Python | Parallel blood-stock enquiry that dials every blood bank at once on CALL-E, extracts a strict availability schema with `unknown` preserved as an answer, and returns a shortlist for a human to act on. |
