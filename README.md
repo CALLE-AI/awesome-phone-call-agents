@@ -36,14 +36,25 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 
 ## Table of Contents
 
-- [Community contributions](#community-contributions)
-- [Why this repository exists](#why-this-repository-exists)
-- [CLI reference](#cli-reference)
-- [Templates](#templates)
-- [Resource list](#resource-list)
-- [Contributing](#contributing)
-- [Community](#community)
-- [License](#license)
+- [Awesome Phone Call Agents](#awesome-phone-call-agents)
+  - [Community contributions](#community-contributions)
+  - [Table of Contents](#table-of-contents)
+  - [Why this repository exists](#why-this-repository-exists)
+  - [CLI reference](#cli-reference)
+  - [Templates](#templates)
+    - [Skill folder template](#skill-folder-template)
+    - [App directory template](#app-directory-template)
+    - [Plugin directory template](#plugin-directory-template)
+    - [README list entry template](#readme-list-entry-template)
+  - [Resource list](#resource-list)
+    - [Skills](#skills)
+    - [Apps](#apps)
+    - [Plugins](#plugins)
+    - [Safety patterns](#safety-patterns)
+  - [Contributing](#contributing)
+    - [Contribution workflow](#contribution-workflow)
+  - [Community](#community)
+  - [License](#license)
 
 ## Why this repository exists
 
@@ -193,6 +204,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/multi-party-scheduler`](apps/typescript/multi-party-scheduler/) | TypeScript | Two-phase appointment scheduling over phone calls: gather availability, confirm one time with everybody by voice, release everybody who confirmed when the commit fails and resume an interrupted run. |
 | [`apps/python/callback-coordinator`](apps/python/callback-coordinator/) | Python | Consent-first callback triage and routing: one CALL-E call learns why a person needs a callback, classifies the outcome into a fail-closed disposition, and routes it to the right team. |
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
+| [`apps/python/incidentops-ai`](apps/python/incidentops-ai/) | Python | Autonomous incident commander that uses Gemini for structured outage analysis and CALL-E for authorized live voice escalation, with Safe Demo Mode, call safeguards, evidence-aware acknowledgement, and auditable incident outcomes. |
 | [`apps/python/partline`](apps/python/partline/) | Python | Dry-run-first industrial replacement-part sourcing that calls approved suppliers, checks exact matches against the original request and keeps purchases and alternate approval human-owned. |
 | [`apps/python/webhook-result-receiver`](apps/python/webhook-result-receiver/) | Python | Durable at-least-once CALL-E terminal webhook ingestion with SQLite deduplication, conflict detection, and authenticated Calls API reconciliation. |
 | [`apps/python/lead-follow-up-booking`](apps/python/lead-follow-up-booking/) | Python | Consent-first lead follow-up booking: a disclosed AI call offers only calendar-confirmed free slots and books a Google Calendar event only when the lead picks a time on the call. |
