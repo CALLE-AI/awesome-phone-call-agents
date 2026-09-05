@@ -4,6 +4,6 @@ COPY pyproject.toml README.md ./
 COPY crc ./crc
 COPY static ./static
 COPY fixtures ./fixtures
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[llm]"
 ENV CRC_DATA_DIR=/tmp/crc PORT=8080
 CMD ["sh", "-c", "uvicorn crc.app:app --host 0.0.0.0 --port ${PORT}"]

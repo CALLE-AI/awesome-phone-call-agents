@@ -39,7 +39,9 @@ def review(task: dict, schema: dict | None = None, use_llm: bool = False) -> dic
             m = by.get(row["field"])
             if m is not None:
                 row["supported"] = bool(m.get("supported"))
-                row["how"] = f"model: {m.get('note', '')[:140]} (turns {m.get('turns')})"
+                row["how"] = "model read the transcript"
+                row["turns"] = [int(x) for x in (m.get("turns") or []) if str(x).lstrip("-").isdigit()]
+                row["note"] = str(m.get("note") or "")[:200]
     unsupported = [r for r in ev if r["supported"] is False]
     unknown = [r for r in ev if r["supported"] is None]
     sc = schema_check(result, schema)
