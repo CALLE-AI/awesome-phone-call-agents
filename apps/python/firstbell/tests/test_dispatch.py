@@ -930,6 +930,20 @@ def test_a_wage_without_a_source_is_refused():
                   source_url="", year=2026)
 
 
+def test_a_funding_rate_without_a_source_is_refused():
+    """The other money class, which had this rule and nothing exercising it.
+
+    `FundingRate` and `StaffCost` both refuse a figure asserted with no provenance, and both
+    spell the check as a loop over required field names. Only the wage was tested. Removing
+    `source` from this one failed no test at all, which is how a rule stops being a rule.
+    """
+    from firstbell.domain import FundingRate
+    for blank in ("", "   "):
+        with pytest.raises(ValueError, match="source"):
+            FundingRate(amount=12.0, currency="$", jurisdiction="Texas", source=blank,
+                        source_url="https://example.gov/rate", year=2026)
+
+
 def test_a_wage_that_is_not_positive_is_refused():
     from firstbell.domain import StaffCost
     with pytest.raises(ValueError):
