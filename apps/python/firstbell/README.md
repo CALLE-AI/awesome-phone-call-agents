@@ -216,6 +216,36 @@ child who is safe at a friend's house from one who is not, and it is not trying 
 moves the case to a person inside a stated window, which is the only thing software should
 be doing with that question.
 
+**And it moved nothing in production, which is worth saying plainly.** Eleven of the twelve
+real calls came back with a structured result. Five of those eleven did not confirm the
+parent already knew, and every one of the five was already going to a person, because every
+required field had come back uninformative and the older rule reached it first. Nothing
+was filed differently.
+
+That is measured rather than asserted, and the measurement is the awkward one. Comparing
+against the filing written in each receipt would have credited this rule with catching
+`S-3004`, and receipt 04 exists precisely because it records a defect that a later fix
+already closed. So `tools/replay_escalation.py` files every call twice with today's code,
+once with the rule and once without, and only a difference between those two is a case
+this rule moved:
+
+```bash
+python tools/replay_escalation.py --receipts <dir>
+```
+
+Check it rather than take it: all eleven results are on the
+[evidence page](https://firstbell-evidence.vercel.app) with `parent_confirmed_aware`, the
+other structured fields and the outcome each was filed under, so the five are countable
+without this repository and without me.
+
+That is the correct result and not a disappointing one. The gap this rule closes is a
+specific shape: a parent who did not know, who then gives a complete and plausible answer.
+Every existing check passes on that shape, which is exactly why it needed its own rule,
+and none of the twelve parents happened to produce it. The offline demonstration does,
+because a demonstration that only shows the cases the code already handled is not showing
+anything. `S-1047` in `examples/absences.csv` is that row, and it is the only row in the
+fixture that reaches this rule.
+
 The middle row is the one that is easy to get wrong. CALL-E can return a call with status
 `completed` and `structured_result: null`, which is a real conversation that the schema
 could not be filled from. A pipeline with two buckets has to put that somewhere, and
