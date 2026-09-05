@@ -11,9 +11,9 @@ pip install -r requirements.txt
 python -m firstbell --work-file examples/absences.csv
 ```
 
-## If you have ten minutes
+## If you have fifteen minutes
 
-Read these five files in this order. Between them they contain every claim this directory
+Read these six files in this order. Between them they contain every claim this directory
 makes, and each one can be checked without an API key.
 
 | # | File | What it settles | Time |
@@ -23,6 +23,7 @@ makes, and each one can be checked without an API key.
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Fifty-nine gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
+| 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 
 ### Where CALL-E is called at runtime
 
@@ -445,6 +446,13 @@ calls were of the second kind.
 
 ## What this does not claim
 
+Three of these are legal rather than technical, and they are set out properly in
+[`docs/the-legal-surface.md`](docs/the-legal-surface.md): what a `consent` column would have
+to become before it is a defensible TCPA record, what a guardian who cannot use a voice call
+gets today (nothing), and who owns an escalation once the software has raised it. The FCC
+confirmed in February 2024 that an AI-generated voice is an "artificial" voice under the
+TCPA, which puts a call like this one inside the statute rather than beside it.
+
 - **No money figure.** Explaining an absence does not make a student present, so no
   attendance funding is recovered by these calls. Seven US states funded schools on daily
   attendance as of 2022 ([PPIC](https://www.ppic.org/blog/who-stands-to-gain-from-changes-in-school-enrollment-funding/),
@@ -486,6 +494,13 @@ calls were of the second kind.
 
 Four things, and each one is a limitation named above rather than a feature I fancy. In the
 order that decides whether this is usable by a real school.
+
+The shape of the deployment they lead to is written out in
+[`docs/what-a-pilot-would-look-like.md`](docs/what-a-pilot-would-look-like.md): two schools,
+six weeks, the four baseline measurements that have to be taken **before** anything is
+switched on, who owns the escalation queue by name, and the five conditions that stop it. It
+is a proposal and nothing in it has happened. It exists because a direction worth building
+is a thing you can describe well enough to be refused.
 
 1. **A local number in the region being called.** The blocker, and not a language problem.
    These calls reached an Indian handset showing a `+1` caller ID from Oakland, and a

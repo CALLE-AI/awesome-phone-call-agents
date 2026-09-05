@@ -208,7 +208,7 @@ def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     """The list on the first screen, checked for both halves of what it promises.
 
     A dead link there is worse than no list. So is a budget the rows do not add up to: the
-    heading offers a reader ten minutes, every row states its own cost, and nothing was
+    heading offers a reader a budget, every row states its own cost, and nothing was
     checking that those two agree. They did not, by a minute, from the day the section was
     written.
 
@@ -217,8 +217,16 @@ def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     lower bound is what stops the list quietly emptying.
     """
     readme = (APP / "README.md").read_text(encoding="utf-8")
-    heading = "## If you have ten minutes"
-    order = readme.split(heading, 1)
+    # The heading is read rather than spelled out here. Hardcoding one wording meant that
+    # honestly raising the budget to match the rows failed this test for the wrong reason,
+    # which pushes the next person towards shaving a row's estimate instead of the heading.
+    words = {"ten": 10, "fifteen": 15, "twenty": 20}
+    found = re.search(r"## If you have (\w+) minutes", readme)
+    assert found, "the README no longer has a reading order"
+    assert found.group(1) in words, (
+        f"the reading order offers '{found.group(1)}' minutes, which this test cannot score"
+    )
+    order = readme.split(found.group(0), 1)
     assert len(order) == 2, "the README no longer has a reading order"
     table = order[1].split("### Where CALL-E is called", 1)[0]
 
@@ -230,8 +238,7 @@ def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     for rel in linked:
         assert (APP / rel).exists(), f"the reading order points at {rel}, which does not exist"
 
-    budget = int(re.search(r"## If you have (\w+) minutes", readme).group(1)
-                 .replace("ten", "10").replace("fifteen", "15").replace("twenty", "20"))
+    budget = words[found.group(1)]
     stated = [int(m) for m in re.findall(r"\| (\d+) min \|", table)]
     assert len(stated) == len(linked), (
         f"{len(linked)} rows but {len(stated)} of them state a reading time"

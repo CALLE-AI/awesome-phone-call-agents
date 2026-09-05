@@ -1,0 +1,137 @@
+# The legal surface
+
+Seven questions a school district's counsel would ask before this software telephoned a
+single parent. Some have an answer in this repository, some have a design position, and some
+are open. They are written down because silence about them reads as never having asked.
+
+This is not legal advice and it is not a compliance sign-off. It is the list of questions a
+district's counsel would ask before this software phoned a single parent, written down so
+that a reader can see which ones have an answer here, which ones have a design position, and
+which ones are open. Every one of them is a question about a school telephoning a family,
+not a question about this code, which is why none of them is answered by the tests.
+
+The order is the order they would be asked in.
+
+## 1. Is an absence call a disclosure of an education record? (FERPA)
+
+**The rule.** FERPA (20 U.S.C. § 1232g; 34 CFR Part 99) restricts disclosure of personally
+identifiable information from education records without written consent. A student's
+attendance record is an education record. Telling a parent about it is ordinarily not a
+disclosure problem, because a parent is the party with rights under FERPA for a minor.
+
+**Where it gets interesting.** The call is placed by software operated by a vendor. That
+makes the vendor's status the question, not the parent's. The usual route is the school
+official exception at 34 CFR § 99.31(a)(1): an outside party may be treated as a school
+official where it performs a service the district would otherwise use its own employees for,
+is under the district's direct control as to the use and maintenance of the records, and
+does not redisclose.
+
+**What this repository can say.** The work file carries the minimum that a call needs: a
+student id, guardian numbers, a locale, a consent flag and an absence date. `student_name`
+is present because a call that cannot say the child's name is not a usable call. Nothing else
+about the student is read, and the receipt records outcomes rather than record contents.
+
+**Open.** Whether the district's own counsel accepts CALL-E, as the upstream telephony
+provider, inside the school official boundary, and what its annual notification of rights
+must say. Neither is answerable here.
+
+## 2. May we place an artificial-voice call to a parent's mobile? (TCPA)
+
+**The rule.** The TCPA (47 U.S.C. § 227) restricts calls to wireless numbers using an
+artificial or prerecorded voice without prior express consent. On 8 February 2024 the FCC
+adopted a Declaratory Ruling recognising that calls made with AI-generated voices are
+"artificial" under the TCPA ([FCC news release](https://www.fcc.gov/document/fcc-makes-ai-generated-voices-robocalls-illegal)).
+That ruling is the reason this section exists: it puts a call like this one squarely inside
+the statute rather than beside it.
+
+**What this repository does.** `consent` is a required column and a row without it is
+`SKIPPED` before any call is placed, which the demonstration shows as `S-1045`. The consent
+gate is implemented, tested, and cannot be bypassed by a flag.
+
+**The gap, stated plainly.** A CSV column reading `yes` is a data structure, not a legal
+record of consent. It carries no timestamp, no evidence of what the parent was told, no
+record of the channel it was given on, and no revocation path. The software enforces a flag
+that a district would have to be able to defend, and nothing here helps it defend one.
+
+**Open, and it is the largest one on this page.** What the district's consent artifact is,
+where it lives, how a parent withdraws it, and whether an emergency or safety exception
+applies to an unexplained absence. A defensible answer would replace the boolean with a
+reference to a dated consent record. That is a schema change and a district conversation,
+not a patch.
+
+## 3. May the call be recorded, and is it? (state wiretap law)
+
+**The rule.** Recording consent is state law and it is not uniform. A majority of US states
+permit recording with one party's consent; a minority require all parties to consent.
+Placing a call across a state line can engage both states' rules.
+
+**What this repository does.** It never records. CALL-E's dashboard holds recordings of calls
+placed through it, and this app has no route to them: there is no audio field on any of the
+three production responses captured under `tests/data`, and `/recording`, `/audio`,
+`/recordings` and `/v1/recordings` all return 404. That is a limitation of the platform
+rather than a decision made here, and it happens to be the safer default.
+
+**Open.** Whether the district's own retention obligations require it to keep a recording it
+currently cannot fetch, and what its position is in an all-party state. Note that the
+recordings published on the evidence page are of calls between the author and the author's
+own line, made for demonstration.
+
+## 4. What is kept, for how long, and who deletes it?
+
+**What this repository does.** A run writes one receipt. It carries outcomes, counts,
+identifiers and timings. It does not carry a transcript unless `--include-transcript` is
+passed, and it never carries an unmasked telephone number: `mask()` is applied on the way out
+and `tests/test_privacy.py` fails the build if a number, a key or a seven-digit run reaches a
+receipt, a log line or stderr.
+
+**Open.** Retention is undefined here because it belongs to the district's schedule, not to a
+tool. A deployment needs a stated life for receipts, a stated life for anything CALL-E holds
+upstream, and a deletion path that covers both. This software writes files to a path it is
+given and has no opinion about how long they live, which is a gap and not a feature.
+
+## 5. What does the data-processing agreement have to say?
+
+The clauses a district would need, none of which this repository can supply:
+
+- The processor's role, limited to placing attendance calls on documented instruction.
+- No redisclosure and no secondary use, which for an AI vendor has to include a written
+  position on training.
+- Sub-processors named, since CALL-E itself routes through an upstream carrier.
+- Where the data is processed, which matters here: the shipped configuration dials Indian
+  numbers over an international line from a US caller ID.
+- Breach notification, audit rights, and deletion on termination.
+
+## 6. A voice-only service and a guardian who cannot use a voice call
+
+This is the objection that most deserves to be uncomfortable, because the argument for this
+software is a language-access argument.
+
+Title VI and the 2015 joint Dear Colleague Letter require a district to communicate with
+families in a language they understand. This app answers that by calling in the family's own
+language. Section 504 of the Rehabilitation Act and Title II of the ADA require effective
+communication with a guardian who is deaf or hard of hearing, and a voice call is not that.
+Solving one duty with a channel that cannot serve the other is not a solution, it is a
+transfer.
+
+**What this repository does about it today: nothing, and it should say so.** There is no
+relay support, no TTY path, no SMS fallback, and no stated behaviour when a family's language
+is outside CALL-E's supported table. The `consent` column is the only gate, and it does not
+carry a communication preference.
+
+**The design position.** The right shape is a per-guardian communication preference in the
+work file, with `voice` as one value among several, and a routing decision that a call is
+simply not attempted for a guardian whose preference it cannot serve. That row would go to
+the human queue as a case the software declined, rather than as a case it failed. That is a
+small change to `WorkItem` and a large change to what a district would have to configure, and
+it is honest to say it is not built.
+
+## 7. Who is accountable for the case the software escalates?
+
+A school cannot delegate its duty of care and this software does not ask it to. The rule is
+that only an explicit confirmation closes a record, and everything else reaches a person
+inside a stated window. `SAFEGUARDING_CALLBACK_MINUTES` is 30.
+
+**Open.** Thirty minutes is a number chosen to be stated rather than a number negotiated with
+anybody. A pilot would have to agree it, name the role that owns the queue, and define what
+happens to an escalation nobody has picked up when that window expires. Software that
+escalates into an unstaffed queue has moved a problem rather than solved it.
