@@ -33,7 +33,7 @@ uv run python screen.py --demo legit           # a cooperative, verifiable calle
 `screen.py` is the real entry point. Preview is the default — it parses an email, runs prechecks, and prints the number it would dial and the exact task CALL-E would receive:
 
 ```bash
-uv run python screen.py --email samples/suspicious_email.txt --sender-domain secure-alerts-billing.com
+uv run python screen.py --email samples/suspicious_email.txt
 ```
 
 ## Placing one real call
@@ -66,7 +66,6 @@ The example below points at `samples/suspicious_email.txt`, so `+18005550187` is
 export GEMINI_API_KEY="<your key>"
 uv run python screen.py \
   --email samples/suspicious_email.txt \
-  --sender-domain secure-alerts-billing.com \
   --live --confirm \
   --to-phone "+18005550187" \
   --allow-number "+18005550187" \

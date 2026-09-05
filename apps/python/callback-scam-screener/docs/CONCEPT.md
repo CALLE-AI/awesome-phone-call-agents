@@ -25,7 +25,7 @@ This isn't a nice-to-have — it's the thing that makes the agent safe to point 
 
 ## Pipeline
 
-1. **Trigger** — An email security alert (SIEM rule, phishing detector, or a simple heuristic for the demo: urgency/threat language + payment or account claim + a phone number + sender domain that doesn't match the claimed company) flags a message and extracts the phone number and the claimed reason for contact.
+1. **Trigger** — This pipeline assumes the email already arrived flagged as suspicious by an upstream system (a SIEM rule, a phishing detector, or — for this demo — a simple heuristic: urgency/threat language + payment or account claim + a phone number). It doesn't re-derive suspicion itself; it extracts the phone number and the claimed reason for contact from a message someone else has already decided is worth screening.
 2. **Pre-call checks** (cheap, no dialing required) — cross-reference the number against known-scam-number lists; check SPF/DKIM/DMARC on the sender; compare against the claimed company's published support number if available. This alone may be enough to raise or lower suspicion before a call is even placed.
 3. **The call** — CALL-E dials the number using a fixed, hardcoded script: state the reason for calling and ask clarifying questions ("what is this regarding," "can you confirm the company name and the reason for this notice"). The script is a closed set of prompts with no ability to branch into providing information — engagement, not negotiation.
 4. **Signal scoring** — during/after the call, score the transcript against known red flags:

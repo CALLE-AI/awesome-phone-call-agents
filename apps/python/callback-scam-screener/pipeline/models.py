@@ -7,7 +7,6 @@ from .guardrails import mask_phone_number
 class Alert:
     claimed_reason: str
     phone_number: str
-    sender_domain: str
     source_email_excerpt: str
 
 
