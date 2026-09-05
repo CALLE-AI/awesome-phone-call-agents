@@ -1,0 +1,36 @@
+{
+  "id": "boil-water",
+  "title": "Boil-water notice confirmation",
+  "hazard_noun": "boil-water notice",
+  "triggers": {
+    "nws_events": [],
+    "open_meteo": null
+  },
+  "purpose": "make sure the person knows about the boil-water notice, understands what to do, and has safe water",
+  "questions": [
+    "Have you heard that tap water in your area must be boiled or replaced with bottled water right now?",
+    "Do you have a way to boil water or enough bottled water for today?",
+    "Have you had stomach pain, vomiting or diarrhoea in the last day?",
+    "Is there anything you need: bottled water delivered, help boiling water, or someone to come by?"
+  ],
+  "confusion_probe": "If the person seems confused or disoriented, gently ask once: Can you tell me what day it is today?",
+  "red_flags": [
+    "vomiting or diarrhoea with signs of dehydration",
+    "no safe water and no way to boil water",
+    "confusion or disorientation"
+  ],
+  "advice": [
+    "Bring tap water to a rolling boil for one full minute before drinking, cooking, brushing teeth or making ice.",
+    "Bottled water is safe. Boiled water can be cooled and stored in a clean covered container.",
+    "Throw away ice made from tap water since the notice began."
+  ],
+  "red_flag_instruction": "If the person is vomiting or has diarrhoea and cannot keep fluids down, tell them calmly to contact their doctor or call {{emergency_number}} if they feel faint, and that you are alerting their emergency contact.",
+  "resource_label": "water distribution point",
+  "follow_up_hours": 24,
+  "voicemail_message": "This is an automated call from {{org}}. A boil-water notice is in effect for your area. Boil tap water for one minute before drinking or use bottled water. We will try again shortly.",
+  "escalation_reason_templates": {
+    "red": "reported illness or no safe water during our boil-water call: {{reasons}}",
+    "unreachable": "could not be reached by phone after {{attempts}} attempts about the boil-water notice",
+    "unverified": "answered but we could not confirm they understood the notice"
+  }
+}

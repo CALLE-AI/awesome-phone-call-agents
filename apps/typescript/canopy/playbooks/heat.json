@@ -1,0 +1,46 @@
+{
+  "id": "heat",
+  "title": "Extreme heat welfare check",
+  "hazard_noun": "extreme heat",
+  "triggers": {
+    "nws_events": [
+      "Extreme Heat Warning",
+      "Excessive Heat Warning",
+      "Heat Advisory",
+      "Extreme Heat Watch",
+      "Excessive Heat Watch"
+    ],
+    "open_meteo": {
+      "apparent_temperature_c_at_least": 40
+    }
+  },
+  "purpose": "check that the person is safe during dangerous heat and find out if they need help",
+  "questions": [
+    "Are you somewhere cool right now, and is your fan or air conditioning working?",
+    "Have you been drinking water today?",
+    "Do you feel dizzy, sick to your stomach, have a headache or muscle cramps, or feel faint or confused?",
+    "Is there anything you need: water, a fan, a ride to a cooling centre, your medication, or someone to come by?"
+  ],
+  "confusion_probe": "If the person seems confused, disoriented, or repeats themselves, gently ask once: Can you tell me what day it is today?",
+  "red_flags": [
+    "confusion or disorientation",
+    "fainting or feeling about to faint",
+    "hot, dry skin or having stopped sweating",
+    "difficulty breathing or chest pain"
+  ],
+  "advice": [
+    "Move to the coolest room, close curtains, and use a fan or air conditioning if available.",
+    "Sip water regularly even if not thirsty.",
+    "Take a cool shower or put a wet cloth on the neck and wrists.",
+    "Avoid going outside in the middle of the day."
+  ],
+  "red_flag_instruction": "If any red flag is present, say clearly and calmly that these can be signs of heat stroke, that they should call {{emergency_number}} now or have someone nearby call for them, and that you are also alerting their emergency contact. Do not give fluids advice in that case and do not attempt any diagnosis.",
+  "resource_label": "cooling centre",
+  "follow_up_hours": 2,
+  "voicemail_message": "This is an automated welfare call from {{org}} because of the extreme heat. Please stay cool, drink water, and call {{emergency_number}} if you feel dizzy, confused or faint. We will try again shortly.",
+  "escalation_reason_templates": {
+    "red": "reported warning signs during our welfare call: {{reasons}}",
+    "unreachable": "could not be reached by phone after {{attempts}} attempts during the heat emergency",
+    "unverified": "answered but we could not confirm they are safe"
+  }
+}

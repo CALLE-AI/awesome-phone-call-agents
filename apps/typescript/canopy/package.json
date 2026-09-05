@@ -1,0 +1,28 @@
+{
+  "name": "calle-canopy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hazard-triggered welfare roll call: when a heat, flood, outage or smoke alert fires, CALL-E phones every opted-in vulnerable person in the area, triages them, escalates the ones who need help to a human, and writes the after-action report.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "canopy": "node --import tsx src/cli.ts",
+    "plan": "node --import tsx src/cli.ts plan --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\"",
+    "demo": "node --import tsx src/cli.ts run --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\"",
+    "serve": "node --import tsx src/cli.ts serve",
+    "fake-server": "node --import tsx src/cli.ts fake-server"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3"
+  }
+}

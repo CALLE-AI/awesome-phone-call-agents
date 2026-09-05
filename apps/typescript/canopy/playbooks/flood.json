@@ -1,0 +1,42 @@
+{
+  "id": "flood",
+  "title": "Flood welfare check",
+  "hazard_noun": "flooding",
+  "triggers": {
+    "nws_events": [
+      "Flash Flood Warning",
+      "Flood Warning",
+      "Flash Flood Emergency",
+      "Coastal Flood Warning"
+    ],
+    "open_meteo": null
+  },
+  "purpose": "check that the person is safe from rising water and find out if they need help to move",
+  "questions": [
+    "Is water entering your home or blocking the road outside?",
+    "Are you able to get upstairs or to higher ground on your own if you need to?",
+    "Do you have your medications, drinking water, and a working phone with you?",
+    "Is there anything you need: help moving, a ride to a shelter, your medication, or someone to come by?"
+  ],
+  "confusion_probe": "If the person seems confused or disoriented, gently ask once: Can you tell me what day it is today?",
+  "red_flags": [
+    "water already inside the home and the person cannot move to higher ground",
+    "trapped or unable to leave",
+    "confusion or disorientation",
+    "difficulty breathing or chest pain"
+  ],
+  "advice": [
+    "Do not walk or drive through moving water.",
+    "Move valuables and medications to an upper floor now while it is easy.",
+    "Keep your phone charged and near you."
+  ],
+  "red_flag_instruction": "If the person is trapped, cannot move away from water, or reports a medical emergency, tell them calmly to call {{emergency_number}} now, and that you are alerting their emergency contact. Do not advise them to enter water.",
+  "resource_label": "shelter",
+  "follow_up_hours": 3,
+  "voicemail_message": "This is an automated welfare call from {{org}} because of flooding in your area. Please move to higher ground if water is rising and call {{emergency_number}} if you are trapped. We will try again shortly.",
+  "escalation_reason_templates": {
+    "red": "reported being at risk during our flood welfare call: {{reasons}}",
+    "unreachable": "could not be reached by phone after {{attempts}} attempts during the flood warning",
+    "unverified": "answered but we could not confirm they are safe"
+  }
+}

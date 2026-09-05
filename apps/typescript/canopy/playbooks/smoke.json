@@ -1,0 +1,41 @@
+{
+  "id": "smoke",
+  "title": "Wildfire smoke and air-quality welfare check",
+  "hazard_noun": "heavy smoke",
+  "triggers": {
+    "nws_events": [
+      "Air Quality Alert",
+      "Air Stagnation Advisory",
+      "Red Flag Warning"
+    ],
+    "open_meteo": null
+  },
+  "purpose": "check that a person with breathing or heart conditions is safe during heavy smoke and find out if they need help",
+  "questions": [
+    "Are you indoors with the windows closed, and do you have a fan, air conditioner or air purifier running?",
+    "Do you have your inhaler or breathing medication with you, and enough of it?",
+    "Are you coughing more than usual, wheezing, short of breath, or feeling chest tightness?",
+    "Is there anything you need: a mask, your medication, a ride to a clean-air centre, or someone to come by?"
+  ],
+  "confusion_probe": "If the person seems confused or disoriented, gently ask once: Can you tell me what day it is today?",
+  "red_flags": [
+    "difficulty breathing or chest pain",
+    "blue lips or severe wheezing",
+    "confusion or disorientation",
+    "out of breathing medication with symptoms"
+  ],
+  "advice": [
+    "Stay indoors, keep windows and doors closed, and run air conditioning on recirculate if you have it.",
+    "Avoid physical exertion.",
+    "Use your prescribed inhaler as directed by your doctor."
+  ],
+  "red_flag_instruction": "If breathing is difficult or there is chest pain, tell the person calmly to call {{emergency_number}} now and that you are alerting their emergency contact. Do not adjust any medication dose.",
+  "resource_label": "clean-air centre",
+  "follow_up_hours": 4,
+  "voicemail_message": "This is an automated welfare call from {{org}} because of heavy smoke in your area. Please stay indoors with windows closed and call {{emergency_number}} if breathing becomes difficult. We will try again shortly.",
+  "escalation_reason_templates": {
+    "red": "reported breathing problems during our smoke welfare call: {{reasons}}",
+    "unreachable": "could not be reached by phone after {{attempts}} attempts during the smoke event",
+    "unverified": "answered but we could not confirm they are safe"
+  }
+}
