@@ -33,7 +33,6 @@ _CALL = re.compile(r"^/v1/calls/([^/]+)$")
 
 class _Handler(BaseHTTPRequestHandler):
     double: CalleDouble
-    require_auth: bool = True
 
     protocol_version = "HTTP/1.1"
 
@@ -55,8 +54,6 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(err.status_code, err.body())
 
     def _authorized(self) -> bool:
-        if not self.require_auth:
-            return True
         header = self.headers.get("Authorization", "")
         return header.startswith("Bearer ") and len(header) > len("Bearer ")
 
