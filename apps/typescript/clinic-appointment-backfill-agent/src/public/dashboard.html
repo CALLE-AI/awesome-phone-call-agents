@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenSlot AI Hospital Ops</title>
+    <style>
+      :root {
+        --bg: #f3f6fb;
+        --panel: #ffffff;
+        --panel-alt: #eef3ff;
+        --line: #dfe7f5;
+        --primary: #1d4ed8;
+        --primary-soft: #dbeafe;
+        --success: #0f766e;
+        --success-soft: #ccfbf1;
+        --warning: #b45309;
+        --warning-soft: #fef3c7;
+        --danger: #b91c1c;
+        --danger-soft: #fee2e2;
+        --text: #172033;
+        --muted: #5f6b82;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Arial, sans-serif;
+      }
+      .shell {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .brand {
+        font-size: 1.7rem;
+        font-weight: 700;
+      }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--success-soft);
+        color: var(--success);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+      }
+      .metric {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .badge {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .badge.blue { background: var(--primary-soft); color: var(--primary); }
+      .badge.orange { background: var(--warning-soft); color: var(--warning); }
+      .badge.green { background: var(--success-soft); color: var(--success); }
+      .badge.red { background: var(--danger-soft); color: var(--danger); }
+      .stat {
+        font-size: 2.1rem;
+        font-weight: 800;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1.3fr 0.7fr;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .panel-head h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 14px 0 20px;
+      }
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 11px 16px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .primary {
+        background: var(--primary);
+        color: white;
+      }
+      .secondary {
+        background: var(--panel-alt);
+        color: var(--primary);
+      }
+      .muted {
+        background: #eef2f7;
+        color: var(--text);
+      }
+      form {
+        display: grid;
+        gap: 12px;
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      select, input, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 1rem;
+        background: #fff;
+      }
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+      }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f8faff;
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 8px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .pill.waiting { background: var(--warning-soft); color: var(--warning); }
+      .pill.contacted { background: var(--primary-soft); color: var(--primary); }
+      .pill.accepted { background: var(--success-soft); color: var(--success); }
+      .pill.declined { background: var(--danger-soft); color: var(--danger); }
+      .helper {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .alert {
+        padding: 12px 14px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        font-weight: 600;
+        display: none;
+      }
+      .alert.success { display: block; background: var(--success-soft); color: var(--success); }
+      .alert.error { display: block; background: var(--danger-soft); color: var(--danger); }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <div class="brand">OpenSlot AI • Clinic Operations</div>
+        <div class="status-pill"><span class="status-dot"></span> Active mock flow</div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="metric"><span class="badge blue">Booked</span><span id="booked" class="stat">0</span></div>
+        </div>
+        <div class="card">
+          <div class="metric"><span class="badge red">Cancelled</span><span id="cancelled" class="stat">0</span></div>
+        </div>
+        <div class="card">
+          <div class="metric"><span class="badge orange">Waiting</span><span id="waiting" class="stat">0</span></div>
+        </div>
+        <div class="card">
+          <div class="metric"><span class="badge green">Patients</span><span id="patients" class="stat">0</span></div>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div class="card">
+          <div class="panel-head">
+            <h2>Mock hospital intake</h2>
+          </div>
+          <div id="formAlert" class="alert"></div>
+          <form id="cancelForm">
+            <div class="field-row">
+              <label>
+                Patient
+                <select id="patientSelect"></select>
+              </label>
+              <label>
+                Appointment slot
+                <select id="appointmentSelect"></select>
+              </label>
+            </div>
+            <label>
+              Cancellation reason
+              <textarea id="reason" placeholder="Patient reported schedule conflict or transportation issue."></textarea>
+            </label>
+            <div class="action-row">
+              <button type="submit" class="primary">Simulate inbound cancellation</button>
+              <button type="button" id="triggerBackfillBtn" class="secondary">Trigger outbound backfill</button>
+              <button type="button" id="resetDemoBtn" class="muted">Reset demo data</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="panel-head">
+            <h2>Live outbound monitor</h2>
+          </div>
+          <div class="helper">Recent CALL-E activity</div>
+          <div id="recentCalls" style="margin-top: 12px;"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="panel-head">
+          <h2>Waitlist priority queue</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Department</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Phone</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <h2>Clinic schedule</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Patient</th>
+              <th>Provider</th>
+              <th>Department</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="appointmentsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const formAlert = document.getElementById('formAlert');
+      const patientSelect = document.getElementById('patientSelect');
+      const appointmentSelect = document.getElementById('appointmentSelect');
+
+      function setAlert(type, message) {
+        formAlert.className = `alert ${type}`;
+        formAlert.textContent = message;
+      }
+
+      function maskPhone(phone) {
+        if (!phone) return '—';
+        const str = String(phone);
+        if (str.length <= 4) return '****';
+        return str.slice(0, -4).replace(/\d/g, '*') + str.slice(-4);
+      }
+
+      function syncAppointmentChoices(appointments, selectedPatientId) {
+        const filteredAppointments = (appointments || []).filter((a) => {
+          if (a.status === 'CANCELLED') return false;
+          if (!selectedPatientId) return true;
+          return a.patient_id === selectedPatientId;
+        });
+
+        const appointmentOptions = filteredAppointments.map((a) => `
+          <option value="${a.id}">${new Date(a.scheduled_at).toLocaleString()} • ${a.provider_name}</option>
+        `).join('');
+        appointmentSelect.innerHTML = appointmentOptions || '<option value="">No active appointments for this patient</option>';
+      }
+
+      async function loadStats() {
+        const res = await fetch('/api/dashboard/stats');
+        const data = await res.json();
+        document.getElementById('booked').textContent = data.booked ?? 0;
+        document.getElementById('cancelled').textContent = data.cancelled ?? 0;
+        document.getElementById('waiting').textContent = data.waiting ?? 0;
+        document.getElementById('patients').textContent = data.totalPatients ?? 0;
+
+        const queueRows = (data.queue || []).map((entry) => `
+          <tr>
+            <td>${entry.patient}</td>
+            <td>${entry.preferred_department}</td>
+            <td>${entry.priority_score}</td>
+            <td><span class="pill ${entry.status.toLowerCase()}">${entry.status}</span></td>
+            <td>${maskPhone(entry.phone_number)}</td>
+          </tr>
+        `).join('');
+        document.getElementById('queueBody').innerHTML = queueRows || '<tr><td colspan="5">No waiting patients</td></tr>';
+
+        const recentCalls = (data.recent_calls || []).map((call) => `
+          <div class="card" style="margin-bottom: 10px; padding: 12px; border-radius: 12px; background: #f9fbff;">
+            <div style="display:flex; justify-content:space-between; gap: 12px; margin-bottom: 6px;">
+              <strong>${call.patient}</strong>
+              <span class="pill ${call.status.toLowerCase() || 'waiting'}">${call.status}</span>
+            </div>
+            <div class="helper">${call.direction} • ${call.transcript_summary}</div>
+          </div>
+        `).join('');
+        document.getElementById('recentCalls').innerHTML = recentCalls || '<div class="helper">No recent calls</div>';
+
+        const appointments = data.appointments || [];
+        const patientOptions = (data.patients || []).map((patient) => `<option value="${patient.id}">${patient.label}</option>`).join('');
+        patientSelect.innerHTML = patientOptions || '<option value="">No patients found</option>';
+
+        const selectedPatient = patientSelect.value || (data.patients && data.patients[0] ? data.patients[0].id : '');
+        if (selectedPatient) {
+          patientSelect.value = selectedPatient;
+        }
+        syncAppointmentChoices(appointments, selectedPatient);
+
+        const rows = (appointments || []).map((a) => `
+          <tr>
+            <td>${new Date(a.scheduled_at).toLocaleString()}</td>
+            <td>${a.patient || 'Unassigned'}</td>
+            <td>${a.provider_name}</td>
+            <td>${a.department}</td>
+            <td><span class="pill ${a.status.toLowerCase()}">${a.status}</span></td>
+            <td>${a.status !== 'CANCELLED' ? `<button class="muted cancel-btn" data-id="${a.id}">Cancel</button>` : '<span class="helper">Closed</span>'}</td>
+          </tr>
+        `).join('');
+        document.getElementById('appointmentsBody').innerHTML = rows || '<tr><td colspan="6">No appointments</td></tr>';
+
+        document.querySelectorAll('.cancel-btn').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const id = button.getAttribute('data-id');
+            if (!id) return;
+            const response = await fetch('/api/appointments/cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ appointment_id: id, action: 'CANCEL', reason: 'Cancelled from hospital dashboard' })
+            });
+            const json = await response.json();
+            if (response.ok) {
+              setAlert('success', 'Appointment cancelled and outbound backfill started.');
+              await loadStats();
+            } else {
+              setAlert('error', json.error || 'Cancellation failed');
+            }
+          });
+        });
+      }
+
+      patientSelect.addEventListener('change', async () => {
+        const chosenPatientId = patientSelect.value;
+        const res = await fetch('/api/dashboard/stats');
+        const data = await res.json();
+        const appointments = data.appointments || [];
+        syncAppointmentChoices(appointments, chosenPatientId);
+      });
+
+      document.getElementById('cancelForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const appointment_id = appointmentSelect.value;
+        const patient_id = patientSelect.value;
+        const reason = document.getElementById('reason').value.trim();
+
+        if (!appointment_id || !patient_id) {
+          setAlert('error', 'Please choose both a patient and an appointment before submitting.');
+          return;
+        }
+
+        const response = await fetch('/api/inbound/mock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointment_id, patient_id, action: 'CANCEL', reason })
+        });
+
+        const json = await response.json();
+        if (response.ok) {
+          setAlert('success', 'Inbound cancellation verified and outbound queue has been triggered.');
+          await loadStats();
+        } else {
+          setAlert('error', json.error || 'Patient verification failed.');
+        }
+      });
+
+      document.getElementById('triggerBackfillBtn').addEventListener('click', async () => {
+        const appointment_id = appointmentSelect.value;
+        if (!appointment_id) {
+          setAlert('error', 'Please choose an appointment to trigger the open-slot backfill flow.');
+          return;
+        }
+
+        const response = await fetch('/api/appointments/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointment_id, action: 'CANCEL', reason: 'Open-slot backfill trigger from operator UI' })
+        });
+        const json = await response.json();
+        if (response.ok) {
+          setAlert('success', 'Outbound backfill sequence launched successfully.');
+          await loadStats();
+        } else {
+          setAlert('error', json.error || 'Backfill trigger failed.');
+        }
+      });
+
+      document.getElementById('resetDemoBtn').addEventListener('click', async () => {
+        const response = await fetch('/api/appointments/reset-demo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const json = await response.json();
+        if (response.ok) {
+          setAlert('success', 'Demo data reset successfully.');
+          await loadStats();
+        } else {
+          setAlert('error', json.error || 'Failed to reset demo data.');
+        }
+      });
+
+      loadStats();
+      setInterval(loadStats, 8000);
+    </script>
+  </body>
+</html>
