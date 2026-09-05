@@ -16,8 +16,8 @@ const server = createServer(async (req, res) => {
   if (pathname === "/api" || pathname.startsWith("/api/")) {
     let body = "";
     for await (const chunk of req) body += chunk;
-    const result = await api.dispatch(req.method || "GET", pathname, body);
-    res.writeHead(result.status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    const result = await api.dispatch(req.method || "GET", pathname, body, req);
+    res.writeHead(result.status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...(result.headers || {}) });
     res.end(JSON.stringify(result.body));
     return;
   }

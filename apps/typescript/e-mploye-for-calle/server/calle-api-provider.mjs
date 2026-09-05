@@ -1,5 +1,6 @@
 import { CalleClient } from "@call-e/calle";
-import { sanitizeError } from "./safety-policy.mjs";
+import { OFFICIAL_CALLE_ORIGIN, pinCalleBaseUrl } from "./calle-origin.mjs";
+import { sanitizeError, sanitizeEvidence, sanitizeSensitiveData, sanitizeTranscript } from "./safety-policy.mjs";
 
 const asSdkInput = (body = {}) => ({
   task: body.task,
@@ -12,20 +13,20 @@ const asSdkInput = (body = {}) => ({
   webhookUrl: body.webhook_url,
 });
 
-const fromSdkAttempt = (attempt) => ({
+const fromSdkAttempt = (attempt) => sanitizeSensitiveData({
   id: attempt.id,
   phone: attempt.phone,
   status: attempt.status,
   started_at: attempt.startedAt,
   completed_at: attempt.completedAt,
   summary: attempt.summary,
-  transcript_turns: attempt.transcriptTurns || [],
+  transcript_turns: sanitizeTranscript(attempt.transcriptTurns || []),
   provider_call_id: attempt.providerCallId,
   failure_code: attempt.failureCode,
   failure_message: attempt.failureMessage,
 });
 
-const fromSdkRecipient = (recipient) => ({
+const fromSdkRecipient = (recipient) => sanitizeSensitiveData({
   id: recipient.id,
   phones: recipient.phones,
   locale: recipient.locale,
@@ -36,7 +37,7 @@ const fromSdkRecipient = (recipient) => ({
   attempts: (recipient.attempts || []).map(fromSdkAttempt),
 });
 
-const fromSdkCall = (call) => ({
+const fromSdkCall = (call) => sanitizeSensitiveData({
   id: call.id,
   object: call.object,
   status: call.status,
@@ -46,7 +47,7 @@ const fromSdkCall = (call) => ({
   summary: call.summary,
   task_completed: call.taskCompleted,
   completion_confidence: call.completionConfidence,
-  evidence: call.evidence || [],
+  evidence: sanitizeEvidence(call.evidence),
   metadata: call.metadata || {},
   failure_code: call.failureCode,
   failure_message: call.failureMessage,
@@ -54,7 +55,7 @@ const fromSdkCall = (call) => ({
   completed_at: call.completedAt,
 });
 
-const fromSdkEvents = (events) => ({
+const fromSdkEvents = (events) => sanitizeSensitiveData({
   object: events.object,
   data: events.data || [],
   next_cursor: events.nextCursor,
@@ -70,17 +71,20 @@ export class CalleApiProvider {
   constructor({ apiKey, baseUrl, liveEnabled, fetchImpl = fetch, timeoutMs = 30000 }) {
     this.name = "live";
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
+    this.baseUrl = pinCalleBaseUrl(baseUrl || OFFICIAL_CALLE_ORIGIN);
     this.liveEnabled = liveEnabled;
     this.timeoutMs = timeoutMs;
     this.client = new CalleClient({
       apiKey,
-      baseUrl,
+      baseUrl: this.baseUrl,
       fetch: async (request) => {
+        if (new URL(request.url).origin !== OFFICIAL_CALLE_ORIGIN) {
+          throw new Error("CALL-E bearer credentials may only be sent to the official HTTPS CALL-E origin");
+        }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
-          return await fetchImpl(new Request(request, { signal: controller.signal }));
+          return await fetchImpl(new Request(request, { signal: controller.signal, redirect: "error" }));
         } finally {
           clearTimeout(timer);
         }

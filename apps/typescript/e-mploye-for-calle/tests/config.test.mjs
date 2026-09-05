@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getConfig, isLiveReady, publicRuntimeConfig } from "../server/config.mjs";
+import { OFFICIAL_CALLE_ORIGIN } from "../server/calle-origin.mjs";
 
 const env = (overrides = {}) => ({
   CALLE_API_KEY: "server-only-test-key",
@@ -23,6 +24,7 @@ describe("server-side CALL-E runtime configuration", () => {
       testPhoneConfigured: true,
       testRegionConfigured: true,
       testLocaleConfigured: true,
+      baseUrlTrusted: true,
       region: "US",
       language: "en-US",
     });
@@ -51,5 +53,17 @@ describe("server-side CALL-E runtime configuration", () => {
     const config = getConfig(env({ CALLE_TEST_REGION: "", CALLE_TEST_LOCALE: "" }));
     expect(isLiveReady(config)).toBe(false);
     expect(publicRuntimeConfig(config)).toMatchObject({ provider: "fake", testRegionConfigured: false, testLocaleConfigured: false });
+  });
+
+  it("fails closed when CALLE_BASE_URL is not the official HTTPS origin", () => {
+    const config = getConfig(env({ CALLE_BASE_URL: "https://attacker.example" }));
+    expect(isLiveReady(config)).toBe(false);
+    expect(publicRuntimeConfig(config)).toMatchObject({ provider: "fake", liveReady: false, baseUrlTrusted: false, baseUrl: OFFICIAL_CALLE_ORIGIN });
+  });
+
+  it("requires an app bearer token whenever live mode is requested", () => {
+    const config = getConfig(env());
+    expect(config.apiAuthRequired).toBe(true);
+    expect(config.apiAuthToken).toBe("");
   });
 });
