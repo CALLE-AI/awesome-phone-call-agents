@@ -19,6 +19,29 @@ const calleClient = new CalleClient({
 const MOCK_CALLS = process.env.MOCK_CALLS !== 'false';
 
 /**
+ * ASCII E.164 validation: starts with +, followed by 1-15 digits.
+ * No spaces, letters, or symbols permitted.
+ */
+function isValidE164(phoneNumber: string): boolean {
+  return /^\+[1-9][0-9]{1,14}$/.test(phoneNumber);
+}
+
+/**
+ * Per-run exact-destination authorization.
+ * AUTHORIZED_CALL_NUMBERS must be set as a comma-separated env var of exact
+ * E.164 numbers the operator has explicitly approved to call in this run.
+ * This stops an unreviewed data.ts change from silently placing real calls
+ * to an unintended number.
+ */
+const AUTHORIZED_TEST_NUMBERS = new Set(
+  (process.env.AUTHORIZED_CALL_NUMBERS ?? '').split(',').map((n) => n.trim()).filter(Boolean)
+);
+
+function buildIntentKey(loadId: string, carrierId: string, round: number): string {
+  return `supplyline-${loadId}-${carrierId}-r${round}`;
+}
+
+/**
  * Server Action: Round 1 — call all carriers for quotes SEQUENTIALLY.
  * The SDK does NOT support multi-recipient arrays. Loop over carriers individually.
  */
@@ -37,17 +60,54 @@ export async function callCarriersForQuotes(loadId: string): Promise<Quote[]> {
 
   // SEQUENTIAL individual calls — SDK only supports single recipient
   for (const carrier of carriers) {
+    // FIX 1 — ASCII E.164 validation
+    if (!isValidE164(carrier.phoneNumber)) {
+      quotes.push({
+        id: `quote-${load.id}-${carrier.id}-r1`,
+        loadId: load.id,
+        carrierId: carrier.id,
+        round: 1,
+        available: 'unknown',
+        quotedRate: null,
+        pickupConfirmed: 'unknown',
+        evidence: `Invalid phone number format (not E.164): ${carrier.phoneNumber}`,
+        transcript: '',
+        timestamp: now,
+      });
+      continue;
+    }
+
+    // FIX 2 — per-run exact-destination authorization
+    if (!MOCK_CALLS && !AUTHORIZED_TEST_NUMBERS.has(carrier.phoneNumber)) {
+      quotes.push({
+        id: `quote-${load.id}-${carrier.id}-r1`,
+        loadId: load.id,
+        carrierId: carrier.id,
+        round: 1,
+        available: 'unknown',
+        quotedRate: null,
+        pickupConfirmed: 'unknown',
+        evidence: 'Number not in AUTHORIZED_CALL_NUMBERS allowlist; call skipped.',
+        transcript: '',
+        timestamp: now,
+      });
+      continue;
+    }
+
     const task = createQuoteTask(load);
 
     try {
-      const response = await calleClient.calls.createAndWait({
-        task,
-        recipient: {
-          phones: [carrier.phoneNumber], // SDK uses `phones` array, not `phoneNumber`
+      const response = await calleClient.calls.createAndWait(
+        {
+          task,
+          recipient: {
+            phones: [carrier.phoneNumber], // SDK uses `phones` array, not `phoneNumber`
+          },
+          resultSchema: taskResultSchema,
+          recipientResultSchema: recipientResultSchema,
         },
-        resultSchema: taskResultSchema,
-        recipientResultSchema: recipientResultSchema,
-      });
+        { idempotencyKey: buildIntentKey(load.id, carrier.id, 1) }
+      );
 
       const recipientResult = response.recipients?.[0];
 
@@ -78,6 +138,9 @@ export async function callCarriersForQuotes(loadId: string): Promise<Quote[]> {
           transcript: recipientResult?.summary || '',
           timestamp: now,
         });
+        // FIX 4 — Stop after ambiguous outcome; do not compound uncertainty
+        // by placing additional real calls this run.
+        break;
       }
     } catch (err) {
       console.error(`CALL-E error for ${carrier.name}:`, err);
@@ -93,6 +156,9 @@ export async function callCarriersForQuotes(loadId: string): Promise<Quote[]> {
         transcript: '',
         timestamp: now,
       });
+      // FIX 4 — Stop after ambiguous outcome; do not compound uncertainty
+      // by placing additional real calls this run.
+      break;
     }
   }
 
@@ -117,18 +183,53 @@ export async function negotiateWithCarrier(
     return mockNegotiateWithCarrier(load, carrier, competingRate);
   }
 
+  const now = new Date().toISOString();
+
+  // FIX 1 — ASCII E.164 validation
+  if (!isValidE164(carrier.phoneNumber)) {
+    return {
+      id: `quote-${load.id}-${carrier.id}-r2`,
+      loadId: load.id,
+      carrierId: carrier.id,
+      round: 2,
+      available: 'unknown',
+      quotedRate: null,
+      pickupConfirmed: 'unknown',
+      evidence: `Invalid phone number format (not E.164): ${carrier.phoneNumber}`,
+      transcript: '',
+      timestamp: now,
+    };
+  }
+
+  // FIX 2 — per-run exact-destination authorization
+  if (!MOCK_CALLS && !AUTHORIZED_TEST_NUMBERS.has(carrier.phoneNumber)) {
+    return {
+      id: `quote-${load.id}-${carrier.id}-r2`,
+      loadId: load.id,
+      carrierId: carrier.id,
+      round: 2,
+      available: 'unknown',
+      quotedRate: null,
+      pickupConfirmed: 'unknown',
+      evidence: 'Number not in AUTHORIZED_CALL_NUMBERS allowlist; call skipped.',
+      transcript: '',
+      timestamp: now,
+    };
+  }
+
   const task = createNegotiationTask(load, competingRate);
 
-  const response = await calleClient.calls.createAndWait({
-    task,
-    recipient: {
-      phones: [carrier.phoneNumber],
+  const response = await calleClient.calls.createAndWait(
+    {
+      task,
+      recipient: {
+        phones: [carrier.phoneNumber],
+      },
+      resultSchema: taskResultSchema,
+      recipientResultSchema: recipientResultSchema,
     },
-    resultSchema: taskResultSchema,
-    recipientResultSchema: recipientResultSchema,
-  });
-
-  const now = new Date().toISOString();
+    { idempotencyKey: buildIntentKey(load.id, carrier.id, 2) }
+  );
 
   const recipientResult = response.recipients?.[0];
 
