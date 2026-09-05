@@ -15,4 +15,4 @@ __pycache__/
 # Gate harness dependencies and its output.
 tools/gates/node_modules/
 tools/gates/shots/
-tools/gates/gate-report.json
+tools/gates/gate-report*.json

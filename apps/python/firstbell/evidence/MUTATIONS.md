@@ -20,11 +20,18 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-Fifteen rows were re-measured on 5 September 2026 by applying each change, running the
-suite and restoring: rows 1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 35, 36 and 37. Twelve
-matched. Three did not and are corrected above: row 2 (three to five), row 3 (three to
-four) and row 8 (one to twenty, because removing the task-level fallback stops the
-demonstration answering at all). The remaining rows have not been re-measured.
+Nineteen rows were re-measured on 5 September 2026 by applying each change, running the
+suite and restoring: rows 1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 19, 20, 31, 32, 35, 36
+and 37. Fourteen matched. Five did not and are corrected above: row 2 (three to five), row
+3 (three to four), row 8 (one to twenty, because removing the task-level fallback stops the
+demonstration answering at all), row 19 (three to four) and row 20 (one to four). The
+remaining twenty-five rows have not been re-measured.
+
+Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
+the poll's retry budget set to zero it produced one failure against a published two, and
+the published number was right: the row says the poll is left *unprotected*, and catching
+nothing at all is the faithful reading. A count below what is published usually means the
+change made was narrower than the words describing it, not that the row is wrong.
 
 | # | The change | Tests that failed |
 |---|---|---|
@@ -46,8 +53,8 @@ demonstration answering at all). The remaining rows have not been re-measured.
 | 16 | Blank `api_base_url` on a receipt that still claims `reached_production_api` | 1 |
 | 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
 | 18 | Compute `reached_production_api` from the configured base URL alone, so a run that exchanged no bytes with CALL-E still reports that it reached production | 1 |
-| 19 | Credit every attempt to the machine instead of only the attempts behind records it closed, so calls that left a family unreached still count as staff time saved | 3 |
-| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 1 |
+| 19 | Credit every attempt to the machine instead of only the attempts behind records it closed, so calls that left a family unreached still count as staff time saved | 4 |
+| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 4 |
 | 21 | Wrap the citation like prose, so the source URL breaks mid-path and the reader cannot open the thing the number came from | 3 |
 | 22 | Drop `source` from the wage validation, so a staff cost can be asserted with no provenance at all | 1 |
 | 23 | Shift one cited line number by one, the way any edit above it would | 1 |
@@ -148,7 +155,7 @@ because they fail as a gate rather than as a count of tests.
 
 | The change | What the gate said |
 |---|---|
-| Append a 120 ms busy loop to the built `app.js` | `long tasks` FAIL, 131, 129, 129, 129, 129 ms, and it named the phase: `131 ms at 137 ms during load` |
+| Append a 120 ms busy loop to the built `app.js` | `long tasks` FAIL, over the ceiling on 10 of 10 loads, worst 144 ms, and it named the phase: `144 ms at 180 ms during load` |
 | Ship one shared fallback family for two real faces, which is how the page was built until this was fixed | `cls` FAIL at 0.00961 against a 0.001 ceiling, naming `span.switch` and a node that had been removed |
 | Let the rail listen only for acts arriving and not for acts leaving, which is how it worked until this was fixed | `rail` FAIL, `at 0px it marks act-01, expected act-00` |
 | Serve the page with the font host reachable but the kit unparsed | `cdn loss` reports what it aborted and how many acts survived |
