@@ -20,7 +20,7 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-**All forty-four rows were re-measured on 5 September 2026** by applying each change,
+**Rows 1 to 44 were all re-measured on 5 September 2026** by applying each change,
 running the suite and restoring. Thirty-four matched what was published. Ten did not and are
 corrected above: row 2 (three to five), row 3 (three to four), row 7 (one to three), row 8
 (one to twenty, because removing the task-level fallback stops the demonstration answering
@@ -32,7 +32,11 @@ takes a different kind of edit and not a different kind of check. Four of the fi
 with what was published. Only row 26 moved.
 
 Ten wrong numbers in forty-four is worth stating plainly rather than burying: this table was
-published before it was verified, and verifying it is what found them. None of the ten
+published before it was verified, and verifying it is what found them.
+
+Rows 45 to 48 came later and are not part of that count. They were measured on 6 September
+2026 as they were written, each applied and run before the row describing it existed, so none
+of them was ever a published number waiting to be checked. None of the ten
 changed whether a gate fires, which is what the table is for. All ten changed how loudly it
 fires, which is what a reader would have checked us on.
 
@@ -102,8 +106,12 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 42 | Type a window bound back into the still generator instead of looking it up | 1 |
 | 43 | Accept `RetryPolicy(max_attempts=0)`, whose create loop never runs, so every item comes back FAILED with an empty reason about a run that dialled nobody | 1 |
 | 44 | Stop escaping `<` in the JSON embedded in the page's `<script>` block, so a transcript turn containing `</script>` ends the data early and the rest of the page is parsed as markup | 1 |
+| 45 | Delete the refusal that keeps a production key off every origin but `https://api.heycall-e.com`, so `CALLE_BASE_URL` can send the live bearer token to any host that is listening | 1 |
+| 46 | Invert that refusal so it stops every destination, which would leave a tool that can never place a real call | 1 |
+| 47 | Compare the base URL by hostname again instead of by origin, so `http://api.heycall-e.com` is filed in the receipt as an ordinary live call | 1 |
+| 48 | Drop the scheme when normalising an origin, so a plaintext destination compares equal to the trusted HTTPS one | 1 |
 
-## Why these forty-four
+## Why these forty-eight
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

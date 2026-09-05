@@ -42,6 +42,35 @@ BANNER_OFFLINE = "OFFLINE. No call will be placed. No CALL-E account is needed."
 # including ours.
 PRODUCTION_HOST = "api.heycall-e.com"
 
+# The one origin the production credential may be sent to. Host alone is not enough: the
+# scheme is half the promise, and `http://api.heycall-e.com` is the same host with the
+# bearer token in the clear.
+TRUSTED_ORIGIN = f"https://{PRODUCTION_HOST}"
+
+# What a real CALL-E project key looks like. Used only to refuse to send one somewhere it
+# does not belong, never to validate one.
+LIVE_KEY_PREFIX = "iams_live_"
+
+
+def _origin(url: str | None) -> str:
+    """scheme://host[:port], lowercased, with a default port dropped.
+
+    Compared as a whole because every part of it is load-bearing. Matching on hostname
+    alone accepts a plaintext downgrade, and matching on the raw string rejects an
+    equivalent URL that only differs by a trailing slash or an explicit :443.
+    """
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    host = (parsed.hostname or "").lower()
+    if not scheme or not host:
+        return ""
+    port = parsed.port
+    if port is None or (scheme, port) in (("https", 443), ("http", 80)):
+        return f"{scheme}://{host}"
+    return f"{scheme}://{host}:{port}"
+
 
 @dataclass(frozen=True)
 class RunMode:
@@ -61,7 +90,10 @@ class RunMode:
     def reached_production(self) -> bool:
         if not self.live or not self.base_url:
             return False
-        return (urlparse(self.base_url).hostname or "") == PRODUCTION_HOST
+        # Origin, not hostname. This used to compare the host and nothing else, so
+        # `http://api.heycall-e.com` answered True: a run that put the bearer token on
+        # the wire in plaintext would have been recorded as an ordinary live call.
+        return _origin(self.base_url) == TRUSTED_ORIGIN
 
     @property
     def label(self) -> str:
@@ -192,7 +224,25 @@ def _client_and_mode(args: argparse.Namespace):
         raise SystemExit("--live needs CALLE_API_KEY in the environment.")
 
     from calle import CalleClient
-    base_url = os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
+    base_url = os.environ.get("CALLE_BASE_URL", TRUSTED_ORIGIN)
+
+    # The credential goes to one origin and nowhere else.
+    #
+    # `CALLE_BASE_URL` exists so the real client can speak real HTTP to the bundled
+    # double, which is how this runs offline and how a reviewer tests it without
+    # credits. That same variable is what makes this dangerous: a machine that has just
+    # placed a live call still has the production key exported, and pointing the base URL
+    # at a double, a colleague's laptop or a typo would hand that key straight to it.
+    # Nothing here checked. The double's own instructions already say to use
+    # `iams_test_anything`; this makes the instruction load-bearing instead of advisory.
+    if _origin(base_url) != TRUSTED_ORIGIN and api_key.startswith(LIVE_KEY_PREFIX):
+        raise SystemExit(
+            f"Refusing to send a live CALL-E key to {base_url}.\n"
+            f"A production credential is only ever sent to {TRUSTED_ORIGIN}.\n"
+            "To run against the bundled double, use a throwaway key:\n"
+            "  export CALLE_API_KEY=iams_test_anything\n"
+            f"To call for real, unset CALLE_BASE_URL or set it to {TRUSTED_ORIGIN}."
+        )
     return CalleClient(api_key=api_key, base_url=base_url), RunMode(True, base_url), None
 
 

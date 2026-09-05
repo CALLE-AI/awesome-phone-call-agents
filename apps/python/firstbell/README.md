@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Forty-four gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Forty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -30,7 +30,7 @@ Four lines do all of it. Every anchor below is checked by a test, so a line numb
 cannot quietly rot.
 
 - The client is constructed on the live path only: `from calle import CalleClient` at
-  `firstbell/cli.py:194`. The offline default never reaches it.
+  `firstbell/cli.py:226`. The offline default never reaches it.
 - The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:320`, with
   the whole phone fallback chain and the per-family `locale` in one request.
 - Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:387`, under a
@@ -254,9 +254,34 @@ exists so a first live run is one call.
 The receipt records where the calls went, not just that live mode was requested. The SDK
 takes a base URL, so the real client over real HTTP can still be talking to a double, and
 a receipt that called that `live` would be manufacturing evidence of a call that never
-happened. `mode` is `live` only when the host was `api.heycall-e.com`, and
+happened. `mode` is `live` only when the origin was `https://api.heycall-e.com`, and
 `live-nonproduction` otherwise, alongside the `api_base_url` and a
 `reached_production_api` boolean.
+
+### The key goes to one origin and nowhere else
+
+`CALLE_BASE_URL` is what makes the local double useful, and it is also the way a live
+credential leaves the building. A machine that has just placed a real call still has
+`CALLE_API_KEY` exported; the next command that points the base URL at a double, a
+colleague's laptop or a typo would hand the production key straight to it.
+
+So a key beginning `iams_live_` is only ever sent to `https://api.heycall-e.com`. Anything
+else exits before the client is built, and names the throwaway key to use instead:
+
+```text
+Refusing to send a live CALL-E key to http://127.0.0.1:8787.
+A production credential is only ever sent to https://api.heycall-e.com.
+To run against the bundled double, use a throwaway key:
+  export CALLE_API_KEY=iams_test_anything
+```
+
+The comparison is on the whole origin rather than the hostname, because the scheme is half
+the promise. `http://api.heycall-e.com` is the right host with the bearer token in the
+clear, and until this was written it both passed the check and was recorded in the receipt
+as an ordinary live call. `https://api.heycall-e.com.evil.test` is the other direction: a
+suffix a hostname check reads as a match. Mutations 45 to 48 in
+[`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) break each half of this and name the test
+that notices.
 
 ## The local double
 
@@ -319,7 +344,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 205 tests
+python -m pytest tests/ -q          # 222 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
