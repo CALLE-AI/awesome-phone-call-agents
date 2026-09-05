@@ -1,0 +1,19 @@
+{
+  "watch_id": "watch-work-permit-2026-09-05",
+  "topic": "work permit renewal",
+  "timezone": "America/Los_Angeles",
+  "reference_number": "WPR-2026-08847-A",
+  "consent": true,
+  "max_checks": 5,
+  "applicant": {
+    "name": "Dana Application",
+    "language": "en",
+    "region": "US"
+  },
+  "agency": {
+    "name": "City Immigration Status Line",
+    "phone": "+14155550172",
+    "language": "en",
+    "region": "US"
+  }
+}
