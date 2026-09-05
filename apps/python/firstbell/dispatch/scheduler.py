@@ -292,7 +292,7 @@ class WaveDispatcher:
         return self._classify(item, final)
 
     def _create_with_retries(self, item: WorkItem) -> dict[str, Any] | ItemResult:
-        from calle import CalleAPIError
+        from calle import CalleAPIError, CalleConnectionError, CalleTimeoutError
 
         key = self._idempotency_key(item)
         last: str = ""
@@ -328,6 +328,24 @@ class WaveDispatcher:
                 if err.code not in RETRYABLE_ERRORS or attempt == self._retry.max_attempts:
                     return ItemResult(item=item, resolution=Resolution.FAILED,
                                       failure_code=err.code, reason=last)
+                self._sleep(self._retry.delay_for(attempt))
+            except (CalleTimeoutError, CalleConnectionError) as err:
+                # A timeout is not an answer. These two subclass Exception rather than
+                # CalleAPIError, so they used to walk past the branch above into the
+                # dispatcher's catch-all and be recorded as FAILED, which reads as "nobody
+                # was reached" about a request that may have arrived and started a phone
+                # ringing. That is the one thing this program exists not to do, and the
+                # read side was fixed for it already.
+                #
+                # `_api_responded` is deliberately not set: nothing answered.
+                last = f"{type(err).__name__}: {redact(str(err))}"
+                if attempt == self._retry.max_attempts:
+                    return ItemResult(
+                        item=item, resolution=Resolution.UNDETERMINED,
+                        reason="the call may have been placed and the service did not "
+                               "answer: " + last)
+                # The same key again, which is what makes this safe to repeat: if the
+                # first request did land, CALL-E replays it rather than calling twice.
                 self._sleep(self._retry.delay_for(attempt))
         return ItemResult(item=item, resolution=Resolution.FAILED, reason=last)
 

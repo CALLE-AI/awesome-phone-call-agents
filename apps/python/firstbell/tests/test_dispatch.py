@@ -802,6 +802,40 @@ def test_a_run_that_reaches_nothing_says_so(double):
     assert report.results[0].resolution is not Resolution.RESOLVED
 
 
+def test_a_timeout_creating_a_call_is_retried_and_never_called_a_failure():
+    """A timeout is not an answer.
+
+    `CalleTimeoutError` and `CalleConnectionError` subclass `Exception`, not
+    `CalleAPIError`, so they missed the only `except` in the create loop and landed in the
+    dispatcher's catch-all as FAILED, which reads as "nobody was reached" about a request
+    that may well have arrived. The same key goes out again, which is what makes retrying
+    safe: if the first request did land, CALL-E replays it instead of ringing twice.
+    """
+    from calle import CalleTimeoutError
+
+    keys = []
+
+    class TimesOut:
+        class calls:
+            @staticmethod
+            def create(**kwargs):
+                keys.append(kwargs["idempotency_key"])
+                raise CalleTimeoutError("read timed out")
+
+    dispatcher = WaveDispatcher(
+        TimesOut(), task_builder=lambda i: "x", result_schema=SCHEMA,
+        poll_interval_seconds=0, sleep=lambda _s: None,
+        retry=RetryPolicy(max_attempts=3))
+    report = dispatcher.run([WorkItem(id="S-91", phones=(IN_A,), consented=True)])
+    result = report.results[0]
+
+    assert len(keys) == 3, f"the timeout was not retried: {len(keys)} attempt(s)"
+    assert len(set(keys)) == 1, "a retry after a timeout must reuse the key, or it rings twice"
+    assert result.resolution is Resolution.UNDETERMINED, (
+        f"a call that may have been placed was reported {result.resolution.value}")
+    assert dispatcher.api_responded is False, "nothing answered, so nothing was reached"
+
+
 # --- What a run took off the desk -------------------------------------------------
 #
 # The claim these tests defend: this run is cheaper than a person below some price per
