@@ -31,12 +31,12 @@ cannot quietly rot.
 
 - The client is constructed on the live path only: `from calle import CalleClient` at
   `firstbell/cli.py:194`. The offline default never reaches it.
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:313`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:320`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:380`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:387`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:305`, rather than as a string match on a message.
+  `dispatch/scheduler.py:312`, rather than as a string match on a message.
 
 ## Reusable without this app
 

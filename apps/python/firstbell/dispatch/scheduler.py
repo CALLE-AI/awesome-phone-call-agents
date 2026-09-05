@@ -192,14 +192,21 @@ class WaveDispatcher:
         # only move the second case's ambiguity from run one to run two. Nothing in
         # this codebase constructs one WaveDispatcher and calls run() on it twice, so
         # refusing the second call costs nothing and removes the ambiguity outright.
-        if self._has_run:
-            raise RuntimeError(
-                "WaveDispatcher.run() was already called on this instance. Its "
-                "cancellation, fatal-error and dispatch-count state belongs to that "
-                "run, and none of it is reset, so a second run here would silently "
-                "reuse it. Construct a fresh WaveDispatcher for each run."
-            )
-        self._has_run = True
+        #
+        # Read and set under the lock, not because anything here calls run() from two
+        # threads but because a guard that can be passed by two callers at once is not a
+        # guard. `self._lock` already exists for the fatal-error flag. No test covers the
+        # concurrent case: writing one would mean racing two threads on purpose and
+        # asserting on the loser, which is a flaky test about a caller that does not exist.
+        with self._lock:
+            if self._has_run:
+                raise RuntimeError(
+                    "WaveDispatcher.run() was already called on this instance. Its "
+                    "cancellation, fatal-error and dispatch-count state belongs to that "
+                    "run, and none of it is reset, so a second run here would silently "
+                    "reuse it. Construct a fresh WaveDispatcher for each run."
+                )
+            self._has_run = True
 
         items = list(items)
         self._assert_unique_ids(items)
