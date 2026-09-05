@@ -121,9 +121,26 @@ export CALLE_BASE_URL=https://api.heycall-e.com  # optional, this is the default
 ```
 
 See `references/examples.md` for full dry-run and real-run walkthroughs.
-`assets/authorized_numbers.example.txt` is an optional template hosts can
-use to keep a manual record of which recipients have a verified existing
-appointment, per the sourcing rule in `references/safety.md`.
+
+Beyond `--in`, `--out`, `--dry-run`, and `--confirm`, this script also
+enforces several safety properties directly in code (see
+`references/safety.md` for the full contract):
+
+- `--allowlist assets/authorized_numbers.example.txt` — restrict
+  calling to only the phones listed in that file. Exact match only;
+  anything not listed is skipped and reported as `failed: not
+  authorized`, never dialed.
+- Even with `--confirm`, a real run always requires the operator to
+  interactively type `CONFIRM` before any call goes out. Pass `--yes`
+  to skip that prompt for non-interactive/automation use (logged
+  loudly when used — not a quiet default).
+- `--allow-custom-host` — required if `CALLE_BASE_URL` is set to
+  anything other than the official CALL-E host; otherwise the script
+  refuses to run rather than risk sending the API key elsewhere.
+- `--continue-on-ambiguous` — by default the batch halts the moment
+  any call's outcome is `pending` or `unclear`, rather than dialing
+  the rest of the list while something is unresolved. Pass this flag
+  to disable that stop.
 
 ## Safety Rules
 

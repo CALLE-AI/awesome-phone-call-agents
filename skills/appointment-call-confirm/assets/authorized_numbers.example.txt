@@ -1,18 +1,29 @@
 # authorized_numbers.example.txt
 #
-# Example template for a host-maintained record of recipients who have
-# a verified, existing appointment with the business. This file is not
-# read automatically by scripts/place_confirmation_calls.py — it's a
-# starting pattern hosts can adopt to cross-check new appointment rows
-# against before adding them to an appointments.csv batch, per the
-# recipient-sourcing rule in references/safety.md.
+# Example allowlist consumed by scripts/place_confirmation_calls.py's
+# --allowlist flag. When --allowlist is passed, ONLY recipients whose
+# phone exactly matches a line here will actually be called — every
+# other row in the batch is skipped and reported as failed
+# "not authorized", never dialed. This is real enforcement in code,
+# not just documentation — see references/safety.md.
+#
+# Every example number below is from an officially reserved fictional
+# range (never allocated to a real subscriber):
+#   - US/Canada (NANP):      555-0100 through 555-0199, any area code
+#   - UK (Ofcom, London):    020 7946 0000 through 7946 0999
+#   - UK (Ofcom, mobile):    07700 900000 through 900999
+# When adding your own real recipients, replace these with real
+# verified numbers — never invent a "plausible-looking" number for a
+# country without a confirmed reserved range; use one of the ranges
+# above instead if you need a placeholder.
 #
 # Format: one recipient per line —
 #   phone (E.164), recipient_name, verified_appointment_source
 #
-# Lines starting with # are comments and should be ignored by any
-# tooling a host builds around this template.
+# Lines starting with # are comments. Only the first comma-separated
+# field (the phone number) is read by --allowlist; the rest is for
+# human reference only.
 
 +14155550101, Alex Rivera, booked via Sunrise Clinic front desk 2026-09-01
-+919812345670, Priya Nair, booked via workshop intake form 2026-09-02
-+6591234567, Wei Tan, booked via salon booking widget 2026-09-03
++442079460101, Priya Nair, booked via workshop intake form 2026-09-02
++447700900101, Wei Tan, booked via salon booking widget 2026-09-03
