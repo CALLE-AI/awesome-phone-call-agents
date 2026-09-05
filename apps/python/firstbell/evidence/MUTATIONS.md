@@ -149,6 +149,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 66 | Teach another gate to skip and declare it nowhere, which is how a gate stops running without anybody deciding that it should | 1 |
 | 67 | Drop a gate that still skips out of the register, so the suite goes quiet about one it already knew about | 1 |
 | 68 | Declare a gate as unable to run when it runs perfectly well, because a register nobody prunes becomes a list of excuses | 1 |
+| 69 | State a mutation count in the app README that the table does not have | 1 |
+| 70 | State a different one in `evidence/README.md`, which is where this drift actually was: the index said forty-four while the table held sixty-eight | 1 |
+| 71 | Round the published alert rate down from 45% to 35%, which is the direction somebody would round it if they were rounding on purpose | 1 |
+| 72 | Change one `no` answer on the built page to `yes`, so the page no longer supports the rate the README states beside it | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -158,6 +162,15 @@ mentioning the fields existed, not that it did anything. Row 62 survived, the ga
 changed to name the assignment exactly and to read the built page rather than only the
 source that builds it, and row 62 then failed as it should. It is recorded here as a killed
 row because that is what it is now, and the paragraph is the honest part.
+
+Rows 69 and 70 are a count gate that had been reading one file while two stated the number.
+The app README's count has been checked since a blind reviewer found it stale. The index file
+next to the table was never covered, so it sat at "Forty-four test gates and eleven browser
+gates" while the table grew to sixty-eight, and it stayed wrong through every run of the gate
+written to catch exactly that. A checked number beside an unchecked one is the failure this
+project is named for, and it happened twice in the same repository. Rows 71 and 72 hold the
+alert rate, which is published as a percentage and is therefore two numbers divided: the gate
+recomputes it from the page rather than reading it back.
 
 Rows 66 to 68 cover the register of gates that cannot always run. A skipped test prints the
 same dot a passing one does under `-q`, so `240 passed` and `238 passed, 2 skipped` look
@@ -182,7 +195,7 @@ added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every num
 repository is checked. Row 58 is the same planted number after the scope was widened. The
 pair is the proof, and neither row means anything without the other.
 
-## Why these sixty-eight
+## Why these seventy-two
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

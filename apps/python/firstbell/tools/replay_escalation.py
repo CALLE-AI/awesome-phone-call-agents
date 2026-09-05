@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dispatch import Escalation  # noqa: E402
 from dispatch.validation import problems  # noqa: E402
+from firstbell.domain import SAFEGUARDING_CALLBACK_MINUTES  # noqa: E402
 from firstbell.domain import RESULT_SCHEMA, safeguarding_escalation  # noqa: E402
 
 UNINFORMATIVE = frozenset({"unknown"})
@@ -112,6 +113,21 @@ def main(argv=None) -> int:
           f"{', '.join(sorted(unconfirmed))}")
     print(f"{len(moved)} would be filed differently because of the escalation rule"
           + (f": {', '.join(sorted(moved))}" if moved else ""))
+
+    # The alert rate, which is a different question from whether anything moved and the one
+    # a school would ask first. Both numbers were already printed above; nothing put them
+    # together, so the rate went unstated everywhere in this repository.
+    if seen:
+        rate = 100.0 * len(unconfirmed) / len(seen)
+        print()
+        print(f"Alert rate: {len(unconfirmed)} of {len(seen)} answered calls ({rate:.0f}%) "
+              f"carry the safeguarding flag and its {SAFEGUARDING_CALLBACK_MINUTES}-minute "
+              f"callback window.")
+        print("On this sample every one of them was already going to a person, so the rule "
+              "adds no case to the queue. What it adds is a clock and a position at the top "
+              "of it. A rate near half is a staffing question before it is a code question, "
+              "and it is stated here because a rule that fires this often is either the "
+              "safest thing in the app or the reason a school turns it off.")
     if not moved:
         print()
         print("Nothing moved. Every call that did not confirm was already going to a "

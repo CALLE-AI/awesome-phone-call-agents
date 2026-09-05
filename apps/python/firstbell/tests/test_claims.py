@@ -268,7 +268,9 @@ NUMBER_WORDS = {
     57: "fifty-seven", 58: "fifty-eight", 59: "fifty-nine", 60: "sixty",
     61: "sixty-one", 62: "sixty-two", 63: "sixty-three", 64: "sixty-four",
     65: "sixty-five", 66: "sixty-six", 67: "sixty-seven", 68: "sixty-eight",
-    69: "sixty-nine", 70: "seventy",
+    69: "sixty-nine", 70: "seventy", 71: "seventy-one", 72: "seventy-two",
+    73: "seventy-three", 74: "seventy-four", 75: "seventy-five", 76: "seventy-six",
+    77: "seventy-seven", 78: "seventy-eight", 79: "seventy-nine", 80: "eighty",
 }
 
 
@@ -290,11 +292,18 @@ def test_the_readme_states_the_real_number_of_mutations():
     word = NUMBER_WORDS.get(rows)
     assert word, f"add {rows} to NUMBER_WORDS so this gate can keep checking"
 
+    # Both files that state this count, not just the one that was caught first. The index
+    # beside the table said "Forty-four test gates and eleven browser gates" while the table
+    # held sixty-eight rows, and it stayed wrong through every run of this gate because this
+    # gate only ever read the app README. A checked number beside an unchecked one is the
+    # whole failure, and it happened twice in the same repository.
+    for rel in ("README.md", "evidence/README.md"):
+        text = (APP / rel).read_text(encoding="utf-8")
+        assert f"{word.capitalize()} gates broken on purpose" in text, (
+            f"MUTATIONS.md has {rows} rows, so {rel} should say "
+            f"'{word.capitalize()} gates broken on purpose'"
+        )
     readme = (APP / "README.md").read_text(encoding="utf-8")
-    assert f"{word.capitalize()} gates broken on purpose" in readme, (
-        f"MUTATIONS.md has {rows} rows, so the README should say "
-        f"'{word.capitalize()} gates broken on purpose'"
-    )
 
     # And no other spelled-out count may appear beside the word "gates", which is how the
     # stale "Thirteen of them" survived several edits.

@@ -679,3 +679,14 @@ def test_every_real_result_the_readme_promises_is_on_the_page():
     assert len(not_yes) == 5, (
         f"the README says five are countable and the page shows {len(not_yes)}: {not_yes}"
     )
+
+    # The alert rate is the same two numbers divided, so it is checked here rather than by a
+    # second gate that would need the receipts and would therefore skip for every reader.
+    # A published percentage that nothing recomputes is how the last three counts went stale.
+    stated = re.search(r"That is an alert rate of \*\*(\d+)%\*\*", readme)
+    assert stated, "the README no longer states the alert rate"
+    computed = round(100 * len(not_yes) / len(answered))
+    assert int(stated.group(1)) == computed, (
+        f"the README says the alert rate is {stated.group(1)}% and {len(not_yes)} of "
+        f"{len(answered)} is {computed}%"
+    )

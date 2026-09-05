@@ -18,7 +18,7 @@ the calls produced, and the machinery that keeps both honest.
 | File | What it is |
 |---|---|
 | [`api-shape.json`](api-shape.json) | Every key path and JSON type the production API returned, next to what the offline double emits. Path names and type names only: no conversation, no number, no id, no field value. Regenerate with `tools/double_conformance.py`. |
-| [`MUTATIONS.md`](MUTATIONS.md) | Forty-four test gates and eleven browser gates, each broken on purpose, with what noticed. |
+| [`MUTATIONS.md`](MUTATIONS.md) | Seventy-two gates broken on purpose, with how many tests noticed each one. |
 
 ## What the calls actually settled
 

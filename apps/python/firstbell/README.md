@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Sixty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Seventy-two gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -247,6 +247,19 @@ and none of the twelve parents happened to produce it. The offline demonstration
 because a demonstration that only shows the cases the code already handled is not showing
 anything. `S-1047` in `examples/absences.csv` is that row, and it is the only row in the
 fixture that reaches this rule.
+
+**How often it fires is a separate question, and a more uncomfortable one.** On the eleven
+real calls that came back with a structured result, five did not confirm the parent already
+knew. That is an alert rate of **45%**, and the tool above prints it. Every one of those five
+was already going to a person, so the rule adds no case to the queue; what it adds is a
+thirty-minute clock and a position at the top of it.
+
+A rate near half is a staffing question before it is a code question. Eleven calls to one
+cooperative handset is not a sample anyone should plan a rota from, and the honest reading is
+that the rate is unknown and this is the only number we have. It is written down because a
+rule that fires on nearly half of answered calls is either the safest thing in this app or
+the reason a school switches it off in week two, and nobody can tell which from here. It is
+the first thing `docs/what-a-pilot-would-look-like.md` would measure.
 
 The middle row is the one that is easy to get wrong. CALL-E can return a call with status
 `completed` and `structured_result: null`, which is a real conversation that the schema
