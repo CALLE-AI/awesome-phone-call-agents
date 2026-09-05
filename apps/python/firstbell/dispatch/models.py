@@ -26,7 +26,32 @@ class Resolution(str, Enum):
 
     @property
     def needs_a_human(self) -> bool:
+        """Whether the CALL itself came back short. Not the whole question.
+
+        Read this on its own and it says a schema-valid answer never needs a person,
+        which was true of the data and false of the world. Ask `ItemResult.needs_a_human`
+        instead unless the resolution really is all you have.
+        """
         return self in (Resolution.UNDETERMINED, Resolution.FAILED)
+
+
+class Escalation(str, Enum):
+    """Whether an answer, having arrived intact, is safe to close automatically.
+
+    This is a second axis and not a fourth `Resolution`, because the two questions are
+    genuinely different and collapsing them loses one. `Resolution` is about the call: did
+    a usable answer come back. `Escalation` is about the answer: is what it says something
+    a person has to see. An answer can be perfectly well-formed and still be the most
+    urgent thing in the queue.
+
+    Adding a fourth resolution instead would have quietly broken the rule this package is
+    named for. Three outcomes are load-bearing here, and a caller counting `resolved`
+    against a four-member enum would have started dropping the new one on the floor in
+    exactly the way two-outcome code drops `undetermined` today.
+    """
+
+    NONE = "none"
+    SAFEGUARDING = "safeguarding"
 
 
 # Error codes where retrying the identical request is reasonable. Everything outside this
@@ -141,11 +166,26 @@ class ItemResult:
     # so no call was made and nothing was billed. None: the response carried no usable
     # created_at, so we do not know, and saying "placed" would be a guess.
     placed_by_this_run: bool | None = None
+    # Set by the caller's own rule, because what counts as unsafe to close is a property
+    # of the domain and not of telephony. This package supplies the channel and the
+    # default, which is that nothing escalates unless something says so.
+    escalation: Escalation = Escalation.NONE
 
     @property
     def masked_numbers(self) -> tuple[str, ...]:
         """Never log a real number. The repo's PR checklist requires masking."""
         return tuple(mask(n) for n in self.numbers_tried)
+
+    @property
+    def needs_a_human(self) -> bool:
+        """The whole question, and the one every caller should be asking.
+
+        `resolution.needs_a_human` answers only whether the call came back short. It was
+        the only thing anyone asked, so an answer that arrived complete was closed no
+        matter what it said, and the one case this software exists to catch was the one
+        it filed automatically.
+        """
+        return self.resolution.needs_a_human or self.escalation is not Escalation.NONE
 
 
 def mask(phone: str) -> str:
@@ -217,7 +257,19 @@ class DispatchReport:
 
     @property
     def needs_human(self) -> list[ItemResult]:
-        return [r for r in self.results if r.resolution.needs_a_human]
+        """Everything a person has to look at, worst first.
+
+        Order is part of the output. A queue that lists an escalation below eleven
+        ordinary callbacks has technically reported it, and a clerk working top-down
+        reaches it last.
+        """
+        queue = [r for r in self.results if r.needs_a_human]
+        queue.sort(key=lambda r: 0 if r.escalation is not Escalation.NONE else 1)
+        return queue
+
+    @property
+    def escalated(self) -> list[ItemResult]:
+        return [r for r in self.results if r.escalation is not Escalation.NONE]
 
     def counts(self) -> dict[str, int]:
         out = {r.value: 0 for r in Resolution}

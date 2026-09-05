@@ -6,6 +6,7 @@ once. This package is the layer that makes those facts survivable.
 
 from .models import (
     DispatchReport,
+    Escalation,
     ItemResult,
     Resolution,
     WorkItem,
@@ -18,7 +19,8 @@ from .validation import UnsupportedSchema, is_valid, problems
 
 __all__ = [
     "WaveDispatcher", "RetryPolicy", "Cancelled", "default_idempotency_key",
-    "WorkItem", "ItemResult", "DispatchReport", "Resolution", "mask", "redact_free_text",
+    "WorkItem", "ItemResult", "DispatchReport", "Resolution", "Escalation",
+    "mask", "redact_free_text",
     "is_valid", "problems", "UnsupportedSchema",
     "WorkSource", "CsvSource", "MemorySource", "SourceError",
 ]

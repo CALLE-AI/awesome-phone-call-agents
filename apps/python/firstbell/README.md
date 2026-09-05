@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Forty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Fifty-six gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -30,13 +30,13 @@ Four lines do all of it. Every anchor below is checked by a test, so a line numb
 cannot quietly rot.
 
 - The client is constructed on the live path only: `from calle import CalleClient` at
-  `firstbell/cli.py:226`. The offline default never reaches it.
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:320`, with
+  `firstbell/cli.py:235`. The offline default never reaches it.
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:327`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:387`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:394`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:312`, rather than as a string match on a message.
+  `dispatch/scheduler.py:319`, rather than as a string match on a message.
 
 ## Reusable without this app
 
@@ -75,11 +75,11 @@ is a different tool from a broadcast. That is the gap this app sits in.
 
 The default is offline against a local double that speaks the real CALL-E API. Nothing
 leaves the machine, nothing is billed, and the run is deterministic, so the printed
-numbers can be checked against the six rows in `examples/absences.csv`.
+numbers can be checked against the seven rows in `examples/absences.csv`.
 
 ```
 OFFLINE. No call will be placed. No CALL-E account is needed.
-6 row(s) from examples\absences.csv, concurrency 3.
+7 row(s) from examples\absences.csv, concurrency 3.
 
   [ok   ] S-1041       schema-valid answer received
   [ok   ] S-1042       schema-valid answer received
@@ -87,15 +87,17 @@ OFFLINE. No call will be placed. No CALL-E account is needed.
   [HUMAN] S-1044       the call completed but returned no structured result
   [skip ] S-1045       no recorded consent to be called
   [HUMAN] S-1046       nobody answered after trying 2 number(s)
+  [SAFEG] S-1047       schema-valid answer received, escalated as safeguarding and not closed automatically
 
 What this run was worth
-  attempted            5
-  resolved             3   schema-valid reason on record
+  attempted            6
+  resolved             4   schema-valid reason on record
+  of those, escalated  1   answer received, still not closed
   undetermined         1   call happened, no usable answer, needs a person
   failed               1   nobody reached on any number
   skipped, no consent  1
-  calls placed         7   (no telephone call was placed)
-  resolution rate      60%
+  calls placed         8   (no telephone call was placed)
+  resolution rate      50%   closed, not merely answered
 
   reached in-language
     en-IN              1
@@ -104,6 +106,7 @@ What this run was worth
   non-English families 2 of 3 resolved
 
   still open, by language
+    en-IN              1   needs a person
     ta-IN              2   needs a person
 
   funding recovered    not claimed
@@ -115,19 +118,22 @@ What this run was worth
                        if your jurisdiction is one of them.
 
   staff time avoided
-    attempts billed     7
+    attempts billed     8
     attempts removed    4   behind the 3 record(s) this run closed
-    attempts still open 3   on somebody's desk, so not counted as saved
-    break-even          $0.22 per call, for every minute one manual attempt takes
-                        so cheaper than the desk below $0.67 a call at 3 minutes an attempt
+    attempts still open 4   on somebody's desk, so not counted as saved
+    break-even          $0.20 per call, for every minute one manual attempt takes
+                        so cheaper than the desk below $0.59 a call at 3 minutes an attempt
                         $23.55/hour, from $48,980 over 2,080 h. Secretaries and administrative
                         assistants, Educational services; state, local, and private, 2025.
                         Source: US Bureau of Labor Statistics, Occupational Outlook Handbook
                         https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm
 
-2 case(s) need a person. Nothing here is closed:
-  S-1044       the call completed but returned no structured result
-  S-1046       nobody answered after trying 2 number(s)
+3 case(s) need a person. Nothing here is closed:
+  1 of those case is safeguarding: the parent did not confirm they already knew.
+  A school would have to answer these within 30 minutes.
+  !! S-1047       schema-valid answer received, escalated as safeguarding and not closed automatically
+     S-1044       the call completed but returned no structured result
+     S-1046       nobody answered after trying 2 number(s)
 ```
 
 Five students were attempted and seven calls were placed, because two of them needed a
@@ -161,9 +167,54 @@ closes a record.
 
 | Outcome | What happened | Who owns it next |
 | --- | --- | --- |
-| `resolved` | The call returned a result that satisfies the schema | Nobody. The record is closed |
+| `resolved` | The call returned a result that satisfies the schema | Nobody, unless it is escalated |
 | `undetermined` | The call connected and a conversation happened, but no usable answer came back | A person |
 | `failed` | Nobody was reached on any number for that student | A person |
+
+### The answer can be perfect and still not ours to close
+
+Three outcomes answer a question about the *call*: did a usable answer come back. They do
+not answer the question about the *answer*: is what it says something a person has to see.
+For a long time this app had only the first question, and used it for both.
+
+So it filed the case it was built for. A parent picks up, learns from an automated call
+that a child who left the house for school is not at school, and offers a guess at where
+she might be. Every field is populated, the schema is satisfied, nothing is uncertain:
+`resolved`, closed, nobody looks at it again. `parent_confirmed_aware` was collected on
+every call and printed on the evidence page, and no line of code read it.
+
+`Escalation` is a second axis rather than a fourth outcome, because a fourth member of
+`Resolution` would have broken the rule the enum exists for. Code that counts `resolved`
+against a three-member enum would start dropping the new member on the floor, in exactly
+the way two-bucket code drops `undetermined` today.
+
+The rule is in `firstbell/domain.py` and it is one sentence: **only an explicit `yes`
+closes an absence record.** Not "escalate when the parent said no", which reads a missing
+field as reassurance, and `parent_confirmed_aware` is not in the schema's `required` list,
+so it can be missing. A record is closed on a confirmation, and nothing else is a
+confirmation.
+
+Three things follow, and each is a test:
+
+- An escalated case is printed as `SAFEG`, not `ok`, and sorts to the **top** of the human
+  queue. A queue that lists it below eleven ordinary callbacks has reported it in the same
+  way that reporting it tomorrow would.
+- It is not counted as closed. `resolution rate` and `funding recovered` are both computed
+  from `closed`, which is `resolved` minus escalated. When this rule was added the demo's
+  headline rate fell from 60% to 50%, because one of the four answers was no longer work
+  taken off anybody's desk. A rate that rises when the software finds a missing child is
+  measuring the wrong thing.
+- A caller's rule that raises fails **closed**. "I could not decide whether this is
+  serious" is not a reason to close a record.
+
+`SAFEGUARDING_CALLBACK_MINUTES` is 30, stated in code rather than left to a deployment,
+because an escalation with no clock is a label. Mutations 49 to 56 break each of these and
+name the tests that notice.
+
+This is the honest limit of it: the rule routes, and it does not judge. It cannot tell a
+child who is safe at a friend's house from one who is not, and it is not trying to. It
+moves the case to a person inside a stated window, which is the only thing software should
+be doing with that question.
 
 The middle row is the one that is easy to get wrong. CALL-E can return a call with status
 `completed` and `structured_result: null`, which is a real conversation that the schema
@@ -344,7 +395,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 222 tests
+python -m pytest tests/ -q          # 237 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

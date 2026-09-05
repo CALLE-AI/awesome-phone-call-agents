@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 from dispatch import (
     CsvSource,
     DispatchReport,
+    Escalation,
     Resolution,
     SourceError,
     WaveDispatcher,
@@ -34,7 +35,15 @@ from dispatch import (
     redact_free_text,
 )
 
-from .domain import RESULT_SCHEMA, FundingRate, StaffCost, build_task, summarise
+from .domain import (
+    RESULT_SCHEMA,
+    SAFEGUARDING_CALLBACK_MINUTES,
+    FundingRate,
+    StaffCost,
+    build_task,
+    safeguarding_escalation,
+    summarise,
+)
 
 BANNER_OFFLINE = "OFFLINE. No call will be placed. No CALL-E account is needed."
 
@@ -338,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         task_builder=build_task,
         result_schema=RESULT_SCHEMA,
         concurrency=args.concurrency,
+        escalate=safeguarding_escalation,
         idempotency_key=default_idempotency_key("attendance", date.today().isoformat()),
         poll_interval_seconds=2.0 if mode.live else 0.0,
     )
@@ -374,6 +384,11 @@ def _print_human(report: DispatchReport, summary) -> None:
             Resolution.FAILED: "HUMAN",
             Resolution.SKIPPED: "skip",
         }[result.resolution]
+        # A resolved-and-escalated row prints `ok` under the old mapping, which is the
+        # same four characters a closed case gets. The whole point of the escalation is
+        # that a person reading down this column stops at it.
+        if result.escalation is not Escalation.NONE:
+            marker = result.escalation.value.upper()[:5]
         print(f"  [{marker:5s}] {result.item.id:12s} {result.reason}")
 
     print()
@@ -383,10 +398,18 @@ def _print_human(report: DispatchReport, summary) -> None:
 
     queue = report.needs_human
     if queue:
+        escalated = report.escalated
         print()
         print(f"{len(queue)} case(s) need a person. Nothing here is closed:")
+        if escalated:
+            noun = 'case is' if len(escalated) == 1 else 'cases are'
+            print(f"  {len(escalated)} of those {noun} safeguarding: the parent did "
+                  f"not confirm they already knew.")
+            print(f"  A school would have to answer these within "
+                  f"{SAFEGUARDING_CALLBACK_MINUTES} minutes.")
         for result in queue:
-            print(f"  {result.item.id:12s} {result.reason}")
+            flag = "!! " if result.escalation is not Escalation.NONE else "   "
+            print(f"  {flag}{result.item.id:12s} {result.reason}")
 
 
 if __name__ == "__main__":

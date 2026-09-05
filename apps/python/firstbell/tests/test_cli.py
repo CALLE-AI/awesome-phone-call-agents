@@ -28,11 +28,46 @@ def test_the_demo_run_shows_all_three_outcomes(capsys):
     """A run where everything succeeds hides the outcome the product exists for."""
     main(["--work-file", WORK])
     out = capsys.readouterr().out
-    assert "resolved             3" in out
+    assert "resolved             4" in out
     assert "undetermined         1" in out
     assert "failed               1" in out
     assert "skipped, no consent  1" in out
-    assert "2 case(s) need a person" in out
+    assert "3 case(s) need a person" in out
+
+
+def test_the_demo_run_also_shows_an_answer_that_is_not_ours_to_close(capsys):
+    """The fourth outcome the run has to be able to show, on the second axis.
+
+    S-1047 comes back schema-valid, so every check the dispatcher makes passes and the
+    old code printed `ok` beside it. What the answer says is that a parent has just
+    learned a child who left for school is not there. The row has to read differently,
+    it has to be in the human queue, and it has to be at the top of it.
+    """
+    main(["--work-file", WORK])
+    out = capsys.readouterr().out
+
+    assert "[SAFEG] S-1047" in out, "an escalated row must not print the closed marker"
+    assert "of those, escalated  1" in out
+    assert "1 of those case is safeguarding" in out
+    assert "within 30 minutes" in out
+
+    # Top of the queue, above the two ordinary callbacks, and flagged.
+    queue = out[out.index("case(s) need a person"):]
+    assert queue.index("S-1047") < queue.index("S-1044") < queue.index("S-1046")
+    assert "!! S-1047" in queue
+
+
+def test_an_escalated_answer_is_not_counted_as_work_taken_off_the_desk(capsys):
+    """The rate must fall when the app finds something, not rise.
+
+    `resolution_rate` divided every schema-valid answer by every attempt, so escalating a
+    case improved the headline. Four answers over six attempts is 67%; three of them are
+    closed, and 50% is the number this run is entitled to print.
+    """
+    main(["--work-file", WORK])
+    out = capsys.readouterr().out
+    assert "resolution rate      50%" in out
+    assert "closed, not merely answered" in out
 
 
 def test_it_is_deterministic(capsys):
@@ -79,7 +114,7 @@ def test_the_receipt_records_the_mode_and_masks_every_number(tmp_path):
     data = json.loads(receipt.read_text(encoding="utf-8"))
 
     assert data["mode"] == "offline", "a receipt that hid the mode would be worthless"
-    assert data["counts"]["resolved"] == 3
+    assert data["counts"]["resolved"] == 4
     unmasked = [m for m in re.findall(r"\+\d{8,15}", json.dumps(data)) if "*" not in m]
     assert unmasked == [], f"raw numbers reached the receipt: {unmasked}"
 

@@ -89,10 +89,10 @@ def test_the_prose_numbers_match_the_program_too():
     printed = run.stdout.replace("\r\n", "\n")
 
     quoted = [
-        "attempts billed     7",
+        "attempts billed     8",
         "attempts removed    4",
-        "attempts still open 3",
-        "break-even          $0.22 per call, for every minute one manual attempt takes",
+        "attempts still open 4",
+        "break-even          $0.20 per call, for every minute one manual attempt takes",
     ]
     for line in quoted:
         assert line in printed, "the README quotes a line the program no longer prints: " + line
@@ -231,6 +231,8 @@ NUMBER_WORDS = {
     36: "thirty-six", 37: "thirty-seven", 38: "thirty-eight",
     31: "thirty-one", 32: "thirty-two", 39: "thirty-nine", 40: "forty", 41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
     45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
+    49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two",
+    53: "fifty-three", 54: "fifty-four", 55: "fifty-five", 56: "fifty-six",
 }
 
 

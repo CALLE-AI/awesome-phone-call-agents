@@ -12,7 +12,7 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
-from dispatch import ItemResult, Resolution, WorkItem
+from dispatch import Escalation, ItemResult, Resolution, WorkItem
 
 # What a usable answer looks like. Kept small on purpose: every field here is one the
 # office actually needs to close the record, and nothing is asked that a parent would not
@@ -37,6 +37,39 @@ RESULT_SCHEMA: dict[str, Any] = {
         "free_text_note": {"type": "string"},
     },
 }
+
+def safeguarding_escalation(result: dict[str, Any]) -> Escalation:
+    """Only an explicit `yes` closes an absence record without a person seeing it.
+
+    This is the rule the rest of this app is an argument for, and until it was written the
+    app did not have it. `parent_confirmed_aware` was collected on every call, printed on
+    the evidence page, and read by nothing: a schema-valid answer was closed as RESOLVED
+    whatever it said. So the exact case this software exists to catch, a parent learning
+    from the call that a child who left for school never arrived, was filed automatically
+    the moment that parent then offered any plausible reason.
+
+    The field is not in the schema's `required` list either, so it can be absent rather
+    than merely negative, and an absent field is not a reassuring one.
+
+    Hence the shape of the test. Not "is it `no`", which would close both the missing and
+    the `unknown` case, but "is it `yes`". A record is closed on a confirmation, and
+    nothing else is a confirmation. That is the same standard the call itself is held to:
+    the agent triages, and a person closes anything that is not unambiguously benign.
+
+    The cost of this rule is a longer human queue, and that cost is the point. It is
+    stated in the run summary and in `README.md` rather than tuned away.
+    """
+    confirmed = str(result.get("parent_confirmed_aware", "")).strip().lower()
+    if confirmed == "yes":
+        return Escalation.NONE
+    return Escalation.SAFEGUARDING
+
+
+# The window a district would have to agree to before this ran against real families. It
+# is stated here rather than left to a deployment, because an escalation with no clock is
+# a label, and this one names the case where a child's whereabouts are unaccounted for.
+SAFEGUARDING_CALLBACK_MINUTES = 30
+
 
 # Spoken first, before anything is asked. Several jurisdictions require disclosure that a
 # caller is an AI system, and a school would need it in writing before it let this near a
@@ -203,13 +236,29 @@ class ImpactSummary:
     staff: StaffCost | None = None
     attempts_resolved: int = 0
     attempts_open: int = 0
+    # Cases that came back schema-valid and are still not closed. Counted separately
+    # because the alternative is counting them twice: once as an answer received, and
+    # again, silently, inside a rate that says the work is done.
+    escalated: int = 0
     resolved_by_language: dict[str, int] = field(default_factory=dict)
     open_by_language: dict[str, int] = field(default_factory=dict)
 
     @property
+    def closed(self) -> int:
+        """Answers this run is entitled to close: schema-valid and not escalated."""
+        return self.resolved - self.escalated
+
+    @property
     def resolution_rate(self) -> float:
+        """What fraction of the work this run took off somebody's desk.
+
+        The numerator was `resolved`, which is every schema-valid answer including the
+        ones routed to a person. That made the headline rate rise every time the app
+        found something serious, which is precisely backwards, and it was the number
+        printed largest.
+        """
         attempted = self.resolved + self.undetermined + self.failed
-        return (self.resolved / attempted) if attempted else 0.0
+        return (self.closed / attempted) if attempted else 0.0
 
     @property
     def non_english_resolved(self) -> int:
@@ -240,18 +289,26 @@ class ImpactSummary:
 
     @property
     def funding_recovered(self) -> float | None:
-        """Only the absences that came back with a usable reason count.
+        """Only the absences this run actually closed count.
 
         An undetermined or failed call recovers nothing: the record is still open and a
         human still has to work it. Counting those would be the kind of arithmetic that
         makes a number impressive and false.
+
+        An escalated call is open in exactly the same way, and for a worse reason, so it
+        is subtracted here too. When the escalation rule was added this property still
+        read `self.resolved`, which meant the money figure went up by one row every time
+        the app found a child nobody could account for. The rule above was already written
+        down; it just had not been applied to every number derived from it.
         """
-        return None if self.rate is None else self.resolved * self.rate.amount
+        return None if self.rate is None else self.closed * self.rate.amount
 
     def lines(self) -> list[str]:
         out = [
             f"  attempted            {self.resolved + self.undetermined + self.failed}",
             f"  resolved             {self.resolved}   schema-valid reason on record",
+            *([f"  of those, escalated  {self.escalated}   answer received, still not closed"]
+              if self.escalated else []),
             f"  undetermined         {self.undetermined}   call happened, no usable answer, needs a person",
             f"  failed               {self.failed}   nobody reached on any number",
             f"  skipped, no consent  {self.skipped_no_consent}",
@@ -267,7 +324,8 @@ class ImpactSummary:
                 f"  provenance unknown   {self.calls_unknown_provenance}   the response "
                 "carried no usable created_at"
             )
-        out.append(f"  resolution rate      {self.resolution_rate:.0%}")
+        out.append(f"  resolution rate      {self.resolution_rate:.0%}"
+                   + ("   closed, not merely answered" if self.escalated else ""))
 
         # The headline this project is entitled to claim. It needs no external source,
         # because it is counted from what this run actually did. The legal duty it speaks
@@ -281,7 +339,7 @@ class ImpactSummary:
                 label = locale or "unspecified"
                 out.append(f"    {label:<18s} {self.resolved_by_language[locale]}")
             out.append(
-                f"  non-English families {self.non_english_resolved} of {self.resolved} resolved"
+                f"  non-English families {self.non_english_resolved} of {self.closed} resolved"
             )
         if self.open_by_language:
             out += ["", "  still open, by language"]
@@ -305,7 +363,7 @@ class ImpactSummary:
             out += [
                 "",
                 f"  funding recovered    {self.rate.currency}{recovered:,.2f}",
-                f"                       {self.resolved} resolved x {self.rate.currency}{self.rate.amount:,.2f}",
+                f"                       {self.closed} resolved x {self.rate.currency}{self.rate.amount:,.2f}",
             ] + _cited(self.rate.cite(), indent=23)
 
         ceiling = self.break_even_per_call_minute
@@ -325,7 +383,7 @@ class ImpactSummary:
                 "  staff time avoided",
                 f"    attempts billed     {self.calls_placed}",
                 f"    attempts removed    {self.attempts_resolved}   behind the "
-                f"{self.resolved} record(s) this run closed",
+                f"{self.closed} record(s) this run closed",
                 f"    attempts still open {self.attempts_open}   on somebody's desk, so "
                 "not counted as saved",
                 f"    break-even          {cur}{ceiling:,.2f} per call, for every minute "
@@ -355,9 +413,9 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
     for result in results:
         counts[result.resolution] += 1
         locale = result.item.locale or ""
-        if result.resolution is Resolution.RESOLVED:
+        if result.resolution is Resolution.RESOLVED and not result.needs_a_human:
             resolved_by_language[locale] = resolved_by_language.get(locale, 0) + 1
-        elif result.resolution.needs_a_human:
+        elif result.needs_a_human:
             open_by_language[locale] = open_by_language.get(locale, 0) + 1
     return ImpactSummary(
         contacted=counts[Resolution.RESOLVED] + counts[Resolution.UNDETERMINED],
@@ -371,10 +429,12 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         live=live,
         rate=rate,
         staff=staff,
+        escalated=sum(1 for r in results if r.escalation is not Escalation.NONE),
         attempts_resolved=sum(r.attempts_made for r in results
-                              if r.resolution is Resolution.RESOLVED),
+                              if r.resolution is Resolution.RESOLVED
+                              and not r.needs_a_human),
         attempts_open=sum(r.attempts_made for r in results
-                          if r.resolution.needs_a_human),
+                          if r.needs_a_human),
         resolved_by_language=resolved_by_language,
         open_by_language=open_by_language,
     )

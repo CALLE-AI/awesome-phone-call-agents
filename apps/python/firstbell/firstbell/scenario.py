@@ -65,3 +65,25 @@ def apply_demo_outcomes(double: CalleDouble) -> None:
 
     # Nobody home on any number.
     double.set_outcome("+915550000006", Outcome.no_answer())
+
+    # The case the escalation rule exists for, and the one this demo did not have.
+    #
+    # Everything about this answer is well-formed. A reason is given, a return date is
+    # given, the schema is satisfied, and nothing in it is uncertain enough to make the
+    # call undetermined. Read as data it is the cleanest result in the run.
+    #
+    # Read as a sentence, a parent has just found out from an automated call that a child
+    # who left the house for school is not at school, and has guessed at where she might
+    # be. Before `safeguarding_escalation` existed this row printed `ok` and closed.
+    double.set_outcome("+915550000007", Outcome.answered(
+        {"reason_category": "other", "expected_return": "today",
+         "parent_confirmed_aware": "no",
+         "free_text_note": "parent believes she may be with a friend"},
+        [("bot", "This is an automated call from the school attendance office. You are "
+                 "speaking with an AI assistant, not a person."),
+         ("user", "Sorry, what? No, I did not know she was absent."),
+         ("bot", "Divya was marked absent this morning. May I ask the reason?"),
+         ("user", "She left for school at half seven. Maybe she is at her friend's "
+                  "house, I will call them now."),
+         ("bot", "Thank you. A member of staff will call you back.")],
+    ))

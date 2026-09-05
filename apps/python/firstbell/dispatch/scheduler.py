@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
 from .models import (
+    Escalation,
     FATAL_ERRORS,
     PERMANENT_ERRORS,
     RETRYABLE_ERRORS,
@@ -105,6 +106,7 @@ class WaveDispatcher:
         result_schema: dict[str, Any],
         concurrency: int = 4,
         uninformative_values: frozenset[str] = frozenset({"unknown"}),
+        escalate: Callable[[dict[str, Any]], Escalation] | None = None,
         idempotency_key: Callable[[WorkItem], str] | None = None,
         retry: RetryPolicy | None = None,
         webhook_url: str | None = None,
@@ -121,6 +123,11 @@ class WaveDispatcher:
         self._schema = result_schema
         self._concurrency = concurrency
         self._uninformative = frozenset(v.strip().lower() for v in uninformative_values)
+        # What counts as too serious to close automatically is a question about absences,
+        # or overdue invoices, or whatever this list is; it is not a question about
+        # telephony, so this package does not answer it. The default escalates nothing,
+        # which keeps every existing caller behaving exactly as it did.
+        self._escalate = escalate or (lambda result: Escalation.NONE)
         self._idempotency_key = idempotency_key or (lambda item: item.id)
         self._retry = retry or RetryPolicy()
         # None until a run happens, then True if CALL-E answered anything at all. An
@@ -445,20 +452,47 @@ class WaveDispatcher:
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
                               reason="the call completed but returned no structured result")
 
+        # Asked once, here, so that every path holding a structured result gets the same
+        # answer. A malformed result that still says the serious thing is not less serious
+        # for being malformed, and it was the well-formed one that was being closed.
+        escalation = self._escalation_for(result)
+
         found = problems(result, self._schema)
         if found:
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
-                              structured_result=result,
+                              structured_result=result, escalation=escalation,
                               reason="result did not satisfy the schema: " + "; ".join(found))
 
         if self._learned_nothing(result):
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
-                              structured_result=result,
+                              structured_result=result, escalation=escalation,
                               reason="the call completed but every required field came "
                                      "back unknown")
 
+        if escalation is not Escalation.NONE:
+            # Schema-valid, and still not ours to close. This is the branch the whole
+            # escalation axis exists for: nothing about the data is wrong, and a person
+            # still has to see it.
+            return ItemResult(**base, resolution=Resolution.RESOLVED,
+                              structured_result=result, escalation=escalation,
+                              reason=f"schema-valid answer received, escalated as "
+                                     f"{escalation.value} and not closed automatically")
+
         return ItemResult(**base, resolution=Resolution.RESOLVED, structured_result=result,
                           reason="schema-valid answer received")
+
+    def _escalation_for(self, result: dict[str, Any]) -> Escalation:
+        """Never let a caller's rule take down a run.
+
+        A rule that raises is a bug in the caller, and the safe reading of "I could not
+        decide whether this is serious" is that it might be. Failing closed here costs a
+        clerk one glance; failing open loses the case the rule was written for.
+        """
+        try:
+            decided = self._escalate(result)
+        except Exception:
+            return Escalation.SAFEGUARDING
+        return decided if isinstance(decided, Escalation) else Escalation.NONE
 
     def _learned_nothing(self, result: dict[str, Any]) -> bool:
         """Schema-valid and useful are not the same thing.

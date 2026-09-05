@@ -34,7 +34,7 @@ with what was published. Only row 26 moved.
 Ten wrong numbers in forty-four is worth stating plainly rather than burying: this table was
 published before it was verified, and verifying it is what found them.
 
-Rows 45 to 48 came later and are not part of that count. They were measured on 6 September
+Rows 45 to 56 came later and are not part of that count. They were measured on 6 September
 2026 as they were written, each applied and run before the row describing it existed, so none
 of them was ever a published number waiting to be checked. None of the ten
 changed whether a gate fires, which is what the table is for. All ten changed how loudly it
@@ -110,8 +110,16 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 46 | Invert that refusal so it stops every destination, which would leave a tool that can never place a real call | 1 |
 | 47 | Compare the base URL by hostname again instead of by origin, so `http://api.heycall-e.com` is filed in the receipt as an ordinary live call | 1 |
 | 48 | Drop the scheme when normalising an origin, so a plaintext destination compares equal to the trusted HTTPS one | 1 |
+| 49 | Make `safeguarding_escalation` return `NONE` for everything, so a parent who did not know their child was absent is filed automatically | 14 |
+| 50 | Ask the rule whether the answer is `no` rather than whether it is `yes`, which closes the missing and the `unknown` case as though either were a confirmation | 5 |
+| 51 | Derive `ItemResult.needs_a_human` from the resolution alone again, so an escalated case never reaches the human queue | 7 |
+| 52 | Stop sorting the queue, so a safeguarding case can sit below every ordinary callback and be reached last | 4 |
+| 53 | Compute funding recovered from `resolved` rather than `closed`, so the money figure rises every time a child cannot be accounted for | 2 |
+| 54 | Compute the resolution rate from `resolved` rather than `closed`, so the headline improves when the app finds something serious | 3 |
+| 55 | Fail open when a caller's escalation rule raises, dropping the case the rule was written to catch on the one run where the rule was broken | 2 |
+| 56 | Drop `escalation=` from the schema-valid branch, so the flag is computed correctly and then not carried | 7 |
 
-## Why these forty-eight
+## Why these fifty-six
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
