@@ -399,6 +399,19 @@ order that decides whether this is usable by a real school.
    agreed before dialling, and more than one speaker. The matched pairs failed on two of
    four because one bilingual person cannot say the same thing twice from memory.
 
+## When this was built
+
+Newly created. The first commit in this directory is `c5fc1d4`, 2026-09-04, and every
+line below it was written after that. No pre-existing project was renamed, forked or
+resubmitted, and nothing here was carried in from earlier work of mine.
+
+```bash
+git log --reverse --format='%h %ad %s' --date=short -- apps/python/firstbell | head -1
+```
+
+That command prints the creation date from the repository itself rather than asking anyone
+to take the sentence above on trust.
+
 ## Attribution
 
 The supported region, calling code and language table in `calle_double/regions.py` is
