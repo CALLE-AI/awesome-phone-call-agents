@@ -117,7 +117,7 @@ Avoid: `- [call-reminder](skills/call-reminder/) - A great tool for calling peop
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
 ### Skills
-- [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured patient information for RDN review and referral follow-up. See [`TEST_RESULTS.md`](skills/rdn-intake-referral/TEST_RESULTS.md) for sanitized live-call validation results.
+- [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured patient information for RDN review and referral follow-up. See [`TEST_RESULTS.md`](skills/rdn-intake-referral/TEST_RESULTS.md) for sanitized live-call validation results. See [`documentation`](docs/rdn-intake-referral.md) for detailed usage and design information.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
