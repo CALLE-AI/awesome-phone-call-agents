@@ -14,6 +14,27 @@ const AMP = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'};
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => AMP[c]);
 const fmt = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 
+/* The longest silence the scene sits through before it starts moving across it.
+ *
+ * The hero call is 59.54 seconds and 39 of them are nobody speaking: eleven seconds after
+ * the agent asks whether the parent is aware, eight after it asks the reason, twelve after
+ * it asks when the child is coming back. Those pauses are the most human thing in the
+ * recording and they are also unwatchable at full length on a page a reader gives thirty
+ * seconds to.
+ *
+ * So the playhead runs at the recording's own speed while somebody is talking, and sweeps
+ * the rest. It is a sweep and not a cut on purpose: the reader watches the playhead race
+ * across a flat stretch of a real waveform, which shows what was skipped and how much of it
+ * there was. A cut would have hidden the same thing.
+ *
+ * 1.5 seconds because a pause longer than about that stops reading as a pause in a
+ * conversation and starts reading as a line that has gone dead. Holding it exactly that
+ * long keeps the beat and spends nothing on the dead air past it. At this value the hero
+ * call runs 20.5 seconds against its real 59.54, and every number the scene puts on the
+ * screen is still the recording's own.
+ */
+const GAP_MAX = 1.5;
+
 export class CallPlayer {
   constructor(root, data, opts) {
     opts = opts || {};
@@ -33,9 +54,160 @@ export class CallPlayer {
     this.activeTurn = -1;
     this.raf = 0;
     this.onTurn = opts.onTurn || null;
+
+    // Scene mode. Present only where the markup asked for it, so the act 3 player is
+    // untouched: it is an audio player and it stays one.
+    this.commits = opts.commits || [];        // one turn index per field, in field order
+    this.clockEl = root.querySelector('[data-clock]');
+    this.cells = this.resultEl
+      ? [...this.resultEl.querySelectorAll('[data-field]')]
+      : [];
+    this.scene = null;                        // the schedule, built on first run
+    this.sceneRaf = 0;
+    this.sceneRunning = false;
+
     this.bind();
     this.upgrade();
     this.select(this.id, true);
+  }
+
+  /* ---- the scene ----------------------------------------------------------------------
+   *
+   * A second clock over the same timeline. Nothing here invents a moment: it decides how
+   * fast to travel between two of CALL-E's own offsets, and never what those offsets are.
+   */
+
+  /* The light is on the register row. The scene root is flagged with it too, so the rule
+   * joining the call to that row can be drawn without a :has() selector: a browser without
+   * :has() would have dropped the one graphic tying a waveform to a row three lines above
+   * it, and lost it silently, which is the worst way to lose anything. */
+  lit() { return this.resultEl || this.root; }
+
+  setLive(state) {
+    this.lit().dataset.live = state;
+    this.root.dataset.live = state;
+  }
+
+  /** Scene seconds against call seconds, as a run of straight segments between turns. */
+  buildSchedule() {
+    const marks = this.call.turns.map((t) => t.offset_seconds);
+    marks.push(this.call.seconds);
+    const callAt = [];
+    const sceneAt = [];
+    for (const m of marks) {
+      // Two turns can share an offset. A zero-length segment would divide by zero on the
+      // way back out, so it is not a segment.
+      if (callAt.length && m <= callAt[callAt.length - 1]) continue;
+      sceneAt.push(callAt.length
+        ? sceneAt[sceneAt.length - 1] + Math.min(m - callAt[callAt.length - 1], GAP_MAX)
+        : 0);
+      callAt.push(m);
+    }
+    return { callAt, sceneAt, length: sceneAt[sceneAt.length - 1] || 0 };
+  }
+
+  /** Where the playhead is, in the recording, at a given moment of the scene. */
+  callTimeAt(sceneT) {
+    const { callAt, sceneAt } = this.scene;
+    if (sceneT <= 0) return callAt[0];
+    for (let k = 0; k < sceneAt.length - 1; k++) {
+      if (sceneT > sceneAt[k + 1]) continue;
+      const span = sceneAt[k + 1] - sceneAt[k];
+      const frac = span > 0 ? (sceneT - sceneAt[k]) / span : 1;
+      return callAt[k] + frac * (callAt[k + 1] - callAt[k]);
+    }
+    return callAt[callAt.length - 1];
+  }
+
+  /** Every field back to waiting, which is where the row was before the call was placed. */
+  sceneReset() {
+    for (const cell of this.cells) {
+      cell.dataset.at = 'pending';
+      cell.textContent = '·';
+    }
+  }
+
+  /** Every field at the value CALL-E returned. The end of the scene, and the served page. */
+  sceneSettle() {
+    const s = this.call.structured || {};
+    for (const cell of this.cells) {
+      const v = s[cell.dataset.field];
+      cell.dataset.at = 'committed';
+      cell.textContent = (v === undefined || v === null) ? '·' : v;
+    }
+  }
+
+  /* Which fields have been answered by now.
+   *
+   * A field is written the moment the playhead passes the turn the parent answers it in.
+   * It is never unwritten by the playhead moving on, because the answer was given: only a
+   * restart takes it back to waiting. */
+  markFields() {
+    const s = this.call.structured || {};
+    this.cells.forEach((cell, i) => {
+      const at = this.commits[i];
+      if (at === undefined || cell.dataset.at === 'committed') return;
+      if (this.activeTurn < at) return;
+      const v = s[cell.dataset.field];
+      cell.textContent = (v === undefined || v === null) ? '·' : v;
+      cell.dataset.at = 'committed';
+    });
+  }
+
+  showClock() {
+    if (!this.clockEl) return;
+    this.clockEl.textContent = `${fmt(this.t)} / ${fmt(this.call.seconds)}`;
+  }
+
+  /* Silent, and it does not touch the audio element. The recording is what the play button
+   * is for; this is the shape of the call, drawn at the speed it happened. */
+  runScene() {
+    if (REDUCED) { this.sceneSettle(); return; }
+    this.stopScene();
+    this.scene = this.buildSchedule();
+    if (!this.scene.length) { this.sceneSettle(); return; }
+    this.sceneReset();
+    this.t = 0;
+    this.activeTurn = -1;
+    this.sceneRunning = true;
+    // The light belongs to the row that is running, not to the register around it.
+    this.setLive('on');
+    const began = performance.now();
+    const step = (now) => {
+      if (!this.sceneRunning) return;
+      const elapsed = (now - began) / 1000;
+      this.t = this.callTimeAt(elapsed);
+      this.sync();
+      this.markFields();
+      this.showClock();
+      this.draw();
+      if (elapsed >= this.scene.length) { this.endScene(); return; }
+      this.sceneRaf = requestAnimationFrame(step);
+    };
+    this.sceneRaf = requestAnimationFrame(step);
+  }
+
+  /** The light goes out and the record it produced stays on the paper. */
+  endScene() {
+    this.sceneRunning = false;
+    cancelAnimationFrame(this.sceneRaf);
+    this.t = this.call.seconds;
+    this.sync();
+    this.sceneSettle();
+    this.showClock();
+    this.draw();
+    this.setLive('off');
+  }
+
+  /* Interrupted rather than finished: a reader who scrolls away or reaches for the
+   * playhead gets the settled row, which is the state the scene was going to leave them
+   * in anyway. Nothing is left half written. */
+  stopScene() {
+    if (!this.sceneRunning) return;
+    this.sceneRunning = false;
+    cancelAnimationFrame(this.sceneRaf);
+    this.sceneSettle();
+    this.setLive('off');
   }
 
   get call() { return this.data[this.id]; }
@@ -49,6 +221,9 @@ export class CallPlayer {
    * after, which is why there is no announce() call in this method.
    */
   upgrade() {
+    // The scene exists, so the control that replays it may exist too.
+    const again = this.root.querySelector('[data-replay]');
+    if (again) again.removeAttribute('hidden');
     this.canvas.removeAttribute('aria-hidden');
     this.canvas.setAttribute('role', 'slider');
     this.canvas.setAttribute('tabindex', '0');
@@ -65,6 +240,12 @@ export class CallPlayer {
 
     const play = this.root.querySelector('[data-play]');
     if (play) play.addEventListener('click', () => this.toggle());
+
+    // Watching it again is the one thing a reader is most likely to want from a twenty
+    // second scene they arrived in the middle of, so it is a real button with a real name
+    // and not an icon.
+    const again = this.root.querySelector('[data-replay]');
+    if (again) again.addEventListener('click', () => this.runScene());
 
     // Clicking the waveform seeks, and clicking a turn seeks to that turn. To a reader those
     // are the same gesture aimed at two representations of one timeline, so both must work.
@@ -125,6 +306,9 @@ export class CallPlayer {
   play() {
     const a = this.ensureAudio();
     if (!a) return;                          // no-audio build: the control is not rendered
+    // The recording and the scene are two clocks over one timeline and only one of them
+    // may hold it. Pressing play hands it to the recording, which is the truthful one.
+    this.stopScene();
     a.currentTime = this.t;
     a.play().then(() => { this.playing = true; this.loop(); }).catch(() => { this.playing = false; });
     this.root.dataset.playing = 'true';
@@ -138,11 +322,16 @@ export class CallPlayer {
   }
 
   seek(sec) {
+    // A reader reaching for the playhead has taken the timeline over, so the scene stops
+    // driving it. Fighting a scrub with an animation is the fastest way to make a control
+    // feel broken.
+    this.stopScene();
     this.t = Math.max(0, Math.min(sec, this.call.seconds));
     if (this.audio) this.audio.currentTime = this.t;
     this.sync();
     this.draw();
     this.announce();
+    this.showClock();
   }
 
   /* Where the playhead is, in the words a screen reader will say. The range belongs to

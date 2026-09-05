@@ -1,12 +1,26 @@
 /* firstbell evidence page.
  *
- * The page is paper. Exactly one kind of band inverts: the one where a call is playing. The
- * lights go down for the phone call and come back up after it. That is the only mode change
- * here, and it earns itself twice, because a waveform needs a dark ground and because a page
- * that has to be read at length should not be read on near-black.
+ * The page is paper, all the way down. One thing on it is lit, and it is lit only while
+ * something is actually happening: a call that is running right now. The light goes on when
+ * the line connects and out when the call ends, and after that the record it produced stays
+ * on the paper in ink like everything else.
  *
- * Colour appears only where an outcome is being stated. Nothing else on this page is
- * coloured, so the three-outcome idea is legible without a legend.
+ * That rule replaced an inverted band. The page used to take the lights DOWN for the call,
+ * onto a near-black warm brown, which read as muddy and low-energy and made the one moment
+ * the page is about the dimmest thing on it. A call arriving is not a darkening. Lighting the
+ * live object rather than darkening everything around it says the same thing with one
+ * element instead of a whole band, and it leaves the page readable at length.
+ *
+ * Two colour systems, and they never touch:
+ *
+ *   the live light   is a FIELD and never ink. It is painted behind things, never with.
+ *   the outcomes     are INK and never a field. They are written, never painted behind.
+ *
+ * That is what lets the light sit two hue-steps from `undetermined` without either being
+ * mistaken for the other: they can never appear in the same role. Nothing decorative is ever
+ * given the light, because on a page about software that refuses to claim it resolved a call
+ * it did not resolve, a colour that lies about liveness would be the same defect in visual
+ * form.
  *
  * Every text-on-ground pair below is measured by tools/check_contrast.py, which understands
  * oklch() and reports the number of pairs it could not measure. That count must be zero.
@@ -22,7 +36,6 @@
   --paper-2:       oklch(0.962 0.007 75);
   --paper-3:       oklch(0.951 0.008 75);
   --paper-deep:    oklch(0.938 0.010 75);
-  --paper-ink:     oklch(0.255 0.014 70);
 
   --ink:           oklch(0.255 0.014 70);
   --ink-2:         oklch(0.430 0.012 70);
@@ -31,13 +44,41 @@
   --line:          oklch(0.878 0.008 75);
   --line-strong:   oklch(0.800 0.010 75);
 
-  /* The theatre. These are the dark ladder values, used only inside .theatre. */
-  --stage:         oklch(0.163 0.013 66);
-  --stage-2:       oklch(0.196 0.011 77);
-  --stage-ink:     oklch(0.940 0.008 75);
-  --stage-ink-2:   oklch(0.780 0.010 75);
-  --stage-ink-3:   oklch(0.660 0.010 75);
-  --stage-line:    oklch(0.320 0.012 72);
+  /* The light. One colour, and it means one thing: this is happening now.
+   *
+   * It is CALL-E's own yellow, measured off heycall-e.com by painted area rather than read
+   * out of a stylesheet, and converted: oklch(0.885 0.17 93) renders #FFD531 against their
+   * #FFD733, which is inside two counts on every channel. Borrowing it is deliberate and it
+   * is the only thing borrowed. On their site it is a field with near-black on it and never
+   * a text colour, which is also the only way it can be used, so the constraint and the
+   * brand agree.
+   *
+   * Against the paper it is 1.31, which is not a border and is not trying to be. That is
+   * what a highlighter does: almost no lightness difference, an unmissable hue difference.
+   * A field that shouted in lightness as well would fight the ink sitting on it.
+   *
+   * The light falls on text that is already there, so the first draft of this remapped the
+   * whole ink ladder under it. That was wrong twice: a colour swap on every text run costs a
+   * restyle of the subtree, and worse, a reader would have watched the words change colour
+   * while the ground faded, which reads as the type flinching.
+   *
+   * Only two steps actually break. --ink and --ink-2 measure 11.12 and 5.72 on the light and
+   * clear AA there without being touched. --ink-3 measures 3.89 and fails, and the waveform's
+   * unplayed bars fail with it. So exactly two values are re-cut, and each is re-cut to one
+   * number that holds on BOTH grounds rather than to a pair that swaps. The ink of the
+   * register never changes. Only the ground under it does, which is one property, on one
+   * element, in one composited step. */
+  --live:          oklch(0.885 0.170 93);   /* the field.       1.31 against the paper     */
+  /* Body text where the light can fall: 6.36 on paper, 4.84 on the light. It replaces
+   * --ink-3 inside the register and nowhere else, because nowhere else can be lit. */
+  --lit-ink-3:     oklch(0.470 0.020 70);
+  /* A hairline that survives the light. --line is 0.878 and the field is 0.885, so the rule
+   * this replaces measured 1.00 against the light: it did not fade, it disappeared. */
+  --lit-line:      oklch(0.740 0.060 85);   /* 2.15 on paper, 1.64 on the light            */
+  /* The light as a stroke, for a mark that has to read as live while still on paper: 3.41
+   * against it, past the 3:1 a meaningful graphic needs. It is a stroke and never a fill and
+   * never a word, because at 3.41 it would fail as body text. */
+  --live-mark:     oklch(0.620 0.160 80);
 
   /* Outcome states. `failed` is never red: nobody answering the phone is not an error, it is
    * the ordinary case this software exists to handle. Red would tell the reader to panic
@@ -47,12 +88,20 @@
   --failed:        oklch(0.480 0.030 250);
   --link:          oklch(0.450 0.090 245);
 
-  --resolved-d:    oklch(0.800 0.110 155);
-  --undetermined-d: oklch(0.820 0.110 75);
-  --failed-d:      oklch(0.760 0.028 250);
-
-  --wave-played:   oklch(0.900 0.010 75);
-  --wave-ahead:    oklch(0.488 0.012 70);
+  /* The waveform is a measurement, so it is drawn in ink and given no gradient and no
+   * shadow. Played is --ink, which needs no second value: 14.61 on paper and 11.12 on the
+   * light. Ahead has to clear 3:1 three ways at once, against the paper, against the light,
+   * and against played, and one value does it: 4.31, 3.28 and 3.39.
+   *
+   * Even so, neither tint carries the meaning on its own. How far through the call the
+   * reader is, is stated by the playhead rule, which is full ink on either ground. The tint
+   * confirms it. That is the same argument the two speakers already make, and for the same
+   * reason: they measure 2.79 against each other, so they are separated by position and not
+   * by colour. */
+  /* These two are read by player.js with getPropertyValue and drawn onto a canvas, so a
+   * search for var(--wave-played) in this file finds nothing. They are used. */
+  --wave-played:   oklch(0.255 0.014 70);   /* = --ink                                    */
+  --wave-ahead:    oklch(0.560 0.030 78);   /* 4.31 paper / 3.28 light / 3.39 vs played   */
 
   --focus:         oklch(0.550 0.100 245);
 
@@ -81,7 +130,87 @@
   --measure-tight: 30.24em;    /* 54 of them */
   --measure-ui: 41.35em;       /* 62 characters of Neue Haas Grotesk Text */
   --measure-ui-tight: 36.02em; /* 54 of them */
+
+  /* ---- the type scale ----
+   *
+   * Eight steps, and they are not one ratio. The bottom five are a UI ladder where the job
+   * is to separate a label from the thing it labels inside a 13px band, so the steps are
+   * about 1.08 and a single pixel is the whole difference. The top three are display, where
+   * a step has to be visible across a screen, so they open out to 1.24 and 1.52. A single
+   * geometric ratio would have made the small end unusable (0.75 to 0.94 in one jump) or the
+   * large end mush. Two regimes, because the page has two jobs.
+   *
+   * These replace fourteen ad-hoc font sizes at 29 call sites. Twenty-one of those already
+   * sat exactly on one of the eight; the other eight were snapped to the nearest step and
+   * the largest any of them moved is 0.6 of a pixel, on `.result-line`. Nothing crossed the
+   * 18.66px or 24px boundaries where WCAG changes what it asks of a contrast ratio, so the
+   * snap cannot have moved a passing run into a failing band. What the scale changes is
+   * that the next size has to be one of these or argue for a ninth. */
+  --size-0: 0.6875rem;   /* 11px  the smallest thing allowed to carry a word: field labels */
+  --size-1: 0.75rem;     /* 12px  timestamps, table heads, the rail                        */
+  --size-2: 0.8125rem;   /* 13px  captions and small print                                 */
+  --size-3: 0.875rem;    /* 14px  table bodies, secondary UI                               */
+  --size-4: 0.9375rem;   /* 15px  the transcript, which is read rather than skimmed        */
+  --size-5: 1.0625rem;   /* 17px  body                                                     */
+  --size-6: 1.3125rem;   /* 21px  the lede and a stated result                             */
+  --size-7: 2rem;        /* 32px  a numeral standing on its own                            */
+
+  /* ---- the spacing scale ----
+   *
+   * A 4pt grid, named for what it separates rather than for its size, so a value cannot be
+   * chosen because it looked right. --space-3 is the unit: it is one line of 13px UI text,
+   * which is what most of the vertical rhythm on this page is built out of.
+   *
+   * --gutter stays a clamp because it is the page margin and has to answer to the viewport
+   * rather than to the grid. */
+  --space-1: 0.25rem;    /*  4px  inside a word: a label to its value                      */
+  --space-2: 0.5rem;     /*  8px  inside a row                                             */
+  --space-3: 1rem;       /* 16px  between rows                                             */
+  --space-4: 1.5rem;     /* 24px  between the parts of one object                           */
+  --space-5: 2.5rem;     /* 40px  between one object and the next                          */
+  --space-6: 4rem;       /* 64px  between an object and the next argument                  */
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
+
+  /* ---- the motion scale ----
+   *
+   * This time they govern. The block that used to sit at the foot of this file declared
+   * five durations and three easings and then went unused: two of the eight were referenced
+   * once each and every other transition on the page carried a hardcoded number, so there
+   * were nine durations in play under a comment claiming five. A scale nothing references
+   * is a comment.
+   *
+   * Four durations and three curves, and every one of them is referenced. Each value is a
+   * decision, not a default:
+   *
+   *   --dur-tick   a fact landing. Under the ~100ms where the eye starts reading a change
+   *                as a movement rather than as a thing that is now true. A structured
+   *                field arriving should feel stamped, not eased in.
+   *   --dur-micro  hover and press. Long enough to be felt, short enough that a control
+   *                pressed twice in a second never feels like it is catching up.
+   *   --dur-enter  something arriving on screen. The old easeOutCubic reveal, kept.
+   *   --dur-mode   the light coming up or going out. It is the largest change the page
+   *                makes, so it is the slowest, and it is still under half a second
+   *                because the reader is waiting on it before anything else can happen.
+   *
+   * There is no duration here for the transcript following the playhead to a new line,
+   * because that scroll is `behavior: smooth` and the browser owns its timing. A token
+   * naming a number nothing applies would be the same lie this block replaced.
+   *
+   * Three curves, all asymmetric, none a browser default. --ease-out is the Ionic drawer
+   * curve: it leaves immediately and lands slowly, which is what makes a 240ms entrance
+   * feel faster than a 240ms `ease` one. There is no --ease-in, because starting slow
+   * delays the exact moment the reader is watching and nothing here should.
+   *
+   * No transition on this page may name a number. If a duration is needed that is not one
+   * of these, it becomes a fifth here with a reason next to it. */
+  --dur-tick:  90ms;
+  --dur-micro: 150ms;
+  --dur-enter: 240ms;
+  --dur-mode:  400ms;
+  --ease-out:  cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-both: cubic-bezier(0.4, 0, 0.2, 1);
+  /* easeOutCubic. The reveal was written against this curve and reads wrong on any other. */
+  --ease-reveal: cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
 /* The swap must not move the page. One corrected fallback per real face.
@@ -148,10 +277,10 @@ body {
   font-kerning: normal;
 }
 
-/* One transition, on the two properties the theatre actually changes. Everything else that
- * recolours inherits, so the whole page crossfades in one composited step instead of
- * hundreds of independent ones. */
-html, body { transition: background-color 420ms ease, color 420ms ease; }
+/* The document no longer changes colour at all. The page-wide crossfade that used to live
+ * here existed to take the whole page down to near-black for one section; the light is a
+ * property of one element now, so the transition belongs on that element and the root has
+ * nothing left to animate. Deleting it also deletes a full-page composite per mode change. */
 
 h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: -0.008em; }
 
@@ -170,7 +299,7 @@ h2 {
 h3 {
   font-family: var(--ui-display);
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--size-2);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -200,8 +329,8 @@ code { font-size: 0.88em; }
   position: relative;
   /* Every act is opaque. The first one is sticky, so it stays behind the page after the
    * curtain closes, and an act that set no ground of its own let the hero show through it:
-   * act 8 was being read over the hero's own transcript. .theatre and the .act-2 and
-   * .act-3 grounds come later in this file and still win on the tie. */
+   * act 8 was being read over the hero's own transcript. The .act-2 and .act-3 grounds
+   * come later in this file and still win on the tie. */
   background: var(--paper);
 }
 .act > .inner { max-width: 68rem; margin: 0 auto; }
@@ -215,20 +344,22 @@ code { font-size: 0.88em; }
 .act-3 { background: var(--paper-3); }
 .act-deep { background: var(--paper-deep); }
 
-/* ---- the theatre --------------------------------------------------------------------- */
-.theatre {
-  background: var(--stage);
-  color: var(--stage-ink);
-  --ink: var(--stage-ink);
-  --ink-2: var(--stage-ink-2);
-  --ink-3: var(--stage-ink-3);
-  --line: var(--stage-line);
-  --resolved: var(--resolved-d);
-  --undetermined: var(--undetermined-d);
-  --failed: var(--failed-d);
-  --link: oklch(0.800 0.080 245);
+/* ---- the light ------------------------------------------------------------------------ */
+/* The one thing on this page that changes colour, and it is one element rather than a band.
+ *
+ * `data-live="on"` is written by the scene and by nothing else, so the light cannot appear
+ * on anything that is not running. It changes exactly one property. Everything written on
+ * the register is already a colour that clears AA on both grounds, so no text moves when
+ * the light does.
+ *
+ * The outcome inks are deliberately not lit and deliberately not remapped. On the field they
+ * measure 2.4 to 3.0 and would fail, and the reason they are absent is better than a remap:
+ * while a call is running there is no outcome yet. The colours that state an outcome arrive
+ * when the light goes out, which is also when the outcome does. */
+.reg-row {
+  transition: background-color var(--dur-mode) var(--ease-both);
 }
-html.dark { background: var(--stage); }
+.reg-row[data-live="on"] { background: var(--live); }
 
 /* ---- the call player ----------------------------------------------------------------- */
 .player { display: grid; gap: 1.5rem; }
@@ -248,7 +379,8 @@ html.dark { background: var(--stage); }
   color: inherit;
   cursor: pointer;
   display: grid; place-items: center;
-  transition: border-color 140ms ease, transform 140ms ease;
+  transition: border-color var(--dur-micro) var(--ease-out),
+              transform var(--dur-micro) var(--ease-out);
 }
 .play:hover { border-color: currentColor; }
 .play:active { transform: scale(0.96); }
@@ -263,11 +395,30 @@ canvas[data-waveform] {
 
 .switch { display: inline-flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
 .switch button {
-  font-family: var(--ui); font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase;
+  font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.05em; text-transform: uppercase;
   padding: 0.4rem 0.85rem; background: transparent; color: var(--ink-3);
-  border: 0; cursor: pointer; transition: color 140ms ease, background-color 140ms ease;
+  border: 0; cursor: pointer; transition: color var(--dur-micro) var(--ease-both),
+              background-color var(--dur-micro) var(--ease-both);
 }
-.switch button[aria-pressed="true"] { background: var(--ink); color: var(--stage); }
+/* The pressed language is filled, but filled light and written in ink rather than the
+ * other way round.
+ *
+ * It used to be ink filled with the dark theatre colour as its text. That rendered
+ * correctly and measured wrongly: the contrast probe resolves a run's ground by walking
+ * what is painted BEHIND the element, and an element's own background is not behind
+ * itself, so it read the theatre colour against the paper two layers down. The number was
+ * high and it was a number about a pair that is not on the screen. Turning the same rule
+ * into paper on ink made the accident visible: 1.07, paper against paper.
+ *
+ * Ink on a paper-deep fill is the same affordance and it is the arrangement the probe can
+ * actually see: the text is ink, the ground behind it is paper either way, and the two
+ * measure 13.5 whichever of them the probe picks up. A fill that can only be checked by a
+ * human eye is not checked. */
+.switch button[aria-pressed="true"] {
+  background: var(--paper-deep);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
 /* Drawn inside the button, not outside it. .switch clips its children so the two buttons
  * share one frame, and a ring 3px outside a button that fills that frame is 3px outside
  * the clip: tabbing to the language switch showed a two-pixel sliver and nothing else, on
@@ -280,7 +431,7 @@ canvas[data-waveform] {
   list-style: none; margin: 0; padding: 0;
   max-height: 22rem; overflow-y: auto;
   font-family: var(--ui);
-  font-size: 0.9375rem; line-height: 1.55;
+  font-size: var(--size-4); line-height: 1.55;
   max-width: var(--measure-ui-tight);
   scrollbar-width: thin;
 }
@@ -290,7 +441,7 @@ canvas[data-waveform] {
   gap: 0 0.75rem;
   padding: 0.45rem 0;
   border-top: 1px solid var(--line);
-  transition: opacity 180ms ease;
+  transition: opacity var(--dur-micro) var(--ease-both);
 }
 .turns li { opacity: 0.42; }
 .turns li[data-rel="ahead"] { opacity: 0.42; }
@@ -306,23 +457,23 @@ html[data-audio="absent"] .turns li[data-rel="ahead"] { opacity: 1; }
 .turns li[data-rel="past"]  { opacity: 0.72; }
 .turns li[data-rel="now"]   { opacity: 1; }
 .turns li[data-who="bot"] .turn-who { color: var(--ink-3); }
-.turn-at  { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-3); padding-top: 0.15em; }
+.turn-at  { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3); padding-top: 0.15em; }
 .turn-who {
-  font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase;
+  font-size: var(--size-0); letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--ink-3); padding-top: 0.3em;
 }
 .turn-text:lang(ta-IN), [lang="ta-IN"] { font-family: var(--tamil); line-height: 1.72; }
 .turn-gloss {
-  grid-column: 3; font-size: 0.85rem; color: var(--ink-3); font-style: italic;
+  grid-column: 3; font-size: var(--size-3); color: var(--ink-3); font-style: italic;
   margin-top: 0.1rem;
 }
 
 /* The structured result. It arrives when the call ends and not before, because that is when
  * CALL-E returned it. */
 .result {
-  font-family: var(--mono); font-size: 0.82rem; line-height: 1.75;
+  font-family: var(--mono); font-size: var(--size-2); line-height: 1.75;
   border: 1px solid var(--line); padding: 1rem 1.1rem;
-  transition: opacity 300ms ease;
+  transition: opacity var(--dur-mode) var(--ease-both);
 }
 .result[data-state="out"] { opacity: 0.35; }
 .result[data-state="in"]  { opacity: 1; }
@@ -330,13 +481,13 @@ html[data-audio="absent"] .turns li[data-rel="ahead"] { opacity: 1; }
 .result dd { margin: 0 0 0.6rem; color: var(--ink); }
 
 /* ---- tables -------------------------------------------------------------------------- */
-table { border-collapse: collapse; width: 100%; font-family: var(--ui); font-size: 0.875rem; }
+table { border-collapse: collapse; width: 100%; font-family: var(--ui); font-size: var(--size-3); }
 th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 th {
-  font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase;
+  font-size: var(--size-0); letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--ink-3); font-weight: 600; border-bottom-color: var(--line-strong);
 }
-td.mono, .mono { font-family: var(--mono); font-size: 0.8125rem; }
+td.mono, .mono { font-family: var(--mono); font-size: var(--size-2); }
 
 /* Status is never colour alone. The word is always present, and undetermined additionally
  * carries a bar, because it is the one a reader must not skim past. */
@@ -346,7 +497,7 @@ td.mono, .mono { font-family: var(--mono); font-size: 0.8125rem; }
 .state-undetermined { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
 
 button[data-copy] {
-  font: inherit; font-family: var(--mono); font-size: 0.8125rem;
+  font: inherit; font-family: var(--mono); font-size: var(--size-2);
   background: transparent; border: 0; border-bottom: 1px dashed var(--line-strong);
   color: inherit; cursor: pointer; padding: 0 0 1px;
 }
@@ -354,11 +505,10 @@ button[data-copy]:hover { border-bottom-style: solid; }
 button[data-copy][data-copied]::after { content: " copied"; color: var(--resolved); font-family: var(--ui); }
 
 pre {
-  font-size: 0.8125rem; line-height: 1.6; overflow-x: auto;
+  font-size: var(--size-2); line-height: 1.6; overflow-x: auto;
   background: var(--paper-deep); border: 1px solid var(--line);
   padding: 1rem 1.1rem; margin: 1rem 0; max-width: 100%;
 }
-.theatre pre { background: var(--stage-2); }
 
 /* ---- reveal -------------------------------------------------------------------------- */
 /* The only entrance on the page. Anything still moving after 320ms is not allowed.
@@ -369,8 +519,8 @@ pre {
 [data-reveal] { opacity: 0; transform: translateY(10px); }
 [data-reveal].shown {
   opacity: 1; transform: none;
-  transition: opacity 240ms cubic-bezier(0.215, 0.61, 0.355, 1),
-              transform 240ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  transition: opacity var(--dur-enter) var(--ease-reveal),
+              transform var(--dur-enter) var(--ease-reveal);
 }
 html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
 
@@ -390,19 +540,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
-footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var(--ui); font-size: 0.85rem; }
-
-/* ---- motion scale --------------------------------------------------------------------- */
-/* Five durations and three easings. No other number appears in a transition on this page. */
-:root {
-  --t-micro: 150ms;
-  --t-enter: 240ms;
-  --t-mode:  400ms;
-  --t-hero:  700ms;
-  --e-out:   cubic-bezier(0.32, 0.72, 0, 1);
-  --e-in:    cubic-bezier(0.4, 0, 1, 1);
-  --e-both:  cubic-bezier(0.4, 0, 0.2, 1);
-}
+footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var(--ui); font-size: var(--size-3); }
 
 /* ---- the rail ------------------------------------------------------------------------- */
 /* The reader's position, and the through-line: the hero call rides here as a miniature after
@@ -412,7 +550,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
   .rail {
     display: block; position: fixed; z-index: 5;
     top: 50%; left: 1.5rem; transform: translateY(-50%);
-    font-family: var(--ui); font-size: 0.75rem;
+    font-family: var(--ui); font-size: var(--size-1);
   }
   .rail ol { list-style: none; margin: 0; padding: 0 0 0 1.25rem; }
   .rail li + li { margin-top: 0.55rem; }
@@ -423,7 +561,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
      * matters least and the sense that matters most. ink-4 stays for the unplayed
      * waveform bars, which are a graphic and carry no words. */
     text-decoration: none; color: var(--ink-3);
-    transition: color var(--t-micro) var(--e-both);
+    transition: color var(--dur-micro) var(--ease-both);
   }
   .rail a[aria-current="true"] { color: var(--ink); }
   .rail a:hover { color: var(--ink-2); }
@@ -445,16 +583,20 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
    * dark. There is exactly one dark band and it has to reach both edges. */
   .act { padding-left: 15rem; }
 
-  /* The rail sits outside the theatre section, so it does not inherit the dark scope and was
-   * rendering paper ink on the dark ground: the active item became the least readable one. */
-  html.dark .rail a { color: var(--stage-ink-3); }
-  html.dark .rail a[aria-current="true"] { color: var(--stage-ink); }
-  html.dark .rail-line { background: var(--stage-line); }
-  html.dark .rail-fill { background: var(--stage-ink-2); }
+  /* The rail used to need four overrides here, because it sits outside the section that
+   * inverted and was rendering paper ink on a dark ground. The page has no inverted band
+   * now, so the rail is on paper at every scroll position and the overrides are gone. */
 }
 
 /* ---- the hero ------------------------------------------------------------------------- */
-.act-00 { min-height: 100svh; display: grid; align-content: start; padding-top: 14vh; }
+/* The whole scene has to be on the first screen: a judge who has to scroll to find out
+ * what this is has already been asked for something. 14vh of head room and the act's
+ * shared 9vh foot came to 207px of the 900 a laptop has, on a screen whose entire job is
+ * to hold one sentence and one object. 8vh and 3rem is 105. */
+.act-00 {
+  min-height: 100svh; display: grid; align-content: start;
+  padding-top: 8vh; padding-bottom: var(--space-6);
+}
 .act-00 .inner { will-change: transform; }
 
 /* The curtain. Act 0 holds while Act 1, which is opaque and sits at z-index 2, slides over
@@ -466,13 +608,24 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
   html[data-curtain] .act-00 { position: sticky; top: 0; z-index: 0; }
 }
 .eyebrow {
-  font-family: var(--ui); font-size: 0.8125rem; letter-spacing: 0.09em;
-  text-transform: uppercase; color: var(--ink-3); margin: 0 0 1.25rem;
+  font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-3);
   font-variant-numeric: tabular-nums;
+  /* p carries a 34.72em measure meant for the serif body. Resolved against 13px of tracked
+   * uppercase UI that is 451px, and this label is longer than that, so it was breaking one
+   * line of small caps across two. A label is one line or it is not a label. */
+  max-width: none;
 }
+/* The whole screen has one sentence on it. Everything else up here is a label on a real
+ * object, and the object is the argument.
+ *
+ * 5rem rather than the 7rem this was: the headline is no longer competing to be the thing
+ * the reader looks at, because the register underneath it is. A statement that has nothing
+ * next to it does not need to be the largest type that fits. */
 .act-00 h1 {
-  font-size: clamp(2.75rem, 7.5vw, 7rem);
+  font-size: clamp(2.25rem, 4.4vw, 4rem);
   line-height: 0.98; letter-spacing: -0.012em; text-wrap: balance;
+  margin-bottom: var(--space-4);
   /* Measured in em of this headline own font-size, never in ch.
    *
    * ch is the advance width of a zero in whatever face is rendering, so 16ch resolved to
@@ -482,16 +635,184 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
    * It appeared in three runs out of five, which is why a single measurement had called
    * it fixed.
    *
-   * em scales with the type across the clamp the way ch did, and depends on no glyph.
-   * 8.2em is the narrowest value where both states wrap to two lines (tools/gates/
-   * font-diag.mjs sweeps it); 8.6em is that value plus margin, because a reader on
-   * another platform gets a different local fallback with different metrics. */
-  max-width: 8.6em;
+   * em scales with the type across the clamp the way ch did, and depends on no glyph. The
+   * value moved from 8.6em to 11em because the headline text changed: the sentence here is
+   * a character longer than the one this was derived against and sits at a smaller size, so
+   * the old width put it on the edge of a third line. 11em holds two lines in both states
+   * with a whole line of margin, and the CLS gate is what proves it rather than this
+   * comment: its ceiling is 0.001 and a wrap that differed between the fallback and the
+   * real face would spend a full line box, which is 0.03 or worse. */
+  max-width: 11em;
 }
 .hero-foot {
-  font-family: var(--ui); font-size: 0.8125rem; color: var(--ink-3);
-  max-width: var(--measure-ui); margin-top: 1.75rem;
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  max-width: var(--measure-ui); margin-top: var(--space-4);
 }
+
+/* ---- the register --------------------------------------------------------------------- */
+/* The object the software acts on, and the object it hands back. Four real calls, one row
+ * each, and the three columns are the three fields CALL-E returns. It is not a table
+ * element because one of its rows opens into a phone call, and a cell containing a canvas,
+ * a transcript and a set of controls is not a cell.
+ *
+ * Every column is fixed or fractional and none is sized by its content. That is the whole
+ * reason a value can be swapped in mid-scene without costing a layout shift: `·` and
+ * `later_this_week` occupy the same track. The CLS ceiling on this page is 0.001, which is
+ * one part of a thousand of a viewport, so a column that resized on a text change would
+ * fail the gate on its own. */
+.register {
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: var(--size-2);
+  font-variant-numeric: tabular-nums;
+  /* The two steps that do not survive the light, re-cut once for the whole register. Only
+   * the register can ever be lit, so this is the only scope that needs them. */
+  --ink-3: var(--lit-ink-3);
+  --line:  var(--lit-line);
+}
+.reg-head, .reg-row {
+  display: grid;
+  grid-template-columns: 7rem repeat(3, minmax(0, 1fr));
+  gap: 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  align-items: baseline;
+}
+.reg-head {
+  font-family: var(--mono); font-size: var(--size-0);
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line-strong);
+}
+.reg-row + .reg-row { border-top: 1px solid var(--line); }
+.reg-id { color: var(--ink-3); }
+.reg-val { overflow-wrap: anywhere; }
+.reg-v { font-weight: 400; color: var(--ink); }
+/* The field name, carried on every value so a screen reader hears which field it is
+ * hearing, and so the row can stack under 52rem where three columns cannot fit. It is
+ * out of sight on a desktop, where the head row says the same thing once. */
+.reg-key {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* The row that is running. Nothing about it moves and nothing about it grows: the scene
+ * turns a light on and that is the whole of it. An entrance that opened this row would be
+ * a layout shift on the first screen, and the ceiling for the whole page is 0.001. */
+
+/* A value that has not arrived yet. The cell is never empty and never hidden: it holds the
+ * same `·` this page prints everywhere else for a field with no value, at 4.84 on the
+ * light, so a reader meets a readable pending state rather than a gap. Hiding it would
+ * also have taken it out of reach of the contrast gate, which skips anything invisible;
+ * an unmeasured run reads as a pass and this page does not allow that anywhere else. */
+/* `·` alone was not enough. The row under the live one carries three real `unknown`s,
+ * which is a value CALL-E returned, and a waiting field one line above it has to be
+ * legible as a different kind of thing at a glance. A blank on a form is a rule, so this
+ * is a rule, in the light's own stroke colour. It is on an inline box, so it adds no
+ * height and cannot move the row when it goes. */
+.reg-v[data-at="pending"] {
+  color: var(--ink-3);
+  border-bottom: 1px dotted var(--live-mark);
+}
+/* The commit is drawn only while the light is on, which is the only time a field can be
+ * arriving. Without that condition the rule would also match the served page, and all
+ * three would flinch once on every load for a scene that had not started. */
+.reg-row[data-live="on"] .reg-v[data-at="committed"] {
+  animation: field-commit var(--dur-tick) var(--ease-out);
+}
+/* 3px, not 8. A field arriving is a fact becoming true, not an object flying in, so the
+ * distance is the smallest one the eye still reads as a landing. Nothing in the real world
+ * appears from nothing, so it is 3px and 0.35 rather than nothing at all. */
+@keyframes field-commit {
+  from { transform: translateY(3px); opacity: 0.35; }
+  to   { transform: none;            opacity: 1; }
+}
+
+/* Three columns of mono at 13px need about 620px before the values start breaking mid
+ * word. Under that the row stacks and each value carries its own field name, which is the
+ * span that was out of sight above. The head row has nothing left to head, so it goes. */
+@media (max-width: 51.999rem) {
+  .reg-head { display: none; }
+  .reg-head, .reg-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1) 0; }
+  .reg-key {
+    position: static; width: auto; height: auto; margin: 0;
+    clip-path: none; color: var(--ink-3);
+  }
+  .reg-key::after { content: " "; }
+}
+
+/* ---- the call, under the row it belongs to ---------------------------------------------- */
+/* Joined to the lit row by a rule in the light's own colour rather than by being inside it.
+ * The rule is --live-mark, which is 3.41 against the paper and so clears the 3:1 a graphic
+ * that carries meaning has to clear: this one carries the only thing tying a waveform to a
+ * row three lines above it. It is a stroke, which is the only role that colour has.
+ *
+ * When the call has ended the rule drops back to the ordinary hairline, because nothing is
+ * running and nothing should be claiming to be. */
+.reg-open {
+  margin-top: var(--space-5);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--line);
+  transition: border-color var(--dur-mode) var(--ease-both);
+}
+.scene[data-live="on"] .reg-open { border-left-color: var(--live-mark); }
+.reg-open .turns {
+  /* Four turns, not the twenty-two rem the act 3 player uses. This one shares a screen with
+   * the register it belongs to and with the sentence above it, and the point of it is that
+   * lines land: a window the playhead pushes them through says that, where a full transcript
+   * sitting still says nothing. Every turn is in the list and the list scrolls, so a reader
+   * with no script still has all seventeen. */
+  max-height: 7.5rem;
+  border-top: 0;
+  margin-top: var(--space-2);
+  max-width: none;
+}
+.reg-open .turns li:first-child { border-top: 0; }
+.reg-open canvas[data-waveform] { height: 2.75rem; }
+
+/* The clock. It says a recording is playing and where the playhead is, which is the truth;
+ * an "on air" lamp would say a call is connected, which is not. Tabular so the digits do
+ * not walk while it counts. */
+.scene-clock {
+  font-family: var(--mono); font-size: var(--size-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+/* The replay button is served hidden and shown once a script exists to answer it, so this
+ * row is 19.44px tall for one frame and 26px after. Six pixels, and everything under it,
+ * the transcript, the caption and the small print, moved down by exactly that: 0.00085 of
+ * layout shift against a ceiling of 0.001, which passed with fifteen percent to spare and
+ * would not have on a slower machine.
+ *
+ * min-height is the button's own measured box, so the row is the same height whether the
+ * button is in it or not, and a reader with no script still gets no empty slot beside the
+ * clock. It holds across the font swap: both faces render the button at 26px. */
+.scene-bar {
+  display: flex; align-items: center; gap: var(--space-3);
+  flex-wrap: wrap; margin-top: var(--space-2);
+  min-height: 1.625rem;
+}
+/* Small print that has to be there. Two claims the scene would otherwise make silently:
+ * that it is running at the recording's speed, and that CALL-E returned the three fields
+ * together at the end rather than one at a time as they are drawn here. */
+.scene-note {
+  font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3);
+  line-height: 1.5; margin: var(--space-2) 0 0; max-width: none;
+}
+.replay {
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: 2px;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: color var(--dur-micro) var(--ease-both),
+              border-color var(--dur-micro) var(--ease-both),
+              transform var(--dur-micro) var(--ease-out);
+}
+.replay:hover { color: var(--ink); border-color: currentColor; }
+/* Pressed is 0.97, not 0.95. This control is 28px tall, and a scale a reader can measure
+ * on a small target reads as the button breaking rather than as the button answering. */
+.replay:active { transform: scale(0.97); }
 
 /* Act 1 rides over the pinned hero, so it needs its own ground and an edge. */
 .act-01 { position: relative; z-index: 2; background: var(--paper); border-top: 1px solid var(--line); }
@@ -504,7 +825,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
   .split { grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); }
 }
 .claim > h2 { margin-bottom: 1rem; }
-.result-line { font-family: var(--ui); font-size: 1.35rem; color: var(--ink); }
+.result-line { font-family: var(--ui); font-size: var(--size-6); color: var(--ink); }
 .result-line b { font-family: var(--mono); font-weight: 500; }
 
 /* ---- stat grid ------------------------------------------------------------------------ */
@@ -514,11 +835,11 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 }
 .stat-grid .cell { background: var(--paper); padding: 1.1rem 1rem; }
 .stat-grid .num {
-  font-family: var(--mono); font-size: 2rem; font-weight: 500; line-height: 1;
+  font-family: var(--mono); font-size: var(--size-7); font-weight: 500; line-height: 1;
   font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .stat-grid .lbl {
-  font-family: var(--ui); font-size: 0.75rem; line-height: 1.4;
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.4;
   color: var(--ink-3); margin-top: 0.45rem;
 }
 
@@ -528,7 +849,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .agree.part { color: var(--undetermined); }
 .caught { color: var(--resolved); font-variant-numeric: tabular-nums; }
 .ids td { padding-top: 0.4rem; padding-bottom: 0.4rem; }
-.compliance td { font-family: var(--ui); font-size: 0.8125rem; }
+.compliance td { font-family: var(--ui); font-size: var(--size-2); }
 .compliance td.ok { color: var(--resolved); white-space: nowrap; }
 .mutations td:nth-child(2) { max-width: 34rem; }
 
@@ -536,12 +857,12 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .takes { display: grid; gap: 2rem; margin-top: 2rem; }
 @media (min-width: 60rem) { .takes { grid-template-columns: repeat(3, 1fr); } }
 .take-n {
-  font-family: var(--mono); font-size: 0.8125rem; color: var(--ink-3);
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
   border-top: 2px solid var(--ink); padding-top: 0.5rem; display: inline-block;
   min-width: 2.5rem;
 }
-.take h4 { font-family: var(--ui-display); font-size: 1.05rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
-.take p { font-size: 0.9375rem; color: var(--ink-2); }
+.take h4 { font-family: var(--ui-display); font-size: var(--size-5); font-weight: 600; margin: 0.75rem 0 0.5rem; }
+.take p { font-size: var(--size-4); color: var(--ink-2); }
 
 /* ---- limits --------------------------------------------------------------------------- */
 .limits { list-style: none; margin: 0; padding: 0; }
@@ -549,19 +870,19 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .limits li:first-child { border-top: 0; }
 .limit { margin: 0 0 0.4rem; max-width: 33.60em; }
 .closes {
-  margin: 0; font-family: var(--ui); font-size: 0.875rem; color: var(--ink-3);
+  margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-3);
   max-width: 40.02em;
 }
 
 /* ---- player extras -------------------------------------------------------------------- */
 .stage { min-width: 0; }
-.cue { font-family: var(--ui); font-size: 0.875rem; color: var(--ink-2); }
-.cue.no-audio { max-width: 30.68em; margin: 0; font-size: 0.8125rem; color: var(--ink-3); }
+.cue { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.cue.no-audio { max-width: 30.68em; margin: 0; font-size: var(--size-2); color: var(--ink-3); }
 .note-free {
-  font-family: var(--ui); font-size: 0.9375rem; line-height: 1.5; color: var(--ink);
+  font-family: var(--ui); font-size: var(--size-4); line-height: 1.5; color: var(--ink);
   margin: 0 0 1rem; max-width: none;
 }
 .result dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; }
-.result dt { font-size: 0.75rem; }
-.conf { font-family: var(--ui); font-size: 0.75rem; color: var(--ink-3); margin: 0.9rem 0 0; }
+.result dt { font-size: var(--size-1); }
+.conf { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3); margin: 0.9rem 0 0; }
 .conf b { font-family: var(--mono); font-weight: 500; color: var(--ink-2); }

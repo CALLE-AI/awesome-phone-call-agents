@@ -276,6 +276,132 @@ def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
     return "".join(out)
 
 
+def commit_turns(call: dict, fields: list[str]) -> list[int]:
+    """Which turn each structured field is answered at, taken out of the transcript.
+
+    The rule is mechanical and it is the only one this file applies: the agent's questions
+    are its turns ending in a question mark, and a field is answered by the first parent
+    turn after the n-th of them. On the hero call that resolves to 21, 31 and 44 seconds,
+    which are the three lines where the parent actually says the thing each field records.
+
+    Where a call has fewer questions than fields, the fields left over are marked at the
+    last turn, because the one moment that is certainly true of every field is that CALL-E
+    had returned it by the time the call ended. Nothing here is chosen for how it looks.
+
+    This is the page's own reading of the transcript and not a timing CALL-E published: the
+    structured result arrives once, at the end. The scene says so on the screen, next to the
+    fields, rather than only here.
+    """
+    turns = call["turns"]
+    asked = [i for i, t in enumerate(turns)
+             if t["speaker"] == "bot" and t["text"].rstrip().endswith("?")]
+    out: list[int] = []
+    for i in asked:
+        answer = next((j for j in range(i + 1, len(turns))
+                       if turns[j]["speaker"] == "user"), None)
+        if answer is not None and answer not in out:
+            out.append(answer)
+        if len(out) == len(fields):
+            break
+    while len(out) < len(fields):
+        out.append(len(turns) - 1)
+    return out
+
+
+def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> str:
+    """The register: one row per call, one column per field, and one row still running.
+
+    The row that is running is not a different kind of row. It is this row with the call it
+    is waiting on opened out inside it, so a reader never has to connect a player somewhere
+    else on the page to a row somewhere here.
+
+    Everything is served filled. With no script, or with reduced motion asked for, this is
+    a complete record of four calls and their results, which is the state the scene ends in
+    anyway. The animation replays how the last row got there; it is never the only way to
+    read it.
+    """
+    fields = data["fieldOrder"]
+    call = data["calls"][live]
+    commits = commit_turns(call, fields)
+
+    out = [f'<div class=scene data-player="{esc(live)}" data-cue=0 data-playing=false '
+           f'data-commits="{esc(",".join(str(c) for c in commits))}">']
+
+    out.append('<div class=register>')
+    out.append('<div class=reg-head><span>call</span>'
+               + "".join(f'<span>{esc(FIELD_LABEL[f])}</span>' for f in fields)
+               + '</div>')
+    for rid in rows:
+        c = data["calls"][rid]
+        is_live = rid == live
+        attrs = ' data-live=off data-result' if is_live else ''
+        out.append(f'<div class=reg-row data-row="{esc(rid)}"{attrs}>')
+        out.append(f'<span class=reg-id>{esc(rid)}</span>')
+        for f in fields:
+            value = c["structured"].get(f, "·")
+            at = ' data-at=committed' if is_live else ''
+            out.append(f'<span class=reg-val><span class=reg-key>{esc(FIELD_LABEL[f])}</span>'
+                       f'<b class=reg-v data-field="{esc(f)}"{at}>{esc(value)}</b></span>')
+        out.append('</div>')
+    out.append('</div>')
+    # The call sits under the register rather than inside the row it belongs to. Inside, it
+    # was the same element and the light was one field, and that field ran the height of a
+    # transcript: a screen with one sentence on it had a third of its area painted yellow
+    # and the fourth row of the register pushed off the bottom. Out here the light is one
+    # row of one register, which is what a highlighter is, and the call is joined to it by a
+    # rule in the same colour rather than by being swallowed into it.
+    out.append(scene_call(call, has_audio))
+    out.append('</div>')
+    return "".join(out)
+
+
+def scene_call(call: dict, has_audio: bool) -> str:
+    """The call itself, drawn inside the register row that is waiting on it.
+
+    The canvas is served blank, hidden from assistive technology and out of the tab order.
+    Nothing draws it and nothing moves it without a script, and a `role=slider` that ignores
+    every arrow key is a promise the served page cannot keep. CallPlayer.upgrade adds the
+    role, the tab stop and the value in the same breath as the key handler.
+    """
+    mins, secs = divmod(int(call["seconds"]), 60)
+    out = ['<div class=reg-open>']
+    out.append('<canvas data-waveform aria-hidden=true></canvas>')
+    out.append('<div class=scene-bar>')
+    if has_audio:
+        out.append(
+            '<button class=play data-play type=button aria-label="Play this call">'
+            '<svg class=i-play viewBox="0 0 12 14" aria-hidden=true><path d="M0 0l12 7-12 7z"/></svg>'
+            '<svg class=i-pause viewBox="0 0 12 14" aria-hidden=true>'
+            '<path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg></button>')
+    out.append(f'<span class=scene-clock data-clock>0:00 / {mins}:{secs:02d}</span>')
+    # Served hidden, and CallPlayer.upgrade shows it, for the same reason the canvas is
+    # served without its slider role: with no script there is no scene to play again, and a
+    # button that answers nothing is the page making a promise it cannot keep. It is in the
+    # markup rather than built in JavaScript so that its words live with the rest of them.
+    out.append('<button class=replay type=button data-replay hidden>'
+               'Play the call again</button>')
+    out.append('</div>')
+    out.append('<ol class=turns data-turns aria-live=off>')
+    for turn in call["turns"]:
+        who = "agent" if turn["speaker"] == "bot" else "parent"
+        m, s = divmod(int(turn["offset_seconds"]), 60)
+        out.append(
+            f'<li data-at="{turn["offset_seconds"]}" data-who="{esc(turn["speaker"])}" '
+            f'data-rel=ahead><span class=turn-at>{m}:{s:02d}</span>'
+            f'<span class=turn-who>{who}</span>'
+            f'<span class=turn-text lang="{esc(call["locale"])}">{esc(turn["text"])}</span></li>')
+    out.append('</ol>')
+    # Two claims the scene would otherwise make silently. Both are cheaper to print than to
+    # be caught on: a judge who works out either of them for themselves stops believing the
+    # rest of the page, and this one is built entirely out of things that can be checked.
+    out.append(f'<p class=scene-note>The {mins}:{secs:02d} recording, played at its own '
+               'speed with silences over 1.5 seconds shortened; the timestamps are CALL-E’s. '
+               'Each field is marked at the answer it came from. CALL-E returned all three '
+               'together when the call ended.</p>')
+    out.append('</div>')
+    return "".join(out)
+
+
 def act(num: str, title: str, body: str, classes: str = "") -> str:
     # One reveal target per act. The hero never reveals: it is the first paint and it is
     # already choreographed on load.
@@ -360,20 +486,29 @@ def build(has_audio: bool) -> str:
     add('<main>')
 
     # ---- Act 0: the call
-    hero_ids = ["S-4105", "S-4106"]
-    cue = cue_for(calls["S-4105"], "left for school")
+    #
+    # One sentence and one object. The sentence is the only prose on this screen and the
+    # object is the argument: four real calls in a register, the third of them still
+    # running. A judge who reads nothing watches a row fill in and has been told the whole
+    # thing.
+    #
+    # The rows are the English call of each committed scenario pair, in the order the
+    # pairs were registered, so which four appear here is decided by the evidence file and
+    # not by this template. The live one is the call where the parent had not been told.
+    hero = "S-4105"
+    rows = [pair["en"] for pair in data["pairs"]]
+    cue = cue_for(calls[hero], "left for school")
     body = [
-        '<p class=eyebrow>08:40. A register is taken. One child is not in it.</p>',
-        '<h1 id=h-00>It calls the parents who never replied.</h1>',
-        '<p class=lede>The school already sent a text message. Some families answer it. This '
-        'is about the ones who do not, and it is the same call in whichever language that '
-        'family speaks.</p>',
-        player_markup(hero_ids, data, cue, has_audio),
-        '<p class=hero-foot>Two real calls, placed by this software. Different languages, '
-        f'different words, the same three fields. Both are the author’s own line, '
-        'scripted and consented; the pupil names are fictional.</p>',
+        '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
+        '<h1 id=h-00>One child is not in the register.</h1>',
+        register_markup(data, rows, hero, has_audio),
+        '<p class=hero-foot>Four real calls placed by this software, one row each, and the '
+        'three columns are the three fields CALL-E returns. The recordings are held outside '
+        'this repository; the transcript, the offsets and the shape of the waveform are what '
+        'CALL-E returned. Every call went to the author’s own line, scripted and consented, '
+        'and the pupil names in the transcripts are fictional.</p>',
     ]
-    add(act("00", "The call", "".join(body), "theatre"))
+    add(act("00", "The call", "".join(body), "hero"))
 
     # ---- Act 1: the residue
     body = [

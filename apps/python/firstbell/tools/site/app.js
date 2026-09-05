@@ -6,7 +6,11 @@
  * it, and scroll has consequences exactly twice, at the hero exit and in the rail.
  *
  * Six primitives may animate and nothing else: playhead-track, field-commit, act-enter,
- * curtain, rail-progress, theatre-open. A seventh requires deleting one of these.
+ * curtain, rail-progress, light-on. A seventh requires deleting one of these.
+ *
+ * light-on replaced theatre-open, which took the whole document to near-black for the
+ * section a call was in. The light is a property of the one row that is running now, so it
+ * is one background on one element instead of a restyle of the page.
  *
  * Lenis is loaded from a CDN and is optional. If it fails to arrive the page still scrolls,
  * plays and reads, which is the same state a reader gets with JavaScript off or with
@@ -41,25 +45,46 @@ function startScroll() {
   return lenis;
 }
 
-/* ---- the theatre --------------------------------------------------------------------- */
-/* The page is paper except where a call is playing. A class flip rather than an animated
- * colour, so it cannot tear, and an observer rather than a scroll handler, so it costs
- * nothing per frame. A call that scrolls out of view stops: a reader who scrolls
- * away mid-sentence should not hear a ghost. */
-function wireTheatre() {
-  const bands = document.querySelectorAll('.theatre');
-  if (!bands.length) return;
+/* ---- off screen -------------------------------------------------------------------- */
+/* A call that scrolls out of view stops. A reader who scrolls away mid-sentence should not
+ * hear a ghost, and should not come back to a scene half way through a story they did not
+ * watch: stopScene leaves the register settled, which is the state the scene was going to
+ * end in and the state the page serves.
+ *
+ * This used to also flip the whole document to a dark mode for the section a call was in.
+ * The light is a property of the one element that is running now, so there is no band to
+ * invert and no class on the root. An observer rather than a scroll handler either way, so
+ * it costs nothing per frame. */
+function wireOffscreen() {
+  if (!players.length) return;
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
-      e.target.classList.toggle('lit', e.intersectionRatio > 0.4);
-      if (e.intersectionRatio < 0.4) {
-        players.filter((p) => e.target.contains(p.root)).forEach((p) => p.pause());
-      }
+      if (e.intersectionRatio > 0.4) continue;
+      const p = players.find((q) => q.root === e.target);
+      if (!p) continue;
+      p.pause();
+      p.stopScene();
     }
-    document.documentElement.classList.toggle(
-      'dark', [...bands].some((b) => b.classList.contains('lit')));
-  }, { threshold: [0, 0.4, 0.75] });
-  bands.forEach((b) => io.observe(b));
+  }, { threshold: [0, 0.4] });
+  players.forEach((p) => io.observe(p.root));
+}
+
+/* ---- the scene ----------------------------------------------------------------------- */
+/* The first screen plays itself, once, silently.
+ *
+ * Silently is not a stylistic choice: an autoplaying call that made a sound would be the
+ * page breaking its own rule, and browsers would refuse it anyway. Once, because this is
+ * a twenty second recording of a real conversation and a loop would turn it into wallpaper.
+ *
+ * With reduced motion asked for, runScene settles the register instead of animating it,
+ * which is the same complete record the server sent. Nothing is behind the animation. */
+function wireScene() {
+  const scene = players.find((p) => p.commits.length && p.cells.length);
+  if (!scene) return;
+  if (REDUCED) { scene.sceneSettle(); return; }
+  // Started off the first frame after boot rather than from boot itself, so the scene
+  // cannot lengthen the task that boots the page. The long-task ceiling here is 50ms.
+  requestAnimationFrame(() => scene.runScene());
 }
 
 /* ---- copy an id ---------------------------------------------------------------------- */
@@ -89,9 +114,14 @@ function wireCopy() {
 function wirePlayers() {
   for (const root of document.querySelectorAll('[data-player]')) {
     const ids = root.dataset.player.split(',');
+    // One turn index per structured field, in field order, worked out from the transcript
+    // by tools/judge_page.py so the served page and the scene agree about which line each
+    // field came from.
+    const commits = (root.dataset.commits || '')
+      .split(',').filter(Boolean).map(Number);
     players.push(new CallPlayer(root, DATA.calls, {
       ids, start: ids[0], cueAt: Number(root.dataset.cue || 0), audioBase: AUDIO,
-      onTurn: paintRail,
+      onTurn: paintRail, commits,
     }));
   }
   // Only one call may be audible at a time. Two players talking over each other turn the
@@ -219,7 +249,6 @@ function wireScrubbed() {
       delete document.documentElement.dataset.curtain;
       hero.style.removeProperty('top');
       inner.style.removeProperty('transform');
-      inner.style.removeProperty('opacity');
       inner.style.removeProperty('will-change');
     }
     if (fill) fill.style.removeProperty('transform');
@@ -251,7 +280,23 @@ function wireScrubbed() {
       if (Math.abs(p - lastCurtain) > 0.0015) {
         lastCurtain = p;
         inner.style.transform = `translate3d(0, ${(-40 * p).toFixed(2)}px, 0)`;
-        inner.style.opacity = (1 - 0.6 * p).toFixed(3);
+        /* This used to write an opacity as well, down to 0.4 across the same window, and
+         * that had to go.
+         *
+         * The contrast gate walks the page a half viewport at a time and reads every text
+         * run against its ground and against the opacity of every ancestor. Once the hero
+         * is a fifth of the way through the curtain it is still on screen, still on top of
+         * the paper, and every word in it is being painted at four tenths of its colour:
+         * eleven transcript timestamps and the scene clock came back between 1.73 and 1.93
+         * against a floor of 4.5. They were failing before this change too. They passed
+         * only because the same runs were also caught at full opacity higher up the page,
+         * and the gate keeps the best reading per run, so a real failure was being hidden
+         * by an accident of where the samples landed.
+         *
+         * Nothing is lost by dropping it. Act 1 is opaque and sits at z-index 2, so it
+         * covers the hero on its own; the fade was dimming an element that was about to be
+         * hidden anyway. The 40px drift is the whole cue and it stays. It is also one
+         * fewer property written per frame on a layer a full screen tall. */
         // Give the layer back once the curtain has closed, which is what the old
         // onComplete did. A promoted layer rasterises its whole box for as long as it
         // is promoted, and this one is a full screen tall.
@@ -318,14 +363,15 @@ function wireReveal() {
 
 /* ---- boot ---------------------------------------------------------------------------- */
 function boot() {
-  wireTheatre();
   wireCopy();
   wirePlayers();
+  wireOffscreen();
   wireRail();
   startScroll();
   wireScrubbed();
   wireReveal();
   document.documentElement.dataset.ready = 'true';
+  wireScene();
 }
 
 if (document.readyState === 'loading') {
