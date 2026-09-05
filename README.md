@@ -148,6 +148,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [RELAY](https://github.com/eyadarshad/RELAY) - Autonomous multi-call business operations agent with a real-time web console that plans missions, queries suppliers via CALL-E, negotiates volume discounts, and enforces human approval before locking purchase orders.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [GridGuard Voice Escalation Agent](https://github.com/draculess99/gridguard-voice-escalation-agent) - Approval-gated grid-risk escalation app using CALL-E with disclosed calls, two human confirmations, structured escalation packets, and a dry-run/no-call default. [Demo](https://gridguard-voice-escalation-agent-production.up.railway.app/)
