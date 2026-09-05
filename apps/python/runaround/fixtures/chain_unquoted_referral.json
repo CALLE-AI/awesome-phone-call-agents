@@ -1,0 +1,47 @@
+{
+  "note": "Fictional test data. Hop one returns a number with no words behind it, so the chain refuses to dial it.",
+  "calls": {
+    "+15550100": {
+      "id": "call_demo_unquoted",
+      "object": "call_task",
+      "status": "completed",
+      "structured_result": {
+        "owns_request": "no",
+        "question_answered": "no",
+        "answer_summary": null,
+        "referral_target_name": "Example Freight Claims",
+        "referral_target_phone": "+15550111",
+        "referral_quote": null,
+        "reference_number": null
+      },
+      "summary": null,
+      "task_completed": true,
+      "recipients": [
+        {
+          "id": "rcp_demo_unquoted",
+          "status": "completed",
+          "structured_result": null,
+          "attempts": [
+            {
+              "status": "completed",
+              "transcript_turns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Calling about ORD-8472."
+                },
+                {
+                  "offset_seconds": 7,
+                  "speaker": "user",
+                  "text": "That is not us."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "failure_code": null,
+      "failure_message": null
+    }
+  }
+}
