@@ -20,7 +20,8 @@ const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>]/g
 async function load(){const h=await (await fetch('/api/health')).json();$('#health').textContent=`${h.calls_on_file} calls on file · live fetch ${h.live_fetch_enabled?'enabled':'off'} · LLM evidence ${h.llm?'on':'off'}`;
  const rows=await (await fetch('/api/calls')).json();
  $('#list').innerHTML=`<div class="call" onclick="bench()"><b>Benchmark</b><div class="t muted">every call on file: completion, evidence, latency</div></div>`+rows.map(r=>`<div class="call" onclick="showCall('${esc(r.id)}',this)"><span class="v v-${esc(r.verdict)}">${esc(r.verdict.replace('_',' '))}</span> <span class="mono">${esc(r.id)}</span> <span class="muted" style="font-size:11px">${esc(r.source)}${r.reviewed?' · reviewed':''}</span><div class="t">${esc(r.task).slice(0,90)}</div><div class="muted" style="font-size:12px">${r.status} · p50 ${r.p50??'—'}s · ${r.unsupported} unsupported</div></div>`).join('');
- if(rows.length) showCall(rows[0].id, document.querySelectorAll('.call')[1]);}
+ const q=new URLSearchParams(location.search);const want=q.get('call');const idx=rows.findIndex(r=>r.id===want);
+ if(q.get('view')==='benchmark') bench(); else if(idx>=0) showCall(rows[idx].id, document.querySelectorAll('.call')[idx+1], q.get('llm')==='true'); else if(rows.length) showCall(rows[0].id, document.querySelectorAll('.call')[1]);}
 async function showCall(id,el,llm){document.querySelectorAll('.call').forEach(x=>x.classList.remove('sel'));if(el)el.classList.add('sel');
  const d=await (await fetch(`/api/calls/${id}${llm?'?llm=true':''}`)).json();const t=d.task,r=d.review,tm=r.timing,c=r.compliance;
  const turns=(t.recipients||[]).flatMap(x=>(x.attempts||[]).flatMap(a=>a.transcript_turns||[]));
