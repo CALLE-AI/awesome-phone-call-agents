@@ -507,7 +507,7 @@ order that decides whether this is usable by a real school.
 
 ## When this was built
 
-Newly created. The first commit in this directory is `c5fc1d4`, 2026-09-04, and every
+Newly created. The first commit in this directory is `e7b2d6a`, 2026-09-04, and every
 line below it was written after that. No pre-existing project was renamed, forked or
 resubmitted, and nothing here was carried in from earlier work of mine.
 
