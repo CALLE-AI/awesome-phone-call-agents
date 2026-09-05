@@ -1,0 +1,38 @@
+{
+  "id": "call_fixture_006",
+  "object": "call_task",
+  "status": "failed",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.81,
+    "label": "high"
+  },
+  "structured_result": {
+    "open_saturday": "unknown",
+    "evidence": ""
+  },
+  "failure_code": "call_failed",
+  "failure_message": "calling task status=NO ANSWER (Hangup by: bot)",
+  "recipients": [
+    {
+      "id": "rcp_fixture_006",
+      "status": "failed",
+      "structured_result": null,
+      "attempts": [
+        {
+          "id": "att_fixture_006",
+          "status": "failed",
+          "started_at": "2026-09-02T22:49:47",
+          "completed_at": "2026-09-02T22:49:47",
+          "transcript_turns": [],
+          "failure_code": "408",
+          "failure_message": null,
+          "summary": "The call did not connect."
+        }
+      ]
+    }
+  ],
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. No real call, number, transcript or account appears here. The shape: the top-level failure_code repeats the status, and the ending is only named by the attempt-level failure_code 408.",
+  "summary": "The call did not connect."
+}

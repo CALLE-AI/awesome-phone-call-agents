@@ -1,0 +1,18 @@
+{
+  "id": "call_fixture_002",
+  "object": "call_task",
+  "status": "completed",
+  "recipients": [
+    {
+      "id": "rcp_002",
+      "status": "completed",
+      "structured_result": { "answered_by": "voicemail" },
+      "summary": "An answering machine took the call."
+    }
+  ],
+  "structured_result": null,
+  "task_completed": false,
+  "completion_confidence": { "score": 0.4, "label": "low" },
+  "failure_code": null,
+  "result_schema_requested": true
+}

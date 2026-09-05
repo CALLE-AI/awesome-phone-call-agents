@@ -1,0 +1,9 @@
+{
+  "id": "rgrp_fixture_105",
+  "object": "goal_run",
+  "goal_id": "goal_delivery_confirmation",
+  "run_id": "run_fixture_105",
+  "status": "completed",
+  "result": null,
+  "error": null
+}

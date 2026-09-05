@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0a0a0b;
+  --paper: #f4f2ee;
+  --paper-dim: #b8b4ab;
+  --paper-faint: #6f6b64;
+  --rule: #26262a;
+
+  /* One accent per basis, and they are the only colours on the page. */
+  --quoted: #6ee7a8;
+  --derived: #f0b849;
+  --absent: #7a7a86;
+  --alarm: #ff6b5d;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+}
+
+::selection {
+  background: var(--derived);
+  color: var(--ink);
+}
+
+textarea {
+  field-sizing: content;
+}
+
+/* The payload gutter. Narrow scrollbar so the JSON keeps its column width. */
+.payload::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.payload::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 999px;
+}
+.payload::-webkit-scrollbar-track {
+  background: transparent;
+}

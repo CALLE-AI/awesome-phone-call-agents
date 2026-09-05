@@ -1,0 +1,39 @@
+{
+  "id": "call_fixture_010",
+  "object": "call_task",
+  "status": "failed",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.61,
+    "label": "medium"
+  },
+  "structured_result": {
+    "open_saturday": "unknown",
+    "evidence": ""
+  },
+  "evidence": [
+    "The call ended immediately with no conversation captured.",
+    "No transcript or speech result was available from the call."
+  ],
+  "summary": "The call did not connect.",
+  "failure_code": "call_failed",
+  "failure_message": "calling task status=FAILED",
+  "recipients": [
+    {
+      "id": "rcp_fixture_010",
+      "status": "failed",
+      "structured_result": null,
+      "attempts": [
+        {
+          "id": "att_fixture_010",
+          "status": "failed",
+          "failure_code": "403",
+          "failure_message": null,
+          "transcript_turns": []
+        }
+      ]
+    }
+  ],
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. The shape came from dialling a number reserved for fiction and assigned to nobody: attempt code 403, no ring, and a failure_message reading FAILED rather than the NO ANSWER the same field carries on calls that did ring."
+}
