@@ -96,6 +96,25 @@ FIELD_LABEL = {
 }
 
 
+def script_json(payload: object) -> str:
+    """`json.dumps`, safe to put between `<script>` and `</script>`.
+
+    The HTML parser ends a script element at the literal `</script`, and it does not care
+    that the text around it is JSON. `json.dumps` has no reason to escape `<`, so a
+    transcript turn carrying that string would close the block early and the rest of the
+    page would be parsed as markup. `\\u003c` is read back as `<` by `JSON.parse`, so
+    this changes the bytes and not the data.
+
+    `&` goes too, so the payload cannot introduce an entity, and `\\u2028` and `\\u2029`
+    because both are line terminators to a JavaScript parser and neither is escaped by
+    `json.dumps`.
+    """
+    text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return (text.replace("<", "\\u003c").replace(">", "\\u003e")
+                .replace("&", "\\u0026")
+                .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+
+
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -252,7 +271,7 @@ def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
     out.append('</dl>')
     conf = first.get("confidence")
     if conf is not None:
-        out.append(f'<p class=conf>completion confidence <b data-conf>{conf}</b></p>')
+        out.append(f'<p class=conf>completion confidence <b data-conf>{esc(conf)}</b></p>')
     out.append('</div></div>')
     return "".join(out)
 
@@ -559,7 +578,7 @@ def build(has_audio: bool) -> str:
         '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
         'so that an unmeasured pair cannot read as a pass.</p></footer>')
 
-    add(f'<script id=call-data type=application/json>{json.dumps(data, ensure_ascii=False, separators=(",", ":"))}</script>')
+    add(f'<script id=call-data type=application/json>{script_json(data)}</script>')
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
         f'crossorigin=anonymous defer></script>')
     add('<script type=module src="app.js"></script>')

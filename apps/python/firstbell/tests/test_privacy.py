@@ -445,6 +445,40 @@ def test_the_authored_fixtures_are_what_the_generator_produces(tracked):
 # The credential
 # ---------------------------------------------------------------------------
 
+def test_the_page_cannot_be_broken_out_of_by_its_own_data():
+    """The call data is embedded in a `<script>` block, and JSON escaping is not enough.
+
+    An HTML parser ends a script element at the literal `</script`, whatever the text
+    around it means, and `json.dumps` has no reason to escape `<` because `<` is legal in
+    JSON. A transcript turn carrying that string would close the block early and the rest
+    of the page would be parsed as markup.
+
+    Nothing in the committed transcripts contains it. That is not the defence: this payload
+    is what a person said on the telephone, transcribed by a model, and the generator must
+    not be able to produce a broken page out of its own input.
+    """
+    import sys as _sys
+
+    _sys.path.insert(0, str(APP / "tools"))
+    try:
+        from judge_page import script_json
+    finally:
+        _sys.path.pop(0)
+
+    hostile = {
+        "turns": [{"text": "</script><img src=x onerror=alert(1)>"}],
+        "note": "an ampersand & a line separator \u2028 and \u2029",
+    }
+    out = script_json(hostile)
+
+    for forbidden in ("</script", "<", ">", "&", "\u2028", "\u2029"):
+        assert forbidden not in out, (
+            f"{forbidden!r} survived into the script block, so the page can be ended by "
+            f"its own data"
+        )
+    assert json.loads(out) == hostile, "escaping changed the data, not just the bytes"
+
+
 def test_the_api_key_reaches_no_surface_a_run_writes():
     """A real key in the environment, and every byte the run produces is searched for it.
 

@@ -20,16 +20,22 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
+Fifteen rows were re-measured on 5 September 2026 by applying each change, running the
+suite and restoring: rows 1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 35, 36 and 37. Twelve
+matched. Three did not and are corrected above: row 2 (three to five), row 3 (three to
+four) and row 8 (one to twenty, because removing the task-level fallback stops the
+demonstration answering at all). The remaining rows have not been re-measured.
+
 | # | The change | Tests that failed |
 |---|---|---|
 | 1 | `max_workers=self._concurrency` becomes `max_workers=None`, removing the concurrency cap | 4 |
 | 2 | `if not item.consented:` becomes `if False:`, disabling the consent gate | 5 |
-| 3 | Drop `insufficient_balance` from the double's `API_ERROR_CODES` | 3 |
+| 3 | Drop `insufficient_balance` from the double's `API_ERROR_CODES` | 4 |
 | 4 | Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 1 |
 | 5 | Write the transcript into every receipt instead of only when `--include-transcript` is given | 1 |
 | 6 | Prefer the attempt's raw SIP code over the task's symbolic one, putting `603` in front of an administrator | 1 |
 | 7 | Delete the SIP translation table, so a queue row reads `the call failed with 603` | 1 |
-| 8 | Stop falling back to the task-level `structured_result`, which is the defect a real call exposed | 1 |
+| 8 | Stop falling back to the task-level `structured_result`, which is the defect a real call exposed | 20 |
 | 9 | Allow that fallback for fan-out too, which would file one family's answer against another family's child | 1 |
 | 10 | Remove the check for a result whose required fields are all uninformative | 1 |
 | 11 | Flag a result if *any* required field is unknown rather than *all* of them | 1 |
@@ -65,8 +71,9 @@ not a disagreement about the rule.
 | 41 | Cite in `docs/images/README.md` the line the caption used to name, which is how both stills shipped | 1 |
 | 42 | Type a window bound back into the still generator instead of looking it up | 1 |
 | 43 | Accept `RetryPolicy(max_attempts=0)`, whose create loop never runs, so every item comes back FAILED with an empty reason about a run that dialled nobody | 1 |
+| 44 | Stop escaping `<` in the JSON embedded in the page's `<script>` block, so a transcript turn containing `</script>` ends the data early and the rest of the page is parsed as markup | 1 |
 
-## Why these forty-three
+## Why these forty-four
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
