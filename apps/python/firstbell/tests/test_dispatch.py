@@ -117,6 +117,21 @@ def test_a_boolean_does_not_satisfy_an_integer_field(double):
 # Every CALL-E error code has to land somewhere, deliberately
 # --------------------------------------------------------------------------
 
+def test_a_number_separated_by_commas_is_still_masked():
+    """The separator class decides what counts as one number.
+
+    CALL-E quotes the number it rejected, and a vendor that writes the groups with commas
+    splits the run into pieces shorter than the seven-digit floor, so every piece is left
+    alone and the whole number survives. Spaces, brackets, dots and hyphens were already
+    handled; the comma is the one that was missing.
+    """
+    from dispatch.models import redact
+
+    leaked = redact("invalid_phone: could not ring +91, 555, 000, 0099")
+    assert "0099" not in leaked, f"the number survived redaction: {leaked!r}"
+    assert "555" not in leaked, f"the number survived redaction: {leaked!r}"
+
+
 def test_every_calle_error_code_is_classified_into_exactly_one_bucket():
     """An error code this dispatcher has never heard of falls through to a plain
     permanent failure today, silently: nothing says the code was unrecognised.

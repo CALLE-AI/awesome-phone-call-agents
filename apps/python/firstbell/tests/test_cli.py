@@ -84,6 +84,45 @@ def test_the_receipt_records_the_mode_and_masks_every_number(tmp_path):
     assert unmasked == [], f"raw numbers reached the receipt: {unmasked}"
 
 
+def test_a_number_inside_a_result_field_is_masked_in_the_receipt(tmp_path):
+    """The flag governs the transcript. It has never governed the result.
+
+    `--include-transcript` is off here, which is the default and the state the README
+    describes as safe. `free_text_note` is part of `RESULT_SCHEMA`, so it is free text a
+    parent supplied, and `_write_receipt` writes the whole `structured_result` with no
+    flag in front of it. A parent who reads out another number puts one there.
+    """
+    from argparse import Namespace
+    from types import SimpleNamespace
+
+    from dispatch.models import DispatchReport, ItemResult, Resolution, WorkItem
+    from firstbell.cli import RunMode, _write_receipt
+
+    # Reserved, like every other number in this tree: a number written into a test to
+    # prove it gets masked would otherwise be a number that could ring somebody.
+    spoken = "+915550000099"
+    item = WorkItem(id="S-9", phones=("+915550000001",), locale="ta-IN")
+    report = DispatchReport(results=[ItemResult(
+        item=item, resolution=Resolution.RESOLVED, call_id="call_1",
+        structured_result={
+            "reason_category": "illness",
+            "free_text_note": f"Ring her father instead, his number is {spoken}.",
+        },
+        reason="schema-valid answer received", attempts_made=1,
+        numbers_tried=("+915550000001",), placed_by_this_run=True,
+    )])
+    summary = SimpleNamespace(resolution_rate=1.0, calls_placed=1, rate=None,
+                              funding_recovered=None)
+    receipt = tmp_path / "receipt.json"
+    _write_receipt(receipt, report=report, mode=RunMode(live=False), summary=summary,
+                   args=Namespace(work_file=WORK, concurrency=1, include_transcript=False))
+
+    written = receipt.read_text(encoding="utf-8")
+    assert spoken not in written, (
+        "a number a parent said reached the receipt with --include-transcript off"
+    )
+
+
 def test_a_work_file_without_consent_is_refused(tmp_path, capsys):
     path = tmp_path / "bad.csv"
     path.write_text("id,phones\nS-1,+915550000001\n", encoding="utf-8")

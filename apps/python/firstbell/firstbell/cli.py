@@ -31,6 +31,7 @@ from dispatch import (
     SourceError,
     WaveDispatcher,
     default_idempotency_key,
+    redact_free_text,
 )
 
 from .domain import RESULT_SCHEMA, FundingRate, StaffCost, build_task, summarise
@@ -249,7 +250,9 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 # True placed, False replayed by an idempotency key, null undetermined.
                 # A receipt that counted a replay as a call would overstate the cost.
                 "placed_by_this_run": r.placed_by_this_run,
-                "structured_result": r.structured_result,
+                # The flag below governs the transcript. It never governed this, and
+                # a result field holds what a person said, so it can hold a number.
+                "structured_result": redact_free_text(r.structured_result),
                 "failure_code": r.failure_code,
                 "reason": r.reason,
                 **({"transcript": list(r.transcript)} if args.include_transcript else {}),

@@ -156,9 +156,11 @@ def mask(phone: str) -> str:
 
 # Seven digits, because that is shorter than any diallable number and longer than anything
 # this app wants to keep: a SIP code is three, an HTTP status is three, and "E.164" is
-# three. Separators are allowed inside the run so that a number written 04 1234 5678 or
-# (04) 1234-5678 is still caught.
-_LONG_DIGIT_RUN = re.compile(r"\+?\d[\d\s().\-]{5,}\d")
+# three. Separators are allowed inside the run so that a number written 04 1234 5678,
+# (04) 1234-5678 or +1, 800, 555, 0199 is still caught. The comma matters: CALL-E
+# quotes the number it rejected and a vendor that groups it with commas was breaking
+# the run into pieces shorter than the floor, so none of them were masked.
+_LONG_DIGIT_RUN = re.compile(r"\+?\d[\d\s(),.\-]{5,}\d")
 
 
 def redact(text: str) -> str:
@@ -180,6 +182,26 @@ def redact(text: str) -> str:
         return mask(digits) if len(re.sub(r"\D", "", digits)) >= 7 else match.group()
 
     return _LONG_DIGIT_RUN.sub(hide, text)
+
+
+def redact_free_text(value: Any) -> Any:
+    """Run `redact` over every string inside a structure this app did not author.
+
+    A structured result is CALL-E's account of what a person said, so any field of it can
+    carry a number the caller read out. `--include-transcript` governs the transcript and
+    has never governed the result, which is written on every run.
+
+    Every string is masked rather than the ones whose names look like free text, because a
+    name list has to be kept in step with the schema and this does not. The values this app
+    writes are codes and enumerations with no long digit run, so they come back unchanged.
+    """
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {k: redact_free_text(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [redact_free_text(v) for v in value]
+    return value
 
 
 @dataclass

@@ -10,6 +10,7 @@ from .models import (
     Resolution,
     WorkItem,
     mask,
+    redact_free_text,
 )
 from .sources import CsvSource, MemorySource, SourceError, WorkSource
 from .scheduler import Cancelled, RetryPolicy, WaveDispatcher, default_idempotency_key
@@ -17,7 +18,7 @@ from .validation import UnsupportedSchema, is_valid, problems
 
 __all__ = [
     "WaveDispatcher", "RetryPolicy", "Cancelled", "default_idempotency_key",
-    "WorkItem", "ItemResult", "DispatchReport", "Resolution", "mask",
+    "WorkItem", "ItemResult", "DispatchReport", "Resolution", "mask", "redact_free_text",
     "is_valid", "problems", "UnsupportedSchema",
     "WorkSource", "CsvSource", "MemorySource", "SourceError",
 ]

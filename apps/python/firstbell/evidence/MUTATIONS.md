@@ -45,8 +45,10 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 35 | Let one dispatcher instance run twice, inheriting the first run's cancellation | 1 |
 | 36 | Accept two work items sharing an id, so one idempotency key covers both | 2 |
 | 37 | Read a service clock an hour behind ours as a definite replay rather than unknown | 1 |
+| 38 | Write the structured result to the receipt unmasked, which is how it shipped until this was fixed | 1 |
+| 39 | Drop the comma from the separator class, so a number a vendor groups with commas is left whole | 1 |
 
-## Why these thirty-seven
+## Why these thirty-nine
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
