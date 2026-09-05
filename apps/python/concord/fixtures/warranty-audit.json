@@ -1,0 +1,11 @@
+{
+  "id": "AU-WAR-2026-09",
+  "org": "Halden Appliance Care",
+  "rubric_id": "RB-WAR-01",
+  "requested_by": "Tom Okafor, Service Standards",
+  "call_window": { "timezone": "Europe/London", "start": "09:00", "end": "17:00" },
+  "branches": [
+    { "id": "H1", "name": "Halden Care, Deansgate", "phone": "+447700900201", "authorization": "service-estate register 2026-09-01" },
+    { "id": "H2", "name": "Halden Care, Kirkby Retail Park", "phone": "+447700900202", "authorization": "service-estate register 2026-09-01" }
+  ]
+}
