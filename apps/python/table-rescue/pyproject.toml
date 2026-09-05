@@ -1,0 +1,22 @@
+[project]
+name = "table-rescue"
+version = "0.1.0"
+description = "Cascade coordinator that recovers cancelled restaurant tables via CALL-E waitlist calls"
+requires-python = ">=3.10"
+dependencies = ["fastmcp"]
+
+[project.optional-dependencies]
+dev = ["pytest", "hypothesis"]
+
+[project.scripts]
+table-rescue = "table_rescue.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["table_rescue*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "e2e"]
