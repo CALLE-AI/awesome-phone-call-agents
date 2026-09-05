@@ -63,3 +63,31 @@ def test_webhook_ingest_and_api(tmp_path, monkeypatch):
     assert client.post("/calle/webhook", json={"type": "call.completed", "data": t}).status_code == 401
     assert client.post("/calle/webhook", json={"type": "call.completed", "data": t}, headers={"X-CRC-Token": "s3cret"}).status_code == 200
     assert client.get("/api/benchmark").json()["aggregate"]["calls"] >= 6
+
+
+def test_live_fetch_prefers_sdk_and_never_creates(monkeypatch):
+    import sys, types
+    from crc import live
+    seen = {}
+
+    class Calls:
+        def get(self, call_id):
+            seen["get"] = call_id
+            return {"id": call_id, "object": "call_task", "status": "completed"}
+
+        def list_events(self, call_id, **kw):
+            return {"data": []}
+
+    class FakeClient:
+        def __init__(self, *, api_key, base_url, timeout):
+            seen["key"] = api_key
+            self.calls = Calls()
+
+    monkeypatch.setitem(sys.modules, "calle", types.SimpleNamespace(CalleClient=FakeClient))
+    monkeypatch.setenv("CALLE_API_KEY", "iams_test")
+    assert live.fetch_call("call_1")["id"] == "call_1" and seen == {"key": "iams_test", "get": "call_1"}
+    assert not [n for n in dir(live) if "create" in n]  # no call-creation surface exists in this module
+    monkeypatch.delenv("CALLE_API_KEY")
+    import pytest
+    with pytest.raises(RuntimeError):
+        live.fetch_call("call_2")

@@ -31,7 +31,7 @@ Roadmap item: `apps/web/call-review-console` ("Review call results, summaries, r
 cd apps/web/call-review-console
 uv venv && uv pip install -e ".[dev]"      # or: pip install -e ".[dev]"
 uvicorn crc.app:app --port 8080            # http://localhost:8080 — fixtures only, no key needed
-pytest -q                                  # 6 tests: timing, compliance, evidence, verdicts, webhook ingest
+pytest -q                                  # 7 tests: timing, compliance, evidence, verdicts, webhook ingest, SDK-backed fetch
 ```
 
 Opt-in live review of your own calls:
