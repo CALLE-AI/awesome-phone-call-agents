@@ -34,10 +34,28 @@ export class CallPlayer {
     this.raf = 0;
     this.onTurn = opts.onTurn || null;
     this.bind();
+    this.upgrade();
     this.select(this.id, true);
   }
 
   get call() { return this.data[this.id]; }
+
+  /* Say it is a slider only where it is one.
+   *
+   * The markup serves this as a blank canvas, hidden from assistive technology and out of
+   * the tab order, because with the script off nothing draws it and nothing moves it: a
+   * role=slider that ignores every arrow key is a promise the page cannot keep. Here the
+   * keys are already bound, so the promise is good. select() sets the value straight
+   * after, which is why there is no announce() call in this method.
+   */
+  upgrade() {
+    this.canvas.removeAttribute('aria-hidden');
+    this.canvas.setAttribute('role', 'slider');
+    this.canvas.setAttribute('tabindex', '0');
+    this.canvas.setAttribute('aria-valuemin', '0');
+    this.canvas.setAttribute('aria-label',
+      'Playhead. Click it, or use the arrow keys, to move through the call.');
+  }
 
   bind() {
     new ResizeObserver(() => this.resize()).observe(this.canvas);

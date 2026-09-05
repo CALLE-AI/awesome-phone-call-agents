@@ -348,13 +348,53 @@ async function gateNoJs(browser, url) {
   const html = await page.content();
   await page.close();
   const missing = ACTS.filter((id) => !html.includes(`id="${id}"`) && !html.includes(`id=${id}`));
-  const text = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
-  const words = text.split(/\s+/).filter(Boolean).length;
-  record("no javascript", missing.length === 0 && words > 800 ? "PASS" : "FAIL",
-    missing.length === 0
-      ? `all ${ACTS.length} acts present in the served HTML, ${words} words of readable text`
-      : `missing acts: ${missing.join(", ")}`,
-    { words, missingActs: missing, evaluated: found });
+  const stripped = html.replace(/<script[\s\S]*?<\/script>/g, "");
+  const words = stripped.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  /* Readable is half of it. The other half is whether the markup promises anything a
+   * script would have had to deliver.
+   *
+   * The served HTML is re-parsed here with its scripts removed, so the DOM being queried
+   * is the one a reader with JavaScript off actually gets, queried with the selectors that
+   * say it plainly. */
+  const inert = await browser.newPage();
+  await inert.setContent(stripped, { waitUntil: "domcontentloaded" });
+  const promises = await inert.evaluate(() => {
+    // These keep working with no script behind them, so they are allowed to say so.
+    const NATIVE = "button, a[href], input, select, textarea, summary, details";
+    const OPERABLE = new Set(["slider", "button", "checkbox", "radio", "switch", "tab",
+      "menuitem", "menuitemcheckbox", "menuitemradio", "combobox", "spinbutton", "option",
+      "treeitem", "link", "textbox", "searchbox"]);
+    const name = (el) => el.tagName.toLowerCase()
+      + (typeof el.className === "string" && el.className.trim()
+        ? "." + el.className.trim().split(/\s+/)[0] : "")
+      + [...el.attributes].filter((a) => a.name.startsWith("data-")).slice(0, 1)
+        .map((a) => `[${a.name}]`).join("")
+      // Two players carry the same markup, so without the section each one sits in the
+      // report reads like the same element counted twice.
+      + ` in ${(el.closest("section[id]") || {}).id || "the page"}`;
+    const out = [];
+    for (const el of document.querySelectorAll("[role], [tabindex]")) {
+      if (el.matches(NATIVE)) continue;
+      const role = (el.getAttribute("role") || "").toLowerCase();
+      const tab = el.getAttribute("tabindex");
+      if (OPERABLE.has(role)) out.push(`${name(el)} says role=${role}`);
+      else if (tab !== null && tab !== "-1") out.push(`${name(el)} takes tabindex=${tab}`);
+    }
+    return out;
+  });
+  await inert.close();
+
+  const ok = missing.length === 0 && words > 800 && promises.length === 0;
+  const why = missing.length
+    ? `missing acts: ${missing.join(", ")}`
+    : promises.length
+      ? `${promises.length} element(s) claim to be operable with no script to operate them: `
+        + promises.slice(0, 3).join(", ")
+      : `all ${ACTS.length} acts present in the served HTML, ${words} words of readable `
+        + `text, and nothing in it claims an interactive role a script would have to service`;
+  record("no javascript", ok ? "PASS" : "FAIL", why,
+    { words, missingActs: missing, falsePromises: promises, evaluated: found });
 }
 
 async function gateCdnLoss(browser, url) {

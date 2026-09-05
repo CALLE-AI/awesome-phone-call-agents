@@ -131,11 +131,22 @@ because they fail as a gate rather than as a count of tests.
 | Strip the playhead's aria-label | `keyboard` FAIL, `2 control(s) with no accessible name` |
 | Read the breakpoint once at parse time instead of asking it live, which is how it shipped until this was fixed | `viewport` FAIL in both directions: `widened, foot: the rail reads 0% at the foot of the page` and `narrowed, past the curtain: the hero is not sticky yet sits at 0.491 opacity, faded for a pin that is not holding it` |
 | Stop recomputing the hero's resting position on resize | `viewport` FAIL, `reshaped, top: the hero rests at -332px where -186px reaches its last line` |
+| Serve the playhead as `role=slider tabindex=0` before any script can back it, which is how it shipped until this was fixed | `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: canvas[data-waveform] in act-00 says role=slider, canvas[data-waveform] in act-03 says role=slider` |
 
-Eight of those ten are the state this page was actually in, not a change invented to trip
+Nine of those eleven are the state this page was actually in, not a change invented to trip
 a gate. The CLS failure, the long task, the rail, the dimmed transcript, the clipped focus
-ring, the playhead no keyboard could reach and the frozen breakpoint were all found this
-way, and all of them are fixed.
+ring, the playhead no keyboard could reach, the frozen breakpoint and the slider that only
+existed once a script arrived were all found this way, and all of them are fixed.
+
+`no javascript` used to count acts and words, which answers whether the page can be *read*
+without a script and says nothing about whether it also claims to be *operated* without one.
+The waveform was served as `role=slider tabindex=0` with a label recommending the arrow
+keys, and with the script off it is 601x72 of canvas with zero opaque pixels that no key can
+move. The rule the gate applies now is decidable from the markup alone: a native control
+keeps working with no script behind it, so `button`, `a[href]`, `input`, `select`,
+`textarea` and `summary` may say what they are, and anything else taking an interactive role
+or a tab stop is asking for a script that has not arrived. The page ships the canvas inert
+and `CallPlayer.upgrade()` promotes it in the same breath as the key handler.
 
 The `viewport` gate exists because two defects in a row came from geometry decided once and
 then relied on for the rest of the session: a resting position computed at wiring, and a
