@@ -48,7 +48,7 @@ def test_the_demo_run_also_shows_an_answer_that_is_not_ours_to_close(capsys):
 
     assert "[SAFEG] S-1047" in out, "an escalated row must not print the closed marker"
     assert "of those, escalated  1" in out
-    assert "1 of those case is safeguarding" in out
+    assert "1 of those cases is safeguarding" in out
     assert "within 30 minutes" in out
 
     # Top of the queue, above the two ordinary callbacks, and flagged.

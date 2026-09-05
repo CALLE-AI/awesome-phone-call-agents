@@ -402,8 +402,8 @@ def _print_human(report: DispatchReport, summary) -> None:
         print()
         print(f"{len(queue)} case(s) need a person. Nothing here is closed:")
         if escalated:
-            noun = 'case is' if len(escalated) == 1 else 'cases are'
-            print(f"  {len(escalated)} of those {noun} safeguarding: the parent did "
+            verb = 'is' if len(escalated) == 1 else 'are'
+            print(f"  {len(escalated)} of those cases {verb} safeguarding: the parent did "
                   f"not confirm they already knew.")
             print(f"  A school would have to answer these within "
                   f"{SAFEGUARDING_CALLBACK_MINUTES} minutes.")

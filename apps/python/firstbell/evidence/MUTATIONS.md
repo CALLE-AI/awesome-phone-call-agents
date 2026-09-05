@@ -51,13 +51,15 @@ takes a different kind of edit and not a different kind of check. Four of the fi
 with what was published. Only row 26 moved.
 
 Ten wrong numbers in forty-four is worth stating plainly rather than burying: this table was
-published before it was verified, and verifying it is what found them.
+published before it was verified, and verifying it is what found them. None of those ten
+corrections changed whether a gate fires, which is what the table is for. All ten changed how
+loudly it fires, which is what a reader would have checked us on.
 
-Rows 45 to 59 came later and are not part of that count. They were measured on 6 September
-2026 as they were written, each applied and run before the row describing it existed, so none
-of them was ever a published number waiting to be checked. None of the ten
-changed whether a gate fires, which is what the table is for. All ten changed how loudly it
-fires, which is what a reader would have checked us on.
+Every row from 45 onwards came later and is not part of that count. Each was measured as it
+was written, applied and run before the row describing it existed, so none was ever a
+published number sitting unchecked. That is the safer order and it is not a guarantee: four
+rows in the 49 to 52 block were later found one too high each, having been measured against a
+tree that already had one test red.
 
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
@@ -253,10 +255,11 @@ would otherwise have to check by hand:
   call that was placed being reported as a call that never happened.
 - **27 to 29** protect the double's likeness to the thing it stands in for, which is the
   load-bearing assumption under every other number here. They were added after a shape
-  comparison against recorded production responses found the double wrong in three places
+  comparison against recorded production responses found the double wrong in four places
   at once: it omitted four task-level fields the API always returns, it put the extracted
-  result where nothing had asked for it, and it spoke its own vocabulary on an attempt
-  where the API sends a numeric SIP code. 29 fails six tests, two of which are about the
+  result where nothing had asked for it, it spoke its own vocabulary on an attempt where
+  the API sends a numeric SIP code, and it gave a failed attempt a duration where the one
+  recorded failure had none. 29 fails seven tests, two of which are about the
   words an administrator reads, so the divergence reached the product and not just the
   fixtures. None of the twenty-six gates before them noticed any of it, because all
   twenty-six were measured against the same wrong model.
@@ -298,10 +301,13 @@ because they fail as a gate rather than as a count of tests.
 | Stop recomputing the hero's resting position on resize | `viewport` FAIL, `reshaped, top: the hero rests at -332px where -186px reaches its last line` |
 | Serve the playhead as `role=slider tabindex=0` before any script can back it, which is how it shipped until this was fixed | `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: canvas[data-waveform] in act-00 says role=slider, canvas[data-waveform] in act-03 says role=slider` |
 
-Nine of those eleven are the state this page was actually in, not a change invented to trip
-a gate. The CLS failure, the long task, the rail, the dimmed transcript, the clipped focus
-ring, the playhead no keyboard could reach, the frozen breakpoint and the slider that only
-existed once a script arrived were all found this way, and all of them are fixed.
+Seven of those eleven are the state this page was actually in, not a change invented to trip
+a gate, and each of the seven says so in its own row. The CLS failure, the rail, the dimmed
+transcript, the clipped focus ring, the playhead no keyboard could reach, the frozen
+breakpoint and the slider that only existed once a script arrived were all found this way,
+and all of them are fixed. The long task is not among them: that row appends a busy loop
+nobody ever shipped, which is the other kind of row and the reason the two are counted
+apart.
 
 `no javascript` used to count acts and words, which answers whether the page can be *read*
 without a script and says nothing about whether it also claims to be *operated* without one.

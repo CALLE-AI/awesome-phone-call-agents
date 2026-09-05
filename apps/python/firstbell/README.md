@@ -136,7 +136,7 @@ What this run was worth
                         https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm
 
 3 case(s) need a person. Nothing here is closed:
-  1 of those case is safeguarding: the parent did not confirm they already knew.
+  1 of those cases is safeguarding: the parent did not confirm they already knew.
   A school would have to answer these within 30 minutes.
   !! S-1047       schema-valid answer received, escalated as safeguarding and not closed automatically
      S-1044       the call completed but returned no structured result
@@ -461,7 +461,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 242 tests
+python -m pytest tests/ -q          # 245 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

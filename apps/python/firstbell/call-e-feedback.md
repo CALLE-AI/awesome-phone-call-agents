@@ -26,7 +26,7 @@ and a safeguarding call that will not end is worse than one that never happened.
 
 We are not the only ones who needed this. `consent-gate` extracts an `end_call_requested`
 field from the finished call and branches on it
-(`apps/python/consent-gate/consent_gate/__main__.py:124-145`). That is a record of someone
+(`apps/python/consent-gate/consent_gate/__main__.py:124-145`, "end_call_requested"). That is a record of someone
 having asked the call to stop, read after it stopped. It is the closest thing to a
 termination control available, and it arrives too late by construction.
 
@@ -34,7 +34,8 @@ termination control available, and it arrives too late by construction.
 and `max_turns` on the task as a backstop the agent cannot talk its way past. The backstop
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
-Anchor: `README.md:314-320` and limitation 3 at `README.md:513-517`.
+Anchor: `README.md:332-340` ("The escape hatch is instructed, not enforced") and
+limitation 3 at `README.md:557-561` ("Platform-side call termination").
 
 ## 2. `structured_result` is returned in two places, and callers guess wrong
 
@@ -50,9 +51,11 @@ another family.
 The clearest evidence that this is under-specified is that three apps in this repository read
 the same two fields three different ways. `appointment-confirm` refuses the fallback unless
 there is exactly one recipient
-(`apps/python/appointment-confirm/appointment_confirm/dispositions.py:54-61`). `accessline`
+(`apps/python/appointment-confirm/appointment_confirm/dispositions.py:54-61`,
+"Expected exactly one recipient result"). `accessline`
 takes `recipients[0]` and falls back with no recipient-count check
-(`apps/python/accessline/accessline/calle_rest.py:366-371`), which is safe for a
+(`apps/python/accessline/accessline/calle_rest.py:366-371`,
+"structured = call_task.get"), which is safe for a
 single-recipient caller and would need a guard if it ever fanned out. We allow it only for a
 single recipient. None of us is being careless. We each read the same reference and reached a
 different conclusion about which field is authoritative.
@@ -112,14 +115,15 @@ knowing what the shapes are.
 
 ## 6. `canceled` is a status with no way to reach it
 
-The call status enum includes `canceled`. There is no cancel endpoint. Nothing in the fifty-six
-apps in this repository calls one, because there is nothing to call.
+The call status enum includes `canceled`. There is no cancel endpoint. Nothing in the 76 apps
+in this repository calls one, because there is nothing to call: every hit on `cancel` across
+`apps/` is a reference to the status value.
 
 For us this is not cosmetic. Our only brake on a run that is going wrong is the concurrency
 cap, because once a call is placed we cannot recall it. That makes a wave of calls to families
 an operation with no stop button, which is a hard thing to hand to a school office.
 
-We looked hard enough to write a test about it. `tests/test_double_guards.py:203-210` posts to
+We looked hard enough to write a test about it. `tests/test_double_guards.py:203-210` ("v1/calls/x/cancel") posts to
 `/v1/calls/x/cancel` and asserts a 404, because our double must not invent a route the real
 API does not serve.
 
@@ -179,7 +183,7 @@ Six of the eight need no account and no key:
 ```bash
 cd apps/python/firstbell
 python -m pytest tests/ -q
-python -m firstbell --demo
+python -m firstbell --work-file examples/absences.csv
 ```
 
 Findings 4 and 8 are observations from live calls and cannot be reproduced from this

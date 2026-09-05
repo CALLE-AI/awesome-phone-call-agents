@@ -299,25 +299,30 @@ def test_the_readme_states_the_real_number_of_mutations():
     # whole failure, and it happened twice in the same repository. A third file was then
     # found saying "Thirteen rules" while the table held seventy-five, which is why this
     # reads a list rather than a pair.
-    for rel in ("README.md", "evidence/README.md", "docs/proving-a-gate-fires.md"):
-        text = (APP / rel).read_text(encoding="utf-8")
+    stating = ("README.md", "evidence/README.md", "docs/proving-a-gate-fires.md")
+    bodies = {rel: (APP / rel).read_text(encoding="utf-8") for rel in stating}
+
+    for rel, text in bodies.items():
         assert f"{word.capitalize()} gates broken on purpose" in text, (
             f"MUTATIONS.md has {rows} rows, so {rel} should say "
             f"'{word.capitalize()} gates broken on purpose'"
         )
-    readme = (APP / "README.md").read_text(encoding="utf-8")
 
     # And no other spelled-out count may appear beside the word "gates", which is how the
-    # stale "Thirteen of them" survived several edits.
-    for other, other_word in NUMBER_WORDS.items():
-        if other == rows:
-            continue
-        assert f"{other_word.capitalize()} gates" not in readme, (
-            f"the README still says '{other_word.capitalize()} gates' somewhere"
-        )
-        assert f"{other_word.capitalize()} of them" not in readme, (
-            f"the README still says '{other_word.capitalize()} of them' somewhere"
-        )
+    # stale "Thirteen of them" survived several edits. Read across all three files rather
+    # than the app README alone: the half above was widened to three when a second file was
+    # caught, and this half was left reading one, which put a checked sentence and an
+    # unchecked one in the same file for a day.
+    for rel, text in bodies.items():
+        for other, other_word in NUMBER_WORDS.items():
+            if other == rows:
+                continue
+            assert f"{other_word.capitalize()} gates" not in text, (
+                f"{rel} still says '{other_word.capitalize()} gates' somewhere"
+            )
+            assert f"{other_word.capitalize()} of them" not in text, (
+                f"{rel} still says '{other_word.capitalize()} of them' somewhere"
+            )
 
 
 def test_no_committed_text_file_carries_an_invisible_control_byte():
@@ -655,5 +660,126 @@ def test_the_mutation_counts_the_readme_quotes_match_the_table_it_points_at():
 
     assert not wrong, (
         "the README quotes kill counts the mutation table disagrees with:\n  "
+        + "\n  ".join(wrong)
+    )
+
+
+def test_prose_that_names_a_mutation_row_agrees_with_that_row():
+    """`evidence/MUTATIONS.md` explains some rows in prose and quotes their kill count.
+
+    One of those sentences said row 29 fails six tests while row 29 said seven, and the
+    correction log four hundred lines further up recorded the change from six to seven. The
+    row moved, the sentence did not, and the file disagreed with itself in two directions at
+    once.
+
+    The pattern this reads is the one the file actually uses: a row number, the word "fails",
+    and a number word or digit.
+    """
+    text = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")
+
+    rows = {}
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) == 3 and cells[0].isdigit() and cells[2].isdigit():
+            rows[int(cells[0])] = int(cells[2])
+    assert len(rows) > 50, f"only {len(rows)} rows parsed, so this gate is reading the wrong table"
+
+    words = {name: value for value, name in enumerate(
+        "zero one two three four five six seven eight nine ten eleven twelve thirteen "
+        "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+
+    wrong = []
+    for match in re.finditer(r"\b(\d+) fails ([a-z]+|\d+) tests?\b", text):
+        row = int(match.group(1))
+        spoken = match.group(2)
+        claimed = int(spoken) if spoken.isdigit() else words.get(spoken)
+        if claimed is None:
+            continue
+        if row not in rows:
+            wrong.append(f"prose names row {row}, which is not in the table")
+        elif rows[row] != claimed:
+            wrong.append(f"prose says row {row} fails {claimed}, the row says {rows[row]}")
+
+    assert not wrong, "MUTATIONS.md disagrees with its own table:\n  " + "\n  ".join(wrong)
+
+
+def test_the_count_of_gates_the_page_really_failed_is_counted_not_typed():
+    """The browser-gate table separates two kinds of row and the prose counts one of them.
+
+    A row either records a state the page was really in, and says so in its own text, or it
+    records a change invented to make a gate fire. The sentence under the table said nine
+    were real, then listed eight, one of which was an invented one. Seven rows carry the
+    marker. Nobody would notice the difference by reading, so it is counted here.
+    """
+    text = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")
+
+    start = text.index("| The change | What the gate said |")
+    end = text.index("\n\n", start)
+    table = [ln for ln in text[start:end].splitlines()
+             if ln.startswith("|") and not set(ln) <= set("|- ")]
+    body = [ln for ln in table if not ln.startswith("| The change |")]
+
+    shipped = [ln for ln in body if "which is how" in ln]
+
+    words = "zero one two three four five six seven eight nine ten eleven twelve".split()
+    claim = re.search(r"\b(\w+) of those (\w+) are the state this page was actually in", text)
+    assert claim, "the sentence this gate checks has been reworded, so it is checking nothing"
+
+    assert words.index(claim.group(1).lower()) == len(shipped), (
+        f"the prose says {claim.group(1)} rows record a state the page was really in; "
+        f"{len(shipped)} rows carry the marker that says so"
+    )
+    assert words.index(claim.group(2).lower()) == len(body), (
+        f"the prose says the table holds {claim.group(2)} rows; it holds {len(body)}"
+    )
+
+
+def test_every_line_range_the_feedback_file_cites_holds_what_it_says_it_holds():
+    """The file we hand to CALL-E cites five ranges, three of them in other people's apps.
+
+    Two were wrong when this was written. Both pointed into `README.md`: one landed on the
+    phone-masking bullet instead of the escape-hatch one, the other on the tail of the India
+    caller-id bullet instead of the call-termination limitation. A reader following either
+    would have found an unrelated paragraph and concluded the finding was made up.
+
+    The existing anchor gate could not see them. It matches "symbol at path.py:NNN" and reads
+    two files, and these are ranges written as "path:START-END" in a third. Rather than widen
+    that regex, each citation now carries the phrase it points at, so this compares text
+    against text and a renumbered file fails loudly instead of drifting quietly.
+    """
+    text = (APP / "call-e-feedback.md").read_text(encoding="utf-8")
+
+    cited = re.findall(
+        r"`([A-Za-z0-9_./-]+):(\d+)-(\d+)`[,)]?\s*\(?\s*\"([^\"]+)\"",
+        text,
+    )
+    assert len(cited) >= 5, (
+        f"only {len(cited)} citations parsed out of the feedback file, so this gate has "
+        f"stopped reading the form the file is written in"
+    )
+
+    wrong = []
+    for rel, start, end, phrase in cited:
+        # Paths starting `apps/` are repository-relative; everything else is app-relative.
+        # APP is apps/python/firstbell, so the repository root is three levels up.
+        target = (APP.parents[2] / rel) if rel.startswith("apps/") else (APP / rel)
+        if not target.exists():
+            wrong.append(f"{rel} does not exist")
+            continue
+
+        lines = target.read_text(encoding="utf-8").splitlines()
+        first, last = int(start), int(end)
+        if last > len(lines):
+            wrong.append(f"{rel}:{first}-{last} runs past the end of a {len(lines)} line file")
+            continue
+
+        window = "\n".join(lines[first - 1:last])
+        if phrase not in window:
+            wrong.append(f"{rel}:{first}-{last} does not contain {phrase!r}")
+
+    assert not wrong, (
+        "the feedback file cites line ranges that do not hold what it says:\n  "
         + "\n  ".join(wrong)
     )
