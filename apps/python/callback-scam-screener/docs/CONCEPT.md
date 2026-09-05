@@ -60,5 +60,7 @@ Validated with a text-based test harness before any real-call budget was spent: 
 |---|---|---|
 | Obvious scammer (remote-access + gift-card ask) | `likely_scam` (score 6, critical hit) | Correct |
 | Moderate scammer (evasive, mild urgency, no critical ask) | `likely_scam` (score 9) | Correct — High-tier signals alone cleared the threshold |
-| Subtle scammer (patient, names a company, invites verification, asks only for last-4 card digits) | `likely_legitimate` (score 0) | **False negative** |
+| Subtle scammer (patient, names a company, but refuses independent verification when offered) | `inconclusive` (score 3) | Correct — escalated to a human rather than cleared |
 | Legitimate business (control) | `likely_legitimate` (score 0) | Correct — no false positive |
+
+This harness doesn't cover a scammer who never discourages verification and never escalates urgency at all — a genuinely low-pressure social engineer who just answers questions cooperatively could plausibly still pass a single screening call uncaught. Single-call behavioral screening has a real ceiling against that kind of slow-burn approach; we don't have a concrete reproducible case demonstrating it right now, but we're not claiming the ceiling doesn't exist.
