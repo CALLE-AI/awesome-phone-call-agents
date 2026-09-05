@@ -1,0 +1,23 @@
+{
+  "name": "calle-roll-call",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "First-hour absence verification for schools: calls guardians of unexplained absentees in cascade order, returns a fail-closed disposition per student, and escalates any child no guardian can account for to a named human.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "fake-server": "node --import tsx fake/calle-server.ts",
+    "preview": "node --import tsx src/cli.ts preview --absences examples/absences.example.json",
+    "demo": "node --import tsx demo/run-local.ts",
+    "rollcall": "node --import tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

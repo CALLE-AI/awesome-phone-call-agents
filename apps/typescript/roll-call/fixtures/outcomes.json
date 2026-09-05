@@ -1,0 +1,123 @@
+{
+  "+15550100101": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "guardian",
+      "guardian_aware": "yes",
+      "reason_category": "illness",
+      "expected_return": "probably Wednesday",
+      "callback_requested": "no",
+      "guardian_words": "Yes, I know, Amara has a fever. I meant to email the office."
+    },
+    "summary": "Guardian confirmed the child is ill at home and expected back Wednesday.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "bot", "text": "Hello, this is an automated assistant calling on behalf of Riverside Primary School about Amara's attendance today. This call is placed by an AI system and may be recorded. Am I speaking with Ms. Okafor?" },
+      { "offset_seconds": 7, "speaker": "user", "text": "Yes, speaking." },
+      { "offset_seconds": 9, "speaker": "bot", "text": "Amara, class 5B, has been marked absent this morning and the school has not received a message. Were you aware that Amara is not at school?" },
+      { "offset_seconds": 16, "speaker": "user", "text": "Yes, I know, Amara has a fever. I meant to email the office. She should be back Wednesday, probably." },
+      { "offset_seconds": 24, "speaker": "bot", "text": "Thank you. Would you like a member of staff to call you back?" },
+      { "offset_seconds": 27, "speaker": "user", "text": "No, that's fine." }
+    ]
+  },
+  "+15550100102": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "guardian",
+      "guardian_aware": "no",
+      "reason_category": "guardian_did_not_know",
+      "expected_return": "",
+      "callback_requested": "yes",
+      "guardian_words": "What do you mean? He left for school at half seven."
+    },
+    "summary": "Guardian was not aware the child is absent and asked for an immediate call-back.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "bot", "text": "Hello, this is an automated assistant calling on behalf of Riverside Primary School about Ben's attendance today. This call is placed by an AI system and may be recorded. Am I speaking with Mr. Lindqvist?" },
+      { "offset_seconds": 6, "speaker": "user", "text": "Yes, this is he." },
+      { "offset_seconds": 8, "speaker": "bot", "text": "Ben, class 3A, has been marked absent this morning and the school has not received a message. Were you aware that Ben is not at school?" },
+      { "offset_seconds": 15, "speaker": "user", "text": "What do you mean? He left for school at half seven." },
+      { "offset_seconds": 19, "speaker": "bot", "text": "Thank you. I will pass this to the school office immediately so a member of staff can speak with you. You can also reach the office on +15550100000." },
+      { "offset_seconds": 26, "speaker": "user", "text": "Yes, please have someone call me right now." }
+    ]
+  },
+  "+15550100103": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "voicemail",
+      "guardian_aware": "unknown",
+      "reason_category": "unknown",
+      "expected_return": "",
+      "callback_requested": "unknown",
+      "guardian_words": ""
+    },
+    "summary": "Voicemail answered; a short message was left.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "unknown", "text": "You have reached the voicemail of ... please leave a message." },
+      { "offset_seconds": 6, "speaker": "bot", "text": "This is an automated call from Riverside Primary School about Chloe's attendance today. Please call the school office on +15550100000." }
+    ]
+  },
+  "+15550100104": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "guardian",
+      "guardian_aware": "yes",
+      "reason_category": "medical_appointment",
+      "expected_return": "after lunch",
+      "callback_requested": "no",
+      "guardian_words": "Ja, wir wissen Bescheid, Chloe hat einen Termin beim Zahnarzt."
+    },
+    "summary": "Second guardian confirmed a dental appointment; child back after lunch.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "bot", "text": "Hallo, hier spricht ein automatischer Assistent im Auftrag der Riverside Primary School wegen Chloes Anwesenheit heute. Dieser Anruf wird von einem KI-System durchgeführt und kann aufgezeichnet werden. Spreche ich mit Frau Weber?" },
+      { "offset_seconds": 8, "speaker": "user", "text": "Ja, am Apparat." },
+      { "offset_seconds": 10, "speaker": "bot", "text": "Chloe aus der Klasse 4C wurde heute Morgen als abwesend gemeldet, und die Schule hat keine Nachricht dazu erhalten. Wussten Sie, dass Chloe nicht in der Schule ist?" },
+      { "offset_seconds": 18, "speaker": "user", "text": "Ja, wir wissen Bescheid, Chloe hat einen Termin beim Zahnarzt. Nach dem Mittagessen kommt sie." },
+      { "offset_seconds": 25, "speaker": "bot", "text": "Vielen Dank. Möchten Sie, dass sich jemand aus dem Sekretariat bei Ihnen meldet?" },
+      { "offset_seconds": 28, "speaker": "user", "text": "Nein, nicht nötig." }
+    ]
+  },
+  "+15550100105": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "guardian",
+      "guardian_aware": "yes",
+      "reason_category": "family",
+      "expected_return": "tomorrow",
+      "callback_requested": "no",
+      "guardian_words": "Hm, right, tomorrow."
+    },
+    "summary": "Guardian reached; the extraction claims awareness but the transcript is vague.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "bot", "text": "Hello, this is an automated assistant calling on behalf of Riverside Primary School about Dev's attendance today. This call is placed by an AI system and may be recorded. Am I speaking with Mr. Patel?" },
+      { "offset_seconds": 6, "speaker": "user", "text": "Speaking." },
+      { "offset_seconds": 8, "speaker": "bot", "text": "Dev, class 6A, has been marked absent this morning and the school has not received a message. Were you aware that Dev is not at school?" },
+      { "offset_seconds": 15, "speaker": "user", "text": "Hm, right, tomorrow." },
+      { "offset_seconds": 18, "speaker": "bot", "text": "Sorry, could you say whether you knew Dev is not at school today?" },
+      { "offset_seconds": 22, "speaker": "user", "text": "I have to go, sorry." }
+    ]
+  },
+  "+15550100106": {
+    "status": "failed",
+    "structured_result": null,
+    "summary": null,
+    "transcript_turns": [],
+    "failure_code": "provider_no_answer",
+    "failure_message": "Ring timeout after 45 seconds"
+  },
+  "+15550100116": {
+    "status": "completed",
+    "structured_result": {
+      "answered_by": "other_person",
+      "guardian_aware": "unknown",
+      "reason_category": "unknown",
+      "expected_return": "",
+      "callback_requested": "unknown",
+      "guardian_words": ""
+    },
+    "summary": "A colleague answered a work number and said Mr. Kaya is in a meeting.",
+    "transcript_turns": [
+      { "offset_seconds": 0, "speaker": "bot", "text": "Hello, this is an automated assistant calling on behalf of Riverside Primary School about Elif's attendance today. This call is placed by an AI system and may be recorded. Am I speaking with Mr. Kaya?" },
+      { "offset_seconds": 7, "speaker": "user", "text": "No, this is his office, he is in a meeting. Can I take a message?" },
+      { "offset_seconds": 11, "speaker": "bot", "text": "It is about Elif's attendance. Please ask Mr. Kaya to call the school office on +15550100000. Thank you, goodbye." }
+    ]
+  }
+}
