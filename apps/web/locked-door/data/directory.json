@@ -1,0 +1,3024 @@
+{
+ "dataset": "Simulated Maricopa County Heat Relief Network directory",
+ "note": "Synthetic. Names, addresses and 555-prefixed numbers are fictional. Modeled on the shape and failure modes of real published county heat-relief directories.",
+ "generated_at": "2026-08-26T16:00:00.000Z",
+ "as_of": "2026-08-26T16:00:00.000Z",
+ "field_schema": [
+  "open_now",
+  "hours",
+  "pet_policy",
+  "accessibility",
+  "intake_requirements",
+  "capacity_status"
+ ],
+ "facilities": [
+  {
+   "id": "MC-1001",
+   "name": "Sunnyslope Library Cooling Center",
+   "operator": "Maricopa County Human Services",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "7309 W Van Buren St, Phoenix, AZ 85090",
+   "address_is_po_box": false,
+   "phone": "(618) 555-1918",
+   "est_daily_visitors": 302,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-02T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "9am-3pm",
+     "last_verified": "2025-12-25T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "svc animals only",
+     "last_verified": "2025-09-19T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-01-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2026-03-10T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1002",
+   "name": "Maryvale Community Center",
+   "operator": "City of Phoenix Parks & Rec",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "4199 E Roosevelt St, Mesa, AZ 85273",
+   "address_is_po_box": false,
+   "phone": "(623) 555-1414",
+   "est_daily_visitors": 49,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "8:00 AM – 7:00 PM",
+     "last_verified": "2026-06-29T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-07-15T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-07T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1003",
+   "name": "Encanto Overnight Heat Respite",
+   "operator": "Salvation Army Valley Corps",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "7161 N Central Ave, Glendale, AZ 85384",
+   "address_is_po_box": false,
+   "phone": null,
+   "est_daily_visitors": 245,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-30T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "M-F 6-8",
+     "last_verified": "2025-12-27T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2025-11-19T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-06-20T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2026-06-03T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-07-23T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1004",
+   "name": "Desert Vista Hydration Station",
+   "operator": "St. Vincent de Paul",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "6654 S 7th Ave, Tempe, AZ 85268",
+   "address_is_po_box": false,
+   "phone": "(613) 555-1809",
+   "est_daily_visitors": 269,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-30T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 10 a.m. to 10 p.m.",
+     "last_verified": "2026-03-29T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "No pets",
+     "last_verified": "2025-09-23T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-07-13T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-17T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1005",
+   "name": "Ocotillo Faith-Based Relief Site",
+   "operator": "Phoenix Public Library",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "3903 W Indian School Rd, Chandler, AZ 85220",
+   "address_is_po_box": false,
+   "phone": "(607) 555-1754",
+   "est_daily_visitors": 39,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-10T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "1100-1700",
+     "last_verified": "2026-03-17T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "Pets OK",
+     "last_verified": "2026-07-25T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-12-25T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1006",
+   "name": "Papago Senior Center",
+   "operator": "Mesa Community Services",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "9657 E Thomas Rd, Peoria, AZ 85320",
+   "address_is_po_box": false,
+   "phone": "(605) 555-1054",
+   "est_daily_visitors": 207,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-09T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "Daily 9AM to 9PM",
+     "last_verified": "2025-07-30T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2025-10-07T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-07-05T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1007",
+   "name": "South Mountain Mobile Relief Unit",
+   "operator": "Glendale Neighborhood Services",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "PO Box 6511, Surprise, AZ 85312",
+   "address_is_po_box": true,
+   "phone": "(616) 555-1754",
+   "est_daily_visitors": 214,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-15T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Open 7:00-21:00 (closed holidays)",
+     "last_verified": "2026-04-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-02-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2025-09-08T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1008",
+   "name": "Cave Creek Municipal Lobby Site",
+   "operator": "Tempe Community Action Agency",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "930 W Camelback Rd, Avondale, AZ 85365",
+   "address_is_po_box": false,
+   "phone": "(615) 555-0152",
+   "est_daily_visitors": 339,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-08T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "9 am - 8 pm, weekdays only",
+     "last_verified": "2026-07-11T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Pet friendly",
+     "last_verified": "2026-04-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-08-23T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2026-02-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-08T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1009",
+   "name": "Estrella Library Cooling Center",
+   "operator": "Lutheran Social Services SW",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "1338 S Mill Ave, Scottsdale, AZ 85291",
+   "address_is_po_box": false,
+   "phone": "(615) 555-0149",
+   "est_daily_visitors": 298,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-01T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "9am-7pm",
+     "last_verified": "2026-03-15T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2026-04-09T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-07-21T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1010",
+   "name": "Palo Verde Community Center",
+   "operator": "Central Arizona Shelter Services",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "9407 E Broadway Rd, Gilbert, AZ 85229",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1026",
+   "est_daily_visitors": 81,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-05T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "10:00 AM – 4:00 PM",
+     "last_verified": "2025-08-13T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-06-16T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1011",
+   "name": "Camelback East Overnight Heat Respite",
+   "operator": "Chicanos Por La Causa",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "310 N Scottsdale Rd, Phoenix, AZ 85064",
+   "address_is_po_box": false,
+   "phone": "+1 623 555 1387",
+   "est_daily_visitors": 126,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-24T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "M-F 10-4",
+     "last_verified": "2025-08-08T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Pets OK",
+     "last_verified": "2026-05-20T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-01-26T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-07-09T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1012",
+   "name": "Deer Valley Hydration Station",
+   "operator": "Society of St. Vincent",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "4965 W Peoria Ave, Mesa, AZ 85236",
+   "address_is_po_box": false,
+   "phone": "(611) 555-1678",
+   "est_daily_visitors": 130,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-03T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 10 a.m. to 9 p.m.",
+     "last_verified": "2025-11-11T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2025-06-23T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-08-02T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1013",
+   "name": "Laveen Faith-Based Relief Site",
+   "operator": "Valley of the Sun United Way",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "PO Box 2962, Glendale, AZ 85326",
+   "address_is_po_box": true,
+   "phone": "(604) 555-1393",
+   "est_daily_visitors": 278,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-30T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "800-2000",
+     "last_verified": "2026-01-20T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Pets OK",
+     "last_verified": "2026-06-10T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-06-27T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2025-07-06T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-08-09T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1014",
+   "name": "Ahwatukee Senior Center",
+   "operator": "Native Health Phoenix",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "4273 N 35th Ave, Tempe, AZ 85223",
+   "address_is_po_box": false,
+   "phone": "(621) 555-1874",
+   "est_daily_visitors": 163,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-07T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "Daily 8AM to 8PM",
+     "last_verified": "2026-05-05T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2025-12-17T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-10-25T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2026-05-05T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-08-09T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1015",
+   "name": "Verrado Mobile Relief Unit",
+   "operator": "Justa Center",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "2888 W Bethany Home Rd, Chandler, AZ 85251",
+   "address_is_po_box": false,
+   "phone": "(613) 555-1414",
+   "est_daily_visitors": 297,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-09T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "Open 11:00-18:00 (closed holidays)",
+     "last_verified": "2025-12-27T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2026-02-23T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-06-03T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1016",
+   "name": "Agua Fria Municipal Lobby Site",
+   "operator": "Maricopa County Human Services",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "9396 S Country Club Dr, Peoria, AZ 85367",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1550",
+   "est_daily_visitors": 142,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-31T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "8 am - 9 pm, weekdays only",
+     "last_verified": "2026-07-08T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2026-01-26T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-01-09T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2025-09-14T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1017",
+   "name": "Copper Sky Library Cooling Center",
+   "operator": "City of Phoenix Parks & Rec",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "PO Box 6703, Surprise, AZ 85345",
+   "address_is_po_box": true,
+   "phone": "(602) 555-1483",
+   "est_daily_visitors": 277,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-01T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "pets welcome",
+     "last_verified": "2026-03-19T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-11-13T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-03-28T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-08-19T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1018",
+   "name": "Red Mountain Community Center",
+   "operator": "Salvation Army Valley Corps",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "8969 N 19th Ave, Avondale, AZ 85373",
+   "address_is_po_box": false,
+   "phone": "(619) 555-1855",
+   "est_daily_visitors": 231,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-18T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-03-27T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-03-21T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1019",
+   "name": "Dobson Ranch Overnight Heat Respite",
+   "operator": "St. Vincent de Paul",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "6227 W Dunlap Ave, Scottsdale, AZ 85253",
+   "address_is_po_box": false,
+   "phone": "(603) 555-1544",
+   "est_daily_visitors": 215,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": false,
+     "last_verified": "2026-07-31T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2025-06-22T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-06-04T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2026-04-22T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1020",
+   "name": "Val Vista Hydration Station",
+   "operator": "Phoenix Public Library",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "1663 E McDowell Rd, Gilbert, AZ 85254",
+   "address_is_po_box": false,
+   "phone": "(613) 555-0140",
+   "est_daily_visitors": 18,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-04T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 7 a.m. to 5 p.m.",
+     "last_verified": "2026-03-31T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-06-22T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1021",
+   "name": "Arrowhead Faith-Based Relief Site",
+   "operator": "Mesa Community Services",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "1503 W Van Buren St, Phoenix, AZ 85057",
+   "address_is_po_box": false,
+   "phone": "(622) 555-1596",
+   "est_daily_visitors": 215,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": false,
+     "last_verified": "2026-07-25T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "1100-2000",
+     "last_verified": "2025-12-24T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2026-06-09T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2024-10-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1022",
+   "name": "Litchfield Senior Center",
+   "operator": "Glendale Neighborhood Services",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "284 E Roosevelt St, Mesa, AZ 85230",
+   "address_is_po_box": false,
+   "phone": "(615) 555-1713",
+   "est_daily_visitors": 185,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-13T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "Daily 10AM to 5PM",
+     "last_verified": "2026-08-03T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Service animals only",
+     "last_verified": "2025-11-29T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-09-11T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1023",
+   "name": "Roosevelt Row Mobile Relief Unit",
+   "operator": "Tempe Community Action Agency",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "1927 N Central Ave, Glendale, AZ 85335",
+   "address_is_po_box": false,
+   "phone": "(622) 555-1665",
+   "est_daily_visitors": 284,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-21T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Open 7:00-21:00 (closed holidays)",
+     "last_verified": "2026-02-10T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-07-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2026-03-18T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1024",
+   "name": "Grant Park Municipal Lobby Site",
+   "operator": "Lutheran Social Services SW",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "1398 S 7th Ave, Tempe, AZ 85271",
+   "address_is_po_box": false,
+   "phone": "(623) 555-0155",
+   "est_daily_visitors": 257,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-03-29T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2025-07-13T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1025",
+   "name": "Coronado Library Cooling Center",
+   "operator": "Central Arizona Shelter Services",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "3646 W Indian School Rd, Chandler, AZ 85280",
+   "address_is_po_box": false,
+   "phone": "(606) 555-1540",
+   "est_daily_visitors": 39,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-29T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "10am-6pm",
+     "last_verified": "2025-12-21T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "No pets",
+     "last_verified": "2025-05-23T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-05-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-07-16T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1026",
+   "name": "Garfield Community Center",
+   "operator": "Chicanos Por La Causa",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "PO Box 8801, Peoria, AZ 85386",
+   "address_is_po_box": true,
+   "phone": "(619) 555-1840",
+   "est_daily_visitors": 275,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-24T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "8:00 AM – 8:00 PM",
+     "last_verified": "2025-10-01T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-09-02T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-06-29T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1027",
+   "name": "Eastlake Overnight Heat Respite",
+   "operator": "Society of St. Vincent",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "6984 N 51st Ave, Surprise, AZ 85321",
+   "address_is_po_box": false,
+   "phone": "(615) 555-1465",
+   "est_daily_visitors": 175,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-21T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "M-F 8-7",
+     "last_verified": "2026-05-08T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "pets welcome",
+     "last_verified": "2026-03-22T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-06-20T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-01-30T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-31T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1028",
+   "name": "Alhambra Hydration Station",
+   "operator": "Valley of the Sun United Way",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "1139 W Camelback Rd, Avondale, AZ 85355",
+   "address_is_po_box": false,
+   "phone": null,
+   "est_daily_visitors": 100,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-02T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 11 a.m. to 8 p.m.",
+     "last_verified": "2026-06-17T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-01-04T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-01-20T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2025-08-16T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1029",
+   "name": "North Gateway Faith-Based Relief Site",
+   "operator": "Native Health Phoenix",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "1118 S Mill Ave, Scottsdale, AZ 85222",
+   "address_is_po_box": false,
+   "phone": null,
+   "est_daily_visitors": 180,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-26T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "1100-2300",
+     "last_verified": "2025-07-31T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2025-04-10T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-08-06T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1030",
+   "name": "Rio Vista Senior Center",
+   "operator": "Justa Center",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "1066 E Broadway Rd, Gilbert, AZ 85244",
+   "address_is_po_box": false,
+   "phone": "(621) 555-1788",
+   "est_daily_visitors": 139,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-23T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Daily 9AM to 5PM",
+     "last_verified": "2026-07-12T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2025-10-01T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2024-10-30T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2026-01-24T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1031",
+   "name": "Tolleson Mobile Relief Unit",
+   "operator": "Maricopa County Human Services",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "3395 N Scottsdale Rd, Phoenix, AZ 85064",
+   "address_is_po_box": false,
+   "phone": "(611) 555-1582",
+   "est_daily_visitors": 211,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-02T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Open 9:00-21:00 (closed holidays)",
+     "last_verified": "2026-08-14T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2025-05-11T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-03-25T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2025-08-17T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1032",
+   "name": "Sun City Municipal Lobby Site",
+   "operator": "City of Phoenix Parks & Rec",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "Mesa, AZ",
+   "address_is_po_box": false,
+   "phone": "(623) 555-1102",
+   "est_daily_visitors": 33,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-29T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-03-20T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2025-08-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1033",
+   "name": "Youngtown Library Cooling Center",
+   "operator": "Salvation Army Valley Corps",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "6359 E Baseline Rd, Glendale, AZ 85323",
+   "address_is_po_box": false,
+   "phone": "(613) 555-1033",
+   "est_daily_visitors": 204,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-31T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "10am-6pm",
+     "last_verified": "2026-07-08T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-07-19T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2024-11-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-02-10T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1034",
+   "name": "El Mirage Community Center",
+   "operator": "St. Vincent de Paul",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "8727 N 35th Ave, Tempe, AZ 85237",
+   "address_is_po_box": false,
+   "phone": "617-555-1681 ext 573",
+   "est_daily_visitors": 108,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-23T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2025-12-25T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-02-04T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-07-06T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1035",
+   "name": "Guadalupe Overnight Heat Respite",
+   "operator": "Phoenix Public Library",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "1427 W Bethany Home Rd, Chandler, AZ 85295",
+   "address_is_po_box": false,
+   "phone": "(606) 555-1469",
+   "est_daily_visitors": 279,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-29T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "M-F 8-11",
+     "last_verified": "2025-09-17T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "Pet friendly",
+     "last_verified": "2026-07-10T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2024-10-03T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2026-02-09T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-08-02T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1036",
+   "name": "Buckeye Hydration Station",
+   "operator": "Mesa Community Services",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "9557 S Country Club Dr, Peoria, AZ 85356",
+   "address_is_po_box": false,
+   "phone": "(605) 555-1209",
+   "est_daily_visitors": 221,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-26T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 9 a.m. to 4 p.m.",
+     "last_verified": "2026-04-17T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "No pets",
+     "last_verified": "2025-09-28T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-24T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1037",
+   "name": "Anthem Faith-Based Relief Site",
+   "operator": "Glendale Neighborhood Services",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "7880 E Guadalupe Rd, Surprise, AZ 85311",
+   "address_is_po_box": false,
+   "phone": "618.555.1964",
+   "est_daily_visitors": 130,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-16T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "1000-2000",
+     "last_verified": "2025-11-01T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-08-10T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1038",
+   "name": "Cactus Park Senior Center",
+   "operator": "Tempe Community Action Agency",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "9434 N 19th Ave, Avondale, AZ 85374",
+   "address_is_po_box": false,
+   "phone": "(603) 555-1473",
+   "est_daily_visitors": 198,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-07-03T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "Daily 9AM to 9PM",
+     "last_verified": "2025-09-05T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1039",
+   "name": "Harmon Mobile Relief Unit",
+   "operator": "Lutheran Social Services SW",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "8206 W Dunlap Ave, Scottsdale, AZ 85230",
+   "address_is_po_box": false,
+   "phone": null,
+   "est_daily_visitors": 215,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-24T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "Open 7:00-16:00 (closed holidays)",
+     "last_verified": "2026-06-24T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-02-23T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-06-11T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1040",
+   "name": "Yucca Municipal Lobby Site",
+   "operator": "Central Arizona Shelter Services",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "3943 E McDowell Rd, Gilbert, AZ 85287",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1123",
+   "est_daily_visitors": 29,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-10T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "11 am - 7 pm, weekdays only",
+     "last_verified": "2026-08-11T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Pets OK",
+     "last_verified": "2026-07-10T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-05-19T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-08-17T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1041",
+   "name": "Ironwood Library Cooling Center",
+   "operator": "Chicanos Por La Causa",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "8929 W Van Buren St, Phoenix, AZ 85067",
+   "address_is_po_box": false,
+   "phone": "(617) 555-1777",
+   "est_daily_visitors": 278,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-23T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "8am-5pm",
+     "last_verified": "2025-11-19T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2026-02-02T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2025-10-19T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-08-21T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1042",
+   "name": "Saguaro Community Center",
+   "operator": "Society of St. Vincent",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "8302 E Roosevelt St, Mesa, AZ 85298",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1768",
+   "est_daily_visitors": 52,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-26T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "7:00 AM – 10:00 PM",
+     "last_verified": "2026-01-06T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2025-08-17T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-03-09T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2025-08-09T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1043",
+   "name": "Mesquite Overnight Heat Respite",
+   "operator": "Valley of the Sun United Way",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "3623 N Central Ave, Glendale, AZ 85358",
+   "address_is_po_box": false,
+   "phone": "(606) 555-1583",
+   "est_daily_visitors": 295,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-25T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "M-F 9-5",
+     "last_verified": "2026-02-24T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2026-01-20T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2026-05-13T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-07-17T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-06-27T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1044",
+   "name": "Chaparral Hydration Station",
+   "operator": "Native Health Phoenix",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "9404 S 7th Ave, Tempe, AZ 85228",
+   "address_is_po_box": false,
+   "phone": "(618) 555-0155",
+   "est_daily_visitors": 282,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-20T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 9 a.m. to 6 p.m.",
+     "last_verified": "2026-06-10T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "No pets",
+     "last_verified": "2026-04-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2025-10-29T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1045",
+   "name": "Pinnacle Peak Faith-Based Relief Site",
+   "operator": "Justa Center",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "7456 W Indian School Rd, Chandler, AZ 85294",
+   "address_is_po_box": false,
+   "phone": "+1 618 555 1845",
+   "est_daily_visitors": 63,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-03T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Service animals only",
+     "last_verified": "2026-01-15T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-01-18T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-08-15T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1046",
+   "name": "Thunderbird Senior Center",
+   "operator": "Maricopa County Human Services",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "9430 E Thomas Rd, Peoria, AZ 85387",
+   "address_is_po_box": false,
+   "phone": "(605) 555-1853",
+   "est_daily_visitors": 325,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-11T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "Daily 10AM to 8PM",
+     "last_verified": "2026-06-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-05-12T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-04-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-07-19T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1047",
+   "name": "Bell Road Mobile Relief Unit",
+   "operator": "City of Phoenix Parks & Rec",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "2779 N 51st Ave, Surprise, AZ 85311",
+   "address_is_po_box": false,
+   "phone": null,
+   "est_daily_visitors": 300,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-09T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Open 8:00-18:00 (closed holidays)",
+     "last_verified": "2026-05-18T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2025-05-11T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-06-01T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-07-26T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1048",
+   "name": "Greenway Municipal Lobby Site",
+   "operator": "Salvation Army Valley Corps",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "2726 W Camelback Rd, Avondale, AZ 85370",
+   "address_is_po_box": false,
+   "phone": "(605) 555-1347",
+   "est_daily_visitors": 337,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-10T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "8 am - 6 pm, weekdays only",
+     "last_verified": "2025-10-07T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2026-06-06T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "referral_required",
+     "last_verified": "2026-08-04T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-08-21T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1049",
+   "name": "Union Hills Library Cooling Center",
+   "operator": "St. Vincent de Paul",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "4184 S Mill Ave, Scottsdale, AZ 85237",
+   "address_is_po_box": false,
+   "phone": "(619) 555-1564",
+   "est_daily_visitors": 261,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-05-23T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-04-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2025-09-20T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1050",
+   "name": "Shea Community Center",
+   "operator": "Phoenix Public Library",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "528 E Broadway Rd, Gilbert, AZ 85281",
+   "address_is_po_box": false,
+   "phone": "(611) 555-1581",
+   "est_daily_visitors": 322,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "9:00 AM – 7:00 PM",
+     "last_verified": "2026-01-05T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "pets welcome",
+     "last_verified": "2025-10-11T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-12-24T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-08-17T16:00:00.000Z",
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1051",
+   "name": "Lone Butte Overnight Heat Respite",
+   "operator": "Mesa Community Services",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "9796 N Scottsdale Rd, Phoenix, AZ 85010",
+   "address_is_po_box": false,
+   "phone": "(617) 555-1868",
+   "est_daily_visitors": 116,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-11T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "M-F 10-9",
+     "last_verified": "2026-05-09T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2025-09-13T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "near_capacity",
+     "last_verified": "2026-07-10T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1052",
+   "name": "Sossaman Hydration Station",
+   "operator": "Glendale Neighborhood Services",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "3886 W Peoria Ave, Mesa, AZ 85279",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1764",
+   "est_daily_visitors": 52,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-25T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-01-17T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-06-29T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1053",
+   "name": "Higley Faith-Based Relief Site",
+   "operator": "Tempe Community Action Agency",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "5650 E Baseline Rd, Glendale, AZ 85362",
+   "address_is_po_box": false,
+   "phone": "(609) 555-1100",
+   "est_daily_visitors": 224,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-30T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "hours": {
+     "value": "700-1700",
+     "last_verified": "2025-07-28T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": "not_accessible",
+     "last_verified": "2026-03-18T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2026-03-29T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-07-04T16:00:00.000Z",
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-1054",
+   "name": "Recker Senior Center",
+   "operator": "Lutheran Social Services SW",
+   "kind": "senior_center",
+   "kind_label": "Senior Center",
+   "vulnerability_weight": 1.22,
+   "address": "7572 N 35th Ave, Tempe, AZ 85210",
+   "address_is_po_box": false,
+   "phone": "(610) 555-1460",
+   "est_daily_visitors": 30,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-22T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "Daily 8AM to 6PM",
+     "last_verified": "2025-12-25T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": "pets must be crated",
+     "last_verified": "2025-06-08T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2024-10-14T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-08-15T16:00:00.000Z",
+     "source": "self_reported"
+    }
+   }
+  },
+  {
+   "id": "MC-1055",
+   "name": "Signal Butte Mobile Relief Unit",
+   "operator": "Central Arizona Shelter Services",
+   "kind": "mobile_unit",
+   "kind_label": "Mobile Relief Unit",
+   "vulnerability_weight": 0.9,
+   "address": "869 W Bethany Home Rd, Chandler, AZ 85296",
+   "address_is_po_box": false,
+   "phone": "(604) 555-1035",
+   "est_daily_visitors": 130,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-06-16T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "Open 9:00-19:00 (closed holidays)",
+     "last_verified": "2026-01-23T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-03-19T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-04-16T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-07-08T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1056",
+   "name": "Crismon Municipal Lobby Site",
+   "operator": "Chicanos Por La Causa",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "PO Box 7356, Peoria, AZ 85347",
+   "address_is_po_box": true,
+   "phone": "(608) 555-1323",
+   "est_daily_visitors": 173,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-04-02",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-12T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-02-18T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1057",
+   "name": "Elliot Library Cooling Center",
+   "operator": "Society of St. Vincent",
+   "kind": "library_cooling_center",
+   "kind_label": "Library Cooling Center",
+   "vulnerability_weight": 1,
+   "address": "1776 E Guadalupe Rd, Surprise, AZ 85388",
+   "address_is_po_box": false,
+   "phone": "617.555.1819",
+   "est_daily_visitors": 230,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": false,
+     "last_verified": "2026-06-26T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "10am-3pm",
+     "last_verified": "2025-07-22T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "no animals permitted",
+     "last_verified": "2025-12-07T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2026-04-12T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "photo_id_required",
+     "last_verified": "2026-03-08T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": "space_available",
+     "last_verified": "2026-07-04T16:00:00.000Z",
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1058",
+   "name": "Warner Community Center",
+   "operator": "Valley of the Sun United Way",
+   "kind": "community_center",
+   "kind_label": "Community Center",
+   "vulnerability_weight": 1.05,
+   "address": "485 N 19th Ave, Avondale, AZ 85357",
+   "address_is_po_box": false,
+   "phone": "614-555-1654 ext 361",
+   "est_daily_visitors": 93,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-05-30",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-12T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": "8:00 AM – 4:00 PM",
+     "last_verified": "2025-09-10T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-10-01T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2026-01-03T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-1059",
+   "name": "Ray Road Overnight Heat Respite",
+   "operator": "Native Health Phoenix",
+   "kind": "overnight_respite",
+   "kind_label": "Overnight Heat Respite",
+   "vulnerability_weight": 1.3,
+   "address": "4366 W Dunlap Ave, Scottsdale, AZ 85269",
+   "address_is_po_box": false,
+   "phone": "(612) 555-1254",
+   "est_daily_visitors": 128,
+   "seasonal_activation_flag": "activated",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-01T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": "fully_accessible",
+     "last_verified": "2025-11-13T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "capacity_status": {
+     "value": "at_capacity",
+     "last_verified": "2026-07-09T16:00:00.000Z",
+     "source": "phone_2025"
+    }
+   }
+  },
+  {
+   "id": "MC-1060",
+   "name": "Chandler Heights Hydration Station",
+   "operator": "Justa Center",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "7599 E McDowell Rd, Gilbert, AZ 85239",
+   "address_is_po_box": false,
+   "phone": "+1 622 555 1740",
+   "est_daily_visitors": 94,
+   "seasonal_activation_flag": "standby",
+   "source_document": "Maricopa County Heat Relief Network directory, rev 2026-06-14",
+   "duplicate_of": null,
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-08-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 10 a.m. to 6 p.m.",
+     "last_verified": "2025-12-31T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "accessibility": {
+     "value": "ramp_only",
+     "last_verified": "2025-07-03T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "intake_requirements": {
+     "value": "no_id_required",
+     "last_verified": "2025-10-01T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    }
+   }
+  },
+  {
+   "id": "MC-9101",
+   "name": "Cave Creek Cooling Site (legacy listing)",
+   "operator": "211 Arizona import",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "930 W Camelback Rd, Avondale, AZ 85365",
+   "address_is_po_box": false,
+   "phone": "(615) 555-0152",
+   "est_daily_visitors": 339,
+   "seasonal_activation_flag": "unknown",
+   "source_document": "211 Arizona partner feed, rev 2026-03-11",
+   "duplicate_of": "MC-1008",
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-03-10T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "9 am - 8 pm, weekdays only",
+     "last_verified": "2026-07-11T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Pet friendly",
+     "last_verified": "2026-04-21T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2026-02-05T16:00:00.000Z",
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-9102",
+   "name": "Val Vista Cooling Site (legacy listing)",
+   "operator": "211 Arizona import",
+   "kind": "hydration_station",
+   "kind_label": "Hydration Station",
+   "vulnerability_weight": 0.78,
+   "address": "1663 E McDowell Rd, Gilbert, AZ 85254",
+   "address_is_po_box": false,
+   "phone": "(613) 555-0140",
+   "est_daily_visitors": 18,
+   "seasonal_activation_flag": "standby",
+   "source_document": "211 Arizona partner feed, rev 2026-03-11",
+   "duplicate_of": "MC-1020",
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-03-08T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": "Mon thru Fri, 7 a.m. to 5 p.m.",
+     "last_verified": "2026-03-31T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "Crated pets only",
+     "last_verified": "2026-06-22T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-9103",
+   "name": "Sun City Cooling Site (legacy listing)",
+   "operator": "211 Arizona import",
+   "kind": "municipal_office",
+   "kind_label": "Municipal Lobby Site",
+   "vulnerability_weight": 0.85,
+   "address": "Mesa, AZ",
+   "address_is_po_box": false,
+   "phone": "(623) 555-1102",
+   "est_daily_visitors": 33,
+   "seasonal_activation_flag": "activated",
+   "source_document": "211 Arizona partner feed, rev 2026-03-11",
+   "duplicate_of": "MC-1032",
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2025-12-10T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "self_reported"
+    },
+    "pet_policy": {
+     "value": "ADA service animals only",
+     "last_verified": "2026-03-20T16:00:00.000Z",
+     "source": "county_pdf"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": "id_requested_not_required",
+     "last_verified": "2025-08-20T16:00:00.000Z",
+     "source": "self_reported"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  },
+  {
+   "id": "MC-9104",
+   "name": "Pinnacle Peak Cooling Site (legacy listing)",
+   "operator": "211 Arizona import",
+   "kind": "faith_based_relief",
+   "kind_label": "Faith-Based Relief Site",
+   "vulnerability_weight": 1.12,
+   "address": "7456 W Indian School Rd, Chandler, AZ 85294",
+   "address_is_po_box": false,
+   "phone": "+1 618 555 1845",
+   "est_daily_visitors": 63,
+   "seasonal_activation_flag": "activated",
+   "source_document": "211 Arizona partner feed, rev 2026-03-11",
+   "duplicate_of": "MC-1045",
+   "fields": {
+    "open_now": {
+     "value": true,
+     "last_verified": "2026-03-27T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "hours": {
+     "value": null,
+     "last_verified": null,
+     "source": "county_pdf"
+    },
+    "pet_policy": {
+     "value": "Service animals only",
+     "last_verified": "2026-01-15T16:00:00.000Z",
+     "source": "partner_import"
+    },
+    "accessibility": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    },
+    "intake_requirements": {
+     "value": null,
+     "last_verified": null,
+     "source": "phone_2025"
+    },
+    "capacity_status": {
+     "value": null,
+     "last_verified": null,
+     "source": "partner_import"
+    }
+   }
+  }
+ ]
+}
