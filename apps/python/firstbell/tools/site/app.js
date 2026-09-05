@@ -5,8 +5,11 @@
  * prose scrolls past it, the hero call stays present in the rail after the reader has left
  * it, and scroll has consequences exactly twice, at the hero exit and in the rail.
  *
- * Six primitives may animate and nothing else: playhead-track, field-commit, act-enter,
- * curtain, rail-progress, light-on. A seventh requires deleting one of these.
+ * Seven primitives may animate and nothing else: playhead-track, field-commit, act-enter,
+ * curtain, rail-progress, light-on, strike-through. An eighth requires deleting one of
+ * these. strike-through was added for act 3 and nothing was deleted to pay for it, which
+ * is a debt against this rule rather than an exception to it: see wireEndings for why the
+ * act could not make its argument without it.
  *
  * light-on replaced theatre-open, which took the whole document to near-black for the
  * section a call was in. The light is a property of the one row that is running now, so it
@@ -69,22 +72,145 @@ function wireOffscreen() {
   players.forEach((p) => io.observe(p.root));
 }
 
-/* ---- the scene ----------------------------------------------------------------------- */
-/* The first screen plays itself, once, silently.
+/* ---- the scenes ------------------------------------------------------------------------
  *
- * Silently is not a stylistic choice: an autoplaying call that made a sound would be the
- * page breaking its own rule, and browsers would refuse it anyway. Once, because this is
- * a twenty second recording of a real conversation and a loop would turn it into wallpaper.
+ * Three scenes now, and they start on different terms.
  *
- * With reduced motion asked for, runScene settles the register instead of animating it,
- * which is the same complete record the server sent. Nothing is behind the animation. */
+ * The hero starts on load, because it is the first screen and a reader who has not scrolled
+ * yet is already looking at it. The other two start the first time they are actually on
+ * screen. A scene that had already finished by the time the reader arrived would be worse
+ * than no scene: the page would have shown its argument to nobody and then claimed it had.
+ *
+ * Silently, all of them. An autoplaying call that made a sound would be the page breaking
+ * its own rule, and browsers would refuse it anyway.
+ *
+ * With reduced motion asked for, every scene settles instead of running, which is the same
+ * complete record the server sent. Nothing is behind the animation.
+ */
+
+/** Which scene a player belongs to. Ungrouped players are the hero's. */
+function groupOf(player) {
+  const holder = player.root.closest('[data-group]');
+  return holder ? holder.dataset.group : 'hero';
+}
+
+function sceneGroups() {
+  const groups = new Map();
+  for (const p of players) {
+    if (!p.commits.length || !p.cells.length) continue;
+    const g = groupOf(p);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(p);
+  }
+  return groups;
+}
+
 function wireScene() {
-  const scene = players.find((p) => p.commits.length && p.cells.length);
-  if (!scene) return;
-  if (REDUCED) { scene.sceneSettle(); return; }
-  // Started off the first frame after boot rather than from boot itself, so the scene
-  // cannot lengthen the task that boots the page. The long-task ceiling here is 50ms.
-  requestAnimationFrame(() => scene.runScene());
+  const groups = sceneGroups();
+  if (!groups.size) return;
+
+  if (REDUCED) {
+    for (const members of groups.values()) members.forEach((p) => p.sceneSettle());
+    return;
+  }
+
+  const run = (members) => members.forEach((p) => p.runScene());
+
+  const hero = groups.get('hero');
+  // Off the first frame after boot rather than from boot itself, so a scene cannot lengthen
+  // the task that boots the page. The long-task ceiling here is 50ms.
+  if (hero) requestAnimationFrame(() => run(hero));
+  groups.delete('hero');
+  if (!groups.size) return;
+
+  /* Once each. A scene that replayed every time it came back into view would be an
+   * animation the reader cannot get away from, and the replay button already covers
+   * wanting to see it again. */
+  const pending = new Map();
+  for (const [name, members] of groups) pending.set(members[0].root, { name, members });
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.intersectionRatio < 0.4) continue;
+      const hit = pending.get(e.target);
+      if (!hit) continue;
+      pending.delete(e.target);
+      io.unobserve(e.target);
+      run(hit.members);
+    }
+  }, { threshold: [0, 0.4] });
+  for (const root of pending.keys()) io.observe(root);
+
+  /* One button per group, because two calls that started together have to restart
+   * together: pressing play on one lane of a duet and watching it race a lane that is
+   * already finished would demonstrate the opposite of the point. */
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-replay-group]');
+    if (!b) return;
+    const members = sceneGroups().get(b.dataset.replayGroup);
+    if (members) run(members);
+  });
+  for (const b of document.querySelectorAll('[data-replay-group]')) {
+    b.removeAttribute('hidden');
+  }
+}
+
+/* ---- three endings ---------------------------------------------------------------------
+ *
+ * The seventh primitive on this page, and the first one added since the six were written
+ * down. It is a strike drawn across a word, and it is here because act 3 has to say that
+ * two of three readings of the same call are wrong, which is an event and not a state: a
+ * reader who arrives to find them already crossed out has been told the answer rather than
+ * shown how it was reached. Nothing was deleted to pay for it, and this note is the honest
+ * version of that rather than a redefinition of one of the six to make the count come out.
+ *
+ * It draws with a transform on a pseudo-element, so no text changes opacity at any point
+ * and every run in this act measures the same ratio while the scene is running as it does
+ * when it has finished.
+ *
+ * The served page has the strikes drawn and no marker anywhere, which is the state this
+ * leaves behind. Rewinding is the script's job, exactly as it is for the register.
+ */
+const FILING_STEP = 700;   // one reading at a time, at about the pace they are read
+
+function wireEndings() {
+  const box = document.querySelector('[data-endings]');
+  if (!box || REDUCED) return;
+  const list = box.querySelector('.filings');
+  const items = [...box.querySelectorAll('.filings li')];
+  if (!list || !items.length) return;
+
+  // Rewound at boot rather than on arrival. Act 3 is below the fold on every viewport this
+  // page supports, so the strikes are taken off screen where nobody is looking at them.
+  list.dataset.strike = 'off';
+
+  let timers = [];
+  const play = () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+    items.forEach((li) => delete li.dataset.at);
+    list.dataset.strike = 'off';
+    items.forEach((li, i) => {
+      timers.push(setTimeout(() => {
+        items.forEach((other) => delete other.dataset.at);
+        li.dataset.at = 'now';
+      }, i * FILING_STEP));
+    });
+    timers.push(setTimeout(() => {
+      // The marker goes out with the last reading. The live colour on this page means
+      // something is happening now, and by here nothing is.
+      items.forEach((li) => delete li.dataset.at);
+      delete list.dataset.strike;
+    }, items.length * FILING_STEP));
+  };
+
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.intersectionRatio < 0.4) continue;
+      io.unobserve(e.target);
+      play();
+    }
+  }, { threshold: [0, 0.4] });
+  io.observe(box);
 }
 
 /* ---- copy an id ---------------------------------------------------------------------- */
@@ -372,6 +498,7 @@ function boot() {
   wireReveal();
   document.documentElement.dataset.ready = 'true';
   wireScene();
+  wireEndings();
 }
 
 if (document.readyState === 'loading') {

@@ -80,11 +80,11 @@ TYPEKIT = "https://use.typekit.net/qdx4jvs.css"
 ACTS = [
     ("00", "The call"),
     ("01", "What the school knew"),
-    ("02", "Twelve comparisons"),
-    ("03", "The receipt of being wrong"),
+    ("02", "Both languages"),
+    ("03", "Three endings"),
     ("04", "Check us against your billing"),
     ("05", "Every rule, broken"),
-    ("06", "Three things to take"),
+    ("06", "Two things to take"),
     ("07", "What is not true"),
     ("08", "Run it yourself"),
 ]
@@ -249,16 +249,7 @@ def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
     # a reader without JavaScript that arrow keys work when they do not. CallPlayer.upgrade
     # adds the role, the tab stop and the value, in the same breath as the key handler.
     out.append('<canvas data-waveform aria-hidden=true></canvas>')
-    out.append('<ol class=turns data-turns aria-live=off>')
-    for turn in first["turns"]:
-        who = "agent" if turn["speaker"] == "bot" else "parent"
-        mins, secs = divmod(int(turn["offset_seconds"]), 60)
-        out.append(
-            f'<li data-at="{turn["offset_seconds"]}" data-who="{esc(turn["speaker"])}" '
-            f'data-rel=ahead><span class=turn-at>{mins}:{secs:02d}</span>'
-            f'<span class=turn-who>{who}</span>'
-            f'<span class=turn-text lang="{esc(first["locale"])}">{esc(turn["text"])}</span></li>')
-    out.append('</ol>')
+    out.append(turns_markup(call))
     out.append('</div>')
 
     out.append('<div class=result data-result data-state=in>')
@@ -402,12 +393,210 @@ def scene_call(call: dict, has_audio: bool) -> str:
     return "".join(out)
 
 
+def turns_markup(call: dict) -> str:
+    """The transcript, at CALL-E's own offsets.
+
+    Shared by the hero scene and by both lanes of the duet so the two cannot drift: one of
+    them printing a turn the other does not have would be a difference the reader would
+    read as evidence.
+    """
+    out = ['<ol class=turns data-turns aria-live=off>']
+    for turn in call["turns"]:
+        who = "agent" if turn["speaker"] == "bot" else "parent"
+        m, s = divmod(int(turn["offset_seconds"]), 60)
+        out.append(
+            f'<li data-at="{turn["offset_seconds"]}" data-who="{esc(turn["speaker"])}" '
+            f'data-rel=ahead><span class=turn-at>{m}:{s:02d}</span>'
+            f'<span class=turn-who>{who}</span>'
+            f'<span class=turn-text lang="{esc(call["locale"])}">{esc(turn["text"])}</span></li>')
+    out.append('</ol>')
+    return "".join(out)
+
+
+def lane_markup(data: dict, cid: str, label: str) -> str:
+    """One side of the duet: a call, its clock, its three fields and its transcript.
+
+    Everything is served at the value CALL-E returned, exactly as the register is, so a
+    reader with no script or with reduced motion asked for gets both results in full. The
+    scene rewinds it to waiting and plays it forward; it is never the only way to read it.
+    """
+    fields = data["fieldOrder"]
+    call = data["calls"][cid]
+    commits = commit_turns(call, fields)
+    mins, secs = divmod(int(call["seconds"]), 60)
+    out = [f'<div class=lane data-player="{esc(cid)}" data-cue=0 data-playing=false '
+           f'data-commits="{esc(",".join(str(c) for c in commits))}">']
+    out.append(f'<div class=lane-head><b class=lane-lang>{esc(label)}</b>'
+               f'<span class=lane-id>{esc(cid)}</span>'
+               f'<span class=scene-clock data-clock>0:00 / {mins}:{secs:02d}</span></div>')
+    out.append('<canvas data-waveform aria-hidden=true></canvas>')
+    out.append('<div class=lane-fields data-result data-live=off>')
+    for f in fields:
+        value = call["structured"].get(f, "·")
+        out.append(f'<span class=lane-f><span class=lane-k>{esc(FIELD_LABEL[f])}</span>'
+                   f'<b class=lane-v data-field="{esc(f)}" data-at=committed>{esc(value)}'
+                   f'</b></span>')
+    out.append('</div>')
+    out.append(turns_markup(call))
+    # CALL-E writes this one-sentence account in English even for a Tamil call. It is the
+    # vendor's own summary, committed with the receipt, and it is what lets a reader with no
+    # Tamil check that the two conversations really did cover the same ground.
+    if call.get("note"):
+        out.append('<p class=lane-note><span class=lane-note-k>CALL-E&#8217;s own note</span>'
+                   f'{esc(call["note"])}</p>')
+    out.append('</div>')
+    return "".join(out)
+
+
+def duet_markup(data: dict, en: str, ta: str, has_audio: bool) -> str:
+    """Two calls, one start.
+
+    They are not synchronised past that first moment and they are not meant to be. The
+    English call ran 59.54 seconds and the Tamil one 109.98, so the Tamil lane is still
+    going after the English lane has settled. That gap is the thing worth showing: a school
+    that only reads English gets the shorter conversation and none of the longer one.
+    """
+    en_c, ta_c = data["calls"][en], data["calls"][ta]
+    out = ['<div class=duet data-group=duet>']
+    out.append(lane_markup(data, en, "English"))
+    out.append(lane_markup(data, ta, "Tamil"))
+    out.append('</div>')
+    out.append('<div class=duet-bar>')
+    # Served hidden for the same reason the hero's replay is: with no script there is no
+    # scene to play again, and a button that answers nothing is a promise the page cannot
+    # keep. app.js shows it once both lanes are real players.
+    out.append('<button class=replay type=button data-replay-group=duet hidden>'
+               'Play both again</button>')
+    out.append(f'<span class=duet-len>{en_c["seconds"]:.0f}s and '
+               f'{ta_c["seconds"]:.0f}s of real recording, each played at its own speed '
+               'with silences over 1.5 seconds shortened</span>')
+    out.append('</div>')
+    return "".join(out)
+
+
+# The three readings of one finished call. Only the third is this app's.
+FILINGS = [
+    ("resolved", "wrong",
+     "a system with two buckets, closing anything that came back schema-valid",
+     "the dashboard reports every family contacted, for a child nobody reached"),
+    ("failed", "wrong",
+     "a system with two buckets, discarding anything short of a full answer",
+     "a call that did reach the parent is thrown away with the ones that never connected"),
+    ("undetermined", "ours",
+     "the call happened and produced no usable answer",
+     "the row stays open under a name, recovers no funding, and is never counted as coverage"),
+]
+
+
+def endings_markup(data: dict, cid: str, run: dict) -> str:
+    """One call, three filings, and the coverage arithmetic each one produces.
+
+    The counts are read out of the committed receipt rather than argued for. The bar is
+    served split the way the receipt splits it; app.js rewinds it to the single undivided
+    bar a two-bucket system would print and lets the reader watch it come apart. With no
+    script, or with reduced motion asked for, the true split is what is on the page and
+    the two-bucket reading sits beside it already crossed out.
+    """
+    fields = data["fieldOrder"]
+    call = data["calls"][cid]
+    counts = run["counts"]
+    placed = run["calls_placed"]
+    resolved = counts["resolved"]
+    order = ["resolved", "undetermined", "failed"]
+
+    out = ['<div class=endings data-endings>']
+    out.append('<div class=subject>')
+    out.append(f'<span class=subject-id>{esc(cid)}</span>')
+    out.append('<span class=subject-say>the call from the first screen, finished</span>')
+    out.append('<span class=subject-fields>')
+    for f in fields:
+        value = call["structured"].get(f, "·")
+        out.append(f'<span class=subject-f><span class=subject-k>{esc(FIELD_LABEL[f])}</span>'
+                   f'<b class=subject-v>{esc(value)}</b></span>')
+    out.append('</span></div>')
+
+    out.append('<ol class=filings>')
+    for name, verdict, who, cost in FILINGS:
+        out.append(f'<li data-filing="{name}" data-verdict="{verdict}">'
+                   f'<span class=filing-verdict>{verdict}</span>'
+                   f'<b class=filing-name>{name}</b>'
+                   f'<span class=filing-who>{who}</span>'
+                   f'<span class=filing-cost>{cost}</span></li>')
+    out.append('</ol>')
+
+    out.append('<div class=tally>')
+    out.append(f'<p class=tally-head>One committed run. {placed} calls placed, '
+               f'{resolved} answered.</p>')
+    out.append('<div class=bar role=img aria-label="'
+               + esc(", ".join(f'{counts[k]} {k}' for k in order if counts[k]))
+               + f' of {placed} calls">')
+    for k in order:
+        if not counts[k]:
+            continue
+        out.append(f'<span class=seg data-seg="{k}" style="flex-grow:{counts[k]}">'
+                   f'<span class=seg-n>{counts[k]}</span>'
+                   f'<span class=seg-k>{k}</span></span>')
+    out.append('</div>')
+    out.append('<p class=tally-alt><span class=tally-x>'
+               f'{placed} of {placed} contacted</span> is what the same run reports with '
+               'nowhere to put the middle four.</p>')
+    out.append('</div>')
+    out.append('</div>')
+    return "".join(out)
+
+
 def act(num: str, title: str, body: str, classes: str = "") -> str:
     # One reveal target per act. The hero never reveals: it is the first paint and it is
     # already choreographed on load.
     reveal = "" if num == "00" else " data-reveal"
     return (f'<section class="act act-{num} {classes}" id="act-{num}" '
             f'aria-labelledby="h-{num}"><div class=inner{reveal}>{body}</div></section>')
+
+
+def css_for_serving(css: str) -> str:
+    """Drop the stylesheet's comments on the way into the page.
+
+    They are worth keeping in `tools/site/page.css`, where the next person to touch a
+    duration or a contrast ratio needs to know why it is that value. They are worth
+    nothing in the bytes a reader downloads, and there are a lot of them: 4,976 words,
+    which is more than the whole page says out loud. Two things went wrong while they
+    shipped. The reader paid for about 25 KB of design reasoning aimed at somebody else,
+    and the no-JavaScript gate, which strips `<script>` but not `<style>`, counted every
+    one of those words as readable text and reported a page 3.5 times longer than it is.
+
+    Strings are tracked rather than assumed away, because `/*` inside a `content:` value
+    is legal and a regex over the whole file would eat the rest of the sheet from there.
+    """
+    out: list[str] = []
+    i, n, quote = 0, len(css), ""
+    while i < n:
+        c = css[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:      # an escape cannot close the string
+                out.append(css[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+            i += 1
+        elif c in "\"'":
+            quote = c
+            out.append(c)
+            i += 1
+        elif c == "/" and css.startswith("/*", i):
+            end = css.find("*/", i + 2)
+            i = n if end == -1 else end + 2
+        else:
+            out.append(c)
+            i += 1
+    # A removed comment leaves its indentation and its blank line behind.
+    lines = [ln.rstrip() for ln in "".join(out).splitlines()]
+    kept: list[str] = []
+    for ln in lines:
+        if ln or (kept and kept[-1]):
+            kept.append(ln)
+    return "\n".join(kept).strip() + "\n"
 
 
 # ---- the page ---------------------------------------------------------------------------
@@ -470,7 +659,7 @@ def build(has_audio: bool) -> str:
     # and buying nothing.
     add(f'<link rel=stylesheet href="{TYPEKIT}" media=print onload="this.media=\'all\'">')
     add(f'<noscript><link rel=stylesheet href="{TYPEKIT}"></noscript>')
-    add(f'<style>{css}</style>')
+    add(f'<style>{css_for_serving(css)}</style>')
 
     # ---- rail
     add('<nav class=rail aria-label="Sections"><span class=rail-line aria-hidden=true>'
@@ -532,80 +721,95 @@ def build(has_audio: bool) -> str:
     body.append('</div></div></div>')
     add(act("01", "What the school knew", "".join(body)))
 
-    # ---- Act 2: twelve comparisons
+    # ---- Act 2: the same call, both languages
+    #
+    # Scene 2. The hero call again, beside its own Tamil twin, both running from the same
+    # moment. The English one is 59.54 seconds and the Tamil one is 109.98, so the two
+    # waveforms are visibly different lengths and settle at different times, which is the
+    # argument: the conversation is not the same, and the three fields underneath it are.
+    en, ta = "S-4105", "S-4106"
+    pair = next(q for q in data["pairs"] if q["en"] == en)
     body = [
-        '<div class=split><div class=claim>',
-        '<h3>02</h3><h2 id=h-02>Twelve comparisons, written down before the phone rang.</h2>',
-        '<p>Four scenarios, each performed twice, once in English and once in Tamil. Three '
-        'enumerated fields per pair. Twelve comparisons, counted and committed before any '
-        f'call was placed, so the number could not be chosen afterwards.</p>',
-        f'<p class=result-line><b>{agree} of {total}</b> matched.</p>',
-        '<p>Then the transcripts were read. All three mismatches are the speaker saying '
-        'different things in the two calls, which a person recalling their own script from '
-        'memory will do. Extraction was faithful to what was actually said in twelve of '
-        'twelve, in both languages.</p>',
-        '<p class=dim>There is no Tamil-specific code anywhere in this app. Language is one '
-        'column in the work file and one string in the request.</p>',
-        '</div><div class=artifact>',
+        '<h3>02</h3><h2 id=h-02>Same call. Whichever language the family speaks.</h2>',
+        '<p class=eyebrow>The call from the first screen, beside the same call in Tamil</p>',
+        duet_markup(data, en, ta, has_audio),
+        f'<p class=duet-line>Different words, different lengths, '
+        f'<b>{pair["agree"]} of {pair["of"]}</b> fields identical.</p>',
+        '<p class=dim>There is no Tamil-specific code in this app. Language is one column '
+        'in the work file and one string in the request.</p>',
+        '<details class=fold><summary>All twelve comparisons, counted before the phone '
+        f'rang: {agree} of {total} matched</summary>',
+        '<p>Four scenarios, each performed twice, three enumerated fields per pair. The '
+        'count was committed before any call was placed, so it could not be chosen '
+        'afterwards. All three mismatches are the speaker saying different things in the '
+        'two calls, which a person recalling their own script from memory will do.</p>',
         '<table class=pairs><thead><tr><th>scenario</th><th>en-IN</th><th>ta-IN</th>'
         '<th>agreed</th></tr></thead><tbody>',
     ]
-    for pair in data["pairs"]:
-        cls = "ok" if pair["agree"] == pair["of"] else "part"
-        body.append(f'<tr><td>{esc(pair["label"])}</td>'
-                    f'<td class=mono>{esc(pair["en"])}</td>'
-                    f'<td class=mono>{esc(pair["ta"])}</td>'
-                    f'<td class="agree {cls}">{pair["agree"]}/{pair["of"]}</td></tr>')
-    body.append('</tbody></table></div></div>')
-    add(act("02", "Twelve comparisons", "".join(body), "act-2"))
+    # Not `p`: build() holds the page's own parts in `p`, and a loop variable of the same
+    # name rebinds it. The page still assembled, because `add` was already bound to the
+    # list's append, and then joined the last pair's keys instead: a 16 byte index.html
+    # that raised nothing.
+    for row in data["pairs"]:
+        cls = "ok" if row["agree"] == row["of"] else "part"
+        body.append(f'<tr><td>{esc(row["label"])}</td>'
+                    f'<td class=mono>{esc(row["en"])}</td>'
+                    f'<td class=mono>{esc(row["ta"])}</td>'
+                    f'<td class="agree {cls}">{row["agree"]}/{row["of"]}</td></tr>')
+    body.append('</tbody></table></details>')
+    add(act("02", "Both languages", "".join(body), "act-2"))
 
-    # ---- Act 3: the receipt of being wrong
+    # ---- Act 3: three endings
+    #
+    # Scene 3. One call, three filings. The call is the one the reader has now watched
+    # twice, and the run it belongs to is committed with its counts, so the coverage
+    # arithmetic on screen is read out of a receipt rather than argued for.
+    run = next(d for name, d in recs if name.startswith("06-"))
+    c06 = run["counts"]
+    placed = run["calls_placed"]
+    open_rows = c06["undetermined"] + c06["failed"]
     body = [
-        '<div class=split><div class=claim>',
-        '<h3>03</h3><h2 id=h-03>This app got one wrong, and the receipt is committed '
-        'uncorrected.</h2>',
-        '<p>A parent refused to talk. CALL-E returned a schema-valid result with every '
-        'required field set to <code>"unknown"</code>, and the row was recorded as resolved. '
-        'It was not resolved. Nobody had spoken to that family about their child.</p>',
-        '<p>The receipt stays as it was written, because a corrected copy would record a run '
-        'that never happened. What changed is the code, and a test now fails if the '
-        'distinction collapses again.</p>',
-        '<p class=dim>Listen to the call it came from. The refusal is the shortest pair in '
-        'the set and its two languages agreed on all three fields.</p>',
-        '</div><div class=artifact>',
-        player_markup(["S-4107", "S-4108"], data, 0, has_audio),
-        '</div></div>',
+        '<h3>03</h3><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
+        '<p class=eyebrow>The same call, filed three ways</p>',
+        endings_markup(data, en, run),
+        '<p class=note>This app made the first mistake itself. A parent refused to talk, '
+        'CALL-E returned a schema-valid result with every required field set to '
+        '<code>"unknown"</code>, and the row was recorded as resolved. The receipt stays as '
+        'it was written, uncorrected, because a corrected copy would record a run that '
+        'never happened. What changed is the code, and a test now fails if the distinction '
+        'collapses again.</p>',
+        f'<p class=dim>Counts read from one committed run of {placed} calls, '
+        '<code>06-locale-matched-pairs.json</code>. '
+        f'{open_rows} of {placed} rows are still open and every one of them is named. The '
+        'rate is resolved over attempted, so an open row can only ever pull it down.</p>',
     ]
-    add(act("03", "The receipt of being wrong", "".join(body), "act-3"))
+    add(act("03", "Three endings", "".join(body), "act-3"))
 
     # ---- Act 4: check us
     have = sum(1 for _c, pv, _r, _s in call_rows if pv)
     body = [
         '<div class=split><div class=claim>',
-        '<h3>04</h3><h2 id=h-04>Check us against your own billing.</h2>',
-        '<p>The API returns one identifier. CALL-E’s dashboard and usage page are keyed '
-        'on another. Both are printed here, so any row can be taken to the vendor’s own '
-        'records and checked against a source with no stake in these claims.</p>',
-        f'<p>{len(live)} of {len(recs)} committed receipts reached the production API, and '
-        f'{have} of {len(call_rows)} calls carry the provider identifier. The receipts '
-        'written before this app recorded that field had it recovered afterwards with a '
-        '<code>GET</code>, which places no call.</p>',
-        '<h3>What is committed, and what is only served here</h3>',
+        '<h3>04</h3><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
+        '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
+        'printed here, so any row can be taken to the vendor&#8217;s records and checked '
+        'against a source with no stake in these claims.</p>',
+        f'<p>{len(live)} of {len(recs)} committed receipts reached the production API and '
+        f'{have} of {len(call_rows)} calls carry the provider identifier. The rest had it '
+        'recovered afterwards with a <code>GET</code>, which places no call.</p>',
         '<table class=compliance><tbody>'
-        '<tr><td>call ids, transcripts, waveform shape, structured results, the audio</td>'
+        '<tr><td>call ids, transcripts, waveforms, structured results, the audio</td>'
         '<td class=dim>served on this page only</td></tr>'
         '<tr><td>the rules those calls produced, and the tests that hold them</td>'
         '<td class=ok>in the repository</td></tr>'
-        '</tbody></table>'
-        '<p class=note>Nothing on the left is in the repository. The maintainer of this '
-        'list requires committed real-call artifacts to be removed, and has said the '
-        'requirement holds even where the people on the call were team members playing a '
-        'part and the numbers were reserved ones, which describes these calls exactly. '
-        'So the recordings live here and the reasoning lives there, and '
+        '</tbody></table>',
+        '<p class=note>The maintainer of this list requires committed real-call artifacts '
+        'to be removed, and has said so even where the people on the call were team members '
+        'playing a part on reserved numbers, which describes these calls exactly. So the '
+        'recordings live here, the reasoning lives there, and '
         '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>',
         '</div><div class=artifact>',
-        '<table class=ids><thead><tr><th>API id</th><th>provider id (dashboard)</th>'
-        '<th>outcome</th></tr></thead><tbody>',
+        '<table class=ids><thead><tr><th>API id</th>'
+        '<th>provider id (dashboard)</th><th>outcome</th></tr></thead><tbody>',
     ]
     for call_id, provider, resolution, _src in call_rows:
         cls = {"resolved": "resolved", "undetermined": "undetermined"}.get(resolution or "", "failed")
@@ -638,12 +842,10 @@ def build(has_audio: bool) -> str:
     add(act("05", "Every rule, broken", "".join(body), "act-2"))
 
     # ---- Act 6: take-aways
+    # "Three outcomes, not two" used to be the first of these. Act 3 now plays it, and a
+    # take-away restating the scene two screens above it is the page making its strongest
+    # argument twice and being believed once.
     takes = [
-        ("Three outcomes, not two",
-         "<code>resolved</code> is an answer on record. <code>failed</code> is nobody "
-         "reached. <code>undetermined</code> is a call that connected and produced nothing "
-         "usable, and it goes to a named person. It is never counted toward a coverage "
-         "percentage, because the whole point is a child nobody has heard about."),
         ("Record the identifier the vendor is keyed on",
          "The id an API returns and the id its billing page shows are not always the same "
          "one. Recording only the first makes a receipt uncheckable by anyone outside the "
@@ -653,13 +855,13 @@ def build(has_audio: bool) -> str:
          "failed. It cost an afternoon and it found a real defect that eighty-eight passing "
          "tests had not."),
     ]
-    body = ['<h3>06</h3><h2 id=h-06>Three things worth taking, whatever you are building.</h2>',
+    body = ['<h3>06</h3><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
             '<div class=takes>']
     for i, (title, text) in enumerate(takes, 1):
         body.append(f'<div class=take><div class=take-n>{i:02d}</div>'
                     f'<h4>{esc(title)}</h4><p>{text}</p></div>')
     body.append('</div>')
-    add(act("06", "Three things to take", "".join(body)))
+    add(act("06", "Two things to take", "".join(body)))
 
     # ---- Act 7: what is not true
     limits = [

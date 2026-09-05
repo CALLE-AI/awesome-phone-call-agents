@@ -886,3 +886,239 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .result dt { font-size: var(--size-1); }
 .conf { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3); margin: 0.9rem 0 0; }
 .conf b { font-family: var(--mono); font-weight: 500; color: var(--ink-2); }
+
+/* ---- the duet, act 2 -------------------------------------------------------------------
+ *
+ * Two calls, side by side, started from the same moment and never synchronised after it.
+ *
+ * The lanes are deliberately not the same height and are never made to be. The English call
+ * ran 59.54 seconds and the Tamil one 109.98, which is 25 turns against 17, and forcing the
+ * two transcripts to a common height would say "these are the same length" in the one place
+ * on the page where the opposite is the argument. Each lane is as tall as its own call.
+ *
+ * What IS aligned is the row the three fields sit on, because that is the comparison. The
+ * fields are pinned to the bottom of each lane by the grid, so a reader scanning across
+ * reads three values against three values with nothing between them. */
+.duet { display: grid; gap: var(--space-4); }
+@media (min-width: 52rem) {
+  .duet { grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+}
+.lane {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;   /* head, wave, fields, transcript takes the rest */
+  gap: var(--space-2);
+  min-width: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+  transition: border-color var(--dur-mode) var(--ease-both);
+}
+/* The same rule the register uses, for the same reason: while this lane's call is running,
+ * the mark ties the waveform to the language label above it. It is a stroke and never a
+ * fill, so it can sit on paper and still clear 3:1. */
+.lane[data-live="on"] { border-left-color: var(--live-mark); }
+
+.lane-head {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  font-family: var(--ui); font-size: var(--size-1);
+}
+.lane-lang { font-size: var(--size-3); font-weight: 600; color: var(--ink); }
+.lane-id { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3); }
+.lane-head .scene-clock { margin-left: auto; }
+
+.lane canvas[data-waveform] { width: 100%; height: 2.5rem; display: block; }
+
+/* The comparison itself. Three values under each waveform, in the same order both sides,
+ * so the answer to "did the Tamil call get the same result" is read across and not worked
+ * out. `·` is what a field says before it has been answered. */
+.lane-fields {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  transition: background-color var(--dur-mode) var(--ease-both);
+}
+.lane-fields[data-live="on"] { background: var(--live); }
+.lane-f { display: grid; gap: 0.1rem; min-width: 0; }
+/* Set as the schema writes it, in mono and lower case, and not as a tracked upper-case
+ * label. FIELD_LABEL is an identity map on purpose: these are the names CALL-E returns and
+ * renaming them for the page would cost a reader the ability to match what is on screen to
+ * what is in the response. Tracked and upper-cased, `parent_confirmed_aware` is wider than
+ * a third of a lane and broke as PARENT_CONFIRMED_AWA / RE, which is a word split that says
+ * the name is something other than what it is. */
+.lane-k {
+  font-family: var(--mono); font-size: var(--size-0); color: var(--lit-ink-3);
+  white-space: nowrap;
+}
+.lane-v {
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
+  font-weight: 500; overflow-wrap: anywhere;
+}
+/* Below the duet's own breakpoint the three fields stack, because at one column a third of
+ * a phone is 40 pixels and no amount of type sizing rescues that. */
+@media (max-width: 51.999rem) {
+  .lane-fields { grid-template-columns: 1fr; }
+  .lane-f { display: flex; align-items: baseline; gap: var(--space-2); }
+}
+/* Waiting, not empty. A dotted rule under the mark says a value is expected here, which an
+ * empty cell does not. --live-mark is a stroke and carries no word, so it stays legal. */
+.lane-v[data-at="pending"] { color: var(--lit-ink-3); border-bottom: 1px dotted var(--live-mark); }
+.lane-fields[data-live="on"] .lane-v[data-at="committed"] {
+  animation: field-commit var(--dur-tick) var(--ease-out);
+}
+
+.lane .turns { max-height: 15rem; }
+
+.lane-note {
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+  margin: 0; max-width: none;
+}
+.lane-note-k {
+  display: block; font-size: var(--size-0); letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+.duet-bar {
+  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  margin-top: var(--space-3);
+  /* Reserved, because the replay button is served hidden and shown by the script. Without
+   * a floor here the paragraph under it moves the moment app.js boots, which is a layout
+   * shift the reader did not ask for and the gate counts. */
+  min-height: 1.625rem;
+}
+.duet-len { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3); }
+.duet-line {
+  font-family: var(--ui); font-size: var(--size-6); color: var(--ink);
+  margin: var(--space-4) 0 var(--space-2); max-width: none;
+}
+.duet-line b { font-variant-numeric: tabular-nums; }
+
+/* ---- a fold ---------------------------------------------------------------------------
+ * The twelve comparisons are the receipt behind the two calls above them. A judge who
+ * believes the scene does not need the table; a judge who does not believe it needs it very
+ * much. `details` is the browser's own answer to that and it costs no script, keeps the
+ * table in the served HTML for the no-JavaScript gate, and is keyboard-reachable already. */
+.fold { margin: var(--space-4) 0 0; border-top: 1px solid var(--line); }
+.fold > summary {
+  cursor: pointer; padding: var(--space-3) 0;
+  font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
+}
+.fold > summary::marker { color: var(--ink-3); }
+.fold > summary:hover { color: var(--ink); }
+.fold > p { margin-top: 0; }
+
+/* ---- three endings, act 3 --------------------------------------------------------------
+ *
+ * One finished call and the three ways it can be filed. Two of the three are wrong, and the
+ * page says which in a word before it says it in a line, because a strike through text is
+ * a graphic and a graphic on its own is not a statement.
+ *
+ * Nothing here fades. The strike is the only thing that moves, it moves by scaling a rule
+ * from its left edge, and every word is at full ink the whole time. That is not a stylistic
+ * preference: text mid-fade has a real, measurable contrast ratio lower than the one it was
+ * designed at, and this page publishes a gate that says every run clears AA. */
+.endings { display: grid; gap: var(--space-4); margin: var(--space-4) 0; }
+
+.subject {
+  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  padding-bottom: var(--space-3); border-bottom: 1px solid var(--line-strong);
+}
+.subject-id { font-family: var(--mono); font-size: var(--size-3); color: var(--ink); font-weight: 500; }
+.subject-say { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3); }
+.subject-fields { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.subject-f { display: flex; align-items: baseline; gap: var(--space-1); }
+.subject-k {
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.subject-v { font-family: var(--mono); font-size: var(--size-2); color: var(--ink); }
+
+.filings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.filings li {
+  display: grid; gap: var(--space-1);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-areas: "verdict name" "verdict who" "verdict cost";
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+  transition: border-color var(--dur-enter) var(--ease-both),
+              transform var(--dur-enter) var(--ease-out);
+}
+/* Where the reader is being asked to look, and only while the scene is walking the list.
+ * The live colour means one thing on this page and this is that thing: it is happening now. */
+.filings li[data-at="now"] { border-left-color: var(--live-mark); transform: translateX(3px); }
+.filing-verdict {
+  grid-area: verdict;
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.07em;
+  text-transform: uppercase; font-weight: 600; color: var(--ink-3);
+  align-self: start;
+}
+li[data-verdict="ours"] .filing-verdict { color: var(--resolved); }
+.filing-name {
+  grid-area: name;
+  font-family: var(--mono); font-size: var(--size-4); color: var(--ink);
+  position: relative; justify-self: start;
+}
+/* The strike is a rule, not `text-decoration`, so it can be drawn rather than switched on.
+ * Served at full width, which is the state a reader with no script gets: the two wrong
+ * filings are already crossed out and the page reads correctly without a frame of motion. */
+.filing-name::after {
+  content: ""; position: absolute; left: -0.1em; right: -0.1em; top: 0.58em; height: 2px;
+  background: var(--ink-2);
+  transform-origin: left center;
+  transition: transform var(--dur-enter) var(--ease-out);
+}
+li[data-verdict="ours"] .filing-name::after { display: none; }
+.filings[data-strike="off"] .filing-name::after { transform: scaleX(0); }
+.filing-who { grid-area: who; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.filing-cost { grid-area: cost; font-family: var(--ui); font-size: var(--size-3); color: var(--ink); }
+li[data-verdict="ours"] .filing-cost { color: var(--ink); font-weight: 500; }
+
+/* The same seven calls, counted twice. Both bars are on the page at once and stay there:
+ * a reader comparing two numbers should be able to look from one to the other, and a
+ * version that swapped one for the other over time would make them remember instead. */
+.tally { display: grid; gap: var(--space-2); }
+.tally-head { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); margin: 0; max-width: none; }
+.bar { display: flex; width: 100%; gap: 2px; }
+.seg {
+  display: grid; gap: 0.1rem; padding: var(--space-2);
+  min-width: 0; flex-basis: 0;
+  font-family: var(--ui);
+}
+.seg-n { font-size: var(--size-6); font-variant-numeric: tabular-nums; line-height: 1; }
+.seg-k { font-size: var(--size-0); letter-spacing: 0.06em; text-transform: uppercase; }
+/* Grounds, not inks. The outcome inks are tuned for text on paper and would not survive
+ * being used as a fill under their own colour, so each segment takes a tint of the paper
+ * and states its outcome in the word rather than in the fill. */
+.seg[data-seg="resolved"] { background: var(--paper); box-shadow: inset 0 2px 0 var(--resolved); }
+.seg[data-seg="undetermined"] { background: var(--paper); box-shadow: inset 0 2px 0 var(--undetermined); }
+.seg[data-seg="failed"] { background: var(--paper); box-shadow: inset 0 2px 0 var(--failed); }
+.seg-n, .seg-k { color: var(--ink); }
+.tally-alt { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); margin: 0; max-width: none; }
+.tally-x { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink); }
+
+/* ---- act 4: the copy that goes somewhere ----------------------------------------------
+ * The one interaction in this act is taking an id to somebody else's dashboard, so the
+ * confirmation says where it is going rather than just that it happened. */
+button[data-copy][data-copied]::after {
+  content: " copied";
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--resolved);
+}
+
+/* A provider id is 32 unbroken characters and an API id is 26. Side by side with the
+ * outcome column they need 668px, and a grid item cannot be narrower than its own content,
+ * so at 390px act 4 pushed the entire document sideways and every act with it. Measured:
+ * scrollWidth 688 against a clientWidth of 390, and hiding this one table returned it to
+ * 390 exactly.
+ *
+ * It predates this redesign. The viewport gate checks the 60rem breakpoint in both
+ * directions and nothing narrower, so a break that only happens on a phone was never in
+ * front of it.
+ *
+ * `anywhere` rather than `break-word` on purpose: only `anywhere` counts toward the
+ * min-content width, which is the number that was doing the damage. The reader loses
+ * nothing, because the copy button carries the whole value in data-copy and hands over an
+ * unbroken id however it is drawn. */
+@media (max-width: 51.999rem) {
+  .ids td.mono, .ids button[data-copy] { overflow-wrap: anywhere; }
+}
