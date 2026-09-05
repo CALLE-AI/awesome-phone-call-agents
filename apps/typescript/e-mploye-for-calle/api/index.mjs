@@ -11,6 +11,8 @@ const config = {
   calleApiKey: "",
   calleLiveEnabled: false,
   calleTestPhone: "",
+  apiAuthToken: "",
+  apiAuthRequired: false,
   stateFile: "/tmp/e-mploye-for-calle-state.json",
 };
 const api = createApi({ workflow: createWorkflow({ config }) });
@@ -27,14 +29,17 @@ export default async function handler(request, response) {
     response.statusCode = 204;
     response.setHeader("access-control-allow-origin", "*");
     response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
-    response.setHeader("access-control-allow-headers", "content-type");
+    response.setHeader("access-control-allow-headers", "content-type, authorization");
     response.end();
     return;
   }
 
-  const result = await api.dispatch(request.method || "GET", routePath(request), request.body);
+  const result = await api.dispatch(request.method || "GET", routePath(request), request.body, request);
   response.statusCode = result.status;
   response.setHeader("access-control-allow-origin", "*");
+  response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type, authorization");
+  for (const [name, value] of Object.entries(result.headers || {})) response.setHeader(name, value);
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.setHeader("cache-control", "no-store");
   response.end(JSON.stringify(result.body));

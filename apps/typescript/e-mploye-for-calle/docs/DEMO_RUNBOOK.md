@@ -67,11 +67,13 @@ The no-call evidence can be reproduced with `npm run test:calle`; it invokes the
 ```text
 CALLE_API_KEY=your_server_side_key
 CALLE_LIVE_ENABLED=true
+CALLE_BASE_URL=https://api.heycall-e.com
 CALLE_TEST_PHONE=your_authorized_e164_test_number
 CALLE_TEST_REGION=US
 CALLE_TEST_LOCALE=en-US
+EMPLOYE_API_TOKEN=private_app_bearer_token
 ```
 
 Run the local server, verify the preview shows the masked test number, authorize the call once, and inspect the returned status/result before applying any scheduling change. The number must be yours or explicitly authorized and must match one of CALL-E's currently supported recipient regions; Argentina (`AR`) is not currently listed as supported. CALL-E documents international lines as primarily intended for testing and does not document buying a dashboard phone number as a prerequisite for the one-shot Calls API. Never commit this `.env` or put the key in frontend variables.
 
-The local server reports live mode as ready only when all five server-side requirements are present: `CALLE_LIVE_ENABLED=true`, `CALLE_API_KEY`, `CALLE_TEST_PHONE`, `CALLE_TEST_REGION`, and `CALLE_TEST_LOCALE`. The dashboard's **Live mode setup** panel shows which requirements are configured, accepts one masked workspace target, and never accepts or displays the secret itself.
+The local server reports live mode as ready only when the provider requirements are present: `CALLE_LIVE_ENABLED=true`, `CALLE_API_KEY`, the official HTTPS `CALLE_BASE_URL`, `CALLE_TEST_PHONE`, `CALLE_TEST_REGION`, and `CALLE_TEST_LOCALE`. The live-capable API also requires a separate `EMPLOYE_API_TOKEN` bearer on every route. The dashboard's **Live mode setup** panel shows which requirements are configured, accepts one masked workspace target, and never accepts or displays either secret.
