@@ -689,6 +689,10 @@ const CONTRAST_PROBE = () => {
     // report positions on screen while nothing of them is drawn there. Measuring those
     // returns the ground twice and calls it a contrast failure. This gate cannot scroll an
     // inner box, so it says it could not measure them rather than that they are wrong.
+    const label = el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim()
+      ? "." + el.className.trim().split(/\s+/).join(".") : "");
+    const key = `${label}|${own.slice(0, 30)}`;
+
     let clipped = false;
     for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
       const ncs = getComputedStyle(n);
@@ -697,15 +701,16 @@ const CONTRAST_PROBE = () => {
       if (r.bottom <= nb.top + 1 || r.top >= nb.bottom - 1
           || r.right <= nb.left + 1 || r.left >= nb.right - 1) { clipped = true; break; }
     }
-    if (clipped) continue;
+    // ...and it must SAY so. This branch used to `continue`, which dropped the row
+    // entirely: the transcript's clipped rows left no trace, so `unmeasured: 0` was
+    // printed while about 116 runs had never been looked at. A run this gate could not
+    // resolve is the third outcome, not the absence of a run.
+    if (clipped) { rows.push({ key, label, text: own.slice(0, 34), unmeasured: true }); continue; }
 
     let alpha = 1;
     for (let n = el; n && n !== document.documentElement.parentNode; n = n.parentElement) {
       alpha *= Number(getComputedStyle(n).opacity);
     }
-    const label = el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim()
-      ? "." + el.className.trim().split(/\s+/).join(".") : "");
-    const key = `${label}|${own.slice(0, 30)}`;
     const fg = paint(cs.color);
     const bg = groundAt(el, x, y);
     if (!fg || !bg) { rows.push({ key, label, text: own.slice(0, 34), unmeasured: true }); continue; }
