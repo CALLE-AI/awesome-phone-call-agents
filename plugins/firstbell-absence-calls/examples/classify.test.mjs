@@ -115,10 +115,10 @@ test("a malformed recipient fails closed rather than resolving", () => {
 });
 
 test("numbers are masked before they reach an execution log", () => {
-  assert.equal(maskNumber("+919999900001"), "+91*******001");
+  assert.equal(maskNumber("+915550000001"), "+91*******001");
   assert.equal(maskNumber("abc"), "****");
   assert.equal(maskNumber(null), "****");
-  assert.ok(!maskNumber("+919999900001").includes("99999"));
+  assert.ok(!maskNumber("+915550000001").includes("55500"));
 });
 
 test("the wave summary keeps skipped rows out of the attempted count", () => {

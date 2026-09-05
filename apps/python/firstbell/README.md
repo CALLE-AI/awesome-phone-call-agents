@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Fifty-six gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Fifty-nine gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -136,9 +136,9 @@ What this run was worth
      S-1046       nobody answered after trying 2 number(s)
 ```
 
-Five students were attempted and seven calls were placed, because two of them needed a
+Six students were attempted and eight calls were placed, because two of them needed a
 second guardian's number. CALL-E bills per call, not per student, so the number that
-matters to a budget is the seven.
+matters to a budget is the eight.
 
 ## Why the last number is a ceiling and not a saving
 
@@ -156,7 +156,7 @@ top of it. An assumption nobody can check should point at its author, not away.
 
 The one unknown left is the one a school office can answer better than anybody else, which
 is why it is left to them: how long one of these calls takes its own staff. At three
-minutes an attempt this run is cheaper than the desk below **$0.67 a call**, on a median of
+minutes an attempt this run is cheaper than the desk below **$0.59 a call**, on a median of
 **$48,980** for secretaries and administrative assistants in educational services. Change
 the minutes, or pass `--staff-annual`, and the ceiling moves with it.
 

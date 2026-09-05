@@ -34,7 +34,7 @@ with what was published. Only row 26 moved.
 Ten wrong numbers in forty-four is worth stating plainly rather than burying: this table was
 published before it was verified, and verifying it is what found them.
 
-Rows 45 to 56 came later and are not part of that count. They were measured on 6 September
+Rows 45 to 59 came later and are not part of that count. They were measured on 6 September
 2026 as they were written, each applied and run before the row describing it existed, so none
 of them was ever a published number waiting to be checked. None of the ten
 changed whether a gate fires, which is what the table is for. All ten changed how loudly it
@@ -118,8 +118,19 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 54 | Compute the resolution rate from `resolved` rather than `closed`, so the headline improves when the app finds something serious | 3 |
 | 55 | Fail open when a caller's escalation rule raises, dropping the case the rule was written to catch on the one run where the rule was broken | 2 |
 | 56 | Drop `escalation=` from the schema-valid branch, so the flag is computed correctly and then not carried | 7 |
+| 57 | Plant an assignable Indian mobile in `plugins/firstbell-absence-calls/` with the privacy gate scoped to `apps/python/firstbell` as it was, which is the state this contribution shipped in | 0 |
+| 58 | The same number with the gate scoped to every path this contribution adds | 1 |
+| 59 | Point `CONTRIBUTION_PATHS` at a directory that no longer exists, which is what a rename looks like from inside the gate. Reported as 10 errors rather than 10 failures, because the guard sits in the helper every one of them calls | 10 |
 
-## Why these fifty-six
+Row 57 is the only row in this table whose measured value is **zero on purpose**. Every other
+zero in this project's history meant the change had been made in the wrong place. This one is
+the finding: the privacy gate resolved its file set with `git ls-files` under
+`apps/python/firstbell`, so `plugins/` had been outside it since the day that directory was
+added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every number in this
+repository is checked. Row 58 is the same planted number after the scope was widened. The
+pair is the proof, and neither row means anything without the other.
+
+## Why these fifty-nine
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

@@ -35,6 +35,22 @@ import pytest
 
 APP = Path(__file__).resolve().parent.parent
 SELF = Path(__file__).resolve()
+REPO = APP.parent.parent.parent
+
+# Every directory this contribution adds, relative to the repository root.
+#
+# This used to be `APP` alone, and two documents said otherwise: `README.md` and
+# `THIRD-PARTY-NOTICES.md` both state that every number in this repository is fictional and
+# that this file fails the build if one is not. It could not. `git ls-files -- <APP>` stops
+# at `apps/python/firstbell/`, so `plugins/firstbell-absence-calls/` was outside the file
+# set from the day it was added, and it was where an assignable Indian mobile was sitting.
+#
+# A scope narrower than the claim is worse than no gate, because the claim is what a reader
+# relies on.
+CONTRIBUTION_PATHS = (
+    "apps/python/firstbell",
+    "plugins/firstbell-absence-calls",
+)
 
 # Assertion messages here list offenders one per line. The separator is a constant
 # because a literal escape inside one of these strings has been mangled twice by the
@@ -104,9 +120,16 @@ def tracked_files() -> list[Path]:
     # every path joins onto the wrong prefix, and the checks below read nothing at all
     # while reporting a healthy file count. That is how the first version of this module
     # passed with the artifacts it exists to forbid still committed.
+    # From the repository root, over every path this contribution adds, so a directory
+    # added later cannot quietly sit outside the check.
+    for relative in CONTRIBUTION_PATHS:
+        assert (REPO / relative).is_dir(), (
+            f"CONTRIBUTION_PATHS names {relative}, which is not a directory. A renamed or "
+            f"moved path must fail here loudly rather than shrink the file set silently."
+        )
     out = subprocess.run(
-        ["git", "ls-files", "-z", "--full-name", "--", str(APP)],
-        cwd=APP, capture_output=True, text=True, check=True,
+        ["git", "ls-files", "-z", "--full-name", "--", *CONTRIBUTION_PATHS],
+        cwd=REPO, capture_output=True, text=True, check=True,
     ).stdout
     return [Path(root) / name for name in out.split("\0") if name]
 

@@ -98,12 +98,37 @@ def test_the_prose_numbers_match_the_program_too():
         assert line in printed, "the README quotes a line the program no longer prints: " + line
         assert line in readme, "the program prints a line the README no longer quotes: " + line
 
-    # The derived three-minute figure, recomputed from the same inputs.
-    staff = StaffCost.us_school_office()
-    ceiling = (4 / 7) * (staff.hourly / 60.0)
-    assert f"**${ceiling * 3:,.2f} a call**" in readme, (
-        "the README's three-minute break-even no longer matches the arithmetic"
+    # Read out of the run, never recomputed here.
+    #
+    # This block used to be `ceiling = (4 / 7) * (staff.hourly / 60.0)`, with the 4 and the
+    # 7 typed in. The demonstration then gained a row, the program started dividing by 8,
+    # and the figure it printed moved from $0.67 to $0.59 while this assertion went on
+    # passing against the old constant. The README carried both numbers, forty lines apart,
+    # and the one test written to stop exactly that had become the thing hiding it.
+    #
+    # A gate may not hold its own copy of the quantity it is checking.
+    printed_ceiling = re.search(
+        r"cheaper than the desk below \$([0-9.,]+) a call at 3 minutes an attempt", printed)
+    assert printed_ceiling, "the program no longer prints a three-minute break-even"
+    assert f"**${printed_ceiling.group(1)} a call**" in readme, (
+        f"the program prints ${printed_ceiling.group(1)} a call at three minutes and the "
+        f"README prose says something else"
     )
+
+    # The two counts the prose restates in words, taken from the same run.
+    attempted = re.search(r"^\s+attempted\s+(\d+)", printed, re.M)
+    placed = re.search(r"^\s+calls placed\s+(\d+)", printed, re.M)
+    assert attempted and placed, "the run summary no longer prints attempted and placed"
+    words = {5: "Five", 6: "Six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+    a, c = int(attempted.group(1)), int(placed.group(1))
+    assert a in words and c in words, f"add {a} and {c} to `words` so this gate keeps checking"
+    assert f"{words[a]} students were attempted and {words[c]} calls were placed" in readme, (
+        f"the program attempted {a} and placed {c}; the README prose disagrees"
+    )
+    assert f"the number that\nmatters to a budget is the {words[c]}." in readme
+    # The wage is a sourced constant rather than a run output, so it is compared
+    # against the class that carries its provenance.
+    staff = StaffCost.us_school_office()
     assert f"**${staff.annual:,.0f}**" in readme, (
         "the README's wage no longer matches the sourced figure"
     )
@@ -233,6 +258,7 @@ NUMBER_WORDS = {
     45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
     49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two",
     53: "fifty-three", 54: "fifty-four", 55: "fifty-five", 56: "fifty-six",
+    57: "fifty-seven", 58: "fifty-eight", 59: "fifty-nine",
 }
 
 
