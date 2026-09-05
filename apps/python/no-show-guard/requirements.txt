@@ -1,0 +1,8 @@
+# No-Show Guard - Python 3.11+
+#
+# Official CALL-E Python SDK for authentication and placing confirmation calls.
+calle-ai
+# Loads CALLE_API_KEY and other settings from a .env file.
+python-dotenv>=1.0.0
+# Pretty console tables for the daily report.
+prettytable>=3.9.0
