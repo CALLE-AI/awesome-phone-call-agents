@@ -92,15 +92,23 @@ AUTHORED_FIXTURES = "tests/data/shape-"
 
 # Ids a test may use literally, because a test that asserts on the shape of an id needs a
 # value of that shape. Listed one by one rather than matched by a rule, so that a reviewer
-# can read the four of them and satisfy themselves that none is random. A rule such as "hex
+# can read every one of them and satisfy themselves that none is random. A rule such as "hex
 # with a repeating pattern is fine" would eventually let a real one through, and the point
 # of an allowlist is that adding to it is a visible act.
 #
 # `test_dispatch.py` held a real thirty-two-character billing id here until this check was
-# written. It was the same one the documentation was using as an example.
+# written. It was the same one the documentation was using as an example. This module then
+# did the same thing to itself: it held three real ids, and the exemption below let them sit
+# there for a day. Every value now has to pass the same reading, including the ones in this
+# file, which is why the last three are here rather than thirty lines further down.
 PLACEHOLDER_IDS = frozenset({
     "aaaa1111bbbb2222cccc3333dddd4444",
     "bbbb2222cccc3333dddd4444eeee5555",
+    # Three shapes the shortener has to survive: a second underscore inside the body, a
+    # leading hyphen, and a bare 32-hex billing id with no prefix at all.
+    "call_x_aaaa1111bbbb2222cccc3333",
+    "call_-bbbb2222cccc3333dddd4444",
+    "cccc3333dddd4444eeee5555ffff6666",
 })
 
 
@@ -209,8 +217,11 @@ def test_no_provider_call_id_is_committed(tracked):
     """The vendor's own id for a conversation, which is what one upstream scrub missed."""
     offenders = []
     for path in tracked:
-        if path.resolve() == SELF:
-            continue          # this file has to be able to describe the pattern it forbids
+        # This file is scanned like every other. It used to be skipped, on the reasoning that
+        # a module describing a pattern has to be allowed to contain it. That was true of the
+        # regex and false of everything else, and three real ids lived here behind it. The
+        # allowlist is the exemption now, because adding to the allowlist is something a
+        # reviewer sees.
         body = text_of(path)
         if body is None:
             continue
@@ -590,12 +601,12 @@ def test_no_whole_call_identifier_can_reach_the_page():
     finally:
         _sys.path.pop(0)
 
-    real = [
-        "call_x_aaaaaaaaaaaaaaaaaaaa",
-        "call_-bbbbbbbbbbbbbbbbbbbbb",
-        "cccccccc11111111dddddddd22222222",
-    ]
-    for value in real:
+    # Synthetic, and on the allowlist above. The earlier version of this list held the three
+    # real ids these are modelled on, which put an artifact of three real calls inside the
+    # module whose job is to keep them out.
+    shapes = sorted(i for i in PLACEHOLDER_IDS if len(i) > 24)
+    assert len(shapes) == 5, "the shortener needs every allowlisted shape, not a subset"
+    for value in shapes:
         short = mask_id(value)
         assert value not in short, f"{value} survives its own shortening"
         assert len(short) < len(value), f"{value} was not shortened at all"
