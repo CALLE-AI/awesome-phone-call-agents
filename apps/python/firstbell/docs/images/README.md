@@ -68,11 +68,19 @@ Every image in this directory was opened and checked, individually, for:
   stated as such in the page footer and in `README.md`)
 - no call transcript text
 
-Every line number in a caption was checked against `dispatch/scheduler.py` at the time the
-caption was written:
+No line number in a caption is typed. `capture-stills.mjs` finds each landmark in
+`dispatch/scheduler.py` when it renders, and throws with the landmark named if it cannot,
+because a still that quietly draws the wrong lines cannot be told from a correct one. The
+figures below are the current answers, and they are checked by
+`test_every_cited_line_number_still_says_what_the_readme_claims`, which reads this file as
+well as the entry README.
 
-- `proof-call-site.png`: `self._client.calls.create(` is the only occurrence of
-  `calls.create` in this codebase (checked with a repository-wide search), at line 211.
-- `proof-classification.png`: `_classify()` runs from line 252 to line 306 and contains
-  exactly six `return` statements, at lines 269, 283, 290, 295, 300 and 305. No other line
-  in that range contains the word `return` as a statement.
+- `proof-call-site.png`: the only occurrence of `calls.create` in this codebase is
+  `self._client.calls.create(` at
+  `dispatch/scheduler.py:303`, inside `def _create_with_retries` at
+  `dispatch/scheduler.py:294`.
+- `proof-classification.png`: `def _classify` at
+  `dispatch/scheduler.py:390` returns exactly six times and the still labels every one of them,
+  including `resolution=Resolution.FAILED` at
+  `dispatch/scheduler.py:421` and `resolution=Resolution.RESOLVED` at
+  `dispatch/scheduler.py:443`.

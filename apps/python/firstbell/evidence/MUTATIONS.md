@@ -48,8 +48,10 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 38 | Write the structured result to the receipt unmasked, which is how it shipped until this was fixed | 1 |
 | 39 | Drop the comma from the separator class, so a number a vendor groups with commas is left whole | 1 |
 | 40 | Let a `calls.create` timeout fall through to the catch-all, which is how it shipped until this was fixed: no retry, and a call that may have been placed recorded as FAILED | 1 |
+| 41 | Cite in `docs/images/README.md` the line the caption used to name, which is how both stills shipped | 1 |
+| 42 | Type a window bound back into the still generator instead of looking it up | 1 |
 
-## Why these forty
+## Why these forty-two
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

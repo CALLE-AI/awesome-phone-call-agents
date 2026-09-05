@@ -110,6 +110,35 @@ def test_the_prose_numbers_match_the_program_too():
     assert staff.source_url in readme
 
 
+def test_the_still_generator_names_no_line_it_has_not_looked_up():
+    """The pictures drifted because their line numbers were typed into the generator.
+
+    `proof-call-site.png` carried the caption "The only call site.
+    dispatch/scheduler.py:211-221" over what had become the thread pool, and
+    `proof-classification.png` labelled seven ranges RESOLVED, FAILED and UNDETERMINED
+    inside a method that had moved a hundred and twenty lines. Re-running the tool would
+    have redrawn both, still wrong, still confident.
+
+    Every figure is looked up in the source now. This checks that none has been typed back
+    in, which is the only way the drift returns. It reads the generator rather than the
+    PNGs because nothing here can read a picture.
+    """
+    src = (APP / "tools/gates/capture-stills.mjs").read_text(encoding="utf-8")
+    typed = []
+    for pattern, why in (
+        (r"const\s+(?:start|end|hlFrom|hlTo)\s*=\s*\d", "a window bound assigned a literal"),
+        (r"\{\s*from:\s*\d+\s*,\s*to:\s*\d+", "a highlight zone with literal bounds"),
+        (r"\(lines?\s+\d+", "a caption naming a literal line"),
+    ):
+        for hit in re.findall(pattern, src):
+            typed.append(f"{why}: {hit.strip()!r}")
+    assert not typed, (
+        "a line number was typed into the still generator instead of looked up in the "
+        "source, which is how the last two pictures came to describe code that had "
+        "moved:\n  " + "\n  ".join(typed)
+    )
+
+
 ANCHOR = re.compile(r"`([^`]+)` at\s*\n?\s*`([a-z_/]+\.py):(\d+)`")
 
 
@@ -123,12 +152,19 @@ def test_every_cited_line_number_still_says_what_the_readme_claims():
     The count assertion is the important half. Without it, deleting every anchor would
     make this test pass on an empty list, which is the way a check like this usually dies.
     """
-    readme = (APP / "README.md").read_text(encoding="utf-8")
-    pairs = ANCHOR.findall(readme)
-    assert len(pairs) >= 4, (
-        f"expected at least 4 runtime anchors in the README, found {len(pairs)}. "
-        "If they were removed on purpose, lower this number deliberately."
-    )
+    # Both documents, because the pictures drifted while the README stayed right. The
+    # captions inside the PNGs are derived by `capture-stills.mjs` at render time; this
+    # checks the prose beside them, which is the half a reader quotes.
+    documents = {"README.md": 4, "docs/images/README.md": 4}
+    pairs = []
+    for name, least in documents.items():
+        found = ANCHOR.findall((APP / name).read_text(encoding="utf-8"))
+        assert len(found) >= least, (
+            f"expected at least {least} runtime anchors in {name}, found {len(found)}. "
+            "If they were removed on purpose, lower this number deliberately."
+        )
+        pairs.extend(found)
+
     for symbol, path, line in pairs:
         target = APP / path
         assert target.exists(), f"the README cites {path}, which does not exist"
@@ -193,7 +229,7 @@ NUMBER_WORDS = {
     27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty",
     33: "thirty-three", 34: "thirty-four", 35: "thirty-five",
     36: "thirty-six", 37: "thirty-seven", 38: "thirty-eight",
-    31: "thirty-one", 32: "thirty-two", 39: "thirty-nine", 40: "forty",
+    31: "thirty-one", 32: "thirty-two", 39: "thirty-nine", 40: "forty", 41: "forty-one", 42: "forty-two",
 }
 
 

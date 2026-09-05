@@ -51,6 +51,64 @@ function codeLines(relPath, start, end) {
   return all.slice(start - 1, end).map((line, i) => ({ n: start + i, text: line }));
 }
 
+/* ---- finding the subject ------------------------------------------------------------
+ *
+ * These stills used to carry typed line numbers, and `scheduler.py` moved under them by
+ * ninety-two lines. A picture that names a line is a claim about the file, so it is read
+ * out of the file. Anything that cannot be located throws with the landmark named, which
+ * is the only safe failure: a still that quietly draws the wrong lines is indistinguishable
+ * from a correct one.
+ */
+function allLines(relPath) {
+  return readFileSync(join(APP, relPath), "utf8").split("\n");
+}
+
+/** The 1-based line of the first line matching `re`. */
+function lineOf(all, re, what) {
+  const i = all.findIndex((l) => re.test(l));
+  if (i < 0) throw new Error(`capture-stills: could not find ${what}; the still would lie`);
+  return i + 1;
+}
+
+/** Where a statement beginning at `from` ends.
+ *
+ * Two shapes appear here and the rule has to cover both: arguments indented past the
+ * opening line, and a closing bracket returned to the opening line's own indent. Counting
+ * brackets instead would be defeated by one inside a string.
+ */
+function stmtEnd(all, from) {
+  const open = all[from - 1];
+  const indent = open.length - open.trimStart().length;
+  let end = from;
+  for (let n = from; n < all.length; n += 1) {
+    const text = all[n];
+    if (text.trim() === "") continue;
+    const ind = text.length - text.trimStart().length;
+    if (ind > indent) { end = n + 1; continue; }
+    if (ind === indent && text.trim().startsWith(")")) end = n + 1;
+    break;
+  }
+  return end;
+}
+
+/** Every `return ItemResult(...)` in a span, with the outcome each one names. */
+function outcomesIn(all, from, to) {
+  const out = [];
+  for (let n = from; n <= to; n += 1) {
+    const m = /return ItemResult\(.*resolution=Resolution\.(\w+)/.exec(all[n - 1] || "");
+    if (m) out.push({ from: n, to: stmtEnd(all, n), outcome: m[1] });
+  }
+  return out;
+}
+
+const OUTCOME_COLOR = { FAILED: "red", RESOLVED: "green", UNDETERMINED: "amber" };
+
+/** "line 3" or "lines 3, 9 and 12", so the caption reads as a sentence at any count. */
+function lineWords(ns) {
+  if (ns.length === 1) return `line ${ns[0]}`;
+  return `lines ${ns.slice(0, -1).join(", ")} and ${ns[ns.length - 1]}`;
+}
+
 const ROW_H = 25;
 const HEADER_H = 40;
 const PAD_TOP = 18;
@@ -112,9 +170,15 @@ function svgArrow(x1, y1, x2, y2, color) {
 /** ---- Still A: the calls.create call site ------------------------------------------- */
 function stillCallSite() {
   const relPath = "dispatch/scheduler.py";
-  const start = 202, end = 222;
+  const all = allLines(relPath);
+  // The window opens at the function that owns the call and closes one line past the call
+  // itself, which is the framing this still has always had, now measured rather than typed.
+  const start = lineOf(all, /def _create_with_retries\b/, "def _create_with_retries");
+  const hlFrom = lineOf(all, /self\._client\.calls\.create\(/, "the calls.create call site");
+  const hlTo = stmtEnd(all, hlFrom);
+  const end = hlTo + 1;
+  const keyLine = lineOf(all, /idempotency_key=key,/, "the idempotency_key argument");
   const lines = codeLines(relPath, start, end);
-  const hlFrom = 211, hlTo = 221;
 
   const maxChars = Math.max(...lines.map((l) => l.text.length));
   const codeWidth = 60 + Math.ceil(maxChars * CHAR_W) + 24;
@@ -149,7 +213,7 @@ function stillCallSite() {
       <b>${esc(relPath)}:${hlFrom}</b>: <code>self._client.calls.create(...)</code> is the
       only place in this codebase that invokes CALL-E's <code>calls.create</code>. It is called
       once per work item, inside a bounded retry loop (<code>_create_with_retries</code>,
-      line ${start}), and the same <code>idempotency_key</code> (line 220) is reused on every
+      line ${start}), and the same <code>idempotency_key</code> (line ${keyLine}) is reused on every
       retry so a network retry cannot place a second phone call to the same person.
     </div>
   </div>
@@ -215,18 +279,28 @@ function stillTerminalRun() {
 /** ---- Still C: the classification decision ------------------------------------------- */
 function stillClassification() {
   const relPath = "dispatch/scheduler.py";
-  const start = 252, end = 306;
+  const all = allLines(relPath);
+  const start = lineOf(all, /def _classify\b/, "def _classify");
+  // The method ends where its last return ends. Reading to the next `def` would drag in
+  // the blank lines between them and pad the picture with nothing.
+  const bodyEnd = (() => {
+    const next = all.findIndex((l, i) => i >= start && /^    def \b/.test(l));
+    return next < 0 ? all.length : next;
+  })();
+  const outcomes = outcomesIn(all, start, bodyEnd);
+  if (outcomes.length === 0) {
+    throw new Error("capture-stills: _classify returns no ItemResult; the still would lie");
+  }
+  const end = outcomes[outcomes.length - 1].to;
   const lines = codeLines(relPath, start, end);
 
   const zones = [
-    { from: 252, to: 252, color: "blue", label: null },
-    { from: 269, to: 270, color: "amber", label: "UNDETERMINED" },
-    { from: 283, to: 284, color: "red", label: "FAILED" },
-    { from: 290, to: 291, color: "amber", label: "UNDETERMINED" },
-    { from: 295, to: 297, color: "amber", label: "UNDETERMINED" },
-    { from: 300, to: 303, color: "amber", label: "UNDETERMINED" },
-    { from: 305, to: 306, color: "green", label: "RESOLVED" },
+    { from: start, to: start, color: "blue", label: null },
+    ...outcomes.map((o) => ({
+      from: o.from, to: o.to, color: OUTCOME_COLOR[o.outcome] || "amber", label: o.outcome,
+    })),
   ];
+  const linesFor = (name) => lineWords(outcomes.filter((o) => o.outcome === name).map((o) => o.from));
   function zoneFor(n) {
     return zones.find((z) => n >= z.from && n <= z.to && z.label);
   }
@@ -268,11 +342,11 @@ function stillClassification() {
     <div class="caption">
       <b>${esc(relPath)}:${start}-${end}</b>: <code>_classify()</code> turns one API
       response into exactly one of three outcomes. <span style="color:#f85149">FAILED</span>
-      (line 283) when the call's status is <code>failed</code> or <code>canceled</code>.
-      <span style="color:#d29922">UNDETERMINED</span> (lines 269, 290, 295, 300) when the call
+      (${linesFor("FAILED")}) when the call's status is <code>failed</code> or <code>canceled</code>.
+      <span style="color:#d29922">UNDETERMINED</span> (${linesFor("UNDETERMINED")}) when the call
       timed out, produced no structured result, failed schema validation, or every required
       field came back <code>unknown</code>. <span style="color:#3fb950">RESOLVED</span>
-      (line 305) only when a schema-valid, non-empty answer was returned. No other return
+      (${linesFor("RESOLVED")}) only when a schema-valid, non-empty answer was returned. No other return
       statement in this method exists.
     </div>
   </div>
