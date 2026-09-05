@@ -519,3 +519,55 @@ def test_no_gate_skips_without_saying_so():
         "these are declared as unable to run and no longer skip, so the note is now wrong: "
         + ", ".join(stale)
     )
+def test_every_published_statistic_is_one_we_recorded_the_source_for():
+    """The one class of number in this README that no test could reach, until now.
+
+    Everything else here is computed by the program or counted out of a file, so drift fails
+    the suite. A figure from a government release is neither, and one of them was simply
+    wrong: the README said England recorded 18.7% persistent absence in 2024/25, a number
+    that appears nowhere in the DfE release. The published rate is 17.63%. It was found by
+    reading the primary source, which is luck rather than a process, and this file is the
+    process.
+
+    `evidence/statistics.json` holds each figure with its publisher, its URL, the sentence it
+    came from and the date it was read at source. This checks the two directions that matter:
+    no percentage may appear in the sourced section without being in that file, and nothing in
+    that file may be quoted at a different value.
+    """
+    import json
+
+    record = json.loads(
+        (APP / "evidence" / "statistics.json").read_text(encoding="utf-8"))
+    figures = {f["value"]: f for f in record["figures"]}
+    assert figures, "evidence/statistics.json records no figures"
+
+    for value, entry in figures.items():
+        for field in ("claim", "publisher", "url", "quote", "read_at_source"):
+            assert entry.get(field), f"{value} has no {field}"
+        assert entry["url"].startswith("https://"), f"{value} has no resolvable source"
+        assert value.rstrip("%").replace(".", "").isdigit(), (
+            f"{value} is not a figure this gate can compare"
+        )
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    # The sourced section only. Percentages elsewhere are computed by the program and are
+    # held by their own gates, so pulling them in here would make this file the second
+    # place a computed number is written down, which is the defect it exists to prevent.
+    start = readme.find("So the office still works a list by hand.")
+    end = readme.find("## ", start)
+    assert start > 0 and end > start, "the sourced statistics section has moved or gone"
+    section = readme[start:end]
+
+    published = set(re.findall(r"\d+\.?\d*%", section))
+    unsourced = sorted(published - set(figures))
+    assert not unsourced, (
+        "these figures are published with no entry in evidence/statistics.json: "
+        + ", ".join(unsourced)
+    )
+
+    for value, entry in figures.items():
+        if value not in published:
+            continue
+        assert entry["url"] in section, (
+            f"{value} is published without the source link recorded for it"
+        )

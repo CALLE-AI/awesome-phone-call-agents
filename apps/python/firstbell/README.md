@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Seventy-two gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Seventy-five gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -57,14 +57,19 @@ why, and the tools schools buy send the notification outward: an SMS, or a recor
 robocall that plays a message and hangs up. Those tell a parent something. They do not
 bring an answer back.
 
-So the office still works a list by hand. In 2021-22, 14 million American students were
-chronically absent (IES, National Center for Education Statistics). England recorded 18.7%
-persistent absence in 2024/25 (Department for Education). Every unexplained absence in
-those numbers is a phone call somebody has to make.
+So the office still works a list by hand. More than 14 million American students were
+chronically absent in 2021-22
+([IES](https://ies.ed.gov/use-work/supporting-recovery-with-evidence-based-practices/chronic-absenteeism)).
+England recorded a 17.63% persistent absence rate across the autumn and spring terms of
+2024/25, down from 19.23% the year before and still well above the 10.53% of 2018/19
+([DfE](https://explore-education-statistics.service.gov.uk/find-statistics/pupil-absence-in-schools-in-england/2024-25-autumn-and-spring-term)).
+Every unexplained absence in those numbers is a phone call somebody has to make.
 
-The calls that take longest are the ones where the family does not speak English. 21.7% of
-the United States population aged 5 and over speaks a language other than English at home
-(Census Bureau, American Community Survey). Under Title VI, a district has to communicate
+The calls that take longest are the ones where the family does not speak English. 78.3% of
+the United States population aged 5 and over spoke only English at home in the 2018-2022
+American Community Survey five-year estimates
+([Census Bureau](https://www.census.gov/newsroom/press-releases/2023/language-at-home-acs-5-year.html)),
+which leaves 21.7% who speak something else. Under Title VI, a district has to communicate
 with those parents in a language they understand, and the 2015 joint Dear Colleague Letter
 from the Department of Education's Office for Civil Rights and the Department of Justice
 requires free oral interpretation where written translation is not practicable. A school
@@ -456,7 +461,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 240 tests
+python -m pytest tests/ -q          # 241 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

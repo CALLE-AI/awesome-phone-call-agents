@@ -153,6 +153,9 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 70 | State a different one in `evidence/README.md`, which is where this drift actually was: the index said forty-four while the table held sixty-eight | 1 |
 | 71 | Round the published alert rate down from 45% to 35%, which is the direction somebody would round it if they were rounding on purpose | 1 |
 | 72 | Change one `no` answer on the built page to `yes`, so the page no longer supports the rate the README states beside it | 1 |
+| 73 | Put the wrong England absence figure back, which is the defect this gate was written after rather than a defect imagined for it | 1 |
+| 74 | Add a plausible new percentage to the sourced section with no entry behind it, which is how the first one got in | 1 |
+| 75 | Drop the source link and leave the figure bare, so it reads as sourced without being checkable | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -162,6 +165,19 @@ mentioning the fields existed, not that it did anything. Row 62 survived, the ga
 changed to name the assignment exactly and to read the built page rather than only the
 source that builds it, and row 62 then failed as it should. It is recorded here as a killed
 row because that is what it is now, and the paragraph is the honest part.
+
+Rows 73 to 75 are the last class of number in this repository that nothing could reach. Every
+other figure here is computed by the program or counted out of a file, so drift fails the
+suite. A figure from a government release is neither. One of them was simply wrong: the README
+said England recorded 18.7% persistent absence in 2024/25, which appears nowhere in the DfE
+release, where the published rate is 17.63%. It was found by reading the primary source, which
+is luck and not a process. `evidence/statistics.json` now records each figure with its
+publisher, its URL, the sentence it came from and the date it was read, and the gate refuses a
+percentage in that section with nothing behind it. Row 73 is the original error, put back on
+purpose to watch it fail.
+
+Worth saying plainly: the correction had been made once already, in a working tree that was
+lost before it was committed, and it came back. A fix that is not committed did not happen.
 
 Rows 69 and 70 are a count gate that had been reading one file while two stated the number.
 The app README's count has been checked since a blind reviewer found it stale. The index file
@@ -195,7 +211,7 @@ added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every num
 repository is checked. Row 58 is the same planted number after the scope was widened. The
 pair is the proof, and neither row means anything without the other.
 
-## Why these seventy-two
+## Why these seventy-five
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
