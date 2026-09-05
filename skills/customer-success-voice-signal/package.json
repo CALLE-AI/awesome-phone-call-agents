@@ -1,0 +1,29 @@
+{
+  "name": "customer-success-voice-signal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stage Manager skill: CALL-E rings the CS owner when a named account hits a high-risk cue.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "dry-run": "tsx src/cli.ts --dry-run",
+    "signal": "tsx src/cli.ts",
+    "serve-cue": "tsx src/serveCli.ts",
+    "apply-action": "tsx src/applyActionCli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.6.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

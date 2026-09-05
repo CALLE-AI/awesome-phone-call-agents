@@ -1,0 +1,29 @@
+{
+  "fixture_id": "stuck_support_acme",
+  "trigger_id": "stuck_support",
+  "severity": "high",
+  "summary": "Acme Corp ticket #4821 looping after two bot handoffs with no resolution.",
+  "brief": "Acme Corp, an enterprise account, has an open support case that the AI path cannot close. Two bot handoffs already happened. The customer is still waiting. Stage Manager needs a CS decision on takeover versus specialist assign versus snooze.",
+  "ticket_id": "4821",
+  "account": {
+    "id": "acct_acme",
+    "name": "Acme Corp",
+    "tier": "enterprise",
+    "health_flags": ["support_loop"]
+  },
+  "cs_owner": {
+    "id": "cs_maya",
+    "name": "Maya Chen",
+    "e164": "+15555550100",
+    "opt_in_phone": true,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "07:00",
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  "metadata": {
+    "bot_handoffs": 2,
+    "product": "error-monitoring SaaS"
+  }
+}
