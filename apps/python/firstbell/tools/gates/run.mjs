@@ -417,7 +417,15 @@ async function gateNoJs(browser, url) {
   await page.close();
   const missing = ACTS.filter((id) => !html.includes(`id="${id}"`) && !html.includes(`id=${id}`));
   const stripped = html.replace(/<script[\s\S]*?<\/script>/g, "");
-  const words = stripped.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  /* The stylesheet is inlined into this page, so tag-stripping the whole document counted
+   * the stylesheet as readable text. On the build that exposed this, 6,710 of 9,724 words
+   * were the <style> block and 4,526 of those were CSS comments, which made this number
+   * mostly a measure of how heavily the stylesheet was commented. No reader has that
+   * property. Count the prose, and keep `stripped` intact for the DOM check below, which
+   * needs the styles to see the page a reader gets. */
+  const prose = stripped.replace(/<style[\s\S]*?<\/style>/g, "");
+  const words = prose.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
 
   /* Readable is half of it. The other half is whether the markup promises anything a
    * script would have had to deliver.
