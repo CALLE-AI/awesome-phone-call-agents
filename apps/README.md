@@ -59,3 +59,4 @@ apps/
 ```
 
 Every app should include its own README with setup, usage, side effects, credential handling, dry-run or preview behavior, and cancellation or rollback instructions when it can create calls or recurring jobs.
+| [`agentcover-callgate`](python/agentcover-callgate/) | Python | Bounded-autonomy gateway that wraps every CALL-E phone call in the safety_protocol enforcement layer: scope allowlist, budget, kill switch, immutable audit, and claims-ready insurance evidence. |

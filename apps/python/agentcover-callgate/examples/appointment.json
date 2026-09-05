@@ -1,0 +1,18 @@
+{
+  "task": "Confirm Tuesday 2:00 PM appointment for patient #4471; if they cannot make it, offer the next open slot and update the record. Identify yourself as the clinic's scheduling assistant.",
+  "phones": ["+15551234567"],
+  "region": "US",
+  "locale": "en-US",
+  "estimated_cost": 1.0,
+  "urgency": "normal",
+  "result_schema": {
+    "type": "object",
+    "required": ["confirmed"],
+    "properties": {
+      "confirmed": {"type": "boolean"},
+      "alternate_offered": {"type": "boolean"}
+    }
+  },
+  "idempotency_key": "agentcover_demo_appt_4471",
+  "metadata": {"patient_ref": "4471", "clinic": "demo"}
+}
