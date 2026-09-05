@@ -3,7 +3,7 @@ import { getConfig, isLiveReady, publicRuntimeConfig } from "./config.mjs";
 import { CalleApiProvider } from "./calle-api-provider.mjs";
 import { FakeCallProvider } from "./fake-call-provider.mjs";
 import { JsonStateStore } from "./persistence.mjs";
-import { evaluateCallSafety, isE164, maskPhone } from "./safety-policy.mjs";
+import { evaluateCallSafety, isE164, maskPhone, sanitizeEvidence, sanitizeError, sanitizeSensitiveData, sanitizeText, sanitizeTranscript } from "./safety-policy.mjs";
 import { DEFAULT_WORKFLOW_TYPE, getWorkflowTemplate, publicWorkflowTemplates } from "./workflow-catalog.mjs";
 
 const OUTCOMES = ["confirmed", "reschedule_requested", "declined", "unknown"];
@@ -60,9 +60,9 @@ const safeResult = (value) => {
       : "No reliable contact message was returned.";
   return {
     outcome: OUTCOMES.includes(result.outcome) ? result.outcome : "unknown",
-    requested_date: typeof result.requested_date === "string" ? result.requested_date : "",
-    requested_time: typeof result.requested_time === "string" ? result.requested_time : "",
-    contact_message: contactMessage,
+    requested_date: typeof result.requested_date === "string" ? sanitizeText(result.requested_date) : "",
+    requested_time: typeof result.requested_time === "string" ? sanitizeText(result.requested_time) : "",
+    contact_message: sanitizeText(contactMessage).slice(0, 500),
     confidence: typeof result.confidence === "number" ? Math.max(0, Math.min(1, result.confidence)) : 0,
     needs_manager_review: result.needs_manager_review !== false,
   };
@@ -80,10 +80,10 @@ const timeFromMinutes = (value) => {
   return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
 };
 const transcriptFromProvider = (providerResponse) => {
-  if (Array.isArray(providerResponse.transcript_turns)) return providerResponse.transcript_turns;
-  return (Array.isArray(providerResponse.recipients) ? providerResponse.recipients : [])
+  if (Array.isArray(providerResponse.transcript_turns)) return sanitizeTranscript(providerResponse.transcript_turns);
+  return sanitizeTranscript((Array.isArray(providerResponse.recipients) ? providerResponse.recipients : [])
     .flatMap((recipient) => Array.isArray(recipient?.attempts) ? recipient.attempts : [])
-    .flatMap((attempt) => Array.isArray(attempt?.transcript_turns) ? attempt.transcript_turns : []);
+    .flatMap((attempt) => Array.isArray(attempt?.transcript_turns) ? attempt.transcript_turns : []));
 };
 
 export class CallWorkflow {
@@ -118,14 +118,14 @@ export class CallWorkflow {
     if (this.provider.name === "live") {
       publicState.employees = publicState.employees.map((employee) => ({ ...employee, phone: maskPhone(employee.phone) }));
     }
-    return {
+    return sanitizeSensitiveData({
       ...publicState,
       runtime: { ...publicRuntimeConfig(this.config), workflows: publicWorkflowTemplates(), workspaceConfigured: this.provider.name === "live" && state.employees.length > 0 && state.shifts.length > 0 },
-    };
+    });
   }
 
   addEvent(state, type, message, jobId) {
-    state.events.unshift({ id: id("evt"), type, message, createdAt: this.clock(), ...(jobId ? { jobId } : {}) });
+    state.events.unshift({ id: id("evt"), type, message: sanitizeText(message), createdAt: this.clock(), ...(jobId ? { jobId } : {}) });
     state.events = state.events.slice(0, 80);
   }
 
@@ -312,13 +312,13 @@ export class CallWorkflow {
       job.providerStatus = providerResponse.status;
       job.status = statusForProvider(providerResponse.status);
       job.failureCode = providerResponse.failure_code || null;
-      job.failureMessage = providerResponse.failure_message || null;
+      job.failureMessage = providerResponse.failure_message ? sanitizeError(providerResponse.failure_message) : null;
       job.updatedAt = this.clock();
       this.addEvent(state, "call_created", `${this.provider.name === "fake" ? "Simulated" : "Live CALL-E"} call created with status ${providerResponse.status}.`, job.id);
     } catch (error) {
       job.status = "failed";
       job.failureCode = "provider_create_failed";
-      job.failureMessage = error instanceof Error ? error.message : "Provider create failed";
+      job.failureMessage = sanitizeError(error instanceof Error ? error.message : "Provider create failed");
       job.updatedAt = this.clock();
       this.addEvent(state, "call_failed", `Call creation failed: ${job.failureMessage}`, job.id);
     }
@@ -338,13 +338,13 @@ export class CallWorkflow {
       job.status = "needs_review";
       job.result = safeResult(providerResponse.structured_result);
       job.outcome = job.result.outcome;
-      job.evidence = Array.isArray(providerResponse.evidence) ? providerResponse.evidence : [];
+      job.evidence = sanitizeEvidence(providerResponse.evidence);
       job.transcript = transcriptFromProvider(providerResponse);
       this.addEvent(state, "call_completed", `${getWorkflowTemplate(job.workflowType).label} completed with outcome ${job.outcome}; manager review is required before applying a change.`, job.id);
     } else if (TERMINAL_PROVIDER_STATUSES.has(providerResponse.status)) {
       job.status = statusForProvider(providerResponse.status);
       job.failureCode = providerResponse.failure_code || null;
-      job.failureMessage = providerResponse.failure_message || null;
+      job.failureMessage = providerResponse.failure_message ? sanitizeError(providerResponse.failure_message) : null;
       this.addEvent(state, providerResponse.status === "canceled" ? "call_canceled" : "call_failed", `Provider status is ${providerResponse.status}.`, job.id);
     } else {
       job.status = statusForProvider(providerResponse.status);

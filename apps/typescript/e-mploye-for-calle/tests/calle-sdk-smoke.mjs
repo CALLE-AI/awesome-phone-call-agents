@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { CalleApiProvider } from "../server/calle-api-provider.mjs";
+import { OFFICIAL_CALLE_ORIGIN } from "../server/calle-origin.mjs";
 
 const requests = [];
 const callId = "call_smoke_123";
@@ -105,7 +106,7 @@ const fetchImpl = async (request) => {
 
 const provider = new CalleApiProvider({
   apiKey: "smoke-test-key",
-  baseUrl: "https://api.example.test",
+  baseUrl: OFFICIAL_CALLE_ORIGIN,
   liveEnabled: true,
   fetchImpl,
 });

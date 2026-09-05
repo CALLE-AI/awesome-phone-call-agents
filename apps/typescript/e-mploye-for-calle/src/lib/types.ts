@@ -80,6 +80,7 @@ export interface RuntimeConfig {
   liveRequested: boolean;
   liveReady: boolean;
   apiKeyConfigured: boolean;
+  baseUrlTrusted: boolean;
   testPhoneConfigured: boolean;
   testPhoneMasked: string;
   testRegionConfigured: boolean;

@@ -56,11 +56,12 @@ CALLE_BASE_URL=https://api.heycall-e.com
 CALLE_TEST_PHONE=+15551234567
 CALLE_TEST_REGION=US
 CALLE_TEST_LOCALE=en-US
+EMPLOYE_API_TOKEN=private_app_bearer_token
 CALLE_DEFAULT_LANGUAGE=en-US
 CALLE_DEFAULT_REGION=MX
 ```
 
-Never put `CALLE_API_KEY` or `CALLE_TEST_PHONE` in frontend variables or commit them. Before a live run, set one controlled E.164 test number through these server-only variables, verify the destination region and locale, and keep the manager approval step enabled. The public Vercel deployment overrides these values and stays fake-only. If any required piece is missing, the server safely falls back to the fake provider instead of claiming to be live.
+Never put `CALLE_API_KEY` or `CALLE_TEST_PHONE` in frontend variables or commit them. A live-capable HTTP server also requires the separate `EMPLOYE_API_TOKEN` and rejects every API route without `Authorization: Bearer <token>`; never reuse the CALL-E API key as this app token. For a private dashboard build, set `VITE_EMPLOYE_API_TOKEN` to that app token (it is visible to the browser and must only be used on a private deployment), or place the dashboard behind an authenticated proxy. Before a live run, set one controlled E.164 test number through these server-only variables, verify the destination region and locale, and keep the manager approval step enabled. The public Vercel deployment overrides these values and stays fake-only. If a provider-readiness piece is missing, the server safely falls back to the fake provider; if the live flag is enabled without the app token, every live-capable route fails closed with 503 instead of serving data.
 
 The test number must belong to a CALL-E-supported recipient region and the region/locale must match. Argentina (`AR`) is not currently listed. The published integration guide says that international destinations use CALL-E's international phone lines and are primarily intended for testing; buying a phone number in the dashboard is not documented as a prerequisite for the one-shot Calls API. See the [CALL-E integrations guide](https://github.com/CALLE-AI/call-e-integrations#-supported-regions-and-languages) before attempting a live call.
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { createWorkflow } from "../server/call-workflow.mjs";
+import { OFFICIAL_CALLE_ORIGIN } from "../server/calle-origin.mjs";
 import { FakeCallProvider } from "../server/fake-call-provider.mjs";
 import { JsonStateStore } from "../server/persistence.mjs";
 
@@ -17,7 +18,7 @@ const make = () => {
 const makeLive = () => {
   const directory = mkdtempSync(path.join(tmpdir(), "employe-live-workflow-")); dirs.push(directory);
   const config = {
-    stateFile: path.join(directory, "state.json"), calleApiKey: "server-only-test-key", calleBaseUrl: "https://api.example.test",
+    stateFile: path.join(directory, "state.json"), calleApiKey: "server-only-test-key", calleBaseUrl: OFFICIAL_CALLE_ORIGIN,
     calleLiveEnabled: true, calleTestPhone: "+14155552671", calleTestRegion: "US", calleTestLocale: "en-US",
     defaultLanguage: "en-US", defaultRegion: "US",
   };

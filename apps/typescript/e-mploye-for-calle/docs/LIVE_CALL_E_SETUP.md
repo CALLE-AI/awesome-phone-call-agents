@@ -11,13 +11,16 @@ The public Vercel deployment is intentionally hard-coded to sandbox mode. This p
 
 ## Live readiness contract
 
-The live provider is selected only when all five conditions are true on the server:
+The live provider is selected only when all six provider conditions are true on the server. The live-capable HTTP surface also requires the separate app bearer token:
 
 1. `CALLE_LIVE_ENABLED=true` explicitly opts into live execution.
 2. `CALLE_API_KEY` contains a server-side CALL-E API key.
-3. `CALLE_TEST_PHONE` is a valid E.164 number (`+` followed by 8–15 digits) that belongs to you or is explicitly authorized for testing.
-4. `CALLE_TEST_REGION` is an explicit supported destination region.
-5. `CALLE_TEST_LOCALE` is an explicit locale matching that region.
+3. `CALLE_BASE_URL` is the official HTTPS origin `https://api.heycall-e.com` (the default); other origins fail closed.
+4. `CALLE_TEST_PHONE` is a valid E.164 number (`+` followed by 8–15 digits) that belongs to you or is explicitly authorized for testing.
+5. `CALLE_TEST_REGION` is an explicit supported destination region.
+6. `CALLE_TEST_LOCALE` is an explicit locale matching that region.
+
+`EMPLOYE_API_TOKEN` protects the live-capable app API. Every API route, including health/state reads, workspace configuration, reset, call creation, status/result refresh, approval, rejection, retry, cancellation, and apply, requires `Authorization: Bearer <EMPLOYE_API_TOKEN>`.
 
 If any condition is missing, E-mploye safely uses `FakeCallProvider`, reports `FAKE · NO CALLS`, and does not claim that a live call is available. A configured key is never returned to the browser; the dashboard exposes only boolean readiness indicators.
 
@@ -35,10 +38,13 @@ All variables below are server-only. Use a local `.env`, a private deployment se
 | `CALLE_BASE_URL` | No | CALL-E API origin; defaults to `https://api.heycall-e.com`. |
 | `CALLE_TEST_REGION` | Yes | Destination region sent to CALL-E, for example `US`. |
 | `CALLE_TEST_LOCALE` | Yes | Destination locale sent to CALL-E, for example `en-US`. |
+| `EMPLOYE_API_TOKEN` | Yes | Separate bearer token for the app API; never reuse `CALLE_API_KEY`. |
 | `CALLE_DEFAULT_LANGUAGE` | No | Fallback language when no test locale is set. |
 | `CALLE_DEFAULT_REGION` | No | Fallback region when no test region is set. |
 | `EMPLOYE_PORT` | No | Node API port; defaults to `8787`. |
 | `EMPLOYE_STATE_FILE` | No | JSON state path; use persistent storage only for private deployments. |
+
+The live server fails closed with `503 authentication_not_configured` if the live flag is enabled without `EMPLOYE_API_TOKEN`. The public Vercel handler explicitly forces fake mode and disables this requirement. If the dashboard is built to call a private live server directly, set `VITE_EMPLOYE_API_TOKEN` at build time; that value is browser-visible, so a private authenticated proxy is preferable for production.
 
 Start from the committed template:
 
@@ -60,6 +66,10 @@ $env:CALLE_LIVE_ENABLED = 'true'
 $env:CALLE_TEST_PHONE = '+15551234567'
 $env:CALLE_TEST_REGION = 'US'
 $env:CALLE_TEST_LOCALE = 'en-US'
+$secureAppToken = Read-Host 'E-mploye app API bearer token (entrada oculta)' -AsSecureString
+$env:EMPLOYE_API_TOKEN = (New-Object System.Net.NetworkCredential('', $secureAppToken)).Password
+# If the dashboard calls this server directly, this is browser-visible; prefer a private auth proxy.
+$env:VITE_EMPLOYE_API_TOKEN = $env:EMPLOYE_API_TOKEN
 npm run dev
 ```
 
@@ -88,7 +98,7 @@ The container serves the built dashboard and API on `http://localhost:8787`. For
 8. Follow **CALL-E EXECUTION TRACE**: authorization → provider task → status/result → human review.
 9. Inspect the returned status, structured result, transcript, and evidence. Apply a scheduling change only after checking the result.
 
-The **Live mode setup** panel intentionally accepts workspace data, not credentials. It cannot switch a server from fake to live from the browser: the API key, explicit flag, authorized phone, region, and locale stay in server configuration. Loading the workspace only prepares one controlled target; the manager approval still gates the actual provider request.
+The **Live mode setup** panel intentionally accepts workspace data, not credentials. It cannot switch a server from fake to live from the browser: the API key, app bearer token, official origin, explicit flag, authorized phone, region, and locale stay in server configuration. Loading the workspace only prepares one controlled target; the manager approval still gates the actual provider request.
 
 ## Health and troubleshooting
 
@@ -96,6 +106,12 @@ The server exposes a non-secret health response:
 
 ```text
 GET /api/health
+```
+
+In live mode, health is protected like every other API route:
+
+```text
+Authorization: Bearer <EMPLOYE_API_TOKEN>
 ```
 
 Useful fields under `runtime` are:
