@@ -7,6 +7,8 @@ description: Autonomous revenue recovery that detects calendar no-shows and casc
 
 No-show recovery platform for service-based businesses (clinics, dental, salons). Detects missed appointments on Google Calendar, makes AI voice calls via CALL-E to the original client, and cascades open slots down a prioritized waitlist until the slot is filled.
 
+**Default mode is DRY_RUN** — the dashboard demo simulates the full cascade flow without placing real phone calls. Set `CALL_E_DRY_RUN=false` in `.env` to enable live calls (requires a verified CALL-E API key and destination numbers you own).
+
 ## Architecture
 
 ```
@@ -48,6 +50,7 @@ Create a `.env` file:
 ```env
 DATABASE_URL="postgresql://..."
 CALL_E_API_KEY="iams_live_..."
+CALL_E_DRY_RUN="true"
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
 GOOGLE_REDIRECT_URI="http://localhost:3000/api/auth/google-calendar-callback"
@@ -72,7 +75,7 @@ npm run dev
 
 ### Call initiation
 
-Calls are placed using the `@call-e/calle` SDK:
+Calls are placed using the `@call-e/calle` SDK. When `CALL_E_DRY_RUN=true`, calls are logged to the database without hitting the CALL-E API:
 
 ```typescript
 import { CalleClient } from '@call-e/calle';
@@ -90,9 +93,11 @@ await calle.calls.create({
 ### Webhook handling
 
 CALL-E sends terminal events to `/api/calls/webhook/calle`. The webhook:
-1. Updates the `CallAttempt` record in Postgres
-2. Sends a `call.completed` event to Inngest
-3. Inngest's `step.waitForEvent` resumes the cascade workflow
+
+1. **Validates the `case_id`** — rejects events with unknown case IDs (prevents unbound webhook events from arbitrary sources)
+2. Updates the `CallAttempt` record in Postgres
+3. Sends a `call.completed` event to Inngest
+4. Inngest's `step.waitForEvent` resumes the cascade workflow
 
 ### Dynamic scripts
 
@@ -103,13 +108,11 @@ Call scripts are generated dynamically based on context:
 
 ## Dry-Run Mode
 
-The dashboard includes an interactive demo that simulates the full cascade flow using `setTimeout` — no live calls are placed. Click "Trigger Test Cascade" on the dashboard to see the workflow in action.
+The default mode (`CALL_E_DRY_RUN=true`) logs every cascade step to the database and console without placing real calls. This is the recommended mode for demos and hackathon presentations. Toggle to live mode by setting `CALL_E_DRY_RUN=false` and providing valid destination numbers.
 
-## Cancellation
+## Cascade Timeout
 
-The Inngest workflow can be stopped by:
-- Not sending the `call.completed` webhook event (workflow times out after 10 minutes)
-- Manually updating the `RecoveryCase.cascadeStatus` to `COMPLETED` in the database
+The Inngest workflow waits up to 10 minutes for a webhook response before marking the call as `NO_ANSWER` and advancing to the next waitlist person. This timeout is configurable in the Inngest function definition.
 
 ## Source Code
 
