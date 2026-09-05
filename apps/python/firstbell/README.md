@@ -319,7 +319,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 194 tests
+python -m pytest tests/ -q          # 195 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -406,7 +406,7 @@ line below it was written after that. No pre-existing project was renamed, forke
 resubmitted, and nothing here was carried in from earlier work of mine.
 
 ```bash
-git log --reverse --format='%h %ad %s' --date=short -- apps/python/firstbell | head -1
+git log --reverse --format='%h %ad %s' --date=short -- :/apps/python/firstbell | head -1
 ```
 
 That command prints the creation date from the repository itself rather than asking anyone

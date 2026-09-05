@@ -343,3 +343,70 @@ def test_every_file_in_evidence_is_described():
     )
     for path in described:
         assert path.name in listed, f"{path.name} is committed but not described"
+
+
+CREATION_CLAIM = re.compile(
+    r"first commit in this directory is `([0-9a-f]{7,40})`,\s*(\d{4}-\d{2}-\d{2})")
+PUBLISHED_PATHSPEC = re.compile(r"git log --reverse[^\n]*?--\s+(\S+)")
+
+
+def _first_commit_touching(pathspec: str, cwd: Path) -> str:
+    """The first line the README's own command produces, run without a shell."""
+    out = subprocess.run(
+        ["git", "log", "--reverse", "--format=%h %ad", "--date=short", "--", pathspec],
+        cwd=cwd, capture_output=True, text=True, check=True).stdout
+    lines = [line for line in out.splitlines() if line.strip()]
+    # An empty history is the failure this is most likely to meet, and an empty answer
+    # compared against an empty answer agrees with everything. The published command
+    # already had this defect once: its pathspec is written relative to the repository
+    # root, so running it in the directory the README sits in printed nothing and exited
+    # zero.
+    assert lines, (
+        f"`git log ... -- {pathspec}` run from {cwd} printed nothing and exited zero, so "
+        "the command the README publishes does not show a reader anything"
+    )
+    return lines[0]
+
+
+def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
+    """The provenance claim, which is the one claim here a reader cannot check by reading.
+
+    The rules require an entry to say whether it is new or a significant update, so this
+    sentence is a compliance answer and not decoration. It names a commit and a date, and
+    both are the kind of fact that goes stale silently: prose does not notice a rebase.
+
+    Nothing is written down here. The hash and the date are read out of the README and
+    compared against git, so this file carries no figure of its own to drift, and the
+    pathspec is read out of the published command rather than retyped, so the command a
+    reader is invited to run is the command that is checked.
+
+    A rebase makes this fail, and that is the intended behaviour rather than a cost. After
+    one, the published hash names nothing and the sentence is false; the author date the
+    claim rests on survives a rebase, so only the half that genuinely changed goes red.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+
+    claim = CREATION_CLAIM.search(readme)
+    assert claim, "the README no longer states a first commit and date where this looks"
+    claimed_hash, claimed_date = claim.group(1), claim.group(2)
+
+    published = PUBLISHED_PATHSPEC.search(readme)
+    assert published, "the README no longer publishes a command a reader could run"
+    pathspec = published.group(1)
+
+    root = Path(subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"], cwd=APP,
+        capture_output=True, text=True, check=True).stdout.strip())
+
+    # From the repository root, which is where the published pathspec is written to work.
+    got_hash, got_date = _first_commit_touching(pathspec, root).split()
+    assert got_hash == claimed_hash, (
+        f"the README says the first commit here is {claimed_hash}, git says {got_hash}"
+    )
+    assert got_date == claimed_date, (
+        f"the README says this was created {claimed_date}, git says {got_date}"
+    )
+
+    # And the same commit is the first one touching this directory, asked a second way, so
+    # the claim is about this app rather than about whatever the pathspec happens to name.
+    assert _first_commit_touching(".", APP).split()[0] == claimed_hash
