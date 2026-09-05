@@ -148,6 +148,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [ActionBridge](https://actionbridge.vercel.app) - Human-controlled phone-work orchestration web app that turns a bounded goal into a reviewed CALL-E call plan, with explicit confirmation, status/events, structured results and evidence; the public demo is no-call by default.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [GridGuard Voice Escalation Agent](https://github.com/draculess99/gridguard-voice-escalation-agent) - Approval-gated grid-risk escalation app using CALL-E with disclosed calls, two human confirmations, structured escalation packets, and a dry-run/no-call default. [Demo](https://gridguard-voice-escalation-agent-production.up.railway.app/)
