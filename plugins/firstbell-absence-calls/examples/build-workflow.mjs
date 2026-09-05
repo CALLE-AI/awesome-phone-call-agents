@@ -176,9 +176,14 @@ if (row.skip) {
 // once end to end before it is pointed at a real number.
 if (row.dryRun) {
   const shapes = {
-    "S-1041": { status: "completed", structured_result: { reason_category: "illness", expected_return: "tomorrow" } },
-    "S-1042": { status: "completed", structured_result: { reason_category: "medical_appointment", expected_return: "today" } },
-    "S-1043": { status: "completed", structured_result: { reason_category: "transport", expected_return: "today" }, attempts: 2 },
+    // Two rows that close. An explicit "yes" on parent_confirmed_aware is what closing
+    // requires, and leaving that field out of these shapes is how the first version of this
+    // demo escalated all three and reported a resolution rate of zero.
+    "S-1041": { status: "completed", structured_result: { reason_category: "illness", expected_return: "tomorrow", parent_confirmed_aware: "yes" } },
+    "S-1042": { status: "completed", structured_result: { reason_category: "medical_appointment", expected_return: "today", parent_confirmed_aware: "yes" } },
+    // A schema-valid answer from a parent who did not know. Resolved, escalated, not closed,
+    // and first in the queue. This is the row worth reading in the output.
+    "S-1043": { status: "completed", structured_result: { reason_category: "transport", expected_return: "today", parent_confirmed_aware: "no" }, attempts: 2 },
     // The two shapes that are easy to get wrong, both taken from real calls.
     "S-1044": { status: "completed", structured_result: null },
     "S-1046": { status: "no_answer", structured_result: null, attempts: 2 },

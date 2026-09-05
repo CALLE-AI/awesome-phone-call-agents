@@ -22,6 +22,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { classifyRecipient, summariseWave } from "./classify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const workflow = JSON.parse(
@@ -105,4 +106,57 @@ test("no credential is baked into the file", () => {
   assert.ok(!/iams_live_/.test(raw), "a live CALL-E key is embedded in the workflow");
   assert.ok(!/"credentials"\s*:\s*\{[^}]*"id"/.test(raw),
     "a credential id is embedded, which ties this template to one account");
+});
+
+
+test("the shipped dry run closes something, escalates something, and queues the escalation first", async () => {
+  // The one test that reads the demo a judge actually runs. Everything else in this file
+  // checks that the JSON is well formed; this checks that the thing it does is worth
+  // watching. It exists because the safeguarding rule shipped before these shapes were
+  // updated to carry parent_confirmed_aware, so all three completed rows escalated, closed
+  // came out zero, and the resolution rate the plugin README describes printed as 0%. Every
+  // one of the 26 tests passed while that was true, because none of them ran the shapes.
+  const node = workflow.nodes.find((n) => n.name === "Create Call And Wait");
+  assert.ok(node, "the node that holds the dry-run shapes is gone");
+
+  const src = node.parameters.jsCode;
+  const open = src.indexOf("const shapes = {");
+  assert.ok(open !== -1, "the dry-run shapes are no longer where this test reads them");
+  // Matched without a newline escape on purpose: this file is edited by scripts and an
+  // escape written through one has already been silently flattened here once.
+  const close = src.indexOf("  };", open);
+  const literal = src.slice(open + "const shapes = ".length, close + 3).trim();
+  const shapes = new Function(`return (${literal})`)();
+
+  // The students come out of the first node, so the two lists cannot drift apart.
+  const seed = workflow.nodes.find((n) => n.name === "Absence Config");
+  const students = [...seed.parameters.jsCode.matchAll(/id:\s*"(S-\d+)"/g)].map((m) => m[1]);
+  assert.ok(students.length >= 5, `only ${students.length} students in the roster`);
+  assert.ok(seed, "the node that holds the roster is gone");
+
+  const consented = [...seed.parameters.jsCode.matchAll(/id:\s*"(S-\d+)"[^}]*consent:\s*(true|false)/g)];
+  const rows = consented.map(([, id, consent]) => {
+    if (consent === "false") return { id, resolution: "skipped" };
+    const shape = shapes[id] ?? { status: "completed", structured_result: null };
+    const attempts = Array.from({ length: shape.attempts ?? 1 }, (_, i) => ({
+      provider_call_id: `dry_${id}_${i + 1}`,
+    }));
+    return { id, ...classifyRecipient({ ...shape, attempts }) };
+  });
+
+  const summary = summariseWave(rows);
+  assert.ok(summary.closed > 0,
+    `the shipped demo closes ${summary.closed} of ${summary.attempted}, so a judge importing it sees the whole roster land on the human queue`);
+  assert.equal(summary.escalated, 1,
+    "the demo should show the safeguarding path exactly once, so it is legible");
+  assert.ok(summary.resolutionRate > 0, "resolution rate prints as zero");
+  assert.equal(summary.queue[0].escalation, "safeguarding",
+    "the escalated row is not at the top of the queue a person works from");
+
+  // All three resolutions plus a skip, so the demo shows the whole vocabulary.
+  assert.deepEqual(
+    Object.entries(summary.counts).filter(([, n]) => n === 0).map(([k]) => k),
+    [],
+    "an outcome the classifier can produce never appears in the shipped demo",
+  );
 });

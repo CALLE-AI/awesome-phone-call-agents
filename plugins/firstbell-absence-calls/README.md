@@ -24,7 +24,7 @@ record.
 
 | Outcome | What happened | Who owns it next |
 | --- | --- | --- |
-| `resolved` | A result came back and at least one required field says something | Nobody. The record is closed |
+| `resolved` | A result came back and at least one required field says something | Nobody, unless it is escalated. See below |
 | `undetermined` | A conversation happened and produced nothing usable | A person |
 | `failed` | Nobody was reached on any number | A person |
 
@@ -45,11 +45,19 @@ folding them into a rate, so the output cannot be read as though those cases wer
 ## Dry run first
 
 `dryRun` is `true` on import. The first end-to-end run places no calls, needs no API key,
-and returns shaped responses that include both of the awkward outcomes above, so the
-routing can be seen working before anything rings.
+and returns shaped responses covering every ending the classifier has: two records that
+close, one that comes back valid and escalates, one call that connects and yields nothing,
+one nobody answers, and one skipped for want of consent. Five attempted, two closed, a
+resolution rate of 40 percent, and the escalated row at the top of the queue. So the
+routing can be watched working before anything rings.
+
+The eighth shape test runs those shapes through the shipped rule and fails if the demo
+closes nothing. It exists because it did: the safeguarding rule landed before these
+shapes carried `parent_confirmed_aware`, every completed row escalated, and the recipe
+printed a resolution rate of zero while all 26 tests passed.
 
 ```
-node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 26 passing
+node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 27 passing
 node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
 
@@ -84,7 +92,7 @@ for a school to discover in week two.
 
 ## What the shape tests do and do not prove
 
-The other seven tests read the generated workflow the way n8n's importer does. They check the
+The other eight tests read the generated workflow the way n8n's importer does. They check the
 two collections it loads from, the five fields it draws each node with, that no connection
 names a node that is not in the file, that something can start the workflow, that no node is
 stranded, and that no credential is baked in. A workflow can be well-formed JSON, pass every
