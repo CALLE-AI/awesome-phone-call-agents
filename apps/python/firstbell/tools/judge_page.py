@@ -338,8 +338,11 @@ def build(has_audio: bool) -> str:
             add(f'<link rel=preload as=font type="font/woff2" href="{esc(url)}" crossorigin>')
     # The kit ships font-display:auto and neither the API nor a URL parameter changes it, so
     # it is loaded out of the render path and the page paints on metric-matched fallbacks.
-    add(f'<link rel=stylesheet href="{TYPEKIT}" media=print '
-        f'onload="this.media=\'all\';document.documentElement.classList.add(\'fonts\')">')
+    # The onload used to add a `fonts` class to the root as well. Nothing read it: there is
+    # no `.fonts` selector in page.css and neither script mentions it. A class on the root
+    # invalidates the style of every element under it, so it was paying for a full restyle
+    # and buying nothing.
+    add(f'<link rel=stylesheet href="{TYPEKIT}" media=print onload="this.media=\'all\'">')
     add(f'<noscript><link rel=stylesheet href="{TYPEKIT}"></noscript>')
     add(f'<style>{css}</style>')
 
