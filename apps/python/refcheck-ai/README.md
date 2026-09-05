@@ -22,6 +22,8 @@ to prompt, pay for, retry, or defend against.
 | Terminal webhook handling for an **unsigned** delivery, with at-least-once de-duplication and independent re-fetch | `refcheck/webhook.py` |
 | Refusing to infer `no_answer` / `declined` from `failure_code` | `refcheck/results.py` |
 | Stable idempotency keys, so a retried dispatch never places a second call | `refcheck/client.py` |
+| Operator-authorized ASCII E.164 destinations, with non-ASCII confusables refused rather than transliterated | `refcheck/phone.py` |
+| Bearer credentials pinned to the official HTTPS CALL-E origin | `refcheck/client.py` |
 | Graceful handling of "we only confirm dates of employment" | `refcheck/task.py` |
 
 ## Setup
@@ -47,10 +49,12 @@ Templates: `standard`, `engineering`, `sales`, `leadership`.
 
 ## Placing a real call
 
-This dials a real phone and spends CALL-E credits.
+This dials a real phone and spends CALL-E credits, so it needs two independent
+confirmations that come from different places.
 
 ```bash
 export CALLE_API_KEY="iams_live_..."
+export REFCHECK_ALLOWED_DESTINATIONS="+15555550142"
 
 python cli.py --execute --i-have-consent \
     --to "+15555550142" \
@@ -60,9 +64,30 @@ python cli.py --execute --i-have-consent \
     --company "Northwind"
 ```
 
-`--i-have-consent` is required and asserts two things: the referee agreed to be
-called, and the candidate authorised the reference check. Without it the CLI
-exits non-zero and places no call.
+**`REFCHECK_ALLOWED_DESTINATIONS`** is the operator asserting they own or are
+authorized to call each number. It is a comma-separated list of ASCII E.164
+values. An unset or empty list authorizes *nothing*, so a misconfigured
+deployment places no calls rather than every call. A number not on the list is
+refused before the client is even constructed.
+
+**`--i-have-consent`** is the separate claim that the referee agreed to be called
+and the candidate authorized the reference check. Both are required; either one
+missing exits non-zero and places no call.
+
+### Destination validation
+
+Numbers must be ASCII E.164 - a leading `+`, a country code starting 1-9, and
+8-15 digits, with no spaces, hyphens or parentheses. Values containing non-ASCII
+digits (Arabic-Indic, fullwidth, zero-width joiners) are **rejected rather than
+transliterated**: a confusable digit is a different destination, and silently
+"correcting" it would dial someone who was never authorized.
+
+### Masking
+
+Phone numbers are masked wherever this app prints them - preview and live alike,
+including the task preview, error messages, structured results and transcripts.
+`+15555550142` renders as `+1******0142`: enough to tell two destinations apart,
+never enough to read one out of a terminal recording or a CI log.
 
 ## Receiving results by webhook
 
@@ -120,17 +145,25 @@ cancellation. Practical consequences:
 
 - `CALLE_API_KEY` is read from the environment only. It is never written to
   SQLite, never logged, and never printed — the CLI shows no key material.
+- **The bearer token is pinned to the official HTTPS CALL-E origin.**
+  `CALLE_BASE_URL` is parsed, not string-matched, and must resolve to exactly
+  `https://api.heycall-e.com`. Plaintext HTTP, embedded userinfo, a path or
+  query, and suffix look-alikes such as `https://api.heycall-e.com.evil.example`
+  are all refused, so an operator who can set one environment variable cannot
+  redirect the API key to a host they control.
 - `REFCHECK_WEBHOOK_TOKEN` is the webhook path secret. Generate it randomly and
   treat it like a password; anyone holding it can post events at you (though
   they still cannot inject results, because of the re-fetch).
 - Server-side use only. Neither value belongs in a browser or a mobile client.
+- `REFCHECK_ALLOWED_DESTINATIONS` is the operator's dial authorization. Treat
+  changes to it as a privileged action.
 - Referee phone numbers are call inputs; they are not persisted by this app
-  beyond the result row. Sample numbers throughout are in the reserved fictional
-  `+1 555 01xx` range.
+  beyond the result row, and are masked in all output. Sample numbers throughout
+  are in the reserved fictional `+1 555 01xx` range.
 
 ## Tests
 
-63 tests, no credentials and no network:
+109 tests, no credentials and no network:
 
 ```bash
 pip install pytest
@@ -138,9 +171,11 @@ python -m pytest tests -q
 ```
 
 They cover the schema staying inside CALL-E's supported JSON Schema subset for
-every shipped template, the scoring weights, and the webhook trust boundary
-(wrong token, missing/mismatched event id, forged body, duplicate delivery,
-verification failure and retry).
+every shipped template; the scoring weights; the webhook trust boundary (wrong
+token, missing/mismatched event id, forged body, duplicate delivery,
+verification failure and retry); E.164 validation including non-ASCII
+confusables; the destination allowlist failing closed; masking never returning a
+full number; and credential-target pinning against look-alike origins.
 
 ## Files
 
@@ -148,10 +183,11 @@ verification failure and retry).
 refcheck-ai/
 ├── cli.py                  # preview by default; --execute --i-have-consent to dial
 ├── refcheck/
+│   ├── phone.py            # E.164 validation, dial authorization, masking
 │   ├── templates.py        # role-specific question sets
 │   ├── schema.py           # template -> CALL-E result_schema
 │   ├── task.py             # the call instruction
-│   ├── client.py           # calls.create with a stable idempotency key
+│   ├── client.py           # origin pinning, calls.create, idempotency key
 │   ├── results.py          # reading a terminal call task
 │   ├── scoring.py          # weighted score and recommendation
 │   └── webhook.py          # unsigned-webhook receiver, SQLite ledger
@@ -159,13 +195,6 @@ refcheck-ai/
 │   └── fictional_structured_result.json
 └── tests/
 ```
-
-## Full product
-
-This app is the CALL-E-facing core of RefCheck AI, a recruiter-facing web
-application (Next.js + FastAPI + Supabase) that adds authentication, a check
-wizard, PDF reports and shareable read-only links:
-<https://github.com/HectorTa1989/refcheck-ai>
 
 ## License
 
