@@ -20,18 +20,25 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-Nineteen rows were re-measured on 5 September 2026 by applying each change, running the
-suite and restoring: rows 1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 19, 20, 31, 32, 35, 36
-and 37. Fourteen matched. Five did not and are corrected above: row 2 (three to five), row
-3 (three to four), row 8 (one to twenty, because removing the task-level fallback stops the
-demonstration answering at all), row 19 (three to four) and row 20 (one to four). The
-remaining twenty-five rows have not been re-measured.
+Twenty-six rows were re-measured on 5 September 2026 by applying each change, running the
+suite and restoring: rows 1 to 15, 19, 20, 22, 23, 24, 31, 32, 34, 35, 36 and 37. Twenty
+matched. Six did not and are corrected above: row 2 (three to five), row 3 (three to four),
+row 7 (one to three), row 8 (one to twenty, because removing the task-level fallback stops
+the demonstration answering at all), row 19 (three to four) and row 20 (one to three). The
+remaining eighteen rows have not been re-measured.
 
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
 the published number was right: the row says the poll is left *unprotected*, and catching
 nothing at all is the faithful reading. A count below what is published usually means the
 change made was narrower than the words describing it, not that the row is wrong.
+
+A measured zero is a different thing again, and it means the change was not made where the
+row says. Two of the rows above returned zero on a first attempt at reproducing them. Row 7
+had been written as an expression that still evaluated to the original table, so the table
+was never deleted. Row 22 had been applied to `FundingRate`, which validates its provenance
+fields with the same idiom the wage class uses; the row says wage, and the wage is
+`StaffCost`. Both measure as published once the change matches the sentence.
 
 | # | The change | Tests that failed |
 |---|---|---|
@@ -41,7 +48,7 @@ change made was narrower than the words describing it, not that the row is wrong
 | 4 | Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 1 |
 | 5 | Write the transcript into every receipt instead of only when `--include-transcript` is given | 1 |
 | 6 | Prefer the attempt's raw SIP code over the task's symbolic one, putting `603` in front of an administrator | 1 |
-| 7 | Delete the SIP translation table, so a queue row reads `the call failed with 603` | 1 |
+| 7 | Delete the SIP translation table, so a queue row reads `the call failed with 603` | 3 |
 | 8 | Stop falling back to the task-level `structured_result`, which is the defect a real call exposed | 20 |
 | 9 | Allow that fallback for fan-out too, which would file one family's answer against another family's child | 1 |
 | 10 | Remove the check for a result whose required fields are all uninformative | 1 |
@@ -54,7 +61,7 @@ change made was narrower than the words describing it, not that the row is wrong
 | 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
 | 18 | Compute `reached_production_api` from the configured base URL alone, so a run that exchanged no bytes with CALL-E still reports that it reached production | 1 |
 | 19 | Credit every attempt to the machine instead of only the attempts behind records it closed, so calls that left a family unreached still count as staff time saved | 4 |
-| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 4 |
+| 20 | Report a break-even of `0.00` rather than nothing when a run billed no attempts, turning could-not-compute into a free-looking number | 3 |
 | 21 | Wrap the citation like prose, so the source URL breaks mid-path and the reader cannot open the thing the number came from | 3 |
 | 22 | Drop `source` from the wage validation, so a staff cost can be asserted with no provenance at all | 1 |
 | 23 | Shift one cited line number by one, the way any edit above it would | 1 |
