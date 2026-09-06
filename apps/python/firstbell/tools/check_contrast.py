@@ -32,19 +32,25 @@ PAIRS: list[tuple[str, str, float, str]] = [
     ("--ink-2",         "--paper",         4.5,  "secondary prose, table cells"),
     ("--ink-3",         "--paper",         4.5,  "captions, turn timestamps"),
     ("--ink-4",         "--paper",         3.0,  "disabled and decorative only"),
-    ("--paper-ink",     "--paper-deep",    4.5,  "body copy on the deepest paper band"),
     ("--resolved",      "--paper",         4.5,  "the word resolved, on paper"),
     ("--undetermined",  "--paper",         4.5,  "the word undetermined, on paper"),
     ("--failed",        "--paper",         4.5,  "the word failed, on paper"),
     ("--link",          "--paper",         4.5,  "links in running prose"),
-    ("--stage-ink",     "--stage",         4.5,  "transcript text in the theatre"),
-    ("--stage-ink-2",   "--stage",         4.5,  "speaker labels in the theatre"),
-    ("--stage-ink-3",   "--stage",         4.5,  "turn timestamps in the theatre"),
-    ("--resolved-d",    "--stage",         4.5,  "the word resolved, in the theatre"),
-    ("--undetermined-d", "--stage",        4.5,  "the word undetermined, in the theatre"),
-    ("--failed-d",      "--stage",         4.5,  "the word failed, in the theatre"),
-    ("--wave-played",   "--stage",         3.0,  "the played half of the waveform"),
-    ("--wave-ahead",    "--stage",         3.0,  "the unplayed half of the waveform"),
+    # The surfaces the redesign introduced. Each of these ink tokens is a scoped re-cut:
+    # `--ink-3` becomes `--lit-ink-3` inside a panel and `--ink` becomes `--royal-ink` on
+    # the royal plate, so measuring the base token against paper says nothing about the
+    # pair a reader actually looks at. The tool prints an ALIAS line for any re-cut no row
+    # below measures, which is how these were found missing.
+    ("--ink-2",         "--sage",          4.5,  "prose inside a sage panel"),
+    ("--lit-ink-3",     "--sage",          4.5,  "small print inside a sage panel"),
+    ("--ink",           "--brand-field",   4.5,  "the two-minute path, the lead cell"),
+    ("--lit-ink-3",     "--brand-field",   4.5,  "small print on the brand field"),
+    ("--link",          "--brand-field",   4.5,  "the three destinations"),
+    ("--royal-ink",     "--royal",         4.5,  "headings on the royal plate"),
+    ("--royal-ink-2",   "--royal",         4.5,  "body and links on the royal plate"),
+    ("--royal-ink-3",   "--royal",         4.5,  "small print on the royal plate"),
+    ("--ink",           "--card",          4.5,  "the register, the stat cells"),
+    ("--lit-ink-3",     "--card",          4.5,  "the register's small print"),
 ]
 
 

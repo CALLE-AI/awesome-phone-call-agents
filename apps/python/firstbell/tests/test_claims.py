@@ -260,27 +260,28 @@ NUMBER_WORDS_SMALL = {name: value for value, name in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen "
     "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
 
-NUMBER_WORDS = {
-    13: "thirteen", 18: "eighteen", 22: "twenty-two", 26: "twenty-six",
-    27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty",
-    33: "thirty-three", 34: "thirty-four", 35: "thirty-five",
-    36: "thirty-six", 37: "thirty-seven", 38: "thirty-eight",
-    31: "thirty-one", 32: "thirty-two", 39: "thirty-nine", 40: "forty", 41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
-    45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
-    49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two",
-    53: "fifty-three", 54: "fifty-four", 55: "fifty-five", 56: "fifty-six",
-    57: "fifty-seven", 58: "fifty-eight", 59: "fifty-nine", 60: "sixty",
-    61: "sixty-one", 62: "sixty-two", 63: "sixty-three", 64: "sixty-four",
-    65: "sixty-five", 66: "sixty-six", 67: "sixty-seven", 68: "sixty-eight",
-    69: "sixty-nine", 70: "seventy", 71: "seventy-one", 72: "seventy-two",
-    73: "seventy-three", 74: "seventy-four", 75: "seventy-five", 76: "seventy-six",
-    77: "seventy-seven", 78: "seventy-eight", 79: "seventy-nine", 80: "eighty",
-    81: "eighty-one", 82: "eighty-two", 83: "eighty-three", 84: "eighty-four",
-    85: "eighty-five", 86: "eighty-six", 87: "eighty-seven", 88: "eighty-eight",
-    89: "eighty-nine", 90: "ninety", 91: "ninety-one", 92: "ninety-two",
-    93: "ninety-three", 94: "ninety-four", 95: "ninety-five", 96: "ninety-six",
-    97: "ninety-seven", 98: "ninety-eight", 99: "ninety-nine", 100: "one hundred",
-}
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+         "fourteen fifteen sixteen seventeen eighteen nineteen").split()
+_TENS = {2: "twenty", 3: "thirty", 4: "forty", 5: "fifty",
+         6: "sixty", 7: "seventy", 8: "eighty", 9: "ninety"}
+
+
+def _in_words(n: int) -> str:
+    if n < 20:
+        return _ONES[n]
+    if n < 100:
+        tens, rest = divmod(n, 10)
+        return _TENS[tens] + (f"-{_ONES[rest]}" if rest else "")
+    hundreds, rest = divmod(n, 100)
+    head = f"{_ONES[hundreds]} hundred"
+    return head if not rest else f"{head} and {_in_words(rest)}"
+
+
+# Generated rather than typed. The hand-written version stopped at whatever number was
+# current when it was last edited, and the gate below then failed with a note asking
+# somebody to extend it, which is a maintenance task standing between a contributor and a
+# green suite.
+NUMBER_WORDS = {n: _in_words(n) for n in range(1000)}
 
 
 def test_the_readme_states_the_real_number_of_mutations():
@@ -838,4 +839,40 @@ def test_the_readme_states_the_real_number_of_classifier_tests():
     assert claimed is not None, f"add {spoken!r} to NUMBER_WORDS_SMALL so this can keep checking"
     assert claimed == real, (
         f"the README says the classifier module runs {spoken} tests; it runs {real}"
+    )
+
+
+def test_the_contrast_tool_still_measures_the_palette_the_page_is_painted_in():
+    """The footer's sentence about unmeasured pairs, with something behind it.
+
+    A pair that names a token the stylesheet no longer declares is reported rather than
+    silently dropped, which is the right behaviour and is why this was findable at all.
+    It is not enough on its own: nine such rows sat in the table for as long as it took
+    somebody to run the tool by hand and read the bottom of its output.
+
+    The ALIAS half matters as much. `--ink-3` is re-cut to `--lit-ink-3` inside a panel,
+    so measuring `--ink-3` against paper says nothing about the text a reader is looking
+    at, and the tool says so by naming the re-cut no pair covers.
+    """
+    run = subprocess.run(
+        [sys.executable, "tools/check_contrast.py"],
+        cwd=APP, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    assert run.returncode == 0, (run.stdout[-500:] + run.stderr[-500:])
+
+    tally = re.search(r"measured (\d+) pairs, (\d+) failing, (\d+) unmeasured", run.stdout)
+    assert tally, f"the tool no longer prints its tally: {run.stdout[-300:]!r}"
+    measured, failing, unmeasured = (int(g) for g in tally.groups())
+
+    assert measured >= 18, f"the table shrank to {measured} pairs"
+    assert failing == 0, run.stdout
+    assert unmeasured == 0, (
+        f"{unmeasured} pair(s) name a token page.css does not declare. The footer tells a "
+        "reader this tool covers the page's contrast, so a row that cannot be measured is "
+        "a hole in that sentence, not a note at the bottom of a report."
+    )
+    alias = [ln.strip() for ln in run.stdout.splitlines() if ln.strip().startswith("ALIAS")]
+    assert not alias, (
+        "the stylesheet re-cuts an ink token for a surface that no pair measures: "
+        + "; ".join(alias)
     )

@@ -36,6 +36,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
@@ -621,12 +622,94 @@ def demo_markup(has_video: bool, seconds: int) -> str:
     )
 
 
-def act(num: str, title: str, body: str, classes: str = "") -> str:
+def marginalia(label: str, body: str) -> str:
+    """A note that sits in the right margin at wide viewports.
+
+    It carries the things a reader should be able to find without being made to read for
+    them: which figure a section is talking about, the file a number came out of, the gloss
+    on a word the page uses without stopping to define. Below 72rem, which is the width the
+    rail appears at, the stylesheet drops the float and the note falls into normal flow
+    above the block it annotates.
+
+    Nothing here may say anything the act does not already say. A margin is the easiest
+    place on a page to introduce a claim nothing checks, because it reads as an aside and
+    is written last.
+    """
+    return (f'<aside class=marginalia aria-label="{esc(label)}"><b>{esc(label)}</b>'
+            f'{body}</aside>')
+
+
+def pull(quote: str, who: str = "") -> str:
+    """A sentence the act already says, set large.
+
+    The argument is the reason the exact string matters. A reader who takes the page from
+    the pull-quotes alone has to end up with what the page actually claims, so every one of
+    these is lifted word for word out of the prose beside it rather than sharpened for the
+    lift. `tests/test_claims.py` holds the sentences these come from.
+    """
+    tail = f'<span class=pull-who>{esc(who)}</span>' if who else ""
+    return f'<p class=pull>{esc(quote)}{tail}</p>'
+
+
+def path_markup() -> str:
+    """The stated way in, once, at the top.
+
+    This page is 4,283 words and every one of them is held by a test, so the answer to a
+    reader with two minutes cannot be to cut. It is to say where to spend them. Three
+    destinations, in the order they answer the question a judge is actually asking, each an
+    ordinary anchor so it works with no script and lands on a keyboard.
+
+    It sits at the top of act 1 rather than on the first screen. Act 0 has one sentence and
+    one object on it and both are the argument; a menu above the register would be the page
+    explaining itself instead of showing itself, on the one screen where showing works.
+    """
+    steps = [
+        ("act-00", "Watch a row fill in",
+         "A real call to a parent who had not been told, playing in the register it "
+         "belongs to."),
+        ("act-02", "The same call in Tamil",
+         "Two conversations of different lengths, and the three fields underneath them."),
+        ("act-03", "Three endings, not two",
+         "What this software does with a call it could not get an answer to."),
+    ]
+    out = ['<div class=path>',
+           '<p class=path-k>The two-minute path</p>',
+           '<p class=path-lead>Three things, in the order they answer the question. '
+           'Everything else here is the evidence behind them.</p>',
+           '<ol class=path-steps>']
+    for i, (anchor, title, why) in enumerate(steps, 1):
+        out.append(f'<li><span class=path-n>{i:02d}</span>'
+                   f'<a href="#{anchor}">{esc(title)}</a>'
+                   f'<p class=path-why>{esc(why)}</p></li>')
+    out.append('</ol></div>')
+    return "".join(out)
+
+
+def act(num: str, title: str, body: str, classes: str = "", margin: bool = False) -> str:
     # One reveal target per act. The hero never reveals: it is the first paint and it is
     # already choreographed on load.
+    #
+    # `margin` opts the act into the margin column, which reserves 144px of the reading
+    # column at 72rem and above. It is opt-in because four acts hold an artifact that is
+    # already near its minimum width there: the hero's first screen has no height to spare,
+    # the duet's three fields already overlap below about 80rem, and the two identifier
+    # tables are set in unbroken mono. Narrowing those buys a margin note and costs a table.
     reveal = "" if num == "00" else " data-reveal"
+    inner = "inner inner-margin" if margin else "inner"
     return (f'<section class="act act-{num} {classes}" id="act-{num}" '
-            f'aria-labelledby="h-{num}"><div class=inner{reveal}>{body}</div></section>')
+            f'aria-labelledby="h-{num}"><div class="{inner}"{reveal}>{body}</div></section>')
+
+
+def showcase_figure() -> str:
+    """The four-stage figure, loaded from the asset directory by path.
+
+    It is CSS and SVG with no script, so it survives the no-JavaScript pass, and it
+    reserves its own box, so it costs nothing against the layout-shift budget.
+    """
+    spec = spec_from_file_location("showcase", SITE / "showcase.py")
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.showcase_markup()
 
 
 def css_for_serving(css: str) -> str:
@@ -712,7 +795,12 @@ def build(has_audio: bool, repo_url: str | None = None,
     agree = sum(p["agree"] for p in data["pairs"])
     total = sum(p["of"] for p in data["pairs"])
 
-    css = (SITE / "page.css").read_text(encoding="utf-8")
+    # Two stylesheets, one <style>. The figure's rules are scoped under
+    # `.calle-showcase` and neither file reads the other, so order is not load-bearing;
+    # they are concatenated rather than linked because a second request for 4 KB costs a
+    # round trip the page's weight budget was measured without.
+    css = ((SITE / "page.css").read_text(encoding="utf-8") + "\n"
+           + (SITE / "showcase.css").read_text(encoding="utf-8"))
     p: list[str] = []
     add = p.append
 
@@ -796,7 +884,13 @@ def build(has_audio: bool, repo_url: str | None = None,
     add(act("00", "The call", "".join(body), "hero"))
 
     # ---- Act 1: the residue
+    fig_min, fig_sec = divmod(DEMO_SECONDS, 60)
     body = [
+        marginalia("Figure 1", '<p>The demonstration below, '
+                   f'{fig_min}:{fig_sec:02d} with no narration. It opens on '
+                   '<a href="#act-00">the register from the first screen</a>.</p>')
+        if has_video else "",
+        path_markup(),
         demo_markup(has_video, DEMO_SECONDS),
         '<div class=split><div class=claim>',
         '<h3>01</h3><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
@@ -809,14 +903,18 @@ def build(has_audio: bool, repo_url: str | None = None,
         '</div><div class=artifact>',
         '<div class=stat-grid>',
     ]
-    for num, label in ((test_count(), "tests"),
-                       (len(muts), "rules broken on purpose to prove a test notices"),
-                       (len(call_rows), "real calls, each one checkable against CALL-E’s billing"),
-                       ("none", "CALL-E account needed to run the demo")):
-        body.append(f'<div class=cell><div class=num>{esc(num)}</div>'
+    # One of the four is filled. A grid of four equal numbers makes a reader rank them, and
+    # the page already knows the answer: the count of real calls is the number that decides
+    # whether the other three are worth reading, so it is the one that carries the field.
+    for num, label, lead in ((test_count(), "tests", False),
+                             (len(muts), "rules broken on purpose to prove a test notices", False),
+                             (len(call_rows), "real calls, each one checkable against CALL-E’s billing", True),
+                             ("none", "CALL-E account needed to run the demo", False)):
+        body.append(f'<div class=cell{" data-lead" if lead else ""}>'
+                    f'<div class=num>{esc(num)}</div>'
                     f'<div class=lbl>{label}</div></div>')
     body.append('</div></div></div>')
-    add(act("01", "What the school knew", "".join(body)))
+    add(act("01", "What the school knew", "".join(body), margin=True))
 
     # ---- Act 2: the same call, both languages
     #
@@ -829,11 +927,19 @@ def build(has_audio: bool, repo_url: str | None = None,
     body = [
         '<h3>02</h3><h2 id=h-02>Same call. Whichever language the family speaks.</h2>',
         '<p class=eyebrow>The call from the first screen, beside the same call in Tamil</p>',
+        # ---- SHOWCASE INSERTION POINT ------------------------------------------------
+        # The figure below is owned by tools/site/showcase.py and tools/site/showcase.css.
+        # This file loads it and places it; it does not know how it is drawn. The seam is
+        # kept named so the next person editing act 02 can see where the boundary is.
+        # ------------------------------------------------------------------------------
+        showcase_figure(),
         duet_markup(data, en, ta, has_audio),
         f'<p class=duet-line>Different words, different lengths, '
         f'<b>{pair["agree"]} of {pair["of"]}</b> fields identical.</p>',
         '<p class=dim>There is no Tamil-specific code in this app. Language is one column '
         'in the work file and one string in the request.</p>',
+        # Lifted from the sentence directly above it, word for word.
+        pull("There is no Tamil-specific code in this app."),
         '<details class=fold><summary>All twelve comparisons, counted before the phone '
         f'rang: {agree} of {total} matched</summary>',
         '<p>Four scenarios, each performed twice, three enumerated fields per pair. The '
@@ -866,6 +972,11 @@ def build(has_audio: bool, repo_url: str | None = None,
     placed = run["calls_placed"]
     open_rows = c06["undetermined"] + c06["failed"]
     body = [
+        marginalia("Undetermined",
+                   '<p>The third ending. A call that finished without an answer the office '
+                   'can act on, named in the run rather than filed as resolved. The '
+                   '<a href="#act-05">mutation table</a> holds the tests that keep the '
+                   'distinction from collapsing.</p>'),
         '<h3>03</h3><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
         '<p class=eyebrow>The same call, filed three ways</p>',
         endings_markup(data, en, run),
@@ -875,12 +986,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         'it was written, uncorrected, because a corrected copy would record a run that '
         'never happened. What changed is the code, and a test now fails if the distinction '
         'collapses again.</p>',
+        # The opening sentence of the note above, word for word.
+        pull("This app made the first mistake itself."),
         f'<p class=dim>Counts read from one committed run of {placed} calls, '
         '<code>06-locale-matched-pairs.json</code>. '
         f'{open_rows} of {placed} rows are still open and every one of them is named. The '
         'rate is resolved over attempted, so an open row can only ever pull it down.</p>',
     ]
-    add(act("03", "Three endings", "".join(body), "act-3"))
+    add(act("03", "Three endings", "".join(body), "act-3", margin=True))
 
     # ---- Act 4: check us
     have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
@@ -951,6 +1064,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
     body.append('</tbody></table></div></div>')
+    # The first sentence of the claim above, word for word. It closes the act at full width
+    # rather than sitting in the 26rem claim column, where the display face would break one
+    # sentence over six lines.
+    body.append(pull("A test that has never been observed to fail has not been shown to "
+                     "test anything."))
     add(act("05", "Every rule, broken", "".join(body), "act-2"))
 
     # ---- Act 6: take-aways
@@ -967,13 +1085,22 @@ def build(has_audio: bool, repo_url: str | None = None,
          "failed. It cost an afternoon and it found a real defect that eighty-eight passing "
          "tests had not."),
     ]
-    body = ['<h3>06</h3><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
-            '<div class=takes>']
+    # The two take-aways sit on the one dark ground the page has. Nine acts of cream with
+    # nothing to break them is what a reader means by a page that reads long, and this is
+    # the act where a break costs nothing: it holds no artifact, no table and no control, so
+    # a plate that flips every ink inside it can be checked in one place.
+    body = [
+        marginalia("Shown in act 05",
+                   '<p>The <a href="#act-05">mutation table</a> is eighteen deliberate '
+                   'changes and the tests that caught each one.</p>'),
+        '<h3>06</h3><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
+        '<div class=plate-royal><div class=takes>',
+    ]
     for i, (title, text) in enumerate(takes, 1):
         body.append(f'<div class=take><div class=take-n>{i:02d}</div>'
                     f'<h4>{esc(title)}</h4><p>{text}</p></div>')
-    body.append('</div>')
-    add(act("06", "Two things to take", "".join(body)))
+    body.append('</div></div>')
+    add(act("06", "Two things to take", "".join(body), margin=True))
 
     # ---- Act 7: what is not true
     limits = [
@@ -992,7 +1119,11 @@ def build(has_audio: bool, repo_url: str | None = None,
          "It is a pilot, and it is written up as one. The pre-registered comparison count is "
          "committed so nobody has to take the framing on trust."),
     ]
-    body = ['<div class=split><div class=claim>',
+    body = [marginalia("Read this one first",
+                       '<p>A page that names its own limits is easier to check than one '
+                       'that does not. Two of these four belong to the platform and are '
+                       'reported without complaint.</p>'),
+            '<div class=split><div class=claim>',
             '<h3>07</h3><h2 id=h-07>What is not true.</h2>',
             '<p>Four limits, each with what would close it. Two of them are the '
             'platform’s and are reported here without complaint, because a limit you '
@@ -1002,10 +1133,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         body.append(f'<li><p class=limit>{esc(limit)}</p>'
                     f'<p class=closes>{esc(closes)}</p></li>')
     body.append('</ul></div></div>')
-    add(act("07", "What is not true", "".join(body), "act-deep"))
+    add(act("07", "What is not true", "".join(body), "act-deep", margin=True))
 
     # ---- Act 8: close
     body = [
+        marginalia("No account needed",
+                   '<p>The local double is an <code>httpx</code> transport, so the offline '
+                   'path runs the same SDK code the live one does. Nothing here places a '
+                   'telephone call.</p>'),
         '<h3>08</h3><h2 id=h-08>Run the whole thing with no account.</h2>',
         '<p>No API key, no signup, no telephone call. The local double is mounted as an '
         '<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so '
@@ -1015,7 +1150,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<p class=dim>Produced by running exactly that when this page was built:</p>',
         f'<pre class=run>{esc(offline_run())}</pre>',
     ]
-    add(act("08", "Run it yourself", "".join(body)))
+    add(act("08", "Run it yourself", "".join(body), margin=True))
 
     add('</main>')
     # The build's own provenance. The previous footer said "if the repository changes,
@@ -1023,13 +1158,16 @@ def build(has_audio: bool, repo_url: str | None = None,
     # deployed copy goes stale the moment the next commit lands, and this one did, telling
     # readers 88 tests and 18 mutations while the repository said otherwise. A commit and a
     # date can be checked. A promise about future rebuilds cannot.
-    add(f'<footer><p>Built from <code>{build_commit()}</code> on {build_date()} by '
+    # The same reserve the acts take, so the closing plate ends on the line every act
+    # above it ends on rather than 144px past it.
+    add('<footer><div class="inner inner-margin"><div class=plate-royal>'
+        f'<p>Built from <code>{build_commit()}</code> on {build_date()} by '
         '<code>tools/judge_page.py</code>, which reads the numbers rather than being told '
         'them. If that commit is not the tip of the branch, this page is behind it, and '
         'you can see that for yourself rather than being told. Contrast is measured by '
         '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
         'so that an unmeasured pair cannot read as a pass.</p>'
-        + repo_link_markup(repo_url) + '</footer>')
+        + repo_link_markup(repo_url) + '</div></div></footer>')
 
     add(f'<script id=call-data type=application/json>{script_json(data)}</script>')
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
