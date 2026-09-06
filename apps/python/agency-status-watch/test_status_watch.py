@@ -208,6 +208,54 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(result["watch"], "max_checks_reached")
         self.assertIsNone(result["next_check_due"])
 
+    def test_reject_non_ascii_digits_in_phone(self):
+        # \d in Python str patterns matches non-ASCII digits; E.164 must be ASCII only.
+        req = json.loads(SAMPLE.read_text())
+        req["agency"]["phone"] = "+١٤١٥٥٥٥٠١٧٢"  # Arabic-Indic digits
+        code, _ = run_main(["--request", write_temp(req)])
+        self.assertEqual(code, 2)
+
+    def test_reject_missing_authorized_destination(self):
+        req = json.loads(SAMPLE.read_text())
+        req.pop("authorized_destination", None)
+        code, _ = run_main(["--request", write_temp(req)])
+        self.assertEqual(code, 2)
+
+    def test_reject_mismatched_authorized_destination(self):
+        req = json.loads(SAMPLE.read_text())
+        req["authorized_destination"] = "+14155550000"
+        code, _ = run_main(["--request", write_temp(req)])
+        self.assertEqual(code, 2)
+
+    def test_output_redacts_phones_and_reference_in_free_text(self):
+        path = fixture_with(lambda c: c["check_status"]["result"]["structuredContent"]
+                            ["structured_output"].update(
+            {"notes": "Called +14155550172 about WPR-2026-08847-A; said call +14155550172 back."}))
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", path])
+        self.assertEqual(code, 0)
+        self.assertNotIn("+14155550172", out)
+        self.assertNotIn("WPR-2026-08847-A", out)
+
+    def test_stderr_and_detail_redacted_on_cli_failure(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            env = {"AGENCY_STATUS_WATCH_STATE_DIR": state_dir}
+            with mock.patch.dict(os.environ, env):
+                req = json.loads(SAMPLE.read_text())
+                status_watch.write_state(req["watch_id"], {"status": "watching",
+                    "checks_done": 1, "max_checks": 5,
+                    "next_check_due": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()})
+                path = write_temp(req)
+                failing = fixture_with(lambda c: c["check_plan"]["result"]["structuredContent"].update(
+                    {"ready_to_run": False, "clarification_question":
+                     "plan refused for +14155550172 ref WPR-2026-08847-A"}))
+                # fixture mode does not consult state; drive the CLI failure path via check()
+                canned = json.loads(open(failing).read())
+                report = status_watch.check(req | {"_max_checks": 5}, status_watch.FixtureRunner(canned))
+                rendered = json.dumps(status_watch.scrub_output(
+                    report, [req["reference_number"], req["agency"]["phone"]]))
+                self.assertNotIn("+14155550172", rendered)
+                self.assertNotIn("WPR-2026-08847-A", rendered)
+
     def test_output_carries_no_secrets(self):
         code, out = run_main(["--request", str(SAMPLE), "--fixture", str(HAPPY)])
         self.assertEqual(code, 0)

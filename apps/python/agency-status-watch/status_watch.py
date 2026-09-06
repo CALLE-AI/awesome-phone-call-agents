@@ -28,7 +28,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+# Strict ASCII E.164: '+' + country code 1-9 + up to 14 ASCII digits. `[0-9]` not `\d`,
+# which in Python str patterns also matches non-ASCII digits (Arabic-Indic etc.).
+E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
+# Any E.164-shaped run of digits inside free text (output sanitization).
+PHONE_LIKE_RE = re.compile(r"(?<![0-9])\+?[1-9][0-9]{7,14}(?![0-9])")
 TERMINAL_STATUSES = {
     "BUSY", "CANCELED", "CANCELLED", "COMPLETED", "DECLINED",
     "EXPIRED", "FAILED", "NO_ANSWER", "VOICEMAIL",
@@ -42,6 +46,8 @@ RETRY_AFTER_CALL_FAILURE_DAYS = 1
 DECAY_INTERVAL_DAYS = [1, 2, 4, 8]
 DEFAULT_MAX_CHECKS = 5
 SECRET_KEYS = {"confirm_token", "access_token", "refresh_token", "session_secret"}
+# Free-text fields that could echo provider stderr or spoken PII into reports/state.
+FREE_TEXT_KEYS = {"notes", "detail", "needs_human_reason", "spoke_with", "next_action"}
 # Structured-answer contract bound before the watch state machine acts on it.
 STATUS_CATEGORIES = {
     "approved", "denied", "pending_action", "more_info_needed",
@@ -98,6 +104,38 @@ def scrub(obj):
     return obj
 
 
+def redact_free_text(text: str, secrets: list[str]) -> str:
+    """Mask phone-number-shaped runs and known secrets in free text that reaches output.
+
+    Provider stderr and IVR transcripts are echoed into `detail`, `notes`,
+    `needs_human_reason`, etc. Mask full phone numbers and any caller-supplied
+    secret/reference strings so personal data cannot leak into reports or state files.
+    """
+    out = PHONE_LIKE_RE.sub("+•••••••••", text)
+    for s in secrets:
+        if s:
+            out = out.replace(s, "••••")
+    return out
+
+
+def scrub_output(obj, secrets: list[str]):
+    """scrub() plus deep redaction of free-text fields (notes/stderr echoes)."""
+    data = scrub(obj)
+
+    def walk(node):
+        if isinstance(node, dict):
+            return {
+                k: (redact_free_text(v, secrets) if k in FREE_TEXT_KEYS and isinstance(v, str)
+                    else walk(v))
+                for k, v in node.items()
+            }
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    return walk(data)
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -131,6 +169,19 @@ def load_request(path: str) -> dict:
             raise RequestError(f"missing agency.{key}")
     if not E164_RE.match(agency["phone"]):
         raise RequestError("agency.phone is not E.164: masked")
+    # Explicit authorization for the EXACT destination: the request must carry
+    # authorized_destination and it must equal agency.phone character-for-character.
+    # An empty or wildcard authorization set is not accepted — a live call is only
+    # allowed to the number the applicant explicitly named.
+    authorized = raw.get("authorized_destination")
+    if not isinstance(authorized, str) or not authorized.strip():
+        raise RequestError("missing authorized_destination: repeat agency.phone exactly to "
+                           "authorize calls to this specific destination")
+    if not E164_RE.match(authorized.strip()):
+        raise RequestError("authorized_destination is not E.164")
+    if authorized.strip() != agency["phone"]:
+        raise RequestError("authorized_destination does not match agency.phone; the watch is "
+                           "bound to the exact number the applicant authorized")
     max_checks = raw.get("max_checks", DEFAULT_MAX_CHECKS)
     if not isinstance(max_checks, int) or isinstance(max_checks, bool) or not 1 <= max_checks <= 10:
         raise RequestError("max_checks must be an integer between 1 and 10")
@@ -381,6 +432,13 @@ def print_preview(req: dict) -> None:
 
 
 def execute(req: dict) -> int:
+    # Re-verify the exact-destination authorization at run time: the request on disk
+    # could have been edited between preview and --execute.
+    if str(req.get("authorized_destination", "")).strip() != req["agency"]["phone"]:
+        print(f"refusing: authorized_destination no longer matches agency.phone for "
+              f"{req['watch_id']}", file=sys.stderr)
+        return 2
+    secrets = [req.get("reference_number", ""), req["agency"]["phone"]]
     prior = read_state(req["watch_id"])
     if prior:
         status = prior.get("status")
@@ -416,7 +474,8 @@ def execute(req: dict) -> int:
     try:
         report = check(req, CliRunner(), done_before)
     except (RuntimeError, OSError, ValueError) as exc:
-        print(f"check aborted: {exc}", file=sys.stderr)
+        # CLI failure text can embed provider stderr; redact before it reaches the console.
+        print(f"check aborted: {redact_free_text(str(exc), secrets)}", file=sys.stderr)
         return 1
     history = (prior or {}).get("history", [])
     history.append({"at": utcnow().isoformat(), "watch": report["watch"],
@@ -429,7 +488,7 @@ def execute(req: dict) -> int:
         "next_check_due": report["next_check_due"],
         "history": history,
     })
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(scrub_output(report, secrets), ensure_ascii=False, indent=2))
     return 0
 
 
@@ -489,12 +548,13 @@ def main(argv: list[str] | None = None) -> int:
         return execute(req)
     if args.fixture:
         runner = FixtureRunner(json.loads(Path(args.fixture).read_text(encoding="utf-8")))
+        secrets = [req.get("reference_number", ""), req["agency"]["phone"]]
         try:
             report = check(req, runner)
         except (RuntimeError, OSError, ValueError) as exc:
-            print(f"check aborted: {exc}", file=sys.stderr)
+            print(f"check aborted: {redact_free_text(str(exc), secrets)}", file=sys.stderr)
             return 1
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+        print(json.dumps(scrub_output(report, secrets), ensure_ascii=False, indent=2))
         return 0
     print_preview(req)
     return 0

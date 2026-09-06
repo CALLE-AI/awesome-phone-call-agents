@@ -42,7 +42,9 @@ Standard library only; no third-party dependencies.
    (you are consenting to an AI calling the public line about your own application).
 
 Request fields: `watch_id` (stable unique id — one watch per id), `topic`,
-`timezone`, `reference_number`, `consent`, optional `max_checks` (1–10, default 5),
+`timezone`, `reference_number`, `consent`, `authorized_destination` (must repeat
+`agency.phone` exactly — the watch is bound to that one number and refuses to
+dial anything else), optional `max_checks` (1–10, default 5),
 `applicant {name, language, region}`, `agency {name, phone (E.164), language, region}`.
 
 ## Example

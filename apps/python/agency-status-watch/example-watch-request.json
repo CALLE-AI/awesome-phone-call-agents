@@ -5,6 +5,7 @@
   "reference_number": "WPR-2026-08847-A",
   "consent": true,
   "max_checks": 5,
+  "authorized_destination": "+14155550172",
   "applicant": {
     "name": "Dana Application",
     "language": "en",
