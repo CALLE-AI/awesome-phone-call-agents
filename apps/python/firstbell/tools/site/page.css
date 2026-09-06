@@ -1579,3 +1579,22 @@ button[data-copy][data-copied]::after {
  * table cannot be narrower than that, so the whole document scrolled sideways at 1440 and
  * at 1600 with nothing on screen to explain why. Measured after: 1520 and 1600. */
 .ids th { overflow-wrap: anywhere; }
+
+/* ---- the five rows above the mutation fold ---------------------------------------------- */
+/* A blind seat reading this page as a school district administrator stopped at the first row
+ * of the mutation table and did not start again. Their note: "max_workers=self._concurrency
+ * becomes max_workers=None. Not English. I scrolled, saw 138 more, stopped reading."
+ *
+ * Fifty-six percent of the page's words were in that one act. Five rows now sit above the
+ * fold, each led by the sentence a reader who does not write software needs, with the change
+ * itself underneath in the face it is written in. Nothing was deleted: the other 133 are one
+ * click away in the same shape they were always in. */
+.mut-plain {
+  margin: 0 0 0.35rem; max-width: 44ch;
+  font-family: var(--serif); font-size: var(--size-4); color: var(--ink);
+  text-wrap: pretty;
+}
+.mut-code {
+  margin: 0; max-width: none;
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
+}

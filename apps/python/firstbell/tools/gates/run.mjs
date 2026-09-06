@@ -864,6 +864,23 @@ async function gateContrast(browser, url) {
   // Only elements whose centre is on screen can be hit-tested for a ground, so the page
   // is walked a viewport at a time. Two passes reached 47 runs of nearly six hundred, and
   // a gate that judges a twelfth of the page is not measuring the page.
+  // A closed <details> has no geometry at all: its rows are in the document, they have a
+  // colour and a ground, and every rect they report is zero. Folding the mutation table put
+  // 133 rows behind one and the census went from nothing unmeasured to 493 runs it could not
+  // resolve, 294 of them because they could never be centred and 199 because the scroller
+  // inside the fold had no height to be stepped through.
+  //
+  // That report was accurate, and it is the reason the fold is not allowed to hide anything
+  // from this gate. Every disclosure is opened before a single measurement is taken, so what
+  // gets checked is the page a reader can actually put on screen rather than the part of it
+  // that happened to be open when the run started. They stay open: nothing after this point
+  // depends on the fold being shut, and the layout gates run in their own pass.
+  const opened = await page.$$eval("details:not([open])", (els) => {
+    els.forEach((el) => { el.open = true; });
+    return els.length;
+  });
+  if (opened) await new Promise((r) => setTimeout(r, 200));
+
   const height = await page.evaluate(() => window.innerHeight);
   const total = await page.evaluate(() => document.documentElement.scrollHeight);
   absorb(await page.evaluate(CONTRAST_PROBE));

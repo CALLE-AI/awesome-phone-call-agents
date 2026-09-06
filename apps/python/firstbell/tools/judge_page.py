@@ -739,6 +739,19 @@ def pull(quote: str, who: str = "") -> str:
     return f'<p class=pull>{esc(quote)}{tail}</p>'
 
 
+LEAD_MUTATIONS = {
+    "2": "Turn the consent check off, and the software phones a family that never agreed to "
+         "be phoned.",
+    "49": "Turn the safeguarding rule off, and a parent who did not know their child was "
+          "missing is filed as handled and nobody is told.",
+    "53": "Count the money from calls that were answered instead of calls that were closed, "
+          "and the funding figure goes up every time a child cannot be accounted for.",
+    "98": "Remove the check on how a family can be reached, and a guardian who is deaf is "
+          "phoned, reaches nobody, and is recorded as unreachable.",
+    "57": "Plant a real Indian mobile number where the privacy scan was not looking. This is "
+          "the one row no test caught, and it is in the table for that reason.",
+}
+
 def mutation_distribution(muts: list) -> str:
     """The shape of the table beside it, drawn instead of described.
 
@@ -1209,10 +1222,22 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
         '<th>tests that failed</th></tr></thead><tbody>',
     ]
-    for num, change, caught in muts:
+    lead = [row for row in muts if row[0] in LEAD_MUTATIONS]
+    rest = [row for row in muts if row[0] not in LEAD_MUTATIONS]
+    for num, change, caught in lead:
+        body.append(f'<tr><td class=dim>{esc(num)}</td>'
+                    f'<td><p class=mut-plain>{esc(LEAD_MUTATIONS[num])}</p>'
+                    f'<p class=mut-code>{esc_code(change)}</p></td>'
+                    f'<td class="mono caught">{esc(caught)}</td></tr>')
+    body.append('</tbody></table>')
+    body.append(
+        f'<details class=fold><summary>The other {len(rest)}, in the same shape</summary>'
+        '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
+        '<th>tests that failed</th></tr></thead><tbody>')
+    for num, change, caught in rest:
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
-    body.append('</tbody></table></div></div></div>')
+    body.append('</tbody></table></details></div></div></div>')
     # The first sentence of the claim above, word for word. It closes the act at full width
     # rather than sitting in the 26rem claim column, where the display face would break one
     # sentence over six lines.
