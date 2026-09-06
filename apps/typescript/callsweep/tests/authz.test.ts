@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { isAuthorized } from "../src/authz";
+import { isAuthorized, maxCalls, DEFAULT_MAX_CALLS } from "../src/authz";
 
 test("only allowlisted, valid numbers are authorized", () => {
   process.env.ALLOWED_PHONES = "+14155550101, +14155550102";
@@ -17,4 +17,27 @@ test("empty allowlist authorizes nothing", () => {
 test("unset allowlist authorizes nothing", () => {
   delete process.env.ALLOWED_PHONES;
   expect(isAuthorized("+14155550101")).toBe(false);
+});
+
+test("MAX_CALLS defaults to 4 when unset or blank", () => {
+  delete process.env.MAX_CALLS;
+  expect(maxCalls()).toBe(DEFAULT_MAX_CALLS);
+  expect(maxCalls()).toBe(4);
+  process.env.MAX_CALLS = "   ";
+  expect(maxCalls()).toBe(4);
+});
+
+test("MAX_CALLS honors a valid positive integer", () => {
+  process.env.MAX_CALLS = "2";
+  expect(maxCalls()).toBe(2);
+  process.env.MAX_CALLS = "10";
+  expect(maxCalls()).toBe(10);
+});
+
+test("a malformed cap falls back to the default, never to unlimited", () => {
+  for (const bad of ["0", "-3", "abc", "2.5", "Infinity", "1e3x"]) {
+    process.env.MAX_CALLS = bad;
+    expect(maxCalls()).toBe(DEFAULT_MAX_CALLS);
+  }
+  delete process.env.MAX_CALLS;
 });
