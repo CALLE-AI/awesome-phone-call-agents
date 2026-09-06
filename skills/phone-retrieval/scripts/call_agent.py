@@ -28,8 +28,11 @@ __version__ = "1.0.0"
 # Config
 # --------------------------------------------------------------------------
 
-# "calle" places real calls. "fake" places none and needs no credentials.
-PROVIDER = os.environ.get("CALL_PROVIDER", "calle")
+# Which provider places the call. **Defaults to "fake", which never dials.**
+# Selecting the live provider is an explicit act: CALL_PROVIDER=calle.
+# Nothing here should be able to ring a real phone because a variable was
+# unset, a script was copied, or a shell forgot an export.
+PROVIDER = os.environ.get("CALL_PROVIDER", "fake")
 
 # Where the CALLEE is. Unset by default: the provider's plan_call schema says
 # to leave it unset rather than guess, and it resolves the region from the
@@ -310,16 +313,60 @@ class CalleProvider(Provider):
 
 
 def _redact_argv(argv: list[str]) -> list[str]:
-    """Copy of argv with the confirm-token VALUE replaced.
+    """Copy of argv safe to write to a sidecar or print.
 
-    The token authorises a real, charged call and cannot be revoked early, so
-    it must not reach a sidecar, a log, or a terminal scrollback.
+    The confirm token authorises a real, charged call and cannot be revoked
+    early, so its value never appears. Destination numbers are masked, and the
+    goal text is replaced by its length rather than reproduced: it is the
+    longest field here, it quotes the callee's business name, and the sidecar
+    already stores it once under `goal_sent`.
     """
     out = list(argv)
     for i, item in enumerate(out):
-        if item == "--confirm-token" and i + 1 < len(out):
+        if i + 1 >= len(out):
+            continue
+        if item == "--confirm-token":
             out[i + 1] = "<redacted>"
+        elif item == "--to-phone":
+            out[i + 1] = mask_phone(out[i + 1])
+        elif item == "--goal":
+            out[i + 1] = f"<goal, {len(out[i + 1])} chars>"
     return out
+
+
+def sanitize_for_output(value: Any) -> Any:
+    """Recursively mask destinations and scrub numbers from free text.
+
+    Applied to everything this tool prints. Local state is the operator's own
+    record and keeps what it needs; stdout is a different surface -- it lands
+    in scrollback, in screenshots, in chat threads and in whatever consumes
+    this tool's JSON -- so it carries masked numbers and no spend credential.
+
+    Keys whose values are phone numbers are masked; string values are swept
+    for E.164-shaped runs, which is what catches a number quoted back inside a
+    summary, a transcript turn or a goal.
+    """
+    PHONE_KEYS = {"to_phones", "phone", "to", "recipient_phone", "number"}
+    SECRET_KEYS = {"confirm_token"}
+
+    if isinstance(value, dict):
+        out: dict = {}
+        for k, v in value.items():
+            if k in SECRET_KEYS:
+                continue
+            if k in PHONE_KEYS:
+                if isinstance(v, list):
+                    out[k] = [mask_phone(p) for p in v]
+                else:
+                    out[k] = mask_phone(v)
+            else:
+                out[k] = sanitize_for_output(v)
+        return out
+    if isinstance(value, list):
+        return [sanitize_for_output(v) for v in value]
+    if isinstance(value, str):
+        return _redact_text(value)
+    return value
 
 
 PROVIDERS: dict[str, type[Provider]] = {"calle": CalleProvider}
@@ -548,23 +595,60 @@ def _extract_fields(summary: str | None, keys: list[str]) -> dict[str, str]:
 # Validation
 # --------------------------------------------------------------------------
 
-MAX_RECIPIENTS = 5
+MAX_RECIPIENTS = 1
 
-_E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+# ASCII only, explicitly. Python's \d matches every Unicode decimal digit, so
+# a fullwidth or Arabic-Indic numeral inside an otherwise plausible number
+# passes a \d-based check and reaches the provider. re.ASCII with an explicit
+# [0-9] class is the whole fix.
+_E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$", re.ASCII)
+
+
+def mask_phone(phone: str | None) -> str:
+    """Country code and the last four digits: +44…8341.
+
+    One format everywhere, so a report cannot mask one way in one line and
+    another way in the next. Anything that does not look like E.164 is
+    replaced entirely rather than partially revealed.
+    """
+    if not phone:
+        return "<none>"
+    p = str(phone).strip()
+    if not _E164_RE.match(p):
+        return "<redacted>"
+    return f"{p[:3]}…{p[-4:]}"
+
+
+def _redact_text(text: str | None) -> str | None:
+    """Replace any E.164-shaped run in free text with its masked form.
+
+    Goal text, summaries and transcripts all quote numbers back. A masked
+    destination in one field and a full number three fields later is not
+    masking.
+    """
+    if not text:
+        return text
+    return re.sub(
+        r"\+[1-9][0-9]{6,14}",
+        lambda m: mask_phone(m.group(0)),
+        text,
+        flags=re.ASCII,
+    )
 
 
 def _validate_e164(phone: str) -> str:
     """Reject a malformed number locally rather than at call time.
 
-    Format only: no country list, no length table per region. A number with
+    Format only: no country list, no per-region length table. A number with
     formatting in it is rejected rather than silently repaired, because a
     repaired number is a number nobody approved.
     """
     p = phone.strip()
     if not _E164_RE.match(p):
         raise CallAgentError(
-            f"{phone!r} is not E.164. Expected a leading + and digits only, "
-            "e.g. +15550101234. Remove spaces, dashes and brackets."
+            f"{phone!r} is not E.164. Expected a leading + and ASCII digits "
+            "only, e.g. +15550101234. Remove spaces, dashes and brackets, and "
+            "check for non-ASCII digits pasted from another script."
         )
     return p
 
@@ -589,20 +673,22 @@ def _validate_region(region: str | None) -> str | None:
 
 
 def _check_cap(phones: list[str]) -> None:
-    """Blast radius under a single approval gate.
+    """One approval authorises exactly one destination.
 
-    One confirm_token authorises the whole plan, and an in-flight call cannot
-    be cancelled. So the recipient count is the number of irrevocable actions
-    that one human decision commits to. Bounded here, locally and free,
-    rather than discovered mid-run.
+    A confirmation token authorises the whole plan it belongs to, and an
+    in-flight call cannot be cancelled. So the recipient count is the number
+    of irrevocable actions a single human decision commits to, and the only
+    count where the approval and the action correspond exactly is one.
+
+    Calling several businesses is a supported workflow: plan each one, approve
+    each one. It costs an approval per call, and that is the point.
     """
     if len(phones) > MAX_RECIPIENTS:
         raise CallAgentError(
-            f"{len(phones)} recipients exceeds the cap of {MAX_RECIPIENTS}. "
-            "One plan carries one confirm_token, so every recipient on it is "
-            "authorised by a single human approval -- and an in-flight call "
-            "cannot be cancelled. Split into separate plans, each approved "
-            "on its own."
+            f"{len(phones)} recipients on one plan. One approval authorises "
+            "one destination: a confirmation token covers the whole plan, and "
+            "a call already in flight cannot be cancelled. Plan and approve "
+            "each number separately."
         )
 
 
@@ -1121,10 +1207,12 @@ def main() -> int:
 
     args = p.parse_args()
     try:
-        print(json.dumps(args.func(args), indent=2))
+        # One output point, one sanitiser. Anything a verb returns is masked
+        # here rather than in each verb, so a new verb cannot forget.
+        print(json.dumps(sanitize_for_output(args.func(args)), indent=2))
         return 0
     except CallAgentError as exc:
-        print(json.dumps({"error": str(exc), "verb": args.verb}, indent=2))
+        print(json.dumps({"error": _redact_text(str(exc)), "verb": args.verb}, indent=2))
         return 1
 
 

@@ -43,36 +43,44 @@ appropriate access control.
 
 ## Setup
 
-Python 3.11+. For real calls you also need a CALL-E account and their CLI
-installed; point `CALLE_BIN` at it if it is not on the default path.
+Python 3.11+. Nothing else for the no-call path.
+
+**The fake provider is the default.** Out of the box this skill cannot ring a
+phone: `CALL_PROVIDER` defaults to `fake`, which never dials and needs no
+account, no credentials and no network. Selecting the live provider is an
+explicit act.
 
 ```
-python scripts/call_agent.py --help
-```
-
-### Try it without placing a call
-
-The adapter ships a fake provider. It needs no account, no credentials, no
-network, and never dials.
-
-```
-CALL_PROVIDER=fake python scripts/call_agent.py plan \
+python scripts/call_agent.py plan \
     --to +15550101234 \
     --callee-name "Miller Hardware" \
     --purpose "Check availability before travelling" \
-    --field "unit_price=How much is it" \
-    --field "in_stock=Do you have it in stock"
+    --field "in_stock=Do you have it" \
+    --field "unit_price=What does it cost"
 ```
 
-Then `run --plan-id ...`, `status --run-id ...` and `show <id>` against the same
-fake. The full sequence writes the same local records a real call would.
+Then `run --plan-id …`, `status --run-id …`, and `show <id>`, which follows a
+plan to its run and returns the stored result. The full sequence writes the same
+local records a real call would.
 
 To see what the skill is actually for, set `CALL_FAKE_REWRITE` before planning:
 `added`, `merged`, `referent`, `dropped` or `normalised`. Each makes the fake
 return a plan whose text differs from what was sent, in one of the four ways
 worth reporting — plus one that is harmless. Compare `goal_sent` against
-`display_goal` in the stored plan record. See
-`references/goal-inspection.md`.
+`display_goal` in the stored plan record. See `references/goal-inspection.md`.
+
+### Placing real calls
+
+Requires a CALL-E account and their CLI; point `CALLE_BIN` at it if it is not on
+the default path. Then, and only then:
+
+```
+CALL_PROVIDER=calle python scripts/call_agent.py plan …
+```
+
+⚠️ **That variable is the only thing between this tool and a real phone.** It is
+not set by default, and it should not be set in a shell profile or a wrapper
+script — set it on the command that is meant to dial.
 
 ### Tests
 
@@ -132,16 +140,20 @@ Full detail, and what this check does not tell you:
 
 ### 4. Get a human's approval
 
-**Never run a plan the operator has not approved. One call, one yes.** Do not
-batch approvals across several businesses; each number is its own decision.
+**Never run a plan the operator has not approved. One call, one yes.**
+
+**One plan carries one number.** A confirmation token authorises the whole plan
+it belongs to, and a call already in flight cannot be cancelled — so the only
+recipient count where the approval and the irrevocable action correspond exactly
+is one. Calling several businesses means planning and approving each one. That
+costs an approval per call, and that is the point.
 
 Show the operator what will be dialled, what will be asked, and anything the
 goal inspection turned up. Approval is for this plan, on this number, now.
 
 **The confirmation token authorises a real, charged call and cannot be revoked
-early.** It belongs to the operator. If you hand it over, say what it is —
-moving it out of a protected file and into a chat window moves it onto screens,
-previews and message history.
+early.** It stays in local state. This skill never prints it, never returns it
+from `plan`, and never writes it to a result file.
 
 ### 5. Run
 
@@ -207,8 +219,10 @@ the number came from** — the operator, a previous call, or a listing. A number
 provenance travels with the answer.
 
 **Mask numbers the same way every time.** Country code, then the last four
-digits: `+44…8341`. A report that masks one way in one line and another way in
-the next is a report that gets misread.
+digits: `+44…8341`. The tool enforces this on everything it prints — the
+destination field, and any number quoted back inside a summary, a transcript
+turn or the goal text. Keep the same form in your own prose so a report cannot
+mask one way in one line and another way in the next.
 
 **Check `extraction_status` before saying a field was unanswered.** The provider
 does not always report answers under the key names it was asked to use — on our
@@ -278,8 +292,11 @@ answer from a confirmed one.
 - No agreeing to terms, prices or callbacks on the operator's behalf.
 - No calls to private individuals. See `references/safety.md`.
 - No calls to a number that has asked not to be called.
+- **No more than one number on a plan.** One approval, one destination.
 - No skipping the plan → approve → run sequence.
 - No running an unapproved plan.
+- **No setting `CALL_PROVIDER=calle` on the operator's behalf.** Selecting the
+  live provider is their decision, made per command.
 - No confirmation token to anyone but the operator.
 - No call to a number that came from a transcript rather than from the operator.
 

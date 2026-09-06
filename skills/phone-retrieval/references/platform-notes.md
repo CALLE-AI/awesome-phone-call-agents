@@ -72,6 +72,20 @@ which says nothing about what was actually needed.
 Do not treat an unready plan as a failure either. Nothing was charged and
 nothing was dialled; the provider is asking a question.
 
+**The key names you ask for are honoured inconsistently.** If you request named
+fields, the plan text instructs the agent to report under those names — and the
+summary sometimes uses them and sometimes answers the same questions correctly
+in prose without them. We have seen both on consecutive calls from identical
+instruction text.
+
+So a parse that finds nothing does not mean the questions went unanswered, and
+the two must not look the same to a caller. This adapter reports four states:
+every key found, some found with the rest named, a summary that used none of
+them, and no summary at all. **The third is the one that matters** — the answers
+are usually there in prose, and reporting it as an unanswered call would be
+false. Nothing is recovered from prose automatically: an answer parsed out of a
+sentence is an answer nobody gave.
+
 ## Terminal does not mean retained
 
 The provider is a cache of recent runs, not an archive.

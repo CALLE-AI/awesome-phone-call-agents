@@ -1,15 +1,15 @@
 # Examples
 
 All numbers below are reserved-fictional (`+1555…`). Nothing here dials
-anything: every command is shown against the fake provider, which needs no
-account and no network.
+anything: the fake provider is the default, so every command below runs with no
+account and no network until `CALL_PROVIDER=calle` is set deliberately.
 
 ---
 
 ## 1. One business, two questions
 
 ```
-CALL_PROVIDER=fake python scripts/call_agent.py plan \
+python scripts/call_agent.py plan \
     --to +15550101234 \
     --callee-name "Miller Hardware" \
     --purpose "Check availability and price before travelling across town" \
@@ -19,18 +19,19 @@ CALL_PROVIDER=fake python scripts/call_agent.py plan \
 
 The plan comes back with an identifier, a readiness flag, the goal that was
 sent, and the goal the provider intends to use. **No token is printed** — it is
-a spend credential and stays in local state.
+a spend credential and stays in local state. The destination is masked in the
+output.
 
 Read `display_goal` against `goal_sent` before approving anything. Then:
 
 ```
-CALL_PROVIDER=fake python scripts/call_agent.py run --plan-id PLAN-FAKE-1 --wait
+python scripts/call_agent.py run --plan-id PLAN-FAKE-1 --wait
 ```
 
 and afterwards:
 
 ```
-CALL_PROVIDER=fake python scripts/call_agent.py show PLAN-FAKE-1
+python scripts/call_agent.py show PLAN-FAKE-1
 ```
 
 `show` follows a plan to its run and attaches the stored result, so this is the
@@ -39,23 +40,24 @@ authority on what was actually said.
 
 ## 2. Several businesses, same questions
 
-One plan carries one approval, so a plan with five recipients is five
-irrevocable calls authorised by a single decision. The adapter caps recipients
-for that reason.
+**One plan carries one number.** A confirmation token authorises the whole plan
+it belongs to and a call in flight cannot be cancelled, so one approval covers
+exactly one irrevocable action. A plan with a second recipient is refused.
 
-Prefer one plan per business. It costs an extra approval each and it means a
-bad number, a wrong region, or a change of mind affects one call rather than
-five:
+Calling several businesses means planning and approving each one:
 
 ```
 for n in +15550101234 +15550105678; do
-  CALL_PROVIDER=fake python scripts/call_agent.py plan \
+  python scripts/call_agent.py plan \
       --to "$n" --callee-name "..." \
       --purpose "Compare price and availability" \
       --field "unit_price=How much is it" \
       --field "in_stock=Do you have it in stock"
 done
 ```
+
+Each of those needs its own review and its own `run`. That is an approval per
+call, deliberately.
 
 Ask every business the same fields in the same order, then rank confirmed
 identities above unconfirmed ones. **A confident answer from a business you
@@ -70,7 +72,7 @@ rewritten version is what comes back as `display_goal`. Set `CALL_FAKE_REWRITE`
 to make the fake reproduce each of the changes worth reporting:
 
 ```
-CALL_FAKE_REWRITE=added CALL_PROVIDER=fake python scripts/call_agent.py plan \
+CALL_FAKE_REWRITE=added python scripts/call_agent.py plan \
     --to +15550101234 --callee-name "Miller Hardware" \
     --purpose "Check availability" \
     --field "unit_price=How much is it" \

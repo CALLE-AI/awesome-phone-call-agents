@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Behavioural tests for call_agent.py, against the fake provider.
 
 Places no calls, needs no credentials, no network, no node.
@@ -204,11 +204,158 @@ def test_token_never_reaches_the_result_sidecar(tmp):
     check("confirm_token" not in blob, "result sidecar carries no token")
 
 
+def test_two_recipients_on_one_plan_are_refused(tmp):
+    """One approval authorises one destination.
+
+    A confirmation token covers the whole plan and an in-flight call cannot be
+    cancelled, so the only recipient count where the approval and the
+    irrevocable action correspond exactly is one.
+    """
+    ca, _, prov = load(tmp)
+    args = dict(PLAN_ARGS)
+    args["to"] = ["+15550101234", "+15550105678"]
+    try:
+        ca.cmd_plan(argparse.Namespace(**args))
+        check(False, "two recipients on one plan are refused")
+    except ca.CallAgentError:
+        check(True, "two recipients on one plan are refused")
+    check(not prov.plans, "the cap fires before the provider is touched")
+
+
+def test_live_provider_is_never_the_default(tmp):
+    """Nothing should be able to ring a phone because a variable was unset.
+
+    Imports the module with CALL_PROVIDER absent from the environment
+    entirely, which is the state a stranger's shell is in.
+    """
+    os.environ["CALL_STATE_DIR"] = tmp
+    os.environ.pop("CALL_PROVIDER", None)
+    for name in [m for m in sys.modules if m.startswith(("call_agent", "fake_provider"))]:
+        del sys.modules[name]
+    try:
+        ca = importlib.import_module("call_agent")
+        check(
+            ca.PROVIDER == "fake",
+            f"an unset CALL_PROVIDER selects the fake (got {ca.PROVIDER!r})",
+        )
+        check(
+            ca.get_provider().name == "fake",
+            "and get_provider returns it without registration",
+        )
+    finally:
+        os.environ["CALL_PROVIDER"] = "calle"
+
+
+def test_non_ascii_digits_are_rejected(tmp):
+    """Python's \\d matches every Unicode decimal digit.
+
+    A fullwidth or Arabic-Indic numeral inside an otherwise plausible number
+    passes a \\d-based check and reaches the provider. These must not.
+    """
+    ca, _, _ = load(tmp)
+    ok = "+442079460123"
+    check(ca._validate_e164(ok) == ok, "a plain ASCII number is accepted")
+    for bad, label in [
+        # U+FF14 FULLWIDTH DIGIT FOUR. Python's \d matches it, so a \d-based
+        # check accepts this number and passes it to the provider.
+        ("+4420794601\uff141", "fullwidth digit mid-number"),
+        ("+\u0664\u0664\u0662\u0660\u0667\u0669\u0664\u0666\u0660\u0661\u0662\u0663", "Arabic-Indic digits"),
+        ("+4420794601\u0664\u0661", "Arabic-Indic digits mid-number"),
+        ("+44 2079 460123", "spaces"),
+        ("+44-2079-460123", "dashes"),
+    ]:
+        try:
+            ca._validate_e164(bad)
+            check(False, f"{label} is rejected")
+        except ca.CallAgentError:
+            check(True, f"{label} is rejected")
+
+
+def test_mask_phone_is_one_format_everywhere(tmp):
+    ca, _, _ = load(tmp)
+    check(
+        ca.mask_phone("+442079460123") == "+44\u20260123",
+        f"a valid number masks to country code and last four "
+        f"(got {ca.mask_phone('+442079460123')!r})",
+    )
+    check(
+        ca.mask_phone("07700 900123") == "<redacted>",
+        "anything not E.164 is replaced entirely, not partially revealed",
+    )
+    check(ca.mask_phone(None) == "<none>", "a missing number is not masked as a number")
+
+
+def test_output_is_sanitized_everywhere_not_just_the_number_field(tmp):
+    """A masked destination and a full number three fields later is not masking.
+
+    Numbers get quoted back inside summaries, transcript turns and goal text.
+    """
+    ca, _, _ = load(tmp)
+    envelope = {
+        "to_phones": ["+442079460123"],
+        "confirm_token": "SPEND-CREDENTIAL",
+        "summary": "Reached them on +442079460123 and they confirmed.",
+        "transcript": [
+            {"t": "00:00:03", "speaker": "callee", "text": "Call us back on +442079460456."}
+        ],
+        "nested": {"goal_sent": "Call +442079460123 and ask about stock."},
+    }
+    out = ca.sanitize_for_output(envelope)
+    blob = json.dumps(out)
+
+    check("confirm_token" not in blob, "the spend credential is dropped from output")
+    check("SPEND-CREDENTIAL" not in blob, "and so is its value")
+    check(out["to_phones"] == ["+44\u20260123"], "the phone field is masked")
+    check(
+        "+442079460123" not in blob,
+        "the number does not survive anywhere in the output",
+    )
+    check(
+        "+442079460456" not in blob,
+        "a number quoted inside a transcript turn is masked too",
+    )
+    # Assert on the structure, not on json.dumps output: the mask uses an
+    # ellipsis, which serialises to \u2026 and will not match a literal.
+    check(
+        "+44\u20260456" in out["transcript"][0]["text"],
+        "the transcript number is masked rather than deleted",
+    )
+    check(
+        "+44\u20260123" in out["nested"]["goal_sent"],
+        "and nested free text is swept too",
+    )
+
+
 def test_argv_redacts_the_token(tmp):
     ca, _, _ = load(tmp)
-    argv = ca._redact_argv(["node", "x", "--confirm-token", "SECRET", "--json"])
-    check("SECRET" not in argv, "_redact_argv replaces the token value")
+    argv = ca._redact_argv([
+        "node", "x",
+        "--confirm-token", "SECRET",
+        "--to-phone", "+442079460123",
+        "--goal", "Call them and ask whether white lilies are in stock.",
+        "--json",
+    ])
+    blob = " ".join(argv)
+    check("SECRET" not in blob, "_redact_argv replaces the token value")
     check("--confirm-token" in argv, "_redact_argv keeps the flag itself")
+    check("+442079460123" not in blob, "the destination is masked in argv")
+    check("+44\u20260123" in blob, "and masked rather than removed")
+    check(
+        "white lilies" not in blob,
+        "the goal text is not reproduced in argv; it is stored once elsewhere",
+    )
+
+
+def test_cmd_show_output_carries_no_full_number(tmp):
+    ca, _, _ = load(tmp)
+    p = plan(ca)
+    out = ca.sanitize_for_output(ca.cmd_show(argparse.Namespace(id=p["plan_id"])))
+    blob = json.dumps(out)
+    check("confirm_token" not in blob, "show carries no token")
+    check(
+        "+15550101234" not in blob,
+        "show carries no unmasked destination",
+    )
 
 
 def test_show_strips_the_token(tmp):
@@ -468,18 +615,6 @@ def test_malformed_number_is_rejected_not_repaired(tmp):
     except ca.CallAgentError:
         check(True, "a formatted number is rejected")
     check(not prov.plans, "no plan reached the provider after a bad number")
-
-
-def test_recipient_cap_is_enforced_before_the_provider(tmp):
-    ca, _, prov = load(tmp)
-    args = dict(PLAN_ARGS)
-    args["to"] = [f"+1555010123{i}" for i in range(6)]
-    try:
-        ca.cmd_plan(argparse.Namespace(**args))
-        check(False, "the recipient cap is enforced")
-    except ca.CallAgentError:
-        check(True, "the recipient cap is enforced")
-    check(not prov.plans, "the cap fires before the provider is touched")
 
 
 def test_missing_callee_name_is_rejected(tmp):
