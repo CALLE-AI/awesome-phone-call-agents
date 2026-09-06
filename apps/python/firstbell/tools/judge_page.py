@@ -62,6 +62,10 @@ Everything the repository can show on its own runs without this tool:
   python tools/double_conformance.py --check"""
 SITE = Path(__file__).resolve().parent / "site"
 
+# The cut is 161 seconds. Stated once, here, rather than typed into the caption
+# and the label separately, which is two places for one number to drift.
+DEMO_SECONDS = 161
+
 # The only script this page loads from outside its own directory, pinned to a version and
 # to the bytes of that version.
 #
@@ -581,6 +585,42 @@ def repo_link_markup(repo_url: str | None) -> str:
             f'Source, tests and receipts on GitHub</a></p>')
 
 
+def demo_markup(has_video: bool, seconds: int) -> str:
+    """The demonstration, or nothing.
+
+    `controls` and no script: this has to work on the no-javascript pass, and a custom
+    player would be one more thing claiming an interactive role that nothing services.
+    `preload=none` so a reader who does not press play pays for the poster and nothing else.
+    Width and height are the real pixel dimensions, which is what stops the poster arriving
+    and shoving the page down: this site's layout-shift budget is 0.001 and a 16 by 9 block
+    with no reserved box spends all of it at once.
+
+    The caption says what the video is older than. It was cut before the safeguarding rule
+    existed, so the terminal in it prints a summary with no escalation line, and the register
+    above shows the rule the video does not. Saying so is cheaper than a reader finding it.
+    """
+    if not has_video:
+        return ""
+    minutes, rest = divmod(seconds, 60)
+    return (
+        '<figure class=demo>'
+        '<video class=demo-player controls preload=none width=1920 height=1080 '
+        'poster="video/poster.png" '
+        'aria-label="Demonstration of firstbell placing real calls, '
+        f'{minutes} minutes {rest} seconds, no narration">'
+        '<source src="video/firstbell-demo.mp4" type="video/mp4">'
+        '<p>This browser cannot play the file. '
+        '<a href="video/firstbell-demo.mp4">Download it instead</a>.</p>'
+        '</video>'
+        f'<figcaption>{minutes}:{rest:02d}, no narration and no music. Every voice in it is '
+        'the agent or a parent, on a call this code placed. It was cut on 4 September, '
+        'before the safeguarding rule existed, so the terminal in it prints a summary with '
+        'no escalation line and the register above shows a rule the video does not. '
+        'Nothing else in it has been superseded.</figcaption>'
+        '</figure>'
+    )
+
+
 def act(num: str, title: str, body: str, classes: str = "") -> str:
     # One reveal target per act. The hero never reveals: it is the first paint and it is
     # already choreographed on load.
@@ -637,7 +677,8 @@ def css_for_serving(css: str) -> str:
 
 # ---- the page ---------------------------------------------------------------------------
 
-def build(has_audio: bool, repo_url: str | None = None) -> str:
+def build(has_audio: bool, repo_url: str | None = None,
+          has_video: bool = False) -> str:
     data = transcripts()
     # Masked here rather than at each use, so a new surface that reads a call cannot
     # reintroduce a whole identifier by reading the field the old ones read.
@@ -756,6 +797,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
 
     # ---- Act 1: the residue
     body = [
+        demo_markup(has_video, DEMO_SECONDS),
         '<div class=split><div class=claim>',
         '<h3>01</h3><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
         '<p>An unanswered absence message is not information. It is an absence of '
@@ -1002,6 +1044,10 @@ def main() -> int:
     ap.add_argument("out", nargs="?", default="out", help="output directory")
     ap.add_argument("--audio-dir", default=None,
                     help="directory holding <row-id>.m4a clips, outside this repository")
+    ap.add_argument("--video", default=os.environ.get("FIRSTBELL_VIDEO"),
+                    help="the demo mp4, and a poster.png beside it. Kept outside this "
+                         "repository for the same reason the recordings are: it is built "
+                         "from real calls.")
     ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
                     help="directory holding the call recordings, outside this repository")
     ap.add_argument("--repo-url", default=os.environ.get("FIRSTBELL_REPO_URL"),
@@ -1042,15 +1088,35 @@ def main() -> int:
         for clip in clips:
             shutil.copy2(clip, dest / clip.name)
 
+    video = Path(args.video).resolve() if args.video else None
+    poster = video.with_name("poster.png") if video else None
+    has_video = bool(video and video.is_file())
+    if video and not has_video:
+        print(f"--video {video} is not a file; building the page without the demo")
+    if has_video and not poster.is_file():
+        # Refusing rather than shipping a player with no first frame: an unposted video is a
+        # black rectangle that reserves space and invites nobody, which is worse than the
+        # page saying nothing. It is also the layout-shift risk this page has a budget for.
+        raise SystemExit(f"--video needs a poster.png beside it; none at {poster}")
+
+    if has_video:
+        dest = out / "video"
+        dest.mkdir(exist_ok=True)
+        shutil.copy2(video, dest / "firstbell-demo.mp4")
+        shutil.copy2(poster, dest / "poster.png")
+
     for asset in ("app.js", "player.js"):
         shutil.copy2(SITE / asset, out / asset)
 
     page = out / "index.html"
-    page.write_text(build(has_audio, args.repo_url), encoding="utf-8", newline="\n")
+    page.write_text(build(has_audio, args.repo_url, has_video),
+                    encoding="utf-8", newline="\n")
 
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     print(f"{page}  {page.stat().st_size / 1024:.1f} KB")
     print(f"audio: {len(clips)} clips" if has_audio else "audio: none, page says why")
+    print(f"video: the {DEMO_SECONDS}s demo and its poster" if has_video
+          else "video: none, the page carries no demonstration")
     print(f"total output: {total / 1024:.0f} KB across "
           f"{sum(1 for f in out.rglob('*') if f.is_file())} files")
     return 0

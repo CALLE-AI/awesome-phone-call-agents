@@ -691,6 +691,32 @@ footer .source-link { margin-top: var(--space-3); }
   max-width: var(--measure-ui); margin-top: var(--space-4);
 }
 
+/* ---- the demonstration ----------------------------------------------------------------- */
+/* A judge with two minutes watches this and reads nothing. It sits at the top of act 1 rather
+ * than in an act of its own, because a tenth act moves the rail and the act count and buys a
+ * reader nothing. */
+
+.demo { margin: 0 0 var(--space-5); }
+
+/* The box is reserved before the poster arrives. `aspect-ratio` alongside the width and
+ * height attributes rather than instead of them: the attributes carry the ratio for a
+ * browser that has not read this file yet, which is every browser for the first paint. */
+.demo-player {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
+  background: var(--ground-2); border-radius: 3px;
+}
+
+/* Native controls are one focusable element. Offset outward so the ring is not drawn inside
+ * the video's own black frame, where it disappears. */
+.demo-player:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 3px;
+}
+
+.demo figcaption {
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  max-width: var(--measure-ui); margin-top: var(--space-3);
+}
+
 /* ---- the register --------------------------------------------------------------------- */
 /* The object the software acts on, and the object it hands back. Four real calls, one row
  * each, and the three columns are the three fields CALL-E returns. It is not a table
