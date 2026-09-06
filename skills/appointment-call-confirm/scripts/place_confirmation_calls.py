@@ -217,13 +217,13 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 #   - 00-prefixed international: 0014155550101
 #   - Parenthesized area code:   (415) 555-0101
 #   - Dashed/dotted/spaced:      415-555-0101 / 415.555.0101 / 415 555 0101
-#   - Bare national-length runs: 4155550101 (10-15 consecutive digits)
+#   - Bare local/national runs:  5550101 / 4155550101 (7-15 digits)
 _PHONE_PATTERNS = [
     re.compile(r"\+\d{7,15}"),
     re.compile(r"\b00\d{7,15}\b"),
     re.compile(r"\(\d{2,4}\)[\s.-]?\d{3,4}[\s.-]?\d{3,5}"),
     re.compile(r"\b\d{2,4}[\s.-]\d{3,4}[\s.-]\d{3,5}\b"),
-    re.compile(r"\b\d{10,15}\b"),
+    re.compile(r"\b\d{7,15}\b"),
 ]
 
 
@@ -294,7 +294,9 @@ def load_appointments(path: Path) -> list[Appointment]:
         phone = row["phone"].strip()
         ok, reason = validate_e164(phone)
         if not ok:
-            raise ValueError(f"Row {i} ({row.get('recipient_name', '?')}): {reason}: {phone!r}")
+            raise ValueError(
+                f"Row {i} ({row.get('recipient_name', '?')}): {reason}: {_mask(phone)}"
+            )
 
         appts.append(Appointment(
             recipient_name=row["recipient_name"].strip(),
@@ -391,9 +393,7 @@ def place_call(base_url: str, api_key: str, appt: Appointment, webhook_url: Opti
                 f"connection dropped while creating the call — CALL-E may or may "
                 f"not have created the call: {_sanitize_output_text(str(e), api_key)}"}
     except requests.exceptions.HTTPError as e:
-        # A real HTTP error response (4xx/5xx with a body CALL-E sent
-        # back) is a genuine, explicit rejection — not ambiguous. CALL-E
-        # told us clearly that it did not create the call.
+        status_code = e.response.status_code if e.response is not None else None
         detail = ""
         try:
             body = e.response.json()
@@ -407,7 +407,17 @@ def place_call(base_url: str, api_key: str, appt: Appointment, webhook_url: Opti
                 ) + ")"
         except Exception:
             detail = e.response.text[:200] if e.response is not None else str(e)
-        return {"_local_error": f"CALL-E rejected the call: {_sanitize_output_text(detail or str(e), api_key)}"}
+        safe_detail = _sanitize_output_text(detail or str(e), api_key)
+        # A server error, request timeout, or idempotency conflict does not
+        # prove that the provider rejected the create before accepting it.
+        # Stop the batch until an operator can reconcile the outcome.
+        if status_code is None or status_code >= 500 or status_code in {408, 409}:
+            return {
+                "_ambiguous": True,
+                "_local_error": f"CALL-E create outcome was ambiguous: {safe_detail}",
+            }
+        # Other 4xx responses are explicit client-side rejections.
+        return {"_local_error": f"CALL-E rejected the call: {safe_detail}"}
     except requests.exceptions.RequestException as e:
         # Any other unexpected transport-level failure. Default to
         # ambiguous rather than failed — we have no positive

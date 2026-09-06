@@ -99,11 +99,10 @@ rule below is enforced in `scripts/place_confirmation_calls.py` itself
   result.
 - **An ambiguous outcome is an unconditional hard stop — there is no
   override.** This covers both ends of a call's lifecycle:
-  - **At creation**: a request timeout, a dropped connection, or an
-    HTTP 2xx response with no call id all mean CALL-E may or may not
-    have actually created the call — there is no way to tell from the
-    client side. None of these are recorded as a clean `failed` row;
-    all three halt the batch immediately.
+  - **At creation**: a request timeout, a dropped connection, an HTTP
+    5xx/server error, an idempotency conflict, or an HTTP 2xx response
+    with no call id can all leave acceptance uncertain. None is recorded
+    as a clean `failed` row; each halts the batch immediately.
   - **At polling**: a call resolving to `pending` (poll timeout) or
     `unclear` (a structured result that doesn't match a known status)
     halts the batch the same way.

@@ -75,7 +75,7 @@ class TestInferRegion(unittest.TestCase):
 
     def test_prefers_longer_country_code_match(self):
         # +971 (UAE) must not be misread as +9 or +97 matching something else.
-        self.assertEqual(_infer_region("+971501234567"), "AE")
+        self.assertEqual(_infer_region("+971XXXXXXXXX"), "AE")
 
     def test_unknown_code_returns_none(self):
         self.assertIsNone(_infer_region("+9999999999"))
@@ -277,12 +277,22 @@ class TestPlaceCallAmbiguity(unittest.TestCase):
     @patch("place_confirmation_calls.requests.post")
     def test_explicit_rejection_is_not_ambiguous(self, mock_post):
         resp = MagicMock()
+        resp.status_code = 422
         resp.json.return_value = {"error": {"message": "invalid phone number"}}
         http_err = requests.exceptions.HTTPError(response=resp)
         mock_post.side_effect = http_err
         result = place_call(CALLE_BASE_URL, "fake_key", self._appt(), None)
         self.assertFalse(result.get("_ambiguous"))
         self.assertIn("_local_error", result)
+
+    @patch("place_confirmation_calls.requests.post")
+    def test_server_error_is_ambiguous(self, mock_post):
+        resp = MagicMock()
+        resp.status_code = 503
+        resp.json.return_value = {"error": {"message": "provider unavailable"}}
+        mock_post.side_effect = requests.exceptions.HTTPError(response=resp)
+        result = place_call(CALLE_BASE_URL, "fake_key", self._appt(), None)
+        self.assertTrue(result.get("_ambiguous"))
 
     @patch("place_confirmation_calls.requests.post")
     def test_successful_response_with_id_is_not_ambiguous(self, mock_post):

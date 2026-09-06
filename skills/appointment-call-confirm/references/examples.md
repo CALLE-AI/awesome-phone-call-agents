@@ -23,7 +23,8 @@ Re-run with --confirm to actually place these 3 call(s).
 ## 2. Real run after approval
 
 ```bash
-python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --out results.csv --confirm
+python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --out results.csv \
+  --confirm --allowlist assets/authorized_numbers.example.txt
 ```
 
 Even with `--confirm`, the script reprints the dry-run list and requires an
@@ -54,7 +55,8 @@ For non-interactive/automation use, `--yes` skips the interactive prompt
 (loudly logged when used):
 
 ```bash
-python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --confirm --yes
+python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv \
+  --confirm --yes --allowlist assets/authorized_numbers.example.txt
 ```
 
 ## 3. Minimal appointments.csv format
@@ -94,14 +96,20 @@ skips it entirely rather than calling it.
 
 ## 5. Base URL pinning
 
-`CALLE_BASE_URL` defaults to CALL-E's official host. Pointing it anywhere
-else without `--allow-custom-host` causes the script to refuse to run
-rather than risk sending the API key to an unexpected host:
+The runner pins credential-bearing requests to CALL-E's official HTTPS host.
+There is no environment variable or command-line override for the base URL,
+so a credential cannot be redirected to an arbitrary origin.
 
 ```bash
-CALLE_BASE_URL=https://staging.example.com \
-  python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --confirm
-# REFUSING TO RUN: base URL host 'staging.example.com' does not match
-# the official CALL-E host 'api.heycall-e.com'. Pass --allow-custom-host
-# if this is intentional...
+python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv \
+  --confirm --allowlist assets/authorized_numbers.example.txt
 ```
+
+## 6. Stopping and cancellation
+
+At the confirmation prompt, enter anything other than `CONFIRM` to cancel the
+entire batch before any call is submitted. Between calls, stop the process to
+prevent the remaining recipients from being dialed. A call already accepted
+by CALL-E cannot be recalled by this runner; after any ambiguous create or
+poll outcome, it halts and requires operator reconciliation before another
+call is attempted.
