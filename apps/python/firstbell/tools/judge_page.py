@@ -771,7 +771,17 @@ def three_endings_figure() -> str:
     """
     svg_path = SITE / "figures" / "three-endings.svg"
     if not svg_path.exists():
-        return ""
+        # Built here rather than committed. A drawing checked into a tree is a drawing
+        # somebody exported once, and this one is derived from the stylesheet's own inks, so
+        # generating it on every build is the only way the figure and the words beside it
+        # cannot disagree. A checkout without python-lottie builds a page without the figure
+        # rather than a page with a hole in it.
+        try:
+            import make_figure
+
+            make_figure.write(svg_path.parent)
+        except Exception:
+            return ""
     svg = svg_path.read_text(encoding="utf-8")
     # The generator writes a standalone document. Inline it as a graphic instead, so it
     # inherits the page's own colours and carries the page's accessible name.
