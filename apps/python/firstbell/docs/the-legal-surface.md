@@ -113,17 +113,23 @@ communication with a guardian who is deaf or hard of hearing, and a voice call i
 Solving one duty with a channel that cannot serve the other is not a solution, it is a
 transfer.
 
-**What this repository does about it today: nothing, and it should say so.** There is no
-relay support, no TTY path, no SMS fallback, and no stated behaviour when a family's language
-is outside CALL-E's supported table. The `consent` column is the only gate, and it does not
-carry a communication preference.
+**What this repository does about it now.** The work file carries an optional `voice`
+column. `voice=no` means the phone cannot reach this guardian, and it is a gate rather than a
+preference: the row is never dialled, it is not counted among the calls that failed, and it
+goes to the human queue carrying a reason that says somebody has to reach them another way.
+The gate is second, behind consent, because a family that refused to be called is not owed an
+outreach on a different channel either. A value in that column nobody recognises raises
+instead of guessing, since a spelling mistake there decides whether a person is telephoned.
 
-**The design position.** The right shape is a per-guardian communication preference in the
-work file, with `voice` as one value among several, and a routing decision that a call is
-simply not attempted for a guardian whose preference it cannot serve. That row would go to
-the human queue as a case the software declined, rather than as a case it failed. That is a
-small change to `WorkItem` and a large change to what a district would have to configure, and
-it is honest to say it is not built.
+This closes the record-keeping half of the problem and not the communication half. Before it,
+a guardian who could not take the call was dialled, reached nothing, and was filed as a
+failure, which on a report reads as nobody answered. The family was reachable. The channel
+was not, and the record said the opposite.
+
+**What is still not built.** There is no relay support, no TTY path and no SMS fallback.
+firstbell does not send the other message; it declines to send the wrong one and hands the
+case to a person. There is also still no stated behaviour when a family's language is outside
+CALL-E's supported table.
 
 ## 7. Who is accountable for the case the software escalates?
 

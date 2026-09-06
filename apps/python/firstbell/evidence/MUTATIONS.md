@@ -201,6 +201,20 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 92 | Replace the retry backoff with `return 0.0`, so a failing upstream is retried at a family's number as fast as the network allows | 7 |
 | 93 | Return the base delay for every attempt, so the policy retries at a fixed rate and never backs off | 2 |
 | 94 | Remove the ceiling from the backoff, so attempt twelve waits half an hour and the policy becomes a way of never calling back | 2 |
+| 95 | Have `is_valid` answer True for everything, which is what it did for every test in this suite before this row existed: it is exported in `dispatch`'s `__all__` and no code inside this app calls it | 1 |
+| 96 | Have `is_valid` answer False for everything, so a schema-valid result is rejected | 1 |
+| 97 | Drop the negation, so `is_valid` returns true exactly when the value is invalid | 1 |
+| 98 | Remove the gate that refuses to dial a family recorded as unreachable by telephone, so a guardian who is deaf or hard of hearing is called, reaches nothing, and is filed under nobody answered | 5 |
+| 99 | Keep the gate but stop the row claiming it needs a person, so the family is not dialled, is not a failure, and is also not on anyone's queue, which is the quietest of the three ways to lose them | 2 |
+| 100 | Read an explicit `voice=no` as yes, so the column exists, is filled in correctly by the office, and changes nothing | 1 |
+| 101 | Read a blank `voice` cell as no, so every family in a file that does not use the column stops being called | 10 |
+| 102 | Ask the channel before consent, so a family that refused to be called is recorded as work owed to them on another channel | 1 |
+| 103 | Stop excluding `voice` from `context`, which puts a disability record into the sentence the agent reads aloud on the call | 1 |
+| 104 | Treat a `voice` value the reader does not recognise as reachable instead of raising, so a typo in that column silently decides that somebody gets telephoned | 1 |
+| 105 | Put the skip counting back the way it was, `skipped_no_consent=counts[Resolution.SKIPPED]`, so a run that was cancelled reports its unstarted rows as families who refused to be called | 2 |
+| 106 | Stop counting the skips that are neither consent nor channel, so a reason added later disappears from the summary instead of showing up as unattributed | 2 |
+| 107 | Put back a contrast pair naming a token `page.css` no longer declares, so the tool reports it unmeasured and the page keeps telling a reader that an unmeasured pair cannot read as a pass | 1 |
+| 108 | Remove the pair covering a scoped re-cut of an ink token, so the colour a reader actually looks at inside a panel is measured by nothing | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate

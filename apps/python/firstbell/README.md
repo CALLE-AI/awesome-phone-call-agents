@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Ninety-four gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -33,12 +33,12 @@ cannot quietly rot.
 
 - The client is constructed on the live path only: `from calle import CalleClient` at
   `firstbell/cli.py:245`. The offline default never reaches it.
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:327`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:337`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:394`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:404`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:319`, rather than as a string match on a message.
+  `dispatch/scheduler.py:329`, rather than as a string match on a message.
 
 ## Reusable without this app
 
@@ -315,6 +315,12 @@ than the API has.
 - **Consent is required and is never inferred.** A work file with no `consent` column is
   refused outright rather than defaulted, because a missing consent record is not consent.
   `S-1045` in the sample is skipped and counted separately.
+- **A family the telephone cannot reach is not telephoned.** An optional `voice`
+  column marks a guardian who is deaf, hard of hearing, or has a speech disability.
+  `voice=no` is a gate, like consent: the row is never dialled, it is not counted as
+  a failure, and it goes to the human queue with a reason that says somebody has to
+  reach them another way. A value in that column the reader does not recognise raises
+  rather than guessing, because a typo there decides whether a person is phoned.
 - **Phone numbers are masked** everywhere a run writes or prints, including the JSON
   receipt. A test asserts that no unmasked E.164 number can reach a receipt.
 - **Concurrency is capped** and defaults to 3. CALL-E offers no cancel endpoint, so the
@@ -461,7 +467,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 260 tests
+python -m pytest tests/ -q          # 271 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -479,12 +485,48 @@ mutation testing does not cover is written down in that file too: it shows a tes
 change, not that the rule is the right rule. Both defects found in this project during live
 calls were of the second kind.
 
+## What this adds to the repository that was not already in it
+
+Three merged contributions overlap this one, and the overlap is real.
+[`callflow-campaign-runner`](../callflow-campaign-runner/) already takes a CSV to calls and
+triages what comes back, dry run by default.
+[`language-bridge-call`](../../../skills/language-bridge-call/) already places a call in the
+recipient's own language with consent handling and E.164 validation.
+[`n8n-calle-api`](../../../plugins/n8n-calle-api/) is already an importable n8n workflow with
+a dry run and masking. If you came here for one of those three, they are here and they are
+good, and this app is not a better version of them.
+
+Two things are not already here.
+
+**What counts as an answer.** `callflow-campaign-runner` routes a call to a person when
+CALL-E's own verdict is weak: a required field missing or wrongly typed, `task_completed` not
+true, confidence under 0.6, and seven other signals, all of them read off the platform's report
+of itself (`apps/python/callflow-campaign-runner/README.md`, the triage table at lines 195 to
+210). Everything that clears those rows is `auto_closed`. That is the right rule for a
+campaign. It is the wrong rule here, and one real call is why: CALL-E returned a schema-valid
+result, `task_completed` true, good confidence, and every required field set to `"unknown"`,
+because the parent said they could not talk. A well-designed enum offers `"unknown"` instead
+of forcing a guess, so that response is correct, and it is also worth nothing, and it passes
+every confidence test there is. This app classifies on whether the fields carry information,
+not on whether the platform thinks the call went well, which is why `undetermined` exists
+here and cannot collapse into either neighbour.
+
+**The second axis.** Nothing else here reads `parent_confirmed_aware`. A call can come back
+complete, valid and confident, and still be the one in the wave that matters: the parent did
+not know their child was absent. That is not a fourth outcome, it is an escalation riding
+alongside the three, and it is the rule this app exists for. Collapsing it into a bucket
+would put it in a queue underneath eleven ordinary callbacks.
+
+`language-bridge-call` is a relay: one call, then a report back to whoever asked. This is a
+wave, and the language belongs to each family rather than to the deployment, which is the
+difference between working in one district and working in the next one.
+
 ## What this does not claim
 
 Three of these are legal rather than technical, and they are set out properly in
 [`docs/the-legal-surface.md`](docs/the-legal-surface.md): what a `consent` column would have
 to become before it is a defensible TCPA record, what a guardian who cannot use a voice call
-gets today (nothing), and who owns an escalation once the software has raised it. The FCC
+gets today (a row nothing dials, and a person to do it instead), and who owns an escalation once the software has raised it. The FCC
 confirmed in February 2024 that an AI-generated voice is an "artificial" voice under the
 TCPA, which puts a call like this one inside the statute rather than beside it.
 
@@ -496,6 +538,12 @@ TCPA, which puts a call like this one inside the statute rather than beside it.
   them, `--funding-rate` computes a figure, and it refuses to
   run without `--funding-source`, `--funding-url` and `--funding-jurisdiction`, because a
   money number without a citation is worth less than no number.
+- **firstbell does not send the other message.** The `voice` column stops the wrong
+  thing happening: it will not dial a family the phone cannot reach and will not file
+  them as unanswered. It does not send an SMS, does not place a relay call and does
+  not integrate with a TTY service. The row lands on a person's queue and a person
+  does the outreach. That is a smaller claim than an accessible notification system,
+  and it is the whole of what is built.
 - **The Title VI reading is an extension.** The 2015 Dear Colleague Letter names
   English-learner identification and programme notices. Applying it to attendance contact
   follows from the same duty, but the letter does not say the word attendance.
