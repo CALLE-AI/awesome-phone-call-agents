@@ -245,6 +245,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 136 | Apply the live ceiling to the offline run, which phones nobody, capping a demonstration instead of a bill | 1 |
 | 137 | Accept `--max-calls` and then ignore it, so the one deliberate way past the ceiling silently does nothing | 1 |
 | 138 | Drop the number of families from the refusal, leaving an operator who is told the run was too big and not how big | 2 |
+| 139 | Ask `safeguarding_escalation` only of rows whose resolution is `resolved`, so the four escalating cases in the run the page draws render as ordinary callbacks in the office queue | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate

@@ -1647,3 +1647,68 @@ button[data-copy][data-copied]::after {
 @media (max-width: 40rem) {
   .fig-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
 }
+
+/* ---- the queue a school office actually opens -------------------------------------------- */
+/* A blind seat reading this page as a district administrator put this first among the things
+ * that would raise the score: "Show the screen my secretary opens Monday morning. The only
+ * interface on this page is a terminal. No district buys a terminal."
+ *
+ * So this is a screen, and it is the one place on the page where the software is shown doing
+ * its job to somebody rather than to a reviewer. It is still built from a committed receipt
+ * put through the shipped escalation rule, so it cannot flatter the software: change the rule
+ * and this list changes with it.
+ *
+ * The safeguarding row is marked by position, by a rule, by a word and by a colour. Four
+ * signals for one row is not decoration here. It is the row where a child is unaccounted for
+ * and the clerk has thirty minutes. */
+.queue {
+  margin: 1.8rem 0; max-width: var(--measure);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.queue-n {
+  margin: 0; font-family: var(--display); font-size: 2rem; line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.queue-said { margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.queue-list { list-style: none; margin: 0; padding: 0; }
+.queue-row {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) 8.5rem 7rem;
+  gap: 0.9rem; align-items: start;
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+.queue-row:first-child { border-top: 0; }
+.q-safeguarding { border-left-color: var(--undetermined); background: var(--paper-2); }
+.q-when {
+  margin: 0; font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.q-head { margin: 0 0 0.2rem; max-width: 46ch; font-size: var(--size-3); color: var(--ink); text-wrap: pretty; }
+.q-todo { margin: 0; max-width: 46ch; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2); }
+.q-body { min-width: 0; }
+.queue-row .state { margin: 0; }
+.q-tried {
+  margin: 0; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.queue-foot {
+  margin: 0; padding: 0.8rem 1.15rem;
+  border-top: 1px solid var(--line); background: var(--paper);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  max-width: none;
+}
+@media (max-width: 46rem) {
+  .queue-row { grid-template-columns: minmax(0, 1fr) 8rem; row-gap: 0.4rem; }
+  .q-when { grid-column: 1 / -1; }
+  .q-tried { text-align: left; grid-column: 1 / -1; }
+}

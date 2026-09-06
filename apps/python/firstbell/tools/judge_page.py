@@ -804,6 +804,103 @@ def three_endings_figure() -> str:
             'three. The third one is the whole argument.</figcaption></figure>')
 
 
+def queue_markup(run: dict) -> str:
+    """The screen a school office opens on Monday, built from a receipt that already exists.
+
+    A blind seat reading this page as a district administrator scored it 16 of 25 and put
+    this first among the things that would raise it: "Show the screen my secretary opens
+    Monday morning. The only interface on this page is a terminal. No district buys a
+    terminal."
+
+    They are right, and the honest way to answer it matters more than the answer. A drawing
+    of a product that does not exist is a mockup, and an entry whose whole argument is that
+    every claim carries the thing that checks it cannot afford one. So nothing here is drawn.
+    The rows are the items of a committed run, put through `safeguarding_escalation`, the
+    same function the command line calls, and sorted by the same rule as
+    `RunReport.human_queue`: anything escalated first, because a queue that lists a
+    safeguarding case below eleven ordinary callbacks has technically reported it and a clerk
+    working top down reaches it last.
+
+    That means this view cannot flatter the software. If the rule changes, the queue changes.
+    If a case stops escalating, it drops down this list on the next build.
+
+    The free text note is deliberately not shown. It is the only unconstrained string CALL-E
+    returns, the escalation never reads it, and putting a parent's own words about their
+    child on a public page to make an interface look richer would be the wrong trade twice.
+    """
+    # The app itself, imported rather than restated. This view exists to show the shipped
+    # rule deciding real rows, so re-implementing the rule here would make it a drawing of
+    # the software instead of the software.
+    if str(APP) not in sys.path:
+        sys.path.insert(0, str(APP))
+    from dispatch.models import Escalation
+    from firstbell.domain import safeguarding_escalation
+
+    # Escalation is asked of every row that came back with a structured result, whatever the
+    # resolution was. The first version of this asked it only of `resolved` rows, on the
+    # assumption that an undetermined call has nothing to escalate about. In this run all
+    # four escalating cases are undetermined, so that version drew four safeguarding rows as
+    # ordinary callbacks. The bug pointed the one way a bug here must never point: it made
+    # the queue look calmer than the calls were.
+    #
+    # `ItemResult.needs_a_human` is the rule being followed: a row is in the queue if its
+    # resolution needs a person OR it escalated, and the sort puts escalations first.
+    rows = []
+    for item in run["items"]:
+        resolution = item.get("resolution") or ""
+        structured = item.get("structured_result") or {}
+        escalated = bool(structured) and safeguarding_escalation(structured) is not Escalation.NONE
+        if resolution == "resolved" and not escalated:
+            continue
+        rows.append((0 if escalated else 1, escalated, item, resolution))
+    rows.sort(key=lambda r: r[0])
+
+    if not rows:
+        return ""
+
+    out = ['<div class=queue>',
+           '<div class=queue-head>',
+           f'<p class=queue-n>{len(rows)}</p>',
+           '<p class=queue-said>cases need a person. Nothing here is closed.</p>',
+           '</div>',
+           '<ol class=queue-list>']
+
+    # What each state means to the person holding the list, rather than to the program.
+    says = {
+        "undetermined": ("The call connected and ended without an answer the office can use.",
+                         "Call the family back."),
+        "failed": ("Nobody picked up on any number we hold.",
+                   "Try another contact, or send someone."),
+    }
+    for _, escalated, item, resolution in rows:
+        student = esc(item.get("id") or "")
+        tried = len(item.get("numbers_tried") or [])
+        if escalated:
+            head = "The parent did not confirm they already knew their child was absent."
+            if resolution != "resolved":
+                head += " The call also ended without an answer the office can use."
+            todo = "Speak to this family first."
+            cls, label = "q-safeguarding", "safeguarding"
+        else:
+            head, todo = says.get(resolution, (esc(item.get("reason") or ""), "Look at this."))
+            cls, label = f"q-{resolution}", resolution
+        out.append(
+            f'<li class="queue-row {cls}">'
+            f'<p class=q-when>{student}</p>'
+            f'<div class=q-body><p class=q-head>{esc(head)}</p>'
+            f'<p class=q-todo>{esc(todo)}</p></div>'
+            f'<p class="state state-{"undetermined" if escalated else resolution}">'
+            f'{esc(label)}</p>'
+            f'<p class=q-tried>{tried} number{"" if tried == 1 else "s"} tried</p>'
+            '</li>')
+    out.append('</ol>')
+    out.append('<p class=queue-foot>Every row is a real call from '
+               '<code>06-locale-matched-pairs.json</code>, sorted by the same rule the '
+               'program uses. Nothing here was arranged for the picture.</p>')
+    out.append('</div>')
+    return "".join(out)
+
+
 def mutation_distribution(muts: list) -> str:
     """The shape of the table beside it, drawn instead of described.
 
@@ -1196,6 +1293,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         three_endings_figure(),
         '<p class=eyebrow>The same call, filed three ways</p>',
         endings_markup(data, en, run),
+        queue_markup(run),
         '<p class=note>This app made the first mistake itself. A parent refused to talk, '
         'CALL-E returned a schema-valid result with every required field set to '
         '<code>"unknown"</code>, and the row was recorded as resolved. The receipt stays as '

@@ -508,6 +508,23 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     "test_the_figure_carries_no_text_of_its_own":
         "skips when the figure has not been generated in this checkout, since there is no "
         "SVG to read for text that should not be in it",
+    # Not a test: the helper every test in test_queue_view.py goes through, which is where
+    # the skip lives and so where the AST finds it. The receipts are held outside this tree,
+    # so on a checkout without them the whole office-queue view has nothing to be checked
+    # against.
+    "_run":
+        "the office queue is drawn from a committed receipt, and the receipts are held "
+        "outside this repository, so every test of that view goes quiet without them",
+    # These two carry a second skip of their own, on top of the helper's. Both are about the
+    # shape of the committed run rather than the machine: a run where nothing escalates has
+    # no marking to check, and a run where everything escalates has no order to check.
+    "test_every_escalated_row_is_marked_as_one":
+        "skips when no row in the committed run escalates, because there is then nothing "
+        "for the safeguarding marking to be wrong about",
+    "test_the_escalated_rows_come_first":
+        "skips when the run does not mix escalated rows with ordinary ones, because order "
+        "proves nothing about a list that is all one kind. The committed run is all "
+        "escalations today, so this is the state it skips in",
     # The one branch of the video's fact reader that cannot be exercised while the thing it
     # needs is present. It goes quiet on this machine and runs on a clean checkout, which is
     # the opposite way round from the image gates above.
