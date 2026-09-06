@@ -277,7 +277,9 @@ NUMBER_WORDS = {
     77: "seventy-seven", 78: "seventy-eight", 79: "seventy-nine", 80: "eighty",
     81: "eighty-one", 82: "eighty-two", 83: "eighty-three", 84: "eighty-four",
     85: "eighty-five", 86: "eighty-six", 87: "eighty-seven", 88: "eighty-eight",
-    89: "eighty-nine", 90: "ninety",
+    89: "eighty-nine", 90: "ninety", 91: "ninety-one", 92: "ninety-two",
+    93: "ninety-three", 94: "ninety-four", 95: "ninety-five", 96: "ninety-six",
+    97: "ninety-seven", 98: "ninety-eight", 99: "ninety-nine", 100: "one hundred",
 }
 
 

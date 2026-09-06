@@ -75,6 +75,16 @@ times per row with the failing test names captured each time, because a single p
 produced the wrong numbers in the first place. One reading during that work disagreed with
 four repeats of the same mutation, and the repeated value is what is published.
 
+Rows 91 to 94 close two findings that had been sitting open since an earlier review, and both
+are worth naming because of how they escaped. The credential guard refused a key it recognised
+as a production one and sent everything else, which is the only rule in this app that failed
+open; the reviewer who found it also noted that rows 45 to 48 all mutate the origin comparison
+and none of them touched the prefix test, so the mutation testing itself had a blind spot in the
+same shape as the code. The backoff is a bare arithmetic return rather than a branch, so a
+sweep that walked conditionals and assertions could not see it, and `return 0.0` passed the
+whole suite. Both are the same lesson from two directions: a mutation set written by the person
+who wrote the code inherits that person's idea of where the rules are.
+
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
 the published number was right: the row says the poll is left *unprotected*, and catching
@@ -187,6 +197,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 88 | Drop every field but the first from the register the page prints | 1 |
 | 89 | Take the marker off one of the rows that needs a built page, so the note above the table counts more of them than the table carries | 1 |
 | 90 | State a classifier test count in `README.md` that the module in the other language does not have, which is the count that was already wrong once | 1 |
+| 91 | Put the credential guard back the way it was, refusing a key that starts with `iams_live_` instead of requiring one that starts with `iams_test_`, so any key shape it does not recognise is sent to whatever host `CALLE_BASE_URL` names | 4 |
+| 92 | Replace the retry backoff with `return 0.0`, so a failing upstream is retried at a family's number as fast as the network allows | 7 |
+| 93 | Return the base delay for every attempt, so the policy retries at a fixed rate and never backs off | 2 |
+| 94 | Remove the ceiling from the backoff, so attempt twelve waits half an hour and the policy becomes a way of never calling back | 2 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate

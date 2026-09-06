@@ -56,8 +56,18 @@ PRODUCTION_HOST = "api.heycall-e.com"
 # bearer token in the clear.
 TRUSTED_ORIGIN = f"https://{PRODUCTION_HOST}"
 
-# What a real CALL-E project key looks like. Used only to refuse to send one somewhere it
-# does not belong, never to validate one.
+# What a throwaway key looks like. This is an allowlist, and it is the only thing that lets a
+# credential leave for an origin that is not production.
+#
+# It used to be the other way round: a `LIVE_KEY_PREFIX` was refused and everything else was
+# sent. That guard could only stop the key shapes it already knew, so a key issued under any
+# other format, now or later, went to whatever host `CALLE_BASE_URL` named. Every other rule
+# in this app fails closed, including the safeguarding rule it is built around, and this one
+# did not. Recognising danger is a weaker promise than recognising safety.
+TEST_KEY_PREFIX = "iams_test_"
+
+# Kept because it is the shape a reader pictures, and the tests build a realistic live key
+# from it. It no longer decides anything.
 LIVE_KEY_PREFIX = "iams_live_"
 
 
@@ -244,7 +254,12 @@ def _client_and_mode(args: argparse.Namespace):
     # at a double, a colleague's laptop or a typo would hand that key straight to it.
     # Nothing here checked. The double's own instructions already say to use
     # `iams_test_anything`; this makes the instruction load-bearing instead of advisory.
-    if _origin(base_url) != TRUSTED_ORIGIN and api_key.startswith(LIVE_KEY_PREFIX):
+    #
+    # Read as an allowlist. Leaving for anywhere but production requires a key that says it
+    # is a throwaway. A key this code does not recognise is treated as a real one, because
+    # the cost of being wrong in that direction is one confusing error message and the cost
+    # of being wrong in the other is a production credential posted to a stranger's host.
+    if _origin(base_url) != TRUSTED_ORIGIN and not api_key.startswith(TEST_KEY_PREFIX):
         raise SystemExit(
             f"Refusing to send a live CALL-E key to {base_url}.\n"
             f"A production credential is only ever sent to {TRUSTED_ORIGIN}.\n"

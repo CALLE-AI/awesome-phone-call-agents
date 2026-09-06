@@ -173,3 +173,38 @@ def test_an_unparseable_base_url_is_never_the_trusted_origin(nonsense):
     """
     assert _origin(nonsense) == ""
     assert _origin(nonsense) != TRUSTED_ORIGIN
+
+
+# Assembled from parts rather than written out. Written whole, the first of these is the exact
+# shape `test_no_committed_file_carries_anything_shaped_like_a_key` scans every tracked file
+# for, and this file would need adding to an exemption to hold it. The last time a file was
+# exempted so it could hold the shape it describes, three real identifiers moved in behind the
+# exemption. A concatenation costs nothing and keeps the scanner pointed at this file too.
+_TAIL = "SENTINELdeadbeef0123456789"
+
+@pytest.mark.parametrize("key, why", [
+    ("iams_" + "prod_" + _TAIL, "a production prefix this code has never seen"),
+    ("sk_" + "live_" + _TAIL, "a key issued in another vendor's format"),
+    ("eyJhbGciOiJIUzI1NiJ9." + _TAIL, "a bare token with no recognised prefix"),
+    (_TAIL, "no prefix and no structure"),
+])
+def test_a_key_this_code_does_not_recognise_is_treated_as_a_real_one(monkeypatch, key, why):
+    """The guard used to name the danger. Naming the danger only stops the danger you named.
+
+    Its first version refused a key beginning `iams_live_` and sent everything else, so its
+    protection lasted exactly as long as that one format. A key issued under a different
+    prefix, an older one, or no prefix, all went to whatever host `CALLE_BASE_URL` happened
+    to name, which is the variable that exists so this can be pointed at a double.
+
+    It is an allowlist now. Leaving for anywhere but production takes a key that says it is a
+    throwaway, and everything else is assumed to be somebody's real credential. Each of the
+    four below reaches the network under the old rule and is refused under this one.
+    """
+    with pytest.raises(SystemExit) as caught:
+        _run_live(monkeypatch, key=key, base_url="http://127.0.0.1:1")
+
+    message = str(caught.value)
+    assert "Refusing to send a live CALL-E key" in message, (
+        f"{why} was sent to an origin that is not production"
+    )
+    assert key not in message, "the refusal prints the credential it is protecting"
