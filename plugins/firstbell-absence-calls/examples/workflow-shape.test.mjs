@@ -159,4 +159,24 @@ test("the shipped dry run closes something, escalates something, and queues the 
     [],
     "an outcome the classifier can produce never appears in the shipped demo",
   );
+
+  // The README tells a reader what this run prints. Those numbers come from here, so they
+  // are read back out of it rather than repeated in this file: a gate holding its own copy
+  // of the quantity it checks agrees with itself forever.
+  const readme = await readFile(join(HERE, "..", "README.md"), "utf8");
+  const stated = readme.match(
+    /(\w+) attempted, (\w+) closed, a\s+resolution rate of (\d+) percent/,
+  );
+  assert.ok(stated, "the README no longer states what the dry run prints, so nothing checks it");
+
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+  const spoken = (w) => (/^\d+$/.test(w) ? Number(w) : words[w.toLowerCase()]);
+
+  assert.equal(spoken(stated[1]), summary.attempted,
+    `the README says ${stated[1]} attempted; the run attempts ${summary.attempted}`);
+  assert.equal(spoken(stated[2]), summary.closed,
+    `the README says ${stated[2]} closed; the run closes ${summary.closed}`);
+  assert.equal(Number(stated[3]), Math.round(summary.resolutionRate * 100),
+    `the README says ${stated[3]} percent; the run reports ` +
+    `${Math.round(summary.resolutionRate * 100)}`);
 });
