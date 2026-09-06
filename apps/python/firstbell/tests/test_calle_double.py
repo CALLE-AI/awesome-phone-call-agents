@@ -66,9 +66,15 @@ def test_india_supports_tamil_and_australia_does_not():
 
 def test_calling_code_resolution_prefers_the_longer_prefix():
     # +91 must not be swallowed by +1.
+    #
+    # Every subscriber part here is a 555 run, which is the convention the rest of this
+    # repository uses for a number that cannot be dialled: Singapore has no 5-prefixed
+    # mobile range and neither does Sri Lanka. This test reads the country code and
+    # nothing else, so the digits after it were arbitrary, and `+6591234567` is a
+    # perfectly ordinary Singapore mobile that somebody almost certainly owns.
     assert regions.resolve("+9155500001").code == "IN"
-    assert regions.resolve("+6591234567").code == "SG"
-    assert regions.resolve("+9412345678").code == "LK"
+    assert regions.resolve("+6555500000").code == "SG"
+    assert regions.resolve("+9455500000").code == "LK"
     assert regions.resolve("+99912345") is None
 
 

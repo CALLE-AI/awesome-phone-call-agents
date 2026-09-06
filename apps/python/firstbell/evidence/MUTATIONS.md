@@ -219,6 +219,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 110 | Narrow `esc` to `&`, `<` and `>`, which leaves the check on the line above passing while the value it escapes can still close a quoted attribute | 1 |
 | 111 | Rebuild the same attribute as a template literal with the value interpolated raw, which is how the hole survives a rewrite that touches nothing else | 1 |
 | 112 | Retype the count under the browser-gate table rather than leave it to be counted, so the prose says eight rows record a state the page was really in where nine carry the marker | 1 |
+| 113 | Drop the flattening from `as_data` and keep the length cap, so a roster field carrying a line break adds a paragraph to the instruction the agent reads on a call to a parent | 3 |
+| 114 | Drop the length cap from `as_data` and keep the flattening, so one line is all a roster field needs and the line can be a brief | 1 |
+| 115 | Return the roster value from `as_data` untouched, which is how `build_task` read it until this was fixed | 5 |
+| 116 | Remove the sentence in `build_task` naming the three values as record fields, leaving a flattened injection to read as an aside the agent was told nothing about | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
