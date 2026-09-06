@@ -186,6 +186,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 87 | Publish an answer in the register that the record behind it does not hold | 1 |
 | 88 | Drop every field but the first from the register the page prints | 1 |
 | 89 | Take the marker off one of the rows that needs a built page, so the note above the table counts more of them than the table carries | 1 |
+| 90 | State a classifier test count in `README.md` that the module in the other language does not have, which is the count that was already wrong once | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -249,7 +250,7 @@ added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every num
 repository is checked. Row 58 is the same planted number after the scope was widened. The
 pair is the proof, and neither row means anything without the other.
 
-## Why these seventy-five
+## Why these rules and not others
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

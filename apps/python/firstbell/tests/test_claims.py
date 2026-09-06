@@ -256,6 +256,10 @@ def test_the_mutation_table_is_numbered_without_gaps():
     assert ids == list(range(1, len(ids) + 1)), "mutation ids are not 1..n: " + str(ids)
 
 
+NUMBER_WORDS_SMALL = {name: value for value, name in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen "
+    "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+
 NUMBER_WORDS = {
     13: "thirteen", 18: "eighteen", 22: "twenty-two", 26: "twenty-six",
     27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty",
@@ -805,4 +809,31 @@ def test_every_line_range_the_feedback_file_cites_holds_what_it_says_it_holds():
     assert not wrong, (
         "the feedback file cites line ranges that do not hold what it says:\n  "
         + "\n  ".join(wrong)
+    )
+
+
+def test_the_readme_states_the_real_number_of_classifier_tests():
+    """A count from the other language in this contribution, checked from this one.
+
+    The README said the classifier module runs "its fourteen tests" while it ran nineteen, and
+    the plugin's own `manifest.json` said nineteen twice, so two files in one submission
+    disagreed. Every count on the Python side is computed, and this one sat outside that
+    because it belongs to a `node --test` suite. Counting `test(` at the start of a line is
+    enough: that is how both files are written, and a test moved inside a block would change
+    the shape this reads and fail rather than quietly pass.
+    """
+    plugin = APP.parents[2] / "plugins" / "firstbell-absence-calls" / "examples"
+    source = (plugin / "classify.test.mjs").read_text(encoding="utf-8")
+    real = len([line for line in source.splitlines() if line.startswith("test(")])
+    assert real > 10, f"only {real} tests found, so this is counting the wrong thing"
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    found = re.search(r"runs\s+its (\w+) tests", readme)
+    assert found, "the README no longer states this count where this gate looks for it"
+
+    spoken = found.group(1).lower()
+    claimed = int(spoken) if spoken.isdigit() else NUMBER_WORDS_SMALL.get(spoken)
+    assert claimed is not None, f"add {spoken!r} to NUMBER_WORDS_SMALL so this can keep checking"
+    assert claimed == real, (
+        f"the README says the classifier module runs {spoken} tests; it runs {real}"
     )
