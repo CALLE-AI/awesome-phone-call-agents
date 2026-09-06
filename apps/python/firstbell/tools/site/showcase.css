@@ -1,0 +1,400 @@
+/* ============================================================================
+ * The showcase figure.
+ *
+ * Everything here is scoped under .calle-showcase. No selector in this file can
+ * match anything outside the figure, and no custom property declared here reaches
+ * :root, so dropping this into the page cannot change a pixel of the page.
+ *
+ * Two rules govern the motion and neither is negotiable.
+ *
+ *   1. Only `transform` and `opacity` animate. Not width, not height, not top,
+ *      left, margin, padding, stroke-width or stroke-dashoffset. Those all cost
+ *      layout or a full re-raster, and this page is measured for long tasks over
+ *      ten loads.
+ *   2. The structure never animates. Captions, rules, lanes, the panel, the rail
+ *      and every label are painted once at full opacity and stay there. Ten small
+ *      marks move. Stop them and the diagram is complete, which is what makes the
+ *      reduced-motion case a rewrite of one block rather than a second design.
+ *
+ * The loop is 9s. Nine calls are spaced one second apart and each holds a line for
+ * a third of the loop, so three lines are busy at every moment. That is the
+ * concurrency cap, and it is arithmetic rather than decoration: nine marks times a
+ * one-third duty cycle is three.
+ * ========================================================================== */
+
+.calle-showcase {
+  /* ---- Colour. Every value is OKLCH and every one names the hex it came from.
+   * The source hexes were read off CALL-E's own site and are recorded in
+   * CALLE-BRAND.md. ---- */
+
+  --cs-paper: oklch(0.9810 0.0053 106.50);      /* #F9F9F5  warm off-white ground */
+  --cs-ink: oklch(0.3329 0.0000 89.88);         /* #363636  body ink, not black */
+  --cs-ink-deep: oklch(0.2478 0.0000 89.88);    /* #212121  headings */
+  --cs-ink-soft: oklch(0.4728 0.0095 106.76);   /* #5C5C56  secondary labels, 6.38:1 */
+  --cs-rule: oklch(0.8300 0.0137 106.69);       /* #C8C8BE  hairlines, carries no text */
+  --cs-tile: oklch(0.7509 0.0154 106.77);       /* #AFAFA4  register tiles */
+  --cs-sage: oklch(0.9380 0.0212 109.70);       /* #EBECDC  panel surface */
+  --cs-yellow: oklch(0.8881 0.1702 94.10);      /* #FFD733  CALL-E yellow, fill only */
+  --cs-royal: oklch(0.3014 0.0968 264.66);      /* #152A5E  marks and the rail */
+  --cs-blue: oklch(0.5310 0.1985 260.25);       /* #1863DC  the ending that closes */
+
+  /* Measured against the ground each one is actually painted on:
+   *   ink on paper 11.45   ink on yellow 8.64   ink on sage 10.11
+   *   ink-soft on paper 6.38   royal on paper 13.05   royal on yellow 9.85
+   * The lowest is 6.38, against a 4.5 requirement. Yellow is never ink; it is
+   * only ever a fill sitting behind ink. */
+
+  --cs-loop: 9s;
+
+  display: block;
+  margin: 0;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  background: var(--cs-paper);
+  color: var(--cs-ink);
+}
+
+/* Reserve the box before a byte of the figure is painted. The width and height
+ * attributes give the intrinsic ratio, this restates it, and neither the SVG nor
+ * anything inside it ever changes size. The page's layout-shift budget is 0.001
+ * for everything on it, so the figure has to contribute exactly zero. */
+.calle-showcase__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 580;
+  overflow: visible;
+  font-family: "neue-haas-grotesk-text", "Neue Haas Grotesk Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: "kern" 1;
+}
+
+.calle-showcase__caption {
+  max-width: 46em;
+  margin: 0.9rem 0 0;
+  font-family: "neue-haas-grotesk-text", "Neue Haas Grotesk Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--cs-ink);
+}
+
+/* ---- Type inside the figure -------------------------------------------- */
+
+.calle-showcase .cs-caption {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  fill: var(--cs-ink-deep);
+  color: var(--cs-ink-deep);
+}
+
+.calle-showcase .cs-axis-label,
+.calle-showcase .cs-lane-label,
+.calle-showcase .cs-row-label {
+  font-size: 21px;
+  font-weight: 500;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-axis-label { font-size: 22px; }
+
+.calle-showcase .cs-note {
+  font-size: 20px;
+  font-weight: 400;
+  fill: var(--cs-ink-soft);
+  color: var(--cs-ink-soft);
+}
+
+/* "Closed" is set as a lane label rather than a note, so it grows with the other
+ * lane labels at narrow widths instead of being dropped with them. It is the word
+ * that names the routing, and the routing is the argument. */
+.calle-showcase .cs-end {
+  text-anchor: end;
+  fill: var(--cs-ink-soft);
+  color: var(--cs-ink-soft);
+}
+
+/* ---- Stage one: the register ------------------------------------------- */
+
+.calle-showcase .cs-tile { fill: var(--cs-tile); }
+
+/* ---- Stage two: the calls, and the cap on them -------------------------- */
+
+.calle-showcase .cs-slot {
+  fill: var(--cs-sage);
+  stroke: var(--cs-rule);
+  stroke-width: 1.5;
+}
+
+/* The bracket that says three, drawn round the three lines it holds. */
+.calle-showcase .cs-cap {
+  fill: none;
+  stroke: var(--cs-royal);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- Stage three: the three endings ------------------------------------- */
+
+/* The yellow is large and it is under one thing: the ending a two-bucket
+ * pipeline has to file with the successes. */
+.calle-showcase .cs-band { fill: var(--cs-yellow); }
+
+.calle-showcase .cs-lane {
+  stroke: var(--cs-ink-soft);
+  stroke-width: 1.5;
+}
+
+.calle-showcase .cs-arrow { fill: var(--cs-royal); }
+
+/* Full, half, empty. Read the shape and the ending is clear with no colour at
+ * all, which is what keeps it legible in greyscale, under every kind of colour
+ * blindness, and in a forced-colours theme. */
+.calle-showcase .cs-glyph--resolved { fill: var(--cs-blue); }
+
+.calle-showcase .cs-glyph__half { fill: var(--cs-royal); }
+
+.calle-showcase .cs-glyph__ring {
+  fill: none;
+  stroke: var(--cs-royal);
+  stroke-width: 2.5;
+}
+
+.calle-showcase .cs-glyph--no-answer {
+  fill: var(--cs-paper);
+  stroke: var(--cs-royal);
+  stroke-width: 2.5;
+  stroke-dasharray: 3.6 3.6;
+}
+
+.calle-showcase .cs-glyph--safeguarding rect {
+  fill: var(--cs-yellow);
+  stroke: var(--cs-royal);
+  stroke-width: 2.5;
+}
+
+/* ---- Stage four: the queue a person opens ------------------------------- */
+
+.calle-showcase .cs-panel { fill: var(--cs-sage); }
+
+.calle-showcase .cs-row {
+  fill: var(--cs-paper);
+  stroke: var(--cs-rule);
+  stroke-width: 1.5;
+}
+
+.calle-showcase .cs-row--safeguarding {
+  fill: var(--cs-yellow);
+  stroke: var(--cs-royal);
+  stroke-width: 2;
+}
+
+.calle-showcase .cs-rule {
+  stroke: var(--cs-rule);
+  stroke-width: 1.5;
+}
+
+/* ---- The safeguarding axis ---------------------------------------------- */
+
+/* Dashed where the route is merely available, solid where a case is taking it.
+ * It crosses the outcome lanes rather than joining them, because escalation is a
+ * second question about the same call and not a fourth ending. */
+.calle-showcase .cs-axis {
+  fill: none;
+  stroke: var(--cs-royal);
+  stroke-width: 2;
+  stroke-dasharray: 7 6;
+}
+
+.calle-showcase .cs-axis--live { stroke-dasharray: none; }
+
+/* ---- The marks that move ------------------------------------------------ */
+
+.calle-showcase .cs-run__mark { fill: var(--cs-royal); }
+
+.calle-showcase .cs-esc__mark {
+  fill: var(--cs-yellow);
+  stroke: var(--cs-royal);
+  stroke-width: 2.5;
+}
+
+.calle-showcase .cs-run__x,
+.calle-showcase .cs-run__y,
+.calle-showcase .cs-esc__x,
+.calle-showcase .cs-esc__y {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.calle-showcase .cs-run__x {
+  animation: cs-run-x var(--cs-loop) linear infinite;
+  animation-delay: var(--cs-phase);
+}
+
+.calle-showcase .cs-run__y {
+  animation: cs-run-y var(--cs-loop) ease-in-out infinite;
+  animation-delay: var(--cs-phase);
+}
+
+/* Along the route. The stops are the same user units the markup is laid out in:
+ * 0 at the register edge, 84 at the gate, 120 and 294 the two ends of a line,
+ * 380 into a lane, 602 at the ending. A call crawls the queue from 5% to 34%,
+ * which is what spaces the waiting marks evenly instead of stacking them on one
+ * point, then holds a line from 38% to 71.5%. That is a third of the loop. */
+@keyframes cs-run-x {
+  0%     { transform: translateX(0);     opacity: 0; }
+  5%     {                               opacity: 1; }
+  34%    { transform: translateX(84px);  }
+  38%    { transform: translateX(120px); }
+  71.5%  { transform: translateX(294px); }
+  84%    { transform: translateX(380px); }
+  91%    { transform: translateX(602px); opacity: 1; }
+  96%    { transform: translateX(602px); opacity: 0; }
+  100%   { transform: translateX(602px); opacity: 0; }
+}
+
+/* Across the route: down or up into a line, then down or up into a lane. The two
+ * offsets come from the per-call rules below, so there is one pair of keyframes
+ * rather than nine. The properties never change value, so nothing is written per
+ * frame; they are substituted once when style is resolved. */
+@keyframes cs-run-y {
+  0%     { transform: translateY(0); }
+  34%    { transform: translateY(0); }
+  38%    { transform: translateY(var(--cs-slot-y)); }
+  71.5%  { transform: translateY(var(--cs-slot-y)); }
+  84%    { transform: translateY(var(--cs-lane-y)); }
+  100%   { transform: translateY(var(--cs-lane-y)); }
+}
+
+/* Which line each call takes, which ending it reaches, when it starts, and where
+ * it rests when motion is off. Calls take the lines in turn, so line one holds
+ * calls one, four and seven. Four calls end with a reason, three connect and
+ * learn nothing, two get no answer. The delays are negative so every call is
+ * already in flight on the first painted frame; the figure has no build-up and a
+ * reader who lands mid-loop sees the same picture as one who lands at the start. */
+.calle-showcase .cs-run--1 { --cs-slot-y: -72px; --cs-lane-y: -104px; --cs-phase:  0s; --cs-rest-x:   0px; --cs-rest-y: 0px; }
+.calle-showcase .cs-run--2 { --cs-slot-y:   0px; --cs-lane-y:    0px; --cs-phase: -1s; --cs-rest-x:  40px; --cs-rest-y: 0px; }
+.calle-showcase .cs-run--3 { --cs-slot-y:  72px; --cs-lane-y: -104px; --cs-phase: -2s; --cs-rest-x:  80px; --cs-rest-y: 0px; }
+.calle-showcase .cs-run--4 { --cs-slot-y: -72px; --cs-lane-y:  104px; --cs-phase: -3s; --cs-rest-x: 180px; --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--5 { --cs-slot-y:   0px; --cs-lane-y: -104px; --cs-phase: -4s; --cs-rest-x: 207px; --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--6 { --cs-slot-y:  72px; --cs-lane-y:    0px; --cs-phase: -5s; --cs-rest-x: 234px; --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--7 { --cs-slot-y: -72px; --cs-lane-y: -104px; --cs-phase: -6s; --cs-rest-x: 602px; --cs-rest-y: var(--cs-lane-y); }
+.calle-showcase .cs-run--8 { --cs-slot-y:   0px; --cs-lane-y:  104px; --cs-phase: -7s; --cs-rest-x: 602px; --cs-rest-y: var(--cs-lane-y); }
+.calle-showcase .cs-run--9 { --cs-slot-y:  72px; --cs-lane-y:    0px; --cs-phase: -8s; --cs-rest-x: 602px; --cs-rest-y: var(--cs-lane-y); }
+
+/* The escalation. It lifts off the no-answer lane, crosses the other two endings
+ * on the way up, runs the rail and drops into the top of the queue. One case a
+ * loop, because one is what makes it read as an exception. */
+.calle-showcase .cs-esc__x {
+  animation: cs-esc-x var(--cs-loop) ease-in-out infinite;
+  animation-delay: -4.5s;
+}
+
+.calle-showcase .cs-esc__y {
+  animation: cs-esc-y var(--cs-loop) ease-in-out infinite;
+  animation-delay: -4.5s;
+}
+
+@keyframes cs-esc-x {
+  0%   { transform: translateX(0);     opacity: 0; }
+  14%  { transform: translateX(0);     opacity: 0; }
+  18%  {                               opacity: 1; }
+  34%  { transform: translateX(0);     }
+  52%  { transform: translateX(290px); }
+  78%  { transform: translateX(290px); opacity: 1; }
+  84%  { transform: translateX(290px); opacity: 0; }
+  100% { transform: translateX(290px); opacity: 0; }
+}
+
+@keyframes cs-esc-y {
+  0%   { transform: translateY(0); }
+  18%  { transform: translateY(0); }
+  34%  { transform: translateY(-312px); }
+  52%  { transform: translateY(-312px); }
+  60%  { transform: translateY(-244px); }
+  100% { transform: translateY(-244px); }
+}
+
+/* ---- No motion ---------------------------------------------------------- */
+
+/* Every mark stops where it says the most. Three calls strung along the queue,
+ * one in each of the three lines, one resting at each of the three endings, and
+ * the escalation part way along its rail. The route is drawn by where the marks
+ * are, so nothing is lost by holding still. Printing gets the same figure. */
+@media (prefers-reduced-motion: reduce) {
+  .calle-showcase .cs-run__x,
+  .calle-showcase .cs-run__y,
+  .calle-showcase .cs-esc__x,
+  .calle-showcase .cs-esc__y {
+    animation: none;
+    opacity: 1;
+  }
+
+  .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+  .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+  .calle-showcase .cs-esc__x { transform: translateX(150px); }
+  .calle-showcase .cs-esc__y { transform: translateY(-312px); }
+}
+
+@media print {
+  .calle-showcase .cs-run__x,
+  .calle-showcase .cs-run__y,
+  .calle-showcase .cs-esc__x,
+  .calle-showcase .cs-esc__y {
+    animation: none;
+    opacity: 1;
+  }
+
+  .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+  .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+  .calle-showcase .cs-esc__x { transform: translateX(150px); }
+  .calle-showcase .cs-esc__y { transform: translateY(-312px); }
+}
+
+/* ---- Narrow viewports ---------------------------------------------------- */
+
+/* The figure keeps its shape and its box; only the type grows, because the SVG is
+ * scaling down and a 20 user-unit label stops being readable somewhere under a
+ * 700px render. Nothing here changes a rect, so nothing here can shift layout. */
+@media (max-width: 46rem) {
+  .calle-showcase .cs-caption { font-size: 30px; }
+  .calle-showcase .cs-axis-label { font-size: 26px; }
+  .calle-showcase .cs-lane-label,
+  .calle-showcase .cs-row-label { font-size: 24px; }
+  .calle-showcase .cs-note { display: none; }
+}
+
+/* ---- Forced colours ------------------------------------------------------ */
+
+/* A high-contrast theme replaces the palette, so the figure has to survive on its
+ * shapes. It does: full, half and empty stay distinguishable with one ink and one
+ * ground, and the fill states below are chosen to keep them that way. */
+@media (forced-colors: active) {
+  .calle-showcase .cs-tile,
+  .calle-showcase .cs-arrow,
+  .calle-showcase .cs-glyph--resolved,
+  .calle-showcase .cs-glyph__half,
+  .calle-showcase .cs-run__mark {
+    fill: CanvasText;
+  }
+
+  .calle-showcase .cs-slot,
+  .calle-showcase .cs-panel,
+  .calle-showcase .cs-row,
+  .calle-showcase .cs-band,
+  .calle-showcase .cs-glyph--no-answer,
+  .calle-showcase .cs-esc__mark {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+
+  .calle-showcase .cs-cap,
+  .calle-showcase .cs-lane,
+  .calle-showcase .cs-rule,
+  .calle-showcase .cs-axis,
+  .calle-showcase .cs-glyph__ring {
+    stroke: CanvasText;
+  }
+}
