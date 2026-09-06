@@ -189,6 +189,19 @@ def build_parser() -> argparse.ArgumentParser:
                              f"safeguarding escalation in (default: "
                              f"{SAFEGUARDING_CALLBACK_MINUTES}). The report says "
                              f"which one it used and whether it was yours.")
+    # Two reviewers arrived at the same finding from opposite directions: one read the
+    # scheduler and said polling scales badly beside an event, the other read the
+    # constructor and found `webhook_url` accepted, forwarded to CALL-E, and set by
+    # nobody. Both are right. This does not replace the poll, because the run has to
+    # know how each call ended before it can print a report, and a webhook that never
+    # arrives is not a result. What it does is stop the parameter being a promise: an
+    # operator with an endpoint gets CALL-E telling their own system directly, at the
+    # moment the call ends, rather than whenever this process next looks.
+    parser.add_argument("--webhook-url", default=None,
+                        help="Ask CALL-E to POST call.completed and call.failed here "
+                             "as they happen. The run still polls: this is for your "
+                             "own system, not for this one. Deliveries are unsigned, "
+                             "so a receiver has to re-fetch before acting on one.")
     parser.add_argument("--school-name", default="the school")
     parser.add_argument("--funding-rate", type=float, default=None,
                         help="Per-student-per-day funding attached to attendance. "
@@ -438,6 +451,7 @@ def main(argv: list[str] | None = None) -> int:
         escalate=safeguarding_escalation,
         idempotency_key=default_idempotency_key("attendance", date.today().isoformat()),
         poll_interval_seconds=2.0 if mode.live else 0.0,
+        webhook_url=args.webhook_url,
     )
     report = dispatcher.run(items)
 

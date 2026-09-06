@@ -81,6 +81,6 @@ well as the entry README.
   `dispatch/scheduler.py:328`.
 - `proof-classification.png`: `def _classify` at
   `dispatch/scheduler.py:424` returns exactly seven times and the still labels every one of them,
-  including `resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:455` and `resolution=Resolution.RESOLVED` at
-  `dispatch/scheduler.py:486`.
+  including `ItemResult(**base, resolution=Resolution.FAILED` at
+  `dispatch/scheduler.py:455` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:491`.

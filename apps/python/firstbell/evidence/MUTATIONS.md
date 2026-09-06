@@ -247,6 +247,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 138 | Drop the number of families from the refusal, leaving an operator who is told the run was too big and not how big | 2 |
 | 139 | Ask `safeguarding_escalation` only of rows whose resolution is `resolved`, so the four escalating cases in the run the page draws render as ordinary callbacks in the office queue | 1 |
 | 140 | Let the report say the safeguarding window is this project's default whatever window was passed, so a district reads its own agreed clock into a number nobody chose | 1 |
+| 141 | Accept `--webhook-url` and stop forwarding it to CALL-E, so a district's endpoint is promised an event that is never asked for | 1 |
 
 Row 140 is the newest rule and it arrived as a concession. A reviewer reading the code
 asked for `SAFEGUARDING_CALLBACK_MINUTES` to be configurable, because thirty minutes is one
