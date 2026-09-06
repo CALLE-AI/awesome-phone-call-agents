@@ -36,6 +36,7 @@ APP = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(APP / "tools"))
 
 from lottie import objects, Color, Point  # noqa: E402
+from lottie.objects.easing import EaseOut  # noqa: E402
 from lottie.exporters.core import export_lottie  # noqa: E402
 from lottie.exporters.svg import export_svg  # noqa: E402
 
@@ -59,36 +60,66 @@ def _rounded(group, x, y, w, h, fill, radius=8.0):
 
 
 def build() -> objects.Animation:
-    """One call leaving, and the only three states it can come back in."""
+    """One call leaving, and the only three states it can come back in.
+
+    The motion carries the idea rather than decorating it. The call travels once, left to
+    right, and then the three endings arrive one after another instead of together, because
+    arriving together would say they are alternatives of equal weight and they are not: the
+    order is the order the office cares about. `undetermined` lands last and holds longest,
+    which is the one the whole product turns on.
+
+    Easing is `EaseOut` on everything that arrives. Nothing here bounces or overshoots. This
+    is a diagram about children who are not at school.
+    """
     palette = video_facts.palette()
     ink = _rgb(palette["ink"])
     line = _rgb(palette["line-strong"])
     endings = [
         ("resolved", palette["resolved"]),
-        ("undetermined", palette["undetermined"]),
         ("failed", palette["failed"]),
+        ("undetermined", palette["undetermined"]),
     ]
+    ease = EaseOut(0.42)
 
     anim = objects.Animation(DUR, FPS)
     anim.width, anim.height = W, H
     layer = anim.add_layer(objects.ShapeLayer())
 
-    # The spine. Drawn first so everything else sits on it.
+    # The spine, drawn first so everything sits on it. It grows from the call rather than
+    # being there already: the path is made by the call, not waiting for it.
     spine = layer.add_shape(objects.Group())
-    _rounded(spine, 150, 148, 300, 4, line, 2.0)
+    bar = _rounded(spine, 168, 148, 300, 4, line, 2.0)
+    bar.size.add_keyframe(0, Point(0, 4))
+    bar.size.add_keyframe(34, Point(300, 4), ease)
+    bar.position.add_keyframe(0, Point(168, 150))
+    bar.position.add_keyframe(34, Point(318, 150), ease)
 
-    # The call leaving, one plate on the left.
+    # The call itself. One plate, and it settles before the spine starts.
     call = layer.add_shape(objects.Group())
-    _rounded(call, 30, 120, 120, 60, ink, 10.0)
+    _rounded(call, 30, 120, 130, 60, ink, 10.0)
+    call.transform.opacity.add_keyframe(0, 0)
+    call.transform.opacity.add_keyframe(12, 100, ease)
+    call.transform.position.add_keyframe(0, Point(-26, 0))
+    call.transform.position.add_keyframe(16, Point(0, 0), ease)
 
-    # The three endings, stacked, each in the ink the page uses for that word and nowhere
-    # else. A reader who meets the word later has already been shown which one it is.
+    # The three endings. Staggered, and each one slides a little way in rather than fading
+    # on the spot, so a reader's eye is carried from the spine to the row.
     for i, (_name, colour) in enumerate(endings):
+        at = 40 + i * 20
         arm = layer.add_shape(objects.Group())
-        _rounded(arm, 470, 44 + i * 88, 380, 60, _rgb(colour), 10.0)
+        _rounded(arm, 486, 44 + i * 88, 384, 60, _rgb(colour), 10.0)
         arm.transform.opacity.add_keyframe(0, 0)
-        arm.transform.opacity.add_keyframe(40 + i * 18, 0)
-        arm.transform.opacity.add_keyframe(58 + i * 18, 100)
+        arm.transform.opacity.add_keyframe(at, 0)
+        arm.transform.opacity.add_keyframe(at + 16, 100, ease)
+        arm.transform.position.add_keyframe(at, Point(-22, 0))
+        arm.transform.position.add_keyframe(at + 20, Point(0, 0), ease)
+
+        # The short connector from the spine to this row, drawn just before it arrives.
+        arm_line = layer.add_shape(objects.Group())
+        joint = _rounded(arm_line, 468, 72 + i * 88, 18, 3, line, 1.5)
+        joint.size.add_keyframe(0, Point(0, 3))
+        joint.size.add_keyframe(at, Point(0, 3))
+        joint.size.add_keyframe(at + 12, Point(18, 3), ease)
 
     return anim
 

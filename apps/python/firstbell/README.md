@@ -508,7 +508,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 314 tests
+python -m pytest tests/ -q          # 318 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

@@ -588,11 +588,20 @@ async function gateRail(browser, url) {
     };
   });
 
+  // Two answers are defensible when the midpoint lands exactly on the seam between two
+  // acts. The page reads `elementFromPoint`, which returns the act whose last pixel is
+  // there; this arithmetic uses a half-open range, which returns the act whose first pixel
+  // is. Neither is wrong, and a gate has no business breaking a tie it invented, so a
+  // midpoint within a pixel of a boundary accepts either side. Anything further than that
+  // is a real disagreement and still fails.
+  const SEAM = 1;
   const expected = (y) => {
     const mid = y + map.height / 2;
-    let found = null;
-    for (const a of map.acts) if (a.top <= mid && mid < a.top + a.height) found = a.id;
-    return found;
+    const ok = [];
+    for (const a of map.acts) {
+      if (a.top - SEAM <= mid && mid < a.top + a.height + SEAM) ok.push(a.id);
+    }
+    return ok.length ? ok : null;
   };
 
   // Down the page and back up. The way back is the half that was broken.
@@ -613,10 +622,24 @@ async function gateRail(browser, url) {
       return { marked: cur ? cur.getAttribute("href").slice(1) : null,
                y: Math.round(window.scrollY) };
     });
+    // Re-measured here rather than once before the walk. A map taken at load and trusted
+    // afterwards is a map of a page that has not been scrolled yet, and this page changes
+    // height as it is read: acts reveal, a player mounts, a figure swaps its still for an
+    // animation. The gate was comparing what is painted now against where things were then,
+    // and reporting the difference as the rail pointing at the wrong act.
+    const acts = await page.evaluate(() => [...document.querySelectorAll('section[id^="act-"]')]
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return { id: el.id, top: Math.round(r.top + window.scrollY), height: Math.round(r.height) };
+      }));
+    map.acts = acts;
     const want = expected(seen.y);
     if (want === null) continue;   // a midpoint in no act at all is not this gate's business
     checked += 1;
-    if (seen.marked !== want) wrong.push(`at ${seen.y}px it marks ${seen.marked || "nothing"}, expected ${want}`);
+    if (!want.includes(seen.marked)) {
+      wrong.push(`at ${seen.y}px (midpoint ${Math.round(seen.y + map.height / 2)}px) it `
+        + `marks ${seen.marked || "nothing"}, expected ${want.join(" or ")}`);
+    }
   }
   await page.close();
 
@@ -882,15 +905,23 @@ async function gateContrast(browser, url) {
   if (opened) await new Promise((r) => setTimeout(r, 200));
 
   const height = await page.evaluate(() => window.innerHeight);
-  const total = await page.evaluate(() => document.documentElement.scrollHeight);
+  const startTotal = await page.evaluate(() => document.documentElement.scrollHeight);
   absorb(await page.evaluate(CONTRAST_PROBE));
   await takeCensus();
   // Half a viewport at a time. A full step leaves elements that are only ever centred
   // between two stops unsampled, and an element sampled once, part way through its own
   // fade, is judged on that one reading.
+  // `total` is re-read every step rather than trusted from before the walk. This page grows
+  // while it is being read: an act reveals, a player mounts, the figure swaps its still for
+  // the animation it was authored as. A walk bounded by the height the document had at load
+  // stops short of its own end, and everything the growth pushed past that bound is reported
+  // as a run that could never be centred. Six were, all of them in the figure that does the
+  // growing.
+  let total = startTotal;
   for (let y = 0; y < total; y += Math.round(height / 2)) {
     await page.evaluate((to) => window.scrollTo(0, to), y);
     await settleScroll(page);
+    total = Math.max(total, await page.evaluate(() => document.documentElement.scrollHeight));
     // Longer than the 240ms reveal transition, or the gate reads an element part way
     // into its own fade and calls that a contrast failure.
     await new Promise((r) => setTimeout(r, 600));
@@ -973,6 +1004,29 @@ async function gateContrast(browser, url) {
     await new Promise((r) => setTimeout(r, 120));
     absorb(await page.evaluate(CONTRAST_PROBE));
     await takeCensus();
+  }
+
+  // Anything the walk missed gets asked for by name before it is written off. A stepped
+  // walk centres whatever happens to fall on a stop, and an element that lives between two
+  // of them is never centred no matter how many times the page is traversed. Six runs sat
+  // there, the whole key of one figure, and the gate called them unmeasurable when they were
+  // merely unvisited.
+  //
+  // The census keys on a DOM path, so a leftover can be found again and scrolled to on
+  // purpose. What stays unmeasured after this is genuinely unreachable rather than unlucky.
+  const leftovers = [...census.entries()].filter(([k]) => !best.has(k));
+  for (const [, entry] of leftovers) {
+    const found = await page.evaluate((label, text) => {
+      let els = [];
+      try { els = [...document.querySelectorAll(label)]; } catch { return false; }
+      const hit = els.find((el) => (el.textContent || "").trim().startsWith(text.trim().slice(0, 24)));
+      if (!hit) return false;
+      hit.scrollIntoView({ block: "center", behavior: "instant" });
+      return true;
+    }, entry.label, entry.text || "");
+    if (!found) continue;
+    await new Promise((r) => setTimeout(r, 160));
+    absorb(await page.evaluate(CONTRAST_PROBE));
   }
 
   for (const [key, entry] of census) {

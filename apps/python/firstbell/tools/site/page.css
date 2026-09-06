@@ -1712,3 +1712,11 @@ button[data-copy][data-copied]::after {
   .q-when { grid-column: 1 / -1; }
   .q-tried { text-align: left; grid-column: 1 / -1; }
 }
+
+/* The animated build of the figure, when a reader gets one. It replaces the still in place
+ * and inherits its box from it, because a figure that collapsed to nothing while its player
+ * started would shift every word underneath it on a page whose budget for that is 0.001. */
+.fig-anim { display: block; width: 100%; }
+.fig-anim svg { display: block; width: 100%; height: auto; }
+
+.fig-stage { display: block; }

@@ -799,7 +799,15 @@ def three_endings_figure() -> str:
         f'<div class=fig-row><p class="state state-{name}">{name}</p>'
         f'<p class=fig-say>{esc(text)}</p></div>'
         for name, text in rows)
-    return (f'<figure class=endings-fig>{svg}<div class=fig-key>{items}</div>'
+    has_anim = (SITE / "figures" / "three-endings.json").exists()
+    data = ' data-lottie=three-endings.json' if has_anim else ''
+    # The still lives in a stage that is always present. The animation, when there is
+    # one, is mounted inside that stage rather than inserted as a new child of the
+    # figure: inserting one would shift every sibling's nth-of-type, and the contrast
+    # census keys a text run by its DOM path, so the same six runs were counted once
+    # before the mount and once after and six of them were reported as unmeasurable.
+    return (f'<figure class=endings-fig{data}><div class=fig-stage>{svg}</div>'
+            f'<div class=fig-key>{items}</div>'
             '<figcaption>Every call this software places comes back as exactly one of these '
             'three. The third one is the whole argument.</figcaption></figure>')
 
@@ -1526,6 +1534,13 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
         f'crossorigin=anonymous defer></script>')
     add('<script type=module src="app.js"></script>')
+    # The animation, and the player that reads it. Both are deferred and both come after
+    # app.js, because the figure is nine screens down and nothing above it waits on either.
+    # Served from this origin rather than a CDN, so the derived policy covers them under
+    # 'self' and there is no third party in the path of a page about children.
+    if (SITE / "figures" / "three-endings.json").exists():
+        add('<script src="lottie_light.min.js" defer></script>')
+        add('<script src="figure.js" defer></script>')
     add('</html>')
     return "".join(p)
 
@@ -1580,8 +1595,23 @@ def main() -> int:
     # watch one file. What the page shows instead is drawn from the run itself: the register
     # plays, the waveform is the audio, and the figure in act 02 is the system's shape. All
     # of it is built rather than filmed, so it stays true when the code changes.
-    for asset in ("app.js", "player.js"):
+    for asset in ("app.js", "player.js", "figure.js"):
         shutil.copy2(SITE / asset, out / asset)
+
+    # Third-party code lives in its own directory and is declared in VENDOR.json with the
+    # digest of the exact bytes. It is kept out of tools/site/*.js on purpose: the escaping
+    # gate reads every authored script there and asks whether each attribute write is
+    # escaped, which is a question about code somebody here wrote. A minified library is a
+    # supply-chain question instead, and it is answered by the manifest rather than by a
+    # regex over somebody else's compiled output.
+    for asset in ("lottie_light.min.js",):
+        shutil.copy2(SITE / "vendor" / asset, out / asset)
+
+    # The animation the player reads. Built by tools/make_figure.py during this run rather
+    # than committed, so it is always the figure the current palette makes.
+    figure = SITE / "figures" / "three-endings.json"
+    if figure.exists():
+        shutil.copy2(figure, out / "three-endings.json")
 
     page = out / "index.html"
     markup = build(has_audio, args.repo_url)
