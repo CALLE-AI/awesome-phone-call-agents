@@ -91,10 +91,19 @@ Before every run, read the live Goal interface and compare it against the contra
 skill was written for.
 
 ```js
+import { diffContract, publishedRunSpec } from './scripts/_lib.mjs';
+
 const goal = await client.goals.get(GOAL_ID);
-const drift = diffContract(PINNED_CONTRACT, goal.published_run_spec);
+const drift = diffContract(PINNED_CONTRACT, publishedRunSpec(goal));
 if (drift.length) throw new ContractDrift(drift);   // refuse to dial
 ```
+
+**Use the `publishedRunSpec(goal)` helper, not `goal.published_run_spec` directly.** The wire
+format and the docs spell it `published_run_spec.result_schema`; the TypeScript SDK camelCases
+it to `publishedRunSpec.resultSchema`. Reading only the documented name against the TS client
+returns `undefined` rather than throwing — the guard then concludes "no published spec" and
+**refuses every single dial while looking like it is working**. The helper reads both spellings.
+This cost us a day; it is written up in `FEEDBACK.md` at the repo root.
 
 The CALL-E documentation recommends this comparison before deploying a variable change.
 Doing it on **every run** costs one API call and converts a silent failure into a loud
@@ -118,13 +127,20 @@ result, so do not treat that window as a failure.
 
 ### 5. Render, or fail honestly
 
+All eight published `GoalRunError` codes route to a distinct outcome. The set below is the
+one `scripts/render.mjs` implements — keep them in step if CALL-E adds a code.
+
 | Outcome | What the user sees |
 |---|---|
 | valid result | the checklist, with the clerk's verbatim line and the source URL |
-| `no_answer` | "the line did not answer" and the number of attempts. No checklist |
+| `no_answer` | "the line did not answer". No checklist |
 | `declined` | "the office declined to answer an automated caller". No checklist |
-| `result_invalid` | quarantined. No checklist, and the raw result is kept for inspection |
-| `timed_out` | "no usable answer". No checklist |
+| `result_invalid` | the call completed but the answer did not match the contract. Quarantined |
+| `result_unavailable` | the call completed but produced no structured answer. No checklist |
+| `result_failed` | the answer could not be processed into a checklist. No checklist |
+| `timed_out` | "no usable answer" before the deadline. No checklist |
+| `call_failed` | the call could not be completed. No checklist |
+| `canceled` | cancelled before it produced an answer. No checklist |
 
 **No branch renders a partial checklist.** Worked examples of each are in
 `references/examples.md`.
@@ -135,11 +151,27 @@ result, so do not treat that window as a failure.
 places no call. Dialling requires an explicit `--live`:
 
 ```bash
-node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor"
-node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor" --live
+# dry run — prints the request it would send, dials nothing, needs no credentials
+node scripts/call.mjs --office <id> --procedure "<procedure>"
+
+# actually rings a phone
+node scripts/call.mjs --office <id> --procedure "<procedure>" --live
 ```
 
 A skill that dials by default is a skill that dials by accident.
+
+**`data/offices.json` ships with its phone number masked** (`+62XXXXXXXXXX`), so the seeded
+entry cannot dial and every command against it exits `3` with `REFUSING TO DIAL`. That is
+deliberate: a number enters the file only when a human has read it off the office's own
+published page and recorded `source_url` and `source_checked`. Add your own entry before
+running anything.
+
+To see the dry-run output immediately, the test fixture carries a valid fictional number:
+
+```bash
+node scripts/call.mjs --offices ../../test/fixtures/offices.test.json \
+  --office fixture-sourced --procedure "perpanjangan paspor"
+```
 
 ## When not to use this
 
