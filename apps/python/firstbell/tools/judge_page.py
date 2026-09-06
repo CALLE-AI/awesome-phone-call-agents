@@ -1034,15 +1034,31 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     # "Three outcomes, not two" used to be the first of these. Act 3 now plays it, and a
     # take-away restating the scene two screens above it is the page making its strongest
     # argument twice and being believed once.
+    # Counted off the table this page already renders, never typed beside it. This card read
+    # "Eighteen deliberate changes ... eighty-eight passing tests" while sitting three screens
+    # under a counter reading 116, on a page whose entire argument is that its numbers are
+    # counted rather than asserted. A reviewer found that before we did, which is the correct
+    # outcome for a page like this one and an embarrassing one for a card like that one.
+    _muts = mutation_rows()
+    # The rows no test caught. There is exactly one today, and it is the row worth the space:
+    # the gate that should have caught it had been scoped past a whole directory, so the
+    # number it was guarding had never been inside its file set at all.
+    _uncaught = [row for row in _muts if row[2] == "0"]
+    _uncaught_line = (
+        f"Row {_uncaught[0][0]} is the one no test caught, and finding out why is what this "
+        "table is for."
+        if len(_uncaught) == 1
+        else f"{len(_uncaught)} of them were caught by nothing, and each one is a gate that "
+             "was not guarding what it claimed to."
+    ) if _uncaught else "Every one of them was caught by a test that already existed."
     takes = [
         ("Record the identifier the vendor is keyed on",
          "The id an API returns and the id its billing page shows are not always the same "
          "one. Recording only the first makes a receipt uncheckable by anyone outside the "
          "repository that wrote it."),
         ("Break a rule to prove a test catches it",
-         "Eighteen deliberate changes, each reverted, each recorded with the tests that "
-         "failed. It cost an afternoon and it found a real defect that eighty-eight passing "
-         "tests had not."),
+         f"{len(_muts)} deliberate changes, each reverted, each recorded with the number of "
+         f"tests that failed. {_uncaught_line}"),
     ]
     # The two take-aways sit on the one dark ground the page has. Nine acts of cream with
     # nothing to break them is what a reader means by a page that reads long, and this is

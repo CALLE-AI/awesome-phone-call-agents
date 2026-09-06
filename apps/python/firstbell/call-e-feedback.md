@@ -34,8 +34,8 @@ termination control available, and it arrives too late by construction.
 and `max_turns` on the task as a backstop the agent cannot talk its way past. The backstop
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
-Anchor: `README.md:346-354` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:613-617` ("Platform-side call termination").
+Anchor: `README.md:356-364` ("The escape hatch is instructed, not enforced") and
+limitation 3 at `README.md:623-627` ("Platform-side call termination").
 
 ## 2. `structured_result` is returned in two places, and callers guess wrong
 

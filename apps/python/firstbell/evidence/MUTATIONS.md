@@ -223,6 +223,13 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 114 | Drop the length cap from `as_data` and keep the flattening, so one line is all a roster field needs and the line can be a brief | 1 |
 | 115 | Return the roster value from `as_data` untouched, which is how `build_task` read it until this was fixed | 5 |
 | 116 | Remove the sentence in `build_task` naming the three values as record fields, leaving a flattened injection to read as an aside the agent was told nothing about | 1 |
+| 117 | Stop stepping the internal scroll boxes in the contrast gate, so the transcript's lower turns go back to being declined every run | 1 |
+| 118 | Report the contrast census as zero instead of its real size, which is the number that makes an unmeasured count of zero mean anything | 1 |
+| 119 | Take no census at all, so a run the probe never reached leaves no trace again | 1 |
+| 120 | Identify a text run by its class and the first thirty characters of its text again, which folds two elements that share both into one and measures only one of them | 2 |
+| 121 | Type the mutation count into the take-away card instead of counting the rows, which is the defect a reviewer found on the deployed page before this suite did | 2 |
+| 122 | Put back `The offline default never reaches it`, the sentence that told a reader the default run does not use CALL-E when it executes three of the four anchored lines | 1 |
+| 123 | Move `calle-ai` out of the runtime requirements, which would leave the README's reason the offline default runs CALL-E's own code true and beside the point | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -445,6 +452,41 @@ backdrop must come from a hit test rather than from walking parents, because the
 fixed and floats over whichever section is under it. Getting the third one wrong produced
 a ratio of exactly 1.00 on every affected element, which is what that number means when
 you see it: the probe compared a colour with itself.
+
+There is a fourth, and it is the one that reads as a clean result rather than as an error.
+The gate has to be able to reach the run, and it has to say so when it cannot. Three separate
+things were hiding behind a `PASS` that ended `42 could not be resolved to a colour and a
+ground`, and the 42 was the only visible symptom of any of them.
+
+The first is the honest one. Those 42 were transcript turns scrolled out of `ol.turns`, which
+scrolls on its own, and a page-level scroll never moves it. The gate now steps every internal
+scroll box through its own range. The far end has to be an explicit stop: a loop that runs
+while `at <= furthest` stops at the last whole step, so a range that is not a multiple of the
+step keeps its final screenful hidden, which is where the last two of the 42 were.
+
+The second is that the count could not have caught anything else anyway. A run whose centre is
+off screen was skipped with a bare `continue`, leaving no row, so runs the probe never reached
+did not move the number. `unmeasured: 0` meant "none of the ones I looked at". There is now a
+census of every text run on the page, taken by the probe's own rules minus the on-screen test,
+at every stop the probe is taken at rather than at two fixed positions, because this page
+reveals acts on scroll and a run hidden at the top and at the foot is present in between.
+Anything in the census the probe never reached is reported, with the reason. Blinding the
+probe to the transcript is the check: without the census that mutation prints `all 595 text
+runs clear WCAG AA` and nothing unresolved, with 81 runs of real text read by nobody. With it,
+the same mutation prints the 81.
+
+The third was found by the census and is the largest. A run was identified by its class and
+the first thirty characters of its text, so any two elements sharing both were one run and only
+one of them was ever measured. The playback clock exposed it from the other side: `0:25 / 0:59`
+and `0:29 / 0:59` are one span whose digits move, and each unseen reading arrived as a run
+nobody had measured, which is why that count came back 1 on one run and 3 on the next. A run is
+now identified by which element it is, as a path from `body`, and not by what that element
+currently says. Keying on the class instead would have been worse: the register's ids differ
+only in their digits and those really are separate runs on separate rows.
+
+Together those took the gate from 634 measured runs with 42 unresolved to **928 measured with
+none unresolved**, against the same page and the same 4.5 floor, closest 4.62. The 250 runs in
+that difference were never wrong. They had never been looked at, and nothing said so.
 
 The `rail` gate is the one to read if you only read one. The page decides which act you
 are in by hit-testing what is painted at the middle of the viewport. The gate decides by

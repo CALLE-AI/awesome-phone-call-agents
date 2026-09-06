@@ -45,7 +45,18 @@ from .domain import (
     summarise,
 )
 
-BANNER_OFFLINE = "OFFLINE. No call will be placed. No CALL-E account is needed."
+# What the default run says about itself, and it has to say the second line. The first line
+# alone reads as `CALL-E is not involved here`, which is the opposite of what happens: the
+# offline path builds a real `calle.CalleClient` from the pinned `calle-ai` package and every
+# request is constructed, sent, parsed and raised by CALL-E's own code. Only the transport is
+# local, because `CalleClient` takes an injectable httpx client and the double is mounted on
+# it. A reader who is told a run is offline and not told that will reasonably assume the SDK
+# was stubbed out, and the whole point of the double is that it is not.
+BANNER_OFFLINE = (
+    "OFFLINE. No telephone call will be placed and no CALL-E account is needed.\n"
+    "The CALL-E SDK is running: this is a real calle.CalleClient with the local double\n"
+    "mounted on its transport, so every request and every error is CALL-E's own code."
+)
 
 # The one host that can make a phone ring. Anything else answering this API is a double,
 # including ours.

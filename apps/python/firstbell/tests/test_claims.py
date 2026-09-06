@@ -499,6 +499,13 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "screenshot published twelve real call ids and twelve real billing ids",
     "test_the_tool_that_makes_the_stills_cannot_see_a_recording":
         "skips when the still tool is absent, so deleting the tool would silence it",
+    # Not a test: the helper both tests in test_gate_report.py go through, which is where
+    # the two skip conditions live. Named here because that is where the AST finds them.
+    "_contrast":
+        "reads tools/gates/gate-report.json, which is a build artifact and not committed. "
+        "It skips when the report is absent, and again when the report is older than "
+        "out/index.html, because a report about an earlier build reads exactly like a "
+        "current one and every number in it would be about a page no longer on disk",
 }
 
 

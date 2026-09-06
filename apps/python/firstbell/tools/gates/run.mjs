@@ -632,6 +632,52 @@ async function gateRail(browser, url) {
 }
 
 /** Collected in the page: every text run, its painted colour and its painted ground. */
+/**
+ * Every run of text the contrast probe is entitled to judge, named the same way it names
+ * them, with one rule left out: whether the run happens to be centred on screen.
+ *
+ * The probe skips an off-centre run with a bare `continue`, so it leaves no row and the
+ * count of runs that could not be resolved does not move. `unmeasured: 0` then means "none
+ * of the runs I looked at", which is not the claim the gate prints. This is the denominator
+ * that makes the zero mean something: a run in here that never reached the probe is
+ * reported as unmeasured, with the reason, instead of disappearing.
+ */
+const CONTRAST_CENSUS = () => {
+  // A run is identified by which element it is, not by what that element currently says.
+  // Keying on the text made the playback clock a new run every second: `0:25 / 0:59` and
+  // `0:29 / 0:59` are one span whose digits move, and the census reported each unseen
+  // reading as a run nobody had measured. Keying on the text cannot simply be swapped for
+  // keying on the class either, because the register's ids differ only in their digits and
+  // those really are separate runs on separate rows.
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      let nth = 1;
+      for (let sib = n.previousElementSibling; sib; sib = sib.previousElementSibling) {
+        if (sib.tagName === n.tagName) nth++;
+      }
+      parts.push(n.tagName.toLowerCase() + ":" + nth);
+    }
+    return parts.reverse().join(">");
+  };
+
+  const keys = [];
+  for (const el of document.querySelectorAll("body *")) {
+    const own = [...el.childNodes]
+      .filter((n) => n.nodeType === 3 && n.textContent.trim())
+      .map((n) => n.textContent.trim()).join(" ");
+    if (!own) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility !== "visible" || cs.display === "none") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    const label = el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim()
+      ? "." + el.className.trim().split(/\s+/).join(".") : "");
+    keys.push({ key: pathOf(el), label, text: own.slice(0, 34) });
+  }
+  return keys;
+};
+
 const CONTRAST_PROBE = () => {
   const cx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
   const seen = new Map();
@@ -679,6 +725,24 @@ const CONTRAST_PROBE = () => {
     return null;
   };
 
+  // A run is identified by which element it is, not by what that element currently says.
+  // Keying on the text made the playback clock a new run every second: `0:25 / 0:59` and
+  // `0:29 / 0:59` are one span whose digits move, and the census reported each unseen
+  // reading as a run nobody had measured. Keying on the text cannot simply be swapped for
+  // keying on the class either, because the register's ids differ only in their digits and
+  // those really are separate runs on separate rows.
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      let nth = 1;
+      for (let sib = n.previousElementSibling; sib; sib = sib.previousElementSibling) {
+        if (sib.tagName === n.tagName) nth++;
+      }
+      parts.push(n.tagName.toLowerCase() + ":" + nth);
+    }
+    return parts.reverse().join(">");
+  };
+
   const rows = [];
   for (const el of document.querySelectorAll("body *")) {
     const own = [...el.childNodes]
@@ -700,21 +764,37 @@ const CONTRAST_PROBE = () => {
     // inner box, so it says it could not measure them rather than that they are wrong.
     const label = el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim()
       ? "." + el.className.trim().split(/\s+/).join(".") : "");
-    const key = `${label}|${own.slice(0, 30)}`;
+    const key = pathOf(el);
 
     let clipped = false;
+    let clipper = "";
     for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
       const ncs = getComputedStyle(n);
       if (ncs.overflowY === "visible" && ncs.overflowX === "visible") continue;
       const nb = n.getBoundingClientRect();
       if (r.bottom <= nb.top + 1 || r.top >= nb.bottom - 1
-          || r.right <= nb.left + 1 || r.left >= nb.right - 1) { clipped = true; break; }
+          || r.right <= nb.left + 1 || r.left >= nb.right - 1) {
+        clipped = true;
+        clipper = n.tagName.toLowerCase()
+          + (typeof n.className === "string" && n.className.trim()
+             ? "." + n.className.trim().split(/\s+/)[0] : "");
+        break;
+      }
     }
     // ...and it must SAY so. This branch used to `continue`, which dropped the row
     // entirely: the transcript's clipped rows left no trace, so `unmeasured: 0` was
     // printed while about 116 runs had never been looked at. A run this gate could not
     // resolve is the third outcome, not the absence of a run.
-    if (clipped) { rows.push({ key, label, text: own.slice(0, 34), unmeasured: true }); continue; }
+    //
+    // Each one carries the reason it could not be resolved. A bare count cannot be acted
+    // on: forty-two runs scrolled out of a transcript box is the gate working, and forty-two
+    // runs whose ground came back empty is a hole in it, and the number reads the same
+    // either way. The reason is what tells them apart.
+    if (clipped) {
+      rows.push({ key, label, text: own.slice(0, 34), unmeasured: true,
+                  why: "clipped by " + clipper });
+      continue;
+    }
 
     let alpha = 1;
     for (let n = el; n && n !== document.documentElement.parentNode; n = n.parentElement) {
@@ -722,7 +802,11 @@ const CONTRAST_PROBE = () => {
     }
     const fg = paint(cs.color);
     const bg = groundAt(el, x, y);
-    if (!fg || !bg) { rows.push({ key, label, text: own.slice(0, 34), unmeasured: true }); continue; }
+    if (!fg || !bg) {
+      rows.push({ key, label, text: own.slice(0, 34), unmeasured: true,
+                  why: !fg ? "colour did not parse: " + cs.color : "no opaque ground behind it" });
+      continue;
+    }
 
     // The element is painted at `alpha` of its own colour over whatever is behind it, so
     // that composite is the colour a reader sees and the one the ratio is about.
@@ -758,6 +842,16 @@ async function gateContrast(browser, url) {
   await new Promise((r) => setTimeout(r, 400));
 
   const best = new Map();
+  // Taken wherever the probe is taken, and for the same reason the probe is taken there.
+  // Two fixed positions are not enough: this page reveals acts on scroll, so a run that is
+  // hidden at the top and hidden at the foot is present in between, and a census that
+  // misses it cannot be the denominator for the runs the probe reached.
+  const census = new Map();
+  const takeCensus = async () => {
+    for (const entry of await page.evaluate(CONTRAST_CENSUS)) {
+      if (!census.has(entry.key)) census.set(entry.key, entry);
+    }
+  };
   const absorb = (rows) => {
     for (const row of rows) {
       const had = best.get(row.key);
@@ -772,6 +866,7 @@ async function gateContrast(browser, url) {
   const height = await page.evaluate(() => window.innerHeight);
   const total = await page.evaluate(() => document.documentElement.scrollHeight);
   absorb(await page.evaluate(CONTRAST_PROBE));
+  await takeCensus();
   // Half a viewport at a time. A full step leaves elements that are only ever centred
   // between two stops unsampled, and an element sampled once, part way through its own
   // fade, is judged on that one reading.
@@ -782,11 +877,79 @@ async function gateContrast(browser, url) {
     // into its own fade and calls that a contrast failure.
     await new Promise((r) => setTimeout(r, 600));
     absorb(await page.evaluate(CONTRAST_PROBE));
+    await takeCensus();
   }
+  // The page scroll above never reaches inside a box that scrolls on its own. The
+  // transcript is one, and 42 of its turns came back unmeasured on every run for that
+  // reason alone. Clipped is an honest reason and it is still text a reader can scroll to,
+  // so the gate steps each internal scroller through its own range as well. What cannot be
+  // brought on screen at all stays unmeasured and stays counted.
+  const scrollers = await page.evaluate(() => {
+    const found = [];
+    for (const el of document.querySelectorAll("*")) {
+      const cs = getComputedStyle(el);
+      const down = /auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4;
+      const across = /auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 4;
+      if (!down && !across) continue;
+      el.setAttribute("data-cs-scroller", String(found.length));
+      found.push({
+        i: found.length,
+        downTo: down ? el.scrollHeight - el.clientHeight : 0,
+        acrossTo: across ? el.scrollWidth - el.clientWidth : 0,
+        step: Math.max(40, Math.round((down ? el.clientHeight : el.clientWidth) / 2)),
+      });
+    }
+    return found;
+  });
+
+  for (const box of scrollers) {
+    await page.evaluate((i) => {
+      const el = document.querySelector('[data-cs-scroller="' + i + '"]');
+      if (el) el.scrollIntoView({ block: "center" });
+    }, box.i);
+    await settleScroll(page);
+    await new Promise((r) => setTimeout(r, 600));
+    // The stops have to include the far end. Stepping while `at <= furthest` stops at the
+    // last whole step, so a box whose range is not a multiple of the step keeps its final
+    // screenful hidden: that is the two turns this pass left unmeasured before the end was
+    // added explicitly.
+    const furthest = Math.max(box.downTo, box.acrossTo);
+    const stops = [];
+    for (let at = 0; at < furthest; at += box.step) stops.push(at);
+    stops.push(furthest);
+    for (const at of stops) {
+      await page.evaluate((i, to) => {
+        const el = document.querySelector('[data-cs-scroller="' + i + '"]');
+        if (!el) return;
+        el.scrollTop = Math.min(to, el.scrollHeight - el.clientHeight);
+        el.scrollLeft = Math.min(to, el.scrollWidth - el.clientWidth);
+      }, box.i, at);
+      await new Promise((r) => setTimeout(r, 150));
+      absorb(await page.evaluate(CONTRAST_PROBE));
+      await takeCensus();
+    }
+  }
+
+  for (const [key, entry] of census) {
+    if (best.has(key)) continue;
+    best.set(key, { key, label: entry.label, text: entry.text, unmeasured: true,
+                    why: "never centred on screen at any sampling stop" });
+  }
+
   await page.close();
 
   const rows = [...best.values()];
   const unmeasured = rows.filter((r) => r.unmeasured);
+  // Grouped by reason, commonest first. The one reason that is not the gate working is a
+  // run with no opaque ground behind it: that is a run whose colour nobody has checked,
+  // and it is reported by name so it can be fixed rather than counted again next time.
+  const byReason = new Map();
+  for (const row of unmeasured) {
+    const why = row.why || "reason not recorded";
+    byReason.set(why, (byReason.get(why) || 0) + 1);
+  }
+  const reasons = [...byReason.entries()].sort((a, b) => b[1] - a[1]);
+  const groundless = unmeasured.filter((r) => r.why === "no opaque ground behind it");
   const measured = rows.filter((r) => !r.unmeasured);
   if (measured.length < 50) {
     record("contrast", "COULD-NOT-MEASURE",
@@ -799,11 +962,26 @@ async function gateContrast(browser, url) {
     fails.length === 0
       ? `all ${measured.length} text runs clear WCAG AA; the closest is ${worst.toFixed(2)}, `
         + `and ${unmeasured.length} could not be resolved to a colour and a ground`
+        + (unmeasured.length
+           ? `: ` + reasons.map(([why, n]) => `${n} ${why}`).join(", ")
+           : ``)
       : `${fails.length} of ${measured.length} text runs are below WCAG AA: `
         + fails.slice(0, 4).map((f) => `${f.label} ${f.ratio.toFixed(2)} needs ${f.need} `
           + `(${f.px}px, painted at ${f.alpha} of ${f.colour}) "${f.text}"`).join("; "),
     { measured: measured.length, unmeasured: unmeasured.length,
       worst: Number(worst.toFixed(2)),
+      // The size of the census, recorded so the census itself can be checked. Without
+      // this number, deleting the census changes nothing any test can see on a page
+      // where the probe already reaches every run, and a guard nothing can falsify is
+      // not a guard.
+      censused: census.size,
+      unmeasuredReasons: reasons.map(([why, n]) => ({ why, runs: n })),
+      groundless: groundless.slice(0, 12).map((r) => ({ label: r.label, text: r.text })),
+      // Named, not just counted, for the same reason as the groundless ones: a run the
+      // probe never reached is either something to fix or something to argue is
+      // unreachable, and neither conversation can start from a number.
+      unreached: unmeasured.filter((r) => r.why && r.why.startsWith("never centred"))
+        .slice(0, 12).map((r) => ({ label: r.label, text: r.text })),
       fails: fails.slice(0, 12).map((f) => ({ label: f.label, ratio: Number(f.ratio.toFixed(2)),
         need: f.need, px: f.px, alpha: f.alpha, text: f.text })) });
 }

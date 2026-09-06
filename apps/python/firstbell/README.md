@@ -21,24 +21,32 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and sixteen gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and twenty-three gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
 
 ### Where CALL-E is called at runtime
 
-Four lines do all of it. Every anchor below is checked by a test, so a line number here
-cannot quietly rot.
+Four lines do all of it, and the default offline run reaches three of them. Every anchor
+below is checked by a test, so a line number here cannot quietly rot.
 
-- The client is constructed on the live path only: `from calle import CalleClient` at
-  `firstbell/cli.py:245`. The offline default never reaches it.
 - The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:337`, with
   the whole phone fallback chain and the per-family `locale` in one request.
 - Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:404`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:329`, rather than as a string match on a message.
+- The client is built from an api key on the live path only, `from calle import CalleClient` at
+  `firstbell/cli.py:256`.
+
+The offline default stubs none of that. It builds a real client at
+`calle_double/transport.py:88` and mounts the double on that client's own httpx transport,
+so `isinstance(client, calle.CalleClient)` is true and `client.calls` is `calle.calls`.
+Running the default command executes CALL-E's request construction, its response parsing and
+its exception types, and the only local thing in the loop is the wire. That is why
+`calle-ai==0.7.0` is a runtime dependency here and not a test-only one, and it is why the
+seven rows below can be checked without an account.
 
 ## Reusable without this app
 
@@ -85,7 +93,9 @@ leaves the machine, nothing is billed, and the run is deterministic, so the prin
 numbers can be checked against the seven rows in `examples/absences.csv`.
 
 ```
-OFFLINE. No call will be placed. No CALL-E account is needed.
+OFFLINE. No telephone call will be placed and no CALL-E account is needed.
+The CALL-E SDK is running: this is a real calle.CalleClient with the local double
+mounted on its transport, so every request and every error is CALL-E's own code.
 7 row(s) from examples\absences.csv, concurrency 3.
 
   [ok   ] S-1041       schema-valid answer received
@@ -475,7 +485,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 279 tests
+python -m pytest tests/ -q          # 289 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
