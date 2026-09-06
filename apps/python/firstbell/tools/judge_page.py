@@ -752,6 +752,48 @@ LEAD_MUTATIONS = {
           "the one row no test caught, and it is in the table for that reason.",
 }
 
+def three_endings_figure() -> str:
+    """The three words the product turns on, shown once instead of defined three times.
+
+    A blind seat reading this page as a school district administrator listed `resolved`,
+    `undetermined` and `failed` among the words they could not follow, having met all three
+    as a table column. A sentence explaining three outcomes is a paragraph. Three outcomes
+    drawn once is a glance.
+
+    The geometry comes from `tools/make_figure.py`, which authors it as Lottie and exports a
+    still. The words do not: they are HTML beside the drawing rather than text inside it,
+    because text baked into an SVG carries no @font-face, cannot be selected, cannot be
+    found by a page search and is invisible to a translation tool, on a page whose subject is
+    families who do not read English.
+
+    Returns an empty string when the figure has not been generated, so a checkout that has
+    not run the generator builds a page without it rather than a page with a broken image.
+    """
+    svg_path = SITE / "figures" / "three-endings.svg"
+    if not svg_path.exists():
+        return ""
+    svg = svg_path.read_text(encoding="utf-8")
+    # The generator writes a standalone document. Inline it as a graphic instead, so it
+    # inherits the page's own colours and carries the page's accessible name.
+    svg = re.sub(r"<\?xml[^>]*\?>", "", svg, count=1).strip()
+    svg = svg.replace("<svg ", '<svg role=img aria-label="Three endings: a call comes back '
+                               'resolved, undetermined, or failed." ', 1)
+
+    rows = [
+        ("resolved", "The office has an answer it can act on. The case closes."),
+        ("undetermined", "The call happened and produced nothing usable. A person has to "
+                         "pick it up, and the software says so rather than closing it."),
+        ("failed", "Nobody answered on any number. Nothing happened, and nothing is owed."),
+    ]
+    items = "".join(
+        f'<div class=fig-row><p class="state state-{name}">{name}</p>'
+        f'<p class=fig-say>{esc(text)}</p></div>'
+        for name, text in rows)
+    return (f'<figure class=endings-fig>{svg}<div class=fig-key>{items}</div>'
+            '<figcaption>Every call this software places comes back as exactly one of these '
+            'three. The third one is the whole argument.</figcaption></figure>')
+
+
 def mutation_distribution(muts: list) -> str:
     """The shape of the table beside it, drawn instead of described.
 
@@ -1141,6 +1183,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
                    '<a href="#act-05">mutation table</a> holds the tests that keep the '
                    'distinction from collapsing.</p>'),
         '<div class=act-num>03</div><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
+        three_endings_figure(),
         '<p class=eyebrow>The same call, filed three ways</p>',
         endings_markup(data, en, run),
         '<p class=note>This app made the first mistake itself. A parent refused to talk, '

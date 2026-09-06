@@ -499,6 +499,15 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "screenshot published twelve real call ids and twelve real billing ids",
     "test_the_tool_that_makes_the_stills_cannot_see_a_recording":
         "skips when the still tool is absent, so deleting the tool would silence it",
+    # The two on the generated figure. Both go quiet for a reason that is about the machine
+    # rather than about the page, which is exactly the shape that hides a gate if it is not
+    # written down here.
+    "test_the_committed_figure_is_what_the_generator_makes_today":
+        "skips when python-lottie is not installed, because the check regenerates the figure "
+        "and cannot do that without the library that draws it",
+    "test_the_figure_carries_no_text_of_its_own":
+        "skips when the figure has not been generated in this checkout, since there is no "
+        "SVG to read for text that should not be in it",
     # The one branch of the video's fact reader that cannot be exercised while the thing it
     # needs is present. It goes quiet on this machine and runs on a clean checkout, which is
     # the opposite way round from the image gates above.

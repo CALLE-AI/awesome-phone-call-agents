@@ -1618,3 +1618,32 @@ button[data-copy][data-copied]::after {
   max-width: var(--measure);
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
 }
+
+/* ---- the three endings figure ------------------------------------------------------------ */
+/* The three words the product turns on, shown once. A blind seat reading as a district
+ * administrator listed resolved, undetermined and failed among the words they could not
+ * follow, having met all three as a table column and never as a picture.
+ *
+ * The drawing is geometry only. The words sit beside it in HTML rather than inside the SVG,
+ * because SVG text carries no @font-face, cannot be selected or searched, and is invisible to
+ * a translation tool, which would be a poor joke on a page about families who do not read
+ * English. */
+.endings-fig { margin: 1.6rem 0 1.8rem; max-width: var(--measure); }
+.endings-fig svg { display: block; width: 100%; height: auto; }
+.fig-key {
+  display: grid; gap: 0.85rem;
+  margin: 1rem 0 0.6rem;
+}
+.fig-row { display: grid; grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr); gap: 0.9rem; }
+.fig-row .state { margin: 0; align-self: start; }
+.fig-say {
+  margin: 0; max-width: 52ch;
+  font-size: var(--size-3); color: var(--ink-2); text-wrap: pretty;
+}
+.endings-fig figcaption {
+  margin-top: 0.9rem; max-width: var(--measure);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+}
+@media (max-width: 40rem) {
+  .fig-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+}
