@@ -454,9 +454,16 @@ export class CallPlayer {
       li.dataset.who = t.speaker;
       li.dataset.rel = 'ahead';
       const who = t.speaker === 'bot' ? 'agent' : 'parent';
+      // Every value on the next three lines goes through esc, including the locale. The
+      // locale was the one that did not, and it lands inside an attribute rather than in
+      // text, so a locale carrying a double quote would have closed lang= and opened
+      // whatever followed it. judge_page.py escapes the same field when it renders the
+      // same markup; this renderer did not, which is the shape of the bug: two writers of
+      // one string, one of them careful.
       let html = '<span class="turn-at">' + fmt(t.offset_seconds) + '</span>' +
                  '<span class="turn-who">' + who + '</span>' +
-                 '<span class="turn-text" lang="' + this.call.locale + '">' + esc(t.text) + '</span>';
+                 '<span class="turn-text" lang="' + esc(this.call.locale) + '">' +
+                 esc(t.text) + '</span>';
       // The gloss exists only on non-English turns. It is a translation written by the author,
       // labelled as one in the markup, because CALL-E did not return it.
       if (t.gloss) html += '<span class="turn-gloss" lang="en">' + esc(t.gloss) + '</span>';

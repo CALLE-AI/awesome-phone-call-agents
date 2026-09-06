@@ -215,6 +215,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 106 | Stop counting the skips that are neither consent nor channel, so a reason added later disappears from the summary instead of showing up as unattributed | 2 |
 | 107 | Put back a contrast pair naming a token `page.css` no longer declares, so the tool reports it unmeasured and the page keeps telling a reader that an unmeasured pair cannot read as a pass | 1 |
 | 108 | Remove the pair covering a scoped re-cut of an ink token, so the colour a reader actually looks at inside a panel is measured by nothing | 1 |
+| 109 | Put the locale back into `lang="..."` unescaped in the browser-side transcript renderer, the way it shipped, so a locale carrying a double quote closes the attribute and opens whatever follows it | 1 |
+| 110 | Narrow `esc` to `&`, `<` and `>`, which leaves the check on the line above passing while the value it escapes can still close a quoted attribute | 1 |
+| 111 | Rebuild the same attribute as a template literal with the value interpolated raw, which is how the hole survives a rewrite that touches nothing else | 1 |
+| 112 | Retype the count under the browser-gate table rather than leave it to be counted, so the prose says eight rows record a state the page was really in where nine carry the marker | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -346,11 +350,17 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The eleven browser gates
+## The twelve browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
 because they fail as a gate rather than as a count of tests.
+
+The twelfth is `overflow`, and it is the one that was missing rather than the one that was
+added. The document was wider than the window at 1152 and at 390 CSS pixels, which is a
+sideways scrollbar on an ordinary laptop, and every other gate passed on that build without
+noticing: weight, contrast, the rail and the keyboard all read the same whether the page is
+1152px wide or 1545px wide inside a 1152px window.
 
 | The change | What the gate said |
 |---|---|
@@ -365,11 +375,14 @@ because they fail as a gate rather than as a count of tests.
 | Read the breakpoint once at parse time instead of asking it live, which is how it shipped until this was fixed | `viewport` FAIL in both directions: `widened, foot: the rail reads 0% at the foot of the page` and `narrowed, past the curtain: the hero is not sticky yet sits at 0.491 opacity, faded for a pin that is not holding it` |
 | Stop recomputing the hero's resting position on resize | `viewport` FAIL, `reshaped, top: the hero rests at -332px where -186px reaches its last line` |
 | Serve the playhead as `role=slider tabindex=0` before any script can back it, which is how it shipped until this was fixed | `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: canvas[data-waveform] in act-00 says role=slider, canvas[data-waveform] in act-03 says role=slider` |
+| Take `overflow-x: auto` off the two scrolling boxes, which is how the page shipped until this was fixed | Two gates at once. `overflow` FAIL, `at 390px the document is 582px wide, widest is table.ids reaching 582px. at 1152px the document is 1264px wide`; and `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: div.scrollbox in act-04 takes tabindex=0, div.scrollbox in act-05 takes tabindex=0`. The second failure is the point: a box that has stopped scrolling has also stopped being operable without script, so the exemption that lets it carry `tabindex` cannot be claimed by a div that does not scroll |
+| Let the one-column `.split` track go back to implicit `auto`, which is how it shipped until this was fixed | `overflow` FAIL, `at 390px the document is 582px wide, widest is div.claim reaching 582px` |
 
-Seven of those eleven are the state this page was actually in, not a change invented to trip
-a gate, and each of the seven says so in its own row. The CLS failure, the rail, the dimmed
+Nine of those thirteen are the state this page was actually in, not a change invented to trip
+a gate, and each of the nine says so in its own row. The CLS failure, the rail, the dimmed
 transcript, the clipped focus ring, the playhead no keyboard could reach, the frozen
-breakpoint and the slider that only existed once a script arrived were all found this way,
+breakpoint, the slider that only existed once a script arrived, the two tables that pushed
+the document sideways and the implicit grid track underneath them were all found this way,
 and all of them are fixed. The long task is not among them: that row appends a busy loop
 nobody ever shipped, which is the other kind of row and the reason the two are counted
 apart.

@@ -753,9 +753,16 @@ def test_the_count_of_gates_the_page_really_failed_is_counted_not_typed():
 
     shipped = [ln for ln in body if "which is how" in ln]
 
-    words = "zero one two three four five six seven eight nine ten eleven twelve".split()
+    words = ("zero one two three four five six seven eight nine ten eleven twelve "
+             "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
     claim = re.search(r"\b(\w+) of those (\w+) are the state this page was actually in", text)
     assert claim, "the sentence this gate checks has been reworded, so it is checking nothing"
+
+    for group in (1, 2):
+        assert claim.group(group).lower() in words, (
+            f"the prose counts in {claim.group(group)!r}, which this gate cannot turn into a "
+            "number; widen the word list rather than leaving the count unchecked"
+        )
 
     assert words.index(claim.group(1).lower()) == len(shipped), (
         f"the prose says {claim.group(1)} rows record a state the page was really in; "
