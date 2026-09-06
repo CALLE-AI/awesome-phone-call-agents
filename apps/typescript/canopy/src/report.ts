@@ -26,15 +26,19 @@ function fmtSeconds(s: number | null): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+const TERMINAL = new Set(["completed", "failed", "canceled"]);
+
 export function buildReport(projection: Projection): string {
   const event = projection.event;
   const states = [...projection.states.values()];
   const byOutcome = (o: Outcome): PersonState[] => states.filter((s) => s.outcome === o);
+  const pendingStates = states.filter((s) => s.outcome === null);
   const total = states.length;
   const reached = states.filter((s) => s.outcome === "green" || s.outcome === "yellow" || s.outcome === "red").length;
   const calls = [...projection.calls.values()];
   const waveCalls = calls.filter((c) => c.kind === "wave");
   const escalationCalls = calls.filter((c) => c.kind === "escalation");
+  const pendingCalls = calls.filter((c) => !TERMINAL.has(c.status));
   const dispatches = [...projection.dispatches.values()];
   const declaredAt = projection.timeline[0]?.at ?? null;
   const verdictTimes = states.map((s) => s.classifiedAt).filter((t): t is string => t !== null).sort();
@@ -49,6 +53,9 @@ export function buildReport(projection: Projection): string {
   lines.push(`- Declared: ${declaredAt ?? "n/a"} (source: ${event?.source ?? "n/a"})`);
   lines.push(`- Organisation: ${event?.org ?? "n/a"}`);
   lines.push(`- Mode: ${projection.mode ?? "n/a"}${projection.mode === "dry-run" ? " (no real calls were placed; conversations were simulated by the local fake CALL-E server)" : ""}`);
+  if (pendingCalls.length > 0 || projection.failedWaves.length > 0) {
+    lines.push(`- Status: **incomplete**. ${pendingCalls.length} call(s) still pending and ${projection.failedWaves.length} wave(s) not accepted by CALL-E. Run \`resume --event-id ${event?.id ?? ""}\`.`);
+  }
   lines.push("");
   lines.push("## Summary");
   lines.push("");
@@ -61,6 +68,8 @@ export function buildReport(projection: Projection): string {
   lines.push(`| Red (human escalation) | ${byOutcome("red").length} |`);
   lines.push(`| Unreachable | ${byOutcome("unreachable").length} |`);
   lines.push(`| Unverified (answered, facts not established) | ${byOutcome("unverified").length} |`);
+  lines.push(`| Not attempted (CALL-E did not accept the task) | ${byOutcome("not_attempted").length} |`);
+  lines.push(`| Awaiting a result (call still pending) | ${pendingStates.length} |`);
   lines.push(`| Wave call tasks placed | ${waveCalls.length} |`);
   lines.push(`| Escalation calls to contacts | ${escalationCalls.length} |`);
   lines.push(`| Dispatch tickets | ${dispatches.length} (${dispatches.filter((d) => d.needsHumanApproval).length} need human approval) |`);
@@ -68,10 +77,9 @@ export function buildReport(projection: Projection): string {
   lines.push(`| Time to last verdict | ${fmtSeconds(lastVerdict)} |`);
   lines.push("");
 
-  const section = (title: string, outcome: Outcome, empty: string): void => {
+  const section = (title: string, list: PersonState[], empty: string): void => {
     lines.push(`## ${title}`);
     lines.push("");
-    const list = byOutcome(outcome);
     if (list.length === 0) {
       lines.push(empty);
       lines.push("");
@@ -81,8 +89,10 @@ export function buildReport(projection: Projection): string {
       const person = projection.people.get(state.personId);
       lines.push(`### ${person?.name ?? state.personId} (${maskPhone(person?.phone ?? "")}, priority ${state.priority}, risk ${state.riskScore})`);
       lines.push("");
-      lines.push(`- Verdict: **${state.outcome}**${state.agentTier && state.agentTier !== state.outcome ? ` (agent said ${state.agentTier})` : ""}`);
-      lines.push(`- Why: ${state.reasons.join("; ")}`);
+      lines.push(`- Verdict: **${state.outcome ?? "pending"}**${state.agentTier && state.agentTier !== state.outcome ? ` (agent said ${state.agentTier})` : ""}`);
+      if (state.reasons.length > 0) {
+        lines.push(`- Why: ${state.reasons.join("; ")}`);
+      }
       if (state.lastSummary) {
         lines.push(`- Call summary: ${state.lastSummary}`);
       }
@@ -101,10 +111,16 @@ export function buildReport(projection: Projection): string {
     }
   };
 
-  section("Red: warning signs reported", "red", "Nobody reported red-flag symptoms.");
-  section("Unreachable", "unreachable", "Everyone was reached.");
-  section("Unverified", "unverified", "Every completed call established the facts.");
-  section("Yellow: follow-up due", "yellow", "Nobody needed a follow-up.");
+  section("Red: warning signs reported", byOutcome("red"), "Nobody reported red-flag symptoms.");
+  section("Unreachable", byOutcome("unreachable"), "Everyone was reached.");
+  section("Unverified", byOutcome("unverified"), "Every completed call established the facts.");
+  section("Yellow: follow-up due", byOutcome("yellow"), "Nobody needed a follow-up.");
+  if (byOutcome("not_attempted").length > 0) {
+    section("Not attempted: CALL-E did not accept the call task", byOutcome("not_attempted"), "");
+  }
+  if (pendingStates.length > 0) {
+    section("Awaiting a result", pendingStates, "");
+  }
 
   lines.push("## Dispatch tickets");
   lines.push("");
@@ -130,9 +146,11 @@ export function buildReport(projection: Projection): string {
   lines.push("");
   const slow = calls.flatMap((c) => c.firstBotTurnOffsets.map((o, i) => ({ call: c.callId, recipient: c.recipients[i]?.maskedPhone ?? "?", offset: o }))).filter((x) => x.offset !== null && x.offset >= 15);
   const nullResults = states.filter((s) => s.outcome === "unverified").length;
-  const failures = calls.filter((c) => c.status !== "completed");
+  const failures = calls.filter((c) => TERMINAL.has(c.status) && c.status !== "completed");
   const lowConfidence = calls.filter((c) => c.confidenceLabel !== null && c.confidenceLabel.toLowerCase() === "low");
-  lines.push(`- Call tasks: ${calls.length} (${waveCalls.length} wave, ${escalationCalls.length} escalation); ${failures.length} did not complete${failures.length > 0 ? ` (${failures.map((f) => `${f.callId}: ${f.failureCode ?? f.status}`).join(", ")})` : ""}.`);
+  const retryNotes = projection.timeline.filter((t) => t.message.includes("did not accept") && t.message.includes("retry")).length;
+  lines.push(`- Call tasks: ${calls.length} (${waveCalls.length} wave, ${escalationCalls.length} escalation); ${failures.length} did not complete${failures.length > 0 ? ` (${failures.map((f) => `${f.callId}: ${f.failureCode ?? f.status}`).join(", ")})` : ""}; ${pendingCalls.length} still pending.`);
+  lines.push(`- Create requests retried after a platform error: ${retryNotes}. Waves never accepted: ${projection.failedWaves.length}.`);
   lines.push(`- Completed calls with no usable structured result: ${nullResults}.`);
   lines.push(`- Calls with low completion confidence: ${lowConfidence.length}.`);
   lines.push(`- Recipients whose first bot turn started 15 s or more after connect: ${slow.length}${slow.length > 0 ? ` (${slow.map((s) => `${s.recipient} at ${s.offset}s`).join(", ")})` : ""}.`);

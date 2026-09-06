@@ -3,7 +3,10 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import { isE164 } from "./mask.js";
+import { parseQuietHours, resolveTimeZone, type QuietWindow } from "./quiet-hours.js";
+import type { TaskMode } from "./types.js";
 
 export type Mode = "dry-run" | "live";
 
@@ -12,13 +15,21 @@ export interface Config {
   apiKey: string | null;
   baseUrl: string;
   publicUrl: string | null;
+  /** Interface the dashboard binds to. 127.0.0.1 by default; 0.0.0.0 for a hosted dry-run demo. */
+  host: string;
   port: number;
   fakePort: number;
   org: string;
   emergencyNumber: string;
   waveSize: number;
+  /** batch: one call task per wave with recipients[]. per-person: one call task per person, placed in parallel per wave. */
+  taskMode: TaskMode;
   liveAllowlist: string[] | null;
   dataDir: string;
+  quietHours: QuietWindow | null;
+  timeZone: string;
+  /** Required on every dashboard and API route except the webhook when set. Auto-generated when a public URL is configured. */
+  dashboardToken: string | null;
 }
 
 /** Loads KEY=VALUE lines from a .env file without adding a dependency. Existing env wins. */
@@ -75,18 +86,37 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       }
     }
   }
+  const taskModeRaw = (env["CANOPY_TASK_MODE"] ?? "").trim().toLowerCase();
+  let taskMode: TaskMode;
+  if (taskModeRaw === "batch" || taskModeRaw === "per-person") {
+    taskMode = taskModeRaw;
+  } else if (taskModeRaw.length === 0) {
+    // Live defaults to one task per person so the agent always knows whom it is speaking to.
+    taskMode = mode === "live" ? "per-person" : "batch";
+  } else {
+    throw new Error(`CANOPY_TASK_MODE must be batch or per-person, got ${taskModeRaw}`);
+  }
+  const publicUrl = (env["CANOPY_PUBLIC_URL"] ?? "").trim() || null;
+  const tokenRaw = (env["CANOPY_DASHBOARD_TOKEN"] ?? "").trim();
+  const dashboardToken = tokenRaw.length > 0 ? tokenRaw : publicUrl !== null ? randomBytes(18).toString("base64url") : null;
+  const portFallback = intEnv(env, "PORT", 4700, true);
   return {
     mode,
     apiKey: apiKey.length > 0 ? apiKey : null,
     baseUrl: mode === "live" ? (env["CALLE_BASE_URL"] ?? "https://api.heycall-e.com") : `http://127.0.0.1:${fakePort}`,
-    publicUrl: (env["CANOPY_PUBLIC_URL"] ?? "").trim() || null,
-    port: intEnv(env, "CANOPY_PORT", 4700, true),
+    publicUrl,
+    host: (env["CANOPY_HOST"] ?? "").trim() || "127.0.0.1",
+    port: intEnv(env, "CANOPY_PORT", portFallback, true),
     fakePort,
     org: (env["CANOPY_ORG"] ?? "").trim() || "Canopy Emergency Response",
     emergencyNumber: (env["CANOPY_EMERGENCY_NUMBER"] ?? "").trim() || "your local emergency number",
     waveSize: intEnv(env, "CANOPY_WAVE_SIZE", 4),
+    taskMode,
     liveAllowlist,
     dataDir: (env["CANOPY_DATA_DIR"] ?? "").trim() || join(process.cwd(), "data", "runs"),
+    quietHours: parseQuietHours(env["CANOPY_QUIET_HOURS"] ?? "21:00-07:00"),
+    timeZone: resolveTimeZone(env["CANOPY_TIMEZONE"]),
+    dashboardToken,
   };
 }
 

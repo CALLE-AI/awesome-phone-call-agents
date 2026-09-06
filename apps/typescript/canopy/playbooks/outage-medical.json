@@ -2,6 +2,7 @@
   "id": "outage-medical",
   "title": "Power outage check for people who depend on electric medical devices",
   "hazard_noun": "power outage",
+  "life_safety": true,
   "triggers": {
     "nws_events": [],
     "open_meteo": null

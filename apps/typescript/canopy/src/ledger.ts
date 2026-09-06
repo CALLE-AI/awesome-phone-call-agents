@@ -13,6 +13,8 @@ export type LedgerEntry =
   | { type: "registry.loaded"; at: string; count: number; skipped: number; warnings: string[] }
   | { type: "person.registered"; at: string; person: Person; riskScore: number; priority: Priority; factors: string[] }
   | { type: "wave.planned"; at: string; wave: Wave }
+  | { type: "wave.failed"; at: string; wave: Wave; personIds: string[]; error: string }
+  | { type: "call.pending"; at: string; callId: string; personIds: string[]; reason: string }
   | { type: "call.created"; at: string; call: CallRecord; taskPreview: string }
   | { type: "call.event"; at: string; callId: string; level: string; message: string; eventId: string }
   | { type: "call.terminal"; at: string; call: CallRecord; summary: string | null; evidence: string[] }
@@ -30,6 +32,8 @@ export interface Projection {
   people: Map<string, Person>;
   states: Map<string, PersonState>;
   waves: Wave[];
+  /** Waves whose call task CALL-E never accepted; `resume` re-places them with the same idempotency keys. */
+  failedWaves: { wave: Wave; personIds: string[]; error: string }[];
   calls: Map<string, CallRecord>;
   timeline: { at: string; message: string; level: string }[];
   dispatches: Map<string, DispatchTicket>;
@@ -44,6 +48,7 @@ export function emptyProjection(): Projection {
     people: new Map(),
     states: new Map(),
     waves: [],
+    failedWaves: [],
     calls: new Map(),
     timeline: [],
     dispatches: new Map(),
@@ -87,8 +92,17 @@ export function apply(projection: Projection, entry: LedgerEntry): void {
       projection.waves.push(entry.wave);
       projection.timeline.push({ at: entry.at, level: "info", message: `Wave ${entry.wave.index} planned: ${entry.wave.personIds.length} people, priority ${entry.wave.priority}, attempt ${entry.wave.attempt}` });
       break;
+    case "wave.failed":
+      projection.failedWaves.push({ wave: entry.wave, personIds: entry.personIds, error: entry.error });
+      projection.timeline.push({ at: entry.at, level: "error", message: `Wave ${entry.wave.index} (attempt ${entry.wave.attempt}) was not accepted by CALL-E: ${entry.error}` });
+      break;
+    case "call.pending":
+      projection.timeline.push({ at: entry.at, level: "warning", message: `${entry.callId} still in progress when the run stopped (${entry.reason}); run resume to settle it` });
+      break;
     case "call.created":
       projection.calls.set(entry.call.callId, entry.call);
+      // A re-placed failed wave that CALL-E now accepts is no longer failed.
+      projection.failedWaves = projection.failedWaves.filter((f) => !(f.wave.index === entry.call.wave && f.wave.attempt === entry.call.attempt && entry.call.kind === "wave"));
       for (const personId of entry.call.personIds) {
         const state = projection.states.get(personId);
         if (state) {

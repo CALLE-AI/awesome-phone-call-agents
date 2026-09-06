@@ -19,6 +19,7 @@ at a time.
 | Philadelphia's inbound Heatline took 81 calls in a three-day heat emergency | WHYY, 2023 |
 | Ahmedabad's Heat Action Plan averts about 1,190 deaths a year, but its outreach is one-way messaging with weak last-mile follow-up | Hess et al., 2018; Urban Science 2020 |
 | 4.5 million at-risk US Medicare beneficiaries, over 3 million dependent on electricity-powered medical devices, are reached by hand during outages | HHS emPOWER |
+| Singapore's NEA advises the elderly and people with lung or heart disease to limit outdoor activity when the 24-hour PSI passes 100 | NEA haze advisories |
 
 The pattern is consistent: the registry exists, the evidence that a two-way phone call saves lives
 exists, and the bottleneck is the hours it takes humans to dial. Inbound hotlines reach dozens; outbound
@@ -35,22 +36,25 @@ products are sold to US health insurers and Korean city governments.
 The organisations that actually own emergency registries elsewhere, such as city emergency management
 offices, district health departments, Red Cross chapters, Meals on Wheels programmes and community
 health worker networks, cannot buy them. Canopy is that capability as an open, hazard-agnostic
-workflow on CALL-E, in any language CALL-E speaks, for any registry that fits in a CSV.
+workflow on CALL-E, in any language CALL-E speaks, for any registry that fits in a CSV. Two things
+those products do not do: phone the neighbour, and let the code overrule the agent.
 
 ## How it works
 
 ```
 alert feed or operator  ->  hazard event  ->  risk-ordered waves
-                                                    |
-                                   one CALL-E call task per wave
-                                   recipients[], per-recipient schema,
-                                   task-level aggregate, idempotency key
+(NWS, Open-Meteo, NEA PSI)                          |
+                                   one CALL-E call task per person (live)
+                                   or per wave (batch): per-recipient schema,
+                                   task-level aggregate, idempotency key,
+                                   create retried with backoff on 429 / 5xx
                                                     |
                               terminal webhook (checked, de-duplicated,
                               re-fetched) or polling, whichever comes first
                                                     |
                                    fail-closed verdict per person
                                    green | yellow | red | unreachable | unverified
+                                   not_attempted (task refused) | awaiting (pending)
                                                     |
                    +----------------+---------------+------------------+
                  close          follow-up       escalation call     door-knock list
@@ -62,20 +66,22 @@ alert feed or operator  ->  hazard event  ->  risk-ordered waves
                                                     |
                                    append-only ledger -> live dashboard
                                                      -> after-action report
+                                                     -> resume after a crash
 ```
 
 ### CALL-E usage in detail
 
 | Surface | Use in Canopy |
 | --- | --- |
-| `POST /v1/calls` via `@call-e/calle` `client.calls.create` | One task per wave. `recipients[]` with `phones`, `locale`, `region` per person. |
+| `POST /v1/calls` via `@call-e/calle` `client.calls.create` | One task per person (live) or per wave (batch). `recipients[]` with `phones`, `locale`, `region`. |
 | `recipient_result_schema` | `answered_by`, `is_cool`, `hydrated`, `symptoms[]`, `confusion_suspected`, `needs[]`, `tier`, `notes`. Enum descriptions carry the selection rules. |
-| `result_schema` | `green_count`, `yellow_count`, `red_count`, `not_reached_count` for the wave. |
+| `result_schema` | `green_count`, `yellow_count`, `red_count`, `not_reached_count` for the task. |
 | `metadata` | `event_id`, `wave`, `attempt`, `person_ids`; in dry-run also the scenario hints for the fake server. |
-| `Idempotency-Key` | `canopy:<event>:wave<n>:attempt<m>` and `canopy:<event>:escalation:<person>`. |
+| `Idempotency-Key` | `canopy:<event>:wave<n>:attempt<m>[:<person>]` and `canopy:<event>:escalation:<person>`; reused across retries and resume. |
 | `webhook_url` | Terminal events to `/calle/webhook`; header checked, de-duplicated, then `GET /v1/calls/{id}`. |
 | `GET /v1/calls/{id}/events` | Developer events streamed into the ledger and dashboard timeline while a call is in flight. |
-| `completion_confidence`, `evidence[]`, `transcript_turns[]` | Confidence gates green; user turns become the report's "in their words" quotes; first bot-turn offsets flag silent starts. |
+| `completion_confidence`, `evidence[]`, `transcript_turns[]` | Confidence vetoes green on single-recipient tasks; user turns become the report's "in their words" quotes; first bot-turn offsets flag silent starts. |
+| Error model (`CalleRateLimitError`, `CalleAPIError` status, codes) | Transient errors retried with backoff; invalid requests fail fast into `not_attempted`. |
 | A second `client.calls.create` | The escalation call to the emergency contact, with its own schema (`reached`, `will_check`, `eta_minutes`, `wants_emergency_services`). |
 | Agent Skill | `skills/hazard-roll-call` lets Claude Code, Codex or any Agent-Skills host drive the same workflow with the same safety rules. |
 
@@ -87,29 +93,47 @@ phoned. Confusion is the heat-stroke sign that kills; a model that under-rates i
 Every rule in `classify.ts` and `cascade.ts` is a pure function with a test, and the agent's own tier is
 kept beside the verdict so the report shows every disagreement.
 
+### Why failure semantics get their own tests
+
+A rate limit during a heat wave must not turn into ten phone calls to frightened relatives about
+people who were never dialled. `test/robustness.test.ts` injects 429s, 503s, invalid requests and
+timeouts into the fake server and asserts, for each, exactly which people are dialled, which are
+marked `not_attempted`, which are `awaiting`, and that `resume` brings the event to the same end
+state as an uninterrupted run, with no duplicate call and no duplicate ticket.
+
+## What it looks like
+
+![Dashboard after a drill: map, tiers, dispatch queue with a human approval, people quoted in their own words](images/dashboard-after-drill.png)
+
+![Dashboard mid-drill: calls in flight, verdicts landing as webhooks arrive](images/dashboard-mid-drill.png)
+
 ## Demo guide (about three minutes)
 
 1. `npm run plan`: the registry is scored and the wave order is printed with masked numbers and the
    reasons. Point at the rendered task: the disclosure line, the four questions, the emergency number.
-2. `npm run serve`, open the dashboard, press "Start drill". Watch the map fill: green, yellow, two reds,
-   one grey. The timeline shows the CALL-E call task ids, the dialing events, the webhooks arriving.
-3. Open the dispatch queue: Miguel asked for emergency services for Rosa, and that ticket is waiting for
-   a human. Approve it. Sarah is on her way to Harold, ETA 15 minutes. Samuel has no contact and is on
-   the door-knock list.
-4. Open the after-action report. Reach rate, tiers, "in their words" quotes, tickets, platform
-   observations (one recipient's first bot turn started 23 seconds in).
+2. `npm run serve`, open the dashboard, pick the Ahmedabad sample, press "Start drill". Watch the map
+   fill: green, yellow, two reds, one grey. The timeline shows the CALL-E call task ids, the dialing
+   events, the webhooks arriving. Hindi and Tamil speakers are quoted in their own words.
+3. Open the dispatch queue: Rakesh asked for emergency services for Savitaben, and that ticket is
+   waiting for a human. Approve it. Meena is on her way to Ramanbhai, ETA 15 minutes. Salma has no
+   contact and is on the door-knock list.
+4. Open the after-action report. Reach rate, tiers, quotes, tickets, platform observations (one
+   recipient's first bot turn started 23 seconds in).
 5. For a live demonstration, set `CANOPY_MODE=live`, an API key, `CANOPY_LIVE_ALLOWLIST` with the
-   consenting demo participants, and run with `--confirm`. Real phones ring, in the language on each
-   registry row, and the same dashboard fills from real CALL-E results.
+   consenting demo participants, and run with `--confirm`. Real phones ring, one task per person, in
+   the language on each registry row, and the same dashboard fills from real CALL-E results.
 
 ## Ethics and compliance notes
 
 - Opt-in registry only; consent and its date are stored per row.
 - The AI discloses itself in the first sentence of every call.
+- Quiet hours (21:00-07:00 by default, in the configured time zone) are enforced for live calls; only
+  life-safety playbooks may be overridden, with a recorded reason.
 - Emergency-purpose calls fall under the TCPA emergency exception in the US; Canopy discloses anyway.
 - No diagnosis, no dosing advice. Red flags: call the emergency number, and a human is alerted.
 - Canopy never contacts emergency services itself; a person approves that ticket.
-- Phone numbers are masked everywhere except the operator's own registry file.
+- Phone numbers are masked everywhere except the operator's own registry file. Addresses, medical
+  keywords and notes never reach CALL-E.
 
 ## Feedback for the CALL-E team (collected while building)
 
@@ -119,21 +143,29 @@ kept beside the verdict so the report shows every disagreement.
    A `scheduled_at` on `POST /v1/calls`, matching the MCP `plan_call` field, would close the gap.
 3. No `answered_by` disposition from the platform; voicemail detection has to be delegated to the
    extraction schema, which is weaker than a platform signal.
-4. Webhooks are unsigned; the `CALL-E-Event-Id` equality check is a consistency check, not
+4. `completion_confidence` is per task. In a multi-recipient task one bad recipient lowers the
+   confidence for everyone, so it cannot gate individual verdicts; a per-recipient confidence would let
+   batch tasks be as safe as single-recipient ones.
+5. Webhooks are unsigned; the `CALL-E-Event-Id` equality check is a consistency check, not
    authentication. An HMAC header would let receivers trust the payload without a re-fetch.
-5. `failure_code` is not a published enum, so a client cannot distinguish "declined" from "carrier
+6. `failure_code` is not a published enum, so a client cannot distinguish "declined" from "carrier
    rejected" without heuristics.
-6. A queued call can dial long after the client's wait timed out (issue #283). Canopy therefore never
+7. Concurrency and rate limits are not published. "Reach everyone within the hour" is a promise a city
+   makes to its registry, and the platform's throughput is the number that decides whether it is true.
+8. A queued call can dial long after the client's wait timed out (issue #283). Canopy therefore never
    trusts `waitForResult` and drives everything from webhooks plus polling; documentation could steer
    developers the same way.
-7. The delay before the first bot word (issue #295) matters more for elderly recipients than for
+9. The delay before the first bot word (issue #295) matters more for elderly recipients than for
    businesses; a configurable "speak first" behaviour or a faster connect path would help welfare
    use cases.
+10. India is served from the international line, so recipients see a foreign caller ID. Local numbers
+    for India would remove the single biggest trust barrier for this use case there.
 
 ## Roadmap
 
 - Registry import from Everbridge, Rave and emPOWER exports.
 - A Goal-Runs variant of the per-person check so `no_answer` and `declined` arrive as typed codes.
 - Volunteer pools: when a contact cannot go, call the nearest registered volunteer.
+- More feeds: PAGASA typhoon bulletins, IMD heat warnings, utility PSPS notices.
 - Pilot with one city emergency management office or one community health worker network, measuring
   reach rate and time-to-reach against their manual baseline.

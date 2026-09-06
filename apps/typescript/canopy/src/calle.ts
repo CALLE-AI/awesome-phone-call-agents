@@ -20,8 +20,9 @@ export function createCalleClient(config: Config): CalleClient {
   return new CalleClient({ apiKey: "dry-run-no-real-key", baseUrl: config.baseUrl });
 }
 
-export function waveIdempotencyKey(eventId: string, wave: Wave): string {
-  return `canopy:${eventId}:wave${wave.index}:attempt${wave.attempt}`;
+export function waveIdempotencyKey(eventId: string, wave: Wave, personId?: string): string {
+  const base = `canopy:${eventId}:wave${wave.index}:attempt${wave.attempt}`;
+  return personId === undefined ? base : `${base}:${personId}`;
 }
 
 export function escalationIdempotencyKey(eventId: string, personId: string): string {
@@ -55,12 +56,14 @@ export interface WaveCallInput {
   wave: Wave;
   people: Person[];
   webhookUrl: string | null;
+  /** per-person mode: the single person this task is for, so the key is unique per person. */
+  personKey?: string;
 }
 
 export async function createWaveCall(input: WaveCallInput): Promise<{ call: Call; task: string; idempotencyKey: string }> {
   const { config, client, event, playbook, wave, people, webhookUrl } = input;
   const task = renderWaveTask(playbook, event, people);
-  const idempotencyKey = waveIdempotencyKey(event.id, wave);
+  const idempotencyKey = waveIdempotencyKey(event.id, wave, input.personKey);
   const create = {
     task,
     recipients: people.map(recipientFor),

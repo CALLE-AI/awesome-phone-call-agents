@@ -16,9 +16,13 @@ export interface Playbook {
   title: string;
   /** Plain noun spoken in the disclosure and used in default headlines, e.g. "extreme heat". */
   hazard_noun: string;
+  /** true when delay costs lives; only life-safety playbooks may override quiet hours. */
+  life_safety: boolean;
   triggers: {
     nws_events: string[];
     open_meteo: { apparent_temperature_c_at_least: number } | null;
+    /** Singapore NEA 24-hour PSI threshold (data.gov.sg). */
+    nea_psi?: { psi_24h_at_least: number } | null;
   };
   purpose: string;
   questions: string[];
@@ -65,6 +69,9 @@ export function validatePlaybook(playbook: Playbook, file = "playbook"): void {
   }
   if (typeof playbook.hazard_noun !== "string" || playbook.hazard_noun.trim().length === 0) {
     throw new Error(`${file}: hazard_noun is required`);
+  }
+  if (typeof playbook.life_safety !== "boolean") {
+    throw new Error(`${file}: life_safety must be true or false`);
   }
   if (!playbook.red_flag_instruction.includes("{{emergency_number}}")) {
     throw new Error(`${file}: red_flag_instruction must recite {{emergency_number}}`);

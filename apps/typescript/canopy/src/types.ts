@@ -37,7 +37,7 @@ export interface Person {
   scenario: string | null;
 }
 
-export type EventSource = "manual" | "nws" | "open-meteo" | "drill";
+export type EventSource = "manual" | "nws" | "open-meteo" | "nea-psi" | "drill";
 
 export interface HazardEvent {
   id: string;
@@ -64,6 +64,9 @@ export interface Wave {
   attempt: number;
 }
 
+/** How a wave is turned into CALL-E call tasks. */
+export type TaskMode = "batch" | "per-person";
+
 /** What the agent is asked to extract for each person. Mirrors the recipient result schema exactly. */
 export interface TriageResult {
   answered_by: "person" | "other_person" | "voicemail" | "ivr" | "unknown";
@@ -86,9 +89,9 @@ export interface EscalationResult {
 }
 
 /** Canopy's own verdict after applying fail-closed rules to the agent's result. */
-export type Outcome = "green" | "yellow" | "red" | "unreachable" | "unverified";
+export type Outcome = "green" | "yellow" | "red" | "unreachable" | "unverified" | "not_attempted";
 
-export const OUTCOMES: readonly Outcome[] = ["green", "yellow", "red", "unreachable", "unverified"];
+export const OUTCOMES: readonly Outcome[] = ["green", "yellow", "red", "unreachable", "unverified", "not_attempted"];
 
 export interface Classification {
   outcome: Outcome;
@@ -103,7 +106,11 @@ export type ActionType =
   | "retry"
   | "contact-call"
   | "escalate"
-  | "door-knock";
+  | "door-knock"
+  /** CALL-E never accepted the call task; an operator must resume or call by hand. Never escalates. */
+  | "operator-review"
+  /** The call was accepted but had not finished when the run stopped; `resume` settles it. */
+  | "await-result";
 
 export interface NextAction {
   type: ActionType;
@@ -117,7 +124,7 @@ export interface NextAction {
 export interface DispatchTicket {
   id: string;
   personId: string;
-  kind: "contact_committed" | "volunteer_needed" | "door_knock" | "emergency_services";
+  kind: "contact_committed" | "volunteer_needed" | "door_knock" | "emergency_services" | "not_attempted";
   summary: string;
   etaMinutes: number | null;
   needsHumanApproval: boolean;

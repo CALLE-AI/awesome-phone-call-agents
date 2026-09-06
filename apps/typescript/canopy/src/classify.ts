@@ -34,7 +34,7 @@ export function isTriageResult(value: unknown): value is TriageResult {
 }
 
 function rank(outcome: Outcome): number {
-  return { green: 0, unverified: 1, yellow: 2, unreachable: 2, red: 3 }[outcome];
+  return { green: 0, unverified: 1, not_attempted: 1, yellow: 2, unreachable: 2, red: 3 }[outcome];
 }
 
 export function classify(input: ClassifyInput): Classification {

@@ -2,6 +2,7 @@
   "id": "boil-water",
   "title": "Boil-water notice confirmation",
   "hazard_noun": "boil-water notice",
+  "life_safety": false,
   "triggers": {
     "nws_events": [],
     "open_meteo": null

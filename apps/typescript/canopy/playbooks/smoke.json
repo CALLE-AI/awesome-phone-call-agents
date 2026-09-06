@@ -2,13 +2,17 @@
   "id": "smoke",
   "title": "Wildfire smoke and air-quality welfare check",
   "hazard_noun": "heavy smoke",
+  "life_safety": true,
   "triggers": {
     "nws_events": [
       "Air Quality Alert",
       "Air Stagnation Advisory",
       "Red Flag Warning"
     ],
-    "open_meteo": null
+    "open_meteo": null,
+    "nea_psi": {
+      "psi_24h_at_least": 100
+    }
   },
   "purpose": "check that a person with breathing or heart conditions is safe during heavy smoke and find out if they need help",
   "questions": [

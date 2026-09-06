@@ -73,6 +73,8 @@ export interface FakeServerOptions {
   perRecipientMs?: number;
   /** When true, log requests to stderr. */
   verbose?: boolean;
+  /** Reject the first `count` POST /v1/calls with this error, to exercise retry and not-attempted paths. */
+  createFailures?: { count: number; status: number; code: string };
 }
 
 export interface FakeServerHandle {
@@ -117,6 +119,50 @@ function hashScenario(phone: string): Scenario {
   }
   const pool: Scenario[] = ["green", "green", "green", "yellow", "green", "unreachable", "green", "red"];
   return pool[h % pool.length] ?? "green";
+}
+
+const LOCALIZED_USER_TURNS: Record<string, Partial<Record<Scenario, string[]>>> = {
+  hi: {
+    green: ["Haan, main hi bol rahi hoon.", "Haan, pankha chal raha hai, main baithak mein hoon.", "Haan, paani pi rahi hoon.", "Nahin, main theek hoon.", "Nahin, dhanyavaad."],
+    yellow: ["Haan.", "Pankha subah se band hai, bahut garmi hai.", "Thoda paani piya hai.", "Sar mein dard hai, chakkar nahin.", "Ek pankha mil jaaye to achha hoga."],
+    red: ["Haan... bol rahi hoon.", "Nahin, AC nahin hai, bahut garmi hai.", "Nahin, jee machal raha hai.", "Chakkar aa raha hai, abhi rasoi mein gir gayi thi.", "Kisi ko bhej dijiye."],
+    caregiver: ["Main unki beti hoon, main saath hoon.", "Haan, AC chal raha hai, woh aaram kar rahi hain.", "Haan, paani deti rehti hoon.", "Nahin, woh theek hain."],
+  },
+  ta: {
+    green: ["Aamaa, naan thaan pesuren.", "Aamaa, fan odudhu, naan hall-la irukken.", "Aamaa, thanni kudichen.", "Illa, nallaa irukken.", "Illa, nandri."],
+    yellow: ["Aamaa.", "Kaalaila irundhu fan velai seiyala, romba soodu.", "Konjam thanni kudichen.", "Thalai vali irukku, thalai suthala.", "Oru fan kedaicha nallaa irukkum."],
+    red: ["Aamaa... pesuren.", "Illa, AC illa, romba soodu.", "Illa, kuzhambara maadhiri irukku.", "Thalai suthudhu, ippo samayalarai-la vizhundhutten.", "Yaaravadhu anuppunga."],
+    caregiver: ["Naan avanga ponnu, naan kooda irukken.", "Aamaa, AC odudhu, avanga rest edukkuraanga.", "Aamaa, thanni kudukkuren.", "Illa, avanga nallaa irukkaanga."],
+  },
+  es: {
+    green: ["Si, soy yo.", "Si, estoy en la sala y el ventilador esta encendido.", "Si, bastante.", "No, me siento bien.", "No, gracias por llamar."],
+    yellow: ["Si.", "El ventilador dejo de funcionar esta manana. Hace mucho calor aqui.", "Si, un poco.", "Tengo dolor de cabeza pero no estoy mareada.", "Un ventilador ayudaria. No puedo ir a la tienda."],
+    red: ["Si... habla ella.", "No, no hay aire acondicionado. Es como un horno.", "No mucho, tengo nauseas.", "Estoy mareada. Casi me caigo en la cocina ahora mismo.", "Por favor, manden a alguien."],
+    caregiver: ["Soy su hija, estoy con ella ahora. Puedo responder por ella.", "Si, el aire esta encendido y esta descansando.", "Si, le sigo trayendo agua.", "No, esta bien."],
+  },
+  zh: {
+    green: ["Shi de, shi wo.", "Shi, wo zai keting, fengshan kai zhe.", "Shi, he le hen duo shui.", "Bu, wo hen hao.", "Bu yong, xiexie ni da dianhua."],
+    caregiver: ["Wo shi ta nuer, wo zai ta shenbian, wo keyi dai ta huida.", "Shi, kongtiao kai zhe, ta zai xiuxi.", "Shi, wo yizhi gei ta song shui.", "Bu, ta hen hao."],
+  },
+};
+
+/** Swaps the scripted user turns for a localized set when the recipient's locale has one. */
+function localizeTurns(turns: ApiAttempt["transcript_turns"], scenario: Scenario, locale: string | null): ApiAttempt["transcript_turns"] {
+  const base = (locale ?? "en").split(/[-_]/)[0]?.toLowerCase() ?? "en";
+  const key: Scenario = scenario === "slow-green" ? "green" : scenario;
+  const set = LOCALIZED_USER_TURNS[base]?.[key];
+  if (!set) {
+    return turns;
+  }
+  let i = 0;
+  return turns.map((turn) => {
+    if (turn.speaker !== "user") {
+      return turn;
+    }
+    const text = set[i] ?? turn.text;
+    i += 1;
+    return { ...turn, text };
+  });
 }
 
 function isEscalationSchema(schema: unknown): boolean {
@@ -338,6 +384,7 @@ export function startFakeCalleServer(options: FakeServerOptions = {}): Promise<F
   const events = new Map<string, ApiEvent[]>();
   const idempotency = new Map<string, string>();
   const timers = new Set<NodeJS.Timeout>();
+  let failuresLeft = options.createFailures?.count ?? 0;
 
   const log = (message: string): void => {
     if (options.verbose) {
@@ -422,6 +469,9 @@ export function startFakeCalleServer(options: FakeServerOptions = {}): Promise<F
         const scenario: Scenario = (SCENARIOS as readonly string[]).includes(raw ?? "") ? (raw as Scenario) : escalation ? "contact-commit" : hashScenario(phone);
         const name = names[phone] ?? "the registered person";
         const played = escalation ? playEscalation(scenario, name) : playTriage(scenario, name);
+        if (!escalation) {
+          played.turns = localizeTurns(played.turns, scenario, recipient.locale);
+        }
         const attempt = recipient.attempts[0];
         if (attempt) {
           attempt.status = played.attemptStatus;
@@ -483,6 +533,12 @@ export function startFakeCalleServer(options: FakeServerOptions = {}): Promise<F
       log(`${req.method} ${url.pathname}`);
       if (req.method === "POST" && url.pathname === "/v1/calls") {
         const body = await readJson(req);
+        if (failuresLeft > 0 && options.createFailures) {
+          failuresLeft -= 1;
+          res.setHeader("Retry-After", "1");
+          error(res, options.createFailures.status, options.createFailures.code, "Injected failure for testing.");
+          return;
+        }
         const key = req.headers["idempotency-key"];
         if (typeof key === "string" && idempotency.has(key)) {
           const existing = calls.get(idempotency.get(key) ?? "");

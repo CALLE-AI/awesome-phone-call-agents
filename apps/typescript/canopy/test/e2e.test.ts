@@ -76,7 +76,7 @@ test("a full dry-run drill classifies everyone, cascades, and writes a reproduci
   });
   const summary = await orchestrator.run();
 
-  assert.deepEqual(summary.outcomes, { green: 3, yellow: 1, red: 2, unreachable: 1, unverified: 1, pending: 0 });
+  assert.deepEqual(summary.outcomes, { green: 3, yellow: 1, red: 2, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
   const states = ledger.projection.states;
   assert.equal(states.get("p001")?.outcome, "red");
   assert.equal(states.get("p002")?.outcome, "red", "confusion overrides the agent's yellow");

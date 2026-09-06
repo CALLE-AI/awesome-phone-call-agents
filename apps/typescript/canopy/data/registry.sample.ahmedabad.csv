@@ -1,0 +1,11 @@
+person_id,name,phone,locale,region,age,lives_alone,has_cooling,medical_risks,address,lat,lng,contact_name,contact_phone,contact_locale,consent,consent_date,notes,scenario
+a001,Savitaben Patel,+91555010001,hi-IN,IN,83,yes,no,cardiac,"Jamalpur, near the vegetable market",23.0140,72.5870,Rakesh Patel,+91555010011,hi-IN,yes,2026-03-15,Landline; hard of hearing,red
+a002,Ramanbhai Desai,+91555010002,hi-IN,IN,78,yes,unknown,copd;dementia,"Maninagar, Krishna Nagar society",22.9970,72.6060,Meena Desai,+91555010012,hi-IN,yes,2026-03-20,Son visits on Sundays,red-confusion
+a003,Fatima Sheikh,+91555010003,hi-IN,IN,80,yes,no,diabetes,"Juhapura, block C",22.9920,72.5300,Imran Sheikh,+91555010013,hi-IN,yes,2026-04-02,Prefers Hindi,yellow
+a004,Lakshmi Iyer,+91555010004,ta-IN,IN,86,no,yes,cardiac;mobility,"Satellite, near the temple",23.0270,72.5150,Karthik Iyer,+91555010014,ta-IN,yes,2026-02-11,Tamil-speaking; daughter-in-law at home,caregiver
+a005,Hasmukh Shah,+91555010005,hi-IN,IN,90,yes,yes,oxygen,"Paldi, Sardar Patel colony",23.0110,72.5600,Nilesh Shah,+91555010015,en-IN,yes,2026-01-30,Home oxygen concentrator,unreachable
+a006,Joseph D'Souza,+91555010006,en-IN,IN,69,no,yes,dialysis,"Vastrapur, lake road",23.0370,72.5290,Maria D'Souza,+91555010016,en-IN,yes,2026-05-05,,green
+a007,Kamlesh Parmar,+91555010007,hi-IN,IN,72,yes,yes,,"Naroda, GIDC road",23.0700,72.6500,Bhavna Parmar,+91555010017,hi-IN,yes,2026-04-18,,slow-green
+a008,Salma Ansari,+91555010008,hi-IN,IN,75,yes,no,respiratory,"Danilimda",22.9980,72.5850,,,,yes,2026-02-27,No emergency contact on file,unverified
+a009,Hansaben Vaghela,+91555010009,hi-IN,IN,81,yes,no,,"Odhav",23.0300,72.6600,Dinesh Vaghela,+91555010019,hi-IN,yes,2026-03-08,Outdoor vendor; works midday,green
+a010,Anand Krishnan,+91555010010,ta-IN,IN,77,yes,unknown,cardiac,"Bopal, sector 4",23.0330,72.4700,Priya Krishnan,+91555010020,ta-IN,yes,2026-05-21,Prefers Tamil,yellow

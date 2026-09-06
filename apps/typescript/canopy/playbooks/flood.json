@@ -2,6 +2,7 @@
   "id": "flood",
   "title": "Flood welfare check",
   "hazard_noun": "flooding",
+  "life_safety": true,
   "triggers": {
     "nws_events": [
       "Flash Flood Warning",

@@ -2,6 +2,7 @@
   "id": "heat",
   "title": "Extreme heat welfare check",
   "hazard_noun": "extreme heat",
+  "life_safety": true,
   "triggers": {
     "nws_events": [
       "Extreme Heat Warning",

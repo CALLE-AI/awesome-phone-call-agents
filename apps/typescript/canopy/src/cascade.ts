@@ -45,6 +45,8 @@ export function nextAction(state: Pick<PersonState, "attempts" | "contactCalled"
         reason: hasContact ? "contact already phoned; a person must go" : "no emergency contact on file; a person must go",
         suggestEmergencyServices: true,
       };
+    case "not_attempted":
+      return { type: "operator-review", reason: "CALL-E did not accept the call task; nobody was dialled, so nobody is alerted. Resume the event or call by hand." };
     case "unreachable":
     case "unverified":
       if (state.attempts < policy.maxPersonAttempts) {
