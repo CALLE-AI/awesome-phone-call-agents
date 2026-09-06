@@ -652,8 +652,16 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
 
     `evidence/statistics.json` holds each figure with its publisher, its URL, the sentence it
     came from and the date it was read at source. This checks the two directions that matter:
-    no percentage may appear in the sourced section without being in that file, and nothing in
+    no figure may appear in the sourced section without being in that file, and nothing in
     that file may be quoted at a different value.
+
+    It read percentages only, for months. The file's own note said it "fails if the README
+    publishes a figure that is not here", and the regex only matched a percent sign, so "More than 14
+    million American students were chronically absent" walked straight through: a real
+    figure, correctly sourced in a link, with no machine-readable record behind it and
+    nothing able to notice if the link rotted or the number drifted. A gate whose stated
+    scope is wider than its actual scope is worse than no gate, because the note is what
+    everybody reads.
     """
     import json
 
@@ -666,9 +674,10 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
         for field in ("claim", "publisher", "url", "quote", "read_at_source"):
             assert entry.get(field), f"{value} has no {field}"
         assert entry["url"].startswith("https://"), f"{value} has no resolvable source"
-        assert value.rstrip("%").replace(".", "").isdigit(), (
-            f"{value} is not a figure this gate can compare"
-        )
+        bare = value.rstrip("%").replace(",", "").replace(".", "")
+        for word in (" million", " billion", " thousand"):
+            bare = bare.replace(word, "")
+        assert bare.isdigit(), f"{value} is not a figure this gate can compare"
 
     readme = (APP / "README.md").read_text(encoding="utf-8")
     # The sourced section only. Percentages elsewhere are computed by the program and are
@@ -679,7 +688,16 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
     assert start > 0 and end > start, "the sourced statistics section has moved or gone"
     section = readme[start:end]
 
+    # Percentages, and counts with a magnitude word or thousands separators. The second
+    # half is the part that was missing. `\b\d[\d,.]*` alone would also catch a year and a
+    # section number, so a count only registers when it carries a magnitude word or a comma.
     published = set(re.findall(r"\d+\.?\d*%", section))
+    published |= {
+        found.strip()
+        for found in re.findall(r"\b\d[\d,]*(?:\.\d+)?\s*(?:million|billion|thousand)\b",
+                                section)
+    }
+    published |= set(re.findall(r"\b\d{1,3}(?:,\d{3})+\b", section))
     unsourced = sorted(published - set(figures))
     assert not unsourced, (
         "these figures are published with no entry in evidence/statistics.json: "
