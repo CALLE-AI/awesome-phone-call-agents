@@ -395,7 +395,9 @@ def scene_call(call: dict, has_audio: bool) -> str:
     out.append('<button class=replay type=button data-replay hidden>'
                'Play the call again</button>')
     out.append('</div>')
-    out.append('<ol class=turns data-turns aria-live=off>')
+    out.append('<ol class=turns data-turns aria-live=off tabindex=0 '
+        'aria-label="What was said on the call, turn by turn. Scrolls, so it takes '
+        'focus and answers the arrow keys.">')
     for turn in call["turns"]:
         who = "agent" if turn["speaker"] == "bot" else "parent"
         m, s = divmod(int(turn["offset_seconds"]), 60)
@@ -423,7 +425,9 @@ def turns_markup(call: dict) -> str:
     them printing a turn the other does not have would be a difference the reader would
     read as evidence.
     """
-    out = ['<ol class=turns data-turns aria-live=off>']
+    out = ['<ol class=turns data-turns aria-live=off tabindex=0 '
+        'aria-label="What was said on the call, turn by turn. Scrolls, so it takes '
+        'focus and answers the arrow keys.">']
     for turn in call["turns"]:
         who = "agent" if turn["speaker"] == "bot" else "parent"
         m, s = divmod(int(turn["offset_seconds"]), 60)
@@ -984,7 +988,12 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     add('<canvas class=rail-wave data-rail-wave width=96 height=36 aria-hidden=true></canvas>')
     add('</ol></nav>')
 
-    add('<main>')
+    # A keyboard reader met the nine-link rail before every one of the eight acts and had no
+    # way past it. The link is the first thing in the tab order and it is invisible until it
+    # takes focus, which is the only time it is any use to anybody.
+    add('<a class=skip href="#act-00">Skip to the call</a>')
+
+    add('<main id=main>')
 
     # ---- Act 0: the call
     #
@@ -1026,7 +1035,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     body = [
         path_markup(),
         '<div class=split><div class=claim>',
-        '<h3>01</h3><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
+        '<div class=act-num>01</div><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
         '<p>An unanswered absence message is not information. It is an absence of '
         'information, and it looks identical whether the child is at home with a fever or '
         'never arrived anywhere.</p>',
@@ -1058,7 +1067,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     en, ta = "S-4105", "S-4106"
     pair = next(q for q in data["pairs"] if q["en"] == en)
     body = [
-        '<h3>02</h3><h2 id=h-02>Same call. Whichever language the family speaks.</h2>',
+        '<div class=act-num>02</div><h2 id=h-02>Same call. Whichever language the family speaks.</h2>',
         '<p class=eyebrow>The call from the first screen, beside the same call in Tamil</p>',
         # ---- SHOWCASE INSERTION POINT ------------------------------------------------
         # The figure below is owned by tools/site/showcase.py and tools/site/showcase.css.
@@ -1110,7 +1119,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
                    'can act on, named in the run rather than filed as resolved. The '
                    '<a href="#act-05">mutation table</a> holds the tests that keep the '
                    'distinction from collapsing.</p>'),
-        '<h3>03</h3><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
+        '<div class=act-num>03</div><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
         '<p class=eyebrow>The same call, filed three ways</p>',
         endings_markup(data, en, run),
         '<p class=note>This app made the first mistake itself. A parent refused to talk, '
@@ -1132,7 +1141,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
     body = [
         '<div class="split split-long"><div class=claim>',
-        '<h3>04</h3><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
+        '<div class=act-num>04</div><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
         '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
         'here, shortened at both ends, alongside the structured answer each call brought '
         'back, so any row can be taken to the vendor&#8217;s records and checked against a '
@@ -1184,7 +1193,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     # ---- Act 5: mutations
     body = [
         '<div class="split split-long"><div class=claim>',
-        '<h3>05</h3><h2 id=h-05>Every rule, broken on purpose.</h2>',
+        '<div class=act-num>05</div><h2 id=h-05>Every rule, broken on purpose.</h2>',
         '<p>A test that has never been observed to fail has not been shown to test anything. '
         'Each row is a change made to working code to check that a specific test notices. '
         'Every one was reverted and the suite returned to green.</p>',
@@ -1252,12 +1261,12 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         marginalia("Shown in act 05",
                    f'<p>The <a href="#act-05">mutation table</a> is {len(_muts)} deliberate '
                    f'changes and the tests that caught each one.</p>'),
-        '<h3>06</h3><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
+        '<div class=act-num>06</div><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
         '<div class=plate-royal><div class=takes>',
     ]
     for i, (title, text) in enumerate(takes, 1):
         body.append(f'<div class=take><div class=take-n>{i:02d}</div>'
-                    f'<h4>{esc(title)}</h4><p>{text}</p></div>')
+                    f'<h3 class=take-t>{esc(title)}</h3><p>{text}</p></div>')
     body.append('</div></div>')
     add(act("06", "Two things to take", "".join(body), margin=True))
 
@@ -1283,7 +1292,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
                        'that does not. Two of these four belong to the platform and are '
                        'reported without complaint.</p>'),
             '<div class="split split-long"><div class=claim>',
-            '<h3>07</h3><h2 id=h-07>What is not true.</h2>',
+            '<div class=act-num>07</div><h2 id=h-07>What is not true.</h2>',
             '<p>Four limits, each with what would close it. Two of them are the '
             'platform’s and are reported here without complaint, because a limit you '
             'can read is worth more than a claim you cannot check.</p>',
@@ -1300,14 +1309,15 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
                    '<p>The local double is an <code>httpx</code> transport, so the offline '
                    'path runs the same SDK code the live one does. Nothing here places a '
                    'telephone call.</p>'),
-        '<h3>08</h3><h2 id=h-08>Run the whole thing with no account.</h2>',
+        '<div class=act-num>08</div><h2 id=h-08>Run the whole thing with no account.</h2>',
         '<p>No API key, no signup, no telephone call. The local double is mounted as an '
         '<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so '
         'the offline path exercises the same SDK code as the live one.</p>',
         '<pre>pip install -r requirements-dev.txt\n'
         'python -m firstbell --work-file examples/absences.csv</pre>',
         '<p class=dim>Produced by running exactly that when this page was built:</p>',
-        f'<pre class=run>{esc(offline_run())}</pre>',
+        '<pre class=run tabindex=0 role=region aria-label="What the offline run prints, '
+        'verbatim. Scrolls sideways on a narrow screen.">' + esc(offline_run()) + '</pre>',
     ]
     add(act("08", "Run it yourself", "".join(body), margin=True))
 

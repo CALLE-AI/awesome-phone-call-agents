@@ -931,6 +931,33 @@ async function gateContrast(browser, url) {
     }
   }
 
+  // Anything that is only painted while it holds focus cannot be reached by scrolling to
+  // it, because it is not on screen to be scrolled to. The skip link is the case: it sits
+  // at translateY(-120%) until a keyboard reader tabs to it, so the sampler above walked
+  // straight past it and reported it as a run nobody had measured. That report was correct.
+  //
+  // The answer is to measure it in the state it is actually seen in rather than to exempt
+  // it, because an exemption here would be a promise that the one control a keyboard reader
+  // meets first has a contrast nobody ever checked.
+  const focusable = await page.$$eval(
+    "a[href], button, [tabindex]:not([tabindex='-1'])",
+    (els) => els
+      .filter((el) => {
+        const t = getComputedStyle(el).transform;
+        return t && t !== "none" && !t.includes("matrix(1, 0, 0, 1, 0, 0)");
+      })
+      .map((el, i) => { el.setAttribute("data-cs-focus", String(i)); return i; }),
+  );
+  for (const i of focusable) {
+    await page.evaluate((n) => {
+      const el = document.querySelector('[data-cs-focus="' + n + '"]');
+      if (el) el.focus();
+    }, i);
+    await new Promise((r) => setTimeout(r, 120));
+    absorb(await page.evaluate(CONTRAST_PROBE));
+    await takeCensus();
+  }
+
   for (const [key, entry] of census) {
     if (best.has(key)) continue;
     best.set(key, { key, label: entry.label, text: entry.text, unmeasured: true,

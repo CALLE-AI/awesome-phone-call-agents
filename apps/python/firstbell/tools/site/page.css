@@ -393,6 +393,20 @@ h3 {
   color: var(--ink-3);
   margin: 0 0 0.6rem;
 }
+/* The act number. It reads as an eyebrow and it used to be marked up as one, an <h3> sitting
+ * above the act's <h2>. That made the document outline run h1, h3, h2, h3, h2, and a screen
+ * reader listing the headings on this page announced "01, 02, 03, 04" rather than the eight
+ * sentences that carry the argument. It is a label, so it is a label now, and it keeps every
+ * visual property it had. */
+.act-num {
+  font-family: var(--ui-display);
+  font-weight: 600;
+  font-size: var(--size-2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.6rem;
+}
 
 p { margin: 0 0 1.1rem; max-width: var(--measure); }
 p.lede {
@@ -830,6 +844,27 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
 
 /* ---- utility ------------------------------------------------------------------------- */
 .dim { color: var(--ink-3); }
+/* The skip link. Hidden until focused, then it lands on the paper as an ordinary control
+ * rather than a floating browser artefact. It has to sit above the rail's stacking context
+ * or it would take focus behind the thing it exists to skip. */
+.skip {
+  position: fixed; top: 0; left: 0; z-index: 100;
+  transform: translateY(-120%);
+  background: var(--card); color: var(--link);
+  font-family: var(--ui); font-size: var(--size-3);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--line-strong); border-top: 0;
+  border-bottom-right-radius: 4px;
+  text-decoration-thickness: 0.08em;
+}
+.skip:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skip { transition: transform 140ms ease-out; }
+}
+
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
@@ -1269,7 +1304,8 @@ footer .source-link { margin-top: var(--space-3); }
   border-top: 2px solid var(--ink); padding-top: 0.5rem; display: inline-block;
   min-width: 2.5rem;
 }
-.take h4 { font-family: var(--ui-display); font-size: var(--size-5); font-weight: 600; margin: 0.75rem 0 0.5rem; }
+.take .take-t { font-family: var(--ui-display); font-size: var(--size-5); font-weight: 600;
+  margin: 0.75rem 0 0.5rem; letter-spacing: -0.006em; text-transform: none; color: var(--ink); }
 .take p { font-size: var(--size-4); color: var(--ink-2); }
 
 /* ---- limits --------------------------------------------------------------------------- */

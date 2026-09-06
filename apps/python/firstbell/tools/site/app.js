@@ -39,10 +39,18 @@ function startScroll() {
   requestAnimationFrame(raf);
   document.querySelectorAll('.rail a[href^="#"]').forEach((a) => {
     a.addEventListener('click', (e) => {
-      const target = document.querySelector(a.getAttribute('href'));
+      // A held modifier means the reader asked the browser for something, usually a new
+      // tab. Swallowing it to run a smooth scroll takes that away with no way to get it
+      // back, and the rail is the one place on this page somebody would try it.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      const href = a.getAttribute('href');
+      const target = document.querySelector(href);
       if (!target) return;
       e.preventDefault();
       lenis.scrollTo(target, { offset: -64 });
+      // The hash never moved, so the address bar could not be copied or shared and the
+      // back button had nothing to go back to.
+      if (history.pushState) history.pushState(null, '', href);
     });
   });
   return lenis;

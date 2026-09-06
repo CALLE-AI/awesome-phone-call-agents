@@ -312,6 +312,7 @@ export class CallPlayer {
     a.currentTime = this.t;
     a.play().then(() => { this.playing = true; this.loop(); }).catch(() => { this.playing = false; });
     this.root.dataset.playing = 'true';
+    this.announce(true);
   }
 
   pause() {
@@ -319,6 +320,18 @@ export class CallPlayer {
     if (this.audio) this.audio.pause();
     this.root.dataset.playing = 'false';
     cancelAnimationFrame(this.raf);
+    this.announce(false);
+  }
+
+  // The icon swaps in CSS off root.dataset.playing, so a sighted reader always knew which
+  // state the control was in and a screen reader never did: the button shipped
+  // aria-label="Play this call" and kept it while the call was playing. The switches at
+  // select() already did this correctly, so this is the same treatment, not a new idea.
+  announce(playing) {
+    const b = this.root.querySelector('[data-play]');
+    if (!b) return;
+    b.setAttribute('aria-label', playing ? 'Pause this call' : 'Play this call');
+    b.setAttribute('aria-pressed', playing ? 'true' : 'false');
   }
 
   seek(sec) {
