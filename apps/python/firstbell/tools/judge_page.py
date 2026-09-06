@@ -28,6 +28,8 @@ Standard library only, so it runs anywhere the app runs.
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import html
 import json
 import os
@@ -566,6 +568,128 @@ def endings_markup(data: dict, cid: str, run: dict) -> str:
     return "".join(out)
 
 
+# The response headers the deployed page is served with. Everything below that names an
+# origin or a hash is read off the page that was just built, because a policy typed by hand
+# describes the page its author remembered rather than the page in the directory. The first
+# stylesheet that moves makes a typed policy either wrong or a lie, and a Content-Security-
+# Policy that is wrong fails loudly in front of whoever opened the page.
+#
+# The fixed half says what this page never does. It places no network call of its own, has
+# no form, embeds no plugin, and is never framed, so those are all closed rather than
+# narrowed. A reader can check that against the two scripts: neither contains fetch,
+# XMLHttpRequest, WebSocket, EventSource or a dynamic import.
+CSP_CLOSED = (
+    "default-src 'none'",
+    "connect-src 'none'",
+    "object-src 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "manifest-src 'none'",
+    "worker-src 'none'",
+)
+
+
+def _csp_hash(source: str) -> str:
+    """A CSP source expression for one piece of inline text, over its UTF-8 bytes."""
+    digest = hashlib.sha256(source.encode("utf-8")).digest()
+    return "'sha256-" + base64.b64encode(digest).decode("ascii") + "'"
+
+
+def _origin_of(url: str) -> str:
+    """The scheme and host a subresource comes from, or 'self' when it is ours."""
+    if not url.startswith(("http://", "https://")):
+        return "'self'"
+    return "/".join(url.split("/", 3)[:3])
+
+
+def _sources(page: str, pattern: str) -> list[str]:
+    """Origins matched by one pattern, ordered so the header is stable across builds."""
+    found = {_origin_of(m.group(1)) for m in re.finditer(pattern, page)}
+    return sorted(found, key=lambda s: (s != "'self'", s))
+
+
+def content_security_policy(page: str) -> str:
+    """The policy this exact page needs, and nothing wider.
+
+    Two allowances here read as concessions and are worth stating plainly rather than
+    hiding in a header. `'unsafe-hashes'` appears because the page carries one event
+    handler and two style attributes; it does not relax anything on its own, it only lets
+    the hashes beside it match in an attribute position, so the sole handler a browser will
+    run is the exact string `this.media='all'`. It is written into script-src and style-src
+    rather than the -attr variants because Safari shipped the -attr variants late, and a
+    policy that silently stops applying on one browser is worse than one that is explicit.
+    """
+    style_blocks = re.findall(r'''<style\b[^>]*>(.*?)</style>''', page, re.S)
+    style_attrs = [v for _, v in re.findall(r'''\sstyle=(["'])(.*?)\1''', page, re.S)]
+    handlers = [b for _, _, b in re.findall(r'''\son([a-z]+)=(["'])(.*?)\2''', page, re.S)]
+
+    scripts = _sources(page, r'''<script[^>]*\bsrc=["']?([^"'\s>]+)''')
+    sheets = _sources(page, r'''<link[^>]*rel=["']?stylesheet["']?[^>]*\bhref=["']?([^"'\s>]+)''')
+    fonts = _sources(page, r'''<link[^>]*(?:as=font|rel=preconnect)[^>]*\bhref=["']?([^"'\s>]+)''')
+
+    # A stylesheet can pull another stylesheet from an origin this markup never names. The
+    # Typekit kit does exactly that: the sheet at use.typekit.net imports a second one from
+    # p.typekit.net, and reading the page will never reveal it because the page does not say
+    # it. That is the ceiling on deriving a policy from bytes, and it is why the preconnect
+    # hints are read here as declarations of an origin the page talks to rather than as
+    # decoration. tools/gates/csp-check.mjs is what found this: the policy agreed with the
+    # page and the browser refused a stylesheet anyway.
+    sheets = sorted(set(sheets) | {f for f in fonts if f != "'self'"})
+
+    unsafe_hashes = ["'unsafe-hashes'"] if (handlers or style_attrs) else []
+
+    directives = list(CSP_CLOSED) + [
+        "script-src " + " ".join(scripts + unsafe_hashes
+                                 + [_csp_hash(h) for h in handlers]),
+        "style-src " + " ".join(sheets + unsafe_hashes
+                                + [_csp_hash(s) for s in style_blocks]
+                                + [_csp_hash(a) for a in style_attrs]),
+        "font-src " + " ".join(f for f in fonts if f != "'self'") if fonts else "font-src 'none'",
+        # The favicon is an empty data URI, answered from the document so the request for
+        # /favicon.ico never leaves the browser. That is the only data: URL on the page.
+        "img-src 'self' data:",
+        # One <audio> element per call row, all of them beside index.html.
+        "media-src 'self'",
+    ]
+    return "; ".join(d for d in directives if d.split(" ", 1)[-1])
+
+
+def security_headers(page: str) -> list[dict[str, str]]:
+    """Every response header the deployment sets, in the order they are written out."""
+    return [
+        {"key": "Content-Security-Policy", "value": content_security_policy(page)},
+        # The page serves one HTML file, two modules, a stylesheet and eight audio clips,
+        # every one of them with a correct type. Nothing here needs a browser to guess.
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        # A judge arrives from a submission form or a private document. The referrer would
+        # hand this page the address of whichever of those it was, so it is not sent.
+        {"key": "Referrer-Policy", "value": "no-referrer"},
+        # Every feature here is one nothing on this page reaches for. autoplay is not in
+        # the list and belongs to the same argument: the register resumes a clip after a
+        # seek without a fresh gesture, so denying autoplay would deny the page a thing it
+        # actually does. A header is only worth trusting if it is not partly untrue.
+        {"key": "Permissions-Policy",
+         "value": "accelerometer=(), camera=(), display-capture=(), "
+                  "encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), "
+                  "magnetometer=(), microphone=(), midi=(), payment=(), usb=()"},
+        # frame-ancestors above is the directive browsers honour. This is the same answer
+        # for anything old enough to read only the header Microsoft shipped first.
+        {"key": "X-Frame-Options", "value": "DENY"},
+        {"key": "Cross-Origin-Opener-Policy", "value": "same-origin"},
+        {"key": "Cross-Origin-Resource-Policy", "value": "same-origin"},
+    ]
+
+
+def deployment_config(page: str) -> str:
+    """The Vercel configuration, serialised the way the built page is: derived, then written."""
+    config = {
+        "$schema": "https://openapi.vercel.sh/vercel.json",
+        "headers": [{"source": "/(.*)", "headers": security_headers(page)}],
+    }
+    return json.dumps(config, indent=2) + "\n"
+
+
 def repo_link_markup(repo_url: str | None) -> str:
     """The source link, or nothing.
 
@@ -1065,9 +1189,12 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     # the act where a break costs nothing: it holds no artifact, no table and no control, so
     # a plate that flips every ink inside it can be checked in one place.
     body = [
+        # Counted, like the card below it and the counter three acts above it. This margin
+        # note was the third place on one page that stated the size of the same table, and
+        # the only one still saying eighteen.
         marginalia("Shown in act 05",
-                   '<p>The <a href="#act-05">mutation table</a> is eighteen deliberate '
-                   'changes and the tests that caught each one.</p>'),
+                   f'<p>The <a href="#act-05">mutation table</a> is {len(_muts)} deliberate '
+                   f'changes and the tests that caught each one.</p>'),
         '<h3>06</h3><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
         '<div class=plate-royal><div class=takes>',
     ]
@@ -1206,7 +1333,14 @@ def main() -> int:
         shutil.copy2(SITE / asset, out / asset)
 
     page = out / "index.html"
-    page.write_text(build(has_audio, args.repo_url), encoding="utf-8", newline="\n")
+    markup = build(has_audio, args.repo_url)
+    page.write_text(markup, encoding="utf-8", newline="\n")
+
+    # The policy is derived from the bytes above rather than kept beside them, so the two
+    # cannot disagree. Written after the page for the same reason: there is nothing to
+    # describe until the page exists.
+    (out / "vercel.json").write_text(deployment_config(markup), encoding="utf-8",
+                                     newline="\n")
 
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     print(f"{page}  {page.stat().st_size / 1024:.1f} KB")

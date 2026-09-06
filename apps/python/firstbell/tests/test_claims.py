@@ -501,11 +501,25 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "skips when the still tool is absent, so deleting the tool would silence it",
     # Not a test: the helper both tests in test_gate_report.py go through, which is where
     # the two skip conditions live. Named here because that is where the AST finds them.
+    # Not a test either: the helper both tests in test_page_prose_counts.py read the page
+    # through. It skips on any checkout where the page has not been built, which needs the
+    # receipts held outside this repository.
+    "_page":
+        "reads out/index.html to check the counts the page spells out in a sentence against "
+        "the data those sentences describe. The page is built from receipts that are "
+        "deliberately not committed, so on a clean checkout there is nothing to read",
     "_contrast":
         "reads tools/gates/gate-report.json, which is a build artifact and not committed. "
         "It skips when the report is absent, and again when the report is older than "
         "out/index.html, because a report about an earlier build reads exactly like a "
         "current one and every number in it would be about a page no longer on disk",
+    # Not a test: the helper every test in test_security_headers.py reads the policy through.
+    "_headers":
+        "reads out/vercel.json, the response headers the build derives from the page it just "
+        "wrote. Both are build artifacts and neither is committed, so on a clean checkout "
+        "there is no policy to check and no page for it to be checked against. The half of "
+        "this that a browser measures is a gate in tools/gates/run.mjs and skips on its own "
+        "terms, reporting could-not-measure rather than passing",
 }
 
 

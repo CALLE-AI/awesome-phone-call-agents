@@ -35,6 +35,10 @@ NUMBER_WORDS = (
 )
 
 
+# A word-boundary pattern, built once and reused by both checks below.
+BOUNDED = r"\b%s\b"
+
+
 def _takeaway_block() -> str:
     """The `takes = [...]` assignment, sliced out of the builder by its own syntax tree.
 
@@ -109,4 +113,32 @@ def test_the_row_the_card_singles_out_is_really_the_uncaught_one():
         f"{len(uncaught)} rows report that no test caught them ({[r[0] for r in uncaught]}). "
         "That is not a formatting problem: each one is a gate that was not guarding what it "
         "claimed to, and the page still speaks about a single row"
+    )
+
+
+def test_nowhere_in_the_builder_spells_the_size_of_the_mutation_table():
+    """One page stated the size of one table in three places, and two of them were typed.
+
+    The first version of this gate read only the take-away block, so it passed while a
+    margin note two hundred lines away still said eighteen. That note shipped to production
+    and was found by reading the deployed page, not by running this suite. A gate scoped to
+    the place a defect was found last time is a gate that misses it in the next place.
+
+    So the whole builder is read, and every sentence describing a count of deliberate
+    changes has to derive that count.
+    """
+    source = BUILDER.read_text(encoding="utf-8")
+
+    offenders = []
+    for number, line in enumerate(source.splitlines(), 1):
+        stripped = line.strip()
+        if stripped.startswith("#") or "deliberate" not in stripped.lower():
+            continue
+        spelled = [w for w in NUMBER_WORDS if re.search(BOUNDED % w, stripped.lower())]
+        if spelled:
+            offenders.append("line %d: %s in %r" % (number, spelled, stripped[:70]))
+
+    assert not offenders, (
+        "the page states the size of the mutation table as a spelled number, which nothing "
+        "will update when a row is added: " + "; ".join(offenders)
     )

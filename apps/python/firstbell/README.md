@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and twenty-three gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and thirty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -38,7 +38,7 @@ below is checked by a test, so a line number here cannot quietly rot.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:329`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:256`.
+  `firstbell/cli.py:278`.
 
 The offline default stubs none of that. It builds a real client at
 `calle_double/transport.py:88` and mounts the double on that client's own httpx transport,
@@ -376,6 +376,29 @@ python -m firstbell --work-file examples/absences.csv \
 `--live` without `--yes-i-mean-it` exits with an explanation instead of dialling. `--limit`
 exists so a first live run is one call.
 
+**A live run stops at fifty families and says so.** `--yes-i-mean-it` is given before the
+work file has been counted, so on its own it confirms an intention rather than an amount.
+The failure that needs stopping is not an attacker: it is a morning where the office exports
+the wrong view from its student system and gets every enrolled pupil instead of the day's
+absentees. The idempotency key is `attendance:{student}:{day}`, which makes the second run
+of a day free and can do nothing about the first, because every row is a different child.
+
+The refusal names the number it found and how to proceed on purpose:
+
+```
+This run would phone 412 families, more than the 50-call ceiling.
+Nothing has been dialled.
+If roster.csv is the file you meant, say the number on purpose:
+  --max-calls 412
+If it is not the file you meant, --limit takes the first N rows instead.
+```
+
+It refuses rather than truncating. Placing the first fifty calls would phone whichever
+families the file happened to list first, and a partial run reads like a finished one to
+whoever opens the summary afterwards. Nobody chose that fifty. The ceiling covers the whole
+live branch and not only the runs that reach production, because a rehearsal against the
+double that quietly omits the size of the run is rehearsing something else.
+
 The receipt records where the calls went, not just that live mode was requested. The SDK
 takes a base URL, so the real client over real HTTP can still be talking to a double, and
 a receipt that called that `live` would be manufacturing evidence of a call that never
@@ -485,7 +508,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 289 tests
+python -m pytest tests/ -q          # 303 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

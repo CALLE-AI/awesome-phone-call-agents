@@ -29,6 +29,7 @@ import { existsSync } from "node:fs";
 import { extname, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
+import { measureCsp } from "./csp-check.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, "..", "..");
@@ -1370,6 +1371,20 @@ async function shoot(browser, url) {
     { written, wrong });
 }
 
+/**
+ * The page under the headers it is actually served with.
+ *
+ * Every other gate here loads the page bare. The deployment does not: it sends a
+ * Content-Security-Policy derived from the page's own bytes, and a policy that refuses one
+ * subresource is a broken page for whoever opened it. Measuring it needs a second server,
+ * because the headers have to be on the response rather than in the markup, so this gate
+ * brings its own and reuses the browser the suite already started.
+ */
+async function gateCsp(browser) {
+  const { status, detail, measured } = await measureCsp(browser);
+  record("the page under its own Content-Security-Policy", status, detail, measured);
+}
+
 async function main() {
   if (!existsSync(OUT)) {
     console.error(`No built page at ${OUT}.\nRun: python tools/judge_page.py`);
@@ -1403,6 +1418,7 @@ async function main() {
     await gateKeyboard(browser, url);
     await gateViewport(browser, url);
     await gateOverflow(browser, url);
+    await gateCsp(browser);
     await shoot(browser, url);
   } finally {
     await browser.close();

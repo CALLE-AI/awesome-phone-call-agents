@@ -230,6 +230,21 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 121 | Type the mutation count into the take-away card instead of counting the rows, which is the defect a reviewer found on the deployed page before this suite did | 2 |
 | 122 | Put back `The offline default never reaches it`, the sentence that told a reader the default run does not use CALL-E when it executes three of the four anchored lines | 1 |
 | 123 | Move `calle-ai` out of the runtime requirements, which would leave the README's reason the offline default runs CALL-E's own code true and beside the point | 1 |
+| 124 | Type the size of the mutation table into the act 06 margin note again, the one of that page's three statements of it that the first version of this gate did not read | 1 |
+| 125 | Say five real calls under a register that renders four, which is the shape a fifth receipt arriving would produce on its own | 1 |
+| 126 | Change the enumerated field count in the locale fold so its own arithmetic stops reaching the comparison total it claims above | 1 |
+| 127 | Stop sending `X-Content-Type-Options`, leaving the browser free to guess a type the deployment declared correctly | 1 |
+| 128 | Open `frame-ancestors` from `'none'` to `'self'`, which is the whole difference between a page that cannot be framed and one that can | 1 |
+| 129 | Let `style-src` fall back to `'unsafe-inline'`, which grants every inline block and makes the three hashes beside it decorative | 1 |
+| 130 | Grant `script-src` an origin the page never names, the shape a third-party allowance takes after the script it was added for is dropped | 1 |
+| 131 | Change one character of the inline stylesheet's hash, which is what a policy describing an earlier build looks like | 1 |
+| 132 | Narrow the header rule from every path to `/index.html`, so the modules and the eight audio clips are served with no policy at all | 5 |
+| 133 | Hang a second inline event handler on the page, so `'unsafe-hashes'` is widening the policy for something nobody decided to allow | 2 |
+| 134 | Move the live ceiling from `more than` to `at or more than`, so a run of exactly the size the operator was told is allowed gets refused | 2 |
+| 135 | Count rows rather than the calls a run would place, so a file of families who never consented is refused for spend it was never going to cost | 1 |
+| 136 | Apply the live ceiling to the offline run, which phones nobody, capping a demonstration instead of a bill | 1 |
+| 137 | Accept `--max-calls` and then ignore it, so the one deliberate way past the ceiling silently does nothing | 1 |
+| 138 | Drop the number of families from the refusal, leaving an operator who is told the run was too big and not how big | 2 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -276,6 +291,26 @@ page rather than the source had a `\b` in its pattern that a shell heredoc turne
 64 all passed while it was dead, because every one of them is caught by the source half.
 Only a mutation that plants a whole identifier in the built artifact could tell the two
 halves apart, and row 65 is that mutation. A gate with two halves needs a row per half.
+
+Rows 127 to 132 are about the headers the page is served with, and they exist because a
+browser cannot check the thing they check. The gate in `run.mjs` loads the page under its
+own policy and counts what was refused, which catches a policy that is too narrow, and a
+reader would see that as a broken page. A policy that is too wide refuses nothing. Granting
+an origin the page stopped using, or falling back to `'unsafe-inline'` so that every hash
+beside it becomes decorative, passes a browser check in silence. Row 132 is the largest
+number in the table's recent rows and the least interesting: narrowing the header rule from
+every path to `/index.html` breaks the shape every one of these gates reads the policy
+through, so five fail at once rather than one failing usefully.
+
+One mutation in that set is not in the table, because it was never measured. The change was
+to put a second inline event handler on the page and see whether the gate that says there is
+exactly one notices. It was written against `<body`, and this page emits no `<body` tag,
+since HTML permits omitting it and the builder omits it. The replacement matched nothing,
+the suite ran against an unchanged page, and the harness reported that the gate had missed a
+defect which was never planted. A mutation that does not apply reads exactly like a gate
+that failed. The harness now compares the file before and after and reports a third outcome
+rather than counting a no-op as a miss, which is the same rule the gates themselves follow.
+The row will be written when there is a measurement to put in it.
 
 Row 57 is the only row in this table whose measured value is **zero on purpose**. Two other
 kinds of zero exist and neither is this one. A zero can mean the change was made in the wrong
@@ -361,11 +396,15 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The twelve browser gates
+## The thirteen browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
 because they fail as a gate rather than as a count of tests.
+
+The thirteenth is the only one that does not load the page bare. The deployment sends the
+page with headers derived from its own bytes, so that gate serves it the same way and counts
+what the browser refused.
 
 The twelfth is `overflow`, and it is the one that was missing rather than the one that was
 added. The document was wider than the window at 1152 and at 390 CSS pixels, which is a
@@ -388,14 +427,24 @@ noticing: weight, contrast, the rail and the keyboard all read the same whether 
 | Serve the playhead as `role=slider tabindex=0` before any script can back it, which is how it shipped until this was fixed | `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: canvas[data-waveform] in act-00 says role=slider, canvas[data-waveform] in act-03 says role=slider` |
 | Take `overflow-x: auto` off the two scrolling boxes, which is how the page shipped until this was fixed | Two gates at once. `overflow` FAIL, `at 390px the document is 582px wide, widest is table.ids reaching 582px. at 1152px the document is 1264px wide`; and `no javascript` FAIL, `2 element(s) claim to be operable with no script to operate them: div.scrollbox in act-04 takes tabindex=0, div.scrollbox in act-05 takes tabindex=0`. The second failure is the point: a box that has stopped scrolling has also stopped being operable without script, so the exemption that lets it carry `tabindex` cannot be claimed by a div that does not scroll |
 | Let the one-column `.split` track go back to implicit `auto`, which is how it shipped until this was fixed | `overflow` FAIL, `at 390px the document is 582px wide, widest is div.claim reaching 582px` |
+| Drop `https://p.typekit.net` from `style-src`, which is how the build first derived the policy until this was fixed | `the page under its own Content-Security-Policy` FAIL, `style-src-elem refused https://p.typekit.net/p.css` |
+| Drop the inline stylesheet's hash, all 39 KB of it | Same gate, FAIL, and it says what a reader would see rather than what the browser said: `the inline stylesheet was refused, so the page renders unstyled` |
+| Drop `https://cdn.jsdelivr.net` from `script-src` | Same gate, FAIL, `script-src-elem refused https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js` |
+| Drop `'self'` from `script-src`, leaving the page's own module unreachable | Same gate, FAIL, `script-src-elem refused http://127.0.0.1:60008/app.js` |
+| Drop `'unsafe-hashes'` and the handler's hash, so the one inline handler on the page stops matching | Same gate, FAIL, `script-src-attr refused inline` |
 
-Nine of those thirteen are the state this page was actually in, not a change invented to trip
-a gate, and each of the nine says so in its own row. The CLS failure, the rail, the dimmed
+Ten of those eighteen are the state this page was actually in, not a change invented to trip
+a gate, and each of the ten says so in its own row. The CLS failure, the rail, the dimmed
 transcript, the clipped focus ring, the playhead no keyboard could reach, the frozen
 breakpoint, the slider that only existed once a script arrived, the two tables that pushed
 the document sideways and the implicit grid track underneath them were all found this way,
-and all of them are fixed. The long task is not among them: that row appends a busy loop
-nobody ever shipped, which is the other kind of row and the reason the two are counted
+and all of them are fixed. The tenth is the refused stylesheet, and it is the newest: the
+build derives the page's policy from the page's own bytes, so the two agree by construction,
+and the first policy it derived was still wrong. The Typekit sheet imports a second sheet
+from an origin the markup never names. Reading the page could not have found it and the
+browser found it on the first load, which is the whole argument for measuring a policy
+rather than reasoning about one. The long task is not among the ten: that row appends a busy
+loop nobody ever shipped, which is the other kind of row and the reason the two are counted
 apart.
 
 `no javascript` used to count acts and words, which answers whether the page can be *read*

@@ -81,6 +81,24 @@ TEST_KEY_PREFIX = "iams_test_"
 # from it. It no longer decides anything.
 LIVE_KEY_PREFIX = "iams_live_"
 
+# How many families one live run will phone before it stops and asks.
+#
+# `--yes-i-mean-it` is granted before the work file has been counted, so it confirms an
+# intention rather than an amount. The failure that needs stopping is not an attacker: it is
+# a morning where the office exports the wrong view from its student system and gets every
+# enrolled pupil instead of the day's absentees. The idempotency key protects the second run
+# and does nothing for the first, because every row is a different child.
+#
+# It refuses rather than truncating. Truncating would place calls to whichever families the
+# file happened to list first, which is a worse answer than none: a partial run looks like a
+# finished one, and nobody chose that subset. A refusal that names the number it found lets
+# the operator see the size of what they were about to do, which is the whole control.
+#
+# Fifty is a school's bad morning, not a district's mailing list. A whole-school run is a
+# real thing to want, so `--max-calls` raises it, and raising it is an act rather than a
+# default.
+DEFAULT_CALL_CEILING = 50
+
 
 def _origin(url: str | None) -> str:
     """scheme://host[:port], lowercased, with a default port dropped.
@@ -158,6 +176,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Required with --live. Confirms real people will be phoned.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Only take the first N rows. Use this with --live.")
+    parser.add_argument("--max-calls", type=int, default=None,
+                        help=f"Refuse a live run larger than this (default: "
+                             f"{DEFAULT_CALL_CEILING}). Raise it deliberately for a whole "
+                             f"school; the refusal names the number it found.")
     parser.add_argument("--school-name", default="the school")
     parser.add_argument("--funding-rate", type=float, default=None,
                         help="Per-student-per-day funding attached to attendance. "
@@ -361,6 +383,37 @@ def main(argv: list[str] | None = None) -> int:
         items = items[: args.limit]
 
     client, mode, double = _client_and_mode(args)
+
+    # The size of the thing, checked before any of it happens.
+    #
+    # It covers the whole live branch rather than only the runs that reach production. A
+    # live run against the bundled double spends nothing, but it is a rehearsal of the real
+    # thing, and a rehearsal that quietly omits the size of the run is rehearsing something
+    # else. It also means the guard is exercised by the suite instead of only in the one
+    # situation nobody wants to test in.
+    #
+    # The offline default is exempt. It phones nobody and dials nothing, so a ceiling there
+    # would cap a demonstration rather than any spend, and it is the run a reviewer executes.
+    # Rows are not calls. A family that never consented is never dialled, and neither is one
+    # the telephone cannot reach; both are gates inside the dispatcher and both come back as
+    # SKIPPED with no call placed. Counting rows would refuse runs that were never going to
+    # spend anything, and would print a number of families nobody was going to phone. The
+    # two conditions are the dispatcher's own, and `test_the_ceiling_counts_calls_not_rows`
+    # fails if they ever stop agreeing.
+    #
+    # A ceiling of zero or less refuses every live run. That is nonsense to ask for and it
+    # fails closed, so it is left to mean what it says rather than guarded again.
+    would_dial = [i for i in items if i.consented and i.reachable_by_voice]
+    ceiling = DEFAULT_CALL_CEILING if args.max_calls is None else args.max_calls
+    if mode.live and len(would_dial) > ceiling:
+        raise SystemExit(
+            f"This run would phone {len(would_dial)} families, more than the {ceiling}-call "
+            f"ceiling.\nNothing has been dialled.\n"
+            f"If {args.work_file} is the file you meant, say the number on purpose:\n"
+            f"  --max-calls {len(would_dial)}\n"
+            "If it is not the file you meant, --limit takes the first N rows instead."
+        )
+
     print(mode.banner())
     print(f"{len(items)} row(s) from {args.work_file}, concurrency {args.concurrency}.")
     print()
