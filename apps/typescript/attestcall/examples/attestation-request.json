@@ -1,0 +1,9 @@
+{
+  "vendorName": "Acme Payments Inc.",
+  "vendorPhone": "+14155550123",
+  "framework": "PCI-DSS",
+  "requestedBy": "Vendor Risk, Contoso",
+  "referenceId": "MSA-2024-0912",
+  "region": "US",
+  "locale": "en-US"
+}

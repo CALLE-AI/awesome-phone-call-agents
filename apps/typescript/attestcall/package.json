@@ -1,0 +1,29 @@
+{
+  "name": "attestcall",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn a compliance question into a dated, evidence-grounded, hash-chained attestation record using one disclosed CALL-E phone call.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "attestcall": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp -r src/public dist/public",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --import tsx test/*.test.ts",
+    "cli": "tsx src/cli.ts",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3"
+  }
+}
