@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and thirty-nine gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and forty gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -38,7 +38,7 @@ below is checked by a test, so a line number here cannot quietly rot.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:329`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:278`.
+  `firstbell/cli.py:287`.
 
 The offline default stubs none of that. It builds a real client at
 `calle_double/transport.py:88` and mounts the double on that client's own httpx transport,
@@ -147,7 +147,7 @@ What this run was worth
 
 3 case(s) need a person. Nothing here is closed:
   1 of those cases is safeguarding: the parent did not confirm they already knew.
-  A school would have to answer these within 30 minutes.
+  A school would have to answer these within 30 minutes (this project's default, which no district has agreed to).
   !! S-1047       schema-valid answer received, escalated as safeguarding and not closed automatically
      S-1044       the call completed but returned no structured result
      S-1046       nobody answered after trying 2 number(s)
@@ -508,7 +508,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 320 tests
+python -m pytest tests/ -q          # 321 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

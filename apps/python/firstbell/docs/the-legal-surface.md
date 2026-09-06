@@ -48,6 +48,21 @@ the statute rather than beside it.
 `SKIPPED` before any call is placed, which the demonstration shows as `S-1045`. The consent
 gate is implemented, tested, and cannot be bypassed by a flag.
 
+**What the parent actually hears, in their own language.** The disclosure is a constant in
+`firstbell/domain.py`, not a template, so a deployment cannot reword or omit it. A reviewer
+asked the obvious next question: the constant is English, so is a Tamil-speaking parent
+disclosed to in English? The answer is on a real call. Work item `S-4106`, `ta-IN`, opens:
+
+> இது பள்ளி வருகைக் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.
+>
+> நீங்கள் ஒரு நபருடன் அல்ல, AI உதவியாளருடன் பேசுகிறீர்கள்.
+
+That is the first thing said, before anything is asked, and it is the disclosure the FCC
+ruling is about. It is not a translation this project wrote: the locale is one column in
+the work file, and the recording is in `evidence/receipts`. The English call opens with the
+same sentence in English. Whether a district's counsel accepts a machine translation of a
+disclosure as the disclosure is a question for them, and it is not answered here.
+
 **The gap, stated plainly.** A CSV column reading `yes` is a data structure, not a legal
 record of consent. It carries no timestamp, no evidence of what the parent was told, no
 record of the channel it was given on, and no revocation path. The software enforces a flag

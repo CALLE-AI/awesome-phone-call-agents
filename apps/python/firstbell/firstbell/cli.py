@@ -180,6 +180,15 @@ def build_parser() -> argparse.ArgumentParser:
                         help=f"Refuse a live run larger than this (default: "
                              f"{DEFAULT_CALL_CEILING}). Raise it deliberately for a whole "
                              f"school; the refusal names the number it found.")
+    # A reviewer reading the code asked for this and was right: thirty minutes is one
+    # district's mandate, not every district's. What the constant is defending is that
+    # there is a clock at all, so this can move the window and cannot remove it.
+    parser.add_argument("--safeguarding-minutes", type=int,
+                        default=SAFEGUARDING_CALLBACK_MINUTES,
+                        help=f"The window a district has agreed to answer a "
+                             f"safeguarding escalation in (default: "
+                             f"{SAFEGUARDING_CALLBACK_MINUTES}). The report says "
+                             f"which one it used and whether it was yours.")
     parser.add_argument("--school-name", default="the school")
     parser.add_argument("--funding-rate", type=float, default=None,
                         help="Per-student-per-day funding attached to attendance. "
@@ -443,9 +452,15 @@ def main(argv: list[str] | None = None) -> int:
             "attempts_removed": summary.attempts_resolved,
             "attempts_still_open": summary.attempts_open,
             "break_even_per_call_minute": summary.break_even_per_call_minute,
+            # The window this run judged its escalations against, and whether anybody
+            # chose it. A machine reader that cannot tell a district's agreed clock from
+            # this project's default will report one as the other.
+            "safeguarding_minutes": args.safeguarding_minutes,
+            "safeguarding_minutes_is_default":
+                args.safeguarding_minutes == SAFEGUARDING_CALLBACK_MINUTES,
         }, indent=2))
     else:
-        _print_human(report, summary)
+        _print_human(report, summary, args.safeguarding_minutes)
 
     if args.receipt:
         _write_receipt(args.receipt, report=report, mode=mode, summary=summary, args=args,
@@ -455,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if report.fatal_error else 0
 
 
-def _print_human(report: DispatchReport, summary) -> None:
+def _print_human(report: DispatchReport, summary, safeguarding_minutes: int) -> None:
     for result in report.results:
         marker = {
             Resolution.RESOLVED: "ok  ",
@@ -488,8 +503,14 @@ def _print_human(report: DispatchReport, summary) -> None:
             verb = 'is' if len(escalated) == 1 else 'are'
             print(f"  {len(escalated)} of those cases {verb} safeguarding: the parent did "
                   f"not confirm they already knew.")
+            # Which number, and whose. A report that prints a window without saying
+            # where it came from lets a district read its own policy into a default it
+            # never set.
+            whose = ("this project's default, which no district has agreed to"
+                     if safeguarding_minutes == SAFEGUARDING_CALLBACK_MINUTES
+                     else "the window you passed on the command line")
             print(f"  A school would have to answer these within "
-                  f"{SAFEGUARDING_CALLBACK_MINUTES} minutes.")
+                  f"{safeguarding_minutes} minutes ({whose}).")
         for result in queue:
             flag = "!! " if result.escalation is not Escalation.NONE else "   "
             print(f"  {flag}{result.item.id:12s} {result.reason}")

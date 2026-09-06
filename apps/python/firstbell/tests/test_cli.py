@@ -302,3 +302,38 @@ def test_the_receipt_separates_targeting_the_api_from_reaching_it(tmp_path):
     assert payload(True)["reached_production_api"] is True
     assert payload(False)["reached_production_api"] is False
     assert payload(None)["reached_production_api"] is None
+
+
+def test_the_safeguarding_window_says_whose_it_is(capsys):
+    """Thirty minutes is one district's mandate, and the report has to say so.
+
+    A blind reviewer reading the code asked for the window to be configurable, which is
+    right: districts sit under different obligations. The risk in granting it is the
+    opposite of the one it fixes. A report that prints a number with no provenance lets a
+    reader take this project's default for their own policy, so the sentence names which
+    it is and the JSON carries the same answer as a boolean.
+    """
+    assert main(["--work-file", WORK]) == 0
+    default = capsys.readouterr().out
+    assert "within 30 minutes (this project's default, which no district has agreed to)" \
+        in default
+
+    assert main(["--work-file", WORK, "--safeguarding-minutes", "15"]) == 0
+    chosen = capsys.readouterr().out
+    assert "within 15 minutes (the window you passed on the command line)" in chosen
+
+    # `--json` still prints the offline banner first, on purpose: a reader piping this
+    # somewhere is entitled to see that no telephone rang. The document starts at the
+    # first brace.
+    def body(text):
+        return json.loads(text[text.index("{"):])
+
+    assert main(["--work-file", WORK, "--json"]) == 0
+    payload = body(capsys.readouterr().out)
+    assert payload["safeguarding_minutes"] == 30
+    assert payload["safeguarding_minutes_is_default"] is True
+
+    assert main(["--work-file", WORK, "--safeguarding-minutes", "45", "--json"]) == 0
+    payload = body(capsys.readouterr().out)
+    assert payload["safeguarding_minutes"] == 45
+    assert payload["safeguarding_minutes_is_default"] is False

@@ -246,6 +246,15 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 137 | Accept `--max-calls` and then ignore it, so the one deliberate way past the ceiling silently does nothing | 1 |
 | 138 | Drop the number of families from the refusal, leaving an operator who is told the run was too big and not how big | 2 |
 | 139 | Ask `safeguarding_escalation` only of rows whose resolution is `resolved`, so the four escalating cases in the run the page draws render as ordinary callbacks in the office queue | 1 |
+| 140 | Let the report say the safeguarding window is this project's default whatever window was passed, so a district reads its own agreed clock into a number nobody chose | 1 |
+
+Row 140 is the newest rule and it arrived as a concession. A reviewer reading the code
+asked for `SAFEGUARDING_CALLBACK_MINUTES` to be configurable, because thirty minutes is one
+district's mandate and not every district's, and they were right. The risk in granting it
+is the opposite of the one it fixes: a report that prints a window with no provenance lets
+a reader take a default for a policy. So the flag moves the window, cannot remove it, and
+the report names which of the two it used. Row 140 breaks the naming rather than the
+window, because the number was never the part that could quietly become a lie.
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
