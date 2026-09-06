@@ -125,7 +125,7 @@ class OnlyAnAuthorisedRecipientIsDialled(unittest.TestCase):
 
 class WhatIsActuallySent(unittest.TestCase):
 
-    def test_one_request_carrying_the_task_and_the_schema(self):
+    def test_one_request_carrying_the_task_the_recipient_and_the_schema(self):
         transport = Transport(201, {"id": "call_x", "status": "queued"})
         prepared, payload = place(NUM, "students only", "Students only", "t",
                                   key=KEY, send=transport)
@@ -133,10 +133,33 @@ class WhatIsActuallySent(unittest.TestCase):
         sent = transport.sent[0]
         self.assertEqual(sent["url"], place_call.CALLS)
         self.assertEqual(sent["key"], KEY)
-        self.assertEqual(sorted(sent["body"]), ["result_schema", "task"])
+        self.assertEqual(sorted(sent["body"]),
+                         ["recipients", "result_schema", "task"])
         self.assertIn(NUM, sent["body"]["task"])
         self.assertEqual(payload["id"], "call_x")
         self.assertEqual(prepared["family"], "students only")
+
+    def test_the_request_names_the_recipient_the_operator_authorised(self):
+        """Without this the provider has nobody to ring.
+
+        The repository's own fake server reads the destination from
+        `recipients[0].phones[0]` and refuses a create that omits it, so the
+        workflow the README advertises could not place a call. The number sent
+        is the one that just passed the authorisation check, never another.
+        """
+        transport = Transport(201, {"id": "call_x", "status": "queued"})
+        place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        self.assertEqual(transport.sent[0]["body"]["recipients"],
+                         [{"phones": [NUM]}])
+
+    def test_the_request_uses_only_field_names_the_provider_accepts(self):
+        """The fake rejects any unknown field with a 400, so a typo here is a
+        blocked workflow rather than a warning."""
+        accepted = {"task", "recipients", "result_schema",
+                    "recipient_result_schema", "metadata", "webhook_url"}
+        transport = Transport(201, {"id": "call_x"})
+        place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        self.assertLessEqual(set(transport.sent[0]["body"]), accepted)
 
     def test_the_key_never_reaches_the_body(self):
         transport = Transport(201, {"id": "call_x"})
@@ -194,6 +217,62 @@ class NothingSensitiveLeavesThisFile(unittest.TestCase):
         rendu = collect("call_x", key=KEY, send=Transport(200, self.FINISHED))
         self.assertEqual(rendu["status"], "completed")
         self.assertEqual(rendu["structured_result"]["open_to_non_students"], "yes")
+
+    # THE SHAPE THIS REPOSITORY'S OWN FAKE SERVER RETURNS. The destination and
+    # the transcript are not top level fields, they sit two levels down under
+    # `recipients` and `attempts`. A denylist of field names never saw them.
+    NESTED = {"id": "call_y", "status": "completed",
+              "structured_result": {"open_to_non_students": "yes"},
+              "task_completed": True,
+              "metadata": {"source": "clause-check-by-phone"},
+              "recipients": [{
+                  "phones": [NUM],
+                  "structured_result": None,
+                  "attempts": [{
+                      "phone": NUM,
+                      "transcript_turns": [
+                          {"speaker": "agent", "text": "Is it open to non students?"},
+                          {"speaker": "recipient", "text": "Yes, anyone can come."}],
+                  }],
+              }]}
+
+    def test_a_nested_destination_does_not_come_back(self):
+        rendu = collect("call_y", key=KEY, send=Transport(200, self.NESTED))
+        self.assertNotIn(NUM, json.dumps(rendu))
+        self.assertNotIn("recipients", rendu)
+
+    def test_a_nested_transcript_does_not_come_back(self):
+        rendu = collect("call_y", key=KEY, send=Transport(200, self.NESTED))
+        self.assertNotIn("anyone can come", json.dumps(rendu))
+        self.assertNotIn("transcript_turns", json.dumps(rendu))
+
+    def test_the_nested_payload_still_answers_the_question(self):
+        rendu = collect("call_y", key=KEY, send=Transport(200, self.NESTED))
+        self.assertEqual(sorted(rendu), ["id", "status", "structured_result"])
+        self.assertEqual(rendu["structured_result"]["open_to_non_students"], "yes")
+
+    def test_a_field_nobody_has_seen_yet_is_dropped_by_default(self):
+        """The reason this is an allowlist. A denylist is wrong about every
+        field a provider adds after it was written, and it is wrong in the
+        direction that leaks."""
+        later = dict(self.NESTED, voiceprint_id="vp_98d", caller_notes="he sounded tired")
+        rendu = collect("call_y", key=KEY, send=Transport(200, later))
+        self.assertNotIn("voiceprint_id", rendu)
+        self.assertNotIn("caller_notes", rendu)
+
+    def test_a_refusal_says_why_without_quoting_the_number_back(self):
+        """Providers echo the request inside their error text, and a refusal is
+        printed, so this is the path that puts a real number in a shell history."""
+        transport = Transport(400, {"code": "invalid_request",
+                                    "message": "recipient %s is not reachable" % NUM,
+                                    "request_id": "req_77"})
+        with self.assertRaises(Refused) as refused:
+            place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        said = str(refused.exception)
+        self.assertNotIn(NUM.lstrip("+"), said)
+        self.assertIn("invalid_request", said)
+        self.assertIn("not reachable", said)
+        self.assertNotIn("req_77", said)
 
     def test_a_caller_who_asks_for_everything_gets_everything(self):
         rendu = collect("call_x", key=KEY, send=Transport(200, self.FINISHED), raw=True)

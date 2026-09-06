@@ -91,23 +91,36 @@ schema the provider would accept and then fail to fill is refused here. A
 missing key stops the run with a sentence rather than with a `401` that reads
 like a permissions problem.
 
+The request itself carries three things, the task, the result schema, and the
+recipient the operator authorised, as `recipients: [{"phones": ["+447700..."]}]`.
+The number sent is the one that just passed the authorisation check and never
+another. A request without it has nobody to ring.
+
 The transport is a parameter of `place` and `collect`, which is why the
 witnesses can exercise every path through this file without a key and without
 dialling anyone.
 
 ### What comes back, and what does not
 
-`collect` returns the identifier, the state and the structured answer. **It
-does not return the transcript, the recording or the destination**, and neither
-does `place`. The provider hands all three over next to the answer, this
-project uses none of them, and the obvious way to look at a result is to print
-it. A default that returns them puts a stranger's voice one `print` away from a
-terminal, a shell history or a CI log. `collect(..., raw=True)` returns the
-whole payload, for a caller who has decided to.
+`collect` returns the identifier, the state and the structured answer, **and
+nothing else**. Those three field names are an allowlist, not a list of fields
+to strip. A denylist only ever stops what its author had already seen, so it
+misses a destination nested under `recipients`, a transcript nested under
+`attempts`, and every field a provider adds after the list was written. It is
+wrong in the direction that leaks.
+
+The provider hands the recording, the transcript and the destination over next
+to the answer, this project uses none of them, and the obvious way to look at a
+result is to print it. A default that returns them puts a stranger's voice one
+`print` away from a terminal, a shell history or a CI log.
+`collect(..., raw=True)` returns the whole payload, for a caller who has
+decided to.
 
 For the same reason, a refusal names the destination **masked**, keeping the
 country code and the last two digits so you can still recognise which number
-you meant. A refusal is printed, so whatever it carries is what ends up on a
+you meant. A refusal coming from the provider is reduced to the few fields that
+say what went wrong, shortened, with any long run of digits masked, because a
+provider that refuses a request usually quotes the request back. A refusal is printed, so whatever it carries is what ends up on a
 screen. A short or malformed value is hidden whole rather than half revealed.
 
 ## Side effects
@@ -183,11 +196,15 @@ answer can change something, and an answer nobody can interpret changes nothing.
 
 ```bash
 python tests_bridge.py       # 26 witnesses, no call, no network, no key
-python tests_place_call.py   # 21 more, on the file that dials, same rule
+python tests_place_call.py   # 28 more, on the file that dials, same rule
 ```
 
-Eight of the twenty-one hold the line above, that nothing a caller is likely to
-print carries a number, a transcript or a recording. They check the masked
+Thirteen of the twenty-eight hold the line above, that nothing a caller is
+likely to print carries a number, a transcript or a recording. Five of those
+thirteen use a payload shaped the way this repository's own fake server shapes
+one, with the destination and the transcript nested under `recipients` and
+`attempts`, because that is the shape a list of field names to strip walked
+straight past. They check the masked
 refusal in both directions, that it hides the number and that it still says
 enough to recognise it, that a malformed value is hidden whole, that the
 trimming does not swallow the answer the verdict is computed from, and that a
