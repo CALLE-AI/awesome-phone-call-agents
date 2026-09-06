@@ -499,6 +499,13 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "screenshot published twelve real call ids and twelve real billing ids",
     "test_the_tool_that_makes_the_stills_cannot_see_a_recording":
         "skips when the still tool is absent, so deleting the tool would silence it",
+    # The one branch of the video's fact reader that cannot be exercised while the thing it
+    # needs is present. It goes quiet on this machine and runs on a clean checkout, which is
+    # the opposite way round from the image gates above.
+    "test_a_missing_gate_report_refuses_rather_than_reporting_zero":
+        "skips when tools/gates/gate-report.json is present, because the branch under test "
+        "is the one that refuses when it is absent. The report is not committed, so this "
+        "runs on any fresh checkout and goes quiet only after the browser gates have run",
     # Not a test: the helper both tests in test_gate_report.py go through, which is where
     # the two skip conditions live. Named here because that is where the AST finds them.
     # Not a test either: the helper both tests in test_page_prose_counts.py read the page
