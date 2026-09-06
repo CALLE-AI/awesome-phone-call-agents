@@ -701,3 +701,110 @@ def test_every_real_result_the_readme_promises_is_on_the_page():
         f"the README says the alert rate is {stated.group(1)}% and {len(not_yes)} of "
         f"{len(answered)} is {computed}%"
     )
+
+
+def test_the_page_builder_masks_every_identifier_and_drops_no_result(tmp_path):
+    """The masking rule and the every-result promise, checked without any real receipt.
+
+    Everything else about the published page is checked by a gate that skips on a clean
+    checkout, because it reads `out/index.html` and that file is built from records of real
+    calls held outside this repository. That was declared rather than hidden, and it still
+    left the two claims added last testable only by the person who wrote them.
+
+    This builds the page a second time from `tests/fixture_page.py`, which is authored, and
+    asserts the two properties that do not depend on whose calls went in: no whole identifier
+    survives the build, and every call the fixture carries has a row on the page. What it
+    cannot check is that the *published* page was built from the eleven real calls. That claim
+    still needs the receipts, and it is declared in the register with the gate that holds it.
+    """
+    import subprocess
+    import sys
+
+    sys.path.insert(0, str(APP / "tests"))
+    try:
+        import fixture_page
+    finally:
+        sys.path.pop(0)
+
+    receipts = fixture_page.write(tmp_path / "receipts")
+    out = tmp_path / "page"
+    built = subprocess.run(
+        [sys.executable, str(APP / "tools" / "judge_page.py"), str(out),
+         "--receipts", str(receipts)],
+        capture_output=True, text=True, cwd=str(APP),
+    )
+    assert built.returncode == 0, (
+        f"the page builder failed on an authored fixture:\n{built.stdout}\n{built.stderr}"
+    )
+
+    html = (out / "index.html").read_text(encoding="utf-8")
+
+    # The same two patterns the tracked-file scan uses, against the artifact rather than the
+    # source. A build that stopped masking would still pass every source-level check.
+    leaked_api = PROVIDER_ID.findall(html)
+    leaked_billing = [h for h in BILLING_ID.findall(html) if h not in PLACEHOLDER_IDS]
+    assert not leaked_api, f"{len(leaked_api)} whole call id(s) reached a built page"
+    assert not leaked_billing, (
+        f"{len(leaked_billing)} whole provider id(s) reached a built page"
+    )
+
+    # Masked, not merely absent. A builder that dropped the column would pass the two above.
+    for sid, _locale, letter, _aware, _reason, _ret in fixture_page.CALLS:
+        assert sid in html, f"{sid} went into the build and has no row on the page"
+        short = mask_id_from_tools()(fixture_page.api_id(letter))
+        assert short in html, f"{sid} has no masked call id on the page"
+
+    # The register carries one row per matched pair, on the English side, so the answers to
+    # check for are the ones on that side. Each value is written with its own `data-field`,
+    # which is what this reads: a build that dropped a column would still put every id on the
+    # page, and slicing on the order of spans would be guessing at a structure that is
+    # already labelled.
+    answers = {sid: aware for sid, _l, _c, aware, _r, _e in fixture_page.CALLS}
+
+    def row_of(student: str) -> str:
+        marker = f'data-row="{student}"'
+        assert marker in html, f"{student} has no row in the register"
+        after = html.split(marker, 1)[1]
+        nxt = after.find("data-row=")
+        return after if nxt == -1 else after[:nxt]
+
+    counted_on_page = 0
+    for _label, en, _ta, _agree, _of in fixture_page.PAIRS:
+        row = row_of(en)
+        # The one row the opening scene animates carries an extra attribute between the
+        # field name and the value, so the pattern has to allow for anything up to the
+        # closing bracket rather than assume the quote is the last thing before it.
+        shown = {field: value for field, value in
+                 re.findall(r'data-field="([^"]+)"[^>]*>([^<]*)<', row)}
+        assert set(shown) == set(fixture_page.FIELD_ORDER), (
+            f"the row for {en} carries {sorted(shown)}, not the published field order"
+        )
+        assert shown["parent_confirmed_aware"] == answers[en], (
+            f"the row for {en} shows {shown['parent_confirmed_aware']!r} where the record "
+            f"behind it says {answers[en]!r}"
+        )
+        if shown["parent_confirmed_aware"] != "yes":
+            counted_on_page += 1
+
+    from_fixture = sum(1 for _label, en, _ta, _a, _o in fixture_page.PAIRS
+                       if answers[en] != "yes")
+    assert counted_on_page == from_fixture, (
+        f"the page shows {counted_on_page} answers that are not a yes; the records behind it "
+        f"hold {from_fixture}"
+    )
+
+
+def mask_id_from_tools():
+    """The shortener, imported from the builder rather than reimplemented here.
+
+    A copy would agree with itself forever. This is the same function the page is built with,
+    so a change to it fails the assertion above rather than quietly matching a stale twin.
+    """
+    import sys
+
+    sys.path.insert(0, str(APP / "tools"))
+    try:
+        from judge_page import mask_id
+    finally:
+        sys.path.pop(0)
+    return mask_id

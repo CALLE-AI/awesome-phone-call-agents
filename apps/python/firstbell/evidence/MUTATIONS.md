@@ -61,6 +61,15 @@ published number sitting unchecked. That is the safer order and it is not a guar
 rows in the 49 to 52 block were later found one too high each, having been measured against a
 tree that already had one test red.
 
+Rows 49 to 52 were re-measured on 6 September after a verification pass reported all four one
+too high, and all four were. The published values were 14, 5, 7 and 4; the measured values are
+13, 4, 6 and 3. The cause is the one this file already describes happening once: they were
+measured against a tree that had a test red for an unrelated reason, so every count carried
+that failure. Four rows, one cause, one direction. The correction was itself measured three
+times per row with the failing test names captured each time, because a single pass is what
+produced the wrong numbers in the first place. One reading during that work disagreed with
+four repeats of the same mutation, and the repeated value is what is published.
+
 Row 32 is worth a sentence on how to read a mismatch in the other direction. Measured with
 the poll's retry budget set to zero it produced one failure against a published two, and
 the published number was right: the row says the poll is left *unprotected*, and catching
@@ -131,10 +140,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 46 | Invert that refusal so it stops every destination, which would leave a tool that can never place a real call | 1 |
 | 47 | Compare the base URL by hostname again instead of by origin, so `http://api.heycall-e.com` is filed in the receipt as an ordinary live call | 1 |
 | 48 | Drop the scheme when normalising an origin, so a plaintext destination compares equal to the trusted HTTPS one | 1 |
-| 49 | Make `safeguarding_escalation` return `NONE` for everything, so a parent who did not know their child was absent is filed automatically | 14 |
-| 50 | Ask the rule whether the answer is `no` rather than whether it is `yes`, which closes the missing and the `unknown` case as though either were a confirmation | 5 |
-| 51 | Derive `ItemResult.needs_a_human` from the resolution alone again, so an escalated case never reaches the human queue | 7 |
-| 52 | Stop sorting the queue, so a safeguarding case can sit below every ordinary callback and be reached last | 4 |
+| 49 | Make `safeguarding_escalation` return `NONE` for everything, so a parent who did not know their child was absent is filed automatically | 13 |
+| 50 | Ask the rule whether the answer is `no` rather than whether it is `yes`, which closes the missing and the `unknown` case as though either were a confirmation | 4 |
+| 51 | Derive `ItemResult.needs_a_human` from the resolution alone again, so an escalated case never reaches the human queue | 6 |
+| 52 | Stop sorting the queue, so a safeguarding case can sit below every ordinary callback and be reached last | 3 |
 | 53 | Compute funding recovered from `resolved` rather than `closed`, so the money figure rises every time a child cannot be accounted for | 2 |
 | 54 | Compute the resolution rate from `resolved` rather than `closed`, so the headline improves when the app finds something serious | 3 |
 | 55 | Fail open when a caller's escalation rule raises, dropping the case the rule was written to catch on the one run where the rule was broken | 2 |
@@ -158,6 +167,19 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 73 | Put the wrong England absence figure back, which is the defect this gate was written after rather than a defect imagined for it | 1 |
 | 74 | Add a plausible new percentage to the sourced section with no entry behind it, which is how the first one got in | 1 |
 | 75 | Drop the source link and leave the figure bare, so it reads as sourced without being checkable | 1 |
+| 76 | Plant a call id inside `tests/test_privacy.py` itself, where the module's own exemption used to hide it | 1 |
+| 77 | State a kill count in `README.md` that the mutation table disagrees with | 1 |
+| 78 | State a kill count in this file's prose that the row it names disagrees with | 1 |
+| 79 | Say nine rows of the browser table record a state the page was really in, when seven carry the marker that says so | 1 |
+| 80 | Take the marker off one browser row, so a failure the page really had reads as an invented one | 1 |
+| 81 | Point a citation in `call-e-feedback.md` at the wrong lines of `README.md` | 1 |
+| 82 | Shift a citation into another app so it names lines that exist and say something else | 1 |
+| 83 | Reintroduce a stale gate count into `evidence/README.md`, the second file that states it | 1 |
+| 84 | Switch a gate off with `@pytest.mark.skipif` rather than a call to `pytest.skip` | 1 |
+| 85 | Switch a whole test file off from module scope with `pytestmark` | 1 |
+| 86 | Make the masking loop assign each identifier to itself, checked against a page built from an authored fixture rather than the published one | 2 |
+| 87 | Publish an answer in the register that the record behind it does not hold | 1 |
+| 88 | Drop every field but the first from the register the page prints | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
@@ -205,8 +227,16 @@ page rather than the source had a `\b` in its pattern that a shell heredoc turne
 Only a mutation that plants a whole identifier in the built artifact could tell the two
 halves apart, and row 65 is that mutation. A gate with two halves needs a row per half.
 
-Row 57 is the only row in this table whose measured value is **zero on purpose**. Every other
-zero in this project's history meant the change had been made in the wrong place. This one is
+Row 57 is the only row in this table whose measured value is **zero on purpose**. Two other
+kinds of zero exist and neither is this one. A zero can mean the change was made in the wrong
+place, which is what every earlier zero in this project turned out to be. A zero can also mean
+the gate did not run, which was true of rows 63, 64, 65, 71 and 72 on any checkout but this
+author's: all five were held by a single test that reads `out/index.html`, a file built from
+records of real calls and kept out of this repository on purpose. Rows 86, 87 and 88 are the
+answer to that. They break the same builder and are caught by a gate that builds the page from
+`tests/fixture_page.py`, which is authored, so a reviewer with no receipts can watch them fail.
+The claim that the *published* page carries eleven real calls still needs the receipts, and it
+is still declared as a gate that cannot always run. This one is
 the finding: the privacy gate resolved its file set with `git ls-files` under
 `apps/python/firstbell`, so `plugins/` had been outside it since the day that directory was
 added, while `README.md` and `THIRD-PARTY-NOTICES.md` both stated that every number in this

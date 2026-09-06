@@ -271,6 +271,9 @@ NUMBER_WORDS = {
     69: "sixty-nine", 70: "seventy", 71: "seventy-one", 72: "seventy-two",
     73: "seventy-three", 74: "seventy-four", 75: "seventy-five", 76: "seventy-six",
     77: "seventy-seven", 78: "seventy-eight", 79: "seventy-nine", 80: "eighty",
+    81: "eighty-one", 82: "eighty-two", 83: "eighty-three", 84: "eighty-four",
+    85: "eighty-five", 86: "eighty-six", 87: "eighty-seven", 88: "eighty-eight",
+    89: "eighty-nine", 90: "ninety",
 }
 
 
@@ -472,7 +475,11 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
 GATES_THAT_CANNOT_ALWAYS_RUN = {
     # This one skips on a clean checkout today.
     "test_every_real_result_the_readme_promises_is_on_the_page":
-        "reads out/index.html, which is built from receipts held outside this repository",
+        "reads out/index.html, which is built from receipts held outside this repository. "
+        "What it checks that does not depend on whose calls went in is now also checked by "
+        "test_the_page_builder_masks_every_identifier_and_drops_no_result, which builds the "
+        "page from an authored fixture and runs on any checkout. What is left here is the "
+        "claim about the eleven real calls, which nothing without the receipts can settle",
     # These three guard the committed images, so they go quiet exactly when there are none
     # to guard, which is the moment an image gate is easiest to lose by accident. Only the
     # second one skipped in the run this register was written against, and it has two
