@@ -200,13 +200,13 @@ def test_every_page_the_deployment_serves_is_covered_by_the_one_policy():
     gate that would have caught it was scoped to one file, and the whole argument here is
     that a claim without the thing that checks it is worth nothing.
     """
-    out = APP / "out"
-    if not CONFIG.exists() or not out.is_dir():
-        pytest.skip("no built page and policy; run tools/judge_page.py with --receipts first")
-
+    # No skip of its own. `_directives` reads the policy through `_headers`, which is the
+    # one place in this file that decides whether there is a built page to check, and the
+    # register in test_claims.py records that reason once for the whole file.
     style_src = " ".join(_directives().get("style-src", []))
     script_src = " ".join(_directives().get("script-src", []))
 
+    out = APP / "out"
     pages = sorted(out.rglob("*.html"))
     assert len(pages) > 1, (
         "the build emitted one page. If the document pages were dropped on purpose, this "
