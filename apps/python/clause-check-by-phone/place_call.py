@@ -26,6 +26,7 @@ without dialling anyone.
 from __future__ import annotations
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -55,23 +56,65 @@ def masked(phone: str) -> str:
     return "+%s%s%s" % (digits[:2], "*" * (len(digits) - 4), digits[-2:])
 
 
-# The fields a finished call carries that this project never needs. The
-# provider returns the recording, the full transcript and the destination
-# alongside the answer, and a caller who prints the payload prints all three.
-RAW_ONLY = ("transcript", "transcripts", "concatenated_transcript", "recording",
-            "recording_url", "to", "from", "phone_number", "customer",
-            "variables", "metadata", "corrected_duration", "call_log")
+# The only three things this project reads from a finished call. Everything
+# else a provider sends is a stranger's voice, a stranger's number, or a field
+# that did not exist when this list was written.
+KEPT = ("id", "status", "structured_result")
+
+# What a refusal may say about itself. A refusal is printed, so it is the one
+# place where a provider's own wording lands in a terminal, and providers echo
+# the request back inside their error text.
+SAID_ON_REFUSAL = ("error", "code", "type", "message")
+A_RUN_OF_DIGITS = re.compile(r"\d{7,}")
+E164_IN_TEXT = re.compile(r"\+[1-9][0-9]{6,14}")
+
+
+def safe_value(value):
+    """Mask full phone numbers inside the small provider-result allowlist."""
+    if isinstance(value, str):
+        return E164_IN_TEXT.sub(lambda match: masked(match.group()), value)
+    if isinstance(value, list):
+        return [safe_value(item) for item in value]
+    if isinstance(value, dict):
+        return {name: safe_value(item) for name, item in value.items()}
+    return value
 
 
 def bounded(payload: dict) -> dict:
     """The part of a provider payload this project is allowed to hand back.
 
+    THIS IS AN ALLOWLIST, AND IT USED TO BE A DENYLIST. The earlier version
+    removed known field names, which stopped a flat payload and nothing else.
+    The provider nests the destination and the transcript one level down, under
+    `recipients` and `attempts`, so a payload of the shape this repository's own
+    fake server returns came back whole. A denylist also has to be right about
+    a field that does not exist yet, and it never is, so the first time a
+    provider adds one it leaks by default.
+
     Everything the tool needs is the identifier, the state and the structured
-    answer. The rest is a stranger's voice and a stranger's number, and a
-    default that returns them invites a caller to print them. Anyone who
-    genuinely needs the whole thing asks for it by name, `raw=True`.
+    answer. Anyone who genuinely needs the whole thing asks for it by name,
+    `raw=True`.
     """
-    return {c: v for c, v in payload.items() if c not in RAW_ONLY}
+    return {name: safe_value(payload[name]) for name in KEPT if name in payload}
+
+
+def safe_error(payload: dict) -> dict:
+    """What a provider's refusal is allowed to say in a printed message.
+
+    `bounded` is the right answer for a finished call and the wrong one for a
+    refusal, which carries no identifier and no result and would print as an
+    empty dict. This keeps the few fields that say what went wrong, shortens
+    them, and masks any long run of digits, because a provider that refuses a
+    request usually quotes the request back.
+    """
+    said = {}
+    for name in SAID_ON_REFUSAL:
+        if name not in payload:
+            continue
+        text = str(payload[name])[:120]
+        said[name] = A_RUN_OF_DIGITS.sub(
+            lambda run: run.group()[:2] + "*" * (len(run.group()) - 2), text)
+    return said
 
 
 def authorised(phone: str) -> bool:
@@ -128,12 +171,19 @@ def place(phone: str, family: str, quote: str, source: str,
         raise Refused("the provider would accept this schema and then fail to "
                       "fill it, %s" % "; ".join(problems))
 
+    # THE RECIPIENT TRAVELS IN THE REQUEST, and it did not before. Without it
+    # the provider has nobody to ring, this repository's own fake server
+    # refuses the create, and the workflow this README advertises could not
+    # place a call at all. The shape is the one the fake accepts, a list of
+    # recipients each carrying its phones, and the number is the one the
+    # operator authorised three lines above.
     body = json.dumps({"task": prepared["task"],
+                       "recipients": [{"phones": [phone]}],
                        "result_schema": prepared["result_schema"]}).encode("utf-8")
     status, payload = send(CALLS, key, body)
     if status >= 300:
         raise Refused("the provider refused the call, %s %s"
-                      % (status, bounded(payload)))
+                      % (status, safe_error(payload)))
     return prepared, bounded(payload)
 
 
@@ -157,10 +207,11 @@ def collect(call_id: str, prepared: dict | None = None,
         raise Refused("no CALLE_API_KEY in the environment")
     status, payload = send("%s/%s" % (CALLS, call_id), key, None)
     if status >= 300:
-        raise Refused("could not read the call, %s %s" % (status, bounded(payload)))
-    answer = payload.get("structured_result") or {}
+        raise Refused("could not read the call, %s %s" % (status, safe_error(payload)))
+    safe_payload = bounded(payload)
+    answer = safe_payload.get("structured_result") or {}
     if not raw:
-        payload = bounded(payload)
+        payload = safe_payload
     if prepared is None:
         return payload
     return payload, contradiction(prepared, answer)
