@@ -251,6 +251,16 @@ class NothingSensitiveLeavesThisFile(unittest.TestCase):
         self.assertEqual(sorted(rendu), ["id", "status", "structured_result"])
         self.assertEqual(rendu["structured_result"]["open_to_non_students"], "yes")
 
+    def test_phone_numbers_inside_the_allowed_answer_are_masked(self):
+        payload = dict(self.NESTED)
+        payload["structured_result"] = {
+            "open_to_non_students": "yes",
+            "their_words": "call %s later" % NUM,
+        }
+        rendu = collect("call_y", key=KEY, send=Transport(200, payload))
+        self.assertNotIn(NUM, json.dumps(rendu))
+        self.assertIn("*", rendu["structured_result"]["their_words"])
+
     def test_a_field_nobody_has_seen_yet_is_dropped_by_default(self):
         """The reason this is an allowlist. A denylist is wrong about every
         field a provider adds after it was written, and it is wrong in the

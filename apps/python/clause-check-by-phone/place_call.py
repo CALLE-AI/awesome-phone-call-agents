@@ -66,6 +66,18 @@ KEPT = ("id", "status", "structured_result")
 # the request back inside their error text.
 SAID_ON_REFUSAL = ("error", "code", "type", "message")
 A_RUN_OF_DIGITS = re.compile(r"\d{7,}")
+E164_IN_TEXT = re.compile(r"\+[1-9][0-9]{6,14}")
+
+
+def safe_value(value):
+    """Mask full phone numbers inside the small provider-result allowlist."""
+    if isinstance(value, str):
+        return E164_IN_TEXT.sub(lambda match: masked(match.group()), value)
+    if isinstance(value, list):
+        return [safe_value(item) for item in value]
+    if isinstance(value, dict):
+        return {name: safe_value(item) for name, item in value.items()}
+    return value
 
 
 def bounded(payload: dict) -> dict:
@@ -83,7 +95,7 @@ def bounded(payload: dict) -> dict:
     answer. Anyone who genuinely needs the whole thing asks for it by name,
     `raw=True`.
     """
-    return {name: payload[name] for name in KEPT if name in payload}
+    return {name: safe_value(payload[name]) for name in KEPT if name in payload}
 
 
 def safe_error(payload: dict) -> dict:
@@ -196,9 +208,10 @@ def collect(call_id: str, prepared: dict | None = None,
     status, payload = send("%s/%s" % (CALLS, call_id), key, None)
     if status >= 300:
         raise Refused("could not read the call, %s %s" % (status, safe_error(payload)))
-    answer = payload.get("structured_result") or {}
+    safe_payload = bounded(payload)
+    answer = safe_payload.get("structured_result") or {}
     if not raw:
-        payload = bounded(payload)
+        payload = safe_payload
     if prepared is None:
         return payload
     return payload, contradiction(prepared, answer)
