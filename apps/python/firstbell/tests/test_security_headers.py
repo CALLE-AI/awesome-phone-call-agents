@@ -185,3 +185,62 @@ def test_the_only_inline_handler_is_the_one_that_loads_the_fonts():
         f"the page's inline handlers are {handlers}, which is not the single font-loading "
         "handler this policy was written around"
     )
+
+
+def test_every_page_the_deployment_serves_is_covered_by_the_one_policy():
+    """`/(.*)` means every page, and until a security pass ran, it meant one.
+
+    The rule above reads `index.html`. The build now emits five document pages beside it,
+    each carrying a small stylesheet `index.html` does not have, and the header is set on
+    `/(.*)` rather than on `/index.html`. A policy derived from the first page is correct
+    for the first page and refuses the styles on the other five, which is a reader getting
+    the legal surface as unstyled text.
+
+    Nothing had broken when this was written. The point is that nothing was watching: the
+    gate that would have caught it was scoped to one file, and the whole argument here is
+    that a claim without the thing that checks it is worth nothing.
+    """
+    out = APP / "out"
+    if not CONFIG.exists() or not out.is_dir():
+        pytest.skip("no built page and policy; run tools/judge_page.py with --receipts first")
+
+    style_src = " ".join(_directives().get("style-src", []))
+    script_src = " ".join(_directives().get("script-src", []))
+
+    pages = sorted(out.rglob("*.html"))
+    assert len(pages) > 1, (
+        "the build emitted one page. If the document pages were dropped on purpose, this "
+        "gate should be changed deliberately rather than left passing on a smaller site."
+    )
+
+    for page in pages:
+        markup = page.read_text(encoding="utf-8")
+        where = page.relative_to(out).as_posix()
+
+        for block in re.findall(r"<style\b[^>]*>(.*?)</style>", markup, re.S):
+            digest = base64.b64encode(hashlib.sha256(block.encode("utf-8")).digest()).decode()
+            assert f"'sha256-{digest}'" in style_src, (
+                f"{where} carries a {len(block)} byte inline stylesheet with no hash in "
+                f"style-src, so a reader gets that page unstyled"
+            )
+
+        for _, value in re.findall(r"""\sstyle=(["'])(.*?)\1""", markup, re.S):
+            digest = base64.b64encode(hashlib.sha256(value.encode("utf-8")).digest()).decode()
+            assert f"'sha256-{digest}'" in style_src, (
+                f"{where} carries the style attribute {value!r} with no matching hash"
+            )
+
+        for _, _, handler in re.findall(r"""\son([a-z]+)=(["'])(.*?)\2""", markup, re.S):
+            digest = base64.b64encode(
+                hashlib.sha256(handler.encode("utf-8")).digest()).decode()
+            assert f"'sha256-{digest}'" in script_src, (
+                f"{where} carries the inline handler {handler!r} with no matching hash"
+            )
+
+        # A document page runs nothing. The policy would refuse an unhashed script anyway,
+        # and a refused script is a page that half works rather than one that says why.
+        if where.startswith("docs/"):
+            assert "<script" not in markup, (
+                f"{where} carries a script tag. Document pages are rendered markdown and "
+                f"have nothing to run."
+            )

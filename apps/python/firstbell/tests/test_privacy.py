@@ -737,16 +737,31 @@ def test_the_page_builder_masks_every_identifier_and_drops_no_result(tmp_path):
         f"the page builder failed on an authored fixture:\n{built.stdout}\n{built.stderr}"
     )
 
-    html = (out / "index.html").read_text(encoding="utf-8")
+    # Every page the build emits, not just the first one. A security pass over the output
+    # found this gate reading `index.html` alone on the night the build began publishing
+    # five document pages beside it: nothing had leaked, and nothing would have caught it
+    # if it had. The rule is about what the deployment serves, so it reads what the
+    # deployment serves.
+    pages = sorted(out.rglob("*.html"))
+    assert pages, "the builder emitted no HTML at all"
+    assert len(pages) > 1, (
+        "only one page came out of the build. If the document pages were removed on "
+        "purpose, say so here; if they broke, this is the failure."
+    )
 
     # The same two patterns the tracked-file scan uses, against the artifact rather than the
     # source. A build that stopped masking would still pass every source-level check.
-    leaked_api = PROVIDER_ID.findall(html)
-    leaked_billing = [h for h in BILLING_ID.findall(html) if h not in PLACEHOLDER_IDS]
-    assert not leaked_api, f"{len(leaked_api)} whole call id(s) reached a built page"
-    assert not leaked_billing, (
-        f"{len(leaked_billing)} whole provider id(s) reached a built page"
-    )
+    for page in pages:
+        markup = page.read_text(encoding="utf-8")
+        where = page.relative_to(out).as_posix()
+        leaked_api = PROVIDER_ID.findall(markup)
+        leaked_billing = [h for h in BILLING_ID.findall(markup) if h not in PLACEHOLDER_IDS]
+        assert not leaked_api, f"{len(leaked_api)} whole call id(s) reached {where}"
+        assert not leaked_billing, (
+            f"{len(leaked_billing)} whole provider id(s) reached {where}"
+        )
+
+    html = (out / "index.html").read_text(encoding="utf-8")
 
     # Masked, not merely absent. A builder that dropped the column would pass the two above.
     for sid, _locale, letter, _aware, _reason, _ret in fixture_page.CALLS:

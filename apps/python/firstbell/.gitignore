@@ -22,8 +22,9 @@ tools/gates/gate-report*.json
 # by judge_page.py on every run, so there is nothing for it to drift against.
 tools/site/figures/
 
-# Written by a run rather than by a person. `local_dev.db` is the offline double's
-# store and `profile-claim.lock` is one run telling the next that it is still going.
-# Both appear the first time the demo is run and neither is part of the entry.
+# Two empty files that appear when a tool is run with this directory as its working
+# directory. Nothing in this project writes either one: `grep -rn local_dev.db --include=*.py`
+# returns nothing, and both arrived at 0 bytes during an unrelated CLI run. They are ignored
+# so they cannot be committed by accident, and named here rather than guessed at.
 local_dev.db
 profile-claim.lock
