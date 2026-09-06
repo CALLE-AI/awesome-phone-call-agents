@@ -121,11 +121,14 @@ def test_the_ceiling_counts_calls_not_rows(tmp_path, monkeypatch, double_over_ht
     """
     work = tmp_path / "mixed.csv"
     work.write_text(
+        # +91555 is the reserved prefix this repository uses for India, so none of these can
+        # ring anybody. The trailing block is 9xxxxxx rather than 0xxxxxx so it cannot
+        # collide with the twelve numbers the demo scenario binds outcomes to.
         "id,phones,locale,region,consent,voice,student_name\n"
-        "S-8001,+919000000001,en-IN,IN,yes,yes,One\n"
-        "S-8002,+919000000002,en-IN,IN,no,yes,Two\n"       # never consented
-        "S-8003,+919000000003,en-IN,IN,yes,no,Three\n"     # not reachable by voice
-        "S-8004,+919000000004,en-IN,IN,yes,yes,Four\n",
+        "S-8001,+915559000001,en-IN,IN,yes,yes,One\n"
+        "S-8002,+915559000002,en-IN,IN,no,yes,Two\n"       # never consented
+        "S-8003,+915559000003,en-IN,IN,yes,no,Three\n"     # not reachable by voice
+        "S-8004,+915559000004,en-IN,IN,yes,yes,Four\n",
         encoding="utf-8", newline="\n",
     )
     monkeypatch.setattr(cli, "DEFAULT_CALL_CEILING", 1)
