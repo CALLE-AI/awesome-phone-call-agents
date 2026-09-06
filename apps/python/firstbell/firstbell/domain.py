@@ -12,7 +12,7 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
-from dispatch import Escalation, ItemResult, Resolution, WorkItem
+from dispatch import NO_CONSENT, Escalation, ItemResult, Resolution, WorkItem
 
 # What a usable answer looks like. Kept small on purpose: every field here is one the
 # office actually needs to close the record, and nothing is asked that a parent would not
@@ -229,6 +229,12 @@ class ImpactSummary:
     failed: int
     skipped_no_consent: int
     calls_placed: int
+    # Skips are not one thing. A family that never consented is closed business; a
+    # family the phone cannot reach is open work on somebody's desk. Counting both as
+    # `skipped_no_consent`, which is what this did, also reported a cancelled run as a
+    # wave of consent refusals.
+    skipped_no_voice: int = 0
+    skipped_not_dialled: int = 0
     calls_replayed: int = 0
     calls_unknown_provenance: int = 0
     live: bool = False
@@ -264,10 +270,6 @@ class ImpactSummary:
     def non_english_resolved(self) -> int:
         return sum(n for loc, n in self.resolved_by_language.items()
                    if not loc.lower().startswith("en"))
-
-    @property
-    def languages_covered(self) -> list[str]:
-        return sorted({loc for loc in self.resolved_by_language if loc})
 
     @property
     def break_even_per_call_minute(self) -> float | None:
@@ -312,6 +314,10 @@ class ImpactSummary:
             f"  undetermined         {self.undetermined}   call happened, no usable answer, needs a person",
             f"  failed               {self.failed}   nobody reached on any number",
             f"  skipped, no consent  {self.skipped_no_consent}",
+            *([f"  no voice channel     {self.skipped_no_voice}   never dialled, needs "
+               "another way to reach them"] if self.skipped_no_voice else []),
+            *([f"  skipped, not dialled {self.skipped_not_dialled}   cancelled, or "
+               "stopped by another gate"] if self.skipped_not_dialled else []),
             f"  calls placed         {self.calls_placed}{'' if self.live else '   (no telephone call was placed)'}",
         ]
         if self.calls_replayed:
@@ -422,7 +428,11 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         resolved=counts[Resolution.RESOLVED],
         undetermined=counts[Resolution.UNDETERMINED],
         failed=counts[Resolution.FAILED],
-        skipped_no_consent=counts[Resolution.SKIPPED],
+        skipped_no_consent=sum(1 for r in results if r.reason == NO_CONSENT),
+        skipped_no_voice=sum(1 for r in results if r.needs_another_channel),
+        skipped_not_dialled=(counts[Resolution.SKIPPED]
+                             - sum(1 for r in results if r.reason == NO_CONSENT)
+                             - sum(1 for r in results if r.needs_another_channel)),
         calls_placed=buckets[True] if calls_placed is None else calls_placed,
         calls_replayed=buckets[False],
         calls_unknown_provenance=buckets[None],

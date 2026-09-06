@@ -45,15 +45,46 @@ def _split_phones(raw: str) -> tuple[str, ...]:
     return tuple(p for p in parts if p)
 
 
+_YES = {"1", "true", "yes", "y", "granted"}
+_NO = {"0", "false", "no", "n", "denied"}
+
+
 def _truthy(raw: str | None) -> bool:
-    return (raw or "").strip().lower() in {"1", "true", "yes", "y", "granted"}
+    return (raw or "").strip().lower() in _YES
+
+
+def _voice_ok(raw: str | None, where: str) -> bool:
+    """Whether the phone can reach this family at all.
+
+    Blank means the office has not recorded it, and an unrecorded family is dialled,
+    because that is what happens today and pretending otherwise would silently stop
+    calling people. A value nobody recognises raises: a typo in this column decides
+    whether a person gets phoned, and guessing at it is how a spelling mistake becomes an
+    accessibility complaint.
+    """
+    value = (raw or "").strip().lower()
+    if not value:
+        return True
+    if value in _YES:
+        return True
+    if value in _NO:
+        return False
+    raise SourceError(
+        f"{where}: voice is {raw!r}, which this does not understand. Use yes or no. "
+        "This column decides whether a person is telephoned, so it is not guessed at."
+    )
 
 
 class CsvSource:
     """Reads work items from a CSV export.
 
-    Required columns: `id`, `phones`. Optional: `locale`, `region`, `consent`, and any
+    Required columns: `id`, `phones`. Optional: `locale`, `region`, `voice`, and any
     other column, which is carried through in `context` so the task text can use it.
+
+    `voice` is how the office records a family the telephone cannot reach: a guardian who
+    is deaf, hard of hearing, or has a speech disability. `voice=no` means the row is
+    never dialled and goes to a person instead. Leaving the column out keeps today's
+    behaviour, which is that everybody is dialled.
 
     `consent` is required to be present as a column. A file with no consent column raises,
     rather than defaulting to consented: a missing column is ambiguous, and the safe
@@ -105,7 +136,8 @@ class CsvSource:
 
                 context = {
                     k: v for k, v in row.items()
-                    if k not in {"id", "phones", "locale", "region", "consent"} and v
+                    if k not in {"id", "phones", "locale", "region", "consent", "voice"}
+                    and v
                 }
                 yield WorkItem(
                     id=item_id,
@@ -114,6 +146,8 @@ class CsvSource:
                     region=(row.get("region") or "").strip() or None,
                     context=context,
                     consented=_truthy(row.get("consent")),
+                    reachable_by_voice=_voice_ok(
+                        row.get("voice"), f"{self.path.name} line {line_number}"),
                 )
 
 

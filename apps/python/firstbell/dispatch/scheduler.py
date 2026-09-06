@@ -33,8 +33,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
 from .models import (
+    CANCELLED,
     Escalation,
     FATAL_ERRORS,
+    NO_CONSENT,
+    NO_VOICE_CHANNEL,
     PERMANENT_ERRORS,
     RETRYABLE_ERRORS,
     DispatchReport,
@@ -227,8 +230,16 @@ class WaveDispatcher:
                 # A person who has not consented is never dialled. This is a gate, not a
                 # filter: it comes before dispatch and it cannot be configured off.
                 report.results.append(ItemResult(
-                    item=item, resolution=Resolution.SKIPPED,
-                    reason="no recorded consent to be called",
+                    item=item, resolution=Resolution.SKIPPED, reason=NO_CONSENT,
+                ))
+            elif not item.reachable_by_voice:
+                # Consent is asked first because a family that never agreed to be called
+                # is not owed a call on another channel either. This gate is second and
+                # it is the one that leaves work behind: the row is not dialled, is not
+                # a failure, and goes to a person.
+                report.results.append(ItemResult(
+                    item=item, resolution=Resolution.SKIPPED, reason=NO_VOICE_CHANNEL,
+                    needs_another_channel=True,
                 ))
             else:
                 callable_items.append(item)
@@ -247,8 +258,7 @@ class WaveDispatcher:
                     report.results.append(future.result())
                 except Cancelled:
                     report.results.append(ItemResult(
-                        item=item, resolution=Resolution.SKIPPED,
-                        reason="cancelled before dispatch",
+                        item=item, resolution=Resolution.SKIPPED, reason=CANCELLED,
                     ))
                 except PollFailed as failure:
                     # Reachable only if a poll failure escapes _handle, which it should

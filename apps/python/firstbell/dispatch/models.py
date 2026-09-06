@@ -35,6 +35,15 @@ class Resolution(str, Enum):
         return self in (Resolution.UNDETERMINED, Resolution.FAILED)
 
 
+# The reason a row was never dialled, written once so that whoever counts the skips
+# later is reading the same string the gate wrote. Counting skips by resolution alone
+# reported a cancelled run as a wave of consent refusals.
+NO_CONSENT = "no recorded consent to be called"
+NO_VOICE_CHANNEL = ("this family is not reachable by a voice call; "
+                    "nothing was dialled and somebody has to reach them another way")
+CANCELLED = "cancelled before dispatch"
+
+
 class Escalation(str, Enum):
     """Whether an answer, having arrived intact, is safe to close automatically.
 
@@ -130,6 +139,11 @@ class WorkItem:
     region: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
     consented: bool = True
+    # False when the office has recorded that the phone cannot reach this family: a
+    # guardian who is deaf, hard of hearing, or has a speech disability. This app cannot
+    # discover that by dialling, and dialling anyway files them under "nobody answered",
+    # which is a record that says the family was unreachable when the channel was.
+    reachable_by_voice: bool = True
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -170,6 +184,10 @@ class ItemResult:
     # of the domain and not of telephony. This package supplies the channel and the
     # default, which is that nothing escalates unless something says so.
     escalation: Escalation = Escalation.NONE
+    # A skipped row is normally nobody's problem: an unconsented family was never going
+    # to be dialled and nothing is owed. This one is different. The call was not placed
+    # because the channel cannot carry it, so the work did not go away, it moved.
+    needs_another_channel: bool = False
 
     @property
     def masked_numbers(self) -> tuple[str, ...]:
@@ -185,7 +203,9 @@ class ItemResult:
         matter what it said, and the one case this software exists to catch was the one
         it filed automatically.
         """
-        return self.resolution.needs_a_human or self.escalation is not Escalation.NONE
+        return (self.resolution.needs_a_human
+                or self.escalation is not Escalation.NONE
+                or self.needs_another_channel)
 
 
 def mask(phone: str) -> str:

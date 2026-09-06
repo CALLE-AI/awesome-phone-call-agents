@@ -25,7 +25,9 @@ from dispatch import (
     WaveDispatcher,
     WorkItem,
     default_idempotency_key,
+    is_valid,
     mask,
+    problems,
 )
 from dispatch.validation import UnsupportedSchema
 from tests.fixtures import IN_A, IN_FALLBACK
@@ -347,6 +349,28 @@ def test_a_schema_using_unimplemented_keywords_is_refused_up_front():
             client=None, task_builder=lambda i: "x",
             result_schema={"type": "object", "oneOf": [{"required": ["a"]}]},
         )
+
+
+def test_the_exported_is_valid_agrees_with_problems_on_both_answers():
+    """`is_valid` is exported and nothing in this app calls it.
+
+    Every classification test above goes through `problems`, so a wrapper that answered
+    True for everything passed the entire suite. This is the only thing holding the
+    boolean to the list it is supposed to summarise.
+    """
+    assert is_valid(GOOD, SCHEMA) is True
+    assert problems(GOOD, SCHEMA) == []
+
+    rejected = [
+        ({}, "the required field is absent"),
+        ({"reason": None}, "the required field is present and null"),
+        ({"reason": "illness", "returning": "maybe"}, "a value outside the enum"),
+        ({"reason": "illness", "day_count": True}, "a boolean where an integer belongs"),
+        ("she is unwell", "a string where the object belongs"),
+    ]
+    for value, why in rejected:
+        assert is_valid(value, SCHEMA) is False, why
+        assert problems(value, SCHEMA), why
 
 
 def test_a_work_item_must_have_an_id_and_a_number():

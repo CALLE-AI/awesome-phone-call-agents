@@ -402,6 +402,10 @@ def _print_human(report: DispatchReport, summary) -> None:
         # A resolved-and-escalated row prints `ok` under the old mapping, which is the
         # same four characters a closed case gets. The whole point of the escalation is
         # that a person reading down this column stops at it.
+        # A skip that leaves work behind must not print the same four characters as a
+        # skip that closes it.
+        if result.needs_another_channel:
+            marker = "HUMAN"
         if result.escalation is not Escalation.NONE:
             marker = result.escalation.value.upper()[:5]
         print(f"  [{marker:5s}] {result.item.id:12s} {result.reason}")
