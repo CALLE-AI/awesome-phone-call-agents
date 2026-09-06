@@ -18,6 +18,7 @@ video a hue behind with nothing to say so. Reading one from the other makes them
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -135,3 +136,54 @@ def test_a_missing_gate_report_refuses_rather_than_reporting_zero():
         video_facts.browser_gate_count()
 
     assert "cannot be measured" in str(caught.value)
+
+
+def test_the_video_is_never_handed_a_whole_call_identifier():
+    """The masking that reached the page had never reached the video.
+
+    Ledger row 132 closed Must Fix 1 by stripping whole call identifiers at the source "so
+    a new surface cannot reintroduce a whole one". The video was exactly that new surface.
+    `video/panels.py` in the workshop printed three of them at full length onto a
+    1920x1080 plate, for months, because it is built outside this
+    tree and holds its own copies.
+
+    Masking on the way out would not have helped: the caller still held the whole value.
+    So the contract hands over identifiers that are already short, and this is the test
+    that keeps them that way.
+    """
+    from judge_page import mask_id
+
+    receipts = next(
+        (base for base in (Path(os.environ.get("FIRSTBELL_RECEIPTS") or "nowhere"),
+                           Path("D:/calle-workshop/receipts"),
+                           APP / "evidence" / "receipts")
+         if base.is_dir()),
+        None,
+    )
+    if receipts is None:
+        pytest.skip("the receipts are held outside this repository and are not here")
+
+    whole = set()
+    for path in sorted(receipts.glob("0*.json")):
+        import json
+
+        for item in json.loads(path.read_text(encoding="utf-8")).get("items", []):
+            if item.get("call_id"):
+                whole.add(item["call_id"])
+
+    assert whole, "no call identifiers were read, so this test proved nothing"
+
+    emitted = video_facts.calls(receipts)
+    assert emitted, "the call panels would be handed nothing to print"
+
+    text = str(emitted)
+    leaked = sorted(one for one in whole if one in text)
+    assert not leaked, (
+        "the document the video build reads contains whole call identifiers: "
+        f"{leaked}. Mask them where they are read, not where they are printed."
+    )
+
+    for work_item, call in emitted.items():
+        assert call["call_id_masked"] == mask_id(call["call_id_masked"]) or "…" in (
+            call["call_id_masked"]
+        ), f"{work_item} carries an identifier that was never masked"

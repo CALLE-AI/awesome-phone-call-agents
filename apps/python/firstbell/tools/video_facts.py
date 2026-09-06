@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -159,7 +160,59 @@ def sourced_figures() -> list[dict]:
     ]
 
 
-def facts() -> dict:
+def calls(receipts_dir: Path) -> dict[str, dict]:
+    """Every work item a receipt records, with its call identifier already masked.
+
+    The call panels in the video were typed by hand and printed three identifiers at full
+    length, months after `judge_page.mask_id` had stripped them from the page "so a new
+    surface cannot reintroduce a whole one". The video was that new surface: it is built
+    outside this repository, so nothing here could see it.
+
+    Masking on the way out is not enough when the caller holds the whole value anyway, so
+    this returns work item to masked id and the video build is never handed a complete one.
+    """
+    import judge_page
+
+    judge_page.RECEIPTS = receipts_dir
+    out: dict[str, dict] = {}
+    for _name, receipt in judge_page.receipts():
+        for item in receipt.get("items", []):
+            work_item = item.get("id")
+            if not work_item or work_item in out:
+                continue
+            out[work_item] = {
+                "call_id_masked": judge_page.mask_id(item.get("call_id") or ""),
+                "resolution": item.get("resolution"),
+                "reason": item.get("reason"),
+            }
+    return dict(sorted(out.items()))
+
+
+def live_runs(receipts_dir: Path) -> dict[str, int]:
+    """Runs that reached the production API, and how many calls they placed between them.
+
+    The evidence card counted "receipts from calls against the live API: 4" for as long as
+    the card existed. There were four when somebody typed it. There are six now, and they
+    placed twelve calls. Nothing was going to notice, because the number was a string in a
+    generator that no longer exists.
+    """
+    import judge_page
+
+    judge_page.RECEIPTS = receipts_dir
+    runs = [r for _name, r in judge_page.receipts() if r.get("reached_production_api")]
+    if not runs:
+        raise SystemExit(
+            f"no receipt under {receipts_dir} records reaching the production API, so the "
+            "evidence card cannot be given a count. This is a measurement failure, not a "
+            "zero."
+        )
+    return {
+        "runs": len(runs),
+        "calls_placed": sum(int(r.get("calls_placed") or 0) for r in runs),
+    }
+
+
+def facts(receipts_dir: Path) -> dict:
     passed, ran = browser_gate_count()
     return {
         "tests": test_count(),
@@ -168,6 +221,8 @@ def facts() -> dict:
         "browser_gates_run": ran,
         "figures": sourced_figures(),
         "palette": palette(),
+        "calls": calls(receipts_dir),
+        "live_runs": live_runs(receipts_dir),
     }
 
 
@@ -175,9 +230,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true",
                         help="emit the document the video build reads")
+    parser.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
+                        help="the receipts directory the page is built from")
     args = parser.parse_args()
 
-    data = facts()
+    if not args.receipts:
+        raise SystemExit(
+            "pass --receipts or set FIRSTBELL_RECEIPTS. The call panels read their "
+            "identifiers from the receipts, so there is no default worth guessing."
+        )
+    receipts_dir = Path(args.receipts).resolve()
+    if not receipts_dir.is_dir():
+        raise SystemExit(f"--receipts {receipts_dir} is not a directory")
+
+    data = facts(receipts_dir)
     if args.json:
         print(json.dumps(data, indent=2))
         return 0
@@ -191,6 +257,11 @@ def main() -> int:
     print("palette")
     for name, value in data["palette"].items():
         print(f"  {name:<16} {value}")
+    print(f"live runs        {data['live_runs']['runs']}"
+          f" placing {data['live_runs']['calls_placed']} calls")
+    print("calls")
+    for work_item, call in data["calls"].items():
+        print(f"  {work_item:<8} {call['call_id_masked']:<18} {call['resolution']}")
     return 0
 
 

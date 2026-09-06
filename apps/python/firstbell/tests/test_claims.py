@@ -508,6 +508,12 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     "test_the_figure_carries_no_text_of_its_own":
         "skips when the figure has not been generated in this checkout, since there is no "
         "SVG to read for text that should not be in it",
+    # The leak gate on the video's fact document. It reads the receipts, and the receipts
+    # live outside this tree, so a clean checkout has no identifiers to prove are masked.
+    "test_the_video_is_never_handed_a_whole_call_identifier":
+        "reads the call identifiers out of the receipts, which are held outside this "
+        "repository, so on a checkout without them there is nothing to check the masking "
+        "against",
     # Not a test: the helper every test in test_queue_view.py goes through, which is where
     # the skip lives and so where the AST finds it. The receipts are held outside this tree,
     # so on a checkout without them the whole office-queue view has nothing to be checked
