@@ -38,6 +38,9 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(APP / "tools"))
+# The cost card reads the wage constants out of the program itself rather than a
+# second copy of them, so `firstbell` has to be importable from here as well.
+sys.path.insert(0, str(APP))
 
 # The stylesheet is the single definition of every colour this project uses. Reading the
 # tokens out of it rather than restating them means a re-cut on the page reaches the video
@@ -212,6 +215,63 @@ def live_runs(receipts_dir: Path) -> dict[str, int]:
     }
 
 
+def economics() -> dict:
+    """What the demonstration run costs against what a desk costs, from the run itself.
+
+    A blind buyer seat read the entry and reported that the whole business case is inside a
+    console shot at eleven pixels, "in a font I cannot read", and that a unit price is not a
+    budget. The numbers are good and they were unreadable, which is the same as not having
+    them.
+
+    They are computed rather than restated. `python -m firstbell --json` prints exactly what
+    the human report prints, from the same summary object, so a card built on this cannot
+    disagree with the terminal beside it in the cut.
+    """
+    from firstbell.domain import StaffCost
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "firstbell", "--work-file", "examples/absences.csv", "--json"],
+        cwd=APP, capture_output=True, text=True,
+    )
+    start = proc.stdout.find("{")
+    if start < 0:
+        raise SystemExit(
+            "the demonstration run printed no JSON, so the video cannot be given a cost "
+            "case: " + (proc.stdout[-400:] or proc.stderr[-400:])
+        )
+    run = json.loads(proc.stdout[start:])
+
+    ceiling = run["break_even_per_call_minute"]
+    if not ceiling:
+        raise SystemExit(
+            "the run reported no break-even, which is a measurement failure rather than a "
+            "cost of zero"
+        )
+
+    staff = StaffCost.us_school_office()
+    return {
+        # Money per call, per minute one manual attempt takes. A rate rather than a flat
+        # saving, because what CALL-E charges is unpublished and a school knows its own
+        # wage bill and its own call length.
+        "break_even_per_call_minute": round(ceiling, 4),
+        "break_even_at_three_minutes": round(ceiling * 3, 2),
+        "currency": staff.currency,
+        "hourly": round(staff.hourly, 2),
+        "annual": staff.annual,
+        "hours_per_year": staff.hours_per_year,
+        "occupation": staff.occupation,
+        "industry": staff.industry,
+        "source": staff.source,
+        "source_url": staff.source_url,
+        "attempts_billed": run["attempts_billed"],
+        "attempts_removed": run["attempts_removed"],
+        "attempts_still_open": run["attempts_still_open"],
+        # Deliberately null, and the card says so. Explaining an absence does not make a
+        # child present, so no attendance funding is recovered by the call.
+        "funding_recovered": run["funding_recovered"],
+    }
+
+
 def facts(receipts_dir: Path) -> dict:
     passed, ran = browser_gate_count()
     return {
@@ -223,6 +283,7 @@ def facts(receipts_dir: Path) -> dict:
         "palette": palette(),
         "calls": calls(receipts_dir),
         "live_runs": live_runs(receipts_dir),
+        "economics": economics(),
     }
 
 
@@ -257,6 +318,10 @@ def main() -> int:
     print("palette")
     for name, value in data["palette"].items():
         print(f"  {name:<16} {value}")
+    money = data["economics"]
+    print(f"break-even       {money['currency']}{money['break_even_per_call_minute']:.2f}"
+          f" per call per minute, {money['currency']}"
+          f"{money['break_even_at_three_minutes']:.2f} at three minutes")
     print(f"live runs        {data['live_runs']['runs']}"
           f" placing {data['live_runs']['calls_placed']} calls")
     print("calls")

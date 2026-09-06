@@ -25,7 +25,7 @@
 import { createServer } from "node:http";
 import { copyFile, readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { extname, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
@@ -1242,14 +1242,18 @@ const VIEWPORT_TALLER = { width: 1600, height: 1100 };
  * `innerWidth` includes the vertical scrollbar and would report a false 15px overflow on
  * every platform that draws one.
  */
-async function gateOverflow(browser, url) {
+async function gateOverflow(browser, url, alsoUrls = []) {
   const widths = [390, 800, 1152, 1280, 1440, 1600];
   const stops = [];
+  // Every page the deployment serves, because a `<pre>` in a document at 390px pushes a
+  // horizontal scrollbar onto the whole document exactly as one in an act would, and a
+  // gate that only ever opened index.html would have called that clean.
+  const pages = [url, ...alsoUrls];
 
-  for (const width of widths) {
+  for (const [width, target] of widths.flatMap((w) => pages.map((t) => [w, t]))) {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
-    await page.goto(url, { waitUntil: "networkidle0" });
+    await page.goto(target, { waitUntil: "networkidle0" });
     await new Promise((r) => setTimeout(r, 300));
 
     const seen = await page.evaluate(() => {
@@ -1293,15 +1297,15 @@ async function gateOverflow(browser, url) {
     });
 
     await page.close();
-    stops.push({ width, ...seen });
+    stops.push({ width, url: target.replace(/^https?:[/][/][^/]+/, ""), ...seen });
   }
 
   const bad = stops.filter((s) => s.doc > s.room + 1);
   record("overflow", bad.length === 0 ? "PASS" : "FAIL",
     bad.length === 0
-      ? `nothing reaches past the right edge at any of ${widths.length} widths, `
-        + `${widths[0]} to ${widths[widths.length - 1]}px`
-      : bad.map((s) => `at ${s.width}px the document is ${s.doc}px wide`
+      ? `nothing reaches past the right edge on any of ${pages.length} pages at any of `
+        + `${widths.length} widths, ${widths[0]} to ${widths[widths.length - 1]}px`
+      : bad.map((s) => `${s.url} at ${s.width}px is ${s.doc}px wide`
           + (s.worst.length ? `, widest is ${s.worst[0].name} reaching ${s.worst[0].right}px` : ""))
         .join(". "),
     { stops });
@@ -1483,6 +1487,149 @@ async function gateCsp(browser) {
   record("the page under its own Content-Security-Policy", status, detail, measured);
 }
 
+/**
+ * The five document pages, which nothing checked until now.
+ *
+ * They were added because a blind reviewer reading as a district operations director found
+ * that `docs/the-legal-surface.md` and `docs/what-a-pilot-would-look-like.md`, the two
+ * documents that decide whether they would run a pilot, were reachable only by cloning the
+ * repository. Publishing five unchecked pages on a site whose argument is that every claim
+ * carries the thing that checks it would answer one complaint by earning a worse one, so
+ * they are measured with the same probe the main page is measured with.
+ *
+ * Simpler than the main page and deliberately so: no acts, no reveals, no rail, no audio,
+ * no script of any kind. The walk is therefore a walk and nothing else. What is checked is
+ * what can go wrong here: colour, the link back, and whether the browser refused anything.
+ */
+async function gateDocs(browser, base, slugs) {
+  const best = new Map();
+  const census = new Map();
+  const structure = [];
+  const refused = [];
+
+  const absorb = (rows) => {
+    for (const row of rows) {
+      const had = best.get(row.key);
+      if (row.unmeasured) { if (!had) best.set(row.key, row); continue; }
+      if (!had || had.unmeasured || row.ratio > had.ratio) best.set(row.key, row);
+    }
+  };
+
+  for (const slug of slugs) {
+    const url = `${base}/docs/${slug}.html`;
+    const page = await browser.newPage();
+    // Keyed per page. Two documents share a DOM path for their first paragraph and one
+    // would otherwise stand in for the other, which is a census that counts five pages
+    // and measures fewer.
+    const key = (row) => ({ ...row, key: `${slug} ${row.key}` });
+    const takeCensus = async () => {
+      for (const entry of await page.evaluate(CONTRAST_CENSUS)) {
+        const k = `${slug} ${entry.key}`;
+        if (!census.has(k)) census.set(k, { ...entry, key: k, slug });
+      }
+    };
+
+    page.on("pageerror", (err) => refused.push(`${slug}: ${err.message}`));
+    page.on("console", (msg) => {
+      if (msg.type() === "error") refused.push(`${slug}: ${msg.text()}`);
+    });
+    page.on("requestfailed", (req) => {
+      refused.push(`${slug}: ${req.url()} ${req.failure()?.errorText || "failed"}`);
+    });
+
+    await page.setViewport({ width: 1440, height: 900 });
+    const response = await page.goto(url, { waitUntil: "networkidle0" });
+    await page.evaluate(() => document.fonts.ready).catch(() => {});
+    await new Promise((r) => setTimeout(r, 400));
+
+    const shape = await page.evaluate(() => ({
+      h1: document.querySelectorAll("h1").length,
+      back: document.querySelector("a.doc-back")?.getAttribute("href") || null,
+      words: (document.body.innerText || "").trim().split(/\s+/).length,
+      scripts: document.querySelectorAll("script").length,
+    }));
+    structure.push({ slug, http: response?.status() ?? 0, ...shape });
+
+    absorb((await page.evaluate(CONTRAST_PROBE)).map(key));
+    await takeCensus();
+
+    const height = await page.evaluate(() => window.innerHeight);
+    const total = await page.evaluate(() => document.documentElement.scrollHeight);
+    for (let y = 0; y < total; y += Math.round(height / 2)) {
+      await page.evaluate((to) => window.scrollTo(0, to), y);
+      await settleScroll(page);
+      await new Promise((r) => setTimeout(r, 150));
+      absorb((await page.evaluate(CONTRAST_PROBE)).map(key));
+      await takeCensus();
+    }
+
+    // Anything the stepped walk never centred is asked for by name before it is written
+    // off, exactly as the main page's pass does it. An element living between two stops
+    // is unvisited rather than unmeasurable, and the two are not the same report.
+    for (const [k, entry] of census) {
+      if (best.has(k) || entry.slug !== slug) continue;
+      const found = await page.evaluate((label, text) => {
+        let els = [];
+        try { els = [...document.querySelectorAll(label)]; } catch { return false; }
+        const hit = els.find((el) =>
+          (el.textContent || "").trim().startsWith(text.trim().slice(0, 24)));
+        if (!hit) return false;
+        hit.scrollIntoView({ block: "center", behavior: "instant" });
+        return true;
+      }, entry.label, entry.text || "");
+      if (!found) continue;
+      await new Promise((r) => setTimeout(r, 140));
+      absorb((await page.evaluate(CONTRAST_PROBE)).map(key));
+    }
+
+    await page.close();
+  }
+
+  for (const [key, entry] of census) {
+    if (best.has(key)) continue;
+    best.set(key, { key, label: entry.label, text: entry.text, unmeasured: true,
+                    why: "never centred on screen at any sampling stop" });
+  }
+
+  const rows = [...best.values()];
+  const measured = rows.filter((r) => !r.unmeasured);
+  const unmeasured = rows.filter((r) => r.unmeasured);
+  const fails = measured.filter((r) => r.ratio < r.need).sort((a, b) => a.ratio - b.ratio);
+
+  const broken = [];
+  for (const s of structure) {
+    if (s.http !== 200) broken.push(`${s.slug} answered ${s.http}`);
+    if (s.h1 !== 1) broken.push(`${s.slug} has ${s.h1} h1 elements, not 1`);
+    if (s.back !== "../index.html") broken.push(`${s.slug} links back to ${s.back}`);
+    if (s.words < 200) broken.push(`${s.slug} rendered only ${s.words} words`);
+    if (s.scripts) {
+      broken.push(`${s.slug} carries ${s.scripts} script tags and should carry none`);
+    }
+  }
+
+  if (measured.length < 200) {
+    record("document pages", "COULD-NOT-MEASURE",
+      `only ${measured.length} text runs across ${slugs.length} pages resolved to a colour `
+      + `and a ground`);
+    return;
+  }
+
+  const worst = Math.min(...measured.map((r) => r.ratio));
+  const problems = [
+    ...broken,
+    ...fails.slice(0, 4).map((f) => `${f.label} ${f.ratio.toFixed(2)} needs ${f.need}`),
+    ...refused.slice(0, 4),
+  ];
+  record("document pages", problems.length === 0 ? "PASS" : "FAIL",
+    problems.length === 0
+      ? `${slugs.length} pages, ${structure.reduce((n, s) => n + s.words, 0)} words, every `
+        + `one linking back; ${measured.length} text runs clear WCAG AA with the closest at `
+        + `${worst.toFixed(2)}, ${unmeasured.length} unresolved; nothing refused`
+      : problems.join("; "),
+    { pages: structure, measured: measured.length, unmeasured: unmeasured.length,
+      worst: Number(worst.toFixed(2)), refused: refused.length });
+}
+
 async function main() {
   if (!existsSync(OUT)) {
     console.error(`No built page at ${OUT}.\nRun: python tools/judge_page.py`);
@@ -1494,7 +1641,15 @@ async function main() {
     process.exit(2);
   }
   const { server, port } = await serve(OUT);
-  const url = `http://127.0.0.1:${port}/index.html`;
+  const base = `http://127.0.0.1:${port}`;
+  const url = `${base}/index.html`;
+  // Read off what the build published rather than listed here. A document added to
+  // `doc_pages.PUBLISHED` and not to a list in this file would be a page on a public site
+  // that no gate had ever opened, which is the failure this gate exists to prevent.
+  const docSlugs = existsSync(join(OUT, "docs"))
+    ? readdirSync(join(OUT, "docs")).filter((f) => f.endsWith(".html"))
+        .map((f) => f.replace(/[.]html$/, "")).sort()
+    : [];
   console.log(`serving ${OUT} with gzip on ${url}`);
   console.log(`browser: ${chrome}\n`);
 
@@ -1515,8 +1670,9 @@ async function main() {
     await gateContrast(browser, url);
     await gateKeyboard(browser, url);
     await gateViewport(browser, url);
-    await gateOverflow(browser, url);
+    await gateOverflow(browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html"));
     await gateCsp(browser);
+    await gateDocs(browser, base, docSlugs);
     await shoot(browser, url);
   } finally {
     await browser.close();

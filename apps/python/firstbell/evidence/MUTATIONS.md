@@ -397,7 +397,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The thirteen browser gates
+## The fourteen browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -406,6 +406,14 @@ because they fail as a gate rather than as a count of tests.
 The thirteenth is the only one that does not load the page bare. The deployment sends the
 page with headers derived from its own bytes, so that gate serves it the same way and counts
 what the browser refused.
+
+The fourteenth is `document pages`, and it exists because five pages went up with nothing
+over them. A blind reviewer reading as a district operations director found that the two
+documents deciding whether they would run a pilot were reachable only by cloning the
+repository, so the build began rendering `docs/` into pages. Publishing five unchecked pages
+on a site arguing that every claim carries the thing that checks it would have answered one
+complaint by earning a worse one. It reads them with the same probe the main page is read
+with, and the overflow gate was widened to walk them at the same time.
 
 The twelfth is `overflow`, and it is the one that was missing rather than the one that was
 added. The document was wider than the window at 1152 and at 390 CSS pixels, which is a
@@ -433,9 +441,13 @@ noticing: weight, contrast, the rail and the keyboard all read the same whether 
 | Drop `https://cdn.jsdelivr.net` from `script-src` | Same gate, FAIL, `script-src-elem refused https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js` |
 | Drop `'self'` from `script-src`, leaving the page's own module unreachable | Same gate, FAIL, `script-src-elem refused http://127.0.0.1:60008/app.js` |
 | Drop `'unsafe-hashes'` and the handler's hash, so the one inline handler on the page stops matching | Same gate, FAIL, `script-src-attr refused inline` |
+| Point the document pages' back link at `index.html` rather than `../index.html`, so every one of the five is a page a reader cannot leave | `document pages` FAIL, naming all five: `locale-is-not-only-a-hint links back to index.html; proving-a-gate-fires links back to index.html; ...` |
+| Set the line explaining why a document is worth opening in an ink nobody measured | `document pages` FAIL, `p.doc-why 1.51 needs 4.5`, on four of the five |
+| Put a script on the document pages, which is the one surface here the escaping gate does not read | `document pages` FAIL, `carries 1 script tags and should carry none`, on all five |
+| Widen `overflow` from `index.html` to every page the deployment serves, which is how the five document pages shipped an hour before this ran. Nothing was broken to produce it | `overflow` FAIL on its first run: `/docs/receipt-provenance.html at 390px is 397px wide`. A filename set in code inside a paragraph set the paragraph's minimum width. It was already true of five pages that had gone up an hour earlier |
 
-Ten of those eighteen are the state this page was actually in, not a change invented to trip
-a gate, and each of the ten says so in its own row. The CLS failure, the rail, the dimmed
+Eleven of those twenty-two are the state this page was actually in, not a change invented
+to trip a gate, and each of the eleven says so in its own row. The CLS failure, the rail, the dimmed
 transcript, the clipped focus ring, the playhead no keyboard could reach, the frozen
 breakpoint, the slider that only existed once a script arrived, the two tables that pushed
 the document sideways and the implicit grid track underneath them were all found this way,
@@ -446,7 +458,9 @@ from an origin the markup never names. Reading the page could not have found it 
 browser found it on the first load, which is the whole argument for measuring a policy
 rather than reasoning about one. The long task is not among the ten: that row appends a busy
 loop nobody ever shipped, which is the other kind of row and the reason the two are counted
-apart.
+apart. The eleventh is the last row in the table, the one that widened `overflow` to the
+document pages and failed immediately: seven pixels of a filename, on a page that had been
+public for an hour.
 
 `no javascript` used to count acts and words, which answers whether the page can be *read*
 without a script and says nothing about whether it also claims to be *operated* without one.

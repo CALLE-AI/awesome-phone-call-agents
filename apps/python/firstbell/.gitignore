@@ -21,3 +21,9 @@ tools/gates/gate-report*.json
 # is a drawing somebody exported once, and this one is derived from page.css and rebuilt
 # by judge_page.py on every run, so there is nothing for it to drift against.
 tools/site/figures/
+
+# Written by a run rather than by a person. `local_dev.db` is the offline double's
+# store and `profile-claim.lock` is one run telling the next that it is still going.
+# Both appear the first time the demo is run and neither is part of the entry.
+local_dev.db
+profile-claim.lock

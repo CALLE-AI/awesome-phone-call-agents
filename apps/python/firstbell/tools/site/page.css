@@ -1720,3 +1720,44 @@ button[data-copy][data-copied]::after {
 .fig-anim svg { display: block; width: 100%; height: auto; }
 
 .fig-stage { display: block; }
+
+/* ---- Further reading -----------------------------------------------------------------
+ * Everything above this point is the page arguing with itself: nine acts, twenty-three
+ * links, every one of them an anchor back into the same document. A blind reviewer reading
+ * as a district operations director found that the two documents deciding whether they
+ * would run a pilot, the legal surface and the pilot shape, were reachable only by cloning
+ * the repository, and that the outside figures the entry rests on carried a publisher's
+ * name with no way to go and check it.
+ *
+ * So this is the one block on the page whose links leave it. It sits after the last act
+ * because it is what a reader does next, not part of the argument, and it is set in the
+ * page's own inks so it does not read as a footer of afterthoughts. */
+.further { border-top: 2px solid var(--ink); padding-top: var(--space-4); }
+.further-k {
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-2);
+}
+.further-lead {
+  font-family: var(--ui-display); font-weight: 600; font-size: var(--size-5);
+  line-height: 1.2; color: var(--ink); margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui-tight);
+}
+.read-list { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid;
+             gap: var(--space-3); }
+@media (min-width: 52rem) {
+  /* Two columns rather than three. Five documents over three columns leaves a row of two
+   * looking like the set was cut short, and each blurb is a sentence rather than a phrase. */
+  .read-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+}
+.read-list li { display: grid; gap: var(--space-1); align-content: start;
+                border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.read-list a { font-family: var(--ui); font-size: var(--size-3); font-weight: 600; }
+.read-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+            margin: 0; max-width: none; }
+.sources { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.sources li { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.sources .num { font-family: var(--mono); font-variant-numeric: tabular-nums;
+                font-size: var(--size-3); color: var(--ink); }
+.sources p { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+             margin: 0.3rem 0 0; max-width: var(--measure-ui); }
+.sources .read-at { color: var(--ink-3); }

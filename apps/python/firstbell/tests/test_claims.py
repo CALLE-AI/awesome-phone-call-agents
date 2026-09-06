@@ -831,9 +831,17 @@ def test_the_count_of_gates_the_page_really_failed_is_counted_not_typed():
 
     shipped = [ln for ln in body if "which is how" in ln]
 
+    # Widened to thirty when the table passed twenty rows, which is what this gate's own
+    # message asks for. A hyphen is a word character to a reader and not to `\w`, so the
+    # pattern takes one too: without that, "twenty-two" reads as "two" and the gate would
+    # have compared the table's twenty-two rows against the number 2, failing for a reason
+    # that has nothing to do with whether the count is right.
     words = ("zero one two three four five six seven eight nine ten eleven twelve "
-             "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
-    claim = re.search(r"\b(\w+) of those (\w+) are the state this page was actually in", text)
+             "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty "
+             "twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six "
+             "twenty-seven twenty-eight twenty-nine thirty").split()
+    claim = re.search(r"\b([\w-]+) of those ([\w-]+) are the state this page was actually in",
+                      text)
     assert claim, "the sentence this gate checks has been reworded, so it is checking nothing"
 
     for group in (1, 2):

@@ -41,6 +41,14 @@ from datetime import datetime, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+# This file is a script as often as it is an import, and the two put different things on
+# the path. Running `python tools/judge_page.py` puts tools/ there; a caller importing it
+# by file location does not, and would fail on the next line for a reason that has nothing
+# to do with what it was trying to do.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import doc_pages  # noqa: E402  (needs the line above)
+
 APP = Path(__file__).resolve().parent.parent
 EVIDENCE = APP / "evidence"
 # Where the call recordings are read from, set by main(). Deliberately not a path inside
@@ -613,8 +621,14 @@ def _sources(page: str, pattern: str) -> list[str]:
     return sorted(found, key=lambda s: (s != "'self'", s))
 
 
-def content_security_policy(page: str) -> str:
-    """The policy this exact page needs, and nothing wider.
+def content_security_policy(*pages: str) -> str:
+    """The policy these exact pages need, and nothing wider.
+
+    Plural because the header is set on `/(.*)` and the deployment serves the documents
+    under `docs/` as well as the page itself. A policy derived from `index.html` alone is
+    correct for `index.html` and silently wrong for everything beside it: a document page
+    carries a style block index.html does not have, and a browser would refuse it while
+    every check here reported a policy that agreed with the page it was derived from.
 
     Two allowances here read as concessions and are worth stating plainly rather than
     hiding in a header. `'unsafe-hashes'` appears because the page carries one event
@@ -624,13 +638,24 @@ def content_security_policy(page: str) -> str:
     rather than the -attr variants because Safari shipped the -attr variants late, and a
     policy that silently stops applying on one browser is worse than one that is explicit.
     """
-    style_blocks = re.findall(r'''<style\b[^>]*>(.*?)</style>''', page, re.S)
-    style_attrs = [v for _, v in re.findall(r'''\sstyle=(["'])(.*?)\1''', page, re.S)]
-    handlers = [b for _, _, b in re.findall(r'''\son([a-z]+)=(["'])(.*?)\2''', page, re.S)]
+    # Deduplicated across the pages and sorted, so the header is byte-stable whatever
+    # order they were built in and two pages sharing a stylesheet share one hash.
+    def across(finder) -> list[str]:
+        return sorted({found for page in pages for found in finder(page)})
 
-    scripts = _sources(page, r'''<script[^>]*\bsrc=["']?([^"'\s>]+)''')
-    sheets = _sources(page, r'''<link[^>]*rel=["']?stylesheet["']?[^>]*\bhref=["']?([^"'\s>]+)''')
-    fonts = _sources(page, r'''<link[^>]*(?:as=font|rel=preconnect)[^>]*\bhref=["']?([^"'\s>]+)''')
+    def origins(pattern: str) -> list[str]:
+        found = {o for page in pages for o in _sources(page, pattern)}
+        return sorted(found, key=lambda o: (o != "'self'", o))
+
+    style_blocks = across(lambda p: re.findall(r'''<style\b[^>]*>(.*?)</style>''', p, re.S))
+    style_attrs = across(
+        lambda p: [v for _, v in re.findall(r'''\sstyle=(["'])(.*?)\1''', p, re.S)])
+    handlers = across(
+        lambda p: [b for _, _, b in re.findall(r'''\son([a-z]+)=(["'])(.*?)\2''', p, re.S)])
+
+    scripts = origins(r'''<script[^>]*\bsrc=["']?([^"'\s>]+)''')
+    sheets = origins(r'''<link[^>]*rel=["']?stylesheet["']?[^>]*\bhref=["']?([^"'\s>]+)''')
+    fonts = origins(r'''<link[^>]*(?:as=font|rel=preconnect)[^>]*\bhref=["']?([^"'\s>]+)''')
 
     # A stylesheet can pull another stylesheet from an origin this markup never names. The
     # Typekit kit does exactly that: the sheet at use.typekit.net imports a second one from
@@ -659,12 +684,12 @@ def content_security_policy(page: str) -> str:
     return "; ".join(d for d in directives if d.split(" ", 1)[-1])
 
 
-def security_headers(page: str) -> list[dict[str, str]]:
+def security_headers(*pages: str) -> list[dict[str, str]]:
     """Every response header the deployment sets, in the order they are written out."""
     return [
-        {"key": "Content-Security-Policy", "value": content_security_policy(page)},
-        # The page serves one HTML file, two modules, a stylesheet and eight audio clips,
-        # every one of them with a correct type. Nothing here needs a browser to guess.
+        {"key": "Content-Security-Policy", "value": content_security_policy(*pages)},
+        # The deployment serves the page, five document pages, two modules and eight audio
+        # clips, every one with a correct type. Nothing here needs a browser to guess.
         {"key": "X-Content-Type-Options", "value": "nosniff"},
         # A judge arrives from a submission form or a private document. The referrer would
         # hand this page the address of whichever of those it was, so it is not sent.
@@ -685,11 +710,11 @@ def security_headers(page: str) -> list[dict[str, str]]:
     ]
 
 
-def deployment_config(page: str) -> str:
+def deployment_config(*pages: str) -> str:
     """The Vercel configuration, serialised the way the built page is: derived, then written."""
     config = {
         "$schema": "https://openapi.vercel.sh/vercel.json",
-        "headers": [{"source": "/(.*)", "headers": security_headers(page)}],
+        "headers": [{"source": "/(.*)", "headers": security_headers(*pages)}],
     }
     return json.dumps(config, indent=2) + "\n"
 
@@ -984,6 +1009,60 @@ def mutation_distribution(muts: list) -> str:
     )
 
 
+def sources_markup() -> str:
+    """Every outside figure this project publishes, with somewhere to go and check it.
+
+    The page had none of these. It argues that a claim without the thing that checks it is
+    worthless, and the four figures it rests on that were not measured here, England's
+    persistent absence rate, the two US language shares, the count of chronically absent
+    American pupils, appeared only in a README, and even there the publisher was named
+    without a link. A reviewer reading as a district buyer said the plainest version of
+    this: a publisher's name is not a source, it is an assertion about a source.
+
+    Read out of `evidence/statistics.json`, which is the file the claims gate already
+    checks the README against, so the page cannot publish a figure with a different value
+    from the one the record holds.
+    """
+    figures = json.loads(
+        (EVIDENCE / "statistics.json").read_text(encoding="utf-8"))["figures"]
+    rows = []
+    for figure in figures:
+        url = figure.get("url")
+        if not url:
+            raise SystemExit(
+                f"the figure {figure['id']} in evidence/statistics.json has no url, so the "
+                f"page would name a publisher with nowhere to go and check them"
+            )
+        rows.append(
+            f'<li><span class=num>{esc(figure["value"])}</span> {esc(figure["claim"])}'
+            f'<p><a href="{html.escape(url, quote=True)}" rel="noopener">'
+            f'{esc(figure["publisher"])}</a>'
+            f'<span class=read-at>, read at source {esc(figure["read_at_source"])}</span>'
+            f'</p></li>'
+        )
+    return f'<ul class=sources>{"".join(rows)}</ul>'
+
+
+def further_markup() -> str:
+    """The one block on this page whose links leave it.
+
+    Placed after the last act, because it is what a reader does next rather than part of
+    the argument. Two lists: the documents, and the outside numbers. A blind reviewer
+    reading as a district operations director found both unreachable and scored the entry
+    on what they could reach, which is the correct thing for them to have done.
+    """
+    return (
+        '<section class="further inner inner-margin" aria-labelledby=h-further>'
+        '<p class=further-k>Where to go next</p>'
+        '<h2 class=further-lead id=h-further>Everything this rests on, and how to leave '
+        'this page to check it.</h2>'
+        + doc_pages.index_markup()
+        + '<p class=further-k>The outside figures, and who published them</p>'
+        + sources_markup()
+        + '</section>'
+    )
+
+
 def path_markup() -> str:
     """The stated way in, once, at the top.
 
@@ -1043,6 +1122,23 @@ def showcase_figure() -> str:
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.showcase_markup()
+
+
+def page_css() -> str:
+    """The whole stylesheet, as one string.
+
+    Two stylesheets, one `<style>`. The figure's rules are scoped under `.calle-showcase`
+    and neither file reads the other, so order is not load-bearing; they are concatenated
+    rather than linked because a second request for 4 KB costs a round trip the page's
+    weight budget was measured without.
+
+    A function rather than a line inside `build`, because the document pages are set in
+    the same stylesheet and byte-identical blocks share one hash in the policy. Two copies
+    of this expression would eventually differ by a newline and cost a second hash for
+    nothing.
+    """
+    return ((SITE / "page.css").read_text(encoding="utf-8") + "\n"
+            + (SITE / "showcase.css").read_text(encoding="utf-8"))
 
 
 def css_for_serving(css: str) -> str:
@@ -1128,12 +1224,7 @@ def build(has_audio: bool, repo_url: str | None = None,
     agree = sum(p["agree"] for p in data["pairs"])
     total = sum(p["of"] for p in data["pairs"])
 
-    # Two stylesheets, one <style>. The figure's rules are scoped under
-    # `.calle-showcase` and neither file reads the other, so order is not load-bearing;
-    # they are concatenated rather than linked because a second request for 4 KB costs a
-    # round trip the page's weight budget was measured without.
-    css = ((SITE / "page.css").read_text(encoding="utf-8") + "\n"
-           + (SITE / "showcase.css").read_text(encoding="utf-8"))
+    css = page_css()
     p: list[str] = []
     add = p.append
 
@@ -1534,6 +1625,7 @@ def build(has_audio: bool, repo_url: str | None = None,
     ]
     add(act("08", "Run it yourself", "".join(body), margin=True))
 
+    add(further_markup())
     add('</main>')
     # The build's own provenance. The previous footer said "if the repository changes,
     # this page changes with it", which is a claim the page cannot make about itself: a
@@ -1641,11 +1733,18 @@ def main() -> int:
     markup = build(has_audio, args.repo_url, args.video_url)
     page.write_text(markup, encoding="utf-8", newline="\n")
 
+    # The five committed documents, rendered rather than retyped, in the page's own inks.
+    # They are what a reader who will not clone a repository can still read: the pilot
+    # shape, the legal surface, and the three that say how the evidence itself was made.
+    docs = doc_pages.write_all(out, css_for_serving(page_css()))
+
     # The policy is derived from the bytes above rather than kept beside them, so the two
-    # cannot disagree. Written after the page for the same reason: there is nothing to
-    # describe until the page exists.
-    (out / "vercel.json").write_text(deployment_config(markup), encoding="utf-8",
-                                     newline="\n")
+    # cannot disagree. Written after the pages for the same reason: there is nothing to
+    # describe until they exist. Every page the deployment serves goes in, because the
+    # header is set on `/(.*)` and a policy that fits one of six is wrong for five.
+    (out / "vercel.json").write_text(
+        deployment_config(markup, *(d.read_text(encoding="utf-8") for d in docs)),
+        encoding="utf-8", newline="\n")
 
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     print(f"{page}  {page.stat().st_size / 1024:.1f} KB")
