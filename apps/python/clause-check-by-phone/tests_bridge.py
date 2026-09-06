@@ -102,6 +102,10 @@ class WhatDoesNotJustifyACall(unittest.TestCase):
         with self.assertRaises(NothingToAsk):
             call_task(NUM + "\n", "students only", "Students only", "s")
 
+    def test_non_ascii_digits_are_not_destinations(self):
+        with self.assertRaises(NothingToAsk):
+            call_task("+١٢٣٤٥٦٧٨", "students only", "Students only", "s")
+
     def test_the_longest_and_shortest_numbers_e164_allows(self):
         for right in ("+1234567", "+" + "1" * 15):
             self.assertIn(right, call_task(right, "students only",
