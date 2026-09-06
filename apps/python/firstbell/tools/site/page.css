@@ -1138,8 +1138,19 @@ footer .source-link { margin-top: var(--space-3); }
 /* The artifact holds still while the argument scrolls past it. One CSS rule, no JavaScript,
  * and it is most of what turns a document into something that reads like a documentary. */
 @media (min-width: 60rem) {
-  .split > .artifact { position: sticky; top: 12vh; }
+  /* `align-self: start` is the whole rule. Without it a grid item stretches to the row's
+   * height, a stretched item has nowhere to travel, and `position: sticky` on it does
+   * exactly nothing. The comment above described the intended behaviour for the entire life
+   * of this page while the page scrolled both columns together, which is why more than half
+   * the scroll depth had a column that simply ran out and left the space blank. */
+  .split > .artifact { position: sticky; top: 12vh; align-self: start; }
   .split { grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); }
+
+  /* Three acts hold a table or a transcript taller than the argument beside it. Sticking the
+   * taller column would pin something that cannot fit and clip its foot, so in those the
+   * argument is what holds still and the artifact is what moves. */
+  .split-long > .artifact { position: static; }
+  .split-long > .claim { position: sticky; top: 12vh; align-self: start; }
 }
 .claim > h2 { margin-bottom: 1rem; }
 .result-line { font-family: var(--ui); font-size: var(--size-6); color: var(--ink); }
@@ -1191,11 +1202,39 @@ footer .source-link { margin-top: var(--space-3); }
 .compliance td.ok { color: var(--resolved); white-space: nowrap; }
 .mutations td:nth-child(2) { max-width: 34rem; }
 
+/* ---- the distribution figure ----------------------------------------------------------- */
+/* Sits in act 05's argument column, which now holds still while the whole mutation table
+ * scrolls past it. The figure is what makes that pinning worth doing: the reader keeps the
+ * shape of the table in view while reading the table itself.
+ *
+ * No width and no height on the svg, only a viewBox, so it scales to the column and reserves
+ * its own box. A figure that reserved nothing would land after the fonts and move the note
+ * above it, which is the one thing this page's 0.001 shift budget cannot afford. */
+.dist { margin: 1.5rem 0 0; }
+.dist svg { display: block; width: 100%; height: auto; overflow: visible; }
+.dist-k {
+  font-family: var(--mono); font-size: 11px; fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.dist-n {
+  font-family: var(--mono); font-size: 11px; fill: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.dist figcaption {
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.45;
+  color: var(--ink-3); margin-top: 0.6rem;
+}
+
 /* ---- take-aways ----------------------------------------------------------------------- */
 .takes { display: grid; gap: 2rem; margin-top: 2rem; }
 /* The plate already carries the space the margin was buying. */
 .plate-royal > .takes { margin-top: 0; }
-@media (min-width: 60rem) { .takes { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 60rem) {
+  /* Two cards in a three-column track left a third of the royal plate blank, on the
+   * shortest act of the page and the only dark ground it has. auto-fit spends the
+   * columns the cards actually need, and keeps working if a third card arrives. */
+  .takes { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+}
 .take-n {
   font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
   border-top: 2px solid var(--ink); padding-top: 0.5rem; display: inline-block;

@@ -735,6 +735,62 @@ def pull(quote: str, who: str = "") -> str:
     return f'<p class=pull>{esc(quote)}{tail}</p>'
 
 
+def mutation_distribution(muts: list) -> str:
+    """The shape of the table beside it, drawn instead of described.
+
+    The mutation table is the longest artifact on this page, and its shape is the argument:
+    a deliberate change is almost always noticed by a small handful of tests, and exactly
+    one was noticed by none. A reader who scrolls all of it arrives at that in a minute.
+    This says it in a glance.
+
+    Built from the same rows the table is built from, so the two cannot disagree. Nothing
+    here is typed: every number below is counted off `muts`. Drawn as an `svg` with a
+    `viewBox` and no fixed height, so it reserves its own box and shifts nothing, and with no
+    script, so it is the same figure with JavaScript off.
+    """
+    order = ["0", "1", "2", "3", "4", "5+"]
+    buckets = {key: 0 for key in order}
+    for row in muts:
+        try:
+            n = int(row[2])
+        except (ValueError, IndexError):
+            continue
+        buckets["5+" if n >= 5 else str(n)] += 1
+
+    total = sum(buckets.values())
+    widest = max(buckets.values()) or 1
+    uncaught = buckets["0"]
+
+    row_h, bar_x, bar_max = 22, 30, 196
+    bars = []
+    for i, key in enumerate(order):
+        count = buckets[key]
+        top = i * row_h
+        # A bar of zero width would read as a missing row rather than an empty one, so an
+        # empty bucket keeps a hairline. The uncaught bucket is the one worth finding, so it
+        # is the only one drawn in the accent.
+        width = max(round(bar_max * count / widest, 1), 1.5) if count else 1.5
+        fill = "var(--brand-field)" if key == "0" and count else "var(--ink-2)"
+        bars.append(
+            f'<text x="0" y="{top + 14}" class=dist-k>{key}</text>'
+            f'<rect x="{bar_x}" y="{top + 4}" width="{width}" height="13" fill="{fill}"/>'
+            f'<text x="{bar_x + width + 5}" y="{top + 14}" class=dist-n>{count}</text>'
+        )
+
+    caption = (f"{uncaught} of {total} changes were noticed by no test at all."
+               if uncaught else f"Every one of {total} changes was noticed by a test.")
+    label = ("Deliberate changes grouped by how many tests noticed each one: "
+             + ", ".join(f"{buckets[k]} noticed by {k}" for k in order) + ".")
+
+    return (
+        '<figure class=dist>'
+        f'<svg viewBox="0 0 260 {len(order) * row_h + 4}" role=img '
+        f'aria-label="{esc(label)}">{"".join(bars)}</svg>'
+        f'<figcaption>Tests that noticed each change. {esc(caption)}</figcaption>'
+        '</figure>'
+    )
+
+
 def path_markup() -> str:
     """The stated way in, once, at the top.
 
@@ -1075,7 +1131,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
     # ---- Act 4: check us
     have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
     body = [
-        '<div class=split><div class=claim>',
+        '<div class="split split-long"><div class=claim>',
         '<h3>04</h3><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
         '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
         'here, shortened at both ends, alongside the structured answer each call brought '
@@ -1127,7 +1183,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
 
     # ---- Act 5: mutations
     body = [
-        '<div class=split><div class=claim>',
+        '<div class="split split-long"><div class=claim>',
         '<h3>05</h3><h2 id=h-05>Every rule, broken on purpose.</h2>',
         '<p>A test that has never been observed to fail has not been shown to test anything. '
         'Each row is a change made to working code to check that a specific test notices. '
@@ -1136,6 +1192,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<code>reached_production_api</code> was computed from the configured base URL alone, '
         'so a run whose every attempt died at the transport layer would still have published '
         'that it reached production.</div>',
+        mutation_distribution(muts),
         '</div><div class=artifact>',
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every gate broken on purpose, with the number of tests that '
@@ -1225,7 +1282,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
                        '<p>A page that names its own limits is easier to check than one '
                        'that does not. Two of these four belong to the platform and are '
                        'reported without complaint.</p>'),
-            '<div class=split><div class=claim>',
+            '<div class="split split-long"><div class=claim>',
             '<h3>07</h3><h2 id=h-07>What is not true.</h2>',
             '<p>Four limits, each with what would close it. Two of them are the '
             'platform’s and are reported here without complaint, because a limit you '
