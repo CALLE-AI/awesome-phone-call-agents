@@ -27,7 +27,11 @@ const skipPrompt = args.includes('--yes') || args.includes('-y');
 const targetPhone = getArg('--phone', '+15555550199');
 const userName = getArg('--user', 'Omar');
 const coachRole = getArg('--coach', 'The Clarifier');
-const sessionTopic = getArg('--topic', 'Weekly Momentum Check-in: Unblocking Q3 Execution');
+const sessionMode = getArg('--mode', 'kickoff'); // 'kickoff' | 'followup'
+const defaultTopic = sessionMode === 'followup'
+  ? 'Accountability Verification on 5:00 PM Milestone'
+  : 'Weekly Momentum Check-in: Unblocking Q3 Execution';
+const sessionTopic = getArg('--topic', defaultTopic);
 
 // Validation helper
 function isValidE164(phone) {
@@ -62,6 +66,7 @@ async function main() {
   console.log(`🎯 Coach:    ${coachRole}`);
   console.log(`📞 Recipient: ${maskPhone(targetPhone)}`);
   console.log(`💡 Topic:    ${sessionTopic}`);
+  console.log(`🔄 Call Type: ${sessionMode === 'followup' ? 'Follow-Up Verification Check-in' : 'Momentum Kickoff Call'}`);
   console.log(`⚡ Mode:     ${isLive ? '🔴 LIVE CALL' : '🟢 DRY-RUN (Safe Simulation)'}\n`);
 
   if (!isValidE164(targetPhone)) {
@@ -69,36 +74,60 @@ async function main() {
     process.exit(1);
   }
 
-  const callGoal = `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion.`;
+  const callGoal = sessionMode === 'followup'
+    ? `You are ${coachRole}, an elite executive coach in Mazō calling ${userName} for a scheduled follow-up check-in. Inquire whether the agreed milestone was completed, verify execution evidence, update streak momentum, and provide immediate unblocking if stalled.`
+    : `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion.`;
 
   if (!isLive) {
     console.log('--- [DRY-RUN SIMULATION] ---');
     console.log('• Validating coach persona and prompt constraints: PASS');
     console.log(`• Generated CALL-E Goal: "${callGoal.slice(0, 110)}..."`);
     console.log('• Simulating call plan generation with CALL-E engine...');
-    console.log('• Simulated Call Plan ID: plan_mazo_demo_88291');
-    console.log('• Simulated Call Status: COMPLETED (Duration: 2m 45s)');
+    console.log(`• Simulated Call Plan ID: plan_mazo_${sessionMode}_${Math.floor(10000 + Math.random() * 90000)}`);
+    console.log('• Simulated Call Status: COMPLETED (Duration: 2m 15s)');
     console.log('\n--- [STRUCTURED OUTPUT EXTRACTED] ---');
-    console.log(JSON.stringify({
-      sessionId: 'sess_demo_1092',
-      coach: coachRole,
-      client: userName,
-      status: 'completed',
-      outcome: 'Breakthrough achieved on project milestone prioritization',
-      actionItems: [
-        {
-          task: 'Finalize core API contract and submit production build',
-          deadline: 'Today @ 5:00 PM',
-          priority: 'high',
-          identifiedObstacle: 'Context-switching between design and architecture',
-          solution: '90-minute deep work block with notifications silenced'
+
+    if (sessionMode === 'followup') {
+      console.log(JSON.stringify({
+        sessionId: 'sess_fup_8842',
+        callType: 'accountability_verification',
+        coach: coachRole,
+        client: userName,
+        status: 'verified_completed',
+        reconciledMilestone: 'Finalize core API contract and submit production build',
+        verificationOutcome: 'Milestone 100% completed and shipped on schedule',
+        momentumScoreAwarded: '+25 XP',
+        streakLevel: 'Active (Day 4)',
+        nextScheduledCheckin: 'Tomorrow @ 8:30 AM Kickoff'
+      }, null, 2));
+    } else {
+      console.log(JSON.stringify({
+        sessionId: 'sess_kickoff_1092',
+        callType: 'kickoff_and_lockin',
+        coach: coachRole,
+        client: userName,
+        status: 'completed',
+        outcome: 'Breakthrough achieved on project milestone prioritization',
+        actionItems: [
+          {
+            task: 'Finalize core API contract and submit production build',
+            deadline: 'Today @ 5:00 PM',
+            priority: 'high',
+            identifiedObstacle: 'Context-switching between design and architecture',
+            solution: '90-minute deep work block with notifications silenced'
+          }
+        ],
+        breakthroughMoment: 'Realized that shipping the core feature first unblocks the entire product release.',
+        relentlessAccountabilityLoop: {
+          scheduledCallbackAt: 'Today @ 5:00 PM',
+          engine: 'CALL-E Telephony Protocol',
+          status: 'armed'
         }
-      ],
-      breakthroughMoment: 'Realized that shipping the core feature first unblocks the entire product release.',
-      nextScheduledCheckin: 'Tomorrow @ 9:00 AM'
-    }, null, 2));
+      }, null, 2));
+    }
 
     console.log('\n✅ Dry-run completed successfully with 0 telephone side-effects.');
+    console.log('💡 Tip: Try the verification loop with: node mazo-coach.js --mode followup');
     console.log('💡 To place a real live call with CALL-E, run with: --live --phone "+<your_number>"');
     return;
   }
