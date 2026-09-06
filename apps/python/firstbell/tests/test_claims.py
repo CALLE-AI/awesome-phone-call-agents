@@ -943,3 +943,37 @@ def test_the_contrast_tool_still_measures_the_palette_the_page_is_painted_in():
         "the stylesheet re-cuts an ink token for a surface that no pair measures: "
         + "; ".join(alias)
     )
+
+
+def test_the_demo_video_is_linked_when_there_is_one_to_link():
+    """The page has to be able to point at the video, and point at nothing when there is none.
+
+    Ledger row 139: the demo video existed for weeks, two minutes and fifty three seconds of
+    it, four recordings of real calls, and it was linked from no README, no page and no
+    submission field. Nobody judging the entry could reach it.
+
+    The fix cannot be a constant, because the rules require the video to be "uploaded to and
+    made publicly visible on YouTube or Vimeo" and a link to something nobody has published
+    is worse than no link. So it is a build input, and this is the gate on both halves of
+    that: a URL passed in reaches the page, and no URL leaves no dangling markup.
+    """
+    import sys
+
+    sys.path.insert(0, str(APP / "tools"))
+    from judge_page import video_link_markup
+
+    assert video_link_markup(None) == "", (
+        "the page would carry an empty video link, which reads as a broken one"
+    )
+    assert video_link_markup("") == ""
+
+    markup = video_link_markup("https://youtu.be/abc123")
+    assert "https://youtu.be/abc123" in markup
+    assert markup.startswith("<p") and markup.endswith("</p>")
+
+    # A URL is a build input, so it is attacker-adjacent in the same way every other input
+    # on this page is, and the page ships under a Content-Security-Policy that a quote
+    # break would not save it from.
+    hostile = video_link_markup('https://x/"><script>alert(1)</script>')
+    assert "<script>" not in hostile, "the video URL is written into an attribute unescaped"
+    assert "&quot;" in hostile or "&#x27;" in hostile

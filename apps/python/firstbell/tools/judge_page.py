@@ -710,6 +710,25 @@ def repo_link_markup(repo_url: str | None) -> str:
             f'Source, tests and receipts on GitHub</a></p>')
 
 
+def video_link_markup(video_url: str | None) -> str:
+    """The demo, or nothing.
+
+    Same rule as the source link and for a worse reason. The video existed for weeks, two
+    minutes and fifty three seconds of it, four recordings of real calls, and it was linked
+    from no README, no page and no submission field, so no judge could reach it. It is not
+    linked from a constant because the rules require it to be "uploaded to and made
+    publicly visible on YouTube or Vimeo", and a link to a video nobody has published yet
+    is worse than no link.
+
+    Rebuild with `--video-url` the moment it is up.
+    """
+    if not video_url:
+        return ""
+    safe = html.escape(video_url, quote=True)
+    return (f'<p class=source-link><a href="{safe}" rel="noopener">'
+            f'Watch the demo, 2 min 53</a></p>')
+
+
 def marginalia(label: str, body: str) -> str:
     """A note that sits in the right margin at wide viewports.
 
@@ -1074,7 +1093,8 @@ def css_for_serving(css: str) -> str:
 
 # ---- the page ---------------------------------------------------------------------------
 
-def build(has_audio: bool, repo_url: str | None = None) -> str:
+def build(has_audio: bool, repo_url: str | None = None,
+          video_url: str | None = None) -> str:
     data = transcripts()
     # Masked here rather than at each use, so a new surface that reads a call cannot
     # reintroduce a whole identifier by reading the field the old ones read.
@@ -1188,6 +1208,7 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<p class=standfirst>Phones the families whose absence notification went '
         'unanswered, in the language that family speaks, and brings back a structured '
         'reason a school office can act on.</p>',
+        video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
@@ -1528,7 +1549,8 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         'you can see that for yourself rather than being told. Contrast is measured by '
         '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
         'so that an unmeasured pair cannot read as a pass.</p>'
-        + repo_link_markup(repo_url) + '</div></div></footer>')
+        + video_link_markup(video_url) + repo_link_markup(repo_url)
+        + '</div></div></footer>')
 
     add(f'<script id=call-data type=application/json>{script_json(data)}</script>')
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
@@ -1552,6 +1574,8 @@ def main() -> int:
                     help="directory holding <row-id>.m4a clips, outside this repository")
     ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
                     help="directory holding the call recordings, outside this repository")
+    ap.add_argument("--video-url", default=os.environ.get("FIRSTBELL_VIDEO_URL"),
+                    help="the published demo video, once it is on YouTube or Vimeo")
     ap.add_argument("--repo-url", default=os.environ.get("FIRSTBELL_REPO_URL"),
                     help="public URL of the source repository. Omitted rather than "
                          "guessed: a link to a repository that is not published yet "
@@ -1614,7 +1638,7 @@ def main() -> int:
         shutil.copy2(figure, out / "three-endings.json")
 
     page = out / "index.html"
-    markup = build(has_audio, args.repo_url)
+    markup = build(has_audio, args.repo_url, args.video_url)
     page.write_text(markup, encoding="utf-8", newline="\n")
 
     # The policy is derived from the bytes above rather than kept beside them, so the two
