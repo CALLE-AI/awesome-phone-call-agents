@@ -711,6 +711,22 @@ def test_prose_that_names_a_mutation_row_agrees_with_that_row():
 
     assert not wrong, "MUTATIONS.md disagrees with its own table:\n  " + "\n  ".join(wrong)
 
+    # The instruction at the top of that file names how many rows cannot be reproduced on a
+    # clean checkout. Every other count in this project is computed, so this one is too.
+    marked = [line for line in text.splitlines()
+              if line.startswith("|") and "**Needs the built page.**" in line]
+    stated = re.search(r"except\s+the (\w+) marked \*\*needs the built page\*\*", text,
+                       re.S | re.I)
+    assert stated, (
+        "the note saying how many rows need a built page has been reworded, so nothing is "
+        "counting them"
+    )
+    spoken = stated.group(1).lower()
+    claimed = int(spoken) if spoken.isdigit() else words.get(spoken)
+    assert claimed == len(marked), (
+        f"the file says {spoken} rows need a built page; {len(marked)} carry the marker"
+    )
+
 
 def test_the_count_of_gates_the_page_really_failed_is_counted_not_typed():
     """The browser-gate table separates two kinds of row and the prose counts one of them.

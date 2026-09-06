@@ -4,7 +4,12 @@ A test that has never been observed to fail has not been shown to test anything.
 below is a change made to working code to check that a specific test notices. Every one
 was reverted and the suite returned to green.
 
-Reproduce any of them by making the change and running `python -m pytest tests/ -q`.
+Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
+the five marked **needs the built page**. Those five are held by a gate that reads
+`out/index.html`, which is built from records of real calls kept outside this repository, so on
+a clean checkout it skips and they measure zero. Rows 86 to 88 break the same builder and are
+caught by a gate that builds the page from an authored fixture, which does run on a clean
+checkout.
 
 Three of the gates watch what the program prints rather than any one rule:
 `test_the_readme_sample_is_what_the_program_actually_prints`,
@@ -154,16 +159,16 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 60 | Have `mask_id` hand back the identifier it was given, so every call id on the page is whole again | 1 |
 | 61 | Print the API id straight into the identifier table, shortening only the provider id beside it | 1 |
 | 62 | Assign `_call[_key] = _call[_key]` in the loop that shortens the embedded call data, which is a masking loop that masks nothing | 1 |
-| 63 | Have the README promise eight results on the page when the page carries eleven | 1 |
-| 64 | Change one `unknown` answer in the built page to `yes`, so four of the five countable non-yes answers remain | 1 |
-| 65 | Leave one whole provider id in the built page, in a comment the layout never shows, which is what a leak looks like when it is not in a visible column | 1 |
+| 63 | Have the README promise eight results on the page when the page carries eleven **Needs the built page.** | 1 |
+| 64 | Change one `unknown` answer in the built page to `yes`, so four of the five countable non-yes answers remain **Needs the built page.** | 1 |
+| 65 | Leave one whole provider id in the built page, in a comment the layout never shows, which is what a leak looks like when it is not in a visible column **Needs the built page.** | 1 |
 | 66 | Teach another gate to skip and declare it nowhere, which is how a gate stops running without anybody deciding that it should | 1 |
 | 67 | Drop a gate that still skips out of the register, so the suite goes quiet about one it already knew about | 1 |
 | 68 | Declare a gate as unable to run when it runs perfectly well, because a register nobody prunes becomes a list of excuses | 1 |
 | 69 | State a mutation count in the app README that the table does not have | 1 |
 | 70 | State a different one in `evidence/README.md`, which is where this drift actually was: the index said forty-four while the table held sixty-eight | 1 |
-| 71 | Round the published alert rate down from 45% to 35%, which is the direction somebody would round it if they were rounding on purpose | 1 |
-| 72 | Change one `no` answer on the built page to `yes`, so the page no longer supports the rate the README states beside it | 1 |
+| 71 | Round the published alert rate down from 45% to 35%, which is the direction somebody would round it if they were rounding on purpose **Needs the built page.** | 1 |
+| 72 | Change one `no` answer on the built page to `yes`, so the page no longer supports the rate the README states beside it **Needs the built page.** | 1 |
 | 73 | Put the wrong England absence figure back, which is the defect this gate was written after rather than a defect imagined for it | 1 |
 | 74 | Add a plausible new percentage to the sourced section with no entry behind it, which is how the first one got in | 1 |
 | 75 | Drop the source link and leave the figure bare, so it reads as sourced without being checkable | 1 |
@@ -180,6 +185,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 86 | Make the masking loop assign each identifier to itself, checked against a page built from an authored fixture rather than the published one | 2 |
 | 87 | Publish an answer in the register that the record behind it does not hold | 1 |
 | 88 | Drop every field but the first from the register the page prints | 1 |
+| 89 | Take the marker off one of the rows that needs a built page, so the note above the table counts more of them than the table carries | 1 |
 
 Rows 60 to 65 were measured on 6 September 2026 and are the first ones written against a
 gate rather than against the app. Rows 62 and 65 are why they exist. The first version of that gate
