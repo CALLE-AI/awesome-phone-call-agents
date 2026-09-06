@@ -454,8 +454,17 @@ async function gateNoJs(browser, url) {
       if (el.matches(NATIVE)) continue;
       const role = (el.getAttribute("role") || "").toLowerCase();
       const tab = el.getAttribute("tabindex");
+      // A scrolling box is operated by the browser, not by us: arrow keys and a wheel
+      // move it with every script on the page stripped, and WCAG asks for it to be
+      // reachable by Tab, so `tabindex=0` on one is the accessible thing rather than a
+      // promise nothing keeps. The exemption reads the computed overflow rather than a
+      // class name, so a div that does not scroll cannot claim it.
+      const style = getComputedStyle(el);
+      const scrolls = ["auto", "scroll"].includes(style.overflowX)
+        || ["auto", "scroll"].includes(style.overflowY);
       if (OPERABLE.has(role)) out.push(`${name(el)} says role=${role}`);
-      else if (tab !== null && tab !== "-1") out.push(`${name(el)} takes tabindex=${tab}`);
+      else if (tab !== null && tab !== "-1" && !scrolls)
+        out.push(`${name(el)} takes tabindex=${tab}`);
     }
     return out;
   });
@@ -943,6 +952,84 @@ const VIEWPORT_TALLER = { width: 1600, height: 1100 };
  * against. Each is sampled at the top of the page, one and a half screens down where the
  * curtain has closed, and at the foot.
  */
+/**
+ * Nothing may reach past the right edge of the window.
+ *
+ * A horizontal scrollbar on a reading page is the cheapest possible way to look unfinished,
+ * and it is invisible to every other gate here: weight, contrast, the rail and the keyboard
+ * pass identically whether the document is 1152px wide or 1545px wide in a 1152px window.
+ *
+ * Widths are the ones the surface is actually cut for plus the two the redesign measured as
+ * overflowing, so this starts life red if either is unfixed rather than starting green and
+ * proving nothing. `documentElement.clientWidth` rather than `innerWidth`, because
+ * `innerWidth` includes the vertical scrollbar and would report a false 15px overflow on
+ * every platform that draws one.
+ */
+async function gateOverflow(browser, url) {
+  const widths = [390, 800, 1152, 1280, 1440, 1600];
+  const stops = [];
+
+  for (const width of widths) {
+    const page = await browser.newPage();
+    await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
+    await page.goto(url, { waitUntil: "networkidle0" });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const seen = await page.evaluate(() => {
+      const room = document.documentElement.clientWidth;
+      const doc = document.documentElement.scrollWidth;
+      const over = [];
+      for (const el of document.querySelectorAll("body *")) {
+        const box = el.getBoundingClientRect();
+        if (box.width === 0 && box.height === 0) continue;
+        const right = box.right + window.scrollX;
+        // One pixel of slack: a fractional layout rounds up and a border that lands on
+        // the edge is not an overflow anybody can see or scroll to.
+        if (right > room + 1) {
+          const name = el.tagName.toLowerCase()
+            + (el.id ? "#" + el.id : "")
+            + (el.className && typeof el.className === "string"
+              ? "." + el.className.trim().split(/\s+/).join(".") : "");
+          over.push({ name, right: Math.round(right) });
+        }
+      }
+      over.sort((a, b) => b.right - a.right);
+      // The element whose own content is wider than its box is the cause; everything
+      // else in the list is a parent stretched by it, and naming a parent sends whoever
+      // reads this to the wrong rule.
+      const cause = [];
+      for (const el of document.querySelectorAll("body *")) {
+        // A clipped element's content is wider than its box on purpose and it cannot
+        // push a parent. The visually hidden field labels are all of that shape, and
+        // naming one as a cause sends a reader to the wrong rule.
+        const clips = getComputedStyle(el).overflowX !== "visible";
+        if (!clips && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+          cause.push({
+            name: el.tagName.toLowerCase()
+              + (el.className && typeof el.className === "string"
+                ? "." + el.className.trim().split(/\s+/).join(".") : ""),
+            box: el.clientWidth, content: el.scrollWidth,
+          });
+        }
+      }
+      return { room, doc, worst: over.slice(0, 3), cause: cause.slice(0, 4) };
+    });
+
+    await page.close();
+    stops.push({ width, ...seen });
+  }
+
+  const bad = stops.filter((s) => s.doc > s.room + 1);
+  record("overflow", bad.length === 0 ? "PASS" : "FAIL",
+    bad.length === 0
+      ? `nothing reaches past the right edge at any of ${widths.length} widths, `
+        + `${widths[0]} to ${widths[widths.length - 1]}px`
+      : bad.map((s) => `at ${s.width}px the document is ${s.doc}px wide`
+          + (s.worst.length ? `, widest is ${s.worst[0].name} reaching ${s.worst[0].right}px` : ""))
+        .join(". "),
+    { stops });
+}
+
 async function gateViewport(browser, url) {
   const stops = [];
   const problems = [];
@@ -1137,6 +1224,7 @@ async function main() {
     await gateContrast(browser, url);
     await gateKeyboard(browser, url);
     await gateViewport(browser, url);
+    await gateOverflow(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();

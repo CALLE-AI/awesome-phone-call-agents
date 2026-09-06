@@ -406,7 +406,13 @@ code { font-size: 0.88em; }
 
 /* Claim on one side, the artifact that checks it on the other. Below 60rem it stacks, claim
  * first, because a claim with its evidence underneath still reads correctly. */
-.split { display: grid; gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start; }
+/* One column below 60rem, and it is stated rather than left implicit. An implicit
+ * track is `auto`, which is floored by its widest item's min-content, so a table in
+ * the artifact column widened the whole act and the document with it at 390px. */
+.split {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start;
+}
 @media (min-width: 60rem) { .split { grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); } }
 
 .act-2 { background: var(--paper-2); }
@@ -1189,6 +1195,17 @@ footer .source-link { margin-top: var(--space-3); }
 .agree.part { color: var(--undetermined); }
 .caught { color: var(--resolved); font-variant-numeric: tabular-nums; }
 .ids td { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+
+/* The register of identifiers is the widest thing on the page and it has a floor: two
+ * masked ids, every field the call returned, and the outcome. At 1152px the rail's 15rem
+ * inset and the margin column leave it about 112px short, and the document was going wide
+ * rather than the table. Nothing else on the page overflowed at any width, so the box goes
+ * here rather than a rule about tables in general. */
+/* `min-width: 0` because a grid or flex item's default is `auto`, which is its
+ * min-content width: without it the box grows to the table instead of scrolling it,
+ * and `overflow-x: auto` is then a rule about a box that is never too small. */
+.scrollbox { overflow-x: auto; min-width: 0; max-width: 100%; }
+.scrollbox:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .compliance td { font-family: var(--ui); font-size: var(--size-2); }
 .compliance td.ok { color: var(--resolved); white-space: nowrap; }
 .mutations td:nth-child(2) { max-width: 34rem; }

@@ -1025,6 +1025,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'recordings live here, the reasoning lives there, and '
         '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>',
         '</div><div class=artifact>',
+        '<div class=scrollbox tabindex=0 role=region '
+        'aria-label="Every call in this run, with its identifiers and fields. '
+        'Scrolls sideways on a narrow screen.">'
         '<table class=ids><thead><tr><th>API id</th>'
         '<th>provider id (dashboard)</th>'
         + "".join(f'<th>{esc(f)}</th>' for f in data["fieldOrder"])
@@ -1042,7 +1045,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         body.append(f'<tr><td class=mono>{esc(mask_id(call_id))}</td><td>{pv}</td>'
                     f'{cells}'
                     f'<td><span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
-    body.append('</tbody></table></div></div>')
+    body.append('</tbody></table></div></div></div>')
     add(act("04", "Check us against your billing", "".join(body)))
 
     # ---- Act 5: mutations
@@ -1057,13 +1060,16 @@ def build(has_audio: bool, repo_url: str | None = None,
         'so a run whose every attempt died at the transport layer would still have published '
         'that it reached production.</div>',
         '</div><div class=artifact>',
+        '<div class=scrollbox tabindex=0 role=region '
+        'aria-label="Every gate broken on purpose, with the number of tests that '
+        'noticed. Scrolls sideways on a narrow screen.">'
         '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
         '<th>tests that failed</th></tr></thead><tbody>',
     ]
     for num, change, caught in muts:
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
-    body.append('</tbody></table></div></div>')
+    body.append('</tbody></table></div></div></div>')
     # The first sentence of the claim above, word for word. It closes the act at full width
     # rather than sitting in the 26rem claim column, where the display face would break one
     # sentence over six lines.
