@@ -154,6 +154,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [GridGuard Voice Escalation Agent](https://github.com/draculess99/gridguard-voice-escalation-agent) - Approval-gated grid-risk escalation app using CALL-E with disclosed calls, two human confirmations, structured escalation packets, and a dry-run/no-call default. [Demo](https://gridguard-voice-escalation-agent-production.up.railway.app/)
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
+- [Mazō Executive Coach](apps/typescript/mazo/) - Autonomous AI executive coach that initiates real-time CALL-E phone calls to break through decision paralysis, secure commitments, and extract structured action items.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
@@ -161,6 +162,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/mazo`](apps/typescript/mazo/) | TypeScript / Node | Autonomous AI executive coach that initiates real-time phone calls via CALL-E to turn overthinking into decisive action, with safe dry-run simulation, archetype selection, and structured task extraction. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
 | [`apps/typescript/sparescout`](apps/typescript/sparescout/) | TypeScript | Approval-gated multi-supplier vehicle-part sourcing with strict fitment schemas, durable evidence history, interruption-safe CALL-E monitoring, global market localization, and a no-call fixture default. |
