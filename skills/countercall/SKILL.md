@@ -63,7 +63,7 @@ are not appropriate targets for an automated caller at all.
 Most call skills return prose and let the reader interpret it. This one returns a **pinned,
 validated object**, and refuses to return anything else.
 
-The Goal's `result_schema` sets `additionalProperties: false` and constrains four fields to
+The pinned `result_schema` sets `additionalProperties: false` and constrains four fields to
 enumerations — `payment_method`, `appointment_required`, `originals_or_copies` and
 `clerk_certainty`, each of which includes a value for "the clerk did not know". If the call comes back shaped differently, the result is quarantined rather
 than rendered. A half-parsed checklist is worse than no checklist, because the user acts
@@ -85,10 +85,33 @@ wrong person gets called.
 
 Run `scripts/preflight.mjs` to check the number and the contract without dialling.
 
-### 2. Check the published contract has not drifted
+### 2. Pick a transport, then make sure the contract is honest
 
-Before every run, read the live Goal interface and compare it against the contract this
-skill was written for.
+There are two ways to reach CALL-E, and `scripts/transport.mjs` picks between them. Both
+place a real outbound call and both return the **same validated shape**, so nothing above the
+transport changes.
+
+| | needs | who owns the schema |
+|---|---|---|
+| **`calls`** *(default)* | `CALLE_API_KEY` | you do — it ships with the request as `result_schema` |
+| **`goals`** | `CALLE_API_KEY` + `COUNTERCALL_GOAL_ID` | the published Goal |
+
+`selectTransport()` uses `goals` when `COUNTERCALL_GOAL_ID` is set and `calls` otherwise.
+`COUNTERCALL_TRANSPORT=goals|calls` forces one, and an unrecognised value throws rather than
+falling back — a typo must not silently dial on a path nobody chose.
+
+**Why `calls` is the default.** Publishing a Goal is only possible inside CALL-E Chat: there
+is no `POST /v1/goals`, no MCP publish tool, and no action on the Goal detail page. That makes
+the Goals path dependent on a surface you may not be able to reach — during the 2026-09-02
+CALL-E login suspension it was reachable by nobody. The Calls transport needs one credential
+and works regardless.
+
+**On `calls`, drift is impossible by construction.** `resultSchemaJSON()` generates the
+request-scoped schema from the same `CONTRACT` object that `validateResult` checks the reply
+against, so the two cannot disagree. There is nothing to compare.
+
+**On `goals`, compare before every run.** The published Goal owns the schema, so it can move
+underneath you:
 
 ```js
 import { diffContract, publishedRunSpec } from './scripts/_lib.mjs';
@@ -112,8 +135,9 @@ is quietly wrong.
 
 ### 3. Place one call
 
-`goals.run` with an `Idempotency-Key` scoped to office, procedure and date, so a retry
-never double-dials a public line:
+`transport.run(...)` — `goals.run` or `calls.create` depending on the transport — always with
+an `Idempotency-Key` scoped to office, procedure and date, so a retry never double-dials a
+public line:
 
 ```text
 countercall:{office}:{procedure}:{yyyy-mm-dd}:v1
@@ -124,6 +148,13 @@ countercall:{office}:{procedure}:{yyyy-mm-dd}:v1
 `goals.waitForResult` has one completion rule: stop when either `result` or `error` is
 non-null. A completed call can briefly return both null while CALL-E parses the structured
 result, so do not treat that window as a failure.
+
+`calls.waitForResult` returns a terminal `CallTask` instead, and `normaliseCall()` folds it
+onto the same shape. One case there is worth knowing: **`status: "completed"` with
+`structuredResult: null`** means the call connected but the evidence could not satisfy the
+schema. That is terminal — it becomes `result_unextractable`, never an empty card. Handing a
+null result upward would make the renderer decide what a missing checklist means, and the only
+safe answer is to render nothing.
 
 ### 5. Render, or fail honestly
 

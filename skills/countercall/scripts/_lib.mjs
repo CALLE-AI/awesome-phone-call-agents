@@ -76,8 +76,16 @@ export function loadOffices(args, importMetaUrl) {
   return JSON.parse(readFileSync(source, 'utf8'));
 }
 
-/** Flags that take no value. Anything else consumes the token after it. */
-export const BOOLEAN_FLAGS = new Set(['live', 'plan', 'report']);
+/**
+ * Flags that take no value. Anything else consumes the token after it.
+ *
+ * `write` and `json` were missing here, which made `verify_live.mjs --write` a silent no-op:
+ * with no token after it, `--write` parsed as `undefined`, the falsy check skipped the write,
+ * and the command exited 0 having done nothing. DEMO.md documented that command as the way to
+ * fill its verification block, so the block stayed a placeholder while the tool reported
+ * success. A flag that quietly means its own opposite is worse than a missing flag.
+ */
+export const BOOLEAN_FLAGS = new Set(['live', 'plan', 'report', 'write', 'json']);
 
 export function parseArgs(argv) {
   const args = { live: false };

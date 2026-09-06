@@ -7,14 +7,19 @@
  *
  *   node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor"
  *   node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor" --live
+ *
+ * Two transports, same card. With COUNTERCALL_GOAL_ID set it runs a published Goal; without
+ * one it runs the Calls API and sends the contract as a request-scoped schema. See
+ * transport.mjs for why both exist. --transport goals|calls forces one.
  */
 import { validateOffice, idempotencyKey, parseArgs, loadOffices } from './_lib.mjs';
 import { validateResult } from './contract.mjs';
 import { renderCard, renderFailure } from './render.mjs';
+import { selectTransport, missingCredentials } from './transport.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.office || !args.procedure) {
-  console.error('usage: call.mjs --office <id> --procedure "<name>" [--live]');
+  console.error('usage: call.mjs --office <id> --procedure "<name>" [--live] [--transport goals|calls]');
   process.exit(2);
 }
 
@@ -26,24 +31,24 @@ if (problems.length) {
   process.exit(3);
 }
 
-const today = new Date(Date.now()).toISOString().slice(0, 10);
+// --transport is a per-invocation override of the same variable transport.mjs reads, so
+// there is exactly one selection rule rather than a flag path and an env path.
+const env = args.transport ? { ...process.env, COUNTERCALL_TRANSPORT: args.transport } : process.env;
 
-// Exactly the object the SDK takes: `phone` at the top level, no target wrapper.
-// CreateGoalRunRequest is a closed object — region, locale and display name live on the
-// published Goal and are rejected per run.
-const request = {
-  goalId: process.env.COUNTERCALL_GOAL_ID ?? '<COUNTERCALL_GOAL_ID>',
-  phone: office.phone_e164,
-  variables: {
-    office_name: office.name,
-    procedure: args.procedure,
-    city: office.city,
-  },
-  idempotencyKey: idempotencyKey(args.office, args.procedure, today),
-};
+let transport;
+try {
+  transport = selectTransport(env);
+} catch (error) {
+  console.error(error.message);
+  process.exit(2);
+}
+
+const today = new Date(Date.now()).toISOString().slice(0, 10);
+const key = idempotencyKey(args.office, args.procedure, today);
+const request = transport.describe(office, args.procedure, key, env);
 
 if (!args.live) {
-  console.log('DRY RUN - no call placed. Add --live to dial.');
+  console.log(`DRY RUN - no call placed. Transport: ${transport.name}. Add --live to dial.`);
   console.log('');
   console.log(JSON.stringify(request, null, 2));
   console.log('');
@@ -52,28 +57,34 @@ if (!args.live) {
   process.exit(0);
 }
 
-if (!process.env.CALLE_API_KEY) {
-  console.error('--live requires CALLE_API_KEY.');
-  process.exit(4);
-}
-if (!process.env.COUNTERCALL_GOAL_ID) {
-  console.error('--live requires COUNTERCALL_GOAL_ID (publish a Goal in CALL-E Chat first).');
+const missing = missingCredentials(transport, env);
+if (missing.length) {
+  console.error(`--live on the ${transport.name} transport requires ${missing.join(' and ')}.`);
+  if (transport.name === 'goals') {
+    console.error('Publish a Goal in CALL-E Chat first, or run --transport calls, which needs only a key.');
+  }
   process.exit(4);
 }
 
 const { CalleClient } = await import('@call-e/calle');
-const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
+const client = new CalleClient({ apiKey: env.CALLE_API_KEY });
 
-console.log(`Dialling ${office.phone_e164} ...`);
+// The drift guard is a precondition of dialling, not of preflight. A caller who skips
+// preflight still must not reach a drifted Goal.
+try {
+  await transport.assertReady(client, env);
+} catch (error) {
+  console.error(`REFUSING TO DIAL: ${error.message}`);
+  for (const d of error.drift ?? []) console.error(`  - ${d}`);
+  process.exit(4);
+}
+
+console.log(`Dialling ${office.phone_e164} via the ${transport.name} transport ...`);
 const started = Date.now();
 try {
-  const run = await client.goals.run(request);
-
-  // Poll on GoalRun.id. The nested runSpec/telephone `runId` is a different identity and
-  // substituting it returns 404.
-  const outcome = await client.goals.waitForResult(request.goalId, run.id);
+  const outcome = await transport.run(client, office, args.procedure, key, env);
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
-  const meta = { procedure: args.procedure, runId: run.id, calledAt: run.createdAt };
+  const meta = { procedure: args.procedure, runId: outcome.runId, calledAt: outcome.calledAt };
 
   // `result` and `error` are mutually exclusive and either one is terminal.
   if (outcome.error) {
@@ -83,14 +94,15 @@ try {
     process.exit(5);
   }
 
-  // The server validated against the published schema; we re-validate against the schema
+  // The server validated against the schema it was given; we re-validate against the schema
   // this build was PINNED to. Those are different claims, and only the second one keeps a
-  // drifted Goal from rendering a confident wrong card.
-  const problems = validateResult(outcome.result);
-  if (problems.length) {
+  // drifted Goal — or a model that returned something plausible and wrong — from rendering
+  // a confident wrong card.
+  const invalid = validateResult(outcome.result);
+  if (invalid.length) {
     console.log(renderFailure('result_invalid', office, meta));
     console.log('');
-    for (const problem of problems) console.log(`  - ${problem}`);
+    for (const problem of invalid) console.log(`  - ${problem}`);
     process.exit(5);
   }
 

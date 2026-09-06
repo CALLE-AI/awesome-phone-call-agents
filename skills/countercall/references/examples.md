@@ -33,9 +33,14 @@ Result:
 }
 ```
 
-The value is in the gap between this and the website. The published page says bring
-"KTP, KK, paspor lama". It does not say the family card must be an original, and it does
-not say an appointment must be booked first. Both are trips lost.
+The value is in the gap between this and the website. The office's own published pages give
+an address and a phone number; they do not say whether the family card must be an original,
+or whether an appointment must be booked first. Both are trips lost.
+
+*(Checked 2026-09-06 against <https://jakartaselatan.imigrasi.go.id/en/tentang-kami/alamat>,
+which publishes the phone number and address used in `offices.json` and no document
+requirements. This example is illustrative — the values above are a schema illustration, not
+a call recording.)*
 
 ## 2. The clerk was unsure about one field
 
