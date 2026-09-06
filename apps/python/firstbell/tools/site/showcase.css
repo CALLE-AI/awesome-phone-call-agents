@@ -28,9 +28,19 @@
    * CALLE-BRAND.md. ---- */
 
   --cs-paper: oklch(0.9810 0.0053 106.50);      /* #F9F9F5  warm off-white ground */
+
+  /* The ground this block paints, which is not the same job as --cs-paper. The figure
+   * sits inside act 02, and painting the brand off-white there drew a rectangle 16
+   * points cooler than the band around it, with hard edges and nothing to explain them.
+   * This tracks the band instead. It stays opaque, which is the part that matters to
+   * the contrast gate: that gate resolves a ground by walking the paint stack reading
+   * background-color and never reads an SVG fill, so a transparent block would put
+   * every text run in the figure at risk of not being measured at all. The fallback is
+   * the brand value, so the figure still stands up outside this page. */
+  --cs-ground: var(--paper-2, oklch(0.9810 0.0053 106.50));
   --cs-ink: oklch(0.3329 0.0000 89.88);         /* #363636  body ink, not black */
   --cs-ink-deep: oklch(0.2478 0.0000 89.88);    /* #212121  headings */
-  --cs-ink-soft: oklch(0.4728 0.0095 106.76);   /* #5C5C56  secondary labels, 6.38:1 */
+  --cs-ink-soft: oklch(0.4728 0.0095 106.76);   /* #5C5C56  secondary labels, 6.04:1 */
   --cs-rule: oklch(0.8300 0.0137 106.69);       /* #C8C8BE  hairlines, carries no text */
   --cs-tile: oklch(0.7509 0.0154 106.77);       /* #AFAFA4  register tiles */
   --cs-sage: oklch(0.9380 0.0212 109.70);       /* #EBECDC  panel surface */
@@ -38,10 +48,14 @@
   --cs-royal: oklch(0.3014 0.0968 264.66);      /* #152A5E  marks and the rail */
   --cs-blue: oklch(0.5310 0.1985 260.25);       /* #1863DC  the ending that closes */
 
-  /* Measured against the ground each one is actually painted on:
-   *   ink on paper 11.45   ink on yellow 8.64   ink on sage 10.11
-   *   ink-soft on paper 6.38   royal on paper 13.05   royal on yellow 9.85
-   * The lowest is 6.38, against a 4.5 requirement. Yellow is never ink; it is
+  /* Measured against the ground each one is actually painted on, and two grounds carry
+   * text. Most of the labels sit on the block, so they read against --cs-ground; the
+   * four rows in stage four are filled with --cs-paper, so their labels read against
+   * that:
+   *   on cs-ground: ink 10.84   ink-soft 6.04   royal 12.35
+   *   on cs-paper:  ink 11.45   ink-soft 6.38   royal 13.05
+   *   ink on yellow 8.64   ink on sage 10.11   royal on yellow 9.85
+   * The lowest is 6.04, against a 4.5 requirement. Yellow is never ink; it is
    * only ever a fill sitting behind ink. */
 
   --cs-loop: 9s;
@@ -49,7 +63,7 @@
   display: block;
   margin: 0;
   padding: clamp(0.75rem, 2vw, 1.5rem);
-  background: var(--cs-paper);
+  background: var(--cs-ground);
   color: var(--cs-ink);
 }
 
