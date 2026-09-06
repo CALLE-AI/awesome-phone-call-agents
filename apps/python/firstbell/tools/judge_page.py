@@ -1036,8 +1036,9 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
         register_markup(data, rows, hero, has_audio),
-        '<p class=hero-foot>Four real calls placed by this software, one row each, and the '
-        'three columns are the three fields CALL-E returns. The recordings are held outside '
+        '<p class=hero-foot>Four real calls placed by this software, one row each. CALL-E is '
+        'the voice service that dials the number and holds the conversation; the three '
+        'columns are the three fields it hands back. The recordings are held outside '
         'this repository; the transcript, the offsets and the shape of the waveform are what '
         'CALL-E returned. Every call went to the author’s own line, scripted and consented, '
         'and the pupil names in the transcripts are fictional.</p>',
@@ -1055,6 +1056,13 @@ def build(has_audio: bool, repo_url: str | None = None) -> str:
         '<p>The call above is the second kind. At '
         f'{cue + 5} seconds a parent learns from a robot that their daughter is not at '
         'school, having watched her leave for it that morning.</p>',
+        # Not written for this page. This is what the program prints at the head of its
+        # own escalation queue, and it was sitting nine screens below here, in terminal
+        # text, as the last thing a reader met. A blind seat called it the strongest
+        # sentence in the entry and reached it after the point they had stopped reading.
+        '<p class=stakes>A school would have to answer these within 30 minutes.</p>',
+        '<p class=stakes-src>Printed by the run itself, above the cases it refuses to '
+        'close. The whole queue is in act 08.</p>',
         '</div><div class=artifact>',
         '<div class=stat-grid>',
     ]
