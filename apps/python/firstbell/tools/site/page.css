@@ -140,10 +140,29 @@
 
   /* Outcome states. `failed` is never red: nobody answering the phone is not an error, it is
    * the ordinary case this software exists to handle. Red would tell the reader to panic
-   * about the wrong thing. */
-  --resolved:      oklch(0.470 0.105 155);
+   * about the wrong thing.
+   *
+   * The three were re-cut because the page was running three cool accents that meant
+   * different things. `failed` sat at hue 250 with 0.030 of chroma, which is the link hue at
+   * a sixth of its saturation and one lightness step away from it, so the state that means
+   * "nobody picked up" rendered as a link that had lost its colour. Vercel's system settles
+   * this by refusing the situation outright: their `success` and `link` are the same token,
+   * `#0070f3`, there is no green in the palette at all, and everything that is not a warning
+   * or an error is left to the grey ladder. Colour is spent on interaction, not decoration.
+   *
+   * The same rule is applied here without giving up the warm ground:
+   *
+   *   blue          is interaction and nothing else. Links and the focus ring, one hue.
+   *   amber         is the one state that asks a person to do something.
+   *   green         is the one state that says the software finished the job.
+   *   warm grey     is the state where nothing happened, which is what it looks like.
+   *
+   * Every lightness below is the number it already was, so no measured pair moved: only hue
+   * and chroma changed, and `tools/check_contrast.py` is the thing that says so rather than
+   * this comment. */
+  --resolved:      oklch(0.470 0.120 150);
   --undetermined:  oklch(0.480 0.105 62);
-  --failed:        oklch(0.480 0.030 250);
+  --failed:        oklch(0.480 0.012 70);
   /* The action blue, one step down and slightly off it, so it holds as running text on
    * every ground this page has: 5.86 on paper, 5.43 on the sage, 5.31 on --paper-deep and
    * 5.02 on the brand field. It replaces a stock blue at hue 245 that belonged to nothing. */
@@ -570,11 +589,21 @@ th {
 }
 td.mono, .mono { font-family: var(--mono); font-size: var(--size-2); }
 
-/* Status is never colour alone. The word is always present, and undetermined additionally
- * carries a bar, because it is the one a reader must not skim past. */
+/* Status is never colour alone. The word is always present, and the two states that are not
+ * the ordinary good case carry a rule as well, because a reader scanning the column reads
+ * the marks before the words.
+ *
+ * The two rules are different on purpose, and the difference is the instruction:
+ *
+ *   solid    somebody has to do something about this row
+ *   dotted   nothing happened and nothing is owed
+ *
+ * The dotted rule is what lets `failed` be a neutral grey. Without it a grey state in a
+ * column of coloured ones reads as a style that failed to load rather than a state that was
+ * chosen, and grey is the honest colour for a call nobody answered. */
 .state { font-family: var(--ui); font-weight: 500; }
 .state-resolved { color: var(--resolved); }
-.state-failed { color: var(--failed); }
+.state-failed { color: var(--failed); padding-left: 0.5rem; border-left: 2px dotted var(--line-strong); }
 .state-undetermined { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
 
 button[data-copy] {
