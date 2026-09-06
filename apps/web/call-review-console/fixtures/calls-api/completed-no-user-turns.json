@@ -1,0 +1,53 @@
+{
+  "id": "call_fixture_009",
+  "object": "call_task",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.88,
+    "label": "high"
+  },
+  "structured_result": {
+    "open_saturday": "unknown",
+    "evidence": ""
+  },
+  "evidence": [
+    "No recipient speech was captured during the call.",
+    "The call ended before the Saturday-hours question was answered."
+  ],
+  "summary": "The call connected and ended without a reply.",
+  "failure_code": null,
+  "recipients": [
+    {
+      "id": "rcp_fixture_009",
+      "status": "completed",
+      "structured_result": null,
+      "attempts": [
+        {
+          "id": "att_fixture_009",
+          "status": "completed",
+          "failure_code": null,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "I am an automated assistant,"
+            },
+            {
+              "offset_seconds": 1,
+              "speaker": "bot",
+              "text": "this call may be recorded, and I am calling to check one published detail."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Can you hear me?"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. The shape: the call connected and completed, the agent spoke and nobody answered, and structured_result came back filled in with a status of completed and no failure code anywhere."
+}

@@ -1,0 +1,5 @@
+{
+  "run_id": "run_mcp_cancelled",
+  "status": "CANCELLED",
+  "activity": [{ "ts": "10:00:02", "message": "Stop requested" }]
+}

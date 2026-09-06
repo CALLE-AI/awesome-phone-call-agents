@@ -1,0 +1,8 @@
+{
+  "run_id": "run_mcp_declined",
+  "status": "DECLINED",
+  "activity": [{ "ts": "10:00:03", "message": "Dialing" }],
+  "summary": "Fixture run ending in DECLINED.",
+  "transcript": null,
+  "next_step": null
+}

@@ -1,0 +1,35 @@
+{
+  "name": "call-review-console",
+  "version": "1.0.0",
+  "description": "Read how a CALL-E phone call ended across the Calls API, Goal Runs and MCP, with the field that said so next to every reading.",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "asheard": "^0.1.2",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

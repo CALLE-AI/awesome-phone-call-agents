@@ -1,0 +1,64 @@
+{
+  "id": "call_fixture_011",
+  "object": "call_task",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.94,
+    "label": "high"
+  },
+  "structured_result": {
+    "announced_time": "20 hours, 1 minute, coordinated universal time",
+    "evidence": "At tone, 20 hours, 1 minute, coordinated universal time."
+  },
+  "evidence": [
+    "The call connected to a recorded announcement.",
+    "The recording announced a time.",
+    "The agent reported the captured time before the call ended."
+  ],
+  "summary": "The call connected and the announced time was captured.",
+  "failure_code": null,
+  "recipients": [
+    {
+      "id": "rcp_fixture_011",
+      "status": "completed",
+      "structured_result": null,
+      "attempts": [
+        {
+          "id": "att_fixture_011",
+          "status": "completed",
+          "failure_code": null,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "I am an automated assistant and this call may be recorded."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Radio station call sign and location."
+            },
+            {
+              "offset_seconds": 8,
+              "speaker": "bot",
+              "text": "Could you repeat that, please?"
+            },
+            {
+              "offset_seconds": 29,
+              "speaker": "user",
+              "text": "At tone, 20 hours, 1 minute, coordinated universal time."
+            },
+            {
+              "offset_seconds": 32,
+              "speaker": "bot",
+              "text": "The announced time is 20 hours, 1 minute, UTC."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. The shape: a call that genuinely succeeded. The other side spoke, the answer was extracted correctly and checked against a known truth, and task_completed came back true. It is here to sit next to completed-voicemail-task-completed.json, which also says true and is wrong, and whose confidence is two hundredths lower."
+}

@@ -1,0 +1,38 @@
+{
+  "id": "call_fixture_001",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Call the listed number and ask whether the office is open on Saturday.",
+  "recipients": [
+    {
+      "id": "rcp_001",
+      "phones": ["<E164_PHONE>"],
+      "region": "US",
+      "locale": "en-US",
+      "status": "completed",
+      "structured_result": { "open_saturday": "yes" },
+      "summary": "The office is open on Saturday morning.",
+      "attempts": [
+        {
+          "id": "att_001",
+          "phone": "<E164_PHONE>",
+          "status": "completed",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Are you open on Saturday?" },
+            { "offset_seconds": 6, "speaker": "user", "text": "Yes, until noon." }
+          ],
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "structured_result": { "open_saturday": "yes" },
+  "summary": "The office is open on Saturday morning.",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.91, "label": "high" },
+  "evidence": ["The respondent said they are open until noon."],
+  "failure_code": null,
+  "failure_message": null,
+  "result_schema_requested": true
+}

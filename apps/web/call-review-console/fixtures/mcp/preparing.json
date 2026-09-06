@@ -1,0 +1,6 @@
+{
+  "run_id": "run_mcp_preparing",
+  "status": "PREPARING",
+  "activity": [{ "ts": "10:00:01", "message": "Preparing the call" }],
+  "next_step": "Poll get_call_run again in 10 seconds."
+}

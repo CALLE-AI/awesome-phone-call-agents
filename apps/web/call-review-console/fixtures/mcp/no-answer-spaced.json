@@ -1,0 +1,6 @@
+{
+  "run_id": "run_mcp_no_answer_spaced",
+  "status": "NO ANSWER",
+  "activity": [{ "ts": "10:00:03", "message": "Dialing" }],
+  "summary": "The line rang out."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "call_fixture_005",
+  "object": "call_task",
+  "status": "failed",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.79,
+    "label": "high"
+  },
+  "structured_result": {
+    "open_saturday": "unknown",
+    "evidence": ""
+  },
+  "evidence": [
+    "The call ended with a no-answer status.",
+    "No transcript or speech was captured."
+  ],
+  "summary": "The call did not connect.",
+  "failure_code": "call_failed",
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. No real call, number, transcript or account appears here. The shape: the call never connected, and structured_result came back anyway, matching the requested schema with an empty evidence string."
+}

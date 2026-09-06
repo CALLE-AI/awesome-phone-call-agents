@@ -1,0 +1,10 @@
+{
+  "id": "rgrp_fixture_101",
+  "object": "goal_run",
+  "goal_id": "goal_delivery_confirmation",
+  "run_id": "run_fixture_101",
+  "status": "failed",
+  "run_spec": { "id": "rspec_v4", "version": 4 },
+  "result": null,
+  "error": { "code": "no_answer", "message": "No human answered the call.", "detail_code": "no_human_answered" }
+}

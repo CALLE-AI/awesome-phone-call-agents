@@ -1,0 +1,75 @@
+{
+  "id": "call_fixture_007",
+  "object": "call_task",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.93,
+    "label": "high"
+  },
+  "structured_result": {
+    "open_saturday": "unknown",
+    "evidence": "\"You have reached 555-0100. Please leave a message after the tone.\""
+  },
+  "evidence": [
+    "The call ended normally.",
+    "A transcript was captured."
+  ],
+  "summary": "The call ended and a transcript was captured.",
+  "failure_code": null,
+  "recipients": [
+    {
+      "id": "rcp_fixture_007",
+      "status": "completed",
+      "structured_result": null,
+      "attempts": [
+        {
+          "id": "att_fixture_007",
+          "status": "completed",
+          "started_at": "2026-09-03T03:01:32.304400Z",
+          "completed_at": "2026-09-03T03:02:38.096159Z",
+          "failure_code": null,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Hello, I'm an automated assistant. This call may be recorded. Are you open on Saturday?"
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "You have reached 555-0100. Please leave a message after the tone."
+            },
+            {
+              "offset_seconds": 8,
+              "speaker": "bot",
+              "text": "Hello, I'm an automated assistant. This call may be recorded. Are you open on Saturday?"
+            },
+            {
+              "offset_seconds": 21,
+              "speaker": "bot",
+              "text": "Can you hear me?"
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "bot",
+              "text": "Hello, I'm an automated assistant. This call may be recorded. Are you open on Saturday?"
+            },
+            {
+              "offset_seconds": 48,
+              "speaker": "bot",
+              "text": "Can you hear me?"
+            },
+            {
+              "offset_seconds": 61,
+              "speaker": "bot",
+              "text": "Thank you, bye."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "result_schema_requested": true,
+  "_source": "Synthetic. Reproduces a payload shape seen while testing, with every value written for this file. No real call, number, transcript or account appears here. The shape: an answering machine took the call, the agent asked its question into the tone, and task_completed came back true with the greeting quoted as the evidence."
+}

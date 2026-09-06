@@ -1,0 +1,15 @@
+{
+  "id": "evt_fixture_004",
+  "type": "call.result_validation_failed",
+  "created_at": "2026-08-31T10:00:00Z",
+  "data": {
+    "id": "call_fixture_004",
+    "object": "call_task",
+    "status": "completed",
+    "structured_result": null,
+    "summary": "The respondent gave a partial answer.",
+    "task_completed": true,
+    "completion_confidence": { "score": 0.72, "label": "medium" },
+    "failure_code": null
+  }
+}
