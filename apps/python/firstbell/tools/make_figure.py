@@ -101,6 +101,13 @@ def write(out_dir: Path) -> dict[str, Path]:
     export_lottie(anim, str(paths["lottie"]))
     paths["svg"] = out_dir / "three-endings.svg"
     export_svg(anim, str(paths["svg"]), frame=DUR - 1)
+
+    # Both exporters open in text mode, so on Windows every newline goes out as CRLF while
+    # git stores and checks out LF. `--check` compares bytes, so the gate would pass on the
+    # machine that generated the file and fail on every clone of it, which is a gate that
+    # reports on the developer rather than on the artifact.
+    for path in paths.values():
+        path.write_bytes(path.read_bytes().replace(bytes([13, 10]), bytes([10])))
     return paths
 
 
