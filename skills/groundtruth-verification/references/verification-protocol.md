@@ -69,11 +69,26 @@ After each terminal call, inspect the state and choose exactly one action:
 
 - **follow_up** — a hard constraint is UNKNOWN and resolvable with one more
   question:
-  - hold requested and possible but pending approval (`hold_available: true`,
-    `hold_confirmed: false`);
+  - a hold was requested and the supplier did not refuse it — typically
+    "I can hold it, but I need to check with my manager first";
   - compatibility answered as `uncertain` but the supplier engaged.
   The follow-up call must be shorter than the first (one focused question)
   and must state that it is a follow-up.
+
+  **Key the trigger on refusal, not on a positive flag.** It is tempting to
+  require something like `hold_available: true` before following up. Do not:
+  on a live call that sentence came back as `hold_available: null,
+  hold_confirmed: false`, and only a deterministic mock ever produced the
+  positive flag — so the follow-up silently never fired against real
+  conversations while passing every test. An explicit refusal closes the
+  door; anything short of it is unresolved, and unresolved is what a
+  follow-up is for.
+
+  **Leave a gap before redialling.** The supplier was just asked to go and
+  check with someone. Calling back within seconds is both socially wrong and
+  technically fragile — a live redial ~90s after hang-up failed with a
+  zero-duration provider error. Wait, and make the wait configurable. A mock
+  has no wall clock, so this failure mode cannot surface in a demo.
 - **next_candidate** — the candidate failed a hard requirement, or its
   remaining unknowns are not resolvable by phone (the supplier cannot check,
   "call back tomorrow", no answer), or the per-candidate call budget is spent.

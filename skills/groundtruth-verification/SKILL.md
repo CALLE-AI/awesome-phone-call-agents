@@ -244,6 +244,16 @@ distance to the geography constraint, then by expected match.
 
 - **No answer / voicemail / hangup**: mark the candidate `unreachable`, move
   to the next candidate. Do not redial the same number in the same run.
+- **Zero-duration provider failures**: a call that starts and ends in the same
+  second, with no transcript, never reached the person. Observed codes are
+  opaque and inconsistent — `500`, `404`, SIP `480` — and carry no actionable
+  reason, so do not branch on them. Treat the candidate as unreachable and
+  move on. Repeated zero-duration failures to one number after several
+  successful calls usually mean carrier-side filtering of automated traffic,
+  not a fault in your code: stop dialling that number rather than retrying.
+- **Before a follow-up**: leave a deliberate gap after the first call ends.
+  Redialling someone seconds after asking them to check with a manager is
+  both unrealistic and, in practice, unreliable.
 - **API failure or timeout**: retry the CALL-E create with the SAME
   idempotency key (never double-dial); after repeated failures, mark the
   candidate unknown and continue.
@@ -254,6 +264,8 @@ distance to the geography constraint, then by expected match.
 
 ## Further reading
 
+- `references/examples.md` — runnable examples: composing a call task, the
+  Goal compatibility refusal, a full offline run, and the honest-failure path.
 - `references/verification-protocol.md` — the full plan → call → adapt →
   extract → verify → decide loop with pseudo-code.
 - `references/evidence-model.md` — claims, evidence, confidence, schemas.
