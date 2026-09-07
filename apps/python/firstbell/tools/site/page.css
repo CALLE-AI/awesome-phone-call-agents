@@ -1686,6 +1686,24 @@ button[data-copy][data-copied]::after {
 }
 .queue-said { margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
 .queue-list { list-style: none; margin: 0; padding: 0; }
+/* The reason, said once above rows that all share it. See queue_markup: every row used to
+ * carry its own copy, and in a run where every case is the same case that set the same two
+ * sentences four times in a 46ch column. */
+.queue-why {
+  margin: 0; padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--size-3); color: var(--ink); max-width: 62ch; text-wrap: pretty;
+}
+.queue-why b {
+  display: block; margin-top: 0.3rem; font-weight: 400;
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+}
+/* With the reason hoisted the middle column is empty, so the remaining three are placed
+ * rather than left to auto-placement, which would slide the state into the gap and put the
+ * three columns of every row out of line with each other. */
+.queue-list.is-shared .q-when { grid-column: 1; }
+.queue-list.is-shared .queue-row .state { grid-column: 3; }
+.queue-list.is-shared .q-tried { grid-column: 4; }
 .queue-row {
   display: grid;
   grid-template-columns: 6rem minmax(0, 1fr) 8.5rem 7rem;
@@ -1718,6 +1736,11 @@ button[data-copy][data-copied]::after {
   .queue-row { grid-template-columns: minmax(0, 1fr) 8rem; row-gap: 0.4rem; }
   .q-when { grid-column: 1 / -1; }
   .q-tried { text-align: left; grid-column: 1 / -1; }
+  /* Two columns here, so the desktop placement above would point at columns that do not
+   * exist. The id takes the row, the state and the count sit side by side under it. */
+  .queue-list.is-shared .q-when { grid-column: 1 / -1; }
+  .queue-list.is-shared .queue-row .state { grid-column: 1; }
+  .queue-list.is-shared .q-tried { grid-column: 2; text-align: right; }
 }
 
 /* The animated build of the figure, when a reader gets one. It replaces the still in place

@@ -74,10 +74,25 @@ def build() -> objects.Animation:
     palette = video_facts.palette()
     ink = _rgb(palette["ink"])
     line = _rgb(palette["line-strong"])
+    # Two orders, and they are not the same order.
+    #
+    # Down the page, the three read `resolved`, `undetermined`, `failed`, because that is
+    # the order of the labels beside the drawing, the order of the table in the README and
+    # the order the CLI prints. They were drawn in arrival order instead, so the middle bar
+    # was `failed` while the middle label said `undetermined`, and a reader mapping the top
+    # bar to the top label got the second one wrong. The labels are HTML beside an SVG that
+    # carries no text of its own, which is what makes position the only thing connecting
+    # them.
+    #
+    # In time they still arrive `resolved`, `failed`, `undetermined`. That stagger is the
+    # point of animating this at all: arriving together would say the three are alternatives
+    # of equal weight, and `undetermined` lands last and holds longest because it is the one
+    # the whole product turns on. Position is where a reader looks; timing is what the motion
+    # says. Decoupling them costs one number per row.
     endings = [
-        ("resolved", palette["resolved"]),
-        ("failed", palette["failed"]),
-        ("undetermined", palette["undetermined"]),
+        ("resolved", palette["resolved"], 0),
+        ("undetermined", palette["undetermined"], 2),
+        ("failed", palette["failed"], 1),
     ]
     ease = EaseOut(0.42)
 
@@ -104,10 +119,10 @@ def build() -> objects.Animation:
 
     # The three endings. Staggered, and each one slides a little way in rather than fading
     # on the spot, so a reader's eye is carried from the spine to the row.
-    for i, (_name, colour) in enumerate(endings):
-        at = 40 + i * 20
+    for row, (_name, colour, arrival) in enumerate(endings):
+        at = 40 + arrival * 20
         arm = layer.add_shape(objects.Group())
-        _rounded(arm, 486, 44 + i * 88, 384, 60, _rgb(colour), 10.0)
+        _rounded(arm, 486, 44 + row * 88, 384, 60, _rgb(colour), 10.0)
         arm.transform.opacity.add_keyframe(0, 0)
         arm.transform.opacity.add_keyframe(at, 0)
         arm.transform.opacity.add_keyframe(at + 16, 100, ease)
@@ -116,7 +131,7 @@ def build() -> objects.Animation:
 
         # The short connector from the spine to this row, drawn just before it arrives.
         arm_line = layer.add_shape(objects.Group())
-        joint = _rounded(arm_line, 468, 72 + i * 88, 18, 3, line, 1.5)
+        joint = _rounded(arm_line, 468, 72 + row * 88, 18, 3, line, 1.5)
         joint.size.add_keyframe(0, Point(0, 3))
         joint.size.add_keyframe(at, Point(0, 3))
         joint.size.add_keyframe(at + 12, Point(18, 3), ease)
@@ -153,6 +168,27 @@ def main() -> int:
     if args.check:
         before = {p.name: p.read_bytes() for p in out_dir.glob("three-endings.*")}
         paths = write(out_dir)
+
+        # Absent is not the same as changed, and this used to say it was.
+        #
+        # The figure is generated rather than committed, so on any checkout that has not
+        # built the page there is nothing to compare against. `before` was empty, every
+        # name mismatched, and this printed "changed: three-endings.json,
+        # three-endings.svg" and exited 1. That is a could-not-measure published as a
+        # failure, which is the one mistake this whole project is built around not making,
+        # made by its own tooling. It also meant the second run of the suite on a fresh
+        # clone passed where the first failed, because the first run wrote the figure as a
+        # side effect of checking for it.
+        #
+        # Exit 3 for could-not-measure, matching `tools/double_conformance.py`.
+        missing = sorted(p.name for p in paths.values() if p.name not in before)
+        if missing:
+            print("cannot be measured: " + ", ".join(missing)
+                  + " did not exist before this run, so there was nothing to compare "
+                    "against. The figure is generated, not committed. It has been written "
+                    "now, so running this again compares two real builds.")
+            return 3
+
         moved = [p.name for p in paths.values()
                  if before.get(p.name) != p.read_bytes()]
         if moved:

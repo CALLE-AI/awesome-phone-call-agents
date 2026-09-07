@@ -912,13 +912,6 @@ def queue_markup(run: dict) -> str:
     if not rows:
         return ""
 
-    out = ['<div class=queue>',
-           '<div class=queue-head>',
-           f'<p class=queue-n>{len(rows)}</p>',
-           '<p class=queue-said>cases need a person. Nothing here is closed.</p>',
-           '</div>',
-           '<ol class=queue-list>']
-
     # What each state means to the person holding the list, rather than to the program.
     says = {
         "undetermined": ("The call connected and ended without an answer the office can use.",
@@ -926,23 +919,57 @@ def queue_markup(run: dict) -> str:
         "failed": ("Nobody picked up on any number we hold.",
                    "Try another contact, or send someone."),
     }
-    for _, escalated, item, resolution in rows:
-        student = esc(item.get("id") or "")
-        tried = len(item.get("numbers_tried") or [])
+
+    def _reason(escalated: bool, item: dict, resolution: str) -> tuple[str, str]:
         if escalated:
             head = "The parent did not confirm they already knew their child was absent."
             if resolution != "resolved":
                 head += " The call also ended without an answer the office can use."
-            todo = "Speak to this family first."
+            return head, "Speak to this family first."
+        return says.get(resolution, (item.get("reason") or "", "Look at this."))
+
+    # Say a shared reason once.
+    #
+    # Every row carried its own copy of it, and in this run all four rows are the same case,
+    # so the same two sentences were set four times in a 46ch column: twenty-four lines of
+    # identical prose, which is most of the height of the one screen on this page that is
+    # supposed to read like a working queue. Reading fatigue was the highest-scoring
+    # complaint a blind seat left about this page, and repetition is the cheapest kind of it
+    # to remove, because nothing is lost: a clerk still learns the reason before the first
+    # row, and each row keeps the three things that differ.
+    #
+    # Only when they really are all the same. A mixed queue puts the reason back on every
+    # row, because a shared band above rows that do not share it would be a lie about four
+    # families at once.
+    reasons = {_reason(escalated, item, resolution)
+               for _, escalated, item, resolution in rows}
+    shared = reasons.pop() if len(reasons) == 1 and len(rows) > 1 else None
+
+    out = ['<div class=queue>',
+           '<div class=queue-head>',
+           f'<p class=queue-n>{len(rows)}</p>',
+           '<p class=queue-said>cases need a person. Nothing here is closed.</p>',
+           '</div>']
+    if shared:
+        out.append(f'<p class=queue-why>All {len(rows)} for the same reason. '
+                   f'{esc(shared[0])}<b>{esc(shared[1])}</b></p>')
+    out.append(f'<ol class="queue-list{" is-shared" if shared else ""}">')
+
+    for _, escalated, item, resolution in rows:
+        student = esc(item.get("id") or "")
+        tried = len(item.get("numbers_tried") or [])
+        head, todo = _reason(escalated, item, resolution)
+        if escalated:
             cls, label = "q-safeguarding", "safeguarding"
         else:
-            head, todo = says.get(resolution, (esc(item.get("reason") or ""), "Look at this."))
             cls, label = f"q-{resolution}", resolution
+        body = "" if shared else (
+            f'<div class=q-body><p class=q-head>{esc(head)}</p>'
+            f'<p class=q-todo>{esc(todo)}</p></div>')
         out.append(
             f'<li class="queue-row {cls}">'
             f'<p class=q-when>{student}</p>'
-            f'<div class=q-body><p class=q-head>{esc(head)}</p>'
-            f'<p class=q-todo>{esc(todo)}</p></div>'
+            f'{body}'
             f'<p class="state state-{"undetermined" if escalated else resolution}">'
             f'{esc(label)}</p>'
             f'<p class=q-tried>{tried} number{"" if tried == 1 else "s"} tried</p>'
