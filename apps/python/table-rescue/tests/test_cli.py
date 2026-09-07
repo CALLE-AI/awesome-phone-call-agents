@@ -137,6 +137,8 @@ def test_run_live_fictional_number_never_reaches_dial(tmp_path, capsys):
     exit_code = main(
         [
             "run", "--live", "--region", "US", "--yes",
+            "--call-window-start", "00:00",
+            "--call-window-end", "23:59",
             "--data-dir", str(data_dir),
             "--state-dir", str(tmp_path / "state"),
             "--run-id", "live-1",

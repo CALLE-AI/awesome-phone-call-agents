@@ -40,10 +40,12 @@ class TestRegionRules:
         # Reserved 555-01xx numbers are (correctly) refused by the fictional
         # gate below, so the live pass path is exercised with a standards-reserved fictional number
         # (patched for live path testing).
-        validate_destination("+14155550132", region="US", live=True)
+        with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
+            validate_destination("+14155550132", region="US", live=True)
 
     def test_region_lookup_is_case_insensitive(self):
-        validate_destination("+14155550132", region="us", live=True)
+        with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
+            validate_destination("+14155550132", region="us", live=True)
 
     def test_wrong_prefix_rejected(self):
         with pytest.raises(SafetyViolation, match="REGION_MISMATCH"):
@@ -78,7 +80,6 @@ class TestFictionalBlock:
         # a standards-reserved fictional number (patched for live path testing).
         with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
             validate_destination("+14155550132", region="US", live=True)
-
     def test_fictional_allowed_in_dry_run(self):
         validate_destination("+15550101", region=None, live=False)
 
@@ -204,12 +205,14 @@ class TestRunSafety:
             region="US",
             authorizations={"+14155550132": {"authorized_by": "op"}},
         )
-        safety.check_destination("+14155550132")
+        with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
+            safety.check_destination("+14155550132")
 
     def test_live_unauthorized_rejected(self):
         safety = RunSafety(live=True, region="US", authorizations={})
-        with pytest.raises(SafetyViolation, match="NOT_AUTHORIZED"):
-            safety.check_destination("+14155550132")
+        with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
+            with pytest.raises(SafetyViolation, match="NOT_AUTHORIZED"):
+                safety.check_destination("+14155550132")
 
 
 @given(
