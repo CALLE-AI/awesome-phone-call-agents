@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AttestCall — Compliance Attestation Console</title>
+    <style>
+      :root {
+        --bg: #0b0f17;
+        --panel: #131a26;
+        --panel-2: #1a2432;
+        --line: #263243;
+        --text: #e7edf5;
+        --muted: #8ba0b8;
+        --accent: #4da3ff;
+        --ok: #35c48c;
+        --warn: #f5b942;
+        --bad: #ff6b6b;
+        --human: #c792ea;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+      .badge {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .badge.demo { color: var(--warn); border-color: var(--warn); }
+      .badge.live { color: var(--ok); border-color: var(--ok); }
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px;
+      }
+      .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 14px; }
+      label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+      input, select {
+        width: 100%;
+        padding: 9px 10px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        color: var(--text);
+        font-size: 13px;
+      }
+      .row { display: flex; gap: 10px; }
+      .row > div { flex: 1; }
+      .btns { margin-top: 16px; display: flex; gap: 10px; }
+      button {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 10px 14px;
+        border-radius: 7px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      pre {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 12px;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .disp { font-size: 15px; font-weight: 700; padding: 8px 12px; border-radius: 7px; display: inline-block; margin-bottom: 12px; }
+      .disp.attested { background: rgba(53,196,140,0.15); color: var(--ok); }
+      .disp.not_attested { background: rgba(255,107,107,0.15); color: var(--bad); }
+      .disp.needs_human { background: rgba(199,146,234,0.15); color: var(--human); }
+      .disp.call_failed { background: rgba(245,185,66,0.15); color: var(--warn); }
+      .kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 10px; font-size: 13px; margin: 10px 0; }
+      .kv dt { color: var(--muted); }
+      .evidence li { margin-bottom: 6px; color: #cfe0f2; }
+      .chain { font-size: 12px; margin-top: 10px; }
+      .chain.ok { color: var(--ok); }
+      .chain.bad { color: var(--bad); }
+      .full { grid-column: 1 / -1; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .hashline { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>☎️ AttestCall</h1>
+      <span class="muted">Compliance attestation, grounded and hash-chained</span>
+      <span id="mode" class="badge">…</span>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>Attestation request</h2>
+        <label>Vendor / partner organization</label>
+        <input id="vendor" value="Acme Payments Inc." />
+        <div class="row">
+          <div>
+            <label>Contact phone (E.164)</label>
+            <input id="phone" value="+14155550123" />
+          </div>
+          <div>
+            <label>Framework</label>
+            <select id="framework">
+              <option>PCI-DSS</option>
+              <option>SOC2-TYPE2</option>
+              <option>ISO-27001</option>
+              <option>HIPAA</option>
+              <option>GDPR</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Requested by</label>
+            <input id="by" value="Vendor Risk, Contoso" />
+          </div>
+          <div>
+            <label>Reference ID (optional)</label>
+            <input id="ref" value="MSA-2024-0912" />
+          </div>
+        </div>
+        <label id="scenarioLabel">Demo scenario</label>
+        <select id="scenario"></select>
+        <div class="btns">
+          <button id="previewBtn">Preview (no call)</button>
+          <button id="attestBtn" class="primary">Place attestation call</button>
+        </div>
+        <p class="muted" id="callNote"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Call preview</h2>
+        <div id="previewOut"><p class="muted">Click “Preview” to see the exact disclosed script and idempotency key before any call is placed.</p></div>
+      </section>
+
+      <section class="panel full">
+        <h2>Attestation result</h2>
+        <div id="resultOut"><p class="muted">No attestation yet.</p></div>
+      </section>
+
+      <section class="panel full">
+        <h2>Audit chain</h2>
+        <div id="chainOut"><p class="muted">Sealed attestation records appear here, each hash-chained to the previous.</p></div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let demoMode = true;
+
+      function req() {
+        return {
+          vendorName: $("vendor").value,
+          vendorPhone: $("phone").value,
+          framework: $("framework").value,
+          requestedBy: $("by").value,
+          referenceId: $("ref").value || undefined,
+          scenario: $("scenario").value || undefined,
+        };
+      }
+
+      async function api(path, body) {
+        const opts = { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" } };
+        if (body) opts.body = JSON.stringify(body);
+        const r = await fetch(path, opts);
+        return r.json();
+      }
+
+      async function init() {
+        const cfg = await api("/api/config");
+        demoMode = cfg.demo;
+        $("mode").textContent = demoMode ? "DEMO MODE — no live calls" : "LIVE MODE";
+        $("mode").className = "badge " + (demoMode ? "demo" : "live");
+        const sel = $("scenario");
+        cfg.scenarios.forEach((s) => {
+          const o = document.createElement("option");
+          o.value = s; o.textContent = s;
+          sel.appendChild(o);
+        });
+        if (!demoMode) { $("scenarioLabel").style.display = "none"; sel.style.display = "none"; }
+        $("callNote").textContent = demoMode
+          ? "Demo mode returns a deterministic fixture with the exact CALL-E result shape. No credentials needed."
+          : "Live mode will place a REAL phone call via CALL-E to the number above.";
+        await refreshChain();
+      }
+
+      $("previewBtn").onclick = async () => {
+        const p = await api("/api/preview", req());
+        if (p.error) { $("previewOut").innerHTML = `<pre>${p.error}</pre>`; return; }
+        $("previewOut").innerHTML = `
+          <div class="kv">
+            <dt>Vendor</dt><dd>${p.vendorName}</dd>
+            <dt>Phone (masked)</dt><dd>${p.vendorPhoneMasked}</dd>
+            <dt>Framework</dt><dd>${p.framework}</dd>
+            <dt>Idempotency</dt><dd class="hashline">${p.idempotencyKey}</dd>
+            <dt>Real call?</dt><dd>${p.willPlaceRealCall ? "YES (live)" : "No (demo)"}</dd>
+          </div>
+          <label>Disclosed call script</label>
+          <pre>${p.taskPreview}</pre>`;
+      };
+
+      $("attestBtn").onclick = async () => {
+        $("attestBtn").disabled = true;
+        $("attestBtn").textContent = demoMode ? "Simulating…" : "Calling…";
+        try {
+          const { record, chainIntact, error } = await api("/api/attest", req());
+          if (error) { $("resultOut").innerHTML = `<pre>${error}</pre>`; return; }
+          renderResult(record, chainIntact);
+          await refreshChain();
+        } finally {
+          $("attestBtn").disabled = false;
+          $("attestBtn").textContent = "Place attestation call";
+        }
+      };
+
+      function renderResult(r, chainIntact) {
+        const a = r.answers || {};
+        const conf = r.completionConfidence ? `${(r.completionConfidence.score * 100).toFixed(0)}% (${r.completionConfidence.label})` : "n/a";
+        const ev = (r.evidence || []).map((e) => `<li>${e}</li>`).join("") || "<li class='muted'>No evidence captured.</li>";
+        $("resultOut").innerHTML = `
+          <span class="disp ${r.disposition}">${r.disposition.replace(/_/g, " ").toUpperCase()}</span>
+          <div class="kv">
+            <dt>Compliant?</dt><dd>${a.is_compliant ?? "—"}</dd>
+            <dt>Cert expiry</dt><dd>${a.cert_expiry_date ?? "—"}</dd>
+            <dt>Auditor</dt><dd>${a.auditor_name ?? "—"}</dd>
+            <dt>Attesting contact</dt><dd>${a.attesting_contact ?? "—"}</dd>
+            <dt>Consent to record</dt><dd>${a.consent_to_record ?? "—"}</dd>
+            <dt>Scope caveats</dt><dd>${a.scope_caveats ?? "—"}</dd>
+            <dt>Confidence</dt><dd>${conf}</dd>
+            <dt>Call status</dt><dd>${r.callStatus} (${r.mode})</dd>
+          </div>
+          <label>Evidence (grounded in transcript)</label>
+          <ul class="evidence">${ev}</ul>
+          <div class="chain ${chainIntact ? "ok" : "bad"}">Record sealed · chain ${chainIntact ? "intact ✓" : "BROKEN ✗"}</div>
+          <p class="hashline">hash: ${r.hash}</p>`;
+      }
+
+      async function refreshChain() {
+        const { records, integrity } = await api("/api/records");
+        if (!records || records.length === 0) {
+          $("chainOut").innerHTML = `<p class="muted">No sealed records yet.</p>`;
+          return;
+        }
+        const rows = records
+          .map(
+            (r) => `<div class="kv" style="grid-template-columns:40px 1fr 130px 100px;border-top:1px solid var(--line);padding-top:8px">
+              <dt>#${r.index}</dt>
+              <dd>${r.request.vendorName} · ${r.request.framework}</dd>
+              <dd><span class="disp ${r.disposition}" style="font-size:11px;padding:2px 6px">${r.disposition.replace(/_/g, " ")}</span></dd>
+              <dd class="muted">${r.mode}</dd>
+            </div>`,
+          )
+          .join("");
+        $("chainOut").innerHTML =
+          rows +
+          `<div class="chain ${integrity.intact ? "ok" : "bad"}">Chain of ${records.length} record(s): ${integrity.intact ? "intact ✓" : "BROKEN at #" + integrity.brokenAt + " ✗"}</div>`;
+      }
+
+      init();
+    </script>
+  </body>
+</html>
