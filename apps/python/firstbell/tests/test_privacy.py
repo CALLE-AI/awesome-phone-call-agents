@@ -668,11 +668,20 @@ def test_every_real_result_the_readme_promises_is_on_the_page():
         f"{len(whole_provider_ids)} whole provider ids are on the page"
     )
 
-    table = re.search(r"<table class=ids>.*?</table>", html, re.S)
+    # `class=ids` followed by a space or the closing bracket, rather than the bracket
+    # alone. The table states its role now, because the identifier columns restyle into
+    # one block per call in a container too narrow for a table and changing `display` on a
+    # table drops the semantics that go with it. A test that fails because an attribute
+    # was added is testing the tag and not the table.
+    table = re.search(r"<table class=ids[ >].*?</table>", html, re.S)
     assert table, "the page no longer has the identifier table the README points at"
 
+    # `[^>]*` between the attribute and the bracket. The cell carries a `data-label` as
+    # well now, and a reader that only finds the value when its attribute happens to be
+    # written last is reading the tag rather than the cell.
     values = re.findall(
-        r'data-field="parent_confirmed_aware">(?:<span class=dim>)?([^<]*)', table.group(0)
+        r'data-field="parent_confirmed_aware"[^>]*>(?:<span class=dim>)?([^<]*)',
+        table.group(0),
     )
     answered = [v.strip() for v in values if v.strip() and v.strip() != "&#183;"]
     not_yes = [v for v in answered if v != "yes"]

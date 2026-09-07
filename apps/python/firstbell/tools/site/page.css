@@ -1293,7 +1293,14 @@ footer .source-link { margin-top: var(--space-3); }
 /* `min-width: 0` because a grid or flex item's default is `auto`, which is its
  * min-content width: without it the box grows to the table instead of scrolling it,
  * and `overflow-x: auto` is then a rule about a box that is never too small. */
-.scrollbox { overflow-x: auto; min-width: 0; max-width: 100%; }
+/* And the box is a container, so the table inside it can answer the width it actually
+ * has rather than the width of the window. Those are different numbers here: at 1152 the
+ * window is wide and this column is 404px, because the rail and the claim column take the
+ * rest. A viewport query cannot see that and had no business deciding it. */
+.scrollbox {
+  overflow-x: auto; min-width: 0; max-width: 100%;
+  container: judge-artifact / inline-size;
+}
 .scrollbox:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .compliance td { font-family: var(--ui); font-size: var(--size-2); }
 .compliance td.ok { color: var(--resolved); white-space: nowrap; }
@@ -1605,13 +1612,89 @@ button[data-copy][data-copied]::after {
  * walks back into the same defect at a wider size. The reader loses nothing either way,
  * because the copy button hands over the whole value from `data-copy` however it is drawn. */
 .ids td.mono, .ids button[data-copy] { overflow-wrap: anywhere; }
+/* And a floor under the identifier column, because `anywhere` with no floor is what
+ * produced two characters to a line. The markup now carries a `<wbr>` after the `call_`
+ * prefix, so the cell breaks in one sensible place and `anywhere` is the last resort it
+ * was meant to be rather than the first rule that applies. */
+.ids td.mono { min-width: 6.5rem; }
+/* The money band spans both columns of the split. It is appended after the artifact
+ * column closes, so a two-column grid puts it back in column one, which is the 26rem
+ * argument column: three cells of 134px each, every label wrapped to four words, and the
+ * one row a buyer reads first set narrower than the prose beside it. Nothing measured it
+ * because nothing overflowed. A screenshot did. */
+.money { grid-column: 1 / -1; }
+
 /* The column heads too, which the earlier fix left out and which are the wider half of the
  * problem: `parent_confirmed_aware` is a field name CALL-E returns and the page prints it
  * as it is returned, so it is one 22 character word that no line break can fall inside.
  * Three of those plus two identifier columns set a min-content width of 1583px, and a
  * table cannot be narrower than that, so the whole document scrolled sideways at 1440 and
  * at 1600 with nothing on screen to explain why. Measured after: 1520 and 1600. */
-.ids th { overflow-wrap: anywhere; }
+/* Underscores only, now that the markup carries a `<wbr>` after each one. `anywhere` was
+ * the only break opportunity these heads had, so it broke them mid-word: `PARENT_ CONFIR
+ * MED_ AWARE` in four lines. The name is one CALL-E returns and this page prints it as
+ * returned, so the break belongs where a reader would put it. */
+.ids th { overflow-wrap: normal; }
+/* The dashboard identifier, on the second line of the cell the API identifier leads.
+ * Secondary ink rather than a label, because a label in front of each of the two lines
+ * costs 40px of column and the head already names them in order. */
+.ids .second { color: var(--ink-3); }
+
+/* Two tiers, and each one is a measurement rather than a guess about phones.
+ *
+ * The table's min-content width is 593px once the identifiers share a column. The column
+ * it sits in is 616px at 1440, 522px at 1280 and 404px at 1152, so at the two middle
+ * widths it overflowed a box the reader had no way of knowing was scrollable, and the
+ * outcome column was cut mid-word at the edge.
+ *
+ * Under 40rem: small print, tight gutters, and no floor under the identifier column.
+ * Under 38rem: no table at all. Compact still needs 539px, and a table that fits its
+ * column by four pixels, which is what a 36rem boundary gave at 1280, is one font
+ * substitution away from being cut again. So the boundary sits where the table has room
+ * to spare: every box that keeps the table has at least 45px of it, and every box below
+ * becomes one block per call, each cell printing the field name in front of itself. */
+@container judge-artifact (max-width: 40rem) {
+  .ids { font-size: var(--size-2); }
+  .ids th, .ids td { padding-left: 0.45rem; padding-right: 0.45rem; }
+  .ids th:first-child, .ids td:first-child { padding-left: 0; }
+  /* And the floor under the identifier column goes. 6.5rem is what that column needs
+   * where there is room to spare; at 1280 there is none, and this is the 17px the table
+   * was over by. The cell takes a third line and nothing breaks mid-word, because the
+   * markup carries a break opportunity after each underscore. */
+  .ids td.mono { min-width: 0; }
+}
+
+@container judge-artifact (max-width: 38rem) {
+  /* The heads go, because each cell now carries its own. Their text is not lost to a
+   * screen reader: `content` on a pseudo-element is read out, and it is the same string
+   * the head carried. */
+  .ids thead { display: none; }
+  .ids, .ids tbody, .ids tr { display: block; }
+  .ids tr {
+    border-top: 1px solid var(--line-strong);
+    padding: 0.55rem 0;
+  }
+  .ids tbody tr:first-child { border-top: 0; }
+  /* 11.5rem, measured rather than chosen: `parent_confirmed_aware` is the longest name
+   * CALL-E returns, and 9.5rem broke it as `PARENT_CONFIRMED_A / WARE`, 10.5rem as
+   * `PARENT_CONFIRMED_AWAR / E`. The tracking is eased off in here for the same reason:
+   * 0.07em of it across 22 capitals is 17px of the column. */
+  .ids td {
+    display: grid; grid-template-columns: minmax(0, 11.5rem) minmax(0, 1fr);
+    gap: 0.75rem; padding: 0.2rem 0; border-bottom: 0;
+  }
+  .ids td::before {
+    content: attr(data-label);
+    font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-3);
+    /* Under everything above: on the narrowest phone the label column is narrower than
+     * the name and a break inside the word is better than a column pushed off the edge. */
+    overflow-wrap: anywhere;
+  }
+  /* The floor under the identifier column was there to stop `anywhere` breaking a name
+   * two characters to a line inside a narrow column. There is no column here. */
+  .ids td.mono { min-width: 0; }
+}
 
 /* ---- the five rows above the mutation fold ---------------------------------------------- */
 /* A reader coming to this page cold, as a school district administrator, stopped at the first row

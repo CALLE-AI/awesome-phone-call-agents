@@ -1884,23 +1884,50 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every call in this run, with its identifiers and fields. '
         'Scrolls sideways on a narrow screen.">'
-        '<table class=ids><thead><tr><th>API id</th>'
-        '<th>provider id (dashboard)</th>'
-        + "".join(f'<th>{esc(f)}</th>' for f in data["fieldOrder"])
-        + '<th>outcome</th></tr></thead><tbody>',
+        '<table class=ids role=table><thead role=rowgroup><tr role=row>'
+        # Both identifiers in one column, stacked. Two columns of masked ids set a
+        # min-content width of 716px in a column that is 616px wide at 1440 and 404px at
+        # 1152, so the last column sat past the scroll edge. They belong together anyway:
+        # a reader checking one call against the billing panel wants that call's two
+        # names one under the other, not two columns apart.
+        '<th role=columnheader>call id (API, then dashboard)</th>'
+        # A break opportunity after each underscore, so `parent_confirmed_aware` breaks
+        # where a reader would break it rather than mid-word. `<wbr>` adds nothing to the
+        # text a screen reader or a copy takes, and it is the difference between a heading
+        # that reads and a heading rendered two characters to a line.
+        + "".join(f'<th role=columnheader>{esc(f).replace("_", "_<wbr>")}</th>'
+                  for f in data["fieldOrder"])
+        + '<th role=columnheader>outcome</th></tr></thead>'
+        '<tbody role=rowgroup>',
     ]
     for call_id, provider, resolution, _src, fields in call_rows:
         cls = {"resolved": "resolved", "undetermined": "undetermined"}.get(resolution or "", "failed")
-        pv = (f'<span class=mono>{esc(mask_id(provider))}</span>'
+        # The dashboard id on the second line, in the secondary ink. Nothing labels the
+        # two lines inside the cell, because the head names them in order and their shapes
+        # differ: the API's identifier carries the `call_` prefix it is issued with, and
+        # the billing panel's is bare hexadecimal.
+        pv = (f'<span class="mono second">{esc(mask_id(provider))}</span>'
               if provider else '<span class=dim>not recorded</span>')
+        # `data-label` is what each cell prints in front of itself once the column heads
+        # are gone, which is the shape this table takes in a container too narrow for it.
         cells = "".join(
-            f'<td data-field="{esc(f)}">'
+            f'<td role=cell data-field="{esc(f)}" data-label="{esc(f)}">'
             + (esc(fields[f]) if fields.get(f) else '<span class=dim>&#183;</span>')
             + '</td>'
             for f in data["fieldOrder"])
-        body.append(f'<tr><td class=mono>{esc(mask_id(call_id))}</td><td>{pv}</td>'
+        # The same break opportunity in the identifier, after the `call_` prefix every
+        # one of them carries. Two lines instead of ten.
+        # Both identifiers inside one element. Where this cell is laid out as a grid,
+        # which is what it becomes in a container too narrow for a table, every child is
+        # an item of that grid: a bare identifier, a `<br>` and a span are three items and
+        # the second identifier ends up in the column the label occupies.
+        body.append('<tr role=row><td role=cell class=mono data-label="call id">'
+                    '<span class=ids-pair>'
+                    + esc(mask_id(call_id)).replace("_", "_<wbr>")
+                    + f'<br>{pv}</span></td>'
                     f'{cells}'
-                    f'<td><span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
+                    f'<td role=cell data-label=outcome>'
+                    f'<span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
     body.append('</tbody></table></div></div>')
     body.append(money_markup(run))
     body.append('</div>')
