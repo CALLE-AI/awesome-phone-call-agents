@@ -20,7 +20,7 @@ Every reservation record requires:
 - party_size (integer)
 - slot (ISO 8601 datetime with timezone)
 - consent (boolean, must be true to dial)
-- status (PENDING_CONFIRM, CONFIRMED, CANCELLED, RESCHEDULED, NO_ANSWER, RECOVERED)
+- status (PENDING_CONFIRM, CONFIRMED, CANCELLED, RESCHEDULED, NO_ANSWER, RECOVERED, NEEDS_REVIEW)
 
 Every waitlist record requires:
 - entry_id (unique identifier)
@@ -31,7 +31,7 @@ Every waitlist record requires:
 - window_end (ISO 8601 datetime)
 - priority (integer, lower is called first)
 - consent (boolean, must be true to dial)
-- status (WAITING, OFFERED, ACCEPTED, DECLINED, NO_ANSWER, EXHAUSTED)
+- status (WAITING, OFFERED, ACCEPTED, DECLINED, NO_ANSWER, EXHAUSTED, NEEDS_REVIEW)
 
 ## Phone Numbers
 

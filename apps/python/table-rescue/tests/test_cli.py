@@ -306,3 +306,21 @@ def test_module_entrypoint_runs():
     )
     assert result.returncode == 0
     assert "table-rescue" in result.stdout
+
+
+def test_run_malformed_phone_fails_cleanly(tmp_path, capsys):
+    data_dir = tmp_path / "data"
+    (data_dir / "fixtures").mkdir(parents=True)
+    (data_dir / "reservations.jsonl").write_text(
+        '{"booking_id": "R-001", "name": "Guest", "phone": "not-a-phone", '
+        '"party_size": 2, "slot": "2026-09-10T19:00:00+07:00", "consent": true}\n',
+        encoding="utf-8",
+    )
+    waitlist_path = data_dir / "waitlist.jsonl"
+    waitlist_path.write_text("", encoding="utf-8")
+    exit_code = main(
+        ["run", "--data-dir", str(data_dir), "--state-dir", str(tmp_path / "state"),
+         "--run-id", "bad-1"]
+    )
+    assert exit_code == 1
+    assert "INVALID_E164" in capsys.readouterr().err

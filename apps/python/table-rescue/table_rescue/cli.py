@@ -135,8 +135,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
-    reservations = load_reservations(reservations_path)
-    waitlist = load_waitlist(waitlist_path)
+    try:
+        reservations = load_reservations(reservations_path)
+        waitlist = load_waitlist(waitlist_path)
+    except SafetyViolation as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     return _run_pipeline(
         args, run_id, reservations, waitlist, state_dir, data_dir, fixture,
         resumed_from=None, refill_cancelled=False,
@@ -332,8 +336,12 @@ def cmd_resume(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    reservations = load_reservations(reservations_path)
-    waitlist = load_waitlist(waitlist_path)
+    try:
+        reservations = load_reservations(reservations_path)
+        waitlist = load_waitlist(waitlist_path)
+    except SafetyViolation as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     # A human reviewed the stopped run: re-eligible the uncertain targets.
     for reservation in reservations:
         if reservation.status in REVIEWABLE_RESERVATION:
