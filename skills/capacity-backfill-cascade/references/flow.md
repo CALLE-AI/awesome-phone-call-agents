@@ -33,5 +33,5 @@ reservations.jsonl      waitlist.jsonl
 | booking CANCELLED | start cascade for that slot |
 | waitlist ACCEPTED | mark slot RECOVERED, stop cascade for the slot |
 | waitlist DECLINED | try the next candidate |
-| NO_ANSWER after retries | escalate in the staff report |
+| NO_ANSWER | stop, escalate in the staff report (never auto-redial) |
 | operator cancels the run | audit CANCELLED_BY_OPERATOR, refuse further dials |

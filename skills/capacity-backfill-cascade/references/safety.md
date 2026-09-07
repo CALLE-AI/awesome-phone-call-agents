@@ -37,7 +37,7 @@ Every waitlist record requires:
 
 Use E.164 numbers only. Documentation and sample data use reserved fictional numbers (e.g., +15550111, +15550112).
 
-Mask phone numbers in all outputs. A common mask shows the country code and last four digits: `+1****1123`.
+Mask phone numbers in all outputs. The app masks to the last two digits (e.g., `+15550111` renders as `+******11`); expose no more than that anywhere.
 
 The full phone number appears only in private runtime state for dialing. Never log full numbers in:
 - Public reports
@@ -45,6 +45,8 @@ The full phone number appears only in private runtime state for dialing. Never l
 - Issue comments
 - README examples
 - Audit logs (use masked form)
+- Live call manifests
+- Provider summaries and errors (sanitize before logging)
 
 ## Consent Verification
 
@@ -79,7 +81,7 @@ arbitrary or insecure origin.
 ## Uncertain Outcomes Stop the Run
 
 Outcomes are classified from the explicit `OUTCOME:` token only. Prose-only
-summaries, unparseable or wrong-family tokens, no-answer after retries, and
+summaries, unparseable or wrong-family tokens, no-answer, and
 provider failures all mark the target NEEDS_REVIEW and stop the run
 (exit code 2) before anyone else is called; keyword hints from the transcript
 appear in the report for the human reviewer only.
@@ -118,7 +120,7 @@ After cancellation:
 
 ## Error Handling
 
-When a call results in `NO_ANSWER` after retries:
+When a call results in the first `NO_ANSWER`:
 - Log the outcome in the audit
 - Include the target in the masked staff report
 - Do not automatically redial without operator intervention
@@ -148,7 +150,7 @@ The workflow stores state in:
 - `state/runs/<run-id>/report.md` - masked staff report
 - `state/runs/<run-id>/state.json` - runtime state (private)
 
-Phone numbers are masked in audit and report. Full numbers exist only in the private state file for dialing.
+Phone numbers are masked in audit, report, manifests, and error messages; provider summaries are sanitized before persistence. Full numbers exist only in the private runtime stores for dialing.
 
 ## Verification
 

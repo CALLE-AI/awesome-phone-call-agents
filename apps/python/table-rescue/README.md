@@ -54,7 +54,9 @@ local); records with `consent: false` are never dialled (SKIPPED_NO_CONSENT); ev
 call goal instructs the agent to identify itself as an automated assistant; reruns
 with the same `--run-id` skip already-dialled targets (SKIPPED_DUPLICATE);
 `table-rescue cancel --run-id <id>` marks a run cancelled and later invocations
-refuse to dial; reports mask numbers to the last two digits.
+refuse to dial; reports, live manifests, and error messages mask phone numbers to
+the last two digits, and provider summaries/errors are sanitized before any
+print or persistence.
 
 ## Setup
 
@@ -188,18 +190,20 @@ phone you control.
 - **Idempotency keys and budgets are proven reliability patterns.** Duplicate-call
   prevention mirrors idempotency-key practice in payment APIs, and the stop-before-dial
   call budget is a circuit-breaker against runaway automation.
-- **Escalate ambiguity to humans.** No-answer and error targets get exactly one retry,
-  then the run stops (exit code 2) with the target marked NEEDS_REVIEW for a staff
-  escalation in the report - human-in-the-loop practice for consequential
-  automated actions, in the spirit of disclosure-by-design that the first
+- **Escalate ambiguity to humans.** The first no-answer or error target stops the
+  run (exit code 2) with the target marked NEEDS_REVIEW for a staff escalation in
+  the report; the same recipient is never redialed automatically - human-in-the-loop
+  practice for consequential automated actions, in the spirit of
+  disclosure-by-design that the first
   consumer phone-calling agent adopted after public debate ([Google Duplex, 2018](https://research.google/blog/google-duplex-an-ai-system-for-accomplishing-real-world-tasks-over-the-phone/)).
 
 ## Limitations
 
 - Cascade runs only for reservations cancelled during the same run.
-- One retry per no-answer target (`--no-answer-retries`); afterwards the target is
-  marked NEEDS_REVIEW and the run stops with exit code 2 and a Needs review report
-  section - uncertain outcomes never advance the cascade on their own.
+- The first no-answer marks the target NEEDS_REVIEW and stops the run with exit
+  code 2 and a Needs review report section - uncertain outcomes never advance the
+  cascade and the same recipient is never auto-redialed; continue only via
+  `table-rescue resume` after review.
 
 ## References
 

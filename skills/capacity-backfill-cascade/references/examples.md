@@ -96,7 +96,7 @@ Date: 2026-09-10T17:00:00+07:00
 
 ## Escalation Required
 The following targets require manual follow-up:
-- R-003 (+1****0103): NO_ANSWER after retries
+- R-003 (+1****0103): NO_ANSWER - stopped for review, never auto-redialed
 ```
 
 ## Example: Consent Handling
