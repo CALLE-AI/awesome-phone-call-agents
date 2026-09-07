@@ -351,6 +351,52 @@ def test_a_schema_using_unimplemented_keywords_is_refused_up_front():
         )
 
 
+def test_a_nested_object_property_is_refused_rather_than_ignored():
+    """`properties` is a supported keyword, and `problems` does not recurse into it.
+
+    That combination let a schema declare a rule and then have it ignored. A property
+    that was itself an object schema passed `assert_supported`, and every rule inside it
+    was then unchecked: the nested enum below accepted any string at all and `problems`
+    returned an empty list, which reads exactly like "this answer is valid". The whole
+    point of re-validating an unsigned webhook's payload is to not do that.
+    """
+    nested = {
+        "type": "object",
+        "properties": {
+            "detail": {
+                "type": "object",
+                "properties": {"severity": {"type": "string", "enum": ["low", "high"]}},
+            },
+        },
+    }
+    with pytest.raises(UnsupportedSchema) as raised:
+        WaveDispatcher(client=None, task_builder=lambda i: "x", result_schema=nested)
+    assert "detail" in str(raised.value)
+
+
+def test_an_array_property_is_refused_because_elements_are_never_checked():
+    """There is no `items` support, so a list of anything at all would pass."""
+    with pytest.raises(UnsupportedSchema) as raised:
+        WaveDispatcher(
+            client=None, task_builder=lambda i: "x",
+            result_schema={"type": "object", "properties": {"tags": {"type": "array"}}},
+        )
+    assert "tags" in str(raised.value)
+
+
+def test_the_schema_this_app_actually_ships_is_still_accepted():
+    """The refusal above is narrow on purpose: it must not break the shipped run.
+
+    `RESULT_SCHEMA` is flat, which is why nothing shipped was affected by the gap. If a
+    later field is nested, this test and the two above disagree, and the disagreement is
+    the point: either flatten the field or teach `problems` to recurse.
+    """
+    from dispatch.validation import assert_supported
+    from firstbell.domain import RESULT_SCHEMA
+
+    assert_supported(RESULT_SCHEMA)
+
+
 def test_the_exported_is_valid_agrees_with_problems_on_both_answers():
     """`is_valid` is exported and nothing in this app calls it.
 
@@ -618,6 +664,71 @@ def test_a_replayed_call_is_not_counted_as_a_call_this_run_placed():
     assert second.results[0].call_id == first.results[0].call_id, "not a replay"
     assert second.results[0].placed_by_this_run is False
     assert len(double.dialled) == 1, "the double dialled again, so this proves nothing"
+
+
+def test_a_corrected_locale_can_be_called_again_the_same_day():
+    """The refusal is right. Being stuck with it until tomorrow was not.
+
+    `default_idempotency_key` keys on `(prefix, student, day)`, and CALL-E fingerprints the
+    request body, so correcting a row and re-running it the same day is the same key with a
+    different body: `idempotency_conflict`, which is a permanent error, so the row is FAILED
+    with no retry and no call. That is the safe direction and it should stay.
+
+    What was missing was any way out. Nothing exposed the prefix, so a family called in a
+    language they do not speak could not be reached again until the next day, on the one
+    field this project argues decides whether the call was understood at all. The way out is
+    a label: it changes the prefix, it is required rather than a bare switch, and it lands in
+    the receipt, because a second call to the same family in one morning needs a reason on
+    the record.
+    """
+    double = CalleDouble(latency_seconds=0.004)
+    double.set_outcome(IN_A, Outcome.answered(GOOD, TALK))
+    day = "2026-09-14"
+
+    wrong = [WorkItem(id="S-1", phones=(IN_A,), locale="en-IN")]
+    first = make(double, idempotency_key=default_idempotency_key("attendance", day)).run(wrong)
+    assert first.results[0].resolution is Resolution.RESOLVED
+    assert len(double.dialled) == 1
+
+    # The office notices the family speaks Tamil and fixes the file.
+    corrected = [WorkItem(id="S-1", phones=(IN_A,), locale="ta-IN")]
+    second = make(double, idempotency_key=default_idempotency_key("attendance", day)).run(corrected)
+    assert second.results[0].resolution is Resolution.FAILED
+    assert second.results[0].failure_code == "idempotency_conflict", (
+        "this test proves nothing unless the second run really is refused: "
+        f"{second.results[0].reason}")
+    assert len(double.dialled) == 1, "the double dialled anyway, so there was no conflict"
+
+    # `--again locale-fix` is this, in the CLI. A different prefix, the same day, the same
+    # student, and the corrected body is accepted.
+    third = make(double, idempotency_key=default_idempotency_key(
+        "attendance-locale-fix", day)).run(corrected)
+    assert third.results[0].resolution is Resolution.RESOLVED
+    assert third.results[0].call_id != first.results[0].call_id, "that was a replay"
+    assert len(double.dialled) == 2, "the corrected call was not placed"
+
+
+def test_the_label_cannot_re_dial_a_previous_days_work():
+    """The label goes in the prefix, not in place of the day.
+
+    Putting the correction where the day sits would make one label a key that has never
+    been used before, for every row, on every day: a file re-run with `--again` a week
+    later would phone every family in it about an absence from last Tuesday.
+    """
+    double = CalleDouble(latency_seconds=0.004)
+    double.set_outcome(IN_A, Outcome.answered(GOOD, TALK))
+    items = [WorkItem(id="S-1", phones=(IN_A,))]
+
+    make(double, idempotency_key=default_idempotency_key(
+        "attendance-locale-fix", "2026-09-14")).run(items)
+    assert len(double.dialled) == 1
+
+    # Same label, same student, a different day: a different key, which is correct, and it
+    # is the day that makes it so.
+    again = make(double, idempotency_key=default_idempotency_key(
+        "attendance-locale-fix", "2026-09-15")).run(items)
+    assert again.results[0].resolution is Resolution.RESOLVED
+    assert len(double.dialled) == 2
 
 
 def test_provenance_is_unknown_rather_than_assumed_when_the_timestamp_is_missing(double):

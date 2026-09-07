@@ -24,6 +24,7 @@ requirement is met.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -301,7 +302,19 @@ class WaveDispatcher:
         if isinstance(call, ItemResult):      # creation failed permanently
             return call
 
-        call_id = call["id"]
+        call_id = call.get("id")
+        if not call_id:
+            # A create() response is documented to carry an id; without one there is
+            # nothing to poll and nothing to recall this call by. CALL-E still accepted
+            # the request, so FAILED would say nobody was reached when the truth is we
+            # cannot tell. This used to be `call["id"]`, which raised KeyError here and
+            # was caught by run()'s generic handler as a dispatcher error, FAILED, with
+            # no id anywhere in the report because none was ever assigned.
+            return ItemResult(
+                item=item, resolution=Resolution.UNDETERMINED,
+                reason="the call was created and the response carried no id, so its "
+                       "outcome could not be read back",
+            )
         with self._lock:
             self._dispatched += 1
             self._in_flight.add(call_id)
@@ -323,7 +336,21 @@ class WaveDispatcher:
         with self._lock:
             self._in_flight.discard(call_id)
 
-        return self._classify(item, final)
+        try:
+            return self._classify(item, final)
+        except Exception as exc:  # noqa: BLE001 - an unexpected shape, not a crash
+            # A response shape _classify does not model (recipients as an object or a
+            # bare string, attempts as a list of strings, and so on) used to raise out of
+            # here after call_id was already discarded from _in_flight above, so it was
+            # caught by run()'s generic handler with no id in scope: a placed, completed,
+            # billed call was reported FAILED with its id gone from every place that
+            # would carry it. The call happened; only the shape was a surprise, so this
+            # is the third outcome, and the id survives it.
+            return ItemResult(
+                item=item, resolution=Resolution.UNDETERMINED, call_id=call_id,
+                reason=f"the call completed and its result could not be read: "
+                       f"{type(exc).__name__}: {redact(str(exc))}",
+            )
 
     def _create_with_retries(self, item: WorkItem) -> dict[str, Any] | ItemResult:
         from calle import CalleAPIError, CalleConnectionError, CalleTimeoutError
@@ -363,13 +390,22 @@ class WaveDispatcher:
                     return ItemResult(item=item, resolution=Resolution.FAILED,
                                       failure_code=err.code, reason=last)
                 self._sleep(self._retry.delay_for(attempt))
-            except (CalleTimeoutError, CalleConnectionError) as err:
+            except (CalleTimeoutError, CalleConnectionError, json.JSONDecodeError) as err:
                 # A timeout is not an answer. These two subclass Exception rather than
                 # CalleAPIError, so they used to walk past the branch above into the
                 # dispatcher's catch-all and be recorded as FAILED, which reads as "nobody
                 # was reached" about a request that may have arrived and started a phone
                 # ringing. That is the one thing this program exists not to do, and the
                 # read side was fixed for it already.
+                #
+                # json.JSONDecodeError joins them for the same reason. The SDK calls
+                # response.json() unconditionally on any 4xx or 5xx before it can build a
+                # CalleAPIError, and a proxy's own error page for a bad gateway or an
+                # unavailable upstream is HTML, not JSON. That body never reached CALL-E's
+                # own error handling, so it used to escape both except clauses here and be
+                # recorded as FAILED after zero retries, for exactly the class of failure
+                # a retry exists to absorb. The status code is not recoverable from this
+                # exception, so it is treated the same as a timeout rather than guessed at.
                 #
                 # `_api_responded` is deliberately not set: nothing answered.
                 last = f"{type(err).__name__}: {redact(str(err))}"

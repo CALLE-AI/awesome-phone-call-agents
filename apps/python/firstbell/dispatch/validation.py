@@ -58,6 +58,37 @@ def assert_supported(schema: dict[str, Any]) -> None:
         if declared is not None and declared not in _TYPES:
             raise UnsupportedSchema(f"property {name!r} has unknown type {declared!r}.")
 
+        # Refuse a rule this checker will not descend into.
+        #
+        # `properties` is in the supported set and `problems()` does not recurse, so a
+        # property that was itself an object or an array schema passed construction and
+        # then had every rule inside it ignored. A nested enum accepted any string at all
+        # and an array accepted objects, integers and None side by side, and `problems()`
+        # returned an empty list, which reads exactly like "this answer is valid".
+        #
+        # The module docstring is the statement of the rule that was being broken: "If a
+        # schema uses something outside the subset, `validate` raises rather than passing
+        # it silently, because a validator that quietly ignores the rule it does not
+        # understand is worse than no validator." A nested block sat inside the keyword set
+        # and outside the implementation, which is the gap between the two.
+        #
+        # `firstbell/domain.RESULT_SCHEMA` is flat, so nothing shipped was affected. This
+        # refuses at construction, which is what `assert_supported` is for, and it is the
+        # next caller who nests a field who needed it.
+        if declared == "object" or "properties" in prop:
+            raise UnsupportedSchema(
+                f"property {name!r} is a nested object schema. This checker validates one "
+                "level, so every rule inside it would be ignored and the answer would come "
+                "back reported as valid. Flatten the field, or teach problems() to recurse "
+                "before you declare it here."
+            )
+        if declared == "array":
+            raise UnsupportedSchema(
+                f"property {name!r} is an array schema. This checker does not look at "
+                "elements, so a list of anything at all would be reported as valid. There "
+                "is no `items` support and pretending otherwise is worse than refusing."
+            )
+
 
 def problems(value: Any, schema: dict[str, Any]) -> list[str]:
     """Return every reason `value` does not satisfy `schema`. Empty means valid."""
