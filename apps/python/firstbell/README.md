@@ -388,6 +388,39 @@ A vendor would publish $0.21 and stop. The reason to publish 31.5 as well is tha
 board is going to ask the question in the meeting, and the answer should already be in the
 run rather than improvised at the table.
 
+## Whether it finishes before the cutoff
+
+An attendance office has a deadline, so a morning has a length. This one is a division and
+the numerator is the only quantity nobody gets to choose: how long a call to a parent
+takes. Eleven real calls answer it, out of their own turn offsets rather than a stopwatch.
+
+```
+python tools/throughput.py --receipts <dir> --pupils 500
+```
+
+```
+11 real call(s) measured from their own turn offsets.
+  mean 51.0s, median 47.0s, longest 106.0s
+  plus one 2s poll interval a call, worst case, so 53.0s a worker a call
+
+500 absences in one morning, against a 75-minute window:
+  concurrency   3    147.5 min   MISSES THE CUTOFF
+  concurrency   4    110.4 min   MISSES THE CUTOFF
+  concurrency  12     37.1 min   fits
+  concurrency  25     17.7 min   fits
+```
+
+The default cap of three misses a nine-fifteen cutoff for a large secondary school, by an
+hour and a quarter, and the number is printed here rather than discovered in week two.
+
+The interesting part is which half of that is the poll loop: two seconds a call against a
+fifty-one second call, so about four per cent of the morning. The cost is the concurrency
+cap, and the cap exists because CALL-E cannot recall a call it has accepted, so the cap is
+the only brake there is. Raising it to 12 fits the window and is one flag. What a
+district is agreeing to when it sets that flag is twelve families dialled at once with no
+way to stop any of them, which is a sentence that belongs in the decision rather than in a
+default.
+
 ## Three outcomes, not two
 
 Most of the design sits in one decision: a call has three endings, and only one of them
@@ -748,7 +781,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 510 tests
+python -m pytest tests/ -q          # 521 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

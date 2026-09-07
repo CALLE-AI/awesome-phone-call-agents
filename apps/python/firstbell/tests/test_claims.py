@@ -556,6 +556,14 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
 # need an artifact that is deliberately not in the repository, so they cannot be made to run
 # on a clean checkout without committing the thing the privacy rules keep out.
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # The throughput figures the README publishes, against the tool run on the receipts
+    # that produced them. The receipts are held outside this repository, so a clone cannot
+    # run this one and should not be told its numbers are wrong. The ten beside it hold the
+    # arithmetic and run anywhere; what is lost while this is quiet is the claim that the
+    # published block is the current output rather than a transcription of an old one.
+    "test_the_readme_block_is_what_the_tool_prints_now":
+        "skips when no run receipts are on the machine, and it is the only check that the "
+        "throughput block in the README is what tools/throughput.py prints today",
     # The cost band's one check that reads the built page rather than the builder. It goes
     # quiet on a checkout with nothing built, which is the same condition every other
     # page-reading gate here skips on. The eight beside it in that file need no page and
