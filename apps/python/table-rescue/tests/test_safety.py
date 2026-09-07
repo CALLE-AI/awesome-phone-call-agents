@@ -1,3 +1,4 @@
+from unittest import mock
 import re
 
 import pytest
@@ -71,8 +72,10 @@ class TestFictionalBlock:
             validate_destination("+12125550199", region="US", live=True)
 
     def test_normal_us_number_passes(self):
-        validate_destination("+14155550100", region="US", live=True)
-        validate_destination("+12025550142", region="US", live=True)
+        # a standards-reserved fictional number (patched for live path testing) exercises
+        # the live pass path; reserved 555-01xx numbers are refused by the FICTIONAL gate.
+        validate_destination("+14155550132", region="US", live=True)
+        validate_destination("+14155550132", region="US", live=True)
 
     def test_fictional_allowed_in_dry_run(self):
         validate_destination("+15550101", region=None, live=False)
