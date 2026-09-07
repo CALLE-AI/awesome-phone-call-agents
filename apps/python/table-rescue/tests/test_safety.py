@@ -23,7 +23,9 @@ class TestSyntax:
     @pytest.mark.parametrize(
         "phone",
         ["", "14155550100", "+04155550100", "+1 415 555 0100", "+1415555010?",
-        "0012345", "+abc", "+14155550100\n"],
+        "0012345", "+abc", "+14155550100\n",
+        # Unicode decimal digits must never pass ASCII-strict E.164.
+        "+84１２３４５６７", "+8٤١٢٣٤٥٦٧", "+84९८७६५४३२"],
     )
     def test_rejects_non_e164(self, phone):
         with pytest.raises(SafetyViolation, match="INVALID_E164"):
@@ -163,5 +165,5 @@ def test_arbitrary_text_is_never_a_valid_destination(text):
         validate_phone_syntax(text)
     except SafetyViolation:
         return
-    # Anything accepted must satisfy the E.164 grammar itself.
-    assert re.fullmatch(r"\+[1-9]\d{6,14}", text) is not None
+    # Anything accepted must satisfy the ASCII-strict E.164 grammar itself.
+    assert re.fullmatch(r"\+[1-9][0-9]{6,14}", text) is not None

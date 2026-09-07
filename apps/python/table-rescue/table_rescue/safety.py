@@ -11,7 +11,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-E164_RE = re.compile(r"\+[1-9]\d{6,14}")
+# ASCII-strict on purpose: \d would also match Unicode decimal digits
+# (fullwidth, Arabic-Indic, Devanagari), which are not valid E.164.
+E164_RE = re.compile(r"\+[1-9][0-9]{6,14}")
 
 # region -> (calling code, min national digits, max national digits)
 REGION_CALLING_CODES: dict[str, tuple[str, int, int]] = {
