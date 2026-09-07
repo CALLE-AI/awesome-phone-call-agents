@@ -61,3 +61,26 @@ def test_render_report_estimates_protected_revenue():
     )
     plain = render_report("run-1", [], [reservation], [])
     assert "Estimated revenue protected" not in plain
+
+
+def test_report_needs_review_section_and_resumed_from():
+    reservation = Reservation(
+        booking_id="R-001", name="Guest", phone="+15550101", party_size=2,
+        slot="2026-09-10T19:00:00+07:00", consent=True,
+        status=ReservationStatus.NEEDS_REVIEW,
+    )
+    outcomes = [
+        CallOutcome(
+            run_id="run-2", target_id="R-001", status=CallStatus.UNCERTAIN,
+            notes="guest mumbled [hint: confirm]",
+            uncertainty_reason="UNPARSEABLE_SUMMARY",
+        )
+    ]
+    report = render_report(
+        "run-2", outcomes, [reservation], [], resumed_from="run-1"
+    )
+    assert "Resumed from run: run-1" in report
+    assert "Needs review" in report
+    assert "R-001" in report
+    assert "UNPARSEABLE_SUMMARY" in report
+    assert "hint: confirm" in report

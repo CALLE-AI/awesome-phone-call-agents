@@ -13,6 +13,7 @@ DIALLED_STATUSES = {
     "ACCEPTED",
     "DECLINED",
     "ERROR",
+    "UNCERTAIN",
 }
 
 
@@ -65,6 +66,7 @@ class AuditLog:
             "notes": outcome.notes,
             "transcript_ref": outcome.transcript_ref,
             "call_cost_id": outcome.call_cost_id,
+            "uncertainty_reason": outcome.uncertainty_reason,
         }
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")

@@ -1,3 +1,6 @@
+import tempfile
+from pathlib import Path
+
 from table_rescue.models import CallOutcome, CallStatus
 from table_rescue.stores import (
     AuditLog,
@@ -32,3 +35,16 @@ def test_audit_log_tracks_dials_and_cancellation(tmp_path):
         CallOutcome(run_id="run-1", target_id="-", status=CallStatus.CANCELLED_BY_OPERATOR)
     )
     assert audit.is_cancelled()
+
+
+def test_dialed_targets_counts_uncertain():
+    audit = AuditLog(Path(tempfile.mkdtemp()) / "runs" / "run-1")
+    audit.append(
+        CallOutcome(
+            run_id="run-1", target_id="R-001", status=CallStatus.UNCERTAIN,
+            uncertainty_reason="UNPARSEABLE_SUMMARY",
+        )
+    )
+    assert audit.dialed_targets() == {"R-001"}
+    record = audit.records()[0]
+    assert record["uncertainty_reason"] == "UNPARSEABLE_SUMMARY"
