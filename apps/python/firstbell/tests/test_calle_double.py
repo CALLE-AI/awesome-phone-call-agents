@@ -646,3 +646,68 @@ def test_the_numbers_this_repository_uses_are_still_accepted(client):
         created = client.calls.create(task="Ask.", recipients=[{"phones": [phone]}],
                                       result_schema=None)
         assert created["id"]
+
+
+def test_the_double_declares_which_sdk_release_it_was_checked_against():
+    """A double carrying only its own version cannot say what it is pretending to be.
+
+    `tools/double_conformance.py` compares these shapes against real API responses, and
+    that comparison is only meaningful against a named release. `CONFORMS_TO` is that
+    name, and it has to be the release this repository actually pins, or the double is
+    declaring conformance to something nobody here has run.
+    """
+    from pathlib import Path
+
+    import calle_double
+
+    assert calle_double.__version__, "the double has no version of its own"
+    assert calle_double.CONFORMS_TO.startswith("calle-ai=="), (
+        f"CONFORMS_TO is {calle_double.CONFORMS_TO!r}, which does not name an SDK release"
+    )
+    pinned = [
+        line.strip()
+        for line in (Path(__file__).resolve().parent.parent / "requirements.txt")
+        .read_text(encoding="utf-8").splitlines()
+        if line.strip().startswith("calle-ai==")
+    ]
+    assert pinned == [calle_double.CONFORMS_TO], (
+        f"the double says it conforms to {calle_double.CONFORMS_TO} and "
+        f"requirements.txt pins {pinned}"
+    )
+    assert calle_double.__version__ not in calle_double.CONFORMS_TO, (
+        "the double's own version and the SDK release it mirrors are the same string, "
+        "which is the confusion the two fields exist to prevent"
+    )
+
+
+def test_the_double_is_installable_on_its_own():
+    """The claim is that a developer can take this without taking the app.
+
+    Checked by reading the packaging rather than by building a wheel in a unit test. The
+    trap it exists for is real and was shipped once: `packages.find` with `where = ["."]`,
+    in a pyproject that sits inside the package directory, looks for `calle_double/` under
+    `calle_double/` and builds an empty wheel that imports nothing.
+    """
+    import re
+    from pathlib import Path
+
+    import calle_double
+
+    text = (Path(__file__).resolve().parent.parent / "calle_double" / "pyproject.toml"
+            ).read_text(encoding="utf-8")
+    assert 'name = "calle-double"' in text
+    assert 'packages = ["calle_double"]' in text, (
+        "the distribution does not name the package it ships"
+    )
+    assert re.search(r'^calle_double = "\."$', text, re.M), (
+        "the package directory is not mapped to the pyproject's own directory, so the "
+        "build looks for calle_double/calle_double/ and ships nothing"
+    )
+    assert 'version = { attr = "calle_double.__version__" }' in text, (
+        "the version is written in the packaging as well as in the package, so the two "
+        "can disagree"
+    )
+    assert 'email = "kesavk659@gmail.com"' in text
+    for line in text.splitlines():
+        if line.startswith("version = ") and "attr" not in line:
+            raise AssertionError(f"a second, literal version: {line}")

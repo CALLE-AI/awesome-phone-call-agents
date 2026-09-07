@@ -28,3 +28,10 @@ tools/site/figures/
 # so they cannot be committed by accident, and named here rather than guessed at.
 local_dev.db
 profile-claim.lock
+
+# setuptools leaves these beside calle_double/pyproject.toml when the double is built or
+# installed with -e. They are build output describing the tree they were built from, so a
+# committed one goes stale the moment the version or the dependency list changes.
+*.egg-info/
+build/
+dist/

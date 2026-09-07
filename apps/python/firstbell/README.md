@@ -747,9 +747,25 @@ python -m calle_double.server --port 8787
 export CALLE_BASE_URL=http://127.0.0.1:8787
 ```
 
-**It is the reusable half of this entry.** A CALL-E written from the published API, mounted
-on the SDK's own transport, with a record proving it matches production, is the thing
-another developer on this platform can take and use tomorrow. It has its own README at
+**It is the reusable half of this entry, and it installs on its own.** "Take it
+tomorrow" used to mean copying a directory, which is not a claim anybody can act on. It is
+now a distribution:
+
+```bash
+pip install -e apps/python/firstbell/calle_double
+python -c "import calle_double; print(calle_double.__version__, calle_double.CONFORMS_TO)"
+# 0.1.0 calle-ai==0.7.0
+```
+
+Two version numbers, on purpose. `__version__` is this double. `CONFORMS_TO` is the
+`calle-ai` release whose real API responses these shapes were compared against, which is
+the question a user of a test double asks first: not how new it is, but what it is
+pretending to be. A test fails if that string stops matching the release
+`requirements.txt` pins.
+
+A CALL-E written from the published API, mounted on the SDK's own transport, with a record
+proving it matches production, is the thing another developer on this platform can take
+and use. It has its own README at
 [`calle_double/README.md`](calle_double/) covering both ways to mount it, what it answers,
 what is a stub, and the three claims about it that are not true. Its credential is
 `evidence/api-shape.json` and its gate is one command:
@@ -823,7 +839,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 544 tests
+python -m pytest tests/ -q          # 546 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
