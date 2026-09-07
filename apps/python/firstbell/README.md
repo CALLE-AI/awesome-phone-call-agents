@@ -902,12 +902,13 @@ python -m pytest tests/ -q          # 598 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**591 is the number collected, not the number that will pass on your machine.** Some of
+**598 is the number collected, not the number that will pass on your machine.** Some of
 these gates need something this repository cannot ship: the twelve call recordings, which
 are held outside the tree because the maintainer of this list requires that, a built copy
 of the page under `out/`, or a gate report from `node tools/gates/run.mjs`. Those skip with
-a reason that names what is missing, so a clean checkout reports something like `561
-passed, 30 skipped` and the two add up to the number above. A skip here is a
+a reason that names what is missing. A checkout of this commit into an empty directory
+reported `581 passed, 17 skipped`, measured rather than estimated, and the two add up to
+the number above. A skip here is a
 could-not-measure rather than a pass, which is the distinction the rest of this entry is
 about, and `-rs` prints each one so nothing hides behind a dot.
 
