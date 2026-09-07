@@ -1,0 +1,32 @@
+{
+  "name": "calle-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A corpus of real CALL-E API responses and a checker that reports which of them a project's fixtures never contain.",
+  "scripts": {
+    "probe": "node --env-file-if-exists=.env --import tsx scripts/probe.ts",
+    "typecheck": "tsc --noEmit",
+    "fabrication-ab": "node --env-file-if-exists=.env --import tsx scripts/fabrication-ab.ts",
+    "no-escape-hatch": "node --env-file-if-exists=.env --import tsx scripts/no-escape-hatch.ts",
+    "meter": "node --env-file-if-exists=.env --import tsx scripts/meter.ts",
+    "mask": "node --import tsx src/mask.ts",
+    "docs": "node --import tsx src/docs.ts",
+    "docs:check": "node --import tsx src/docs.ts --check",
+    "peek": "node --env-file-if-exists=.env --import tsx src/peek.ts",
+    "replay": "node --import tsx src/replay.ts",
+    "watch": "node --env-file-if-exists=.env --import tsx src/watch.ts",
+    "ledger": "node --env-file-if-exists=.env --import tsx src/ledger-report.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "headroom": "node --env-file-if-exists=.env --import tsx src/headroom.ts",
+    "live": "node --env-file-if-exists=.env --import tsx scripts/live-connected.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

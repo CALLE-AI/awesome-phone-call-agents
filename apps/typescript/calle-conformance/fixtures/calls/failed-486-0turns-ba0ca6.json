@@ -1,0 +1,56 @@
+{
+  "id": "call_8bb66f0082ba0ca6",
+  "object": "call_task",
+  "status": "failed",
+  "task": "Begin the call by saying, word for word: This is an automated call from an AI assistant. Then ask one question: can you hear me clearly? Accept whatever answer you get, thank them, and end the call. Do not say anything else.",
+  "recipients": [
+    {
+      "id": "rcp_93ac656def8a9c6d",
+      "phones": [
+        "+12025550142"
+      ],
+      "locale": "en-US",
+      "region": "US",
+      "status": "failed",
+      "structuredResult": {
+        "heard_clearly": "unknown"
+      },
+      "summary": "The call did not connect and the recipient may be busy or unavailable; you can confirm retrying in about 45 minutes, provide a different retry time, or ask to retry immediately.",
+      "attempts": [
+        {
+          "id": "att_cac10a623350fccc",
+          "phone": "+12025550142",
+          "status": "failed",
+          "startedAt": "2026-03-04T14:00:00",
+          "completedAt": "2026-03-04T14:00:00",
+          "summary": "The call did not connect and the recipient may be busy or unavailable; you can confirm retrying in about 45 minutes, provide a different retry time, or ask to retry immediately.",
+          "transcriptTurns": [],
+          "providerCallId": "f9c827c5750624ed0a7fbbaabc3ff1c9",
+          "failureCode": "486",
+          "failureMessage": null
+        }
+      ]
+    }
+  ],
+  "structuredResult": null,
+  "summary": "The call did not connect and the recipient may be busy or unavailable; you can confirm retrying in about 45 minutes, provide a different retry time, or ask to retry immediately.",
+  "taskCompleted": false,
+  "completionConfidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "evidence": [
+    "The call ended with no answer.",
+    "No speech or transcript was captured.",
+    "The recorded call duration was 0 seconds."
+  ],
+  "metadata": {
+    "run": "corpus",
+    "probe": "live-connected",
+    "requiredLine": "This is an automated call from an AI assistant."
+  },
+  "failureCode": "call_failed",
+  "failureMessage": "calling task status=NO ANSWER (Hangup by: bot)",
+  "createdAt": "2026-03-04T17:59:08.961000Z",
+  "completedAt": "2026-03-04T18:00:44.229000Z"
+}
