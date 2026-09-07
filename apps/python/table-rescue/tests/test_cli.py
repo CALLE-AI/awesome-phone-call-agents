@@ -283,6 +283,18 @@ def test_resume_missing_source_run_fails_cleanly(tmp_path, capsys):
     assert "no audit log" in capsys.readouterr().err
 
 
+def test_resume_refuses_operator_cancelled_run(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    state_dir = tmp_path / "state"
+    main(["cancel", "--run-id", "stopped-1", "--state-dir", str(state_dir)])
+    exit_code = main(
+        ["resume", "--run-id", "stopped-1",
+         "--data-dir", str(data_dir), "--state-dir", str(state_dir)]
+    )
+    assert exit_code == 1
+    assert "cancelled by the operator" in capsys.readouterr().err
+
+
 def test_module_entrypoint_runs():
     import subprocess
     import sys

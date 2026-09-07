@@ -307,11 +307,19 @@ REVIEWABLE_WAITLIST = {WaitlistStatus.NEEDS_REVIEW, WaitlistStatus.NO_ANSWER}
 def cmd_resume(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir)
     state_dir = Path(args.state_dir)
-    source_audit = AuditLog(state_dir / "runs" / args.run_id)
-    if not source_audit.path.exists():
+    source_audit_path = state_dir / "runs" / args.run_id / "audit.jsonl"
+    if not source_audit_path.exists():
         print(
             f"ERROR: no audit log for run {args.run_id} under "
             f"{state_dir / 'runs'}.",
+            file=sys.stderr,
+        )
+        return 1
+    source_records = AuditLog(state_dir / "runs" / args.run_id).records()
+    if any(row["status"] == "CANCELLED_BY_OPERATOR" for row in source_records):
+        print(
+            f"ERROR: run {args.run_id} was cancelled by the operator; "
+            "resume refused.",
             file=sys.stderr,
         )
         return 1
