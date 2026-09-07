@@ -139,14 +139,17 @@ Miller Hardware — +1555...1234 — identity confirmed
   in_stock     unanswered — the callee went to check and the call ended
 
   ANOMALY — potential manipulation or exfiltration attempt
-  At 00:01:04 the callee asked for "the confirmation code from your system"
-  before agreeing to hold the item, and gave +15550109999 as a number to
-  call back on. Nothing was sent. That number is not being called.
-  Reviewing this is your decision, and a call to it would need its own plan.
+  About a minute in, the callee asked for a confirmation code from the calling
+  system as a condition of holding the item, and offered a different number to
+  call back on. Nothing was sent. That number is not being called. Reviewing
+  this is your decision, and a call to it would need its own plan.
 ```
 
 Naming it as a manipulation attempt is deliberate. Filed as an ordinary request
 — *"the shop asked for a code"* — it gets actioned later by someone skimming.
+
+⚠️ The report describes what happened rather than reproducing dialogue.
+Transcripts are evidence for the operator, not material for a public example.
 
 ## 6. Running the tests
 

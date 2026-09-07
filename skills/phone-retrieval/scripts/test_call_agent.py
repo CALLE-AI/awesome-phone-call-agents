@@ -388,6 +388,54 @@ def test_no_real_numbers_in_this_suite(tmp):
     check(not stray, f"no non-reserved phone-shaped fixtures (found {stray})")
 
 
+def test_state_on_disk_is_masked_too(tmp):
+    """"Their own machine" is not a security boundary.
+
+    A sidecar is backed up, synced, screenshotted and pasted into issues like
+    any other file. A number quoted back inside a transcript turn is the same
+    disclosure wherever it sits.
+    """
+    ca, _, _ = load(tmp)
+    ca.save_state("pTEST", {
+        "plan_id": "pTEST",
+        "confirm_token": "TOKEN-KEEP-ME",
+        "to_phones": ["+442079460123"],
+        "goal_sent": "Call +442079460123. Alt 07700 900123.",
+        "transcript": [{"t": "00:00:03", "speaker": "callee",
+                        "text": "Ring us on (212) 555-0100."}],
+        "raw": {"activity": [{"msg": "dialed 442079460123"}]},
+    })
+    blob = (Path(tmp) / "pTEST.json").read_text(encoding="utf-8")
+
+    check("+442079460123" not in blob, "the destination is not stored in full")
+    check("07700 900123" not in blob, "nor a number quoted inside the goal")
+    check("(212) 555-0100" not in blob, "nor one inside a transcript turn")
+    check("442079460123" not in blob, "nor one inside a nested activity entry")
+    check(
+        "TOKEN-KEEP-ME" in blob,
+        "the confirm token IS kept: run needs it, and it never reaches output",
+    )
+
+
+def test_state_full_opt_out_keeps_the_audit_trail(tmp):
+    """An operator who needs to know which business a four-day-old record
+    belongs to can have it. Off by default, and a deliberate choice."""
+    os.environ["CALL_STATE_DIR"] = tmp
+    os.environ["CALL_STATE_FULL"] = "1"
+    for name in [m for m in sys.modules if m.startswith(("call_agent", "fake_provider"))]:
+        del sys.modules[name]
+    try:
+        ca = importlib.import_module("call_agent")
+        ca.save_state("pFULL", {"to_phones": ["+442079460123"]})
+        blob = (Path(tmp) / "pFULL.json").read_text(encoding="utf-8")
+        check(
+            "+442079460123" in blob,
+            "CALL_STATE_FULL=1 keeps the unmasked number locally",
+        )
+    finally:
+        os.environ.pop("CALL_STATE_FULL", None)
+
+
 def test_argv_redacts_the_token(tmp):
     ca, _, _ = load(tmp)
     argv = ca._redact_argv([

@@ -36,10 +36,18 @@ not dial; only the run step places a call, and only after a human approves it.
 
 It writes local state — one record per plan and per run, plus the call result —
 to `.calle-runs/` by default (`CALL_STATE_DIR` to change it). These files are
-created owner-only, and they hold the transcript. ⚠️ **Owner-only is a POSIX
-guarantee.** On Windows the files are created with whatever the filesystem
-gives them; if that matters to you, put the state directory somewhere with
-appropriate access control.
+created owner-only and they hold the transcript.
+
+**Phone numbers are masked on disk as well as in output.** A sidecar is backed
+up, synced, screenshotted and pasted into issues like any other file, so a
+number quoted back inside a transcript turn is the same disclosure wherever it
+sits. Set `CALL_STATE_FULL=1` if you need the unmasked number in your own
+records — for instance to tell which of several businesses a four-day-old
+record belongs to. It is off by default.
+
+⚠️ **Owner-only is a POSIX guarantee.** On Windows the files are created with
+whatever the filesystem gives them; if that matters to you, put the state
+directory somewhere with appropriate access control.
 
 ## Setup
 

@@ -337,33 +337,62 @@ def _redact_argv(argv: list[str]) -> list[str]:
 def sanitize_for_output(value: Any) -> Any:
     """Recursively mask destinations and scrub numbers from free text.
 
-    Applied to everything this tool prints. Local state is the operator's own
-    record and keeps what it needs; stdout is a different surface -- it lands
-    in scrollback, in screenshots, in chat threads and in whatever consumes
-    this tool's JSON -- so it carries masked numbers and no spend credential.
-
-    Keys whose values are phone numbers are masked; string values are swept
-    for E.164-shaped runs, which is what catches a number quoted back inside a
-    summary, a transcript turn or a goal.
+    Applied to everything this tool prints. Drops the spend credential
+    entirely: stdout lands in scrollback, screenshots, chat threads and
+    whatever consumes this tool's JSON.
     """
+    return _walk(value, drop_secrets=True)
+
+
+# Local state is masked by default too. The sidecar is the operator's own
+# record, but "their own machine" is not a security boundary: it is backed up,
+# synced, screenshotted and pasted into issues like anything else, and a
+# transcript quoting a number back is the same disclosure wherever it sits.
+#
+# Set CALL_STATE_FULL=1 to keep unmasked numbers locally. That is a deliberate
+# choice with a real use -- an operator who needs to know which of several
+# businesses a four-day-old record belongs to -- and it is off by default.
+STATE_FULL = os.environ.get("CALL_STATE_FULL") == "1"
+
+
+def sanitize_for_storage(value: Any) -> Any:
+    """Mask phone shapes in anything written to disk.
+
+    Keeps `confirm_token`: `run` needs it, it is already excluded from every
+    printed surface, and it is pruned separately. Everything else is treated
+    exactly as printed output is.
+    """
+    if STATE_FULL:
+        return value
+    return _walk(value, drop_secrets=False)
+
+
+def _walk(value: Any, *, drop_secrets: bool) -> Any:
+    """Shared traversal. Keys whose values are numbers are masked; every
+    string is swept for phone-shaped runs, which is what catches a number
+    quoted back inside a summary, a transcript turn, a goal or an activity
+    entry."""
     PHONE_KEYS = {"to_phones", "phone", "to", "recipient_phone", "number"}
     SECRET_KEYS = {"confirm_token"}
 
     if isinstance(value, dict):
         out: dict = {}
         for k, v in value.items():
-            if k in SECRET_KEYS:
+            if drop_secrets and k in SECRET_KEYS:
                 continue
-            if k in PHONE_KEYS:
-                if isinstance(v, list):
-                    out[k] = [mask_phone(p) for p in v]
-                else:
-                    out[k] = mask_phone(v)
+            if k in SECRET_KEYS:
+                out[k] = v
+            elif k in PHONE_KEYS:
+                out[k] = (
+                    [mask_phone(p) for p in v]
+                    if isinstance(v, list)
+                    else mask_phone(v)
+                )
             else:
-                out[k] = sanitize_for_output(v)
+                out[k] = _walk(v, drop_secrets=drop_secrets)
         return out
     if isinstance(value, list):
-        return [sanitize_for_output(v) for v in value]
+        return [_walk(v, drop_secrets=drop_secrets) for v in value]
     if isinstance(value, str):
         return _redact_text(value)
     return value
@@ -768,7 +797,12 @@ def _write_json(path: Path, data: dict) -> None:
 
     chmod after rename leaves a window in which the file exists at the
     process umask. mkstemp creates 0600 and never widens.
+
+    Everything written passes through the storage sanitiser first, so a
+    number cannot reach disk in one field because it was quoted back in
+    another.
     """
+    data = sanitize_for_storage(data)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     try:
         STATE_DIR.chmod(0o700)
