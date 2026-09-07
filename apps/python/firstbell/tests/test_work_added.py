@@ -62,7 +62,18 @@ def test_the_added_cost_is_priced_at_the_lead_grade_and_not_the_desk_grade():
         "the post that answers a safeguarding callback costs more than the post whose "
         "time the calls save, which is the entire finding")
     s = summarise(_wave(), live=True, staff=desk, escalation_staff=lead)
-    assert s.escalation_cost_per_call_lead_minute == 0.25 * (lead.hourly / 60.0)
+    # Per billed attempt, which is the denominator the saving it is subtracted from uses.
+    # This fixture has more attempts than answers, so the two denominators give different
+    # numbers and the test would pass on either only by accident.
+    assert s.calls_placed != s.answered, (
+        "the fixture no longer distinguishes attempts billed from calls answered, so "
+        "this test can no longer tell which denominator the cost is on")
+    assert s.escalation_cost_per_call_lead_minute == (
+        s.net_new_escalations / s.calls_placed) * (lead.hourly / 60.0)
+    assert s.escalation_cost_per_call_lead_minute != (
+        s.net_new_escalations / s.answered) * (lead.hourly / 60.0), (
+        "the cost is on the answered-call denominator again, which is the mismatch a "
+        "district finance office found: it is taken off a per-attempt saving")
 
 
 def test_the_printed_ceiling_falls_once_the_added_work_is_paid_for():

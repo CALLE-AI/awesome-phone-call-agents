@@ -251,27 +251,24 @@ def test_the_three_minute_path_settles_what_it_says_it_settles():
         f"and MUTATIONS.md has {real_rows}"
     )
 
-    # The two money figures, against the program that computes them.
-    from dispatch import ItemResult, Resolution, WorkItem
-    from firstbell.domain import StaffCost, summarise
+    # The two money figures, from the run the first screen names rather than from a
+    # fixture built here. A hand-built wave agreed with the demo run for as long as both
+    # divided by the wrong thing, and stopped agreeing the moment one of them was fixed,
+    # which is a test asserting its own arithmetic and not the program's.
+    import sys
+    sys.path.insert(0, str(APP / "tools"))
+    from money_across_runs import demo_row
 
-    answered = [
-        ItemResult(item=WorkItem(id=f"S-{n}", phones=("+15550100001",)),
-                   resolution=Resolution.RESOLVED,
-                   structured_result={"parent_confirmed_aware": "yes"},
-                   attempts_made=1)
-        for n in range(4)
-    ]
-    computed = summarise(
-        answered, calls_placed=8,
-        staff=StaffCost.us_school_office(),
-        escalation_staff=StaffCost.us_school_safeguarding_lead(),
-    )
-    crossover = computed.escalation_break_even_rate
+    demo = demo_row()
+    crossover = demo["crossover_per_100"]
     assert crossover is not None, "the crossover rate is no longer computed"
-    assert f"{crossover * 100:.1f}" in path, (
+    assert f"{crossover:.1f}" in path, (
         f"the first screen quotes a crossover the program does not compute "
-        f"({crossover * 100:.1f} per 100)"
+        f"({crossover:.1f} per 100)"
+    )
+    assert f"${demo['net_ceiling']:,.2f} a call" in path, (
+        f"the first screen does not quote the demo run's net ceiling "
+        f"(${demo['net_ceiling']:,.2f} a call)"
     )
 
 

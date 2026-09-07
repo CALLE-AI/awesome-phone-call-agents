@@ -467,7 +467,7 @@ class ImpactSummary:
 
     @property
     def escalation_cost_per_call_lead_minute(self) -> float | None:
-        """What the rule adds per call, for every minute one callback takes a lead.
+        """What the rule adds per billed attempt, for every minute one callback takes.
 
         Same shape as `break_even_per_call_minute` and for the same reason: how long a
         safeguarding callback takes is a property of a school and not of this software, so
@@ -475,22 +475,50 @@ class ImpactSummary:
 
         It is subtracted from the break-even rather than reported beside it, because a
         ceiling that ignores the labour the rule creates is a ceiling that is too high.
+
+        The denominator is `calls_placed`, the attempts CALL-E billed, and it used to be
+        `answered`. Somebody reading this as a district finance office found the mismatch:
+        the saving above is per billed attempt, this was per answered call, and money
+        subtracted from money on a different denominator is not money. Both figures moved
+        in this project's favour when it was corrected, from a $0.21 ceiling to $0.35,
+        which is stated here because a correction that happens to flatter the corrector
+        should be easy to check rather than quietly made.
+
+        `net_new_escalation_rate` is still per answered call, because a rota is staffed
+        against answered calls, and it is still what the crossover is expressed in.
         """
-        rate = self.net_new_escalation_rate
-        if rate is None or self.escalation_staff is None:
+        # No answered call, no cost, and that is the third outcome rather than a zero:
+        # a run nobody picked up on has no evidence about how much safeguarding work the
+        # rule creates, and the arithmetic would happily print $0.00 and imply it creates
+        # none. `answered` gates it; `calls_placed` divides it.
+        if (self.escalation_staff is None or not self.calls_placed
+                or not self.answered):
             return None
-        return rate * (self.escalation_staff.hourly / 60.0)
+        return (self.net_new_escalations / self.calls_placed) * (
+            self.escalation_staff.hourly / 60.0)
 
     @property
     def escalation_break_even_rate(self) -> float | None:
         """The net-new escalation rate at which the saving turns into a loss.
 
-        Set the two quantities above equal to each other and the minutes cancel, as long
-        as a callback is given the same number of minutes as a manual attempt, which is
-        the assumption the ceiling is already published under. What is left is a ratio of
-        two wages and nothing else:
+        Two totals, set equal to each other. The desk time this run removes is the
+        attempts it removed at the secretary's wage; the time it creates is the net-new
+        escalations at the counsellor's wage. Give a callback the same number of minutes
+        as a manual attempt, which is the assumption the ceiling is already published
+        under, and the minutes cancel:
 
-            (attempts removed / attempts billed) x secretary wage / lead wage
+            net-new escalations x lead wage = attempts removed x secretary wage
+
+        Divide through by answered calls, because a rate per answered call is what a rota
+        is staffed against, and what is left is:
+
+            (attempts removed / answered calls) x secretary wage / lead wage
+
+        The divisor used to be `calls_placed`, which is the attempts billed, and that made
+        this the crossover between a per-attempt saving and a per-answered-call cost:
+        two unlike rates set equal to each other. It read 31.5 per 100 for the demo run
+        and the honest figure is 50.4, so the published crossover was telling a buyer the
+        saving ended sooner than it does.
 
         A ceiling published without its crossover invites the reader to assume there is
         not one. There is: above this rate the callbacks the safeguarding rule creates
@@ -503,9 +531,9 @@ class ImpactSummary:
         removes fewer attempts, and the rate it can absorb falls with them.
         """
         if (self.staff is None or self.escalation_staff is None
-                or not self.calls_placed or not self.escalation_staff.hourly):
+                or not self.answered or not self.escalation_staff.hourly):
             return None
-        return ((self.attempts_resolved / self.calls_placed)
+        return ((self.attempts_resolved / self.answered)
                 * self.staff.hourly / self.escalation_staff.hourly)
 
     @property
@@ -713,13 +741,25 @@ class ImpactSummary:
                     "                        without the safeguarding rule, so they are "
                     "work",
                     "                        that did not exist before this run",
-                    f"    added               {cur}{added:,.2f} per call, for every "
-                    "minute one callback",
-                    "                        takes the safeguarding lead",
+                    f"    added               {cur}{added:,.2f} per billed attempt, "
+                    "for every minute one",
+                    "                        callback takes the safeguarding lead",
                     f"    ceiling after it    {cur}{left:,.2f} a call, at 3 minutes for "
                     "each of the two",
                     f"                        (from {cur}{ceiling * 3:,.2f}: the line "
                     "above ignores this)",
+                    # The same figure in total dollars, so nobody has to trust the two
+                    # rates and the subtraction. This is the line a finance office reads.
+                    f"                        {self.attempts_resolved} attempt(s) removed "
+                    f"at 3 minutes is {cur}"
+                    f"{self.attempts_resolved * 3 * self.staff.hourly / 60.0:,.2f} of "
+                    "desk time,",
+                    f"                        less {net} callback(s) at 3 minutes, "
+                    f"{cur}"
+                    f"{net * 3 * self.escalation_staff.hourly / 60.0:,.2f} of counsellor "
+                    "time,",
+                    f"                        over the {self.calls_placed} attempt(s) "
+                    "billed",
                 ]
                 crossover = self.escalation_break_even_rate
                 if crossover is not None:

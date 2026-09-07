@@ -122,16 +122,20 @@ def test_the_entry_leads_with_one_number_and_it_is_the_net_one():
 
 
 def test_the_headroom_is_the_two_numbers_divided_and_not_a_claim():
-    """Four times, and it is a division a reader can do in their head.
+    """Seven times, and it is a division a reader can do in their head.
 
     Written as words in the README rather than as a figure, because a figure would be a
     fifth place the arithmetic lives. The test does the division instead.
+
+    It said four times while the net ceiling was $0.21, which subtracted a cost per
+    answered call from a saving per billed attempt. Putting both on the attempts CALL-E
+    bills for raised the ceiling to $0.35 and the headroom with it.
     """
     demo = next(row for row in rows(None) if row["run"] == "the demo")
     headroom = demo["net_ceiling"] / PRICE["observed"]["per_call_usd"]
-    assert 4.0 <= headroom < 5.0, (
-        f"the README says a little over four times and the division gives {headroom:.2f}")
-    assert "four times the headroom" in README
+    assert 7.0 <= headroom < 8.0, (
+        f"the README says a little over seven times and the division gives {headroom:.2f}")
+    assert "seven times the headroom" in README
 
 
 def test_the_tool_runs_and_needs_no_receipts_and_no_account():

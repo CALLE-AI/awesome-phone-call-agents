@@ -80,15 +80,27 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
 
     gross = None if not placed else (
         (removed / placed) * (desk.hourly / 60.0) * MINUTES_AN_ATTEMPT)
+    # The rate a rota is staffed against is per answered call. The cost subtracted from a
+    # per-billed-attempt saving has to be per billed attempt, or the subtraction is
+    # between two unlike rates, which is what it was until a district finance office read
+    # it. Both quantities are published, each labelled with its own denominator.
     rate = None if not answered else net_new / answered
-    added = None if rate is None else rate * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT
+    # Gated on `answered` and divided by `placed`, which is what `ImpactSummary` does and
+    # for the reason this entry is built on: a run nobody picked up on has no evidence
+    # about how much safeguarding work the rule creates, and the division would print
+    # $0.00 and imply it creates none.
+    added = None if (not placed or not answered) else (
+        (net_new / placed) * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT)
     bound = upper_bound(net_new, answered) if answered else None
-    worst = None if (bound is None or gross is None) else (
-        gross - bound * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT)
-    # Where the saving stops. The minutes cancel, so this is a ratio of two ratios and
-    # not a constant: `firstbell/domain.py` derives the same number the same way.
-    crossover = None if not placed else (
-        (removed / placed) * desk.hourly / lead.hourly)
+    # The worst case runs on the same denominator: the upper bound is a rate per answered
+    # call, so it becomes a count of callbacks before it is charged against the attempts.
+    worst = None if (bound is None or gross is None or not placed) else (
+        gross - (bound * answered / placed) * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT)
+    # Where the saving stops, from the two totals: net-new x lead wage = removed x desk
+    # wage. Divided through by answered calls, because that is the denominator a rota is
+    # staffed on. `firstbell/domain.py` derives the same number the same way.
+    crossover = None if not answered else (
+        (removed / answered) * desk.hourly / lead.hourly)
     return {
         "calls": calls,
         "attempts_billed": placed,
@@ -232,9 +244,11 @@ def table(data: list[dict]) -> str:
         "",
         f"gross      = attempts removed / attempts billed x ${desk.hourly:,.2f}/h desk "
         f"x {MINUTES_AN_ATTEMPT:.0f} min",
-        f"added      = net-new escalations / answered calls x ${lead.hourly:,.2f}/h lead "
+        f"added      = net-new escalations / attempts billed x ${lead.hourly:,.2f}/h lead "
         f"x {MINUTES_AN_ATTEMPT:.0f} min",
         "net        = gross - added, and it is the figure this entry leads with",
+        "             both are per billed attempt, which is what CALL-E charges for and",
+        "             the only denominator on which one can be taken off the other",
         "crossover  = the net-new rate per 100 answered calls at which net reaches zero",
         "",
         "The ceiling moves between runs because the numerator is measured: how many "
