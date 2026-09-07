@@ -5,7 +5,7 @@ import { book } from "./book";
 import { parseRequest } from "./intake";
 import { discoverByRequest } from "./discovery";
 import { isE164, maskPhone } from "./phone";
-import { isAuthorized, maxCalls } from "./authz";
+import { canPlaceAnotherCall, isAuthorized, maxCalls } from "./authz";
 import * as board from "./board";
 import type { Vendor } from "./types";
 import vendorsCache from "../fixtures/vendors.json";
@@ -20,6 +20,7 @@ const MOCK = process.env.MOCK !== "false";
 
 const request = process.argv.slice(2).join(" ") || "cheapest haircut in San Francisco";
 const { goal, bar, category, location, budget: parsedBudget } = await parseRequest(request);
+let callsPlaced = 0;
 
 board.header(request);
 
@@ -101,6 +102,7 @@ if (!MOCK && vendors.length > 0) {
     process.exit(0);
   }
   vendors = toDial; // dial only the authorized subset, capped by MAX_CALLS
+  callsPlaced = toDial.length;
   console.log("");
 }
 
@@ -133,6 +135,8 @@ if (ranked.length === 0) {
   const pick = choosePick(ranked.length);
   if (pick === null) {
     console.log(`\n  No booking made.\n`);
+  } else if (!MOCK && !canPlaceAnotherCall(callsPlaced)) {
+    console.log(`\n  MAX_CALLS=${maxCalls()} reached. No booking call placed.\n`);
   } else {
     const winnerQuote = ranked[pick]!;
     const service = location ? `${category} in ${location}` : category;

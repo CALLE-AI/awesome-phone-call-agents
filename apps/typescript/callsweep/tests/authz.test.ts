@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { isAuthorized, maxCalls, DEFAULT_MAX_CALLS } from "../src/authz";
+import { canPlaceAnotherCall, isAuthorized, maxCalls, DEFAULT_MAX_CALLS } from "../src/authz";
 
 test("only allowlisted, valid numbers are authorized", () => {
   process.env.ALLOWED_PHONES = "+14155550101, +14155550102";
@@ -40,4 +40,10 @@ test("a malformed cap falls back to the default, never to unlimited", () => {
     expect(maxCalls()).toBe(DEFAULT_MAX_CALLS);
   }
   delete process.env.MAX_CALLS;
+});
+
+test("the booking path cannot exceed the same per-run cap", () => {
+  expect(canPlaceAnotherCall(3, 4)).toBe(true);
+  expect(canPlaceAnotherCall(4, 4)).toBe(false);
+  expect(canPlaceAnotherCall(5, 4)).toBe(false);
 });

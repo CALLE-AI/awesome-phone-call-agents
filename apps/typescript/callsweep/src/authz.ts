@@ -32,3 +32,7 @@ export function maxCalls(): number {
   if (!Number.isInteger(n) || n < 1) return DEFAULT_MAX_CALLS;
   return n;
 }
+
+export function canPlaceAnotherCall(callsPlaced: number, cap = maxCalls()): boolean {
+  return Number.isInteger(callsPlaced) && callsPlaced >= 0 && callsPlaced < cap;
+}
