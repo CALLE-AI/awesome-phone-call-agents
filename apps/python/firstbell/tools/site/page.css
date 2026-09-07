@@ -978,7 +978,7 @@ footer .plate-royal .source-link { margin-top: var(--space-3); }
 @media (min-width: 60rem) and (prefers-reduced-motion: no-preference) {
   html[data-curtain] .act-00 { position: sticky; top: 0; z-index: 0; }
 }
-/* The masthead. A blind reviewer read the first viewport, could not name the product and
+/* The masthead. A reader met the first viewport, could not name the product and
  * could not say who buys it. Both were the page's fault: `firstbell` was in the browser
  * tab and in one shell command nine screens down, and the one sentence that answers the
  * question lived in README.md.
@@ -1614,7 +1614,7 @@ button[data-copy][data-copied]::after {
 .ids th { overflow-wrap: anywhere; }
 
 /* ---- the five rows above the mutation fold ---------------------------------------------- */
-/* A blind seat reading this page as a school district administrator stopped at the first row
+/* A reader coming to this page cold, as a school district administrator, stopped at the first row
  * of the mutation table and did not start again. Their note: "max_workers=self._concurrency
  * becomes max_workers=None. Not English. I scrolled, saw 138 more, stopped reading."
  *
@@ -1634,7 +1634,7 @@ button[data-copy][data-copied]::after {
 
 /* ---- the stakes line ------------------------------------------------------------------- */
 /* The program prints this at the head of its own escalation queue. It was nine screens down
- * in terminal text, and a blind seat reading as a district administrator called it the
+ * in terminal text, and somebody coming to it as a district administrator called it the
  * strongest sentence in the entry, having reached it well past the point they stopped
  * reading. It is set as a quotation from the run rather than as a claim by the page, because
  * that is what it is. */
@@ -1653,9 +1653,9 @@ button[data-copy][data-copied]::after {
 }
 
 /* ---- the three endings figure ------------------------------------------------------------ */
-/* The three words the product turns on, shown once. A blind seat reading as a district
- * administrator listed resolved, undetermined and failed among the words they could not
- * follow, having met all three as a table column and never as a picture.
+/* The three words the product turns on, shown once. Somebody coming to the page as a
+ * district administrator listed resolved, undetermined and failed among the words they
+ * could not follow, having met all three as a table column and never as a picture.
  *
  * The drawing is geometry only. The words sit beside it in HTML rather than inside the SVG,
  * because SVG text carries no @font-face, cannot be selected or searched, and is invisible to
@@ -1689,8 +1689,8 @@ button[data-copy][data-copied]::after {
 }
 
 /* ---- the queue a school office actually opens -------------------------------------------- */
-/* A blind seat reading this page as a district administrator put this first among the things
- * that would raise the score: "Show the screen my secretary opens Monday morning. The only
+/* Somebody coming to this page as a district administrator put this first among the
+ * things that would change their mind: "Show the screen my secretary opens Monday morning. The only
  * interface on this page is a terminal. No district buys a terminal."
  *
  * So this is a screen, and it is the one place on the page where the software is shown doing
@@ -1842,7 +1842,7 @@ button[data-copy][data-copied]::after {
 
 /* ---- Further reading -----------------------------------------------------------------
  * Everything above this point is the page arguing with itself: nine acts, twenty-three
- * links, every one of them an anchor back into the same document. A blind reviewer reading
+ * links, every one of them an anchor back into the same document. Somebody coming to it
  * as a district operations director found that the two documents deciding whether they
  * would run a pilot, the legal surface and the pilot shape, were reachable only by cloning
  * the repository, and that the outside figures the entry rests on carried a publisher's

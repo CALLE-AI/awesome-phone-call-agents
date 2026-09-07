@@ -1714,7 +1714,7 @@ async function gateLinks(browser, base, slugs) {
 /**
  * The five document pages, which nothing checked until now.
  *
- * They were added because a blind reviewer reading as a district operations director found
+ * They were added because somebody coming to the page as a district operations director found
  * that `docs/the-legal-surface.md` and `docs/what-a-pilot-would-look-like.md`, the two
  * documents that decide whether they would run a pilot, were reachable only by cloning the
  * repository. Publishing five unchecked pages on a site whose argument is that every claim

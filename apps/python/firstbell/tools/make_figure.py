@@ -1,9 +1,9 @@
 """The three endings, drawn as an animation, from one source that feeds three surfaces.
 
-A blind seat reading this entry as a school district administrator scored the page 16 of 25
-and rated its reading fatigue 9 out of 10. Among the things they could not follow were the
-three words the whole product turns on, `resolved`, `undetermined` and `failed`, which the
-page states as a table column and never shows.
+Somebody coming to this entry as a school district administrator found the page tiring
+and stopped partway. Among the things they could not follow were the three words the whole
+product turns on, `resolved`, `undetermined` and `failed`, which the page states as a table
+column and never shows.
 
 A sentence explaining three outcomes is a paragraph. Three outcomes drawn once is a glance.
 

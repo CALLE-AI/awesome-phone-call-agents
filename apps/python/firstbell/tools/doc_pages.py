@@ -1,6 +1,6 @@
 """The documents a reader can only reach by cloning, turned into pages they can open.
 
-A blind reviewer scored this entry as a district operations director, read the deployed
+Somebody came to this entry as a district operations director, read the deployed
 page, and wrote: `docs/the-legal-surface.md` "answers the seven questions my counsel asks
 [...] It is the document that decides whether I pilot. It is linked from nowhere a buyer
 goes. I grepped the deployed HTML: FERPA 0 hits, TCPA 0, COPPA 0". They were right. The

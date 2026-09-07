@@ -1,6 +1,6 @@
 """The path one absence row takes, drawn once, for a reader who has not read the code.
 
-Two blind seats reading this entry rated its reading fatigue high and could not follow the
+Two people came to this entry cold, found it tiring, and could not follow the
 sequence: which gate comes first, what the call is allowed to ask, and where a safeguarding
 escalation attaches. All of that is in `README.md` and in `dispatch/scheduler.py`, in prose,
 spread over screens. One picture answers it at a glance, and `docs/images/README.md` is the
