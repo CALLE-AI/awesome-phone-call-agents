@@ -337,3 +337,167 @@ def test_the_safeguarding_window_says_whose_it_is(capsys):
     payload = body(capsys.readouterr().out)
     assert payload["safeguarding_minutes"] == 45
     assert payload["safeguarding_minutes_is_default"] is False
+
+
+def _report_with_an_unaccountable_call():
+    """One call CALL-E accepted, whose every poll came back 503.
+
+    This is the path that fills `not_recallable` without setting `cancelled`, which is
+    the combination that used to print the id nowhere.
+    """
+    from calle import CalleAPIError
+
+    from dispatch import RetryPolicy, WaveDispatcher, WorkItem
+
+    class calls:
+        @staticmethod
+        def create(**kwargs):
+            return {"id": "call_BILLED_7788", "status": "queued"}
+
+        @staticmethod
+        def get(call_id):
+            raise CalleAPIError(code="service_unavailable",
+                                message="upstream is unavailable", status_code=503)
+
+    class Client:
+        pass
+
+    Client.calls = calls
+    dispatcher = WaveDispatcher(
+        Client(), task_builder=lambda i: "x",
+        result_schema={"type": "object", "required": ["reason"],
+                       "properties": {"reason": {"type": "string"}}},
+        poll_interval_seconds=0, sleep=lambda _s: None,
+        retry=RetryPolicy(max_attempts=2),
+    )
+    return dispatcher.run([WorkItem(id="S-1", phones=("+915550000001",))])
+
+
+def test_a_call_the_run_cannot_account_for_has_its_id_printed(capsys):
+    """The id of a placed, billable, unreadable call has to reach a reader.
+
+    `scheduler._handle` keeps such a call in `_in_flight` and says in a comment that the
+    report's `not_recallable` list "is already printed, so a reader sees the id rather
+    than a wrong verdict". It was printed only when the run was cancelled, and a poll
+    failure cancels nothing, so on the path that happens by itself the id appeared in no
+    line of output: not the row, not the summary, not `--json`. `--receipt` had it, and
+    `--receipt` is off by default.
+    """
+    from firstbell import cli
+    from firstbell.domain import summarise
+
+    report = _report_with_an_unaccountable_call()
+    assert report.not_recallable == ["call_BILLED_7788"], "the path did not reproduce"
+    assert report.cancelled is False, "the path did not reproduce: a cancel would mask it"
+
+    cli._print_human(report, summarise(report.results, live=True, rate=None, staff=None), 30)
+    out = capsys.readouterr().out
+    assert "call_BILLED_7788" in out, (
+        "a call this run placed and cannot account for has its id printed nowhere, so "
+        "nobody can chase it with the vendor")
+    # On the same line, not merely somewhere in the output. `S-1` also appears in the row
+    # list and in the queue at the bottom, so an `in out` assertion passed while the
+    # block named a call id with no row beside it.
+    named = [line for line in out.splitlines() if "call_BILLED_7788" in line and "S-1" in line]
+    assert named, (
+        "the block names the call id without saying which family it was for. "
+        "Output was: " + out)
+
+    # And the totals it does not appear in have to say so, because CALL-E may bill it
+    # while the attempt list it would be counted from was never read back.
+    assert "count as 0 in every number below" in out
+    assert "calls placed         0" in out, (
+        "the run prints zero calls placed for a call the vendor accepted; the caveat "
+        "above is the only thing that makes that honest")
+
+
+def test_the_summary_line_names_an_unaccountable_call_without_a_cancel():
+    report = _report_with_an_unaccountable_call()
+    assert "call_BILLED_7788" in report.summary()
+
+
+def test_the_json_output_carries_what_the_run_left_behind(capsys):
+    """`--json` carried counts and money and nothing about how the run ended."""
+    assert main(["--work-file", WORK, "--json"]) == 0
+    text = capsys.readouterr().out
+    payload = json.loads(text[text.index("{"):])
+    assert payload["cancelled"] is False
+    assert payload["not_recallable"] == []
+    assert payload["fatal_error"] is None
+
+
+def test_calling_families_again_needs_a_reason_on_the_record(capsys):
+    """A second call to the same family in one morning is not a silent operation."""
+    for label in ["", "   "]:
+        assert main(["--work-file", WORK, "--again", label]) == 2
+        assert "--again needs a label" in capsys.readouterr().err
+
+
+def test_the_correction_label_is_normalised_and_recorded(tmp_path):
+    """`Locale Fix` and `locale-fix` are one correction, so they cannot be two keys.
+
+    Case and spacing would otherwise let the same fix run twice, and the second run of it
+    would dial every family a third time.
+    """
+    receipt = tmp_path / "run.json"
+    assert main(["--work-file", WORK, "--again", "  Locale Fix ",
+                 "--receipt", str(receipt)]) == 0
+    assert json.loads(receipt.read_text(encoding="utf-8"))["called_again_as"] == "locale-fix"
+
+    plain = tmp_path / "plain.json"
+    assert main(["--work-file", WORK, "--receipt", str(plain)]) == 0
+    assert json.loads(plain.read_text(encoding="utf-8"))["called_again_as"] is None, (
+        "an ordinary run must not look like a correction")
+
+
+def test_a_row_refused_for_a_reused_key_is_told_how_to_be_called_again(capsys):
+    """CALL-E's own sentence is accurate and tells an operator nothing to do.
+
+    `idempotency_conflict` is permanent, so the row is FAILED with no retry and no call.
+    In practice it has one cause: the file was corrected and re-run the same day. The
+    refusal is right; printing it without the way out left a family unreachable until
+    tomorrow in a language they do not speak.
+    """
+    from dispatch import DispatchReport, ItemResult, Resolution, WorkItem
+    from firstbell import cli
+    from firstbell.domain import summarise
+
+    report = DispatchReport(results=[
+        ItemResult(item=WorkItem(id="S-1", phones=("+915550000001",)),
+                   resolution=Resolution.FAILED, failure_code="idempotency_conflict",
+                   reason="This Idempotency-Key was already used with a different "
+                          "request body."),
+    ])
+    cli._print_human(report, summarise(report.results, live=True, rate=None, staff=None), 30)
+    out = capsys.readouterr().out
+    assert "already called today with different details" in out
+    assert "--again locale-fix" in out, "the refusal has to carry the way out of it"
+    assert "S-1" in out
+
+
+def test_the_correction_label_reaches_the_idempotency_key(monkeypatch):
+    """The label has to change the key, which is the only thing that makes it work.
+
+    Every other test here proves the mechanism or the message. This one proves the wire
+    between them: without it, `--again` could be accepted, normalised, printed and written
+    to the receipt while the run still sent the key that CALL-E refuses.
+    """
+    from firstbell import cli
+
+    seen = []
+    real = cli.default_idempotency_key
+
+    def spy(prefix, day):
+        seen.append(prefix)
+        return real(prefix, day)
+
+    monkeypatch.setattr(cli, "default_idempotency_key", spy)
+
+    assert main(["--work-file", WORK]) == 0
+    assert seen == ["attendance"], "an ordinary run must not carry a correction"
+
+    seen.clear()
+    assert main(["--work-file", WORK, "--again", "Locale Fix"]) == 0
+    assert seen == ["attendance-locale-fix"], (
+        "the label was accepted and did not reach the key, so the corrected run would be "
+        "refused exactly as the uncorrected one was")

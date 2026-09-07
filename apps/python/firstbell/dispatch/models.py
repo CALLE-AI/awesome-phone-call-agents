@@ -309,6 +309,15 @@ class DispatchReport:
         if self.cancelled:
             line += (f" | cancelled after {self.cancelled_after} dispatched"
                      f", {len(self.not_recallable)} already in flight and not recallable")
+        elif self.not_recallable:
+            # A poll failure fills `not_recallable` without setting `cancelled`, and this
+            # used to mention the list only inside the branch above. The comment in
+            # `scheduler._handle` justified keeping such a call in flight on the grounds
+            # that "it is already printed, so a reader sees the id rather than a wrong
+            # verdict". It was not printed on this path, which is the one that happens
+            # without anyone asking for it.
+            line += (f" | {len(self.not_recallable)} call(s) placed and not accounted "
+                     f"for: {', '.join(self.not_recallable)}")
         if self.fatal_error:
             line += f" | run stopped: {self.fatal_error}"
         return line

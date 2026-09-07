@@ -195,6 +195,26 @@ def build_parser() -> argparse.ArgumentParser:
                         help=f"Refuse a live run larger than this (default: "
                              f"{DEFAULT_CALL_CEILING}). Raise it deliberately for a whole "
                              f"school; the refusal names the number it found.")
+    # A way to call somebody again today, and the only one.
+    #
+    # The idempotency key is `(prefix, student, day)`, which is deliberately stable: a
+    # retry inside a run cannot double-dial, and a second run of the same file cannot
+    # re-dial yesterday's work. The cost of that came out of a real sequence. A row went
+    # out with the wrong locale, somebody noticed and fixed the file, and the second run
+    # came back `failed | idempotency_conflict`: same key, different request body, refused
+    # by CALL-E. Refusing is right. What was missing was any way out, because nothing
+    # exposed the prefix, so the family called in a language they do not speak could not
+    # be reached again until the next day. `docs/locale-is-not-only-a-hint.md` is this
+    # project's own argument that the locale is the field deciding whether the call was
+    # understood at all.
+    #
+    # The label is required rather than a bare switch, and it lands in the receipt. A
+    # second call to a family needs a reason on the record, and two corrections in one
+    # morning need two different keys or the second one collides with the first.
+    parser.add_argument("--again", metavar="LABEL", default=None,
+                        help="Call rows that were already called today, under a new "
+                             "idempotency key. Use it after correcting a file: "
+                             "--again locale-fix. The label is recorded in the receipt.")
     # A reviewer reading the code asked for this and was right: thirty minutes is one
     # district's mandate, not every district's. What the constant is defending is that
     # there is a clock at all, so this can move the window and cannot remove it.
@@ -372,6 +392,11 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
         # Whichever way the work arrived. Told by main(), which knows the actual file the
         # drop resolved to; derived here when a test builds a receipt directly.
         "work_file": came_from or str(args.work_file or args.work_drop),
+        # Absent on an ordinary run. Present when somebody called families a second time
+        # in one day, which needs a reason on the record rather than a silently different
+        # idempotency key.
+        "called_again_as": (None if getattr(args, "again", None) is None
+                            else _key_label(args.again)),
         "concurrency": args.concurrency,
         "counts": report.counts(),
         "resolution_rate": round(summary.resolution_rate, 4),
@@ -401,7 +426,16 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 "structured_result": redact_free_text(r.structured_result),
                 "failure_code": r.failure_code,
                 "reason": r.reason,
-                **({"transcript": list(r.transcript)} if args.include_transcript else {}),
+                # Redacted the same way the structured result is. The rule for that field
+                # is written as "a structured result is CALL-E's account of what a person
+                # said, so any field of it can carry a number the caller read out", and a
+                # transcript is not an account of what a person said, it is what they said.
+                # The flag governs whether the transcript is written at all. It was also
+                # governing whether the numbers in it were masked, so the same receipt held
+                # `+91********10` in the result and `+91 98765 43210` in the transcript
+                # beside it.
+                **({"transcript": redact_free_text(list(r.transcript))}
+                   if args.include_transcript else {}),
             }
             for r in report.results
         ],
@@ -409,8 +443,58 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _check_numbers(args: argparse.Namespace) -> str | None:
+    """Reject a number that cannot mean anything, before the run starts.
+
+    Four flags used to reach a constructor that raised `ValueError`, so a mistyped number
+    left a traceback on the screen and exited 1. Exit 1 is also what a CALL-E fatal error
+    returns, so a wrapper script could not tell a typo from a stopped run, and every other
+    bad input in this program exits 2 with one sentence. `--concurrency 0` was the worst of
+    the four: it raised after the banner and the row count had already printed, so it looked
+    like the run had begun.
+
+    `--safeguarding-minutes` was accepted at any value, including a negative one, and the
+    report printed "a school would have to answer these within -5 minutes". A window is a
+    clock and a clock does not run backwards. Zero is refused for the same reason: it would
+    read as a mandate to answer before the call ended.
+    """
+    if args.concurrency < 1:
+        return (f"--concurrency {args.concurrency} would place no calls at all. It is the "
+                "only brake CALL-E offers, so it has to be at least 1.")
+    if args.safeguarding_minutes <= 0:
+        return (f"--safeguarding-minutes {args.safeguarding_minutes} is not a window. The "
+                "report would tell a school to answer a safeguarding disclosure within "
+                f"{args.safeguarding_minutes} minutes, which is not a thing anyone can do.")
+    if args.staff_hours is not None and args.staff_hours <= 0:
+        return (f"--staff-hours {args.staff_hours} would divide an annual wage by zero or "
+                "less, and the break-even figure is built on that division.")
+    if args.staff_annual is not None and args.staff_annual <= 0:
+        return (f"--staff-annual {args.staff_annual} is not a wage, so nothing computed "
+                "from it would be a cost.")
+    if args.funding_rate is not None and args.funding_rate <= 0:
+        return (f"--funding-rate {args.funding_rate} would report that closing a case "
+                "recovers nothing or costs money, which is not what a funding rate is.")
+    if args.again is not None and not _key_label(args.again):
+        return ("--again needs a label saying why these families are being called a "
+                "second time today, because it goes on the record: --again locale-fix.")
+    return None
+
+
+def _key_label(raw: str) -> str:
+    """Normalise the --again label into something safe to put in an idempotency key.
+
+    Whitespace and case would otherwise make `Locale Fix` and `locale-fix` two different
+    keys for one correction, which is the collision the label exists to avoid.
+    """
+    return "-".join(raw.strip().lower().split())
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    bad_number = _check_numbers(args)
+    if bad_number:
+        print(bad_number, file=sys.stderr)
+        return 2
     rate = _rate_from(args)
 
     # One name for wherever the work came from. Three places downstream printed
@@ -480,7 +564,12 @@ def main(argv: list[str] | None = None) -> int:
         result_schema=RESULT_SCHEMA,
         concurrency=args.concurrency,
         escalate=safeguarding_escalation,
-        idempotency_key=default_idempotency_key("attendance", date.today().isoformat()),
+        # The prefix carries the correction label, not the day, because the day is
+        # already the third part of the key and moving it would let one label re-dial
+        # yesterday's rows.
+        idempotency_key=default_idempotency_key(
+            "attendance" if args.again is None else f"attendance-{_key_label(args.again)}",
+            date.today().isoformat()),
         poll_interval_seconds=2.0 if mode.live else 0.0,
         webhook_url=args.webhook_url,
     )
@@ -503,6 +592,14 @@ def main(argv: list[str] | None = None) -> int:
             "safeguarding_minutes": args.safeguarding_minutes,
             "safeguarding_minutes_is_default":
                 args.safeguarding_minutes == SAFEGUARDING_CALLBACK_MINUTES,
+            # Three facts a machine reader had no way to see. `--json` carried counts and
+            # money and nothing about whether the run finished or what it left behind, so
+            # a run that stopped on a fatal error and a run that completed printed the
+            # same shape, and a call CALL-E accepted and this run cannot account for
+            # appeared nowhere at all.
+            "cancelled": report.cancelled,
+            "not_recallable": list(report.not_recallable),
+            "fatal_error": report.fatal_error,
         }, indent=2))
     else:
         _print_human(report, summary, args.safeguarding_minutes)
@@ -533,6 +630,49 @@ def _print_human(report: DispatchReport, summary, safeguarding_minutes: int) -> 
         if result.escalation is not Escalation.NONE:
             marker = result.escalation.value.upper()[:5]
         print(f"  [{marker:5s}] {result.item.id:12s} {result.reason}")
+
+    # Calls this run placed and cannot account for.
+    #
+    # `_handle` keeps such a call in `_in_flight` on purpose, and its comment said the id
+    # reaches a reader because the report already prints it. `DispatchReport.summary()`
+    # named the list only when the run was cancelled, and a poll failure does not cancel
+    # anything, so on the path that actually happens the id was printed nowhere: not in
+    # the row, not in the summary, not in `--json`. Only `--receipt` had it, and that is
+    # off by default.
+    #
+    # It sits above the money block deliberately. Every number below it is counted from
+    # attempt lists that were read back, and these calls have none, so they contribute
+    # zero to `calls placed` and zero to `attempts billed` while the vendor may still
+    # bill them. A reader has to see that before the totals, not after.
+    if report.not_recallable:
+        by_call = {r.call_id: r for r in report.results if r.call_id}
+        print()
+        print(f"{len(report.not_recallable)} call(s) this run placed and cannot account "
+              f"for. CALL-E accepted these, so they may appear on the bill:")
+        for call_id in report.not_recallable:
+            owner = by_call.get(call_id)
+            who = owner.item.id if owner else "unknown row"
+            print(f"  {call_id:24s} {who}")
+        print("  No attempt list was read back for these, so they count as 0 in every "
+              "number below.")
+
+    # A refusal that reads like a dead end, with the way out printed next to it.
+    #
+    # `idempotency_conflict` is a permanent error, so the row is FAILED with no retry and
+    # no call, and the reason is CALL-E's own sentence about a key already used with a
+    # different body. That is accurate and it does not tell an operator what to do. It
+    # happens for one reason in practice: the file was corrected and re-run the same day.
+    conflicted = [r for r in report.results
+                  if r.failure_code == "idempotency_conflict"]
+    if conflicted:
+        print()
+        print(f"{len(conflicted)} row(s) were already called today with different "
+              f"details, so nothing was dialled again:")
+        for result in conflicted:
+            print(f"  {result.item.id}")
+        print("  Nothing about them has changed for the family. If the file was "
+              "corrected, say so and they can be called again today:")
+        print("    --again locale-fix")
 
     print()
     print("What this run was worth")
