@@ -35,8 +35,72 @@
 /** Values that mean the question was asked and not answered. */
 const UNINFORMATIVE = new Set(["unknown"]);
 
+/**
+ * The same subset of the absence schema the Python surface validates against.
+ *
+ * The two surfaces used to disagree here by omission. `dispatch/validation.problems()`
+ * re-checks the shape of every result before anything is done with it, because a CALL-E
+ * webhook is unsigned and a result that drives a real decision should not be trusted on
+ * the strength of one hop. This recipe had no equivalent, so a result carrying a value
+ * outside the enum came back `resolved` here and `undetermined` there: the same call, and
+ * the verdict that closes the record is the one with no check behind it.
+ *
+ * Only what the Python subset implements is implemented here: required present and not
+ * null, declared type, enum membership. Nothing else. A checker that quietly ignores the
+ * rule it does not understand is worse than no checker, so this is a full copy of a small
+ * thing rather than a partial copy of a large one.
+ */
+const RESULT_SCHEMA = {
+  required: ["reason_category", "expected_return"],
+  properties: {
+    reason_category: {
+      type: "string",
+      enum: ["illness", "medical_appointment", "family_emergency",
+        "religious_observance", "transport", "other", "unknown"],
+    },
+    expected_return: {
+      type: "string",
+      enum: ["today", "tomorrow", "later_this_week", "longer", "unknown"],
+    },
+    parent_confirmed_aware: { type: "string", enum: ["yes", "no", "unknown"] },
+    free_text_note: { type: "string" },
+  },
+};
+
 /** Required by the absence schema. Only these count towards uninformative. */
-const REQUIRED_FIELDS = ["reason_category", "expected_return"];
+const REQUIRED_FIELDS = RESULT_SCHEMA.required;
+
+/**
+ * Every reason `result` does not satisfy the schema above. An empty list means valid.
+ */
+function schemaProblems(result) {
+  if (!isObject(result)) {
+    return [`expected an object, got ${result === null ? "null" : typeof result}`];
+  }
+  const found = [];
+  for (const name of RESULT_SCHEMA.required) {
+    if (!Object.prototype.hasOwnProperty.call(result, name)) {
+      found.push(`missing required field '${name}'`);
+    } else if (result[name] === null) {
+      found.push(`required field '${name}' is null`);
+    }
+  }
+  for (const [name, rule] of Object.entries(RESULT_SCHEMA.properties)) {
+    const value = result[name];
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (rule.type === "string" && typeof value !== "string") {
+      const got = Array.isArray(value) ? "array" : typeof value;
+      found.push(`'${name}' should be string, got ${got}`);
+      continue;
+    }
+    if (Array.isArray(rule.enum) && !rule.enum.includes(value)) {
+      found.push(`'${name}' is ${JSON.stringify(value)}, not one of ${rule.enum.join(", ")}`);
+    }
+  }
+  return found;
+}
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -157,18 +221,41 @@ export function classifyRecipient(recipient) {
     };
   }
 
+  // Asked once, here, so that every branch holding a result gets the same answer.
+  //
+  // This branch used to hardcode `escalation: "none"`, and that was the one place the two
+  // shipped classifiers disagreed about the rule the whole entry is built around. A call
+  // where every required field came back unknown is a call where nobody confirmed they
+  // knew a child was absent, which is exactly what the safeguarding flag is for. Python
+  // attached it; this did not. The row still reached a human either way, so nothing was
+  // dropped. What was lost is the flag: the row did not sort to the top of the queue and
+  // was not counted in the "N of these are safeguarding, answer within 30 minutes" figure
+  // the argument rests on. A malformed or empty answer that says the serious thing is not
+  // less serious for being malformed.
+  const escalation = safeguardingEscalation(result);
+
+  const invalid = schemaProblems(result);
+  if (invalid.length > 0) {
+    return {
+      resolution: "undetermined",
+      reason: `result did not satisfy the schema: ${invalid.join("; ")}`,
+      attempts,
+      providerCallId,
+      escalation,
+      needsAHuman: true,
+    };
+  }
+
   if (isUninformative(result)) {
     return {
       resolution: "undetermined",
       reason: "every required field came back unknown, so nothing was learned",
       attempts,
       providerCallId,
-      escalation: "none",
+      escalation,
       needsAHuman: true,
     };
   }
-
-  const escalation = safeguardingEscalation(result);
 
   return {
     resolution: "resolved",
@@ -204,6 +291,7 @@ export function summariseWave(rows) {
   let attemptsBilled = 0;
   let attemptsResolved = 0;
   let escalated = 0;
+  let escalatedUnresolved = 0;
 
   for (const row of Array.isArray(rows) ? rows : []) {
     const resolution = row && row.resolution;
@@ -212,8 +300,17 @@ export function summariseWave(rows) {
     }
     counts[resolution] += 1;
     const isEscalated = row.escalation === "safeguarding";
-    if (isEscalated) {
+    // Two counts, because `closed` below subtracts one of them from `resolved`.
+    //
+    // Every escalating row used to land in `escalated`, and until the classifier started
+    // flagging the all-unknown branch every escalating row happened to be resolved, so
+    // the subtraction balanced by luck. It stops balancing the moment an undetermined row
+    // carries the flag: `closed` goes below zero, the resolution rate goes negative, and
+    // a report says a wave of calls un-closed cases that were never open.
+    if (isEscalated && resolution === "resolved") {
       escalated += 1;
+    } else if (isEscalated) {
+      escalatedUnresolved += 1;
     }
     const attempts = Number.isInteger(row.attempts) ? row.attempts : 0;
     attemptsBilled += attempts;
@@ -240,6 +337,9 @@ export function summariseWave(rows) {
     counts,
     attempted,
     escalated,
+    // Flagged on a call that produced nothing usable. Not subtracted from anything,
+    // because it was never counted as resolved in the first place.
+    escalatedUnresolved,
     closed,
     safeguardingCallbackMinutes: SAFEGUARDING_CALLBACK_MINUTES,
     attemptsBilled,

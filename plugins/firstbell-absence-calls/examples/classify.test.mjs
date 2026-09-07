@@ -243,3 +243,66 @@ test("safeguarding rows sort to the top of the human queue", () => {
   assert.equal(summary.queue[0].id, "C", "the safeguarding case must be worked first");
   assert.equal(summary.queue[0].escalation, "safeguarding");
 });
+
+
+test("an all-unknown answer is flagged, not filed as an ordinary callback", () => {
+  // This is the branch the two shipped classifiers disagreed on. Nobody confirmed they
+  // knew the child was absent, because nobody said anything usable at all.
+  const out = classifyRecipient(recipient({
+    structured_result: { reason_category: "unknown", expected_return: "unknown" },
+  }));
+  assert.equal(out.resolution, "undetermined");
+  assert.equal(out.escalation, "safeguarding",
+    "an answer that learned nothing cannot also be an answer that reassured anyone");
+  assert.equal(out.needsAHuman, true);
+});
+
+test("a confirmed parent who then said nothing usable is not flagged", () => {
+  // The flag follows the rule, not the branch. An explicit yes closes the safeguarding
+  // question even when the rest of the answer is worthless, and the row still needs a
+  // person for the ordinary reason.
+  const out = classifyRecipient(recipient({
+    structured_result: {
+      parent_confirmed_aware: "yes",
+      reason_category: "unknown",
+      expected_return: "unknown",
+    },
+  }));
+  assert.equal(out.resolution, "undetermined");
+  assert.equal(out.escalation, "none");
+  assert.equal(out.needsAHuman, true);
+});
+
+test("a value outside the enum is undetermined here, as it is in the python surface", () => {
+  const out = classifyRecipient(recipient({
+    structured_result: { reason_category: "CATASTROPHIC", expected_return: "tomorrow" },
+  }));
+  assert.equal(out.resolution, "undetermined",
+    "a result this recipe cannot vouch for must not close a record");
+  assert.match(out.reason, /did not satisfy the schema/);
+  assert.equal(out.escalation, "safeguarding");
+});
+
+test("a required field that is absent or null does not close a record", () => {
+  for (const result of [
+    { reason_category: "illness" },
+    { reason_category: "illness", expected_return: null },
+  ]) {
+    const out = classifyRecipient(recipient({ structured_result: result }));
+    assert.equal(out.resolution, "undetermined", JSON.stringify(result));
+  }
+});
+
+test("an escalated undetermined row cannot push closed below zero", () => {
+  // Before the count was split, every safeguarding row was subtracted from `resolved`.
+  // One undetermined escalation and no resolved rows gave closed = -1 and a negative
+  // resolution rate: a wave of calls reported as having un-closed cases.
+  const summary = summariseWave([
+    { id: "A", resolution: "undetermined", escalation: "safeguarding", attempts: 2, needsAHuman: true },
+  ]);
+  assert.equal(summary.closed, 0);
+  assert.equal(summary.escalated, 0, "it was never resolved, so it was never closed");
+  assert.equal(summary.escalatedUnresolved, 1, "and it still has to be reported");
+  assert.equal(summary.resolutionRate, 0);
+  assert.ok(summary.resolutionRate >= 0);
+});

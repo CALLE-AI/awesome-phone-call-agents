@@ -57,7 +57,7 @@ shapes carried `parent_confirmed_aware`, every completed row escalated, and the 
 printed a resolution rate of zero while all 26 tests passed.
 
 ```
-node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 27 passing
+node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 32 passing
 node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
 
@@ -89,6 +89,31 @@ On the eleven real calls behind this work the rule changed no filing, because ev
 flagged was already going to a person for a different reason. It fired on five of the eleven.
 An alert rate near half is a staffing question, and it is written down here rather than left
 for a school to discover in week two.
+
+The flag follows the rule and not the branch, and for a while it did not. A call where every
+required field came back unknown carried the flag in the Python app this recipe is a port of
+and did not carry it here, so the same call sorted to the top of one queue and into the
+middle of the other and was counted in one safeguarding total and not the other. Nobody
+confirmed anything on a call that said nothing, which is the case the flag is for. The row
+reached a person either way, so nothing was ever dropped; what was lost was its place in the
+queue. `tests/test_classifier_parity.py` in the app now runs this module through node over
+ten recipients and compares its verdict with the Python one field by field, because the two
+suites in this directory check this module against itself and the app's own no-drift check
+is about the workflow JSON against this module. Neither of them was holding the two
+languages together.
+
+That fix needed a second one beside it. `summariseWave` computed `closed` as resolved minus
+escalated, which balanced only because every escalating row happened to be resolved; the
+moment an undetermined row could carry the flag, a wave with one escalation and nothing
+closed reported a negative closed count and a negative rate. The two are counted separately
+now, `escalated` and `escalatedUnresolved`, and only the first is subtracted.
+
+This module also re-validates the result against the same subset of the schema the app
+checks: required present and not null, declared type, enum membership. It had no equivalent
+before, so a result carrying a value outside the enum was `resolved` here and `undetermined`
+there, and the surface with no check behind it was the one closing records. CALL-E's webhooks
+are unsigned, which is the reason the app re-checks a payload it already received, and it is
+the same reason here.
 
 ## What the shape tests do and do not prove
 

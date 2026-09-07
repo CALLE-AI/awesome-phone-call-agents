@@ -531,6 +531,14 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "skips when the run does not mix escalated rows with ordinary ones, because order "
         "proves nothing about a list that is all one kind. The committed run is all "
         "escalations today, so this is the state it skips in",
+    # Not a test: the helper the classifier parity check runs the JavaScript through. It
+    # skips for two reasons that are both about the machine rather than about either
+    # classifier, and a parity check that goes quiet is the one shape that would let the two
+    # surfaces drift back apart without anybody hearing about it.
+    "_javascript_verdicts":
+        "skips when node is not on PATH, because there is then no way to run the n8n "
+        "recipe's classifier at all, and again when the plugin directory is not in the "
+        "checkout, because the module it compares against is not there to run",
     # The one branch of the video's fact reader that cannot be exercised while the thing it
     # needs is present. It goes quiet on this machine and runs on a clean checkout, which is
     # the opposite way round from the image gates above.
@@ -543,6 +551,15 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     # Not a test either: the helper both tests in test_page_prose_counts.py read the page
     # through. It skips on any checkout where the page has not been built, which needs the
     # receipts held outside this repository.
+    # Added when a bug hunt measured a fresh clone and got five failures where the README
+    # promises two skips. This one reads the gate report, which is a build artifact and is
+    # not committed. Its own sibling twenty lines below it had always guarded for the same
+    # file, which is how the gap was visible once anybody looked.
+    "test_the_counts_are_the_numbers_the_rest_of_the_suite_already_agrees_on":
+        "cross-checks the video's fact reader against the page's, and one of the two counts "
+        "comes from tools/gates/gate-report.json. The report is written by the browser "
+        "suite and deliberately not committed, so on a clean checkout there is nothing to "
+        "cross-check against",
     "_page":
         "reads out/index.html to check the counts the page spells out in a sentence against "
         "the data those sentences describe. The page is built from receipts that are "
@@ -924,12 +941,19 @@ def test_the_readme_states_the_real_number_of_classifier_tests():
     assert real > 10, f"only {real} tests found, so this is counting the wrong thing"
 
     readme = (APP / "README.md").read_text(encoding="utf-8")
-    found = re.search(r"runs\s+its (\w+) tests", readme)
+    # `[\w-]+` rather than `\w+`, and the reverse of the generated table rather than the
+    # hand-written one. The count reached twenty-four, the README spelled it "twenty-four",
+    # and both of those stopped this gate: the pattern matched only "twenty" and then found
+    # no " tests" after it, so the gate failed by claiming the README no longer states a
+    # count it states plainly. That is the maintenance task the comment above `NUMBER_WORDS`
+    # is about, met a second time.
+    found = re.search(r"runs\s+its ([\w-]+) tests", readme)
     assert found, "the README no longer states this count where this gate looks for it"
 
     spoken = found.group(1).lower()
-    claimed = int(spoken) if spoken.isdigit() else NUMBER_WORDS_SMALL.get(spoken)
-    assert claimed is not None, f"add {spoken!r} to NUMBER_WORDS_SMALL so this can keep checking"
+    in_words = {word: value for value, word in NUMBER_WORDS.items()}
+    claimed = int(spoken) if spoken.isdigit() else in_words.get(spoken)
+    assert claimed is not None, f"{spoken!r} is not a number this gate can read"
     assert claimed == real, (
         f"the README says the classifier module runs {spoken} tests; it runs {real}"
     )
