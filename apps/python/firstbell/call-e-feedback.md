@@ -161,6 +161,45 @@ this in India.
 **What we would use:** local presence numbers for IN, or a clear statement of which regions can
 carry a recognisable caller ID today, so integrators cost the problem before they build.
 
+## 9. A Goal fixes the callee's language, so a multilingual caller cannot use Goals
+
+We did not use the Goals resource. This is why, and it is a design consequence rather than an
+omission.
+
+`CreateGoalRunRequest` in `calle-ai==0.7.0` documents itself as closed: "target wrappers,
+per-Run region/locale/display-name hints, task text, schemas, RunSpec selectors, provider
+settings, and unknown fields are not accepted. Region, callee locale, and runtime profile come
+from the published Goal." A run therefore carries a phone number and a variable map, and
+nothing else.
+
+Our whole design is that the language is a property of the family and not of the deployment.
+It is one column in the work file a school already exports, and a district calling in English,
+Tamil and Spanish runs one command. Against Goals that becomes one authored Goal per language,
+and the SDK has no `create_goal`: `generated/api/goals/` holds `get_goal` and `list_goals`
+only, so a district cannot provision them from the integration that needs them.
+
+Then the part that stops it being a workaround. `Goal` exposes `object`, `id`, `title`,
+`description`, `status` and `published_run_spec`, and `GoalPublishedRunSpec` exposes `id`,
+`version`, `input_schema` and `result_schema`. The locale that governs the call appears in
+none of them. A client holding three Goals cannot ask which one speaks Tamil. It has to infer
+it from the human-readable `title` or `description`, which means a naming convention nobody
+can validate, in the one field a dashboard user is free to rewrite. For a call about a child
+that is not a risk we would take.
+
+**What we would use:** `locale` and `region` as read-only fields on `GoalPublishedRunSpec`,
+beside the two schemas that are already there. That is a documentation-and-serialisation
+change rather than a new capability, and it is the difference between choosing a Goal and
+guessing one. A `create_goal` on the API would matter separately, for provisioning.
+
+We are not asking for per-run locale back. Pinning it to the published contract is a
+defensible choice and probably the right one: it is what makes a Goal an interface. The gap is
+that the pinned value is not readable.
+
+`calle_double` answers `GET /v1/goals` with an empty list so that a client which enumerates
+Goals does not crash, and deliberately goes no further. There is no recorded production
+response for the resource in this repository, so anything richer would be a guess presented
+as a conformance record. `evidence/api-shape.json` covers the call surface only, and says so.
+
 ## What worked
 
 Not everything here is a complaint, and three of these decisions saved us real time.

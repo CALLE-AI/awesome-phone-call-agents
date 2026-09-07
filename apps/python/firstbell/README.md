@@ -24,7 +24,7 @@ makes, and each one can be checked without an API key.
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and forty-seven gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
-| 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
+| 7 | [`call-e-feedback.md`](call-e-feedback.md) | Nine findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and why a Goal cannot carry a family whose language the deployment does not fix | 2 min |
 
 ### Where CALL-E is called at runtime
 
