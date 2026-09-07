@@ -1,4 +1,8 @@
+import re
+
 import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from table_rescue.safety import (
     RunSafety,
@@ -143,3 +147,21 @@ class TestRunSafety:
         safety = RunSafety(live=True, region="VN", authorizations={})
         with pytest.raises(SafetyViolation, match="NOT_AUTHORIZED"):
             safety.check_destination("+14155550100")
+
+
+@given(
+    st.text(
+        alphabet=st.characters(blacklist_categories=("Cs",)),
+        min_size=0,
+        max_size=18,
+    )
+)
+@settings(max_examples=200, deadline=None)
+def test_arbitrary_text_is_never_a_valid_destination(text):
+    assume(text != "")
+    try:
+        validate_phone_syntax(text)
+    except SafetyViolation:
+        return
+    # Anything accepted must satisfy the E.164 grammar itself.
+    assert re.fullmatch(r"\+[1-9]\d{6,14}", text) is not None

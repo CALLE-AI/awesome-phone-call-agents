@@ -1,3 +1,6 @@
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from table_rescue.calle_client import (
     LEG_CONFIRM,
     LEG_OFFER,
@@ -221,3 +224,20 @@ def test_ensure_access_token_requires_login():
     client._run_calle_json = lambda args: {"usable": False}
     with pytest.raises(RuntimeError, match="not logged in"):
         client.ensure_access_token()
+
+
+WORDS = st.lists(
+    st.sampled_from(
+        ["guest", "said", "they", "will", "cancel", "the", "booking",
+         "maybe", "keep", "it", "reschedule", "accept", "decline", "?"]
+    ),
+    min_size=0,
+    max_size=12,
+).map(" ".join)
+
+
+@given(summary=WORDS)
+@settings(max_examples=200, deadline=None)
+def test_prose_without_token_is_never_decisive(summary):
+    for leg in (LEG_CONFIRM, LEG_OFFER):
+        assert map_terminal_status("COMPLETED", summary, leg) == CallStatus.UNCERTAIN
