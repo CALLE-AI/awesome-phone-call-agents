@@ -218,10 +218,16 @@ def live_runs(receipts_dir: Path) -> dict[str, int]:
 def economics() -> dict:
     """What the demonstration run costs against what a desk costs, from the run itself.
 
-    A blind buyer seat read the entry and reported that the whole business case is inside a
-    console shot at eleven pixels, "in a font I cannot read", and that a unit price is not a
-    budget. The numbers are good and they were unreadable, which is the same as not having
-    them.
+    Somebody reading the entry as a buyer reported that the whole business case was inside
+    a console shot at eleven pixels, "in a font I cannot read", and that a unit price is not
+    a budget. The numbers were good and they were unreadable, which is the same as not
+    having them.
+
+    The same reader later found four different per-call figures across three surfaces, all
+    of them arithmetic this program printed, none of them saying which run they came from.
+    So this card leads with what the account was billed, and the two ceilings are labelled:
+    the net one is the figure the entry quotes everywhere, and the gross one is here because
+    it is the larger and somebody who saw it in an older cut should be able to find it.
 
     They are computed rather than restated. `python -m firstbell --json` prints exactly what
     the human report prints, from the same summary object, so a card built on this cannot
@@ -249,12 +255,26 @@ def economics() -> dict:
         )
 
     staff = StaffCost.us_school_office()
+    # What the calls actually cost, from the account's own billing panel rather than from
+    # an assumption. The file carries the three things thirteen calls cannot settle.
+    price = json.loads(
+        (APP / "evidence" / "observed-price.json").read_text(encoding="utf-8"))["observed"]
+    # The work the safeguarding rule adds, at the counsellor wage, which the run computes
+    # and prints. A ceiling that ignores it is the number this entry stopped quoting.
+    added = run.get("escalation_cost_per_call_lead_minute") or 0.0
     return {
         # Money per call, per minute one manual attempt takes. A rate rather than a flat
         # saving, because what CALL-E charges is unpublished and a school knows its own
         # wage bill and its own call length.
         "break_even_per_call_minute": round(ceiling, 4),
         "break_even_at_three_minutes": round(ceiling * 3, 2),
+        # Gross minus the callbacks, at three minutes for each. The one figure the README,
+        # the page and this card all quote.
+        "net_ceiling_at_three_minutes": round((ceiling - added) * 3, 2),
+        "escalation_cost_at_three_minutes": round(added * 3, 2),
+        "billed_per_call": price["per_call_usd"],
+        "billed_events": price["billed_events"],
+        "billed_total": price["period_total_usd"],
         "currency": staff.currency,
         "hourly": round(staff.hourly, 2),
         "annual": staff.annual,

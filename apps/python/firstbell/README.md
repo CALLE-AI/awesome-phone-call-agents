@@ -26,9 +26,9 @@ and nothing here is a screenshot.
 | Claim | Check it |
 |---|---|
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
-| It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
+| A call costs $0.05 and removes $0.21 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call**, thirteen events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.21 a call** and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
-| The calls cost four times less than the desk time they remove | CALL-E billed this account **$0.05 a call**, thirteen billed events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). `python tools/money_across_runs.py` prints that against the ceiling for every run in this repository |
+| No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 222 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
