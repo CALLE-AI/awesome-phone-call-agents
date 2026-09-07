@@ -1,0 +1,31 @@
+{
+  "_comment": "What CALL-E actually billed this account, read off the account's own usage page. This is a first-party observation and not a published price, so it is here rather than in statistics.json, which holds figures with a public URL a reader can open. A district must confirm its own pricing before relying on any of it. tests/test_observed_price.py fails if the README or the page quotes a different number, and tools/money_across_runs.py puts it beside the ceiling the run derives.",
+  "observed": {
+    "read_at": "2026-09-07",
+    "account": "the author's own CALL-E account, created for this hackathon",
+    "surface": "the Usage panel of the CALL-E dashboard, All countries, Date Range 2026-08-07 to 2026-09-07",
+    "period_total_usd": 0.65,
+    "billed_events": 13,
+    "per_call_usd": 0.05,
+    "call_rows_read": 10,
+    "direction_of_every_row": "IN",
+    "shortest_duration": "0m35s",
+    "longest_duration": "1m50s",
+    "receipted_calls": 12,
+    "receipts_dated": "2026-09-04",
+    "credit_top_up_usd": 1.0,
+    "credit_top_up_at": "2026-09-03",
+    "balance_after": 0.35
+  },
+  "what_it_supports": [
+    "Every one of the ten rows on the usage panel is $0.05, and the period total of $0.65 divides by $0.05 exactly, so thirteen billable events were priced identically.",
+    "The durations on those rows run from 35 seconds to 1 minute 50, so the price did not move with the length of the call across that range.",
+    "Twelve of the thirteen have committed receipts from 2026-09-04. The thirteenth is a call this account placed outside the receipted set, and it is counted here because the period total is what the account was charged, not what the repository can show."
+  ],
+  "what_it_does_not_support": [
+    "That $0.05 is CALL-E's price. CALL-E publishes no per-call price and this is one account's billing readout, on hackathon credit, in one month.",
+    "That the price is per call rather than per minute. Every observed call is under two minutes, so a flat $0.05 a call and a per-minute price rounded up to a two-minute minimum produce the same thirteen rows. Distinguishing them needs one call over two minutes, and this account has none.",
+    "That the price holds at volume, in another country, or outside a credit grant. Every row read IN, and the account was funded by a $1.00 top-up and a hackathon credit."
+  ],
+  "why_it_is_here": "The entry published a ceiling for months and said, correctly, that no saving could be claimed because CALL-E publishes no price. A ceiling with no price beside it is a number a buyer cannot use. This is the price side, measured rather than assumed, with the three things it cannot tell anybody written down next to it."
+}

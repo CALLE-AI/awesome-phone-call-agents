@@ -1,0 +1,199 @@
+"""The price this account was billed, and the one figure the entry leads with.
+
+For months the cost side of this entry was a ceiling with no price beside it, because
+CALL-E publishes none. That was honest and unusable: a district cannot act on a number
+that says only "below this, a person is cheaper". Meanwhile four different per-call
+figures were published on three surfaces, all of them arithmetic the program printed, none
+of them saying which run it belonged to. A buyer read the entry, found all four, and was
+right to stop trusting the fifth.
+
+Both halves are fixed here. `evidence/observed-price.json` holds what the account was
+billed, with the three things thirteen calls cannot settle written beside it.
+`tools/money_across_runs.py` computes the ceiling for every run this repository can
+produce, from one function, so the figures cannot disagree. This file is what keeps the
+README, the tool and that file saying the same thing.
+"""
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+APP = Path(__file__).resolve().parent.parent
+if str(APP / "tools") not in sys.path:
+    sys.path.insert(0, str(APP / "tools"))
+
+from money_across_runs import figures_for, observed, rows, table  # noqa: E402
+
+PRICE = json.loads((APP / "evidence" / "observed-price.json").read_text(encoding="utf-8"))
+README = (APP / "README.md").read_text(encoding="utf-8")
+
+
+def test_the_billing_readout_divides_the_way_it_says_it_does():
+    """Thirteen events at five cents is sixty-five cents, or the readout is misread.
+
+    This is the whole basis for calling the price flat. If the division does not come out,
+    then either a row was priced differently or the period holds something that is not a
+    call, and in both cases the sentence "every call cost the same" is not supported.
+    """
+    seen = PRICE["observed"]
+    assert abs(seen["billed_events"] * seen["per_call_usd"]
+               - seen["period_total_usd"]) < 0.005, (
+        f"{seen['billed_events']} events at ${seen['per_call_usd']:.2f} is not "
+        f"${seen['period_total_usd']:.2f}, so the price was not flat across the period")
+
+
+def test_the_observation_says_what_it_cannot_settle():
+    """A first-party price with no caveats is a marketing number.
+
+    Three of them are load-bearing: it is one account on hackathon credit, every call ran
+    under two minutes so a per-minute price rounded up looks identical, and nothing here
+    speaks to volume. Any one of them missing turns a measurement into a claim.
+    """
+    limits = " ".join(PRICE["what_it_does_not_support"]).lower()
+    assert len(PRICE["what_it_does_not_support"]) >= 3
+    for phrase in ("publishes no per-call price", "two minutes", "volume"):
+        assert phrase in limits, f"the observation does not disclaim {phrase!r}"
+
+
+def test_the_receipted_calls_are_not_counted_as_the_billed_ones():
+    """Twelve receipts and thirteen billed events are two different numbers.
+
+    Publishing thirteen receipts would be false, and publishing twelve billed events would
+    understate what the account paid. The file holds both, and the gap is stated rather
+    than averaged away.
+    """
+    seen = PRICE["observed"]
+    assert seen["receipted_calls"] < seen["billed_events"]
+    assert any("thirteenth" in line or "outside the receipted set" in line
+               for line in PRICE["what_it_supports"]), (
+        "the file records more billed events than receipts and does not say why")
+
+
+def test_the_readme_quotes_the_price_that_is_recorded():
+    seen = PRICE["observed"]
+    assert f"${seen['per_call_usd']:.2f} a call" in README
+    assert f"${seen['period_total_usd']:.2f}" in README
+    # Matched across a line break, because README prose wraps and a test that pins a
+    # sentence to one line asks the next person to break the paragraph instead.
+    assert re.search(r"two-minute\s+minimum", README), (
+        "the README quotes the price and not the reason it might be a per-minute price")
+    assert "evidence/observed-price.json" in README
+
+
+def test_the_readme_ceiling_table_is_what_the_tool_prints_now():
+    """The block in the README, byte for byte against the tool that produces it.
+
+    The four disagreeing figures existed because three surfaces each did the arithmetic.
+    A README table typed by hand would be the fourth. So the block is compared, and a
+    change to any run's outcome fails here rather than being noticed by a reader.
+    """
+    printed = table(rows(None)).splitlines()
+    header = printed[0]
+    body = [line for line in printed[2:] if line.strip() and not line.startswith("-")]
+    quoted = README[README.index("run  "):]
+    quoted = quoted[:quoted.index("```")].splitlines()
+    assert quoted[0].rstrip() == header.rstrip(), (
+        f"the README table header is stale:\n{quoted[0]!r}\n{header!r}")
+    for line in body[:3]:
+        assert line.rstrip() in [q.rstrip() for q in quoted], (
+            f"the tool prints {line.rstrip()!r} and the README does not")
+
+
+def test_the_entry_leads_with_one_number_and_it_is_the_net_one():
+    """`net`, not `gross`. The larger number is the one that ignores the added work.
+
+    The README's first screen, its cost section and the tool all have to name the same
+    figure, and the reason this is a test is that the entry once led with $0.59 on one
+    surface and $0.21 on another.
+    """
+    demo = next(row for row in rows(None) if row["run"] == "the demo")
+    lead = f"${demo['net_ceiling']:,.2f} a call"
+    first_screen = README[README.index("## If you have three minutes"):
+                          README.index("## If you have twenty minutes")]
+    assert f"**{lead}**" in first_screen, (
+        f"the first screen does not lead with {lead}, which is the demo run's net ceiling")
+    assert f"**{lead}**" in README[README.index("## The same ceiling"):], (
+        "the ceiling section does not name the same figure the first screen does")
+    assert demo["gross_ceiling"] > demo["net_ceiling"], (
+        "gross is meant to be the larger figure; if it is not, the arithmetic changed")
+
+
+def test_the_headroom_is_the_two_numbers_divided_and_not_a_claim():
+    """Four times, and it is a division a reader can do in their head.
+
+    Written as words in the README rather than as a figure, because a figure would be a
+    fifth place the arithmetic lives. The test does the division instead.
+    """
+    demo = next(row for row in rows(None) if row["run"] == "the demo")
+    headroom = demo["net_ceiling"] / PRICE["observed"]["per_call_usd"]
+    assert 4.0 <= headroom < 5.0, (
+        f"the README says a little over four times and the division gives {headroom:.2f}")
+    assert "four times the headroom" in README
+
+
+def test_the_tool_runs_and_needs_no_receipts_and_no_account():
+    """The command on the first screen, run the way a reviewer would run it.
+
+    `--receipts` is optional here and required by the page builder, and that asymmetry is
+    the point: a reviewer with no receipts still gets the rows they can reproduce.
+    """
+    proc = subprocess.run([sys.executable, "tools/money_across_runs.py"],
+                          cwd=APP, capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stderr[-800:]
+    assert "the demo" in proc.stdout
+    assert f"${PRICE['observed']['per_call_usd']:.2f} a call" in proc.stdout
+    assert "--json" not in proc.stdout
+
+
+def test_the_json_output_carries_every_run_and_no_rounded_money():
+    """`--json` is for a reader who wants to check the arithmetic, so it stays unrounded.
+
+    Rounding in the machine-readable output is how two surfaces come to disagree in the
+    second decimal place, which is exactly the defect this file exists for.
+    """
+    proc = subprocess.run([sys.executable, "tools/money_across_runs.py", "--json"],
+                          cwd=APP, capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stderr[-800:]
+    data = json.loads(proc.stdout)
+    assert [row["run"] for row in data][:1] == ["the demo"]
+    demo = data[0]
+    assert demo["net_ceiling"] != round(demo["net_ceiling"], 2), (
+        "the JSON is rounded to cents, so a reader cannot check the division")
+
+
+def test_the_arithmetic_is_a_ratio_of_ratios_and_not_a_constant():
+    """Double the attempts removed and the ceiling doubles. That is the whole claim.
+
+    A figure that did not move with its numerator would mean the tool is printing a
+    constant, which is the shape of the defect this project has recorded twice: a number
+    that looks measured and is typed.
+    """
+    one = figures_for(placed=8, removed=4, answered=5, net_new=1)
+    two = figures_for(placed=8, removed=8, answered=5, net_new=1)
+    assert two["gross_ceiling"] == 2 * one["gross_ceiling"]
+    assert two["crossover_per_100"] == 2 * one["crossover_per_100"]
+    # And the added cost does not move with it, because it is paid per answered call
+    # rather than per attempt removed.
+    assert two["added"] == one["added"]
+
+
+def test_a_run_that_answered_nothing_has_no_rate_and_says_so():
+    """Zero answered calls is not a zero rate, and the tool must not print one.
+
+    The same mistake killed the page build once: a bound that does not exist, multiplied.
+    """
+    nothing = figures_for(placed=3, removed=0, answered=0, net_new=0)
+    assert nothing["added"] is None
+    assert nothing["net_ceiling"] is None
+    assert nothing["net_new_bound"] is None
+    assert "n/a" in table([{**nothing, "run": "x", "calls": 3}])
+
+
+def test_the_price_file_is_reachable_from_the_evidence_index():
+    index = (APP / "evidence" / "README.md").read_text(encoding="utf-8")
+    assert "observed-price.json" in index
+    assert re.search(r"\$0\.05", index), (
+        "the evidence index describes the file without saying what it records")

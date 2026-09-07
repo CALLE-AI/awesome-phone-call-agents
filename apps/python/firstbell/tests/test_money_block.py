@@ -139,7 +139,11 @@ def test_the_band_claims_no_saving_and_no_recovered_funding():
     markup = judge_page.money_markup(_run())
     assert "this run claims none of it" in markup
     assert "Not a saving" in markup
-    assert "does not publish a price per call" in markup
+    # The sentence used to be that nobody has a price. The account has been billed
+    # since, so what the band must still refuse to claim is a saving, and what it must
+    # still say is that the figure beside the price is a ceiling.
+    assert "publishes no price" in markup
+    assert "not a price CALL-E stands behind" in markup
 
 
 def test_the_band_reaches_the_page_rather_than_only_the_test():
@@ -185,11 +189,14 @@ def test_a_run_that_answered_nothing_does_not_kill_the_page_build():
 
     markup = judge_page.money_markup(run)
     assert markup, "the band went silent instead of saying what it could not measure"
-    assert "Nobody answered on this run" in markup
-    assert "a rate needs a call that produced an answer" in markup
+    assert "and nobody answered, so it says nothing" in markup
+    assert "that rate needs an answered call" in markup
     assert "per 100" not in markup, (
         "the band states a bound on a run with no answered call to bound"
     )
+    # The other two figures in the cell are not properties of this run and have to survive
+    # it: the price came off a billing panel and the headline ceiling off the demo run.
+    assert "billed" in markup and "one month" in markup
 
 
 def test_a_run_with_one_answered_call_still_states_the_bound():
@@ -204,4 +211,37 @@ def test_a_run_with_one_answered_call_still_states_the_bound():
     ]}
     markup = judge_page.money_markup(run)
     assert "per 100" in markup, "the bound stopped being published on a run that has one"
-    assert "Nobody answered on this run" not in markup
+    assert "nobody answered, so it says nothing" not in markup
+
+
+def test_the_cost_cell_leads_with_the_billed_price_and_not_a_typed_one():
+    """The two figures on the left of the band come from files, not from this file.
+
+    A buyer found four per-call figures across three surfaces, every one of them real and
+    none of them naming its run. The page now leads with what the account was billed and
+    with the demo run's ceiling, both read from `tools/money_across_runs.py`, which is the
+    module the README table and `tests/test_observed_price.py` also read. A number typed
+    into the page builder would pass every other test in this repository.
+    """
+    import judge_page
+    from money_across_runs import demo_row, observed
+
+    facts = judge_page.money_facts(_run())
+    price = observed()["observed"]
+    assert facts["price"] == price
+    assert facts["demo"]["net_ceiling"] == demo_row()["net_ceiling"]
+
+    markup = judge_page.money_markup(_run())
+    assert f"${price['per_call_usd']:,.2f}" in markup
+    assert f"${demo_row()['net_ceiling']:,.2f}" in markup
+    assert "two minutes" in markup, (
+        "the page quotes the billed price without the reason it may be per-minute")
+
+
+def test_the_cell_says_the_page_receipt_is_a_third_run():
+    """Naming the run is the fix. A figure with no run beside it is what caused this."""
+    import judge_page
+    markup = judge_page.money_markup(_run())
+    assert "receipt is a third run" in markup
+    assert "money_across_runs.py" in markup, (
+        "the page states three figures and does not say where the rest are")

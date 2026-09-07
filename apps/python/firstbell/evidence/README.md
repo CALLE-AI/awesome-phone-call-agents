@@ -19,6 +19,7 @@ the calls produced, and the machinery that keeps both honest.
 |---|---|
 | [`api-shape.json`](api-shape.json) | Every key path and JSON type the production API returned, next to what the offline double emits. Path names and type names only: no conversation, no number, no id, no field value. Regenerate with `tools/double_conformance.py`. |
 | [`MUTATIONS.md`](MUTATIONS.md) | Two hundred and fourteen gates broken on purpose, with how many tests noticed each one. |
+| [`observed-price.json`](observed-price.json) | What CALL-E actually billed this account: thirteen events at $0.05 a call, $0.65 over one month, read off the usage panel on 2026-09-07. A first-party observation rather than a published price, which is why it is not in `statistics.json`, and it carries the three things thirteen calls cannot settle. |
 | [`statistics.json`](statistics.json) | Every externally sourced figure the README publishes, with the publisher, the URL, the sentence it came from and the date it was read at source. It exists because one of them was wrong: the README claimed England recorded 18.7% persistent absence in 2024/25, a number that appears nowhere in the DfE release, where the published rate is 17.63%. |
 
 ## What the calls actually settled

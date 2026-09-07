@@ -20,7 +20,7 @@ cannot describe a version of this program that no longer exists.
 
 ## If you have three minutes
 
-Four claims, and the command or the file that settles each. Nothing here needs an API key
+Five claims, and the command or the file that settles each. Nothing here needs an API key
 and nothing here is a screenshot.
 
 | Claim | Check it |
@@ -28,6 +28,7 @@ and nothing here is a screenshot.
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
 | It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
+| The calls cost four times less than the desk time they remove | CALL-E billed this account **$0.05 a call**, thirteen billed events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). `python tools/money_across_runs.py` prints that against the ceiling for every run in this repository |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 214 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
@@ -190,10 +191,46 @@ it is the reason `--funding-rate` exists and is off by default: explaining an ab
 not make a student present, so this app claims none of it unless a district passes its own
 rate with a source.
 
-Two numbers are missing and neither is guessed at. CALL-E publishes no price per call, so
-the cost side is a ceiling rather than a quote. And how many unanswered notifications a
-district has on an average morning is a number its own office knows and this one does not,
-which is why every figure above is per call or per student rather than per term.
+One of the two missing numbers arrived. CALL-E publishes no price per call, so this entry
+priced its own account instead: thirteen billed events at **$0.05 a call**, $0.65 over the
+month from 7 August to 7 September 2026, read off the usage panel on 7 September
+([`evidence/observed-price.json`](evidence/observed-price.json)). Against the $0.21 ceiling
+that is a little over four times the headroom. Three things it does not settle are written
+down in the same file: it is one account's billing on hackathon credit rather than a price
+CALL-E stands behind, every observed call ran between 35 seconds and 1 minute 50 so these
+rows cannot tell a flat price per call from a per-minute price rounded up to a two-minute
+minimum, and nothing here says the price holds at volume or in another country.
+
+The second number is still missing and is not guessed at. How many unanswered notifications
+a district has on an average morning is a number its own office knows and this one does
+not, which is why every figure above is per call or per student rather than per term.
+
+## The same ceiling, on every run in this repository
+
+The ceiling is a division whose numerator is measured: the attempts sitting behind the
+records a run closed. So it moves between runs, and for a while this entry published
+$0.59, $0.50, $0.78 and $0.21 on three surfaces with nothing saying which run each one
+belonged to. One command now prints all of them from one piece of arithmetic:
+
+```bash
+python tools/money_across_runs.py                    # the runs anybody can reproduce
+python tools/money_across_runs.py --receipts DIR     # and the live ones, if you have them
+```
+
+```
+run                          calls billed removed   gross   added     net crossover
+-----------------------------------------------------------------------------------
+the demo                         6      8       4   $0.59   $0.37   $0.21     31.5%
+with consent records             3      3       2   $0.78   $0.62   $0.16     42.0%
+siblings on one number           1      1       0   $0.00   $0.00   $0.00      0.0%
+```
+
+`net` is the one this entry leads with, everywhere: **$0.21 a call** on the demo run, which
+is the run a reader can reproduce with one command and no account. `gross` ignores the work
+the safeguarding rule creates, which is why it is the larger and the wrong number to quote.
+The rows with one and two calls are in the tool's output because they are committed runs and
+leaving them out would be a choice about which evidence counts, but a ratio over two
+attempts is not a price.
 
 ## Run it
 
@@ -840,7 +877,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 563 tests
+python -m pytest tests/ -q          # 577 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

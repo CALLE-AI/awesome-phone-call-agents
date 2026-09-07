@@ -1017,7 +1017,15 @@ def money_facts(run: dict) -> dict:
     worst = None if (bound is None or ceiling is None) else (
         ceiling * 3 - bound * (lead.hourly / 60.0) * 3)
 
+    # The price and the headline ceiling come from `tools/money_across_runs.py`, which is
+    # the same module the README's table and `tests/test_observed_price.py` read. Three
+    # surfaces doing this arithmetic separately is what produced $0.59, $0.50, $0.78 and
+    # $0.21 with nothing beside them naming a run.
+    from money_across_runs import demo_row, observed
+
     return {
+        "price": observed()["observed"],
+        "demo": demo_row(),
         "sis": figures["chccs-sis-renewal"],
         "enrolment": figures["chccs-enrolment"],
         "per_student": number("chccs-sis-renewal") / number("chccs-enrolment"),
@@ -1071,8 +1079,9 @@ def money_markup(run: dict) -> str:
         '</div>',
 
         '<div class=money-cell>',
-        f'<p class=money-n>${f["ceiling_at_three"]:,.2f}</p>',
-        '<p class=money-what>a call, above which a person is cheaper</p>',
+        f'<p class=money-n>${f["price"]["per_call_usd"]:,.2f}</p>',
+        f'<p class=money-what>a call, billed. The desk time one call removes is worth '
+        f'${f["demo"]["net_ceiling"]:,.2f}</p>',
         # Three endings here as well, and the third one is why this is a branch rather
         # than a format string. A run that placed calls and answered none has no
         # escalation rate: the denominator is zero, so `bound` and `worst_at_three` are
@@ -1082,17 +1091,43 @@ def money_markup(run: dict) -> str:
         #
         # It is the defect this project spends its time hunting, in its own page builder:
         # a quantity that cannot be measured, handled as though it always can be.
-        f'<p class=money-why>Not a saving: CALL-E publishes no price, so this is the '
-        f'ceiling. {f["removed"]} of {f["placed"]} attempts came off a desk at '
-        f'${f["desk"].hourly:,.2f} an hour, at three minutes an attempt. '
-        + ('Nobody answered on this run, so it says nothing at all about what the '
-           'safeguarding rule adds: a rate needs a call that produced an answer, and '
-           'there is no such call here. The ceiling above is the desk time only.</p>'
+        f'<p class=money-why>CALL-E publishes no price, so the left figure is what it '
+        f'billed this account: {f["price"]["billed_events"]} events at '
+        f'${f["price"]["per_call_usd"]:,.2f}, ${f["price"]["period_total_usd"]:,.2f} over '
+        f'one month. The right figure is '
+        f'the demo run: {f["demo"]["attempts_removed"]} of '
+        f'{f["demo"]["attempts_billed"]} attempts came off a desk at '
+        f'${f["desk"].hourly:,.2f} an hour at three minutes each, less the safeguarding '
+        f'callbacks at ${f["lead"].hourly:,.2f}. Not a saving: a ceiling.</p>'
+
+        '</div>',
+        '</div>',
+
+        # Three sentences of caveat, in the order a buyer would object in. The first
+        # used to say nobody has a price, which stopped being true the day the account
+        # was billed. The second is the run this page is built on, which is a third run
+        # again: a ceiling is a division whose numerator is measured, so it moves, and
+        # for a while this page published its own figure with nothing naming the run.
+        f'<p class=money-foot>${f["price"]["per_call_usd"]:,.2f} is one account&#8217;s '
+        'billing on hackathon credit and not a price CALL-E stands behind, so a district '
+        'confirms its own. Every one of those calls ran between '
+        f'{esc(f["price"]["shortest_duration"])} and '
+        f'{esc(f["price"]["longest_duration"])}, all under two minutes, so they cannot '
+        'tell a flat price from a per-minute one rounded up. '
+        'This page&#8217;s receipt is a third run: '
+        f'{f["removed"]} of {f["placed"]} attempts removed, '
+        # Three endings, and the third is why this is a branch. A run that placed calls
+        # and answered none has no escalation rate: the denominator is zero, so `bound`
+        # is None, and multiplying None killed the whole page build once. The guard at
+        # the top only asked whether the ceiling existed, and on that run it is 0.0,
+        # which is a number.
+        + ('and nobody answered, so it says nothing about what the safeguarding rule '
+           'adds: that rate needs an answered call and there is none here. '
            if not f["answered"] or f["bound"] is None else
            f'{f["net_new"]} of {f["answered"]} answered calls became new work for the '
-           f'safeguarding lead, so nothing is subtracted here. '
-           f'{f["answered"]} calls cannot rule out {100 * f["bound"]:.0f} per 100, and at '
-           + (f'that end the ceiling is <b>${f["worst_at_three"]:,.2f}</b>.</p>'
+           f'safeguarding lead, and {f["answered"]} calls cannot rule out '
+           f'{100 * f["bound"]:.0f} per 100. At that end '
+           + (f'the ceiling is ${f["worst_at_three"]:,.2f}. '
               # No None check here, deliberately. `worst_at_three` is None only when the
               # bound or the ceiling is None, the branch above catches the bound and the
               # guard at the top of this function returns early on the ceiling, so this
@@ -1100,17 +1135,15 @@ def money_markup(run: dict) -> str:
               # was not caught by any test, which is how an unreachable guard announces
               # itself: it reads as protection and provides none.
               if f["worst_at_three"] > 0 else
-              'that end the callbacks cost more than the calls save. Which end it is, is '
-              'what a pilot measures in week one.</p>')),
-        '</div>',
-        '</div>',
-
-        '<p class=money-foot>The two numbers nobody has. CALL-E does not publish a price '
-        'per call, so no saving is claimed anywhere on this page. And how many unanswered '
-        'notifications a district handles in a morning is a number a school office has and '
-        'we do not, which is why every figure here is per call rather than per year. '
-        f'For scale only: the United States has {esc(f["districts"]["value"])} regular '
-        f'school districts and {esc(f["schools"]["value"])} public schools '
+              'the callbacks cost more than the calls save, and which end it is, is what '
+              'a pilot measures in week one. '))
+        + '<code>python tools/money_across_runs.py</code> prints every run&#8217;s '
+        'figures from one piece of arithmetic. '
+        'How many unanswered '
+        'notifications a district handles in a morning is still a number a school office '
+        'has and we do not, which is why every figure here is per call rather than per '
+        f'year. For scale only: the United States has {esc(f["districts"]["value"])} '
+        f'regular school districts and {esc(f["schools"]["value"])} public schools '
         f'({cite(f["districts"])}). That is the size of the problem, not a claim about '
         'adoption.</p>',
         '</div>',
