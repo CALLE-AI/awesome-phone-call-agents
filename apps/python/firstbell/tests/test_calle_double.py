@@ -560,3 +560,89 @@ def test_a_busy_line_and_a_switched_off_handset_can_still_be_modelled(double, cl
     final = client.calls.wait_for_result(created["id"], interval_seconds=0)
     assert final["recipients"][0]["attempts"][0]["failure_code"] == "486"
 
+
+# --------------------------------------------------------------------------
+# The clock, which is a field a consumer compares against its own
+# --------------------------------------------------------------------------
+
+def test_the_clock_does_not_drift_away_from_the_caller_on_a_large_run():
+    """A hundred and fifty rows must not turn a known provenance into an unknown one.
+
+    The double advanced one shared clock 30 simulated seconds per step and never pulled it
+    back, so `created_at` ran ahead of the caller's real clock in proportion to the number
+    of calls. Past roughly a hundred it crossed the one-hour skew guard the dispatcher uses
+    in `_was_placed_now`, which then answers None: 0 unknown at 60 rows, 138 of 200. The
+    demonstration file has seven rows, so nothing showed it, and `--max-calls` exists
+    precisely to invite the bigger run.
+
+    Reported as unknown is the honest answer to a question that cannot be answered, and
+    here it was answerable. The clock was the only thing making it not so.
+    """
+    from dispatch import WaveDispatcher, WorkItem
+
+    double = CalleDouble()
+    double.set_default_outcome(Outcome.answered(CONFIRMED, CHAT))
+    items = [WorkItem(id=f"S-{i}", phones=(f"+9155500{i:05d}",)) for i in range(150)]
+    report = WaveDispatcher(
+        build_client(double), task_builder=lambda i: "Ask.",
+        result_schema={"type": "object", "required": ["reason"],
+                       "properties": {"reason": {"type": "string"}}},
+        concurrency=4, poll_interval_seconds=0, sleep=lambda _s: None,
+    ).run(items)
+
+    unknown = [r.item.id for r in report.results if r.placed_by_this_run is None]
+    assert not unknown, (
+        f"{len(unknown)} of {len(items)} calls came back with an unknown provenance, so "
+        "the double's clock has drifted out of the window the consumer compares against")
+    assert all(r.placed_by_this_run is True for r in report.results)
+
+
+def test_a_pinned_clock_still_gives_the_same_timestamps_every_run():
+    """The fix must not cost the determinism a test asks for with `now=`."""
+    from datetime import datetime, timezone
+
+    pinned = datetime(2026, 9, 14, 8, 30, tzinfo=timezone.utc)
+    stamps = []
+    for _ in range(2):
+        double = CalleDouble(now=pinned)
+        double.set_default_outcome(Outcome.answered(CONFIRMED, CHAT))
+        client = build_client(double)
+        made = [client.calls.create(task="Ask.", recipients=[{"phones": [phone]}],
+                                   result_schema=None)
+                for phone in ("+915550000001", "+915550000002")]
+        stamps.append([call["created_at"] for call in made])
+
+    assert stamps[0] == stamps[1], "a pinned double stopped being deterministic"
+    assert all(s.startswith("2026-09-14T08:30") for s in stamps[0]), stamps[0]
+
+
+@pytest.mark.parametrize("phone", [
+    "+91 5550 000001",   # the one an office spreadsheet produces
+    "+91-5550-000001",
+    "915550000001",      # no plus at all
+    "+01234567890",      # a country code starting at zero
+    "+1555",             # too short to be anybody
+    "+9155500000012345", # too long for E.164
+    "+91555000000a",
+])
+def test_a_number_that_is_not_e164_is_refused_by_shape(client, phone):
+    """The double called `startswith('+')` E.164, so a malformed number was dialled.
+
+    A double exists so a class of production refusal can be met offline. A number the real
+    service rejects for its shape was one this one could not show anybody, and the office
+    spreadsheet that feeds this app is the likeliest source of a number typed with spaces.
+    """
+    from calle import CalleAPIError
+
+    with pytest.raises(CalleAPIError) as raised:
+        client.calls.create(task="Ask.", recipients=[{"phones": [phone]}],
+                            result_schema=None)
+    assert raised.value.code == "invalid_phone", raised.value.code
+
+
+def test_the_numbers_this_repository_uses_are_still_accepted(client):
+    """The check above must not refuse the reserved ranges every fixture here is built on."""
+    for phone in ("+915550000001", "+15551000001", "+61455500000"):
+        created = client.calls.create(task="Ask.", recipients=[{"phones": [phone]}],
+                                      result_schema=None)
+        assert created["id"]

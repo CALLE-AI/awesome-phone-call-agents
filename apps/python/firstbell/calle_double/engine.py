@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -77,6 +78,20 @@ class DoubleError(Exception):
 
     def body(self) -> dict[str, Any]:
         return {"error": {"code": self.code, "message": self.message, "details": {}}}
+
+
+# E.164: a plus, a country code that does not start at zero, and up to fifteen digits in
+# total. Nothing else, which is the point.
+#
+# This used to be `phone.startswith("+")`, so `"+91 5550 000001"` was accepted and dialled.
+# A double exists so a class of production refusal can be met offline, and a number the
+# real service rejects for its shape was one this one could not show anybody. The office
+# spreadsheet that feeds this app is the likeliest place for a number typed with spaces.
+_E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+
+
+def _is_e164(value: object) -> bool:
+    return isinstance(value, str) and _E164.match(value) is not None
 
 
 @dataclass
@@ -206,6 +221,10 @@ class _CallTask:
     idempotency_key: str | None
     request_fingerprint: str
     created_at: str = ""
+    # This call's own simulated clock, seeded when it was created and stepped 30 seconds
+    # per advance. It used to be one clock shared by the whole double, which drifted: see
+    # `_seed_clock`.
+    clock: datetime | None = None
     status: str = "queued"
     events: list[dict[str, Any]] = field(default_factory=list)
     canceled: bool = False
@@ -278,6 +297,7 @@ class CalleDouble:
         # clock, which is exactly how a consumer tells a call it just placed from one an
         # idempotency key replayed. Pass `now` to pin it when a test needs determinism.
         self._now = now or datetime.now(timezone.utc)
+        self._pinned = now is not None
         self._calls: dict[str, _CallTask] = {}
         self._by_idempotency: dict[str, str] = {}
         self._ids = itertools.count(1)
@@ -388,7 +408,7 @@ class CalleDouble:
             if not phones:
                 raise DoubleError("invalid_recipient", "Recipient has no phone number.")
             for phone in phones:
-                if not phone.startswith("+"):
+                if not _is_e164(phone):
                     raise DoubleError("invalid_phone", f"{phone!r} is not E.164.")
                 resolved = regions.resolve(phone)
                 if resolved is None:
@@ -417,6 +437,7 @@ class CalleDouble:
                 )
             )
 
+        seeded = self._seed_clock()
         call = _CallTask(
             id=f"call_{next(self._ids)}",
             task=task,
@@ -427,7 +448,8 @@ class CalleDouble:
             webhook_url=webhook_url,
             idempotency_key=idempotency_key,
             request_fingerprint=fingerprint,
-            created_at=_iso(self._now) or "",
+            created_at=_iso(seeded) or "",
+            clock=seeded,
         )
         self._calls[call.id] = call
         if idempotency_key is not None:
@@ -479,12 +501,33 @@ class CalleDouble:
             return self._default_outcome
         return Outcome.answered({"ok": True}, [("bot", "Hello."), ("user", "Yes.")])
 
+    def _seed_clock(self) -> datetime:
+        """Where a new call's own clock starts.
+
+        There used to be one clock for the whole double, advanced 30 simulated seconds by
+        every `_advance` and never pulled back. On a seven-row demonstration that is
+        invisible. On a run of a few hundred, which `--max-calls` explicitly invites, the
+        shared clock ran minutes ahead of the caller's real one, `created_at` crossed the
+        one-hour skew guard in the dispatcher's `_was_placed_now`, and the run reported the
+        provenance of half its calls as unknown: 0 of 60 rows, 138 of 200.
+
+        That is the field breaking the thing it was added for. `__init__` says it: a double
+        whose timestamps mean nothing against a consumer's clock takes away the only way
+        that consumer can tell a call it just placed from one an idempotency key replayed.
+
+        So each call carries its own clock instead. Within a call the steps are still
+        ordered and still cost no wall clock; across calls nothing accumulates. A double
+        that was pinned with `now=` keeps the pinned value, because a test that asks for
+        determinism is entitled to it.
+        """
+        return self._now if self._pinned else datetime.now(timezone.utc)
+
     def _advance(self, call: _CallTask) -> None:
         """Move exactly one recipient one step. Deterministic, no wall clock."""
         if call.status in ("completed", "failed", "canceled"):
             return
         call.status = "in_progress"
-        self._now += timedelta(seconds=30)
+        call.clock = (call.clock or self._seed_clock()) + timedelta(seconds=30)
 
         for recipient in call.recipients:
             if recipient.status in ("completed", "failed", "skipped"):
@@ -512,14 +555,14 @@ class CalleDouble:
             id=f"att_{next(self._ids)}",
             phone=phone,
             status="dialing",
-            started_at=self._now,
+            started_at=call.clock,
             provider_call_id=f"prov_{next(self._ids)}",
         )
         recipient.attempts.append(attempt)
 
         if outcome.answers_on is not None and idx == outcome.answers_on:
             attempt.status = "completed"
-            attempt.completed_at = self._now + timedelta(seconds=42)
+            attempt.completed_at = call.clock + timedelta(seconds=42)
             attempt.transcript = outcome.transcript
             attempt.summary = outcome.summary or "Reached the contact."
             recipient.status = "completed"
@@ -541,7 +584,7 @@ class CalleDouble:
         # full. A dispatcher that reads "the person declined" off 603 is contradicted by
         # this timestamp, and that argument only holds if the double reproduces it.
         # Answered attempts in the same recordings ran 35 to 110 seconds.
-        attempt.completed_at = self._now
+        attempt.completed_at = call.clock
         # The wire code, not the meaning. See ATTEMPT_SIP_CODES.
         attempt.failure_code = outcome.sip_code
         attempt.failure_message = f"calling task status=DECLINED (code {outcome.sip_code})"
@@ -554,7 +597,7 @@ class CalleDouble:
         self._in_flight.discard(call.id)
         any_completed = any(r.status == "completed" for r in call.recipients)
         call.status = "completed" if any_completed else "failed"
-        call.completed_at = self._now
+        call.completed_at = call.clock
         answered = [r for r in call.recipients if r.status == "completed"]
         # One recipient answering means the task result is unambiguously theirs, which is
         # what every recorded response shows. Several answering means the API has no way to
@@ -587,5 +630,5 @@ class CalleDouble:
              details: dict[str, Any]) -> None:
         call.events.append(
             {"id": f"evt_{next(self._ids)}", "level": level, "name": name,
-             "created_at": _iso(self._now), "details": details}
+             "created_at": _iso(call.clock), "details": details}
         )
