@@ -1,0 +1,89 @@
+{
+  "note": "Fictional test data. Numbers are NANP fiction-reserved 555-01xx. No call was placed to produce this file.",
+  "calls": {
+    "+15550100": {
+      "id": "call_demo_hop1",
+      "object": "call_task",
+      "status": "completed",
+      "structured_result": {
+        "owns_request": "no",
+        "question_answered": "no",
+        "answer_summary": null,
+        "referral_target_name": "Example Freight Claims",
+        "referral_target_phone": "+15550111",
+        "referral_quote": "We only sell it, we do not ship it. Damage in transit is the carrier's claim. Call Example Freight on five five five, zero one one one.",
+        "reference_number": null
+      },
+      "summary": null,
+      "task_completed": true,
+      "recipients": [
+        {
+          "id": "rcp_demo_hop1",
+          "status": "completed",
+          "structured_result": null,
+          "attempts": [
+            {
+              "status": "completed",
+              "transcript_turns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "I am an AI assistant calling on behalf of Dana Okafor about order ORD-8472, which arrived crushed."
+                },
+                {
+                  "offset_seconds": 9,
+                  "speaker": "user",
+                  "text": "We only sell it, we do not ship it. Damage in transit is the carrier's claim. Call Example Freight on five five five, zero one one one."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "failure_code": null,
+      "failure_message": null
+    },
+    "+15550111": {
+      "id": "call_demo_hop2",
+      "object": "call_task",
+      "status": "completed",
+      "structured_result": {
+        "owns_request": "no",
+        "question_answered": "no",
+        "answer_summary": null,
+        "referral_target_name": "Example Retail Support",
+        "referral_target_phone": "+1 (555) 0100",
+        "referral_quote": "If the box was packed by the shipper, the claim is theirs, not ours. You need to go back to Example Retail on five five five, zero one zero zero.",
+        "reference_number": "FR-55120"
+      },
+      "summary": null,
+      "task_completed": true,
+      "recipients": [
+        {
+          "id": "rcp_demo_hop2",
+          "status": "completed",
+          "structured_result": null,
+          "attempts": [
+            {
+              "status": "completed",
+              "transcript_turns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Example Retail Support referred this damage claim to you."
+                },
+                {
+                  "offset_seconds": 11,
+                  "speaker": "user",
+                  "text": "If the box was packed by the shipper, the claim is theirs, not ours. You need to go back to Example Retail on five five five, zero one zero zero."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "failure_code": null,
+      "failure_message": null
+    }
+  }
+}
