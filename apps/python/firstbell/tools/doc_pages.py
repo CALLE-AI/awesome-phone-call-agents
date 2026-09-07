@@ -17,10 +17,23 @@ a public site because somebody saved a file there.
 from __future__ import annotations
 
 import html
+import posixpath
+import re
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 DOCS = APP / "docs"
+
+# Where this application sits inside the repository. A link in a committed document is
+# written for the tree, so resolving one means knowing that `../evidence/MUTATIONS.md`
+# from `docs/` is this path plus `evidence/MUTATIONS.md` and not a path on a web server.
+APP_IN_REPO = "apps/python/firstbell"
+REPO = APP.parents[2]
+if REPO / APP_IN_REPO != APP:  # pragma: no cover - a moved application, caught at build
+    raise SystemExit(
+        f"doc_pages expects this app at {APP_IN_REPO} inside the repository and found it "
+        f"at {APP}. Every link in every published document resolves through that path, so "
+        "the constant has to move with the directory.")
 
 # slug, the title a reader sees in the list, and why they would open it. The order is the
 # order a reader meets the questions in: what it costs to try, what the lawyer asks, then
@@ -89,6 +102,59 @@ DOC_CSS = """
 """.strip()
 
 
+# markdown-it emits exactly this shape and nothing nests inside an anchor in these
+# documents, so one pattern reaches every link on every page.
+_LINK = re.compile(r'<a href="([^"]+)">(.*?)</a>', re.S)
+
+
+def _repo_path(doc_path: str, href: str) -> str:
+    """A link written for the tree, resolved to a path from the repository root."""
+    here = posixpath.dirname(f"{APP_IN_REPO}/{doc_path}")
+    resolved = posixpath.normpath(posixpath.join(here, href))
+    if resolved.startswith(".."):
+        raise SystemExit(
+            f"{doc_path} links to {href!r}, which leaves the repository. A published page "
+            "cannot carry a link to a file nobody reading it has.")
+    return resolved
+
+
+def relink(body: str, doc_path: str, repo_url: str | None, ref: str = "HEAD") -> str:
+    """Every repository link in a rendered document, pointed at something a reader can open.
+
+    These documents are committed markdown first and pages second, so their links are
+    written for the tree: `receipt-provenance.md` beside them, `../evidence/MUTATIONS.md`
+    above them. Served unchanged, all eight of them were 404s on the deployment, which is
+    the same defect that put these documents on a site in the first place, one level down.
+    A judge following a citation out of the legal surface got an error page.
+
+    Three endings, and the third is the one worth arguing about. A link to another
+    published document becomes that page. A link to a file in the tree becomes the file on
+    the forge, if the build was told where the tree is. A link to a file in the tree with
+    no forge known stops being a link and keeps its text, because every link text in these
+    documents is already the path in backticks: a reader loses a click and learns the same
+    thing, where inventing a URL would send them somewhere that does not exist.
+    """
+    def one(match: re.Match[str]) -> str:
+        href, text = match.group(1), match.group(2)
+        if href.startswith(("http://", "https://", "mailto:", "#")):
+            return match.group(0)
+        anchor = ""
+        if "#" in href:
+            href, fragment = href.split("#", 1)
+            anchor = "#" + fragment
+        target = _repo_path(doc_path, href)
+        for slug, path, _title, _why in PUBLISHED:
+            if f"{APP_IN_REPO}/{path}" == target:
+                return f'<a href="{slug}.html{anchor}">{text}</a>'
+        if repo_url:
+            kind = "tree" if (REPO / target).is_dir() else "blob"
+            base = repo_url.rstrip("/")
+            return f'<a href="{base}/{kind}/{ref}/{target}{anchor}">{text}</a>'
+        return text
+
+    return _LINK.sub(one, body)
+
+
 def _render_markdown(text: str) -> str:
     """One committed document as HTML, or a refusal that says what to install.
 
@@ -111,13 +177,14 @@ def _render_markdown(text: str) -> str:
     return MarkdownIt("commonmark").render(text)
 
 
-def render(slug: str, path: str, title: str, why: str, css: str) -> str:
+def render(slug: str, path: str, title: str, why: str, css: str,
+           repo_url: str | None = None, ref: str = "HEAD") -> str:
     """One document as a standalone page, in the same inks and typefaces as the site."""
     source = APP / path
     if not source.exists():
         raise SystemExit(f"{source} is listed in doc_pages.PUBLISHED and does not exist")
 
-    body = _render_markdown(source.read_text(encoding="utf-8"))
+    body = relink(_render_markdown(source.read_text(encoding="utf-8")), path, repo_url, ref)
 
     # The document already opens with its own h1. Two would be a page with two titles.
     heading = f"<h1>{html.escape(title)}</h1>"
@@ -139,21 +206,32 @@ def render(slug: str, path: str, title: str, why: str, css: str) -> str:
         f"{heading}"
         f'<p class=doc-why>{html.escape(why)}</p>'
         f"{body}"
-        f'<p class=dim>This page is <code>{html.escape(path)}</code> in the '
+        f'<p class=dim>This page is {_source_markup(path, repo_url, ref)} in the '
         "repository, rendered at build time. The file is the original and this is a "
         "copy of it, so if the two ever disagree the file is right.</p>"
         "</main></html>"
     )
 
 
-def write_all(out: Path, css: str) -> list[Path]:
+def _source_markup(path: str, repo_url: str | None, ref: str) -> str:
+    """The foot line naming the file, as a link to it when the build knows the tree."""
+    name = f"<code>{html.escape(path)}</code>"
+    if not repo_url:
+        return name
+    base = repo_url.rstrip("/")
+    return f'<a href="{base}/blob/{ref}/{APP_IN_REPO}/{path}">{name}</a>'
+
+
+def write_all(out: Path, css: str, repo_url: str | None = None,
+              ref: str = "HEAD") -> list[Path]:
     """Every published document, into `out/docs/`. Returns what was written."""
     target = out / "docs"
     target.mkdir(parents=True, exist_ok=True)
     written = []
     for slug, path, title, why in PUBLISHED:
         page = target / f"{slug}.html"
-        page.write_text(render(slug, path, title, why, css), encoding="utf-8", newline="\n")
+        page.write_text(render(slug, path, title, why, css, repo_url, ref),
+                        encoding="utf-8", newline="\n")
         written.append(page)
     return written
 

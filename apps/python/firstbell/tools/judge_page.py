@@ -1745,6 +1745,10 @@ def main() -> int:
                     help="public URL of the source repository. Omitted rather than "
                          "guessed: a link to a repository that is not published yet "
                          "is worse than no link at all")
+    ap.add_argument("--repo-ref", default=os.environ.get("FIRSTBELL_REPO_REF", "HEAD"),
+                    help="the branch or commit the published tree is read at. HEAD is "
+                         "the forge's own default branch, which is right after a merge "
+                         "and wrong while the work is still on a branch")
     args = ap.parse_args()
 
     # No recordings, no page, and no half-built one either. This tool turns recordings into
@@ -1819,7 +1823,8 @@ def main() -> int:
     # The five committed documents, rendered rather than retyped, in the page's own inks.
     # They are what a reader who will not clone a repository can still read: the pilot
     # shape, the legal surface, and the three that say how the evidence itself was made.
-    docs = doc_pages.write_all(out, css_for_serving(page_css()))
+    docs = doc_pages.write_all(out, css_for_serving(page_css()),
+                               args.repo_url, args.repo_ref)
 
     # The policy is derived from the bytes above rather than kept beside them, so the two
     # cannot disagree. Written after the pages for the same reason: there is nothing to

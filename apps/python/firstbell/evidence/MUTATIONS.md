@@ -291,6 +291,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 182 | Hand-edit the committed path figure, so the README shows something its generator does not write | 1 |
 | 183 | Set an ending's second line in the palest ink the palette holds, on its own coloured plate, so a label on the page's own figure drops below WCAG AA | 1 |
 | 184 | Put the escalation panel's dark ink on a mid-grey plate, which is the pairing a drawing loses track of because the ink and the ground are set in two different places in the file | 1 |
+| 185 | Serve a document page with its markdown link left as written for the tree (`receipt-provenance.md` beside it), which is what all eight of them did on the deployment | 1 |
+| 186 | Point an in-page anchor at an id that is not on the page, so the click scrolls nowhere and reports nothing | 1 |
+| 187 | Give a published page an href in a scheme the link gate does not classify, to check it is counted unmeasured rather than quietly skipped | 1 |
+| 188 | Make a gate raise instead of returning, by pointing a rail link at a deleted element, to check the run still reports the other fifteen | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -705,6 +709,23 @@ used to say every task it found happened "during a full scroll after load" while
 collecting buffered entries from the load itself, which is where the one real task was.
 
 ## What is not covered
+
+Rows 185 to 188 are about links, and they exist because the site had eight dead ones while
+fifteen gates passed. Every gate opened the pages a judge lands on and none of them
+followed a link off one, so the documents published to answer a reviewer's complaint were
+themselves 404ing on every citation they made. Rows 185 and 186 are the two ways that
+happens: a link written for the repository tree, and an anchor into a section that was
+renamed. Row 187 is the gate's third outcome, because a link checker that ignores the
+schemes it did not anticipate reports on the links it happened to understand.
+
+Row 188 is a different animal and it was found by accident, while planting row 186. The
+rail gate reads the destination of every rail link and measures it, so an anchor naming a
+deleted element threw a TypeError, the run stopped at gate seven of sixteen, and
+`gate-report.json` was never written. The suite went red, which is the part that worked.
+Nothing said which gate had found the defect, and the nine gates after it never ran. Each
+gate is now called through a wrapper that turns a throw into a recorded
+could-not-measure, so the run finishes, the report exists, and the outcome is still not a
+pass.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

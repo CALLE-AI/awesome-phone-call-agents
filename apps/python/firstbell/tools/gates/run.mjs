@@ -71,6 +71,30 @@ function record(name, status, detail, measured = {}) {
 }
 
 /**
+ * One gate, with a throw turned into a result instead of into the end of the run.
+ *
+ * Found by planting a dead in-page anchor to prove the link gate notices it. The rail
+ * gate reads the destination of every rail link and calls `getBoundingClientRect` on it,
+ * so a link naming an element that no longer exists threw a TypeError, the run stopped at
+ * gate seven of sixteen, and `gate-report.json` was never written at all. The planted
+ * defect was found, in the sense that the suite went red. Nothing said which gate had
+ * found it, and the nine gates after it never ran.
+ *
+ * A gate that cannot complete has not measured anything, so it records could-not-measure
+ * rather than a pass or a fail, and could-not-measure already fails the run. The point is
+ * that the other gates still report and the file still gets written.
+ */
+async function runGate(name, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    record(name, "COULD-NOT-MEASURE",
+      `this gate threw before it could report: ${err.message.split("\n")[0]}`,
+      { threw: err.constructor?.name || "Error" });
+  }
+}
+
+/**
  * Serve `out/` with gzip, because compression decides the performance target.
  *
  * Measuring an uncompressed directory reports a page weight and a paint time that no
@@ -1565,6 +1589,129 @@ async function gateCsp(browser) {
 }
 
 /**
+ * Every link on every published page, followed.
+ *
+ * The documents on this site are committed markdown rendered at build time, so their
+ * links are written for the repository tree: a sibling `receipt-provenance.md`, an
+ * `../evidence/MUTATIONS.md` one directory up. Served without rewriting, eight of them
+ * were 404s on the deployment. Nothing here noticed, because every gate opened the pages
+ * a judge lands on and none of them followed a link off one. A citation that leads to an
+ * error page is worse than a citation nobody can click: the reader learns the page was
+ * never read by its author.
+ *
+ * Both halves are measured. A same-origin URL is fetched and has to answer 200. A
+ * fragment has to name an element that exists on the page carrying it, because a link
+ * into a section that was renamed scrolls nowhere and reports nothing. An href the gate
+ * cannot classify is counted unmeasured rather than skipped, and unmeasured fails the
+ * run: a link checker that quietly ignores the schemes it did not anticipate reports on
+ * the links it happened to understand.
+ */
+async function gateLinks(browser, base, slugs) {
+  const pages = [`${base}/index.html`,
+                 ...slugs.map((slug) => `${base}/docs/${slug}.html`)];
+  const wanted = new Map();   // same-origin URL -> the pages asking for it
+  const deadAnchors = [];
+  const unmeasured = [];
+  let external = 0;
+  let fragments = 0;
+
+  for (const page of pages) {
+    const tab = await browser.newPage();
+    await tab.goto(page, { waitUntil: "networkidle0" });
+    const found = await tab.evaluate(() => {
+      const rows = [];
+      for (const el of document.querySelectorAll("[href], [src]")) {
+        const raw = el.getAttribute("href") ?? el.getAttribute("src") ?? "";
+        // `.href` and `.src` are already absolute against the document, which is the
+        // resolution a reader's click performs. Reading the attribute instead would
+        // measure the string rather than the destination.
+        const absolute = el.href ?? el.src ?? "";
+        const id = raw.startsWith("#") ? raw.slice(1) : null;
+        rows.push({
+          raw,
+          absolute: typeof absolute === "string" ? absolute : String(absolute),
+          fragmentLands: id === null ? null
+            : (id === "" ? true : document.getElementById(id) !== null),
+        });
+      }
+      return rows;
+    });
+    await tab.close();
+
+    for (const row of found) {
+      if (row.fragmentLands !== null) {
+        fragments += 1;
+        if (!row.fragmentLands) deadAnchors.push(`${page} -> ${row.raw}`);
+        continue;
+      }
+      if (row.raw.startsWith("data:") || row.raw.startsWith("mailto:")) {
+        external += 1;
+        continue;
+      }
+      if (row.absolute.startsWith(base)) {
+        const clean = row.absolute.split("#")[0];
+        if (!wanted.has(clean)) wanted.set(clean, []);
+        wanted.get(clean).push(page);
+        continue;
+      }
+      if (/^https?:[/][/]/.test(row.absolute)) { external += 1; continue; }
+      unmeasured.push(`${page} -> ${row.raw || "(empty)"}`);
+    }
+  }
+
+  const broken = [];
+  for (const [target, askers] of wanted) {
+    let status = 0;
+    try {
+      status = (await fetch(target, { redirect: "manual" })).status;
+    } catch (err) {
+      unmeasured.push(`${target} could not be fetched: ${err.message}`);
+      continue;
+    }
+    if (status !== 200) {
+      broken.push(`${status} ${target.slice(base.length)} (from ${askers.length} page(s))`);
+    }
+  }
+
+  const measured = {
+    pages: pages.length,
+    same_origin_targets: wanted.size,
+    fragments,
+    external_not_followed: external,
+    broken: broken.length,
+    dead_anchors: deadAnchors.length,
+    unmeasured: unmeasured.length,
+  };
+
+  // A link gate that found nothing to follow is a gate that cannot fail. The floor is
+  // below the current count on purpose: it catches a build that stopped emitting links,
+  // not a document that lost one.
+  if (wanted.size < 8) {
+    record("every link on every page resolves", "COULD-NOT-MEASURE",
+      `only ${wanted.size} same-origin links across ${pages.length} pages, which is fewer `
+      + "than this site has. Something stopped emitting links rather than passing.",
+      measured);
+    return;
+  }
+  if (unmeasured.length) {
+    record("every link on every page resolves", "COULD-NOT-MEASURE",
+      `${unmeasured.length} href(s) this gate cannot classify, so they were not checked: `
+      + unmeasured.slice(0, 5).join("; "), measured);
+    return;
+  }
+  if (broken.length || deadAnchors.length) {
+    record("every link on every page resolves", "FAIL",
+      [...broken, ...deadAnchors.map((a) => `dead anchor ${a}`)].slice(0, 10).join("; "),
+      measured);
+    return;
+  }
+  record("every link on every page resolves", "PASS",
+    `${wanted.size} same-origin target(s) answered 200 and ${fragments} fragment(s) `
+    + `landed, across ${pages.length} pages. ${external} external reference(s) were `
+    + "counted and not followed, because this gate measures this build.", measured);
+}
+
+/**
  * The five document pages, which nothing checked until now.
  *
  * They were added because a blind reviewer reading as a district operations director found
@@ -1737,21 +1884,24 @@ async function main() {
   });
 
   try {
-    await gateWeight();
-    await gateCls(browser, url);
-    await gateLongTasks(browser, url);
-    await gateReducedMotion(browser, url);
-    await gateNoJs(browser, url);
-    await gateCdnLoss(browser, url);
-    await gateRail(browser, url);
-    await gateContrast(browser, url);
-    await gateKeyboard(browser, url);
-    await gateViewport(browser, url);
-    await gateOverflow(browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html"));
-    await gateCsp(browser);
-    await gateDocs(browser, base, docSlugs);
-    await gateFigure(browser, url);
-    await shoot(browser, url);
+    await runGate("weight", () => gateWeight());
+    await runGate("cls", () => gateCls(browser, url));
+    await runGate("long tasks", () => gateLongTasks(browser, url));
+    await runGate("reduced motion", () => gateReducedMotion(browser, url));
+    await runGate("no javascript", () => gateNoJs(browser, url));
+    await runGate("cdn loss", () => gateCdnLoss(browser, url));
+    await runGate("rail", () => gateRail(browser, url));
+    await runGate("contrast", () => gateContrast(browser, url));
+    await runGate("keyboard", () => gateKeyboard(browser, url));
+    await runGate("viewport", () => gateViewport(browser, url));
+    await runGate("overflow", () => gateOverflow(
+      browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html")));
+    await runGate("the page under its own Content-Security-Policy", () => gateCsp(browser));
+    await runGate("document pages", () => gateDocs(browser, base, docSlugs));
+    await runGate("every link on every page resolves",
+      () => gateLinks(browser, base, docSlugs));
+    await runGate("animated figure", () => gateFigure(browser, url));
+    await runGate("screenshots", () => shoot(browser, url));
   } finally {
     await browser.close();
     server.close();
