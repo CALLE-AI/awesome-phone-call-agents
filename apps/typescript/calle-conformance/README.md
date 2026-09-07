@@ -36,6 +36,37 @@ repository.
 `npm test` and `node src/docs.ts --check` run the same way, with nothing
 installed.
 
+### Turning the report into a gate
+
+By default it reports and exits 0, because an absence is not a defect. `--require`
+turns it into something a build can fail on:
+
+```bash
+node src/replay.ts ../some-app --require raw-sip-code-as-failure-code
+```
+
+The gate reports three outcomes rather than two.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | every required behaviour is covered, or no gate was asked for |
+| 20 | the payloads parsed, and a required behaviour never appears in them |
+| 45 | there was nothing readable to judge |
+
+Twenty and forty-five are different facts and a caller acts differently on each.
+"Your fixtures do not cover this" is a coverage gap. "I could not read your
+fixtures" is a broken pipeline that a single failure code would hide.
+
+Failure is asymmetric on purpose. A behaviour counts as covered only when a
+predicate positively decided so on a payload that parsed. Every other path,
+including a predicate that threw on an unfamiliar payload, leaves it uncovered,
+and the gate asserts that its exit code and its list of misses agree before it
+prints either. A checker whose own crash reports success is worse than no checker.
+
+`--require all` requires the whole manifest. `--html <path>` writes the same
+report as a standalone file with no stylesheet, no script and no network, for
+reading without a terminal.
+
 ## The finding this exists to carry
 
 **On the free tier, every request that reaches the planner consumes one call from
@@ -150,6 +181,24 @@ test exercises that branch with `failureCode: "busy"`, which is the documented
 vocabulary and is not what an attempt carries. The test proves the branch works.
 It cannot show that the branch is reachable.
 
+## What this cannot see
+
+Every behaviour here is about the shape of a response. None of them is about who
+was on the line.
+
+The API reports that a person answered and what they said. It does not establish
+which person, and neither does anything in this repository: a project that dials
+a number and treats whoever answers as the intended recipient is making an
+assumption no payload can confirm. This corpus inherits that limit rather than
+solving it, and no predicate here should be read as evidence about identity.
+
+One more, recorded as an open question rather than a finding. In the call of
+7 September 2026 that became `completed-no-failure-8turns-ff6b5c.json`, the task
+ended with "Do not say anything else" and the agent spoke a sentence the task did
+not contain. The response reported `taskCompleted: true` with a completion
+confidence of 0.92, labelled high. That is one call. It is not enough to claim
+anything, and it is written here so that it is not quietly forgotten.
+
 ## Known ceilings
 
 Each entry names the measurement that produced it.
@@ -187,11 +236,14 @@ Each entry names the measurement that produced it.
 ```bash
 npm test
 node src/replay.ts ../../..
+node src/replay.ts ../../.. --require all --html report.html
 node src/docs.ts --check
 ```
 
 `npm install` is needed only for `npm run typecheck` and for the probes that
-contact the API. `npm test` is eight tests and touches no network. It includes leak tests that fail
+contact the API. `npm test` is sixteen tests and touches no network. Seven of them
+attack the gate itself with truncated JSON, wrong types and payloads that parse
+but mean nothing, and assert that none of it can be mistaken for coverage. It includes leak tests that fail
 if a real phone number or an identifier from the private captures reaches
 `fixtures/`, verified by injecting one. Every number in the corpus is drawn from
 ranges reserved for documentation.

@@ -19,7 +19,9 @@
     "ledger": "node --env-file-if-exists=.env src/ledger-report.ts",
     "test": "node --test test/*.test.ts",
     "headroom": "node --env-file-if-exists=.env src/headroom.ts",
-    "live": "node --env-file-if-exists=.env scripts/live-connected.ts"
+    "live": "node --env-file-if-exists=.env scripts/live-connected.ts",
+    "report": "node src/replay.ts ../../.. --html report.html",
+    "gate": "node src/replay.ts ../../.. --require all"
   },
   "dependencies": {
     "@call-e/calle": "0.7.0"

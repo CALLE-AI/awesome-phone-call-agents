@@ -3,3 +3,4 @@ probe-results/
 .env
 .env.local
 .calle-ledger*.json
+report.html
