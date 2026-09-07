@@ -49,6 +49,12 @@ PUBLISHED: list[tuple[str, str, str, str]] = [
      "What a pilot would look like",
      "Two schools, six weeks, the four numbers measured before switch-on, and the "
      "children this software is not allowed to call."),
+    ("the-money-in-full",
+     "docs/the-money-in-full.md",
+     "The money, in full",
+     "Why the headline figure is a ceiling and not a saving, what the safeguarding rule "
+     "costs at the grade it lands on, and the rate above which this software costs a "
+     "district money."),
     ("the-legal-surface",
      "docs/the-legal-surface.md",
      "The legal surface",
