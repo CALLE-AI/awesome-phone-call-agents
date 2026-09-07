@@ -127,12 +127,21 @@ def relink(body: str, doc_path: str, repo_url: str | None, ref: str = "HEAD") ->
     the same defect that put these documents on a site in the first place, one level down.
     A judge following a citation out of the legal surface got an error page.
 
-    Three endings, and the third is the one worth arguing about. A link to another
-    published document becomes that page. A link to a file in the tree becomes the file on
-    the forge, if the build was told where the tree is. A link to a file in the tree with
-    no forge known stops being a link and keeps its text, because every link text in these
-    documents is already the path in backticks: a reader loses a click and learns the same
-    thing, where inventing a URL would send them somewhere that does not exist.
+    Four endings, and the fourth was missing. A link to another published document
+    becomes that page. A link to a file in the tree becomes the file on the forge, if the
+    build was told where the tree is. A link to a file in the tree with no forge known
+    stops being a link and keeps its text, because every link text in these documents is
+    already the path in backticks: a reader loses a click and learns the same thing, where
+    inventing a URL would send them somewhere that does not exist.
+
+    And a link to a file that is not in the tree stops the build. That ending was absent,
+    which meant a citation to a path nobody had written produced a well-formed forge URL
+    that will 404 for as long as the page is up. The `tree` or `blob` decision asked
+    whether the target was a directory and never asked whether it was there, so the one
+    check on the way out was checking the shape of the URL rather than the existence of
+    the thing it names. A page whose entire argument is that its citations resolve cannot
+    publish one that does not, and refusing at build time is the only ending that a reader
+    never has to discover.
     """
     def one(match: re.Match[str]) -> str:
         href, text = match.group(1), match.group(2)
@@ -146,6 +155,14 @@ def relink(body: str, doc_path: str, repo_url: str | None, ref: str = "HEAD") ->
         for slug, path, _title, _why in PUBLISHED:
             if f"{APP_IN_REPO}/{path}" == target:
                 return f'<a href="{slug}.html{anchor}">{text}</a>'
+        if not (REPO / target).exists():
+            raise SystemExit(
+                f"{doc_path} links {href!r}, which resolves to {target} and is not in the "
+                "tree.\n"
+                "A forge URL was being built for it, which is a well-formed link to a "
+                "page that will never exist.\n"
+                "Fix the link in the document, or add the file, before publishing."
+            )
         if repo_url:
             kind = "tree" if (REPO / target).is_dir() else "blob"
             base = repo_url.rstrip("/")

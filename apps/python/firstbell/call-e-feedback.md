@@ -1,7 +1,9 @@
 # CALL-E feedback from building firstbell
 
-Ten findings from building an absence-calling app on CALL-E and placing twelve real calls
-with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026.
+Twelve findings from building an absence-calling app on CALL-E and placing twelve real
+calls with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026. The
+last two came from the days after: one off the billing surface, one from a household with
+two absent children.
 
 They are collected here because they were scattered. Until now they lived in a code comment,
 a `docs/` file and three README bullets, which is a bad place for the one thing in this
@@ -36,7 +38,7 @@ and `max_turns` on the task as a backstop the agent cannot talk its way past. Th
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
 Anchor: `README.md:691-699` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:1015-1019` ("Platform-side call termination").
+limitation 3 at `README.md:1046-1050` ("Platform-side call termination").
 
 ## 2. Webhook deliveries are unsigned, and your SDK is where we found out
 
@@ -229,6 +231,60 @@ that the pinned value is not readable.
 Goals does not crash, and deliberately goes no further. There is no recorded production
 response for the resource in this repository, so anything richer would be a guess presented
 as a conformance record. `evidence/api-shape.json` covers the call surface only, and says so.
+
+## 11. A structured result has one subject, so one answer cannot close two records
+
+Two absent children in one household share a telephone. This is common enough that a
+district's export shows it on any given morning, and it is the first thing an attendance
+officer asks about a batch caller: does it ring me twice.
+
+One call reaches the guardian, one extraction comes back, and the result shape has a single
+subject. One `reason_category`, one `expected_return`, one `parent_confirmed_aware`. There
+is no honest way to close the second child's record on that result, because the call was
+not asked about the second child, and an extraction cannot produce an answer nobody gave.
+Reading the one answer across both records writes a sentence into a safeguarding file that
+no parent said.
+
+So this app groups by telephone number, dials once, and holds the sibling with a reason
+that names the row being called (`dispatch/households.py`). That is correct and it is also
+a person's morning: somebody has to open the held row and ring back about the other child,
+having already spoken to that family today.
+
+**What we would use:** either a task that carries several subjects and returns a result per
+subject, so one conversation can close two records the agent actually asked about, or one
+sentence in the reference saying a call has one subject. The sentence costs you nothing and
+would have saved us an afternoon of trying to work out whether we were missing an API. The
+capability is the better answer for schools, clinics and anywhere a household is the unit
+rather than the person, and it is a bigger change than we would ask for casually.
+
+This is a design consequence rather than a bug, and it is here because it is the single
+platform-shaped constraint that changed what our product does.
+
+## 12. Granted credits did not reach the balance, and the dashboard kept warning about it
+
+The hackathon credit email arrived at 11:47 on 7 September 2026. At 18:40 the same day the
+dashboard read Available Credits $0.35 with a Low Balance warning, and the usage page showed
+the $1.00 top-up of 3 September as the only credit transaction. Nothing distinguished
+"granted and not yet applied" from "not granted" from "applied somewhere this page does not
+read".
+
+The consequence is a decision, not an inconvenience. Testing a wave of calls against a
+balance that may or may not exist means either spending to find out, or not testing. We did
+not test the wave.
+
+**What we would use:** the grant as a transaction row the moment it is applied, even if
+that is later than the email, and a balance that distinguishes granted credit from
+purchased. A pending row saying "credit applied, awaiting settlement" would have answered
+it completely.
+
+While we are on that surface: there is no published price per call anywhere in the
+documentation, so we priced our own account instead. Thirteen billed events at $0.05 each,
+$0.65 over the month to 7 September, every call between 35 seconds and 1 minute 50. All of
+them under two minutes, which means we cannot tell a flat price per call from a per-minute
+price rounded up to a two-minute minimum, and that distinction decides whether a district
+can afford a wave of long calls. `evidence/observed-price.json` records what we saw and the
+three things it cannot settle. Publishing the rate and the rounding rule would let anybody
+building on you write a number down instead of a range.
 
 ## What worked
 

@@ -65,6 +65,18 @@ ATTEMPT_SIP_CODES = ("603", "486", "480", "487", "503")
 OBSERVED_ATTEMPT_SIP_CODE = "603"
 
 
+class ScenarioError(ValueError):
+    """Raised for an outcomes file this double cannot load.
+
+    Deliberately not a `DoubleError`. That class asserts its code is one production
+    actually sends, which is the guard that stops this double inventing an error CALL-E
+    would never return, and it fired the first time a scenario refusal tried to borrow it.
+    A file a person has to edit is a configuration problem and not an API response, and
+    the two must not arrive through the same door: a consumer catching CALL-E errors would
+    otherwise swallow "your scenario has a typo in it" as though the platform had spoken.
+    """
+
+
 class DoubleError(Exception):
     """Raised for a request the real API would reject. Carries a real error code."""
 
@@ -138,6 +150,70 @@ class Outcome:
         things to a school office, not because the platform tells them apart.
         """
         return Outcome(answers_on=None, failure_code="declined", sip_code=sip_code)
+
+    def to_spec(self) -> dict[str, Any]:
+        """This outcome as JSON, for a consumer that is not in this process.
+
+        Round-trips through `from_spec`. Only the fields that differ from the defaults are
+        written, because a file a person is meant to read and edit should not carry six
+        lines of restated default per number.
+        """
+        spec: dict[str, Any] = {"answers_on": self.answers_on}
+        if self.structured_result is not None:
+            spec["structured_result"] = self.structured_result
+        if self.transcript:
+            spec["transcript"] = [list(turn) for turn in self.transcript]
+        if self.failure_code is not None:
+            spec["failure_code"] = self.failure_code
+        if self.sip_code != OBSERVED_ATTEMPT_SIP_CODE:
+            spec["sip_code"] = self.sip_code
+        if self.summary is not None:
+            spec["summary"] = self.summary
+        return spec
+
+    @staticmethod
+    def from_spec(spec: object, where: str = "outcome") -> "Outcome":
+        """One outcome out of a file, or a refusal that names the key it choked on.
+
+        Refuses an unknown key rather than ignoring it. `transcipt` in a file somebody
+        hand-edited is a conversation this double would silently not have, and a scenario
+        that quietly loses half of itself is worse than one that will not load: the run
+        completes, the numbers look plausible, and nothing says a word.
+        """
+        if not isinstance(spec, dict):
+            raise ScenarioError(
+                              f"{where}: an outcome has to be an object, not "
+                              f"{type(spec).__name__}")
+        known = {"answers_on", "structured_result", "transcript", "failure_code",
+                 "sip_code", "summary"}
+        unknown = sorted(set(spec) - known - {"_why"})
+        if unknown:
+            raise ScenarioError(
+                              f"{where}: unknown key(s) {', '.join(unknown)}. An outcome "
+                              "this double does not understand would be an outcome it "
+                              "quietly did not produce.")
+        transcript = spec.get("transcript") or ()
+        turns = []
+        for turn in transcript:
+            if not (isinstance(turn, (list, tuple)) and len(turn) == 2
+                    and all(isinstance(part, str) for part in turn)):
+                raise ScenarioError(
+                                  f"{where}: every transcript turn is a [speaker, text] "
+                                  f"pair, and {turn!r} is not")
+            turns.append((turn[0], turn[1]))
+        answers_on = spec.get("answers_on", 0)
+        if answers_on is not None and not isinstance(answers_on, int):
+            raise ScenarioError(
+                              f"{where}: answers_on is an index or null, not "
+                              f"{answers_on!r}")
+        return Outcome(
+            answers_on=answers_on,
+            structured_result=spec.get("structured_result"),
+            transcript=tuple(turns),
+            failure_code=spec.get("failure_code"),
+            sip_code=spec.get("sip_code", OBSERVED_ATTEMPT_SIP_CODE),
+            summary=spec.get("summary"),
+        )
 
     @staticmethod
     def ambiguous(transcript: Iterable[tuple[str, str]],
@@ -323,6 +399,47 @@ class CalleDouble:
     def set_default_outcome(self, outcome: Outcome) -> None:
         with self._lock:
             self._default_outcome = outcome
+
+    def outcomes(self) -> dict[str, Outcome]:
+        """Every bound outcome, by number. A copy: the caller cannot rebind through it.
+
+        Public because the application exports its demonstration scenario through this,
+        so that the file the HTTP server reads and the scenario the in-process transport
+        applies cannot describe two different mornings.
+        """
+        with self._lock:
+            return dict(self._outcomes)
+
+    def load_outcomes(self, spec: object, where: str = "outcomes file") -> int:
+        """A whole scenario out of JSON. Returns how many numbers were bound.
+
+        The shape is `{"numbers": {"+1555...": {...}}}` with an optional `"default"`. A
+        file with no numbers in it is refused: an empty scenario loads silently and then
+        every recipient gets this double's fallback answer, which is the defect this
+        method exists to close.
+        """
+        if not isinstance(spec, dict):
+            raise ScenarioError(
+                              f"{where}: the outcomes file has to be an object")
+        unknown = sorted(set(spec) - {"numbers", "default", "_comment"})
+        if unknown:
+            raise ScenarioError(
+                              f"{where}: unknown key(s) {', '.join(unknown)}")
+        numbers = spec.get("numbers")
+        if not isinstance(numbers, dict) or not numbers:
+            raise ScenarioError(
+                              f"{where}: no numbers. An outcomes file that binds nothing "
+                              "leaves every recipient on this double's fallback answer, "
+                              "which is the reason to pass one.")
+        for phone, entry in numbers.items():
+            if not isinstance(phone, str) or not phone.strip():
+                raise ScenarioError(
+                                  f"{where}: {phone!r} is not a telephone number")
+            self.set_outcome(phone, Outcome.from_spec(entry, f"{where}: {phone}"))
+        if "default" in spec:
+            self.set_default_outcome(
+                Outcome.from_spec(spec["default"], f"{where}: default"))
+        return len(numbers)
 
     def fail_next_request(self, code: str, message: str = "injected", status_code: int = 400) -> None:
         with self._lock:

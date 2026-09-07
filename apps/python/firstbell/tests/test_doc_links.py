@@ -127,3 +127,48 @@ def test_the_foot_of_each_page_reaches_the_file_it_was_rendered_from():
     assert f'href="{FORGE}/blob/HEAD/apps/python/firstbell/{path}"' in markup
     plain = doc_pages.render(slug, path, title, why, "", None)
     assert FORGE not in plain and f"<code>{path}</code>" in plain
+
+
+def test_a_citation_to_a_file_that_is_not_there_stops_the_build():
+    """The link this build would have published, and now refuses to.
+
+    `relink` decided between a `tree` and a `blob` URL by asking whether the target was a
+    directory, and never asked whether it existed. A document citing a path nobody had
+    written got a well-formed forge URL that 404s for as long as the page is up, and the
+    only check on the way out was checking the shape of the URL rather than the existence
+    of the thing it names. This entry's whole argument about its own citations is that
+    they resolve, so the build stops instead.
+    """
+    import pytest
+    with pytest.raises(SystemExit) as caught:
+        doc_pages.relink(
+            '<p><a href="docs/a-file-nobody-wrote.md"><code>nope</code></a></p>',
+            "docs/the-legal-surface.md", FORGE)
+    said = str(caught.value)
+    assert "is not in the tree" in said
+    assert "docs/a-file-nobody-wrote.md" in said
+    assert "will never exist" in said, (
+        "the refusal has to say what the consequence was, or the next person reads it as "
+        "a strictness they can turn off")
+
+
+def test_the_same_link_is_refused_even_with_no_forge_to_point_at():
+    """The no-forge ending keeps the text, and a missing file is still missing.
+
+    Falling through to plain text on a path that does not exist would be the quiet
+    version of the same defect: the page would look fine and the citation would be to
+    nothing at all.
+    """
+    import pytest
+    with pytest.raises(SystemExit):
+        doc_pages.relink(
+            '<p><a href="../evidence/not-a-file.json"><code>nope</code></a></p>',
+            "docs/the-legal-surface.md", None)
+
+
+def test_a_link_to_a_file_that_is_there_still_becomes_a_forge_url():
+    """The refusal must not have swallowed the ordinary case."""
+    markup = doc_pages.relink(
+        '<p><a href="../evidence/MUTATIONS.md"><code>ok</code></a></p>',
+        "docs/the-legal-surface.md", FORGE)
+    assert f'{FORGE}/blob/HEAD/apps/python/firstbell/evidence/MUTATIONS.md' in markup

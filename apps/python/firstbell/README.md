@@ -29,7 +29,7 @@ and nothing here is a screenshot.
 | It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
 | The calls cost four times less than the desk time they remove | CALL-E billed this account **$0.05 a call**, thirteen billed events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). `python tools/money_across_runs.py` prints that against the ceiling for every run in this repository |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 214 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 222 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
 the [evidence page](https://firstbell-evidence.vercel.app) with the recordings.
@@ -44,11 +44,11 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and fourteen gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and twenty-two gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
-| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Ten findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
+| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Twelve findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
 
 ### Where CALL-E is called at runtime
@@ -748,8 +748,11 @@ credential leaves the building. A machine that has just placed a real call still
 `CALLE_API_KEY` exported; the next command that points the base URL at a double, a
 colleague's laptop or a typo would hand the production key straight to it.
 
-So a key beginning `iams_live_` is only ever sent to `https://api.heycall-e.com`. Anything
-else exits before the client is built, and names the throwaway key to use instead:
+So the rule is an allowlist rather than a list of dangerous shapes. A key is sent to any
+origin other than `https://api.heycall-e.com` only when it begins `iams_test_`, which is
+the throwaway prefix the double's own instructions tell you to use. Every other key,
+including a shape this code has never seen, is treated as a production credential, and the
+run exits before the client is built and names the throwaway key to use instead:
 
 ```text
 Refusing to send a live CALL-E key to http://127.0.0.1:8787.
@@ -757,6 +760,12 @@ A production credential is only ever sent to https://api.heycall-e.com.
 To run against the bundled double, use a throwaway key:
   export CALLE_API_KEY=iams_test_anything
 ```
+
+It was written the other way round first, refusing keys that began `iams_live_`. That
+guard could only stop the key shapes it already knew, so a credential issued under any
+other format, now or later, went wherever `CALLE_BASE_URL` pointed. Recognising danger is
+a weaker promise than recognising safety, and the cost of being wrong in this direction is
+one confusing error message.
 
 The comparison is on the whole origin rather than the hostname, because the scheme is half
 the promise. `http://api.heycall-e.com` is the right host with the bearer token in the
@@ -781,9 +790,21 @@ shipped one. It also runs as a real HTTP server for anything that cannot be moun
 process:
 
 ```bash
-python -m calle_double.server --port 8787
+python -m calle_double.server --port 8787 --outcomes examples/demo-outcomes.json
 export CALLE_BASE_URL=http://127.0.0.1:8787
+export CALLE_API_KEY=iams_test_anything
+python -m firstbell --work-file examples/absences.csv --live --yes-i-mean-it
 ```
+
+That run prints the same seven rows as the offline default, because the two ways of
+mounting the double now read the same scenario. Without `--outcomes` it did not. The
+double's fallback answer is `{"ok": true}`, which satisfies no consumer that has a result
+schema, so this command reported every call as `missing required field 'reason_category'`
+and the documented alternative path showed a product that does not work. The scenario
+lives in `firstbell/scenario.py`, where the reasoning beside each outcome is the reason
+the outcome was chosen, and `tools/export_demo_outcomes.py` writes it out in the format
+the server reads. A test fails if the file stops matching the module, and another runs the
+app as a subprocess against the server and compares the two runs row by row.
 
 **It is the reusable half of this entry, and it installs on its own.** "Take it
 tomorrow" used to mean copying a directory, which is not a claim anybody can act on. It is
@@ -877,8 +898,18 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 577 tests
+python -m pytest tests/ -q          # 594 tests collected
+python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
+
+**591 is the number collected, not the number that will pass on your machine.** Some of
+these gates need something this repository cannot ship: the twelve call recordings, which
+are held outside the tree because the maintainer of this list requires that, a built copy
+of the page under `out/`, or a gate report from `node tools/gates/run.mjs`. Those skip with
+a reason that names what is missing, so a clean checkout reports something like `561
+passed, 30 skipped` and the two add up to the number above. A skip here is a
+could-not-measure rather than a pass, which is the distinction the rest of this entry is
+about, and `-rs` prints each one so nothing hides behind a dot.
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
 classification and cancellation, consent, masking, and the live branch end to end against
@@ -1014,7 +1045,7 @@ is a thing you can describe well enough to be refused.
 
 3. **Platform-side call termination.** The escape hatch is instructed and not enforced
    because CALL-E exposes no `end_call`, no `max_turns` and no maximum duration. Written up
-   with the other seven platform findings in
+   with the other eleven platform findings in
    [`call-e-feedback.md`](call-e-feedback.md); until it is answered a prompt is the only
    lever, and it is not binding.
 
@@ -1042,6 +1073,18 @@ date later than their author date, and the largest gap is thirty-eight hours. Th
 a rebase looks like in the log, and it happened: branches were squashed, messages were
 corrected, and one range was reordered so that a fix did not sit above the commit it
 depended on.
+
+One of those rewrites has a reason worth naming, because it removed things a reviewer
+would otherwise expect to find. The maintainer of the list this contributes to has
+required, on several pull requests, that a contributor take committed real-call transcripts
+and every real-call-derived artifact out of the tree, and has said the requirement holds
+even where the people on the call were team members playing a part and the numbers dialled
+were reserved ones. Both describe this project exactly. So the recordings and the receipts
+came out of the history rather than only out of the head of the branch, which is a rewrite
+rather than a deletion, and they live outside the repository instead
+([`evidence/README.md`](evidence/README.md) says where). A tree that quietly lost twelve
+calls' worth of evidence, in an entry whose argument is that every claim carries the thing
+that checks it, is worth explaining before somebody notices the gap.
 
 Nothing was backdated to look earlier than it was, and the sentence above is checkable in
 the direction that matters, because the earliest committer date in the directory is the one

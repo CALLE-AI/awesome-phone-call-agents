@@ -321,6 +321,14 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 212 | Count a refused row as a call that rested on a record naming no number | 1 |
 | 213 | Stop printing how many dialled rows nobody can point at a number for | 2 |
 | 214 | Record a refused row as exposure, which reports a family nobody rang | 1 |
+| 215 | Build a forge URL for a cited file that is not in the tree | 2 |
+| 216 | Ignore an unknown key in a scenario file | 1 |
+| 217 | Load a scenario that binds nothing | 1 |
+| 218 | Export a scenario without its transcripts | 2 |
+| 219 | Accept a transcript turn that is not a speaker and a line | 1 |
+| 220 | Take `--outcomes` and bind none of it | 1 |
+| 221 | Report the exported scenario as current whatever is on disk | 1 |
+| 222 | Default a scenario entry to nobody picking up | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -825,6 +833,37 @@ the same number and was still false. The mutation is caught because the test wen
 source, which is the layer holding the record, rather than at the count where the mistake
 happens to cancel. An unreachable guard reads as protection and provides none: row 208's
 note above is the same lesson learned the other way round, by deleting one.
+
+Rows 215 to 222 are the second documented way of running this, and the citation check that
+was checking the wrong thing. 215 is the one to read first: a link relinker chose between a
+`tree` and a `blob` URL by asking whether the target was a directory, and never asked
+whether it was there, so a mistyped citation became a well-formed permanently missing page
+on a site whose argument is that its citations resolve.
+
+216 to 222 are the double behind real HTTP. That path was documented, was never tested, and
+did not work: the server bound no scenario, so every recipient got the double's fallback
+answer and the application reported every row as a missing required field. Three of these
+eight were planted, survived, and were closed by writing the test rather than by arguing
+the mutation was unfair. 220 is the reason: every test bound the scenario by calling
+`load_outcomes` in process, which is the one thing a reader following the README will not
+do, so taking the flag and binding none of it failed nothing. The test that closes it runs
+the documented command as a subprocess. 221 was an unexercised `--check`, which is the shape
+of every stale generated artifact in this project's history: the checker was never asked to
+check something wrong. 222 was a default nothing exercised, because the exporter always
+writes the field.
+
+Two things happened while measuring these that are worth more than the rows. A scenario
+refusal first tried to raise the double's own `DoubleError`, whose constructor asserts the
+code is one production actually sends; it fired, correctly, because a file with a typo in it
+is a configuration problem and not an API response. And the test for 220 hung the first
+mutation run: it read the server's banner until the line it hoped for, `readline` has no
+timeout, and on the run where nothing was bound that line never came. A test that hangs is
+worse than a test that fails, because it takes the measurement down with it. It now reads
+until the line the server always prints last.
+
+The counts for 220, 221 and 222 were measured over the four test files that can reach the
+code they change (83 tests) rather than over the whole suite, and that scope is stated here
+because a count with no scope beside it is the defect this ledger keeps finding elsewhere.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

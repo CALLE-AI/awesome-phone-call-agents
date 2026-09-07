@@ -30,6 +30,7 @@ from .engine import (
     WEBHOOK_EVENTS,
     CalleDouble,
     DoubleError,
+    ScenarioError,
     OBSERVED_ATTEMPT_SIP_CODE,
     Outcome,
 )
@@ -37,7 +38,7 @@ from .transport import build_client, build_transport
 
 __all__ = [
     "__version__", "CONFORMS_TO",
-    "CalleDouble", "Outcome", "DoubleError",
+    "CalleDouble", "Outcome", "DoubleError", "ScenarioError",
     "build_client", "build_transport",
     "CALL_STATUSES", "RECIPIENT_STATUSES", "ATTEMPT_STATUSES",
     "WEBHOOK_EVENTS", "API_ERROR_CODES", "FAILURE_CODES",

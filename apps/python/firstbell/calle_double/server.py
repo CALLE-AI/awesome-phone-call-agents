@@ -13,6 +13,22 @@ curl the API by hand, or an integration test that runs the application as a subp
 
 Standard library only, so `python -m calle_double.server` works on a clean checkout with
 nothing installed.
+
+## Bind a scenario, or every call answers the same way
+
+With nothing bound, every recipient gets this double's fallback answer, which is a
+two-turn transcript and `{"ok": true}`. That is fine for a client testing plumbing and
+wrong for anything with a result schema: a consumer that requires its own fields sees
+every call come back missing them.
+
+    python -m calle_double.server --outcomes examples/demo-outcomes.json
+
+The file is `{"numbers": {"+1555...": {...}}}` with an optional `"default"`. Each entry
+takes `answers_on`, `structured_result`, `transcript`, `failure_code`, `sip_code` and
+`summary`, which are the fields of `Outcome`, and an unknown key is refused rather than
+ignored. `firstbell` ships its demonstration scenario in that format, exported from the
+same module the in-process run applies, so the two ways of running it produce the same
+morning rather than two different ones.
 """
 
 from __future__ import annotations
@@ -24,9 +40,10 @@ import re
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .engine import CalleDouble, DoubleError, Outcome
+from .engine import CalleDouble, DoubleError, Outcome, ScenarioError
 
 _CALL_EVENTS = re.compile(r"^/v1/calls/([^/]+)/events$")
 _CALL = re.compile(r"^/v1/calls/([^/]+)$")
@@ -214,16 +231,45 @@ def main() -> None:
         "--every-call-fails", action="store_true",
         help="Make every recipient go unanswered, for exercising failure paths.",
     )
+    parser.add_argument(
+        "--outcomes", metavar="FILE",
+        help="JSON scenario to bind, so calls answer the way a consumer's schema "
+             "expects. Without it every recipient gets this double's fallback answer.",
+    )
     args = parser.parse_args()
     refuse_an_open_bind(args.host, args.i_know_this_is_open)
 
     double = CalleDouble()
     if args.every_call_fails:
         double.set_default_outcome(Outcome.no_answer())
+    bound = 0
+    if args.outcomes:
+        path = Path(args.outcomes)
+        if not path.is_file():
+            raise SystemExit(f"no outcomes file at {path}")
+        try:
+            bound = double.load_outcomes(
+                json.loads(path.read_text(encoding="utf-8")), str(path))
+        except ScenarioError as bad:
+            # Printed as one line rather than a traceback.
+            # A scenario that will not load is a file somebody has to edit, and a stack
+            # trace is the wrong instrument for telling them which line of it.
+            raise SystemExit(f"{bad}")
 
     server = serve(double, host=args.host, port=args.port, verbose=args.verbose)
-    print(f"CALL-E double listening on http://{args.host}:{args.port}")
-    print("  export CALLE_BASE_URL=http://%s:%d" % (args.host, args.port))
+    # The port the socket actually got, not the one asked for. `--port 0` means the
+    # operating system picks, which is the sensible thing for a script to pass and used to
+    # print `http://127.0.0.1:0` in both the banner and the export line: an address
+    # nothing can reach, printed as though it were the address to use.
+    port = server.server_address[1]
+    print(f"CALL-E double listening on http://{args.host}:{port}")
+    if bound:
+        print(f"  {bound} number(s) bound from {args.outcomes}")
+    elif not args.every_call_fails:
+        print("  no scenario bound: every recipient answers with this double's fallback,")
+        print("  which is {\"ok\": true} and fails a consumer that has a result schema.")
+        print("  Pass --outcomes FILE to bind one.")
+    print("  export CALLE_BASE_URL=http://%s:%d" % (args.host, port))
     print("  export CALLE_API_KEY=iams_test_anything")
     print("No call placed by this process will ever reach a phone. Ctrl-C to stop.")
     try:
