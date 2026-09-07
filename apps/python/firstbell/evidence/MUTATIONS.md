@@ -266,6 +266,29 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 157 | Key the processed ledger on the filename rather than the content, so a job that rewrites the same rows under a new date stamp gets through | 1 |
 | 158 | Record an export as called-from before its rows are known to be readable, which strands the operator who fixes it | 1 |
 | 159 | Drop the sentence in the ledger header saying what deleting a line permits | 1 |
+| 160 | Restore `call["id"]` on a create response that carries no id, so a request CALL-E accepted raises `KeyError` and is reported as a call nobody answered | 1 |
+| 161 | Let a response shape the classifier does not model raise out of the handler after the id has left the in-flight set, so a placed, completed, billed call is reported FAILED with its id nowhere | 3 |
+| 162 | Stop retrying a 5xx whose body is not JSON, which is the shape a proxy's own bad-gateway page has and the one class of failure a retry exists to absorb | 1 |
+| 163 | Stop naming an unaccountable call in the run summary unless the run was cancelled, which is the branch that does not happen by itself | 1 |
+| 164 | Stop printing the block that names a call this run placed and cannot account for | 1 |
+| 165 | Drop `not_recallable` from `--json`, leaving a machine reader unable to see what the run left behind | 1 |
+| 166 | Print the unaccountable call's id with no row beside it, so nobody can say which family it was for | 1 |
+| 167 | Put back the n8n recipe's hardcoded `escalation: "none"` on the all-unknown branch, so the same call is a safeguarding case in Python and an ordinary callback in the workflow | 1 |
+| 168 | Remove the schema check from the n8n recipe, so a value outside the enum closes a record there and does not here | 1 |
+| 169 | Accept a nested object schema at construction, which `problems()` never recurses into, so every rule inside it is ignored and the answer is reported valid | 1 |
+| 170 | Accept an array property, which has no `items` support, so a list of anything at all is reported valid | 1 |
+| 171 | Accept an empty `--again` label, so a family is called a second time in one morning with no reason on the record | 1 |
+| 172 | Stop normalising the label, so `Locale Fix` and `locale-fix` are two keys for one correction and the fix runs twice | 2 |
+| 173 | Accept the label and never put it in the idempotency key, so the corrected run is refused exactly as the uncorrected one was | 1 |
+| 174 | Stop printing the way out of a reused key, leaving a refusal that reads as a dead end until tomorrow | 1 |
+| 175 | Stop recording the correction in the receipt | 1 |
+| 176 | Stamp the double's `created_at` off one shared clock that advances 30 seconds a step and is never pulled back, so a run of 150 rows reports 27 of them with an unknown provenance | 1 |
+| 177 | Ignore a pinned clock, so a test that asked for determinism stops getting it | 1 |
+| 178 | Call `phone.startswith("+")` E.164 again in the double, so `+91 5550 000001` is accepted and dialled offline where production would refuse it | 6 |
+| 179 | Hardcode an off-palette accent in the README's path figure, so the drawing keeps a colour the page has moved on from | 1 |
+| 180 | Drop the mono fallback chain from the path figure, so a reader without the webfont gets the browser default at a different width | 1 |
+| 181 | Gut the path figure's `desc`, leaving a diagram a screen reader cannot report | 1 |
+| 182 | Hand-edit the committed path figure, so the README shows something its generator does not write | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -273,6 +296,35 @@ with an exception that was not a `SourceError`, and five were accepted when acce
 ends with the wrong thing happening to a family. The suite was green throughout, 329 tests
 at that point, so none of this was a rule that failed. It was a set of cases nobody had
 written down.
+
+Rows 160 to 182 answer a bug hunt run against the whole tree on 7 September 2026, with the
+suite green at 380 tests. Fourteen defects were reported and all fourteen are closed; the
+twenty-three rows here are the ones a script can apply. Three of them are worth reading on
+their own.
+
+Row 161 is the shape the others are variations of. A response CALL-E is free to send and
+the double never produces (recipients as an object keyed by id, or as a bare string, or
+attempts as a list of strings) raised out of the handler after the call id had already been
+discarded from the in-flight set, so the dispatcher's own catch-all recorded a placed,
+completed, billed call as FAILED, with no id in any line of output. The call happened. Only
+the shape was a surprise, and a surprise is the third outcome.
+
+Rows 167 and 168 are the only two in this table that are about a second implementation
+rather than this one. There are two shipped classifiers: `dispatch/scheduler._classify` and
+the n8n recipe's `classify.mjs`. The recipe's own tests checked the JavaScript against
+itself, and this repository's no-drift promise is about the workflow JSON against the module
+beside it, which held. Nothing held the module against the Python it is a port of, and they
+disagreed on the branch the whole entry is built around. `tests/test_classifier_parity.py`
+runs the JavaScript through node over ten fixtures and compares the resolution, the
+escalation and whether a person owns it.
+
+Row 176 is a measurement rather than a rule. The double advanced one shared clock by 30
+simulated seconds on every step and never pulled it back, so `created_at` ran ahead of the
+caller's real clock in proportion to how many calls had been placed and eventually crossed
+the one-hour skew guard the dispatcher uses to tell a call it just placed from one an
+idempotency key replayed. Zero unknown at 60 rows, 59 at 120, 138 at 200. Seven rows is the
+demonstration, so nothing showed it, and `--max-calls` exists to invite the larger run. Each
+call now carries its own clock. Measured after: zero unknown at 60, 120, 200 and 400.
 
 Two of the probe's own expectations were wrong, which is worth recording because a probe
 that is never wrong is a probe that only asks what it already knows. A phone number that is

@@ -61,6 +61,61 @@
       "quote": "derived: 100% minus the 78.3% who spoke only English at home",
       "published": "2023-12-07",
       "read_at_source": "2026-09-05"
+    },
+    {
+      "id": "us-public-schools",
+      "value": "99,297",
+      "claim": "Operating public elementary and secondary schools in the United States, school year 2023-24",
+      "publisher": "National Center for Education Statistics, Common Core of Data",
+      "url": "https://nces.ed.gov/ccd/tables/202324_summary_3.asp",
+      "quote": "Public Elementary/Secondary School Universe Survey, 2023-24 Final Version 1a",
+      "published": "2025-01-01",
+      "read_at_source": "2026-09-07",
+      "note": "The count of schools, not of districts. NCES publishes two district counts for the same year under two definitions: 13,303 regular school districts in Table 1 and 19,186 operating districts in Table 2, the wider one including charter agencies, supervisory unions and service agencies. The narrower one is used here because it is the count of bodies that run an attendance office."
+    },
+    {
+      "id": "us-regular-districts",
+      "value": "13,303",
+      "claim": "Operating regular school districts in the United States, school year 2023-24",
+      "publisher": "National Center for Education Statistics, Common Core of Data",
+      "url": "https://nces.ed.gov/ccd/tables/202324_summary_1.asp",
+      "quote": "Operational and student membership status of public elementary and secondary schools and agencies, by type",
+      "published": "2025-01-01",
+      "read_at_source": "2026-09-07",
+      "note": "See the note on 99,297. The wider NCES figure for the same year is 19,186 and is a different definition of district, not a correction to this one."
+    },
+    {
+      "id": "chccs-sis-renewal",
+      "value": "157,664",
+      "claim": "Total purchase cost approved by one North Carolina school district for its annual PowerSchool contract renewal, 2024-25, paid from the capital outlay technology budget",
+      "publisher": "Chapel Hill-Carrboro City Schools Board of Education, Agenda Abstract, 15 August 2024",
+      "url": "https://chccs.granicus.com/MetaViewer.php?view_id=2&clip_id=646&meta_id=45974",
+      "quote": "the annual renewal of the PowerSchool, LLC Contract for 2024-25",
+      "published": "2024-08-15",
+      "read_at_source": "2026-09-07",
+      "note": "A bundle, not a bare student-information-system licence: it covers the core SIS plus Enrollment Registration with additional languages, Enrollment School Choice, PowerPack, Unified Talent Professional Learning, State Data Validation and Naviance. One district's price, on the record, rather than a market average. Divided by the district's enrolment it is about $13.85 a student a year, which is arithmetic and is labelled as such wherever it appears."
+    },
+    {
+      "id": "chccs-enrolment",
+      "value": "11,386",
+      "claim": "Students enrolled in Chapel Hill-Carrboro City Schools, 2024-25",
+      "publisher": "U.S. News Education, citing National Center for Education Statistics Common Core of Data",
+      "url": "https://www.usnews.com/education/k12/north-carolina/districts/chapel-hill-carrboro-city-schools-102495",
+      "quote": "Chapel Hill-Carrboro City Schools ... 11,386 students",
+      "published": "2025-01-01",
+      "read_at_source": "2026-09-07",
+      "note": "Secondary: US News republishing NCES CCD rather than the CCD table itself. It is the denominator of the per-student arithmetic beside 157,664, so it is registered rather than left in prose, and it is the weaker of the two sources in that sentence."
+    },
+    {
+      "id": "texas-basic-allotment",
+      "value": "6,215",
+      "claim": "Texas Basic Allotment per student in average daily attendance, school year 2025-26",
+      "publisher": "Texas Education Agency",
+      "url": "https://tea.texas.gov/taa-letters/house-bill-2-hb-2-implementation-foundation-school-program-fsp-funding-formula-changes",
+      "quote": "House Bill 2 (HB 2) Implementation: Foundation School Program (FSP) Funding Formula Changes",
+      "published": "2025-07-01",
+      "read_at_source": "2026-09-07",
+      "note": "An annual figure per student in attendance, not a per-absence figure. Dividing it by an instructional-day count gives roughly $35.51 at 175 days or $34.53 at 180, which is arithmetic on a divisor that varies by district size and year, and is labelled arithmetic wherever it appears. Texas raised the allotment from $6,160 through HB2 of the 89th Legislature."
     }
   ]
 }

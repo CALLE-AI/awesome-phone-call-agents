@@ -11,10 +11,12 @@ was not produced from the thing it describes goes stale the moment either one ch
 | `proof-call-site.png` | The exact line that calls CALL-E, boxed, with file and line number | `node tools/gates/capture-stills.mjs` |
 | `proof-terminal-outcomes.png` | A real offline run producing all three outcomes: resolved, undetermined, failed | `node tools/gates/capture-stills.mjs` |
 | `proof-classification.png` | `_classify()`, the one function that turns an API response into an outcome | `node tools/gates/capture-stills.mjs` |
+| `the-path-of-one-absence.svg` | The whole path one absence row takes: both gates, what the call may ask, the three endings, and where a safeguarding escalation attaches | `python tools/make_path_figure.py` |
 
 ## Regenerating everything
 
 ```bash
+python tools/make_path_figure.py                   # writes the-path-of-one-absence.svg
 python tools/judge_page.py out                     # builds out/, no audio
 cd tools/gates && npm install                      # once
 node run.mjs                                        # writes tools/gates/shots/*.png
@@ -24,6 +26,18 @@ node capture-stills.mjs                             # writes the three proof-*.p
 `run.mjs` serves `out/` over gzip and drives system Chrome through `puppeteer-core`; its
 screenshot gate writes one PNG per section of the evidence page to `tools/gates/shots/`,
 none of which is committed. Nothing in this directory comes from it.
+
+`make_path_figure.py` is the odd one out and worth saying so plainly: it is a drawing rather
+than a capture. Nothing in it is a photograph of the program running. What keeps it inside
+this directory's rule is that every value in it is read from the repository rather than
+typed, and that the script is the only way it is written: the colours come out of `page.css`
+through `video_facts.palette()`, the safeguarding window out of
+`firstbell.domain.SAFEGUARDING_CALLBACK_MINUTES`, and
+`test_the_path_figure_is_what_the_generator_writes_today` fails if the committed file is not
+what the script produces now. Every box in it is a branch a reader can find in
+`dispatch/scheduler.py`. It carries text, which the evidence page's own figure is forbidden
+to do, because a README is markdown: there is no HTML to put the labels in and no @font-face
+to load, so each family is declared with the widest fallback chain instead.
 
 `capture-stills.mjs` is a separate script; it does not modify `run.mjs`. The two code stills
 read the exact bytes of `dispatch/scheduler.py` at the line ranges they show, and the
@@ -77,10 +91,10 @@ well as the entry README.
 
 - `proof-call-site.png`: the only occurrence of `calls.create` in this codebase is
   `self._client.calls.create(` at
-  `dispatch/scheduler.py:337`, inside `def _create_with_retries` at
-  `dispatch/scheduler.py:328`.
+  `dispatch/scheduler.py:364`, inside `def _create_with_retries` at
+  `dispatch/scheduler.py:355`.
 - `proof-classification.png`: `def _classify` at
-  `dispatch/scheduler.py:424` returns exactly seven times and the still labels every one of them,
+  `dispatch/scheduler.py:460` returns exactly seven times and the still labels every one of them,
   including `ItemResult(**base, resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:455` and `resolution=Resolution.RESOLVED, structured_result=result,` at
-  `dispatch/scheduler.py:491`.
+  `dispatch/scheduler.py:491` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:527`.
