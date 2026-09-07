@@ -18,6 +18,7 @@ import argparse
 import importlib
 import json
 import os
+import re
 import shutil
 import stat
 import sys
@@ -274,7 +275,7 @@ def test_non_ascii_digits_are_rejected(tmp):
 def test_mask_phone_is_one_format_everywhere(tmp):
     ca, _, _ = load(tmp)
     check(
-        ca.mask_phone("+442079460123") == "+44\u20260123",
+        ca.mask_phone("+442079460123") == "+44...0123",
         f"a valid number masks to country code and last four "
         f"(got {ca.mask_phone('+442079460123')!r})",
     )
@@ -305,7 +306,7 @@ def test_output_is_sanitized_everywhere_not_just_the_number_field(tmp):
 
     check("confirm_token" not in blob, "the spend credential is dropped from output")
     check("SPEND-CREDENTIAL" not in blob, "and so is its value")
-    check(out["to_phones"] == ["+44\u20260123"], "the phone field is masked")
+    check(out["to_phones"] == ["+44...0123"], "the phone field is masked")
     check(
         "+442079460123" not in blob,
         "the number does not survive anywhere in the output",
@@ -315,15 +316,76 @@ def test_output_is_sanitized_everywhere_not_just_the_number_field(tmp):
         "a number quoted inside a transcript turn is masked too",
     )
     # Assert on the structure, not on json.dumps output: the mask uses an
-    # ellipsis, which serialises to \u2026 and will not match a literal.
+    # ellipsis, which serialises to ... and will not match a literal.
     check(
-        "+44\u20260456" in out["transcript"][0]["text"],
+        "+44...0456" in out["transcript"][0]["text"],
         "the transcript number is masked rather than deleted",
     )
     check(
-        "+44\u20260123" in out["nested"]["goal_sent"],
+        "+44...0123" in out["nested"]["goal_sent"],
         "and nested free text is swept too",
     )
+
+
+def test_every_phone_shape_is_redacted_not_just_e164(tmp):
+    """Free text quotes numbers back in whatever form the speaker used.
+
+    A sanitiser that only understands "+" leaves a national-format number,
+    a spaced number and a bracketed number untouched -- which is most of what
+    actually appears in a transcript.
+    """
+    ca, _, _ = load(tmp)
+    for text, label in [
+        ("Call us on +442079460123 tomorrow.", "E.164 in a sentence"),
+        ("Try 07700 900123 after ten.", "national format, spaced"),
+        ("Ring (212) 555-0100 now.", "bracketed area code"),
+        ("or 212-555-0100.", "dashed, sentence-final"),
+        ("call back on 0207 946 0123 please", "spaced landline"),
+        ("my number is 442079460123", "no plus"),
+    ]:
+        out = ca._redact_text(text)
+        # Either fully replaced, or masked to country code + last four. A bare
+        # "..." check would pass on any sentence containing an ellipsis.
+        redacted = bool(
+            "<redacted>" in out or re.search(r"\+\d{1,3}\.\.\.\d{4}", out)
+        )
+        check(redacted, f"{label} is redacted (got {out!r})")
+
+
+def test_sanitizer_leaves_non_phone_digits_alone(tmp):
+    """A transcript full of <redacted> where the prices were is not useful.
+
+    Over-redaction is a real cost, not a safe default: it destroys the record
+    the persistence design exists to keep.
+    """
+    ca, _, _ = load(tmp)
+    for text, label in [
+        ("Meeting on 2026-01-01 at 09:30.", "an ISO date"),
+        ("The order was 24 pounds for 10 stems.", "prices and quantities"),
+        ("Ext 4471 is the desk.", "a short extension"),
+        ("call at 09:30 or 14:00", "clock times"),
+        ("Version 1.18.0 shipped.", "a version string"),
+    ]:
+        out = ca._redact_text(text)
+        check(out == text, f"{label} survives untouched (got {out!r})")
+
+
+def test_no_real_numbers_in_this_suite(tmp):
+    """Fixtures use reserved ranges only.
+
+    +1555 01xx is reserved in NANP; +44 7700 900xxx and +44 20 7946 0xxx are
+    Ofcom's drama ranges and are never allocated. A plausible-looking number
+    in a public test file is somebody's phone ringing.
+    """
+    src = Path(__file__).read_text(encoding="utf-8")
+    runs = re.findall(r"(?<![\w.])(?:\+|\()?\d[\d\s()\-]{5,17}\d(?![\w])", src)
+    reserved = ("5550", "7946", "7700")
+    stray = [
+        r.strip() for r in runs
+        if not any(k in re.sub(r"\D", "", r) for k in reserved)
+        and not re.match(r"^\d{4}-\d{2}-\d{2}$", r.strip())
+    ]
+    check(not stray, f"no non-reserved phone-shaped fixtures (found {stray})")
 
 
 def test_argv_redacts_the_token(tmp):
@@ -339,7 +401,7 @@ def test_argv_redacts_the_token(tmp):
     check("SECRET" not in blob, "_redact_argv replaces the token value")
     check("--confirm-token" in argv, "_redact_argv keeps the flag itself")
     check("+442079460123" not in blob, "the destination is masked in argv")
-    check("+44\u20260123" in blob, "and masked rather than removed")
+    check("+44...0123" in blob, "and masked rather than removed")
     check(
         "white lilies" not in blob,
         "the goal text is not reproduced in argv; it is stored once elsewhere",
@@ -608,7 +670,7 @@ def test_save_result_refuses_a_token_in_the_envelope(tmp):
 def test_malformed_number_is_rejected_not_repaired(tmp):
     ca, _, prov = load(tmp)
     args = dict(PLAN_ARGS)
-    args["to"] = ["+91 98765 43210"]
+    args["to"] = ["+44 7700 900123"]
     try:
         ca.cmd_plan(argparse.Namespace(**args))
         check(False, "a formatted number is rejected")

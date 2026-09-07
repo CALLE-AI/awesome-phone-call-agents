@@ -462,7 +462,7 @@ PROHIBITIONS = (
 )
 
 # Script-aware: a goal may not be in English, and a danda is a terminator.
-_TERMINATORS = ".!?।॥"
+_TERMINATORS = ".!?\u0964\u0965"  # . ! ? danda double-danda
 
 _FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -605,35 +605,76 @@ _E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$", re.ASCII)
 
 
 def mask_phone(phone: str | None) -> str:
-    """Country code and the last four digits: +44…8341.
+    """Country code and the last four digits: +44...0123.
 
     One format everywhere, so a report cannot mask one way in one line and
-    another way in the next. Anything that does not look like E.164 is
-    replaced entirely rather than partially revealed.
+    another way in the next. Anything that is not strict E.164 is replaced
+    entirely rather than partially revealed -- a national-format number with
+    its last four digits shown is still four digits more than nothing.
     """
     if not phone:
         return "<none>"
     p = str(phone).strip()
     if not _E164_RE.match(p):
         return "<redacted>"
-    return f"{p[:3]}…{p[-4:]}"
+    return f"{p[:3]}...{p[-4:]}"
+
+
+# Anything phone-shaped, not only E.164: a national-format number, a number
+# with spaces, dashes or brackets. Free text quotes numbers back in whatever
+# form the speaker used, and a sanitiser that only understands "+" leaves
+# those untouched.
+#
+# Deliberately broad on separators, deliberately narrow on what counts as a
+# number: 7 to 15 digits, which is the E.164 range. Shorter runs are prices,
+# times, quantities and extensions.
+_PHONE_SHAPE_RE = re.compile(
+    r"""
+    (?<![\w.])
+    (?:\+|\()?
+    \d
+    (?:[\d\s()\-]{5,17})       # no "." -- a full stop ends a sentence far
+    \d                         # more often than it separates digits, and
+    (?![\w])                   # including it makes the match backtrack to
+    """,                       # a shorter run that slips under the length
+    re.VERBOSE | re.ASCII,     # floor.
+)
+
+# A date is digits and dashes too. Left alone: a transcript full of
+# <redacted> where the dates were is less useful and reads as broken.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$", re.ASCII)
 
 
 def _redact_text(text: str | None) -> str | None:
-    """Replace any E.164-shaped run in free text with its masked form.
+    """Replace any phone-shaped run in free text with a masked form.
 
-    Goal text, summaries and transcripts all quote numbers back. A masked
-    destination in one field and a full number three fields later is not
-    masking.
+    Goal text, summaries, transcripts and error messages all quote numbers
+    back. A masked destination in one field and a readable one three fields
+    later is not masking.
+
+    Strict E.164 keeps its country code and last four digits so a reader can
+    still tell two destinations apart; anything else is replaced outright,
+    because the shape alone does not say which digits are the country code.
     """
     if not text:
         return text
-    return re.sub(
-        r"\+[1-9][0-9]{6,14}",
-        lambda m: mask_phone(m.group(0)),
-        text,
-        flags=re.ASCII,
-    )
+
+    def _sub(m: re.Match) -> str:
+        raw = m.group(0)
+        stripped = raw.strip()
+        if _ISO_DATE_RE.match(stripped):
+            return raw
+        digits = re.sub(r"[^\d+]", "", raw)
+        count = len(re.sub(r"\D", "", raw))
+        # Outside the E.164 length range it is not a phone number: prices,
+        # times, quantities, reference numbers.
+        if count < 7 or count > 15:
+            return raw
+        if _E164_RE.match(digits):
+            return mask_phone(digits)
+        return "<redacted>"
+
+    return _PHONE_SHAPE_RE.sub(_sub, text)
 
 
 def _validate_e164(phone: str) -> str:

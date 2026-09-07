@@ -1,6 +1,6 @@
 # Examples
 
-All numbers below are reserved-fictional (`+1555…`). Nothing here dials
+All numbers below are reserved-fictional (`+1555...`). Nothing here dials
 anything: the fake provider is the default, so every command below runs with no
 account and no network until `CALL_PROVIDER=calle` is set deliberately.
 
@@ -102,7 +102,7 @@ anything else. **It does not always do so**, and the record has to say that
 rather than quietly presenting the answers as though it had.
 
 ```
-Miller Hardware — +1555…1234 — identity NOT CONFIRMED
+Miller Hardware — +1555...1234 — identity NOT CONFIRMED
   The callee answered without naming the business and was not asked.
   Everything below came from someone at this number. It is not established
   that this number reaches Miller Hardware.
@@ -117,7 +117,7 @@ Compare with a wrong-business outcome, where nothing is reported as an answer
 at all:
 
 ```
-"Miller Hardware" — +1555…1234 — WRONG BUSINESS
+"Miller Hardware" — +1555...1234 — WRONG BUSINESS
   The callee said this is Pinewood Joinery. No questions were asked.
 
   unit_price   unasked
@@ -133,7 +133,7 @@ cannot act on a blank.
 ## 5. Something went wrong on the call
 
 ```
-Miller Hardware — +1555…1234 — identity confirmed
+Miller Hardware — +1555...1234 — identity confirmed
 
   unit_price   24 dollars          (transcript 00:00:12)
   in_stock     unanswered — the callee went to check and the call ended

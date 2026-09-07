@@ -59,7 +59,7 @@ python scripts/call_agent.py plan \
     --field "unit_price=What does it cost"
 ```
 
-Then `run --plan-id …`, `status --run-id …`, and `show <id>`, which follows a
+Then `run --plan-id ...`, `status --run-id ...`, and `show <id>`, which follows a
 plan to its run and returns the stored result. The full sequence writes the same
 local records a real call would.
 
@@ -75,7 +75,7 @@ Requires a CALL-E account and their CLI; point `CALLE_BIN` at it if it is not on
 the default path. Then, and only then:
 
 ```
-CALL_PROVIDER=calle python scripts/call_agent.py plan …
+CALL_PROVIDER=calle python scripts/call_agent.py plan ...
 ```
 
 ⚠️ **That variable is the only thing between this tool and a real phone.** It is
@@ -219,7 +219,7 @@ the number came from** — the operator, a previous call, or a listing. A number
 provenance travels with the answer.
 
 **Mask numbers the same way every time.** Country code, then the last four
-digits: `+44…8341`. The tool enforces this on everything it prints — the
+digits: `+44...8341`. The tool enforces this on everything it prints — the
 destination field, and any number quoted back inside a summary, a transcript
 turn or the goal text. Keep the same form in your own prose so a report cannot
 mask one way in one line and another way in the next.
