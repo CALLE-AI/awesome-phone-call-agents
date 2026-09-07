@@ -183,6 +183,42 @@ vouch for instead of folding it into a total.
 A row that names a record when the run was given no register is refused. It would otherwise
 look better documented than a boolean row while being checked less.
 
+## One row per call, saying what let it ring
+
+Every refusal above is itemised: the record it rested on and a sentence an attendance
+officer can read out. For a long time every approval was two integers. A district
+operations director reading the run said what that means in practice: the refusal log is
+the half nobody builds, and the authorisation log is the half everybody is asked for. When
+a parent telephones the school and asks why they were called, nobody is asking which rows
+were skipped.
+
+`--json` carries one row per call the run placed:
+
+```json
+{
+  "id": "S-1041",
+  "record": "CR-2026-0401",
+  "basis": "a dated record",
+  "numbers_tried": ["+91********01"],
+  "number_named_by_the_record": true,
+  "attempts": 1,
+  "call_id": "call_2",
+  "placed_by_this_run": true
+}
+```
+
+`number_named_by_the_record` is the question underneath the question, and it has three
+answers. `true` means the record named every number on the row, which is what the eighth
+check enforces: a row carrying any number the record does not name is refused outright
+rather than refused at the third attempt. `false` means the record names a pupil and no
+telephone at all, so nobody can point at a number for that call, and it is the same row the
+`no number named` count above is counting. `null` means there was no record to ask, because
+the row dialled on a boolean column.
+
+The numbers are masked here exactly as they are everywhere else this run writes a number
+down. A log kept to answer a complaint about a telephone call does not need the telephone
+number in the clear to say which one rang, and the register holds the unmasked one.
+
 ## Three decisions that stay with you
 
 1. **Where the record lives, and who may write one.** This reads a file. A district that

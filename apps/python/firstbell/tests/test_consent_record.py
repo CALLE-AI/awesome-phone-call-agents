@@ -521,6 +521,55 @@ def test_the_run_counts_the_rows_that_rested_on_a_record_naming_no_number():
         "the count needs the reason beside it, or it reads as a statistic")
 
 
+def test_every_authorised_call_says_whether_the_record_named_the_number(capsys):
+    """A parent rings the school and asks why they were called. This is that answer.
+
+    The refusals were itemised from the beginning: each one names its record and gives a
+    sentence an attendance officer can read out. The approvals were two integers. Somebody
+    reading the entry as a district operations director said it plainly: the refusal log is
+    the half nobody builds and the authorisation log is the half everybody is asked for.
+
+    The log exists now, and this holds the field that answers the question underneath the
+    question. Consent attaches to the number called, so "which record authorised this" is
+    only half an answer, and "did that record name the telephone that rang" is the rest.
+
+    Three states, and the shipped example carries one of each, which is why this runs the
+    documented command rather than building a wave here.
+    """
+    import json
+
+    from firstbell.cli import main
+
+    assert main(["--work-file", "examples/absences-with-consent.csv",
+                 "--consent-records", "examples/consent-register.json", "--json"]) == 0
+    out = capsys.readouterr().out
+    payload = json.loads(out[out.index("{"):])
+    rows = payload["consent"]["authorised"]
+    assert rows, "the authorisation log is empty on a run that placed calls"
+
+    named = {r["id"]: r["number_named_by_the_record"] for r in rows}
+    states = sorted(str(v) for v in named.values())
+    assert states == ["False", "None", "True"], (
+        f"the shipped example is meant to carry one row of each state and carries {named}"
+    )
+
+    # The row whose record names no number is the row the aggregate counts, so the log and
+    # the count cannot drift apart into two different claims about the same run.
+    no_number = [i for i, v in named.items() if v is False]
+    assert len(no_number) == payload["consent"]["dialled_on_a_record_naming_no_number"], (
+        "the per-call log and the count above it disagree about the same run"
+    )
+
+    # And a row with no record has nothing to answer, rather than answering no.
+    for row in rows:
+        if row["record"] is None:
+            assert row["number_named_by_the_record"] is None, (
+                "a row that dialled on a boolean column is reported as a record that "
+                "failed to name the number, which is a different and worse claim"
+            )
+            assert row["basis"] == "a boolean column"
+
+
 def test_the_no_number_count_is_printed_under_consent_and_not_beside_the_totals():
     """It belongs under the paperwork, next to the boolean count it is a cousin of.
 

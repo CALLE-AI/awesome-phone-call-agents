@@ -68,7 +68,7 @@ protected, and that is knowable before a call goes out rather than after.
 
 ## Worked example
 
-Two hundred and twenty-seven gates broken on purpose, each one reverted, with the number of tests that
+Two hundred and twenty-eight gates broken on purpose, each one reverted, with the number of tests that
 caught it, are in [`../evidence/MUTATIONS.md`](../evidence/MUTATIONS.md). Two rows show
 the shape:
 

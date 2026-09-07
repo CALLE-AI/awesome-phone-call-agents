@@ -1010,26 +1010,21 @@ def money_facts(run: dict) -> dict:
                 if item.get("resolution") in ("resolved", "undetermined")]
     net_new = [item for item in items
                if item.get("resolution") == "resolved" and item.get("id") in escalating]
+    # Every escalating row, not only the net-new ones. The page said "0 of 7 answered
+    # calls became new work" a short scroll below a queue showing four rows marked
+    # safeguarding, and reconciling the two meant reading this file.
+    escalated_rows = [item for item in items if item.get("id") in escalating]
     removed = sum(item.get("attempts", 0) for item in closed)
 
-    # Per call, per minute that one manual attempt takes. Same ratio the program prints:
-    # every attempt billed, only the ones behind a closed record credited.
-    ceiling = (removed / placed) * (desk.hourly / 60.0) if placed else None
-    rate = (len(net_new) / len(answered)) if answered else None
-    added = None if rate is None else rate * (lead.hourly / 60.0)
-    # The bound, because a count of zero on seven calls is not a rate of zero. Same
-    # Clopper-Pearson the replay tool publishes, imported rather than reimplemented.
+    # Every figure on this band, from the module that owns the arithmetic. This function
+    # used to do its own division for its own receipt, which is how the mismatched
+    # denominator survived being fixed in two other places: the callback cost was per
+    # answered call and it was taken off a saving that is per billed attempt. One module,
+    # four integers, and the bound comes back with them.
     sys.path.insert(0, str(APP / "tools"))
-    from replay_escalation import upper_bound
-    bound = upper_bound(len(net_new), len(answered)) if answered else None
-    worst = None if (bound is None or ceiling is None) else (
-        ceiling * 3 - bound * (lead.hourly / 60.0) * 3)
+    from money_across_runs import demo_row, figures_for, observed
 
-    # The price and the headline ceiling come from `tools/money_across_runs.py`, which is
-    # the same module the README's table and `tests/test_observed_price.py` read. Three
-    # surfaces doing this arithmetic separately is what produced $0.59, $0.50, $0.78 and
-    # $0.21 with nothing beside them naming a run.
-    from money_across_runs import demo_row, observed
+    receipt = figures_for(placed, removed, len(answered), len(net_new), calls=placed)
 
     return {
         "price": observed()["observed"],
@@ -1043,12 +1038,16 @@ def money_facts(run: dict) -> dict:
         "schools": figures["us-public-schools"],
         "placed": placed,
         "removed": removed,
-        "ceiling_at_three": None if ceiling is None else ceiling * 3,
+        # `figures_for` already prices three minutes an attempt, which is why these
+        # read straight off it rather than being multiplied here.
+        "ceiling_at_three": receipt["gross_ceiling"],
         "net_new": len(net_new),
+        "escalated": len(escalated_rows),
         "answered": len(answered),
-        "added_at_three": None if added is None else added * 3,
-        "bound": bound,
-        "worst_at_three": worst,
+        "added_at_three": receipt["added"],
+        "net_at_three": receipt["net_ceiling"],
+        "bound": receipt["net_new_bound"],
+        "worst_at_three": receipt["worst_case_ceiling"],
         "desk": desk,
         "lead": lead,
     }
@@ -1133,7 +1132,14 @@ def money_markup(run: dict) -> str:
            'adds: that rate needs an answered call and there is none here. '
            if not f["answered"] or f["bound"] is None else
            f'{f["net_new"]} of {f["answered"]} answered calls became new work for the '
-           f'safeguarding lead, and {f["answered"]} calls cannot rule out '
+           f'safeguarding lead'
+           # The queue above this shows the escalating rows, and a reader who counts them
+           # gets a different number from this sentence unless the sentence says why.
+           + (f', though {f["escalated"]} carry the safeguarding mark: net-new counts only '
+              'a call that would have closed on its own, and a call already going to a '
+              'person was going there anyway'
+              if f["escalated"] > f["net_new"] else '')
+           + f'. {f["answered"]} calls cannot rule out '
            f'{100 * f["bound"]:.0f} per 100. At that end '
            + (f'the ceiling is ${f["worst_at_three"]:,.2f}. '
               # No None check here, deliberately. `worst_at_three` is None only when the

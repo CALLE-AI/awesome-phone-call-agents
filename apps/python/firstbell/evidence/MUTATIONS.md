@@ -334,6 +334,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 225 | Keep a work file phone entry that is a word and dial it | 1 |
 | 226 | Shorten an identifier too short to have a middle | 1 |
 | 227 | Load a scenario that answers on a negative index | 1 |
+| 228 | Report every authorised call as one whose number was named | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -899,6 +900,14 @@ needs one character changed. An index past the end still means nobody picks up, 
 how many numbers a recipient has belongs to the request and not to the scenario, so a file
 cannot be checked against it when it loads, and the docstring says so. Counted over the 71
 tests in the three files that exercise the double.
+
+228 is on the authorisation log, which is the artifact a district reaches for when a parent
+rings up and asks why they were telephoned. Each row already named the record that
+authorised the call; the mutation makes every row claim the record named the number that
+rang, which is true of one row in the shipped example and false of another. Consent
+attaches to the number called, so a log that says which record authorised a call and not
+whether that record named the telephone answers half of the only question it exists to
+answer. Counted over the 43 tests in `tests/test_consent_record.py`.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

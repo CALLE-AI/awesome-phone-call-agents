@@ -709,6 +709,17 @@ def main(argv: list[str] | None = None) -> int:
                         "basis": ("a dated record" if r.item.consent_record
                                   else "a boolean column"),
                         "numbers_tried": list(r.masked_numbers),   # masked, never raw
+                        # The question a data protection officer asks about one call:
+                        # was the telephone that rang named in the permission? True
+                        # covers every number on the row, because the run refuses a row
+                        # carrying any number the record does not name rather than
+                        # refusing at the third attempt. False means the record names a
+                        # pupil and no number at all, which is the exposure this entry
+                        # counts rather than closes. Null means there was no record to
+                        # ask: the row dialled on a boolean column.
+                        "number_named_by_the_record": (
+                            None if not r.item.consent_record
+                            else not r.item.consent_names_no_number),
                         "attempts": r.attempts_made,
                         "call_id": r.call_id,
                         "placed_by_this_run": r.placed_by_this_run,
