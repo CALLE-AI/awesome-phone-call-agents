@@ -59,7 +59,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional average check per guest used to estimate protected revenue",
     )
-    run.add_argument("--no-answer-retries", type=int, default=1)
     run.add_argument("--call-window-start", default="09:00")
     run.add_argument("--call-window-end", default="21:00")
     run.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -100,7 +99,6 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("--max-calls", type=int, default=10)
     resume.add_argument("--party-size-tolerance", type=int, default=0)
     resume.add_argument("--avg-check-per-guest", type=float, default=None)
-    resume.add_argument("--no-answer-retries", type=int, default=1)
     resume.add_argument("--call-window-start", default="09:00")
     resume.add_argument("--call-window-end", default="21:00")
     resume.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -151,7 +149,6 @@ def _build_config(args: argparse.Namespace) -> EngineConfig:
     return EngineConfig(
         max_calls=args.max_calls,
         party_size_tolerance=args.party_size_tolerance,
-        no_answer_retries=args.no_answer_retries,
         call_window_start=parse_window(args.call_window_start),
         call_window_end=parse_window(args.call_window_end),
     )

@@ -79,21 +79,17 @@ def test_confirm_reservation_transitions_status(tmp_path):
     assert client.dialed == ["R-001"]
 
 
-def test_confirm_reservation_retries_no_answer_once(tmp_path):
+def test_confirm_first_no_answer_stops_for_reconciliation(tmp_path):
     engine, client, _ = make_engine(
         tmp_path,
-        {
-            "R-001": [
-                {"status": "NO_ANSWER", "new_slot": None, "notes": "nobody"},
-                {"status": "CONFIRMED", "new_slot": None, "notes": "second try"},
-            ]
-        },
+        {"R-001": [{"status": "NO_ANSWER", "new_slot": None, "notes": "nobody"}]},
     )
     reservation = make_reservation()
-    outcome = engine.confirm_reservation("run-1", reservation, NOW)
-    assert outcome.status == CallStatus.CONFIRMED
-    assert reservation.status == ReservationStatus.CONFIRMED
-    assert client.dialed == ["R-001", "R-001"]
+    with pytest.raises(ReconciliationRequiredError, match="R-001"):
+        engine.confirm_reservation("run-1", reservation, NOW)
+    # The same recipient is never auto-redialed; a human resumes instead.
+    assert client.dialed == ["R-001"]
+    assert reservation.status == ReservationStatus.NEEDS_REVIEW
 
 
 def test_non_consented_reservation_is_never_dialed(tmp_path):
@@ -209,18 +205,6 @@ def test_reconciliation_error_carries_triggering_outcome(tmp_path):
     assert excinfo.value.outcome.uncertainty_reason == "PROVIDER_FAILED"
 
 
-def test_confirm_no_answer_after_retries_stops(tmp_path):
-    engine, client, _ = make_engine(
-        tmp_path,
-        {"R-001": [{"status": "NO_ANSWER"}, {"status": "NO_ANSWER"}]},
-    )
-    reservation = make_reservation()
-    with pytest.raises(ReconciliationRequiredError):
-        engine.confirm_reservation("run-1", reservation, NOW)
-    assert client.dialed == ["R-001", "R-001"]
-    assert reservation.status == ReservationStatus.NEEDS_REVIEW
-
-
 def test_waitlist_no_answer_never_advances_to_next_recipient(tmp_path):
     payloads = {
         "W-001": [{"status": "NO_ANSWER"}],
@@ -293,7 +277,7 @@ def test_engine_never_exceeds_budget(tmp_path_factory, statuses, max_calls):
         for i, status in enumerate(statuses)
     }
     engine, client, _ = make_engine(
-        tmp_path, payloads, EngineConfig(max_calls=max_calls, no_answer_retries=0)
+        tmp_path, payloads, EngineConfig(max_calls=max_calls)
     )
     try:
         for i in range(len(statuses)):
@@ -314,7 +298,7 @@ def test_engine_never_dials_a_target_twice_in_one_run(tmp_path_factory, statuses
         f"R-{i:03d}": [{"status": status, "new_slot": None, "notes": ""}]
         for i, status in enumerate(statuses)
     }
-    engine, client, _ = make_engine(tmp_path, payloads, EngineConfig(no_answer_retries=0))
+    engine, client, _ = make_engine(tmp_path, payloads)
     for i in range(len(statuses)):
         try:
             engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)

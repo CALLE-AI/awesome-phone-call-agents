@@ -45,7 +45,6 @@ UNCERTAIN_OUTCOMES = {
 class EngineConfig:
     max_calls: int = 10
     party_size_tolerance: int = 0
-    no_answer_retries: int = 1
     call_window_start: dt_time = dt_time(9, 0)
     call_window_end: dt_time = dt_time(21, 0)
 
@@ -81,13 +80,12 @@ class CascadeEngine:
         goal: str,
         now: datetime,
         leg: str,
-        allow_duplicate: bool = False,
     ) -> CallOutcome:
         if self.audit.is_cancelled():
             return self._skip(run_id, target_id, CallStatus.CANCELLED_BY_OPERATOR)
         if not consent:
             return self._skip(run_id, target_id, CallStatus.SKIPPED_NO_CONSENT)
-        if not allow_duplicate and target_id in self.audit.dialed_targets():
+        if target_id in self.audit.dialed_targets():
             return self._skip(run_id, target_id, CallStatus.SKIPPED_DUPLICATE)
         if not self._within_window(now):
             return self._skip(run_id, target_id, CallStatus.SKIPPED_OUT_OF_WINDOW)
@@ -119,20 +117,6 @@ class CascadeEngine:
             now=now,
             leg=LEG_CONFIRM,
         )
-        if (
-            outcome.status == CallStatus.NO_ANSWER
-            and self.config.no_answer_retries > 0
-        ):
-            outcome = self._place_or_skip(
-                run_id=run_id,
-                phone=reservation.phone,
-                target_id=reservation.booking_id,
-                consent=reservation.consent,
-                goal=goal,
-                now=now,
-                leg=LEG_CONFIRM,
-                allow_duplicate=True,
-            )
         if outcome.status in UNCERTAIN_OUTCOMES:
             reservation.status = ReservationStatus.NEEDS_REVIEW
             raise ReconciliationRequiredError(
