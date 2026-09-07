@@ -198,6 +198,17 @@ def test_confirm_uncertain_marks_needs_review_and_stops(tmp_path):
     assert reservation.status == ReservationStatus.NEEDS_REVIEW
 
 
+def test_reconciliation_error_carries_triggering_outcome(tmp_path):
+    engine, _, _ = make_engine(
+        tmp_path,
+        {"R-001": [{"status": "UNCERTAIN", "uncertainty_reason": "PROVIDER_FAILED"}]},
+    )
+    with pytest.raises(ReconciliationRequiredError) as excinfo:
+        engine.confirm_reservation("run-1", make_reservation(), NOW)
+    assert excinfo.value.outcome.target_id == "R-001"
+    assert excinfo.value.outcome.uncertainty_reason == "PROVIDER_FAILED"
+
+
 def test_confirm_no_answer_after_retries_stops(tmp_path):
     engine, client, _ = make_engine(
         tmp_path,

@@ -29,6 +29,10 @@ class BudgetExceededError(RuntimeError):
 class ReconciliationRequiredError(RuntimeError):
     """Raised when an uncertain outcome stops the run for human review."""
 
+    def __init__(self, message: str, outcome: "CallOutcome"):
+        super().__init__(message)
+        self.outcome = outcome
+
 
 UNCERTAIN_OUTCOMES = {
     CallStatus.NO_ANSWER,
@@ -134,7 +138,8 @@ class CascadeEngine:
             raise ReconciliationRequiredError(
                 f"target {reservation.booking_id} returned {outcome.status.value} "
                 f"({outcome.uncertainty_reason or 'no certain result'}); run stopped "
-                "for reconciliation before any further calls"
+                "for reconciliation before any further calls",
+                outcome=outcome,
             )
         self._apply_confirm(reservation, outcome)
         return outcome
@@ -209,7 +214,8 @@ class CascadeEngine:
                     f"waitlist target {entry.entry_id} returned "
                     f"{outcome.status.value} "
                     f"({outcome.uncertainty_reason or 'no certain result'}); "
-                    "cascade stopped before offering the slot to anyone else"
+                    "cascade stopped before offering the slot to anyone else",
+                    outcome=outcome,
                 )
             entry.status = WaitlistStatus.WAITING
         return placed
