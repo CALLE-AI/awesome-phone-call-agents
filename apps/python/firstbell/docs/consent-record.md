@@ -102,6 +102,15 @@ Numbers are compared on their digits. `+91 555 000 0001` in a register a person 
 and `+915550000001` in an export a system wrote are one telephone, and refusing that pair
 would be a check that reads as careful while stopping real calls about real absences.
 
+Something with no digits in it is not a number and matches nothing. This is worth stating
+because it was the hole in the rule above: strip the digits out of `unknown` and nothing is
+left, nothing equals nothing, so a record holding `unknown` covered a row carrying
+`unknown` and that row was dialled on a permission naming no telephone. OneRoster and
+Clever exports do write `unknown`, `n/a` and `none` into a phone column. The register
+refuses such an entry when it loads, a work file drops it and refuses a row it leaves with
+nothing to dial, and the comparison itself refuses it as well, because a guard that trusts
+its callers to have checked first is one a later caller removes.
+
 **A record that names no numbers still dials, and the run says how many did.** That is the
 exposure left rather than a decision anybody is happy with. Every register written before
 this field existed names no numbers, refusing all of those rows would stop every deployment
@@ -189,7 +198,7 @@ look better documented than a boolean row while being checked less.
 
 ## What checks this
 
-`tests/test_consent_record.py`, thirty-seven tests: one per refusal, one per required
+`tests/test_consent_record.py`, forty-two tests: one per refusal, one per required
 field, the unknown-key refusal, the register-level failures, the digits-only number
 comparison, the count of rows that rested on a record naming no number, and two that read
 the shipped example register beside the work file and fail if the pair stops demonstrating

@@ -106,8 +106,16 @@ class ConsentRecord:
         this returns False for every number, because the caller has to be able to tell
         "this record does not cover that number" from "this record names no numbers at
         all", and those are different sentences to a family.
+
+        Something with no digits in it is not a number and matches nothing, on either
+        side. `unknown` in a phone column strips to an empty string, an empty string
+        equals an empty string, and a record holding `unknown` would otherwise cover a row
+        carrying `unknown`. Both loaders now refuse that entry, and this still refuses it,
+        because a guard that relies on its callers is one a later caller removes.
         """
         want = "".join(ch for ch in number if ch.isdigit())
+        if not want:
+            return False
         return any("".join(ch for ch in held if ch.isdigit()) == want
                    for held in self.phones)
 
@@ -148,6 +156,12 @@ def _as_phones(value: object, where: str) -> tuple[str, ...]:
         if not isinstance(entry, str) or not entry.strip():
             raise RegisterError(f"{where}: phones contains {entry!r}, which is not a "
                                 "telephone number")
+        if not any(ch.isdigit() for ch in entry):
+            raise RegisterError(
+                f"{where}: phones contains {entry!r}, which has no digits in it. A "
+                "district export writes 'unknown' and 'n/a' into a phone column, and a "
+                "record holding one of those names no telephone while looking as though "
+                "it names one.")
         out.append(entry.strip())
     return tuple(out)
 

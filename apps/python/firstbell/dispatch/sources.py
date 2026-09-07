@@ -56,9 +56,15 @@ def _split_phones(raw: str) -> tuple[str, ...]:
 
     CALL-E models `phones` as a list per recipient, so the fallback chain is a first-class
     part of the request rather than something we have to orchestrate ourselves.
+
+    An entry with no digits in it is dropped. `unknown`, `n/a` and `none` all arrive in
+    the phone column of a real district export, and each one used to become an attempt:
+    the dialler tried it, the platform refused it, and the row spent a place in the
+    fallback chain on a word. Dropping it here rather than at the dialler keeps the count
+    of numbers on the row equal to the count of numbers somebody could answer.
     """
     parts = [p.strip() for p in raw.replace(";", ",").split(",")]
-    return tuple(p for p in parts if p)
+    return tuple(p for p in parts if p and any(ch.isdigit() for ch in p))
 
 
 _YES = {"1", "true", "yes", "y", "granted"}
@@ -303,10 +309,17 @@ class CsvSource:
                     )
                 seen.add(item_id)
 
-                phones = _split_phones(row.get("phones") or "")
+                raw_phones = (row.get("phones") or "").strip()
+                phones = _split_phones(raw_phones)
                 if not phones:
+                    # Two different things a reader has to tell apart: an empty cell, and
+                    # a cell holding a word. The second one looks filled in on a
+                    # spreadsheet, so the message quotes it.
+                    detail = (f"no phone number for {item_id!r}" if not raw_phones else
+                              f"no phone number for {item_id!r}: the phones column holds "
+                              f"{raw_phones!r}, which has no digits in it")
                     raise SourceError(
-                        f"{self.path.name} line {line_number}: no phone number for {item_id!r}"
+                        f"{self.path.name} line {line_number}: {detail}"
                     )
 
                 context = {

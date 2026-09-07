@@ -329,6 +329,9 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 220 | Take `--outcomes` and bind none of it | 1 |
 | 221 | Report the exported scenario as current whatever is on disk | 1 |
 | 222 | Default a scenario entry to nobody picking up | 1 |
+| 223 | Compare a number with no digits in it as equal to another | 1 |
+| 224 | Load a consent record whose phone entry is a word | 1 |
+| 225 | Keep a work file phone entry that is a word and dial it | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -864,6 +867,17 @@ until the line the server always prints last.
 The counts for 220, 221 and 222 were measured over the four test files that can reach the
 code they change (83 tests) rather than over the whole suite, and that scope is stated here
 because a count with no scope beside it is the defect this ledger keeps finding elsewhere.
+
+223, 224 and 225 are one hole in three places. The number check compares digits, which is
+what makes `+1 555 010 0301` in a register and `+15550100301` in a work file one telephone.
+Strip the digits out of `unknown` and nothing is left, and nothing equals nothing, so a
+record holding `unknown` covered a row carrying `unknown` and the row was dialled on a
+permission that names no telephone. District exports do write `unknown`, `n/a` and `none`
+into a phone column, so this arrives rather than being invented. The decision refuses it,
+both loaders refuse it before the decision is reached, and 223 is kept as a separate row
+because a guard that depends on its callers validating first is one a fourth caller
+removes. The three counts were measured over `tests/test_consent_record.py`, the 42 tests
+that can reach any of it.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

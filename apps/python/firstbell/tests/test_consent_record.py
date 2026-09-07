@@ -19,8 +19,8 @@ from datetime import date
 
 import pytest
 
-from dispatch.consent import (CHANNELS, PURPOSES, RECORD_SCHEMA, REQUIRED, RegisterError,
-                              load_register, record_from, refusal)
+from dispatch.consent import (CHANNELS, PURPOSES, RECORD_SCHEMA, REQUIRED, ConsentRecord,
+                              RegisterError, load_register, record_from, refusal)
 
 TODAY = date(2026, 9, 7)
 
@@ -337,6 +337,76 @@ def test_the_number_check_compares_digits_and_not_punctuation():
     assert refusal(record, "S-1", "CR-1", TODAY, ("+15550100301",)) is None
     assert record.covers_number("+15550100301")
     assert not record.covers_number("+15550100302")
+
+
+def test_a_word_in_a_phone_column_matches_nothing_on_either_side():
+    """`unknown` is not a telephone, and two of them are not the same telephone.
+
+    The check compares digits, which is what makes a register typed by a person and an
+    export written by a system agree. Strip the digits out of `unknown` and nothing is
+    left, and nothing equals nothing, so a record holding `unknown` covered a row carrying
+    `unknown` and the row was dialled on a permission that names no number at all.
+
+    Both loaders refuse that entry now. This asserts the decision itself, because a guard
+    that relies on its callers having validated first is a guard the fourth caller
+    removes.
+    """
+    # The dataclass directly, because `record_from` refuses this entry now. This is the
+    # state the decision has to answer for even when no loader will hand it over.
+    record = ConsentRecord(
+        id="CR-1", student_id="S-1", channel="voice", purpose="attendance",
+        given_at=date(2026, 8, 14), phones=("unknown",))
+    assert not record.covers_number("unknown")
+    assert not record.covers_number("n/a")
+    assert not record.covers_number("")
+    assert refusal(record, "S-1", "CR-1", TODAY, ("unknown",)) is not None
+
+
+def test_the_register_refuses_a_phone_with_no_digits_in_it():
+    """A district export writes `unknown` into a phone column, and this catches it there.
+
+    The message says what is wrong with the entry rather than that the register is
+    invalid, because the person reading it has a spreadsheet open and the cell looks
+    filled in.
+    """
+    with pytest.raises(RegisterError) as caught:
+        record_from(_raw(phones=["unknown"]), "CR-1")
+    assert "no digits" in str(caught.value)
+    assert "unknown" in str(caught.value)
+
+
+def test_a_row_whose_only_number_is_a_word_is_refused_by_name(tmp_path):
+    """And the same shape on the other side, in the work file.
+
+    It used to become an attempt: the dialler tried `unknown`, the platform refused it,
+    and the row spent a place in its fallback chain on a word.
+    """
+    from dispatch.sources import CsvSource, SourceError
+
+    path = tmp_path / "absences.csv"
+    path.write_text("id,phones,consent\nS-1,unknown,yes\n", encoding="utf-8")
+    with pytest.raises(SourceError) as caught:
+        list(CsvSource(path).items())
+    # The quoted cell, because an empty column and a column holding a word are different
+    # things to whoever has to fix the export.
+    assert "'unknown'" in str(caught.value)
+    assert "no digits" in str(caught.value)
+
+
+def test_a_row_keeps_the_numbers_that_are_numbers(tmp_path):
+    """One word beside one telephone leaves one telephone, and the row runs.
+
+    The count of numbers on the row is the count of numbers somebody could answer, which
+    is what the fallback chain and every attempt figure are built on.
+    """
+    from dispatch.sources import CsvSource
+
+    path = tmp_path / "absences.csv"
+    path.write_text('id,phones,consent\nS-1,"unknown,+15550100301",yes\n',
+                    encoding="utf-8")
+    items = list(CsvSource(path).items())
+    assert len(items) == 1
+    assert items[0].phones == ("+15550100301",)
 
 
 def test_a_record_naming_no_number_still_dials_and_is_counted_instead():
