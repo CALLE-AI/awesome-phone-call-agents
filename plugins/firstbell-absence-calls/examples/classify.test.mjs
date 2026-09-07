@@ -102,16 +102,46 @@ test("a call that reached nobody is failed and names how many numbers were tried
   assert.match(out.reason, /2 number\(s\)/);
 });
 
-test("a task-level result is never borrowed for a recipient that has none", () => {
-  // On a fan-out call this fallback files one family's answer against another family's
-  // child. It is refused even though it would raise the resolution rate.
-  const withTaskResult = {
-    status: "completed",
-    attempts: [{ provider_call_id: "pc_1" }],
-    structured_result: null,
-    task: { structured_result: { reason_category: "illness", expected_return: "today" } },
-  };
-  assert.equal(classifyRecipient(withTaskResult).resolution, "undetermined");
+const TASK_RESULT = { reason_category: "illness", expected_return: "today",
+                      parent_confirmed_aware: "yes" };
+
+test("a task-level result is read when the call had exactly one recipient", () => {
+  // Observed in production: the per-recipient field null and the task-level field fully
+  // populated. Reading only the recipient routes a finished conversation to a person,
+  // which is a false negative that looks exactly like a real failure.
+  const only = { status: "completed", attempts: [{ provider_call_id: "pc_1" }],
+                 structured_result: null };
+  const call = { recipients: [only], structured_result: TASK_RESULT };
+  assert.equal(classifyRecipient(only, call).resolution, "resolved");
+  assert.equal(classifyRecipient(only, call).needsAHuman, false);
+});
+
+test("a task-level result is never borrowed on a fan-out", () => {
+  // Here the result belongs to no particular person, so borrowing it files one family's
+  // answer against another family's child. Refused even though it would raise the
+  // resolution rate.
+  const first = { status: "completed", attempts: [{ provider_call_id: "pc_1" }],
+                  structured_result: null };
+  const second = { status: "completed", attempts: [{ provider_call_id: "pc_2" }],
+                   structured_result: null };
+  const call = { recipients: [first, second], structured_result: TASK_RESULT };
+  assert.equal(classifyRecipient(first, call).resolution, "undetermined");
+  assert.equal(classifyRecipient(second, call).resolution, "undetermined");
+});
+
+test("a recipient with its own result never reads the task-level one", () => {
+  const own = { reason_category: "transport", expected_return: "tomorrow",
+                parent_confirmed_aware: "yes" };
+  const only = { status: "completed", attempts: [{ provider_call_id: "pc_1" }],
+                 structured_result: own };
+  const call = { recipients: [only], structured_result: TASK_RESULT };
+  assert.deepEqual(classifyRecipient(only, call).resolution, "resolved");
+});
+
+test("classifying without the call still works and reads the recipient alone", () => {
+  const only = { status: "completed", attempts: [{ provider_call_id: "pc_1" }],
+                 structured_result: null };
+  assert.equal(classifyRecipient(only).resolution, "undetermined");
 });
 
 test("the provider id comes from the last attempt, not the first", () => {

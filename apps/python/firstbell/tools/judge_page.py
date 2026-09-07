@@ -1417,9 +1417,14 @@ def path_markup() -> str:
     """The stated way in, once, at the top.
 
     This page is 4,283 words and every one of them is held by a test, so the answer to a
-    reader with two minutes cannot be to cut. It is to say where to spend them. Three
+    reader with two minutes cannot be to cut. It is to say where to spend them. Five
     destinations, in the order they answer the question a judge is actually asking, each an
     ordinary anchor so it works with no script and lands on a keyboard.
+
+    The last one is the run itself. A reviewer with three minutes would rather press
+    something than read about it, and the only honest version of that this page can offer
+    is the offline run it already holds, played rather than pasted. It is last because
+    somebody who has not heard a call yet has no reason to care what a console prints.
 
     It sits at the top of act 1 rather than on the first screen. Act 0 has one sentence and
     one object on it and both are the argument; a menu above the register would be the page
@@ -1440,12 +1445,19 @@ def path_markup() -> str:
         ("act-04", "What it costs, and against what",
          "For a buyer: the price above which a person is cheaper, beside what a district "
          "already pays for the system this sits next to."),
+        # Fifth, and last, because a reviewer with minutes rather than hours wants to run
+        # the thing and the only version of that this page can offer is the run it already
+        # holds. It goes at the end of the list and not the start: somebody who has not
+        # heard a call yet has no reason to care what a console prints.
+        ("act-08", "Run it, here, now",
+         "The offline run plays line by line: seven rows, three endings, and the totals. "
+         "No account, no key, nothing dialled."),
     ]
     out = ['<div class=path>',
            '<p class=path-k>The two-minute path</p>',
-           '<p class=path-lead>Three things, in the order they answer the question, and '
-           'a fourth if you are the person who has to pay for it. Everything else here is '
-           'the evidence behind them.</p>',
+           '<p class=path-lead>Three things, in the order they answer the question, a '
+           'fourth if you are the person who has to pay for it, and one you can press. '
+           'Everything else here is the evidence behind them.</p>',
            '<ol class=path-steps>']
     for i, (anchor, title, why) in enumerate(steps, 1):
         out.append(f'<li><span class=path-n>{i:02d}</span>'
@@ -1979,9 +1991,28 @@ def build(has_audio: bool, repo_url: str | None = None,
         'the offline path exercises the same SDK code as the live one.</p>',
         '<pre>pip install -r requirements-dev.txt\n'
         'python -m firstbell --work-file examples/absences.csv</pre>',
-        '<p class=dim>Produced by running exactly that when this page was built:</p>',
-        '<pre class=run tabindex=0 role=region aria-label="What the offline run prints, '
-        'verbatim. Scrolls sideways on a narrow screen.">' + esc(offline_run()) + '</pre>',
+        '<p class=dim>Produced by running exactly that when this page was built. Press '
+        'Run it to watch the rows land one at a time, or read the whole thing at once.</p>',
+        # The interactive surface, and the evidence, are one element. `console.js` reads
+        # this block's own text and decides when each line appears; it never holds a copy.
+        # With JavaScript off the whole run is already on the page and the controls do
+        # nothing, which is the right way round for a block whose value is that it is
+        # verbatim.
+        '<div class=runbox data-run>',
+        '<div class=runbar>'
+        '<span class=switch role=group aria-label="The offline run">'
+        '<button type=button data-run-play>Run it</button>'
+        '<button type=button data-run-skip aria-label="Show the whole run at once">'
+        'All of it</button>'
+        '</span>'
+        '<span class=dim>&#8202;the real output of the command above, '
+        'played line by line</span>'
+        '</div>',
+        '<pre class=run data-run-out tabindex=0 role=region aria-live=off '
+        'aria-label="What the offline run prints, verbatim. Scrolls sideways on a narrow '
+        'screen.">' + esc(offline_run()) + '</pre>',
+        '<div class=runlegend data-run-legend></div>',
+        '</div>',
     ]
     add(act("08", "Run it yourself", "".join(body), margin=True))
 
@@ -2008,6 +2039,12 @@ def build(has_audio: bool, repo_url: str | None = None,
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
         f'crossorigin=anonymous defer></script>')
     add('<script type=module src="app.js"></script>')
+    # Its own module rather than a call from app.js, because app.js owns the player and
+    # the rail and a failure there should not take the run block with it. It mounts
+    # itself: an inline module would need a hash in the derived Content-Security-Policy,
+    # and a policy that has to grow a hash for every small script is a policy somebody
+    # eventually widens.
+    add('<script type=module src="console.js"></script>')
     # The animation, and the player that reads it. Both are deferred and both come after
     # app.js, because the figure is nine screens down and nothing above it waits on either.
     # Served from this origin rather than a CDN, so the derived policy covers them under
@@ -2076,7 +2113,7 @@ def main() -> int:
     # watch one file. What the page shows instead is drawn from the run itself: the register
     # plays, the waveform is the audio, and the figure in act 02 is the system's shape. All
     # of it is built rather than filmed, so it stays true when the code changes.
-    for asset in ("app.js", "player.js", "figure.js"):
+    for asset in ("app.js", "player.js", "figure.js", "console.js"):
         shutil.copy2(SITE / asset, out / asset)
 
     # Third-party code lives in its own directory and is declared in VENDOR.json with the

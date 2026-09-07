@@ -230,7 +230,13 @@ while (Date.now() < deadline) {
   });
 }
 
+// Only the two fields the classifier needs from the call, rather than the whole
+// payload. A transcript travelling between nodes is a transcript in a log somebody has
+// not thought about, and the classifier reads the recipient count and the task-level
+// result and nothing else.
 return [{ json: { ...row, callId, recipient: (call.recipients || [])[0] || null,
+                  call: { recipients: call.recipients || [],
+                          structured_result: call.structured_result || null },
                   placedByThisRun: true } }];`;
 
 const CLASSIFY = `${classifier}
@@ -240,7 +246,10 @@ const row = $input.first().json;
 if (row.skip) {
   return [{ json: row }];
 }
-const verdict = classifyRecipient(row.recipient);
+// row.call carries the recipient count and the task-level result, which is what lets a
+// single-recipient task-level result be read. A row without it classifies on the
+// recipient alone.
+const verdict = classifyRecipient(row.recipient, row.call);
 return [{
   json: {
     id: row.id,

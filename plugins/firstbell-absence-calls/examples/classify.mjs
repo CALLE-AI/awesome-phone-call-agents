@@ -125,17 +125,42 @@ function isUninformative(result) {
 /**
  * Pull the structured result for one recipient.
  *
- * Deliberately never falls back to a task-level `structured_result`. On a fan-out call
- * that fallback files one family's answer against another family's child, which is a
- * data-protection incident rather than a bug. If this recipient has no result of its own,
- * it has no result.
+ * The API carries `structured_result` in two places: once per recipient, and once on the
+ * task. A real single-recipient call to production came back with the per-recipient field
+ * null and the task-level field fully populated, so code that reads only the recipient
+ * concludes the call produced nothing and routes a finished conversation to a person. That
+ * is a false negative and it is indistinguishable from a genuine failure, which makes it
+ * the worst kind.
+ *
+ * The fallback is restricted to a call with exactly one recipient. On a fan-out the
+ * task-level result belongs to no particular person, and guessing which one it describes
+ * trades a false negative for a false attribution: one family's answer filed against
+ * another family's child, which is a data-protection incident rather than a bug.
+ *
+ * `dispatch/scheduler.py:_result_for` is the same rule in Python and has been since the
+ * call that found it. This surface did not have it, so the two classifiers disagreed on a
+ * shape that has actually occurred: PYTHON said resolved and needed nobody, JavaScript
+ * said undetermined and put it on a desk. `tests/test_classifier_parity.py` had no fixture
+ * of that shape, and its coverage check selected fixtures by which verdicts they produced
+ * rather than by what went into them, so a missing input shape could not show up as a gap.
  */
-function recipientResult(recipient) {
+function recipientResult(recipient, call) {
   if (!isObject(recipient)) {
     return null;
   }
-  const result = recipient.structured_result;
-  return isObject(result) ? result : null;
+  const own = recipient.structured_result;
+  if (own !== null && own !== undefined) {
+    return isObject(own) ? own : null;
+  }
+  if (!isObject(call)) {
+    return null;
+  }
+  const recipients = Array.isArray(call.recipients) ? call.recipients : null;
+  if (recipients === null || recipients.length !== 1) {
+    return null;
+  }
+  const task = call.structured_result;
+  return isObject(task) ? task : null;
 }
 
 /**
@@ -186,9 +211,14 @@ export function safeguardingEscalation(result) {
 /**
  * Classify one recipient of one call.
  *
+ * `call` is optional and is the whole call object, needed only to reach a task-level
+ * `structured_result` on a single-recipient call. Omitting it is safe and reads the
+ * recipient alone; passing it is what makes this agree with the Python classifier on a
+ * shape production has produced.
+ *
  * Returns { resolution, reason, attempts, providerCallId, escalation, needsAHuman }.
  */
-export function classifyRecipient(recipient) {
+export function classifyRecipient(recipient, call) {
   const attempts = attemptCount(recipient);
   const last = lastAttempt(recipient);
   const providerCallId = isObject(last) && typeof last.provider_call_id === "string"
@@ -208,7 +238,7 @@ export function classifyRecipient(recipient) {
     };
   }
 
-  const result = recipientResult(recipient);
+  const result = recipientResult(recipient, call);
 
   if (result === null) {
     return {

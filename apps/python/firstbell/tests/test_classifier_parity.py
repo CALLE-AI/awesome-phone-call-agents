@@ -38,9 +38,12 @@ CLASSIFIER = (APP.parent.parent.parent / "plugins" / "firstbell-absence-calls"
 
 # One recipient per branch, written once and fed to both surfaces.
 #
-# The status here is the recipient's, because that is what the JavaScript is handed. The
-# Python side is handed a whole call, so each of these is wrapped below.
-CASES: list[tuple[str, dict]] = [
+# The status is the recipient's. Each case may also carry a third element, which is merged
+# into the call the recipient is wrapped in, because one of the shapes that diverged is a
+# property of the call rather than of the recipient: a task-level `structured_result` on a
+# single-recipient call. A case with no third element gets an empty dict and behaves
+# exactly as it did.
+CASES: list[tuple] = [
     ("a schema-valid answer with an explicit confirmation", {
         "status": "completed",
         "attempts": [{"provider_call_id": "pc_1", "phone": "+915550000001"}],
@@ -102,13 +105,47 @@ CASES: list[tuple[str, dict]] = [
         "attempts": [{"provider_call_id": "pc_10", "phone": "+915550000010"}],
         "structured_result": None,
     }),
+    # The shape production actually produced, and the one that had no fixture: one
+    # recipient, its own `structured_result` null, and the answer on the task. The
+    # third element goes on the call rather than on the recipient because that is
+    # where the API puts it.
+    # Also absent until the shape check was written: a call that reached nobody. Both
+    # surfaces have a branch for it and neither was compared on it.
+    ("nobody reached on any number", {
+        "status": "failed",
+        "attempts": [{"provider_call_id": "pc_11", "phone": "+915550000011",
+                      "status": "failed", "sip_code": "480"},
+                     {"provider_call_id": "pc_12", "phone": "+915550000012",
+                      "status": "failed", "sip_code": "486"}],
+        "structured_result": None,
+     }, {
+        # The call status as well as the recipient's. The wrapper's default is a completed
+        # call, and a completed call carrying a failed single recipient is a shape the API
+        # does not produce: the Python classifier reads the call and the JavaScript reads
+        # the recipient, so a contradiction between the two makes them disagree about a
+        # call that does not exist. Setting both is what makes this fixture a real call.
+        "status": "failed",
+     }),
+    ("one recipient, no result of its own, and the answer on the task", {
+        "status": "completed",
+        "attempts": [{"provider_call_id": "pc_task", "phone": "+915550000001"}],
+        "structured_result": None,
+     }, {
+        "structured_result": {"parent_confirmed_aware": "yes",
+                              "reason_category": "illness",
+                              "expected_return": "today"},
+     }),
 ]
 
 DRIVER = """
 import { classifyRecipient } from CLASSIFIER_URL;
 const cases = JSON.parse(process.argv[2]);
-console.log(JSON.stringify(cases.map((recipient) => {
-  const out = classifyRecipient(recipient);
+// Handed whole calls rather than bare recipients, because one of the shapes the two
+// surfaces can disagree on is a property of the call: a task-level structured_result on a
+// single-recipient call. The Python side has always been handed the call, and handing the
+// JavaScript side less than that is what let the disagreement hide.
+console.log(JSON.stringify(cases.map((call) => {
+  const out = classifyRecipient(call.recipients[0], call);
   return { resolution: out.resolution, escalation: out.escalation,
            needsAHuman: out.needsAHuman };
 })));
@@ -127,8 +164,13 @@ def _javascript_verdicts(tmp_path: Path) -> list[dict]:
         DRIVER.replace("CLASSIFIER_URL", json.dumps(CLASSIFIER.as_uri())),
         encoding="utf-8",
     )
+    wrapped = [
+        {"id": f"call_{i}", "status": "completed", "recipients": [case[1]],
+         **(case[2] if len(case) > 2 else {})}
+        for i, case in enumerate(CASES)
+    ]
     proc = subprocess.run(
-        [node, str(driver), json.dumps([case for _name, case in CASES])],
+        [node, str(driver), json.dumps(wrapped)],
         capture_output=True, text=True,
     )
     assert proc.returncode == 0, (
@@ -144,8 +186,10 @@ def _python_verdicts() -> list[dict]:
         escalate=safeguarding_escalation,
     )
     out = []
-    for index, (_name, recipient) in enumerate(CASES):
-        call = {"id": f"call_{index}", "status": "completed", "recipients": [recipient]}
+    for index, case in enumerate(CASES):
+        recipient, extra = case[1], (case[2] if len(case) > 2 else {})
+        call = {"id": f"call_{index}", "status": "completed", "recipients": [recipient],
+                **extra}
         result = dispatcher._classify(
             WorkItem(id=f"S-{index}", phones=("+915550000001",)), call)
         out.append({
@@ -163,8 +207,8 @@ def test_the_two_shipped_classifiers_reach_the_same_verdict(tmp_path):
     assert len(js) == len(py) == len(CASES)
 
     disagreements = [
-        f"  {name}: python {p}, javascript {j}"
-        for (name, _case), p, j in zip(CASES, py, js) if p != j
+        f"  {case[0]}: python {p}, javascript {j}"
+        for case, p, j in zip(CASES, py, js) if p != j
     ]
     assert not disagreements, (
         "the two shipped classifiers disagree about the same call, so a school running "
@@ -188,3 +232,73 @@ def test_the_fixture_set_actually_reaches_every_verdict_this_is_meant_to_catch()
         (Resolution.UNDETERMINED.value, Escalation.NONE.value),
     ]:
         assert expected in seen, f"no fixture produces {expected}; the set is {sorted(seen)}"
+
+
+def test_the_fixture_set_contains_every_input_shape_the_two_can_disagree_on():
+    """Coverage by what goes in, because the last gap was invisible to coverage by verdict.
+
+    The test above selects fixtures by the verdict pair they produce. That cannot notice a
+    missing input shape: a shape nobody wrote a fixture for produces no verdict, so it
+    subtracts nothing from a set of verdicts that are already covered by other fixtures.
+    One was missing, and it was the one that mattered.
+
+    A single-recipient call can come back with the per-recipient `structured_result` null
+    and the task-level field fully populated. Production produced exactly that.
+    `dispatch/scheduler.py:_result_for` reads the task-level field in that case and the
+    JavaScript did not, so the two surfaces returned resolved with nobody needed and
+    undetermined with a person needed, for the same call. No fixture had that shape.
+
+    So this asserts the shapes, by reading the fixtures rather than by running them. It is
+    deliberately about the inputs and not the outputs: an assertion about outputs is what
+    was already here.
+    """
+    shapes = set()
+    for case in CASES:
+        recipient = case[1]
+        extra = case[2] if len(case) > 2 else {}
+        own = recipient.get("structured_result", "absent") if isinstance(recipient, dict) else "absent"
+        shapes.add((
+            "connected" if isinstance(recipient, dict)
+            and recipient.get("status") == "completed" else "not-connected",
+            "own-result" if isinstance(own, dict) else "no-own-result",
+            "task-result" if isinstance(extra.get("structured_result"), dict)
+            else "no-task-result",
+        ))
+
+    required = {
+        # The shape that diverged, and the reason this test exists.
+        ("connected", "no-own-result", "task-result"),
+        # The ordinary answered call.
+        ("connected", "own-result", "no-task-result"),
+        # A conversation that produced nothing anywhere.
+        ("connected", "no-own-result", "no-task-result"),
+        # Nobody reached.
+        ("not-connected", "no-own-result", "no-task-result"),
+    }
+    missing = sorted(required - shapes)
+    assert not missing, (
+        "no fixture has these input shapes, so the two classifiers are not compared on "
+        f"them at all: {missing}. The set present is {sorted(shapes)}"
+    )
+
+
+def test_a_single_recipient_task_level_result_is_read_by_both_surfaces(tmp_path):
+    """Named separately, because a shape in the set is not the same as a shape agreed on.
+
+    If both surfaces regressed together the parity test above would stay green, and the
+    coverage test would stay green because the fixture is still there. This asserts the
+    verdict itself: production sent a finished conversation with the answer on the task,
+    and neither surface may route it to a person.
+    """
+    index = next((i for i, case in enumerate(CASES)
+                  if len(case) > 2
+                  and isinstance(case[2].get("structured_result"), dict)), None)
+    assert index is not None, "the single-recipient task-level fixture has been removed"
+
+    py = _python_verdicts()[index]
+    js = _javascript_verdicts(tmp_path)[index]
+    assert py["resolution"] == "resolved", (
+        f"python routes a finished conversation with a task-level answer to {py}"
+    )
+    assert py["needsAHuman"] is False
+    assert py == js, f"python {py}, javascript {js}"

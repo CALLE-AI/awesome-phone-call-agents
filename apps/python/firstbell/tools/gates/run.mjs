@@ -1725,6 +1725,161 @@ async function gateLinks(browser, base, slugs) {
  * no script of any kind. The walk is therefore a walk and nothing else. What is checked is
  * what can go wrong here: colour, the link back, and whether the browser refused anything.
  */
+/* Gate 17: the run block plays, and it plays the run.
+ *
+ * The interactive surface on this page is the offline run's own output, animated. That is
+ * only worth having if it cannot become a different run. `console.js` reads the block's
+ * text rather than holding a copy, so the two agree by construction, and this gate is what
+ * proves the construction is what shipped: it takes the text before the console touches
+ * anything, plays to the end, and compares.
+ *
+ * It also checks the two ways this fails without looking broken. A console that blanks the
+ * block and then throws leaves a reader with no evidence at all, which is worse than no
+ * console. And a console that animates but drops the rows leaves a demonstration with no
+ * outcomes in it, so every tag the program printed has to reach the screen.
+ */
+async function gateRunConsole(browser, url) {
+  const page = await browser.newPage();
+  const thrown = [];
+  page.on("pageerror", (err) => thrown.push(String(err)));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") thrown.push(msg.text());
+  });
+
+  await page.goto(url, { waitUntil: "load" });
+
+  const found = await page.evaluate(() => {
+    const box = document.querySelector("[data-run]");
+    if (!box) return { missing: "no element carrying data-run is on the page" };
+    const out = box.querySelector("[data-run-out]");
+    const play = box.querySelector("[data-run-play]");
+    const skip = box.querySelector("[data-run-skip]");
+    if (!out) return { missing: "the run block has no [data-run-out]" };
+    if (!play) return { missing: "the run block has no play control" };
+    return {
+      source: out.textContent,
+      shown: out.textContent,
+      state: box.dataset.runState ?? "",
+      hasSkip: Boolean(skip),
+      playLabel: play.textContent.trim(),
+    };
+  });
+
+  if (found.missing) {
+    await page.close();
+    record("the run block", "FAIL", found.missing);
+    return;
+  }
+
+  /* The text as the markup shipped it, before any script ran on it. Read from the built
+   * file rather than from the page, because the page is where the thing under test is. */
+  const built = await readFile(join(OUT, "index.html"), "utf8");
+  const block = built.match(/<pre class=run data-run-out[^>]*>([\s\S]*?)<\/pre>/);
+  if (!block) {
+    await page.close();
+    record("the run block", "COULD-NOT-MEASURE",
+      "out/index.html has no <pre class=run data-run-out>, so there is nothing to compare "
+      + "the played text against");
+    return;
+  }
+  /* Decoded in full, and the ampersand last.
+   *
+   * The first version of this listed four entities and missed `&#x27;`, which
+   * `html.escape` writes for an apostrophe. The gate reported a mismatch at character
+   * 225 and it was right about there being one: the file said `&#x27;s own code` and
+   * the screen said the apostrophe. The fault was this decoder rather than the page,
+   * and a gate whose own reader is incomplete produces a failure about itself. So
+   * numeric and hexadecimal references are decoded generically instead of from a list
+   * somebody has to keep, and the ampersand is decoded last because doing it first
+   * would turn a literal `&amp;lt;` into a less-than sign.
+   */
+  const unescape = (text) => text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, String.fromCharCode(34))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#([0-9]+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&amp;/g, "&");
+  const shipped = unescape(block[1]);
+
+  /* Idle first: the console renders nothing until it is asked, so the block is empty on a
+   * page nobody has touched. That is the state a screenshot would catch and a reader would
+   * report as a blank panel, so it is asserted rather than assumed. */
+  const idle = await page.evaluate(() => {
+    const out = document.querySelector("[data-run-out]");
+    return { text: out.textContent, state: document.querySelector("[data-run]").dataset.runState };
+  });
+
+  await page.click("[data-run-skip]");
+  await page.waitForFunction(
+    () => document.querySelector("[data-run]").dataset.runState === "done",
+    { timeout: 5000 }).catch(() => {});
+
+  const done = await page.evaluate(() => {
+    const box = document.querySelector("[data-run]");
+    const out = box.querySelector("[data-run-out]");
+    const legend = box.querySelector("[data-run-legend]");
+    return {
+      text: out.textContent,
+      state: box.dataset.runState ?? "",
+      playLabel: box.querySelector("[data-run-play]").textContent.trim(),
+      legendRows: legend ? legend.children.length : 0,
+      tagsPaintedInPlace: out.querySelectorAll(".tag").length,
+    };
+  });
+  await page.close();
+
+  if (thrown.length) {
+    record("the run block", "FAIL",
+      `the page threw while the run block was playing: ${thrown[0]}`);
+    return;
+  }
+  if (done.state !== "done") {
+    record("the run block", "FAIL",
+      `after asking for the whole run the block is in state "${done.state}", not "done", `
+      + "so it did not finish");
+    return;
+  }
+
+  const normalise = (t) => t.replace(/\r\n/g, "\n").trimEnd();
+  if (normalise(done.text) !== normalise(shipped)) {
+    const a = normalise(shipped), b = normalise(done.text);
+    let at = 0;
+    while (at < a.length && at < b.length && a[at] === b[at]) at += 1;
+    record("the run block", "FAIL",
+      `the played text is not the text the page shipped. They diverge at character ${at}: `
+      + `the file has ${JSON.stringify(a.slice(at, at + 60))} and the screen has `
+      + `${JSON.stringify(b.slice(at, at + 60))}`);
+    return;
+  }
+
+  /* Every outcome tag the program printed has to be on the screen when it finishes. A
+   * console that animates and drops the rows is a demonstration with no outcomes in it. */
+  const tags = [...shipped.matchAll(/\[(?:ok|HUMAN|SAFEG|skip|fail)\s*\]/g)].map((m) => m[0]);
+  const missing = tags.filter((tag) => !done.text.includes(tag));
+  if (missing.length) {
+    record("the run block", "FAIL",
+      `${missing.length} of ${tags.length} outcome tag(s) the run printed never reached the `
+      + `screen, starting with ${missing[0]}`);
+    return;
+  }
+  if (done.tagsPaintedInPlace < tags.length) {
+    record("the run block", "FAIL",
+      `${tags.length} outcome tag(s) are in the text and ${done.tagsPaintedInPlace} were `
+      + "picked out, so some rows are rendered as plain text");
+    return;
+  }
+
+  record("the run block", "PASS",
+    `${tags.length} outcome row(s) and ${normalise(shipped).split("\n").length} line(s) `
+    + `played and match the built page byte for byte. Idle state "${idle.state}" with the `
+    + `control reading "${found.playLabel}", finished state "${done.state}" reading `
+    + `"${done.playLabel}", and ${done.legendRows} legend row(s) built from the tags the `
+    + "run actually used. The page threw nothing",
+    { lines: normalise(shipped).split("\n").length, tags: tags.length });
+}
+
+
 async function gateDocs(browser, base, slugs) {
   const best = new Map();
   const census = new Map();
@@ -1897,6 +2052,7 @@ async function main() {
     await runGate("overflow", () => gateOverflow(
       browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html")));
     await runGate("the page under its own Content-Security-Policy", () => gateCsp(browser));
+    await runGate("the run block", () => gateRunConsole(browser, url));
     await runGate("document pages", () => gateDocs(browser, base, docSlugs));
     await runGate("every link on every page resolves",
       () => gateLinks(browser, base, docSlugs));

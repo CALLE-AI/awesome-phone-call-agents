@@ -119,7 +119,7 @@ The classification rule is not locked inside a Python CLI. The same three outcom
 an importable n8n workflow in
 [`plugins/firstbell-absence-calls`](../../../plugins/firstbell-absence-calls/), with the
 classifier extracted into a plain module so `node --test examples/classify.test.mjs` runs
-its twenty-four tests without n8n installed, and the workflow regenerated from that module by
+its twenty-seven tests without n8n installed, and the workflow regenerated from that module by
 a committed script so the two cannot drift apart. It ships with its schedule trigger
 disabled and a dry run that places no calls and needs no API key.
 
@@ -839,7 +839,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 546 tests
+python -m pytest tests/ -q          # 548 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -996,6 +996,29 @@ git log --reverse --format='%h %ad %s' --date=short -- :/apps/python/firstbell |
 
 That command prints the creation date from the repository itself rather than asking anyone
 to take the sentence above on trust.
+
+### The history was rewritten, and here is how much
+
+Eighty-three of the one hundred and sixty-three commits in this directory carry a committer
+date later than their author date, and the largest gap is thirty-eight hours. That is what
+a rebase looks like in the log, and it happened: branches were squashed, messages were
+corrected, and one range was reordered so that a fix did not sit above the commit it
+depended on.
+
+Nothing was backdated to look earlier than it was, and the sentence above is checkable in
+the direction that matters, because the earliest committer date in the directory is the one
+`git log` prints and no rewrite can make it earlier than the day the work happened. But an
+author date is a value the person rewriting chooses, so a reader comparing the two columns
+should be told which one to trust rather than discovering the discrepancy and wondering.
+
+```bash
+git log --format='%at %ct' -- :/apps/python/firstbell |
+  awk '{d=$2-$1; if (d>60) n++} END {print n" of "NR" rewritten"}'
+```
+
+The reason this is here at all: a reviewer who finds eighty-three rewritten commits in an
+entry that argues about honest measurement has found something the entry did not mention,
+and at that point the argument is worth less than the discrepancy.
 
 ## Attribution
 

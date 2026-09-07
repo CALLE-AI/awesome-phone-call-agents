@@ -634,6 +634,39 @@ pre {
   padding: 1rem 1.1rem; margin: 1rem 0; max-width: 100%;
 }
 
+/* ---- the run block ------------------------------------------------------------------- */
+/* The offline run, with controls above it. The block is the evidence and the animation at
+ * the same time, so the frame goes round both and the two cannot be separated by a
+ * stylesheet change.
+ *
+ * The height is fixed while it plays. Without that, sixty lines arriving one at a time
+ * push everything below them down sixty times, and a reader trying to read line four is
+ * chasing it up the screen. It is `min-height` rather than `height` so the finished block
+ * is its own length and nothing is clipped at the end. */
+.runbox { margin: 1rem 0; }
+.runbox .run { margin: 0; min-height: 22rem; }
+.runbox[data-run-state="playing"] .run,
+.runbox[data-run-state="idle"] .run { overflow-y: auto; max-height: 32rem; }
+.runbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.runbar .dim { font-size: var(--size-2); }
+/* The outcome tag the program prints, picked out where it sits rather than restated in a
+ * key beside the line. The colours are the act-3 ones: this is the same three-endings
+ * idea and a second palette for it would say it was a different idea. */
+.run .tag { font-weight: 600; }
+.run .tag-ok    { color: var(--ink); }
+.run .tag-human { color: var(--ink-2); }
+.run .tag-safeg { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.run .tag-skip  { color: var(--ink-3); }
+.run .tag-fail  { color: var(--ink-2); }
+.runlegend {
+  display: grid; gap: 0.3rem; margin-top: 0.7rem;
+  font-size: var(--size-2); color: var(--ink-2);
+}
+.runlegend b { margin-right: 0.35rem; }
+
 /* ---- reveal -------------------------------------------------------------------------- */
 /* The only entrance on the page. Anything still moving after 320ms is not allowed.
  *
