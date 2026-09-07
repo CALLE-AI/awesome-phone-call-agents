@@ -295,6 +295,11 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 186 | Point an in-page anchor at an id that is not on the page, so the click scrolls nowhere and reports nothing | 1 |
 | 187 | Give a published page an href in a scheme the link gate does not classify, to check it is counted unmeasured rather than quietly skipped | 1 |
 | 188 | Make a gate raise instead of returning, by pointing a rail link at a deleted element, to check the run still reports the other fifteen | 1 |
+| 189 | Stop a withdrawn consent record from refusing the call, which is the one misreading here that telephones a family who asked not to be telephoned | 4 |
+| 190 | Make a record expiring today stop covering today, off by one at the boundary an expiry exists to define | 1 |
+| 191 | Let one family's consent record cover any row that points at it, which turns a register with one good record into a permission for the roster | 1 |
+| 192 | Ignore an unrecognised key on a consent record instead of refusing it, so a misspelled `withdrawn_at` reads as a record nobody withdrew | 1 |
+| 193 | Count a row refused on a dated record by exact reason rather than by prefix, which files a family who withdrew consent under the bucket for a cancelled run | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -726,6 +731,14 @@ Nothing said which gate had found the defect, and the nine gates after it never 
 gate is now called through a wrapper that turns a throw into a recorded
 could-not-measure, so the run finishes, the report exists, and the outcome is still not a
 pass.
+
+Rows 189 to 193 are the consent record, and 193 is the one worth reading. The refusal
+carries the register's own sentence after the reason, so `reason == NO_CONSENT` stopped
+matching and a family who had withdrawn consent was counted in neither the consent bucket
+nor any other: the row landed in `skipped_not_dialled`, which is the bucket for a run
+somebody cancelled. The count was right, every total added up, and one family's withdrawal
+was reported as a scheduling artifact. It was found by writing the test rather than by the
+suite, because nothing before it had two reasons that both meant the same thing.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

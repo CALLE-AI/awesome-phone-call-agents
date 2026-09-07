@@ -27,12 +27,14 @@ the Protocol, and a test proves an in-memory implementation substitutes cleanly.
 from __future__ import annotations
 
 import csv
+from datetime import date
 import hashlib
 import io
 import time
 from pathlib import Path
 from typing import Iterable, Iterator, Protocol, runtime_checkable
 
+from .consent import refusal as consent_refusal
 from .models import WorkItem
 
 
@@ -138,9 +140,16 @@ class CsvSource:
 
     REQUIRED = ("id", "phones")
 
-    def __init__(self, path: str | Path, *, encoding: str = "utf-8-sig") -> None:
+    def __init__(self, path: str | Path, *, encoding: str = "utf-8-sig",
+                 consent_register: dict | None = None, today: date | None = None) -> None:
         self.path = Path(path)
         self.encoding = encoding
+        # The district's dated consent records, keyed on id, or None when the run was
+        # given none. `today` is injectable because an expiry check that reads the wall
+        # clock cannot be tested at the boundary, and the boundary is the whole point of
+        # an expiry.
+        self.consent_register = consent_register
+        self.today = today or date.today()
 
     def items(self) -> Iterator[WorkItem]:
         if not self.path.exists():
@@ -280,9 +289,26 @@ class CsvSource:
 
                 context = {
                     k: v for k, v in row.items()
-                    if k not in {"id", "phones", "locale", "region", "consent", "voice"}
+                    if k not in {"id", "phones", "locale", "region", "consent", "voice",
+                                 "consent_record"}
                     and v
                 }
+                # The record reference, and what the register says about it. A row with no
+                # reference is unchanged: it dials on the boolean, as every work file
+                # written before this column existed does.
+                reference = (row.get("consent_record") or "").strip() or None
+                refusal = None
+                if reference is not None and self.consent_register is not None:
+                    refusal = consent_refusal(
+                        self.consent_register.get(reference), item_id, reference,
+                        self.today)
+                elif reference is not None:
+                    # A file that names records and a run given no register is the one
+                    # case where dialling would be worse than refusing: the row looks
+                    # better documented than a boolean row and is checked less.
+                    refusal = (f"row names consent record {reference!r} and this run was "
+                               "given no register to check it against. Pass "
+                               "--consent-records, or remove the column.")
                 yield WorkItem(
                     id=item_id,
                     phones=phones,
@@ -293,6 +319,8 @@ class CsvSource:
                         row.get("consent"), f"{self.path.name} line {line_number}"),
                     reachable_by_voice=_voice_ok(
                         row.get("voice"), f"{self.path.name} line {line_number}"),
+                    consent_record=reference,
+                    consent_refusal=refusal,
                 )
 
 

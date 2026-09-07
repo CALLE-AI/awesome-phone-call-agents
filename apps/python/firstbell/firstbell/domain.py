@@ -326,6 +326,12 @@ class ImpactSummary:
     escalated_unresolved: int = 0
     resolved_by_language: dict[str, int] = field(default_factory=dict)
     open_by_language: dict[str, int] = field(default_factory=dict)
+    # How each dialled row's permission was established. Two numbers rather than a rate,
+    # because the second one is the district's open exposure and a rate would bury it:
+    # a column that says yes is not a dated record, `docs/the-legal-surface.md` says so,
+    # and counsel will ask which rows were which.
+    dialled_on_a_record: int = 0
+    dialled_on_a_boolean: int = 0
     # The wage the escalation queue is paid at. Separate from `staff` because they are
     # different grades: one is the desk this run clears and the other is the post this
     # run adds work to.
@@ -463,6 +469,21 @@ class ImpactSummary:
         out.append(f"  resolution rate      {self.resolution_rate:.0%}"
                    + ("   closed, not merely answered" if self.escalated else ""))
 
+        # Which paperwork each dialled row rested on. Printed even when every row is on a
+        # boolean, because that is the case a district needs to see: the legal surface
+        # calls the boolean the largest open question in this software, and a run that
+        # went quiet about it would be the software agreeing with itself.
+        if self.dialled_on_a_record or self.dialled_on_a_boolean:
+            out += ["", "  consent"]
+            if self.dialled_on_a_record:
+                out.append(f"    on a record        {self.dialled_on_a_record}   dated, "
+                           "voice, attendance, not withdrawn")
+            if self.dialled_on_a_boolean:
+                out.append(f"    on a boolean       {self.dialled_on_a_boolean}   a column "
+                           "that says yes, which is not a record")
+                out.append("                           docs/consent-record.md is the "
+                           "schema that replaces it")
+
         # The headline this project is entitled to claim. It needs no external source,
         # because it is counted from what this run actually did. The legal duty it speaks
         # to is Title VI: a district must reach a family in a language that family
@@ -589,11 +610,24 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         resolved=counts[Resolution.RESOLVED],
         undetermined=counts[Resolution.UNDETERMINED],
         failed=counts[Resolution.FAILED],
-        skipped_no_consent=sum(1 for r in results if r.reason == NO_CONSENT),
+        # `startswith`, not equality. A row refused on a dated consent record carries the
+        # register's own sentence after the reason, and an equality test counted it in
+        # neither bucket: it fell into `skipped_not_dialled`, which is the bucket for a
+        # cancelled run. One family that had withdrawn consent would have been reported
+        # as a scheduling artifact.
+        skipped_no_consent=sum(1 for r in results
+                               if (r.reason or "").startswith(NO_CONSENT)),
         skipped_no_voice=sum(1 for r in results if r.needs_another_channel),
         skipped_not_dialled=(counts[Resolution.SKIPPED]
-                             - sum(1 for r in results if r.reason == NO_CONSENT)
+                             - sum(1 for r in results
+                                   if (r.reason or "").startswith(NO_CONSENT))
                              - sum(1 for r in results if r.needs_another_channel)),
+        dialled_on_a_boolean=sum(1 for r in results
+                                 if r.item.consented and r.item.consent_record is None
+                                 and r.resolution is not Resolution.SKIPPED),
+        dialled_on_a_record=sum(1 for r in results
+                                if r.item.consent_record is not None
+                                and r.resolution is not Resolution.SKIPPED),
         calls_placed=buckets[True] if calls_placed is None else calls_placed,
         calls_replayed=buckets[False],
         calls_unknown_provenance=buckets[None],

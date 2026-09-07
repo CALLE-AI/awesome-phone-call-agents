@@ -103,10 +103,10 @@ well as the entry README.
 
 - `proof-call-site.png`: the only occurrence of `calls.create` in this codebase is
   `self._client.calls.create(` at
-  `dispatch/scheduler.py:364`, inside `def _create_with_retries` at
-  `dispatch/scheduler.py:355`.
+  `dispatch/scheduler.py:375`, inside `def _create_with_retries` at
+  `dispatch/scheduler.py:366`.
 - `proof-classification.png`: `def _classify` at
-  `dispatch/scheduler.py:460` returns exactly seven times and the still labels every one of them,
+  `dispatch/scheduler.py:471` returns exactly seven times and the still labels every one of them,
   including `ItemResult(**base, resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:496` and `resolution=Resolution.RESOLVED, structured_result=result,` at
-  `dispatch/scheduler.py:532`.
+  `dispatch/scheduler.py:507` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:543`.

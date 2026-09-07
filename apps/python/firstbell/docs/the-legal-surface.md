@@ -68,11 +68,23 @@ record of consent. It carries no timestamp, no evidence of what the parent was t
 record of the channel it was given on, and no revocation path. The software enforces a flag
 that a district would have to be able to defend, and nothing here helps it defend one.
 
-**Open, and it is the largest one on this page.** What the district's consent artifact is,
-where it lives, how a parent withdraws it, and whether an emergency or safety exception
-applies to an unexplained absence. A defensible answer would replace the boolean with a
-reference to a dated consent record. That is a schema change and a district conversation,
-not a patch.
+**Half closed, and the open half is still the largest one on this page.** The schema half
+is done: [`docs/consent-record.md`](consent-record.md) is the shape of a dated consent
+record, `dispatch/consent.py` enforces it, and a work file can name one per row in a
+`consent_record` column. Seven checks run before a phone rings and every one fails closed:
+the record must be in the register, be for this student, not be withdrawn, not have
+expired, not be dated in the future, cover `voice` rather than text or email, and cover
+`attendance` rather than general contact. A run prints how many rows it dialled on a record
+and how many on a boolean, because a column that says yes is not a record and this page
+will not let that pass quietly.
+
+What stays open is the conversation, and it is the part that matters to you. Where the
+record lives and who may write one. How a parent withdraws, how fast that reaches the
+register, and what happens to calls already queued. And whether an unexplained absence is
+an emergency: the schema has an `emergency` purpose and this software refuses it, because
+deciding that an absence is a safety exception is a decision about a child rather than a
+configuration option. Changing that is two constants in `dispatch/consent.py`, and it
+should be changed on purpose with a name attached.
 
 ## 3. May the call be recorded, and is it? (state wiretap law)
 

@@ -24,6 +24,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
+from dispatch.consent import RegisterError, load_register
 from dispatch import (
     CsvSource,
     DropSource,
@@ -254,6 +255,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--staff-hours", type=int, default=None,
                         help="Paid hours a year behind --staff-annual. Default 2,080, "
                              "which reads a ten-month contract as cheaper than it is.")
+    parser.add_argument("--consent-records", type=Path, default=None,
+                        help="JSON register of dated consent records. Required if any "
+                             "row names one in a consent_record column: a row that "
+                             "points at a record and is checked against nothing looks "
+                             "better documented than a boolean row and is not.")
     parser.add_argument("--escalation-annual", type=float, default=None,
                         help="Annual cost of the post that answers a safeguarding "
                              "callback. Defaults to a sourced US school counsellor "
@@ -550,7 +556,23 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Could not read the work file: {err}", file=sys.stderr)
             return 2
     else:
-        source = CsvSource(args.work_file)
+        register = None
+        if args.consent_records is not None:
+            # Loaded before the work file, and a failure here stops the run. A register
+            # this cannot parse is a document somebody has to look at, and dialling the
+            # rows it happened to understand would be calling families on the strength
+            # of a file nobody trusts.
+            if not args.consent_records.is_file():
+                print(f"no consent register at {args.consent_records}", file=sys.stderr)
+                return 2
+            try:
+                register = load_register(
+                    json.loads(args.consent_records.read_text(encoding="utf-8")),
+                    args.consent_records.name)
+            except (json.JSONDecodeError, RegisterError) as bad:
+                print(f"the consent register is unusable: {bad}", file=sys.stderr)
+                return 2
+        source = CsvSource(args.work_file, consent_register=register)
         came_from = str(args.work_file)
     try:
         items = list(source.items())
@@ -628,6 +650,26 @@ def main(argv: list[str] | None = None) -> int:
             "attempts_removed": summary.attempts_resolved,
             "attempts_still_open": summary.attempts_open,
             "break_even_per_call_minute": summary.break_even_per_call_minute,
+            # What the run adds, at the grade it adds it. A ceiling published without
+            # this is a ceiling that ignores the labour the safeguarding rule creates,
+            # which is the reading a district buyer caught.
+            "net_new_escalations": summary.net_new_escalations,
+            "answered_calls": summary.answered,
+            "escalation_cost_per_call_lead_minute":
+                summary.escalation_cost_per_call_lead_minute,
+            # Which paperwork each dialled row rested on. The human summary has said this
+            # since the consent schema landed and `--json` did not, so a machine reader
+            # integrating this could not see the one number the legal surface calls the
+            # largest open question in the software.
+            "consent": {
+                "dialled_on_a_record": summary.dialled_on_a_record,
+                "dialled_on_a_boolean": summary.dialled_on_a_boolean,
+                "refused_on_a_record": [
+                    {"id": r.item.id, "record": r.item.consent_record,
+                     "why": r.item.consent_refusal}
+                    for r in report.results if r.item.consent_refusal
+                ],
+            },
             # The window this run judged its escalations against, and whether anybody
             # chose it. A machine reader that cannot tell a district's agreed clock from
             # this project's default will report one as the other.

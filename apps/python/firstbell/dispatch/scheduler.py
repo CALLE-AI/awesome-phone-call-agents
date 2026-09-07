@@ -227,7 +227,18 @@ class WaveDispatcher:
 
         callable_items: list[WorkItem] = []
         for item in items:
-            if not item.consented:
+            if item.consent_refusal:
+                # A dated record that does not cover this call. Checked before the boolean
+                # because it is the more specific statement: a row carrying a record that
+                # was withdrawn last week has a `consent` column that still says yes, and
+                # reading the weaker of two answers is how a family that asked not to be
+                # called gets called. The reason is the register's own sentence, so the
+                # queue says which record and why rather than "no consent".
+                report.results.append(ItemResult(
+                    item=item, resolution=Resolution.SKIPPED,
+                    reason=f"{NO_CONSENT}: {item.consent_refusal}",
+                ))
+            elif not item.consented:
                 # A person who has not consented is never dialled. This is a gate, not a
                 # filter: it comes before dispatch and it cannot be configured off.
                 report.results.append(ItemResult(

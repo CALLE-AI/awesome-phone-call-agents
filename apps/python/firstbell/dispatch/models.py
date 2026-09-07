@@ -139,6 +139,17 @@ class WorkItem:
     region: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
     consented: bool = True
+    # The id of a dated consent record in the register, when the work file names one.
+    # `docs/the-legal-surface.md` says the boolean this sits beside is the largest open
+    # question in this software and that a defensible answer replaces it with a reference
+    # to a dated record. This is that reference. None means the row arrived with a boolean
+    # and nothing else, which still dials and is counted separately in the run, because a
+    # column that says yes is not a record and a district's counsel will ask which it was.
+    consent_record: str | None = None
+    # Why this row may not be dialled on that record, in a sentence an attendance officer
+    # can act on. Set by the source, never by the dispatcher: whether a permission covers
+    # this call is a property of the district's paperwork, not of telephony.
+    consent_refusal: str | None = None
     # False when the office has recorded that the phone cannot reach this family: a
     # guardian who is deaf, hard of hearing, or has a speech disability. This app cannot
     # discover that by dialling, and dialling anyway files them under "nobody answered",

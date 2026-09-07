@@ -18,9 +18,9 @@ Everything in that drawing is a branch in `dispatch/scheduler.py`. It is generat
 `tools/site/page.css` and its safeguarding window out of `firstbell/domain.py`, so it
 cannot describe a version of this program that no longer exists.
 
-## If you have fifteen minutes
+## If you have twenty minutes
 
-Read these seven files in this order. Between them they contain every claim this directory
+Read these eight files in this order. Between them they contain every claim this directory
 makes, and each one can be checked without an API key.
 
 | # | File | What it settles | Time |
@@ -28,27 +28,28 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and eighty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and ninety-three gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
-| 7 | [`call-e-feedback.md`](call-e-feedback.md) | Nine findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and why a Goal cannot carry a family whose language the deployment does not fix | 2 min |
+| 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the seven checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
+| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Ten findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 
 ### Where CALL-E is called at runtime
 
 Four lines do all of it, and the default offline run reaches three of them. Every anchor
 below is checked by a test, so a line number here cannot quietly rot.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:364`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:375`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:440`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:451`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:356`, rather than as a string match on a message.
+  `dispatch/scheduler.py:367`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:366`.
+  `firstbell/cli.py:372`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:369`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:380`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -201,6 +202,10 @@ What this run was worth
   skipped, no consent  1
   calls placed         8   (no telephone call was placed)
   resolution rate      50%   closed, not merely answered
+
+  consent
+    on a boolean       6   a column that says yes, which is not a record
+                           docs/consent-record.md is the schema that replaces it
 
   reached in-language
     en-IN              1
@@ -675,7 +680,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 452 tests
+python -m pytest tests/ -q          # 479 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
