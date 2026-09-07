@@ -1,5 +1,6 @@
 """Command line entrypoint."""
 import argparse
+import json
 import sys
 from datetime import datetime, time as dt_time
 from pathlib import Path
@@ -18,6 +19,8 @@ from .safety import (
     SafetyViolation,
     load_authorizations,
     missing_authorizations,
+    validate_destination,
+    validate_origin,
 )
 from .stores import AuditLog, load_reservations, load_waitlist, write_jsonl_atomic
 
@@ -66,6 +69,19 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--region", default=None)
     run.add_argument("--language", default=None)
     run.set_defaults(func=cmd_run)
+
+    preflight = subparsers.add_parser(
+        "preflight", help="Validate everything live runs require, placing no calls"
+    )
+    preflight.add_argument("--data-dir", default="data")
+    preflight.add_argument("--region", default=None, help="Region for live validation")
+    preflight.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    preflight.add_argument("--channel", default=DEFAULT_CHANNEL)
+    preflight.add_argument("--cache-root", default=DEFAULT_CACHE_ROOT)
+    preflight.add_argument("--calle-command", default="calle")
+    preflight.add_argument("--max-calls", type=int, default=10)
+    preflight.add_argument("--json", action="store_true", help="Machine-readable output")
+    preflight.set_defaults(func=cmd_preflight)
 
     cancel = subparsers.add_parser("cancel", help="Mark a run as operator-cancelled")
     cancel.add_argument("--run-id", required=True)
@@ -272,6 +288,92 @@ def cmd_cancel(args: argparse.Namespace) -> int:
         "Later invocations with the same run id refuse to dial."
     )
     return 0
+
+
+def _run_preflight_checks(args: argparse.Namespace, data_dir: Path) -> list[dict]:
+    checks: list[dict] = []
+
+    def record(name: str, fn) -> None:
+        try:
+            detail = fn()
+            checks.append({"name": name, "status": "PASS", "detail": detail or "ok"})
+        except (SafetyViolation, RuntimeError, OSError, ValueError) as error:
+            checks.append(
+                {"name": name, "status": "FAIL", "detail": str(error) or type(error).__name__}
+            )
+
+    reservations_path = data_dir / "reservations.jsonl"
+    waitlist_path = data_dir / "waitlist.jsonl"
+
+    def load_stores():
+        reservations = load_reservations(reservations_path)
+        waitlist = load_waitlist(waitlist_path)
+        return f"{len(reservations) + len(waitlist)} destinations are valid E.164"
+
+    record("destinations_e164", load_stores)
+
+    def region_rules():
+        if not args.region:
+            raise SafetyViolation("MISSING_REGION", "--region is required for live runs")
+        reservations = load_reservations(reservations_path)
+        waitlist = load_waitlist(waitlist_path)
+        for target in [*reservations, *waitlist]:
+            validate_destination(target.phone, region=args.region, live=True)
+        return f"all destinations match region {args.region} rules"
+
+    record("region_rules", region_rules)
+
+    def authorization():
+        auth_path = data_dir / "authorized_destinations.jsonl"
+        authorizations = load_authorizations(auth_path)
+        reservations = load_reservations(reservations_path)
+        waitlist = load_waitlist(waitlist_path)
+        dialable = [t.phone for t in [*reservations, *waitlist] if t.consent]
+        missing = missing_authorizations(dialable, authorizations)
+        if missing:
+            raise SafetyViolation("NOT_AUTHORIZED", "missing: " + ", ".join(missing))
+        return f"{len(dialable)} dialable destinations operator-authorized"
+
+    record("operator_authorization", authorization)
+
+    def origin():
+        validate_origin(args.base_url)
+        return "origin pinned to official MCP endpoint"
+
+    record("origin_pinned", origin)
+
+    def calle_auth():
+        client = McpCallClient(
+            base_url=args.base_url,
+            channel=args.channel,
+            cache_root=args.cache_root,
+            calle_command=args.calle_command,
+        )
+        client.ensure_access_token()
+        return "cached CALL-E token usable"
+
+    record("calle_auth", calle_auth)
+
+    def budget():
+        if args.max_calls < 1:
+            raise SafetyViolation("INVALID_BUDGET", str(args.max_calls))
+        return f"budget {args.max_calls} call(s) per run"
+
+    record("budget_configured", budget)
+    return checks
+
+
+def cmd_preflight(args: argparse.Namespace) -> int:
+    data_dir = Path(args.data_dir)
+    checks = _run_preflight_checks(args, data_dir)
+    ok = all(check["status"] == "PASS" for check in checks)
+    if args.json:
+        print(json.dumps({"ok": ok, "checks": checks}, indent=2))
+    else:
+        for check in checks:
+            print(f"{check['status']} {check['name']}: {check['detail']}")
+        print("Preflight: " + ("PASS" if ok else "FAIL"))
+    return 0 if ok else 1
 
 
 def main(argv: list[str] | None = None) -> int:

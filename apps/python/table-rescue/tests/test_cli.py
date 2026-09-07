@@ -144,6 +144,50 @@ def test_run_live_fictional_number_never_reaches_dial(tmp_path, capsys):
     assert "FICTIONAL_NUMBER" in capsys.readouterr().err
 
 
+def test_preflight_fails_on_missing_authorization(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    exit_code = main(
+        [
+            "preflight",
+            "--data-dir", str(data_dir),
+            "--region", "US",
+            "--calle-command", "definitely-not-calle",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "FAIL operator_authorization" in captured.out
+    assert "FAIL calle_auth" in captured.out
+    assert "PASS destinations_e164" in captured.out
+
+
+def test_preflight_json_output(tmp_path, capsys):
+    import json as jsonlib
+
+    data_dir = write_sample_data(tmp_path)
+    exit_code = main(
+        [
+            "preflight",
+            "--data-dir", str(data_dir),
+            "--region", "US",
+            "--calle-command", "definitely-not-calle",
+            "--json",
+        ]
+    )
+    payload = jsonlib.loads(capsys.readouterr().out)
+    names = {check["name"] for check in payload["checks"]}
+    assert names == {
+        "destinations_e164",
+        "region_rules",
+        "operator_authorization",
+        "origin_pinned",
+        "calle_auth",
+        "budget_configured",
+    }
+    assert payload["ok"] is False
+    assert exit_code == 1
+
+
 def test_module_entrypoint_runs():
     import subprocess
     import sys
