@@ -7,7 +7,7 @@ from .models import (
     WaitlistEntry,
     WaitlistStatus,
 )
-from .stores import mask_phone
+from .safety import mask_phone, sanitize_text
 
 DIALLED_STATUSES = {
     CallStatus.CONFIRMED,
@@ -60,7 +60,7 @@ def render_report(
     ]
     for outcome in outcomes:
         phone = mask_phone(phones.get(outcome.target_id, "+0000000000"))
-        notes = (outcome.notes or "").replace("|", "/")
+        notes = sanitize_text(outcome.notes or "").replace("|", "/")
         lines.append(
             f"| {outcome.target_id} | {phone} | {outcome.status.value} | {notes} |"
         )
@@ -86,6 +86,8 @@ def render_report(
                 if outcome
                 else "NEEDS_REVIEW"
             )
-            notes = (outcome.notes or "").replace("|", "/") if outcome else ""
+            notes = (
+                sanitize_text(outcome.notes or "").replace("|", "/") if outcome else ""
+            )
             lines.append(f"| {target_id} | {reason} | {notes} |")
     return "\n".join(lines) + "\n"

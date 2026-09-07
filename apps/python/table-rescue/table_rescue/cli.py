@@ -18,6 +18,7 @@ from .safety import (
     RunSafety,
     SafetyViolation,
     load_authorizations,
+    mask_phone,
     missing_authorizations,
     validate_destination,
     validate_origin,
@@ -169,12 +170,15 @@ def _render_manifest(run_id, reservations, waitlist, region, authorizations, max
         row = authorizations.get(target.phone, {})
         target_id = getattr(target, "booking_id", None) or target.entry_id
         lines.append(
-            f"| {target_id} | {target.name} | {target.phone} | {row.get('authorized_by', '-')} |"
+            f"| {target_id} | {target.name} | {mask_phone(target.phone)} | "
+            f"{row.get('authorized_by', '-')} |"
         )
     lines += [
         "",
         "Every destination above passed region-aware E.164 validation and exact "
-        "operator authorization. Fictional NANP numbers can never appear here.",
+        "operator authorization. Fictional NANP numbers can never appear here. "
+        "Phones are masked; match them against your local "
+        "authorized_destinations.jsonl before confirming.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -208,7 +212,7 @@ def _prepare_safety(args, data_dir, reservations, waitlist, audit, run_id):
             file=sys.stderr,
         )
         for phone in missing:
-            print(f"  {phone}", file=sys.stderr)
+            print(f"  {mask_phone(phone)}", file=sys.stderr)
         raise SystemExit(1)
     manifest = _render_manifest(
         run_id, reservations, waitlist, args.region, authorizations, args.max_calls
@@ -409,7 +413,10 @@ def _run_preflight_checks(args: argparse.Namespace, data_dir: Path) -> list[dict
         dialable = [t.phone for t in [*reservations, *waitlist] if t.consent]
         missing = missing_authorizations(dialable, authorizations)
         if missing:
-            raise SafetyViolation("NOT_AUTHORIZED", "missing: " + ", ".join(missing))
+            raise SafetyViolation(
+                "NOT_AUTHORIZED",
+                "missing: " + ", ".join(mask_phone(phone) for phone in missing),
+            )
         return f"{len(dialable)} dialable destinations operator-authorized"
 
     record("operator_authorization", authorization)

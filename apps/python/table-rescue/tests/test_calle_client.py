@@ -207,7 +207,12 @@ def test_mcp_client_retries_transient_not_ready_plan(tmp_path):
 
 
 def test_mcp_client_plan_retry_exhaustion_raises_with_detail(tmp_path):
-    not_ready = {"plan_id": None, "confirm_token": None, "ready_to_run": False}
+    not_ready = {
+        "plan_id": None,
+        "confirm_token": None,
+        "ready_to_run": False,
+        "to_phones": ["+15550101"],
+    }
     script = {
         "plan_call": [dict(not_ready), dict(not_ready), dict(not_ready)],
     }
@@ -215,8 +220,26 @@ def test_mcp_client_plan_retry_exhaustion_raises_with_detail(tmp_path):
     request = CallRequest(
         run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
     )
-    with pytest.raises(RuntimeError, match="after .* attempts"):
+    with pytest.raises(RuntimeError, match="after .* attempts") as excinfo:
         asyncio.run(client._execute(request))
+    # Provider payloads echo the destination; the error must not carry it raw.
+    assert "+15550101" not in str(excinfo.value)
+
+
+def test_calle_command_failure_sanitizes_detail(monkeypatch):
+    import subprocess as subprocess_module
+
+    client = McpCallClient()
+
+    def fake_run(command, **kwargs):
+        return subprocess_module.CompletedProcess(
+            command, 1, stdout="", stderr="failed dialing +14155550100"
+        )
+
+    monkeypatch.setattr("table_rescue.calle_client.subprocess.run", fake_run)
+    with pytest.raises(RuntimeError) as excinfo:
+        client._run_calle_json(["auth", "status"])
+    assert "+14155550100" not in str(excinfo.value)
 
 
 def test_ensure_access_token_requires_login():

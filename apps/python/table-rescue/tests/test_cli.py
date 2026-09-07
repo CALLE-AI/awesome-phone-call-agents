@@ -120,7 +120,9 @@ def test_run_live_aborts_on_missing_authorization(tmp_path, capsys):
     )
     assert exit_code == 1
     err = capsys.readouterr().err
-    assert "+15550111" in err  # W-001 not authorized; nothing dialed
+    # W-001 is not authorized; the raw phone is never printed, only masked.
+    assert "+15550111" not in err
+    assert "+******11" in err
 
 
 def test_run_live_fictional_number_never_reaches_dial(tmp_path, capsys):
@@ -141,11 +143,21 @@ def test_run_live_fictional_number_never_reaches_dial(tmp_path, capsys):
         ]
     )
     assert exit_code == 1
-    assert "FICTIONAL_NUMBER" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert "FICTIONAL_NUMBER" in captured.err
+    # The live manifest masks every phone before printing or persistence.
+    assert "+15550101" not in captured.out
+    assert "+15550111" not in captured.out
+    assert "+******01" in captured.out
 
 
 def test_preflight_fails_on_missing_authorization(tmp_path, capsys):
     data_dir = write_sample_data(tmp_path)
+    (data_dir / "authorized_destinations.jsonl").write_text(
+        '{"phone": "+15550101", "authorized_by": "op", '
+        '"authorized_at": "2026-09-07T00:00:00+07:00"}\n',
+        encoding="utf-8",
+    )
     exit_code = main(
         [
             "preflight",
@@ -159,6 +171,9 @@ def test_preflight_fails_on_missing_authorization(tmp_path, capsys):
     assert "FAIL operator_authorization" in captured.out
     assert "FAIL calle_auth" in captured.out
     assert "PASS destinations_e164" in captured.out
+    # Preflight detail never prints a raw phone.
+    assert "+15550111" not in captured.out
+    assert "+******11" in captured.out
 
 
 def test_preflight_json_output(tmp_path, capsys):

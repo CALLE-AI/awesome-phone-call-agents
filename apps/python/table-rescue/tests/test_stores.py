@@ -2,9 +2,9 @@ import tempfile
 from pathlib import Path
 
 from table_rescue.models import CallOutcome, CallStatus
+from table_rescue.safety import mask_phone
 from table_rescue.stores import (
     AuditLog,
-    mask_phone,
     read_jsonl,
     write_jsonl_atomic,
 )
@@ -20,6 +20,21 @@ def test_jsonl_roundtrip_and_atomic_write(tmp_path):
 
 def test_mask_phone_keeps_last_two_digits():
     assert mask_phone("+15550101") == "+******01"
+
+
+def test_audit_notes_are_sanitized(tmp_path):
+    audit = AuditLog(tmp_path / "runs" / "run-1")
+    audit.append(
+        CallOutcome(
+            run_id="run-1",
+            target_id="R-001",
+            status=CallStatus.CONFIRMED,
+            notes="guest on +14155550100 confirmed",
+        )
+    )
+    record = audit.records()[0]
+    assert "+14155550100" not in record["notes"]
+    assert "confirmed" in record["notes"]
 
 
 def test_audit_log_tracks_dials_and_cancellation(tmp_path):

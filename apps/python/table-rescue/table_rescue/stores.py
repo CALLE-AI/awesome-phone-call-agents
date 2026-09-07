@@ -1,9 +1,10 @@
-"""JSONL stores, masking, and the append-only audit log."""
+"""JSONL stores and the append-only audit log."""
 import json
 import os
 from pathlib import Path
 
 from .models import CallOutcome, Reservation, WaitlistEntry
+from .safety import sanitize_text
 
 DIALLED_STATUSES = {
     "CONFIRMED",
@@ -36,11 +37,6 @@ def write_jsonl_atomic(path: str | Path, rows: list[dict]) -> None:
     os.replace(tmp, path)
 
 
-def mask_phone(phone: str) -> str:
-    digits = phone.lstrip("+")
-    return "+" + "*" * max(len(digits) - 2, 0) + digits[-2:]
-
-
 def load_reservations(path: str | Path) -> list[Reservation]:
     return [Reservation.from_line(row) for row in read_jsonl(path)]
 
@@ -63,7 +59,8 @@ class AuditLog:
             "target_id": outcome.target_id,
             "status": outcome.status.value,
             "new_slot": outcome.new_slot,
-            "notes": outcome.notes,
+            # Provider notes are sanitized before they reach disk.
+            "notes": sanitize_text(outcome.notes) if outcome.notes else outcome.notes,
             "transcript_ref": outcome.transcript_ref,
             "call_cost_id": outcome.call_cost_id,
             "uncertainty_reason": outcome.uncertainty_reason,

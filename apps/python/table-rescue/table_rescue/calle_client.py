@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .models import CallOutcome, CallStatus
-from .safety import validate_origin
+from .safety import sanitize_text, validate_origin
 from .stores import read_jsonl
 
 DEFAULT_BASE_URL = "https://seleven-mcp-sg.airudder.com"
@@ -237,7 +237,8 @@ class McpCallClient:
             command[0] = resolved
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
         if completed.returncode != 0:
-            detail = completed.stderr.strip() or completed.stdout.strip()
+            # Provider stderr can quote dialed numbers; sanitize before raise.
+            detail = sanitize_text(completed.stderr.strip() or completed.stdout.strip())
             raise RuntimeError(f"calle command failed: {' '.join(command)}\n{detail}")
         parsed = json.loads(completed.stdout)
         if not isinstance(parsed, dict):
@@ -308,7 +309,7 @@ class McpCallClient:
                 return plan
             if attempt < attempts - 1:
                 await asyncio.sleep(delay_seconds)
-        detail = json.dumps(plan, default=str)[:300]
+        detail = sanitize_text(json.dumps(plan, default=str))[:300]
         raise RuntimeError(
             f"plan_call not ready for target {target_id} "
             f"after {attempts} attempts: {detail}"

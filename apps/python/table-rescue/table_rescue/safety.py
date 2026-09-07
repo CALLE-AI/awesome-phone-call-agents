@@ -35,10 +35,48 @@ class SafetyViolation(RuntimeError):
         self.detail = detail
 
 
+def mask_phone(phone: str) -> str:
+    digits = phone.lstrip("+")
+    return "+" + "*" * max(len(digits) - 2, 0) + digits[-2:]
+
+
+# A phone-like run: optional leading "+", then digits joined by the common
+# grouping separators. Only runs of seven or more digits are masked, so
+# ordinary small numbers (party sizes, times) survive sanitization.
+_PHONE_LIKE_RE = re.compile(r"\+?\d[\d\-.\s()]*")
+
+
+def sanitize_text(text: str | None) -> str:
+    """Mask every phone-like digit run (7+ digits) down to its last two digits.
+
+    The boundary guard for anything printed or persisted: provider
+    summaries, provider errors, and our own destination references.
+    """
+    if not text:
+        return text or ""
+
+    def mask_run(match: re.Match) -> str:
+        fragment = match.group(0)
+        if sum(character.isdigit() for character in fragment) < 7:
+            return fragment
+        keep = 2
+        characters: list[str] = []
+        for character in reversed(fragment):
+            if character.isdigit():
+                if keep > 0:
+                    keep -= 1
+                else:
+                    character = "*"
+            characters.append(character)
+        return "".join(reversed(characters))
+
+    return _PHONE_LIKE_RE.sub(mask_run, text)
+
+
 def validate_phone_syntax(phone: str) -> None:
     # fullmatch rejects trailing newlines that "$" would otherwise tolerate.
     if not E164_RE.fullmatch(phone):
-        raise SafetyViolation("INVALID_E164", phone)
+        raise SafetyViolation("INVALID_E164", mask_phone(phone))
 
 
 def _is_fictional_nanp(phone: str) -> bool:
@@ -68,7 +106,7 @@ def validate_destination(phone: str, *, region: str | None, live: bool) -> None:
     calling_code, min_len, max_len = specs
     if not phone.startswith(calling_code):
         raise SafetyViolation(
-            "REGION_MISMATCH", f"{phone} does not start with {calling_code}"
+            "REGION_MISMATCH", f"{mask_phone(phone)} does not start with {calling_code}"
         )
     national = phone[len(calling_code):]
     # Fictional check runs before the length check so short sample forms
@@ -76,12 +114,13 @@ def validate_destination(phone: str, *, region: str | None, live: bool) -> None:
     if _is_fictional_nanp(phone):
         raise SafetyViolation(
             "FICTIONAL_NUMBER",
-            f"{phone} is a reserved fictional NANP number and can never be dialed live",
+            f"{mask_phone(phone)} is a reserved fictional NANP number "
+            "and can never be dialed live",
         )
     if not min_len <= len(national) <= max_len:
         raise SafetyViolation(
             "INVALID_LENGTH",
-            f"{phone}: {len(national)} digits after {calling_code}, "
+            f"{mask_phone(phone)}: {len(national)} digits after {calling_code}, "
             f"expected {min_len}-{max_len}",
         )
 
@@ -109,7 +148,7 @@ def load_authorizations(path: str | Path) -> dict[str, dict]:
                     "INVALID_AUTHORIZATION_FILE", f"{path}: line {lineno}: {error}"
                 ) from error
             if phone in authorizations:
-                raise SafetyViolation("DUPLICATE_AUTHORIZATION", phone)
+                raise SafetyViolation("DUPLICATE_AUTHORIZATION", mask_phone(phone))
             authorizations[phone] = row
     return authorizations
 
@@ -135,4 +174,4 @@ class RunSafety:
             raise SafetyViolation("MISSING_REGION", "live runs require --region")
         validate_destination(phone, region=self.region, live=True)
         if phone not in self.authorizations:
-            raise SafetyViolation("NOT_AUTHORIZED", phone)
+            raise SafetyViolation("NOT_AUTHORIZED", mask_phone(phone))

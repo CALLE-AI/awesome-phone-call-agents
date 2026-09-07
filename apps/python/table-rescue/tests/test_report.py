@@ -63,6 +63,24 @@ def test_render_report_estimates_protected_revenue():
     assert "Estimated revenue protected" not in plain
 
 
+def test_report_notes_never_contain_raw_phones():
+    reservation = Reservation(
+        booking_id="R-001", name="Guest", phone="+15550101", party_size=2,
+        slot="2026-09-10T19:00:00+07:00", consent=True,
+        status=ReservationStatus.NEEDS_REVIEW,
+    )
+    outcomes = [
+        CallOutcome(
+            run_id="run-1", target_id="R-001", status=CallStatus.UNCERTAIN,
+            notes="callback +14155550100 after 6pm",
+            uncertainty_reason="UNPARSEABLE_SUMMARY",
+        )
+    ]
+    report = render_report("run-1", outcomes, [reservation], [])
+    assert "+14155550100" not in report
+    assert "callback" in report
+
+
 def test_report_needs_review_section_and_resumed_from():
     reservation = Reservation(
         booking_id="R-001", name="Guest", phone="+15550101", party_size=2,

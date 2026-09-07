@@ -8,7 +8,9 @@ from table_rescue.safety import (
     RunSafety,
     SafetyViolation,
     load_authorizations,
+    mask_phone,
     missing_authorizations,
+    sanitize_text,
     validate_destination,
     validate_origin,
     validate_phone_syntax,
@@ -127,6 +129,55 @@ class TestAuthorization:
         path.write_text('{"name": "Guest"}\n', encoding="utf-8")
         with pytest.raises(SafetyViolation, match="INVALID_AUTHORIZATION_FILE"):
             load_authorizations(path)
+
+
+class TestSanitize:
+    def test_masks_e164_and_separated_forms(self):
+        masked = sanitize_text("call +14155550100 now")
+        assert "+14155550100" not in masked
+        assert mask_phone("+14155550100") in masked
+        assert masked.endswith("now")
+
+    def test_masks_local_separated_forms(self):
+        masked = sanitize_text("said (415) 555-0100 twice")
+        assert "415" not in masked
+        assert "555" not in masked
+        assert masked.endswith("00 twice")
+
+    def test_masks_unicode_digit_runs(self):
+        masked = sanitize_text("number +８４９００００００００ there")
+        assert "８４" not in masked
+
+    def test_short_digit_runs_untouched(self):
+        assert sanitize_text("party of 4 at 19:00") == "party of 4 at 19:00"
+
+    def test_idempotent_and_empty_safe(self):
+        text = "call +14155550100 or 415 555 0100"
+        once = sanitize_text(text)
+        assert sanitize_text(once) == once
+        assert sanitize_text(None) == ""
+        assert sanitize_text("") == ""
+
+
+class TestMaskedViolations:
+    def test_invalid_e164_message_masks_input(self):
+        with pytest.raises(SafetyViolation) as exc:
+            validate_phone_syntax("+1 415 555 0100")
+        assert "+1 415 555 0100" not in str(exc.value)
+        assert mask_phone("+1 415 555 0100") in str(exc.value)
+
+    def test_region_mismatch_message_masks_phone(self):
+        with pytest.raises(SafetyViolation) as exc:
+            validate_destination("+14155550100", region="SG", live=True)
+        assert "+14155550100" not in str(exc.value)
+        assert mask_phone("+14155550100") in str(exc.value)
+
+    def test_not_authorized_message_masks_phone(self):
+        with pytest.raises(SafetyViolation) as exc:
+            RunSafety(live=True, region="VN", authorizations={}).check_destination(
+                "+14155550100"
+            )
+        assert "+14155550100" not in str(exc.value)
 
 
 class TestRunSafety:
