@@ -33,6 +33,11 @@ The bottom row is this corpus, which is where the behaviours come from. Any path
 works, so `node src/replay.ts ../some-app` scores a checkout that is not in this
 repository.
 
+Below the matrix it also lists the projects that call this API and ship no JSON
+payload at all. In this repository that is 53 of the 59 that consume it. A project
+with nothing recorded is not missing six behaviours out of seven, it is uncovered
+by all of them, and no dot in a table can say so.
+
 `npm test` and `node src/docs.ts --check` run the same way, with nothing
 installed.
 
@@ -180,6 +185,14 @@ reaches an answering machine is told the call did not connect to a person. Its o
 test exercises that branch with `failureCode: "busy"`, which is the documented
 vocabulary and is not what an attempt carries. The test proves the branch works.
 It cannot show that the branch is reachable.
+
+The second is worse, and it is in a project that screens job candidates.
+`apps/typescript/hirecall` guards against scoring somebody who was never reached
+by reading `end_reason` out of `structuredResult`, which is the field the platform
+populates on a call with no conversation at all. The check that decides whether
+the result can be trusted is derived from the result. Two fields it already
+receives, a non-null `failureCode` and an empty transcript, would settle it
+without guessing. It ships no tests, so nothing exercises the branch.
 
 ## What this cannot see
 

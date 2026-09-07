@@ -67,6 +67,65 @@ three distinguishable outcomes where the code currently sees one.
 
 ---
 
+## 2. `apps/typescript/hirecall` — the guard against scoring an unanswered call reads the value it is guarding against
+
+**Behaviour:** `structured-result-without-conversation`. On an attempt that never
+connected, `recipients[].structuredResult` is populated anyway, with zero
+transcript turns. Seven of seven failures in this corpus do this.
+
+**Where:** `src/lib/place-call.ts:41-45` and `src/lib/place-call.ts:257-281`
+
+```ts
+function snapshotResult(snapshot: CalleSnapshot): ScreeningResult | null {
+  return parseScreeningResult(
+    snapshot.recipients?.[0]?.structuredResult ?? snapshot.structuredResult ?? null,
+  );
+}
+```
+
+`parseScreeningResult` (`src/lib/call-result-schema.ts:101-115`) returns a filled
+object for any input that is an object at all. It coerces each field to a default
+and never returns null except for a non-object. It does not look at the attempt,
+the failure code, or the transcript.
+
+**What happens.** This app screens job candidates by phone and writes a score and
+a decision against a person's name. Its guard against scoring somebody who was
+never reached is at `src/lib/place-call.ts:265`:
+
+```ts
+if (endReason === "no_answer" || candidate.callStatus === "no_answer") { ... }
+```
+
+`endReason` is read from `response.result?.end_reason` two lines earlier, which is
+the structured result the platform populated on a call that did not connect. So
+the check that decides whether the result can be trusted is derived from the
+result itself. The second half of that condition cannot save it either:
+`mapCalleSnapshotToStatus` maps a failed call to `failed`, never to `no_answer`,
+so `candidate.callStatus` is `failed` on exactly the payloads at issue. The next
+guard, `if (!response.result)`, is false because a filled object was returned.
+What follows is a Gemini call that produces a score and a `decision` for a
+candidate whose phone never rang.
+
+**Scope of the claim, stated narrowly.** Whether this fires depends on which
+member of that app's `end_reason` enum the platform selects on a failed call. If
+it selects `no_answer`, the guard holds. This corpus cannot answer that, because
+it was captured against a different schema: on ours the platform chose `unknown`,
+the member that meant nobody answered. What the corpus does establish is that
+`structuredResult` is populated on a call with no conversation, so the app's
+safety rests entirely on a value it did not compute and does not check. Two
+fields it already receives would settle it without guessing:
+`attempt.failureCode` is non-null and `transcriptTurns` is empty.
+
+**Why nothing catches it.** This project ships no tests and no fake server, so
+there is no payload anywhere in it that could exercise the branch.
+
+**Suggested direction, not a patch.** Refuse to score before consulting the
+structured result at all: if the last attempt has a non-null `failureCode`, or no
+transcript turns, treat the result as absent regardless of what it contains. The
+app already has a branch for that case and a sentence to render.
+
+---
+
 ## How these were found
 
 ```bash
@@ -74,7 +133,14 @@ npm run replay -- <path to a checkout of this repository> corpus=fixtures
 ```
 
 The report shows which behaviours a project's own fixtures never contain. That is
-the shortlist, not the finding. Each entry above was then read in the source, and
+the shortlist, not the finding.
+
+The second entry came from the other half of the same report. `hirecall` has no
+JSON payloads at all, so it cannot appear in the table; it appears instead in the
+list of projects that call this API and ship nothing to test against, which the
+checker prints below the matrix. Fifty-three of the fifty-nine projects that
+consume this API are in that list. A project with no recorded payload is not
+covered by six of the seven behaviours; it is uncovered by all of them. Each entry above was then read in the source, and
 is reported only where an absent behaviour reaches code that would treat it
 differently from the values the project tested against.
 

@@ -170,6 +170,41 @@ for (const root of roots) {
   }
 }
 
+/**
+ * A project that ships no call payloads at all cannot appear in the table, and
+ * that silence is the loudest result the tool can produce. It means every
+ * behaviour is absent, not that none is. These are found by looking for source
+ * that consumes the API rather than for fixtures that describe it.
+ */
+const CONSUMES = /@call-e\/calle|calle-ai|CALLE_API_KEY|heycall-e/;
+const SOURCE = /\.(ts|tsx|js|mjs|py)$/;
+
+function sourceFiles(dir: string, acc: string[] = []): string[] {
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return acc; }
+  for (const name of entries) {
+    if (name === "node_modules" || name === ".git" || name === "dist") continue;
+    if (name === "probe-results" || name === ".venv" || name === "__pycache__") continue;
+    const full = join(dir, name);
+    let st; try { st = statSync(full); } catch { continue; }
+    if (st.isDirectory()) sourceFiles(full, acc);
+    else if (SOURCE.test(name)) acc.push(full);
+  }
+  return acc;
+}
+
+const scored = new Set([...rows.values()].map((r) => r.project));
+const unscoreable = new Set<string>();
+for (const root of roots) {
+  for (const file of sourceFiles(root.path)) {
+    const name = project(root.path, root.label, file);
+    if (scored.has(name) || unscoreable.has(name) || name === root.label) continue;
+    let text: string;
+    try { text = readFileSync(file, "utf8"); } catch { continue; }
+    if (CONSUMES.test(text)) unscoreable.add(name);
+  }
+}
+
 const sorted = [...rows.values()].sort((a, b) => a.project.localeCompare(b.project));
 const width = Math.max(24, ...sorted.map((r) => r.project.length));
 
@@ -196,6 +231,22 @@ if (unreadable.length > 0) {
       `failure mode this corpus exists to expose.\n`,
   );
   for (const f of unreadable) process.stdout.write(`  ${f}\n`);
+}
+
+if (unscoreable.size > 0) {
+  const names = [...unscoreable].sort();
+  const shown = names.slice(0, 12);
+  process.stdout.write(
+    `\n${names.length} projects call this API and ship no JSON payload for this checker to read.\n` +
+      `They cannot appear in the table, so no dot describes them. That is a stronger statement\n` +
+      `than any dot, not a weaker one: there is nothing recorded to compare against reality.\n` +
+      `A project keeping its fixtures inline in test code is invisible here and is counted among\n` +
+      `them, so read this as the size of the blind spot rather than as a verdict on each name.\n`,
+  );
+  for (const n of shown) process.stdout.write(`  ${n}\n`);
+  if (names.length > shown.length) {
+    process.stdout.write(`  and ${names.length - shown.length} more.\n`);
+  }
 }
 
 const ESCAPES: Record<string, string> = {
