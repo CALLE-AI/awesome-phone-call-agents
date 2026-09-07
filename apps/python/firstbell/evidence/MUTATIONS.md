@@ -332,6 +332,8 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 223 | Compare a number with no digits in it as equal to another | 1 |
 | 224 | Load a consent record whose phone entry is a word | 1 |
 | 225 | Keep a work file phone entry that is a word and dial it | 1 |
+| 226 | Shorten an identifier too short to have a middle | 1 |
+| 227 | Load a scenario that answers on a negative index | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -878,6 +880,25 @@ both loaders refuse it before the decision is reached, and 223 is kept as a sepa
 because a guard that depends on its callers validating first is one a fourth caller
 removes. The three counts were measured over `tests/test_consent_record.py`, the 42 tests
 that can reach any of it.
+
+226 is the same shape one layer along. `mask_id` keeps the two ends of an identifier and
+destroys the middle, and for a body of four characters the two ends are the whole body: it
+published the identifier entire, and for a body of three it printed `ab…bc`, repeating a
+character to fill the mask. Nothing in this repository reaches it, because a CALL-E call id
+is 26 characters and a provider id is 32. The number masker in `firstbell/redaction.py` has
+always refused this, showing nothing of a value below the length at which the ends hide
+something, and the identifier masker refuses it now for the same reason. Counted over the
+15 tests in `tests/test_privacy.py`.
+
+227 is the third of the same kind, in the scenario file a consumer of the double writes.
+`answers_on` is an index into the recipient's phones, the dialler compares it against 0, 1
+and 2 as it works down the chain, and a negative index is equal to none of them, so `-1`
+meant nobody picked up on any number. Somebody writing `-1` means the last number, and
+what they got back was a run that looks like a product defect rather than a file that
+needs one character changed. An index past the end still means nobody picks up, because
+how many numbers a recipient has belongs to the request and not to the scenario, so a file
+cannot be checked against it when it loads, and the docstring says so. Counted over the 71
+tests in the three files that exercise the double.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

@@ -307,6 +307,25 @@ def test_the_export_check_fails_on_a_file_that_has_drifted(tmp_path, monkeypatch
     assert export_demo_outcomes.main() == 1, "a missing file is not a passing check"
 
 
+def test_a_negative_answering_index_is_refused_rather_than_answering_nowhere():
+    """`-1` is how a person writes "the last number", and this does not mean that.
+
+    The dialler compares the index against 0, 1, 2 as it works down the chain, so a
+    negative one is never equal to any of them and the scenario quietly becomes nobody
+    picking up. That is a file somebody has to debug against a run that looks like a
+    product defect, so it is refused where the file is read.
+    """
+    from calle_double.engine import Outcome, ScenarioError
+
+    with pytest.raises(ScenarioError) as caught:
+        Outcome.from_spec({"answers_on": -1}, "+15550100301")
+    assert "counts from the front" in str(caught.value)
+    # And the two neighbours of that case still load, so the refusal is about the sign
+    # rather than about anything else.
+    assert Outcome.from_spec({"answers_on": 0}, "x").answers_on == 0
+    assert Outcome.from_spec({"answers_on": None}, "x").answers_on is None
+
+
 def test_a_scenario_entry_that_omits_answers_on_answers_on_the_first_number():
     """The documented default, which is a person picking up rather than nobody.
 

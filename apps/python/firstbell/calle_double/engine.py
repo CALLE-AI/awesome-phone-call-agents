@@ -111,7 +111,12 @@ class Outcome:
     """What happens when this recipient's phone is dialled.
 
     `answers_on` is the index into the recipient's `phones` list that picks up. None
-    means nobody picks up on any number, which is the fallback chain exhausting.
+    means nobody picks up on any number, which is the fallback chain exhausting. An index
+    past the end of the list is also nobody picking up, because the number of phones is a
+    property of the request and not of the scenario, so a file cannot be checked against
+    it when it loads. A negative index is refused when it loads: Python would read it as
+    counting from the end, this does not, and silently answering nowhere is the worst of
+    the three behaviours available.
     """
 
     answers_on: int | None = 0
@@ -206,6 +211,15 @@ class Outcome:
             raise ScenarioError(
                               f"{where}: answers_on is an index or null, not "
                               f"{answers_on!r}")
+        # A negative index answers on no number at all, because the dialler compares it
+        # against 0, 1, 2 and never reaches it. Somebody writing -1 means the last
+        # number, and getting "nobody answered" back with nothing said about it is how a
+        # scenario looks broken when the file is what is wrong.
+        if isinstance(answers_on, int) and answers_on < 0:
+            raise ScenarioError(
+                              f"{where}: answers_on is {answers_on}, and an index into "
+                              "the phones list counts from the front. Use 0 for the first "
+                              "number, or null for nobody answering.")
         return Outcome(
             answers_on=answers_on,
             structured_result=spec.get("structured_result"),

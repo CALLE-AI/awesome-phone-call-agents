@@ -180,6 +180,14 @@ def mask_id(value: str) -> str:
     if not sep:
         head, body = "", value
     keep = 4 if len(body) > 10 else 2
+    # A body whose two ends are the whole body would be published entire by the line
+    # below, and for `abc` it would print `ab…bc`, repeating a character to do it. The
+    # number masker in `firstbell/redaction.py` already refuses that: below the length at
+    # which the ends hide something, show none of it. Nothing here reaches this branch,
+    # because a CALL-E call id is 26 characters and a provider id is 32, which is the
+    # reason to close it now rather than after something shorter arrives.
+    if len(body) <= keep * 2:
+        return f"{head}{sep}…"
     return f"{head}{sep}{body[:keep]}…{body[-keep:]}"
 
 

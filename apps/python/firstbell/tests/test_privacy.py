@@ -618,6 +618,22 @@ def test_no_whole_call_identifier_can_reach_the_page():
 
     assert mask_id("") == "", "an absent identifier must stay absent, not become an ellipsis"
 
+    # And an identifier too short to have a middle shows none of itself, which is the rule
+    # the number masker in `firstbell/redaction.py` already follows. Before this, a body of
+    # four characters was published whole by a function whose job is not publishing them,
+    # and a body of three came out as `ab…bc`, repeating a character to fill the mask.
+    for short_value in ("call_abcd", "call_abc", "call_ab", "call_a", "abcd", "ab"):
+        head, sep, body = short_value.partition("_")
+        if not sep:
+            head, body = "", short_value
+        masked = mask_id(short_value)
+        # The prefix a reader needs to know what kind of identifier this was, and then
+        # nothing. Asserted as an equality rather than as an absence, because a body of
+        # `a` is a single character and "does not appear" is satisfied by accident.
+        assert masked == f"{head}{sep}…", (
+            f"{masked} shows part of a body too short to mask"
+        )
+
     source = (APP / "tools" / "judge_page.py").read_text(encoding="utf-8")
     build = source.split("def build(", 1)[1]
     # The masking loop names both fields through a variable, so it is the one place they
