@@ -14,7 +14,8 @@ from calle_double import CalleDouble, Outcome
 
 _ANSWERED_TA = (
     {"reason_category": "illness", "expected_return": "tomorrow",
-     "parent_confirmed_aware": "yes"},
+     "parent_confirmed_aware": "yes",
+     "spoke_with": "guardian"},
     [("bot", "Kaalai vanakkam. This is an automated call from the school attendance "
              "office. You are speaking with an AI assistant, not a person."),
      ("user", "Sari, sollunga."),
@@ -25,7 +26,8 @@ _ANSWERED_TA = (
 
 _ANSWERED_HI = (
     {"reason_category": "medical_appointment", "expected_return": "today",
-     "parent_confirmed_aware": "yes"},
+     "parent_confirmed_aware": "yes",
+     "spoke_with": "guardian"},
     [("bot", "This is an automated call from the school attendance office. You are "
              "speaking with an AI assistant, not a person."),
      ("user", "Haan, boliye."),
@@ -54,7 +56,8 @@ def apply_demo_outcomes(double: CalleDouble) -> None:
     # chain doing its job, and it is why `phones` is a list.
     double.set_outcome("+915550000003", Outcome.answered(
         {"reason_category": "family_emergency", "expected_return": "later_this_week",
-         "parent_confirmed_aware": "yes"},
+         "parent_confirmed_aware": "yes",
+     "spoke_with": "guardian"},
         [("bot", "This is an automated call from the school attendance office."),
          ("user", "Yes, her grandmother is unwell, we are travelling. Back Thursday.")],
         answers_on=1,

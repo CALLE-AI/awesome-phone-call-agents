@@ -28,7 +28,7 @@ and nothing here is a screenshot.
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
 | It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 201 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 205 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
 the [evidence page](https://firstbell-evidence.vercel.app) with the recordings.
@@ -43,7 +43,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and one gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and five gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the seven checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
@@ -229,6 +229,9 @@ What this run was worth
     on a boolean       6   a column that says yes, which is not a record
                            docs/consent-record.md is the schema that replaces it
 
+  who answered, on the records this run closed
+    a guardian         3   the call recorded a parent or guardian on the line
+
   reached in-language
     en-IN              1
     hi-IN              1
@@ -387,6 +390,45 @@ removes fewer attempts absorbs a lower rate, and the figure moves down with it.
 A vendor would publish $0.21 and stop. The reason to publish 31.5 as well is that a school
 board is going to ask the question in the meeting, and the answer should already be in the
 run rather than improvised at the table.
+
+## Who picked up the telephone
+
+The number is the one a school has on record for a child. That is not the same as a
+guardian answering it, and until this was written the instruction opened by naming the
+pupil and saying the pupil had been marked absent. A brother, a lodger or a neighbour
+minding the house heard both. The fact that a child is absent is itself the disclosure, so
+the only control available is the order the sentences are spoken in.
+
+So the order changed. The automated-caller disclosure is still first, because several
+jurisdictions require it and a school would want it in writing regardless. Then the call
+asks whether it is speaking to a parent or guardian of a pupil at the school, and it names
+nobody and says nothing about an absence until somebody has said yes. If a child answers,
+or an answering machine, or an adult who is not a guardian, the call says the school will
+ring back, records who answered, and stops.
+
+`spoke_with` records that, and it has five values rather than two. It is not required,
+because a field CALL-E does not fill would make every call schema-invalid, which is a
+worse failure than the one this catches. So a record can close three ways and the run
+distinguishes all three:
+
+| The call recorded | What happens |
+|---|---|
+| `guardian` | A confirmation from a guardian closes the record |
+| `child`, `other_adult`, `voicemail` | The record does not close, whatever the awareness field says |
+| nothing, or `unknown` | The record closes as it did before, and the run counts it |
+
+```
+  who answered, on the records this run closed
+    a guardian         3   the call recorded a parent or guardian on the line
+```
+
+The third row is the interesting one, and mutation 203 is the reason it exists. Reading a
+call that recorded nothing as a call answered by somebody who is not the guardian would
+hold more records for a person and looks like the cautious direction. It is not cautious,
+it is false: a call that did not say who answered did not say. Seven tests fail on that
+mutation. So absent is counted and printed rather than resolved in either direction, and
+every one of the eleven real calls on the evidence page falls in that row, because they
+were placed before the field existed.
 
 ## Whether it finishes before the cutoff
 
@@ -781,7 +823,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 521 tests
+python -m pytest tests/ -q          # 544 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

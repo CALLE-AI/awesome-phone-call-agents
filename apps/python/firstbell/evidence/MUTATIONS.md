@@ -308,6 +308,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 199 | Dial the last row of a household instead of the one the export put first, so a receipt cannot be read against the district's own file | 6 |
 | 200 | Stop telling the dialled row who else in the house is absent, which asks a parent about one child while two more of hers are held | 1 |
 | 201 | Count held rows in no bucket, which reports a household the run grouped as a run somebody cancelled | 1 |
+| 202 | Stop checking who answered before reading what they said, so a brother saying the child is ill closes a record only a guardian can close | 4 |
+| 203 | Read a call that did not record who answered as a call answered by somebody who is not the guardian, which invents a fact about a call while trying to be careful | 7 |
+| 204 | Read everybody who answers as the guardian, which is the state this was written to leave | 7 |
+| 205 | Report closures made with nobody recorded as zero, which hides the exposure by publishing a total that looks clean | 3 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -764,6 +768,15 @@ and a district reconciling a receipt against the file it exported finds the run 
 about a row it did not expect. Six tests fail, which is more than any other row here, and
 that is only because the ordering was written down as a decision before it was written as
 code.
+
+Rows 202 to 205 are about who picked up the telephone, and 203 is the one that says
+something about this project rather than about the code. The careful-looking mutation is
+the wrong one: reading a call that recorded nothing as a call answered by a non-guardian
+holds more records for a person and looks like the safe direction. It is not safe, it is
+false, and seven tests fail on it. A call that did not say who answered did not say. The
+run counts those separately and prints the count, and that number is the exposure a
+district is being asked to accept rather than one this software gets to resolve on its
+behalf.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

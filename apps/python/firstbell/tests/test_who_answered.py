@@ -1,0 +1,182 @@
+"""Who was on the line, and what the run may close on their answer.
+
+A call reaches the number a school has on record for a child. That does not mean a
+guardian picked it up. A brother, a lodger, a neighbour minding the house, or the child
+themselves can answer, and until this existed the instruction named the pupil and said the
+pupil was absent before anybody had said who they were. The fact that a child is absent is
+itself the disclosure, so the order the sentences are spoken in is the whole control.
+"""
+from __future__ import annotations
+
+import pytest
+
+from dispatch import Escalation, ItemResult, Resolution, WorkItem
+from firstbell.domain import (
+    RESULT_SCHEMA,
+    answered_by_the_guardian,
+    safeguarding_escalation,
+    summarise,
+    build_task,
+)
+
+
+def closed(**result):
+    return ItemResult(item=WorkItem(id="S-1", phones=("+15550100001",)),
+                      resolution=Resolution.RESOLVED, structured_result=dict(result),
+                      escalation=Escalation.NONE, attempts_made=1)
+
+
+# --- three values, not two -----------------------------------------------------------
+
+
+def test_a_guardian_is_a_guardian():
+    assert answered_by_the_guardian({"spoke_with": "guardian"}) is True
+
+
+@pytest.mark.parametrize("who", ["other_adult", "child", "voicemail"])
+def test_anybody_else_is_not(who):
+    assert answered_by_the_guardian({"spoke_with": who}) is False
+
+
+def test_a_missing_field_is_none_and_not_false():
+    """None is not False, and the difference is a claim about a call.
+
+    Reading absent as "not a guardian" would invent a fact while trying to be careful,
+    which is worse than the carelessness. The run counts it instead.
+    """
+    assert answered_by_the_guardian({}) is None
+
+
+def test_an_explicit_unknown_is_also_none():
+    assert answered_by_the_guardian({"spoke_with": "unknown"}) is None
+
+
+def test_the_value_is_read_case_and_space_insensitively():
+    assert answered_by_the_guardian({"spoke_with": "  Guardian "}) is True
+
+
+def test_the_field_is_in_the_schema_and_is_not_required():
+    """Required would make every call CALL-E does not fill schema-invalid, which is a
+    worse failure than the one this catches."""
+    assert "spoke_with" in RESULT_SCHEMA["properties"]
+    assert "spoke_with" not in RESULT_SCHEMA["required"]
+    assert set(RESULT_SCHEMA["properties"]["spoke_with"]["enum"]) == {
+        "guardian", "other_adult", "child", "voicemail", "unknown"}
+
+
+# --- what closes and what does not ---------------------------------------------------
+
+
+def test_a_confirmation_from_a_guardian_closes_the_record():
+    assert safeguarding_escalation(
+        {"parent_confirmed_aware": "yes", "spoke_with": "guardian"}) is Escalation.NONE
+
+
+def test_a_confirmation_from_a_sibling_does_not_close_the_record():
+    """"Yeah she's sick" from a brother is not a guardian accounting for a child."""
+    assert safeguarding_escalation(
+        {"parent_confirmed_aware": "yes", "spoke_with": "child"}
+    ) is Escalation.SAFEGUARDING
+
+
+def test_a_confirmation_from_another_adult_does_not_close_the_record():
+    assert safeguarding_escalation(
+        {"parent_confirmed_aware": "yes", "spoke_with": "other_adult"}
+    ) is Escalation.SAFEGUARDING
+
+
+def test_an_answering_machine_does_not_close_the_record():
+    assert safeguarding_escalation(
+        {"parent_confirmed_aware": "yes", "spoke_with": "voicemail"}
+    ) is Escalation.SAFEGUARDING
+
+
+def test_who_answered_is_checked_before_what_they_said():
+    """A record answered by a child is held whatever the awareness field says."""
+    for aware in ("yes", "no", "unknown"):
+        assert safeguarding_escalation(
+            {"parent_confirmed_aware": aware, "spoke_with": "child"}
+        ) is Escalation.SAFEGUARDING
+
+
+def test_the_old_behaviour_is_unchanged_when_the_call_did_not_say():
+    """Every call placed before this field existed still reads exactly as it did."""
+    assert safeguarding_escalation({"parent_confirmed_aware": "yes"}) is Escalation.NONE
+    assert safeguarding_escalation({"parent_confirmed_aware": "no"}) is Escalation.SAFEGUARDING
+
+
+# --- the run says what it closed on --------------------------------------------------
+
+
+def test_a_closure_with_a_guardian_on_the_line_is_counted_as_one():
+    summary = summarise([closed(parent_confirmed_aware="yes", spoke_with="guardian")],
+                        calls_placed=1)
+    assert summary.closed_with_a_guardian == 1
+    assert summary.closed_with_no_answerer_recorded == 0
+
+
+def test_a_closure_with_nobody_recorded_is_counted_separately():
+    summary = summarise([closed(parent_confirmed_aware="yes")], calls_placed=1)
+    assert summary.closed_with_no_answerer_recorded == 1
+    assert summary.closed_with_a_guardian == 0
+
+
+def test_the_two_counts_are_not_added_together_anywhere():
+    """The exposure is the second one, so it has to survive as its own number."""
+    summary = summarise([closed(parent_confirmed_aware="yes", spoke_with="guardian"),
+                         closed(parent_confirmed_aware="yes")], calls_placed=2)
+    assert (summary.closed_with_a_guardian,
+            summary.closed_with_no_answerer_recorded) == (1, 1)
+
+
+def test_a_record_that_did_not_close_is_in_neither_count():
+    escalated = ItemResult(
+        item=WorkItem(id="S-2", phones=("+15550100001",)),
+        resolution=Resolution.RESOLVED, escalation=Escalation.SAFEGUARDING,
+        structured_result={"parent_confirmed_aware": "no"}, attempts_made=1)
+    summary = summarise([escalated], calls_placed=1)
+    assert summary.closed_with_a_guardian == 0
+    assert summary.closed_with_no_answerer_recorded == 0
+
+
+def test_the_run_prints_the_exposure_rather_than_folding_it_in():
+    summary = summarise([closed(parent_confirmed_aware="yes")], calls_placed=1)
+    printed = "\n".join(summary.lines())
+    assert "not recorded" in printed
+    assert "Not a claim that a child answered" in printed
+
+
+# --- the instruction ------------------------------------------------------------------
+
+
+def test_the_instruction_asks_who_is_there_before_it_names_a_pupil():
+    """The order of the sentences is the control, so the order is what is asserted."""
+    text = build_task(WorkItem(id="S-1", phones=("+15550100001",),
+                              context={"student_name": "Anitha",
+                                       "school_name": "Oakridge"}))
+    asked = text.find("parent or guardian")
+    named = text.find("Anitha")
+    assert asked > 0 and named > 0, "the instruction no longer asks or no longer names"
+    assert asked < named, (
+        "the instruction names the pupil before it establishes who answered, which "
+        "discloses a pupil's absence to whoever picked up the telephone"
+    )
+
+
+def test_the_instruction_says_not_to_disclose_the_absence_first():
+    text = build_task(WorkItem(id="S-1", phones=("+15550100001",)))
+    assert "do not say that anybody is absent" in text.lower()
+
+
+def test_the_instruction_says_what_to_do_when_a_child_answers():
+    text = build_task(WorkItem(id="S-1", phones=("+15550100001",))).lower()
+    assert "if a child answers" in text
+    assert "call back" in text
+
+
+def test_the_disclosure_is_still_the_first_thing_spoken():
+    """Verifying the answerer must not push the automated-caller disclosure down."""
+    from firstbell.domain import AI_DISCLOSURE
+
+    assert build_task(WorkItem(id="S-1", phones=("+15550100001",))).startswith(
+        AI_DISCLOSURE)
