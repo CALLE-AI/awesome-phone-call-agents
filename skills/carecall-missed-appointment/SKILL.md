@@ -4,6 +4,25 @@ description: Recover missed healthcare appointments through a safe administrativ
 license: MIT
 ---
 
+The reference workflow is designed to:
+
+1. Confirm the intended patient.
+2. Inform them that they were unable to attend their appointment.
+3. Ask whether they would like to reschedule.
+4. Offer available appointment slots supplied by the host system.
+5. Confirm the slot selected by the patient.
+6. Return a structured result that a host system can use to update the appointment.
+
+This is a workflow skill, not a medical assistant and not a replacement for a clinical professional.
+
+This repository contribution is reference workflow documentation. It does not itself execute CALL-E calls.
+
+A host application is responsible for integrating with CALL-E, explicitly authorizing each real call, supplying the destination phone number and appointment data, handling credentials, preventing duplicate calls, and applying the returned structured result.
+
+Any runnable CareCall implementation lives outside this skill package and must provide its own safe default, such as dry-run, fake-server, or explicit opt-in before placing a real call.
+
+---
+
 # CareCall — Missed Appointment Recovery
 
 ## Why this exists
