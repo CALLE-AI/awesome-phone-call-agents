@@ -25,27 +25,43 @@ DOCS = APP / "docs"
 # slug, the title a reader sees in the list, and why they would open it. The order is the
 # order a reader meets the questions in: what it costs to try, what the lawyer asks, then
 # the three that answer how the evidence itself was made.
-PUBLISHED: list[tuple[str, str, str]] = [
+# Four fields: the slug the page is served under, the file it is rendered from relative
+# to the app root, the title, and the one line saying why a reader should open it. The
+# path is spelled out rather than derived from the slug, because the most reusable piece
+# of this entry documents itself next to its own code and copying it into docs/ would
+# make two documents that drift.
+PUBLISHED: list[tuple[str, str, str, str]] = [
     ("what-a-pilot-would-look-like",
+     "docs/what-a-pilot-would-look-like.md",
      "What a pilot would look like",
      "Two schools, six weeks, the four numbers measured before switch-on, and the "
      "children this software is not allowed to call."),
     ("the-legal-surface",
+     "docs/the-legal-surface.md",
      "The legal surface",
      "Seven questions a district's counsel asks before this software telephones a "
      "parent. FERPA, the TCPA, COPPA, retention, and which of them are still open."),
     ("locale-is-not-only-a-hint",
+     "docs/locale-is-not-only-a-hint.md",
      "Locale is not only a hint",
      "Why the same call in Tamil is one column in a work file and not a second code "
      "path, and where that stops being true."),
     ("proving-a-gate-fires",
+     "docs/proving-a-gate-fires.md",
      "Proving a gate fires",
      "How each check in this repository was broken on purpose to confirm it notices, "
      "and what that costs when it is skipped."),
     ("receipt-provenance",
+     "docs/receipt-provenance.md",
      "Where a receipt comes from",
      "What is in a receipt, what was added afterwards, and how to tell a real call "
      "from a replay without trusting this page."),
+    ("the-offline-calle",
+     "calle_double/README.md",
+     "The offline CALL-E, and how to take it",
+     "A CALL-E that dials nobody, written from the published API and checked against "
+     "eleven recorded production responses. Two ways to mount it, and the three things "
+     "about it that are not true."),
 ]
 
 # Only what the documents actually contain. markdown-it-py emits nothing else from these
@@ -95,9 +111,9 @@ def _render_markdown(text: str) -> str:
     return MarkdownIt("commonmark").render(text)
 
 
-def render(slug: str, title: str, why: str, css: str) -> str:
+def render(slug: str, path: str, title: str, why: str, css: str) -> str:
     """One document as a standalone page, in the same inks and typefaces as the site."""
-    source = DOCS / f"{slug}.md"
+    source = APP / path
     if not source.exists():
         raise SystemExit(f"{source} is listed in doc_pages.PUBLISHED and does not exist")
 
@@ -123,7 +139,7 @@ def render(slug: str, title: str, why: str, css: str) -> str:
         f"{heading}"
         f'<p class=doc-why>{html.escape(why)}</p>'
         f"{body}"
-        f'<p class=dim>This page is <code>docs/{html.escape(slug)}.md</code> in the '
+        f'<p class=dim>This page is <code>{html.escape(path)}</code> in the '
         "repository, rendered at build time. The file is the original and this is a "
         "copy of it, so if the two ever disagree the file is right.</p>"
         "</main></html>"
@@ -135,9 +151,9 @@ def write_all(out: Path, css: str) -> list[Path]:
     target = out / "docs"
     target.mkdir(parents=True, exist_ok=True)
     written = []
-    for slug, title, why in PUBLISHED:
+    for slug, path, title, why in PUBLISHED:
         page = target / f"{slug}.html"
-        page.write_text(render(slug, title, why, css), encoding="utf-8", newline="\n")
+        page.write_text(render(slug, path, title, why, css), encoding="utf-8", newline="\n")
         written.append(page)
     return written
 
@@ -147,6 +163,6 @@ def index_markup() -> str:
     rows = [
         f'<li><a href="docs/{html.escape(slug)}.html">{html.escape(title)}</a>'
         f'<p class=read-why>{html.escape(why)}</p></li>'
-        for slug, title, why in PUBLISHED
+        for slug, _path, title, why in PUBLISHED
     ]
     return (f"<ul class=read-list>{''.join(rows)}</ul>")

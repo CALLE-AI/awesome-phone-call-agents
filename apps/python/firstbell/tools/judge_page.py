@@ -688,7 +688,7 @@ def security_headers(*pages: str) -> list[dict[str, str]]:
     """Every response header the deployment sets, in the order they are written out."""
     return [
         {"key": "Content-Security-Policy", "value": content_security_policy(*pages)},
-        # The deployment serves the page, five document pages, two modules and eight audio
+        # The deployment serves the page, six document pages, two modules and eight audio
         # clips, every one with a correct type. Nothing here needs a browser to guess.
         {"key": "X-Content-Type-Options", "value": "nosniff"},
         # A judge arrives from a submission form or a private document. The referrer would
@@ -844,7 +844,9 @@ def three_endings_figure() -> str:
         f'<p class=fig-say>{esc(text)}</p></div>'
         for name, text in rows)
     has_anim = (SITE / "figures" / "three-endings.json").exists()
-    data = ' data-lottie=three-endings.json' if has_anim else ''
+    # A marker, not a path. It used to hold the URL the player fetched, and a URL sitting
+    # in an attribute is an invitation to fetch it again.
+    data = ' data-lottie=window' if has_anim else ''
     # The still lives in a stage that is always present. The animation, when there is
     # one, is mounted inside that stage rather than inserted as a new child of the
     # figure: inserting one would shift every sibling's nth-of-type, and the contrast
@@ -1653,6 +1655,7 @@ def build(has_audio: bool, repo_url: str | None = None,
     # Served from this origin rather than a CDN, so the derived policy covers them under
     # 'self' and there is no third party in the path of a page about children.
     if (SITE / "figures" / "three-endings.json").exists():
+        add('<script src="figure-data.js" defer></script>')
         add('<script src="lottie_light.min.js" defer></script>')
         add('<script src="figure.js" defer></script>')
     add('</html>')
@@ -1725,9 +1728,19 @@ def main() -> int:
 
     # The animation the player reads. Built by tools/make_figure.py during this run rather
     # than committed, so it is always the figure the current palette makes.
+    #
+    # It ships as a script that assigns the data, not as JSON the player fetches. The
+    # policy this build derives sets `connect-src 'none'`, because the page places no
+    # network call, and lottie-web reading a `path:` is a network call. The file returned
+    # 200 and the browser refused it, so the animation never once played on the deployed
+    # page while every check passed: the still is the fallback and the still is correct, so
+    # nothing looked wrong. A script from this origin is already granted by `script-src
+    # 'self'`, so this removes the request rather than widening the policy to permit it.
     figure = SITE / "figures" / "three-endings.json"
     if figure.exists():
-        shutil.copy2(figure, out / "three-endings.json")
+        (out / "figure-data.js").write_text(
+            "window.__firstbellFigure=" + figure.read_text(encoding="utf-8").strip() + ";",
+            encoding="utf-8")
 
     page = out / "index.html"
     markup = build(has_audio, args.repo_url, args.video_url)

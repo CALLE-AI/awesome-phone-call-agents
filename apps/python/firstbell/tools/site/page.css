@@ -1630,6 +1630,13 @@ button[data-copy][data-copied]::after {
  * English. */
 .endings-fig { margin: 1.6rem 0 1.8rem; max-width: var(--measure); }
 .endings-fig svg { display: block; width: 100%; height: auto; }
+/* The rule above beats the browser's own [hidden] { display: none }, which is how
+   the still stayed in the layout after the animation replaced it and pushed 187px
+   of page down. The shift was invisible to the CLS gate because the animation
+   mounts 200px before the figure enters view and CLS only counts what a reader can
+   see move. Written as a rule rather than as an inline style so the policy that
+   hashes this stylesheet keeps covering it. */
+.endings-fig svg[hidden] { display: none; }
 .fig-key {
   display: grid; gap: 0.85rem;
   margin: 1rem 0 0.6rem;

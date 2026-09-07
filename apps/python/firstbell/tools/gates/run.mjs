@@ -380,6 +380,83 @@ async function gateLongTasks(browser, url) {
       longTasks: most ? worstTasks : [] });
 }
 
+// The animated figure. This gate exists because the animation never played once on the
+// deployed page and every other check passed: the still is the fallback, the still is
+// correct, so nothing looked wrong. The policy this build derives closes connect-src, and
+// the player was reading its data from a URL, so the browser refused the only request it
+// made. Then the still failed to leave the layout, because `element.hidden = true` is an
+// HTMLElement property and the still is an SVGElement, so it set no attribute at all.
+//
+// Both were invisible to the gates that were here. The CLS gate scores this 0.00000 because
+// the figure mounts 200px before it enters view and CLS counts only shifts a reader sees.
+// So this asks the three questions directly: did it mount, is it moving, and did anything
+// change size.
+async function gateFigure(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  const refused = [];
+  page.on("console", (m) => {
+    const t = m.text();
+    if (/Content Security Policy|Refused to/i.test(t)) refused.push(t.slice(0, 160));
+  });
+  page.on("requestfailed", (r) => refused.push("request failed: " + r.url().slice(-70)));
+  await page.goto(url, { waitUntil: "networkidle0" });
+
+  const has = await page.$("[data-lottie]");
+  if (!has) {
+    record("animated figure", "COULD-NOT-MEASURE",
+           "the page carries no [data-lottie], so this checkout built without the figure");
+    await page.close();
+    return;
+  }
+
+  const before = await figureBoxes(page);
+  await page.evaluate(() => document.querySelector(".endings-fig").scrollIntoView());
+  await new Promise((r) => setTimeout(r, 2200));
+  const after = await figureBoxes(page);
+
+  const stage = await page.$(".fig-stage");
+  const frameA = await stage.screenshot({ encoding: "base64" });
+  await new Promise((r) => setTimeout(r, 800));
+  const frameB = await stage.screenshot({ encoding: "base64" });
+  await page.close();
+
+  const moving = frameA !== frameB;
+  const grew = ["fig", "stage", "key"].filter((k) => Math.abs(after[k] - before[k]) > 1);
+  const problems = [];
+  if (!after.mounted) problems.push("the player never mounted");
+  if (!moving) problems.push("two frames 800ms apart are identical, so nothing is playing");
+  if (after.mounted && !after.stillHidden) problems.push("the still is still in the layout");
+  if (grew.length) problems.push("these boxes changed size: " + grew.map(
+    (k) => `${k} ${before[k]} to ${after[k]}px`).join(", "));
+  if (refused.length) problems.push(refused.join("; "));
+
+  if (problems.length) {
+    record("animated figure", "FAIL", problems.join(". "));
+  } else {
+    record("animated figure", "PASS",
+           `the figure plays: mounted, the still is out of the layout, two frames 800ms ` +
+           `apart differ, and the figure, stage and key are unchanged at ` +
+           `${after.fig}/${after.stage}/${after.key}px. Nothing refused`);
+  }
+}
+
+function figureBoxes(page) {
+  return page.evaluate(() => {
+    const h = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? +el.getBoundingClientRect().height.toFixed(1) : -1;
+    };
+    const stage = document.querySelector(".fig-stage");
+    const still = stage && stage.querySelector(":scope > svg");
+    return {
+      fig: h(".endings-fig"), stage: h(".fig-stage"), key: h(".fig-key"),
+      mounted: !!(stage && stage.querySelector(".fig-anim")),
+      stillHidden: !!(still && still.hasAttribute("hidden")),
+    };
+  });
+}
+
 async function gateReducedMotion(browser, url) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
@@ -1673,6 +1750,7 @@ async function main() {
     await gateOverflow(browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html"));
     await gateCsp(browser);
     await gateDocs(browser, base, docSlugs);
+    await gateFigure(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();

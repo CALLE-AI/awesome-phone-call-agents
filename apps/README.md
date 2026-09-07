@@ -11,6 +11,7 @@ Current apps:
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
+| [`python/firstbell`](python/firstbell/) | Python | Calls the families whose school-absence notification went unanswered, each in that family's own language, and keeps three endings apart: a usable answer, a call that produced nothing, and nobody reached. Offline by default against a CALL-E double, so the demo needs no account and dials nobody. |
 | [`web/fieldclose`](web/fieldclose/) | TypeScript / Next.js | Human-approved commercial HVAC closeout workflow with a fake-only public path, durable recipient suppression, one-attempt duplicate protection, structured CALL-E results, and explicit human disposition. |
 | [`typescript/kincall`](typescript/kincall/) | TypeScript | Consent-first check-in and trusted-circle coordination: a stated request for help overrides the agent's own judgement, contacts are called one at a time until somebody commits, and the monitored person is called back with the outcome. |
 | [`typescript/revisit-zero`](typescript/revisit-zero/) | TypeScript | Controlled meter-access recovery workbench with deterministic safety gates, exact call approval, one-recipient CALL-E execution, strict structured-result validation, and human-approved rebook export. |

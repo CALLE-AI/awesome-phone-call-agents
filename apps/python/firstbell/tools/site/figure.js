@@ -4,16 +4,22 @@
 // it survives the no-JavaScript pass, and it is what a reader sees if anything below fails.
 // The animation replaces it only when all four of these are true:
 //
-//   the player loaded            a network can drop one file
+//   the player loaded            a script can fail to arrive
+//   the data arrived             it is assigned by figure-data.js, from this origin
 //   motion is not reduced        prefers-reduced-motion is a instruction, not a hint
-//   the figure is on screen      nothing is fetched or decoded for a figure nobody reached
-//   the JSON parsed              a truncated asset leaves the still in place
+//   the figure is on screen      nothing is decoded for a figure nobody reached
+//
+// The data is handed over as an object rather than a URL. It was a URL, and the policy this
+// page derives sets `connect-src 'none'` because the page places no network call, so the
+// browser refused the one request the player made and the animation never played for
+// anybody. The still is the fallback and the still is correct, which is why nothing looked
+// broken for a week.
 //
 // Held to the same rule as everything else on this page: the enhancement may never be worse
 // than the thing it replaces.
 (function () {
   const fig = document.querySelector('[data-lottie]');
-  if (!fig || !window.lottie) return;
+  if (!fig || !window.lottie || !window.__firstbellFigure) return;
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (reduced.matches) return;
@@ -31,28 +37,59 @@
     const stage = fig.querySelector('.fig-stage');
     const still = stage && stage.querySelector('svg');
     if (!stage || !still) return;
-    mount.style.aspectRatio = (still.getAttribute('width') || 900) + ' / '
-                            + (still.getAttribute('height') || 300);
+    // Size the mount from the box the still is actually occupying, not from its width and
+    // height attributes. With `width: 100%; height: auto` a browser lays an inline SVG out
+    // from its viewBox, so the attributes are the authored size and the rect is the drawn
+    // one. They differ here by ten pixels, and ten pixels of the page moving is ten pixels
+    // nobody asked for.
+    const box = still.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    mount.style.aspectRatio = box.width + ' / ' + box.height;
+    // Into the stage, never into the figure. A new child of the figure would renumber its
+    // siblings, and the contrast census identifies a text run by its position among them.
+    stage.appendChild(mount);
     try {
       anim = window.lottie.loadAnimation({
         container: mount,
         renderer: 'svg',
         loop: false,
         autoplay: true,
-        path: fig.dataset.lottie,
+        animationData: window.__firstbellFigure,
       });
     } catch (e) {
-      return;                       // the still stays exactly where it is
+      mount.remove();               // the still stays exactly where it is
+      return;
     }
+    // Look at what was built, not at an event saying it was.
+    //
+    // With a `path:` the player loads over the network, so a `DOMLoaded` listener attached
+    // on the next line is attached in time. With `animationData:` the whole thing is built
+    // inside the call above, synchronously, so both `DOMLoaded` and `data_failed` have
+    // already fired and no listener will ever hear them. The still stayed visible, the
+    // stage held both, and 187px of page moved down. Nothing said so: the CLS gate scores
+    // 0.00000 because the mount happens 200px before the figure enters view and CLS counts
+    // only shifts a reader can see.
+    //
+    // So ask the DOM. A player that drew something leaves an svg with shapes in it, and
+    // that is true whichever way the data arrived.
+    const drew = mount.querySelector('svg');
+    if (!drew || !drew.querySelector('g, path')) {
+      mount.remove();
+      still.removeAttribute('hidden');
+      return;
+    }
+    // `still.hidden = true` does nothing here, and that is the whole reason this was
+    // broken. `hidden` is an IDL property of HTMLElement; the still is an SVGElement, so
+    // the assignment quietly creates a JavaScript property on the object and sets no
+    // attribute at all. The CSS rule that collapses it matches the attribute, so the still
+    // kept its 197px, the stage held both, and every word below moved down.
+    still.setAttribute('hidden', '');
     anim.addEventListener('data_failed', () => {
       mount.remove();
-      still.hidden = false;
+      still.removeAttribute('hidden');
     });
-    anim.addEventListener('DOMLoaded', () => { still.hidden = true; });
-    // Into the stage, never into the figure. A new child of the figure would
-    // renumber its siblings, and the contrast census identifies a text run by
-    // its position among them.
-    stage.appendChild(mount);
+    // Already appended above, before the player ran, because a container outside the
+    // document cannot be measured and the check above measures it.
   };
 
   // A reader who turns motion off after the animation has started is asking for it to stop
@@ -65,7 +102,7 @@
     const still = stage && stage.querySelector('svg');
     if (!stage || !still) return;
     if (mount) mount.remove();
-    if (still) still.hidden = false;
+    if (still) still.removeAttribute('hidden');
   });
 
   if (!('IntersectionObserver' in window)) return;

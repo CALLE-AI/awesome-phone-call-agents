@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and forty-four gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and forty-seven gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Eight findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category | 2 min |
@@ -453,6 +453,17 @@ process:
 ```bash
 python -m calle_double.server --port 8787
 export CALLE_BASE_URL=http://127.0.0.1:8787
+```
+
+**It is the reusable half of this entry.** A CALL-E written from the published API, mounted
+on the SDK's own transport, with a record proving it matches production, is the thing
+another developer on this platform can take and use tomorrow. It has its own README at
+[`calle_double/README.md`](calle_double/) covering both ways to mount it, what it answers,
+what is a stub, and the three claims about it that are not true. Its credential is
+`evidence/api-shape.json` and its gate is one command:
+
+```bash
+python tools/double_conformance.py --check
 ```
 
 It listens on the loopback interface and refuses any other one unless you pass

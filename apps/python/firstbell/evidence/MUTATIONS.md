@@ -251,6 +251,9 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 142 | Let `is_loopback` answer yes to every address, so the double binds to a network on a flag nobody had to type | 1 |
 | 143 | Parse `--i-know-this-is-open` and never consult it, leaving a guard that is written down and not run | 1 |
 | 144 | Drop the override from the refusal text, so an operator with a real reason to open the port reads a wall instead of a choice | 1 |
+| 145 | Put the animation data back behind a URL, so the policy refuses the fetch and the figure never plays | 1 |
+| 146 | Hide the replaced still with `element.hidden`, which SVG does not implement, leaving it in the layout beside the animation | 1 |
+| 147 | Size the animation to twice the still it replaces, so the page under it moves | 1 |
 
 Rows 142 to 144 are the only ones here that test a rule which did not exist before the
 mutation was written. A security pass found the double authorises any bearer token, which
@@ -419,7 +422,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The fourteen browser gates
+## The fifteen browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -436,6 +439,23 @@ repository, so the build began rendering `docs/` into pages. Publishing five unc
 on a site arguing that every claim carries the thing that checks it would have answered one
 complaint by earning a worse one. It reads them with the same probe the main page is read
 with, and the overflow gate was widened to walk them at the same time.
+
+The fifteenth is `animated figure`, and it is the one that was passing on nothing. The page
+carries an animated version of the three-endings drawing, and it had never once played for
+anybody: the policy this build derives closes `connect-src`, because the page places no
+network call, and the player was reading its data from a URL. The browser refused the only
+request it made. Nothing looked wrong, because the still is the fallback and the still is
+correct. Fixing the fetch then exposed a second defect underneath it, that
+`element.hidden = true` is a property of HTMLElement and the still is an SVGElement, so the
+assignment set no attribute and the still stayed in the layout beside the animation.
+
+Neither was visible to the gates that existed. `cls` scores this 0.00000 and attributes no
+source node, because the figure mounts two hundred pixels before it enters the viewport and
+CLS counts only shifts a reader can see. So the new gate asks the three questions directly:
+did the player mount, do two frames eight hundred milliseconds apart differ, and did the
+figure, the stage or the key change size. All three were confirmed by breaking them: the
+data put back behind a URL, the still hidden by the property SVG does not have, and the
+mount sized to twice the still. Rows 145 to 147.
 
 The twelfth is `overflow`, and it is the one that was missing rather than the one that was
 added. The document was wider than the window at 1152 and at 390 CSS pixels, which is a
