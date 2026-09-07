@@ -487,6 +487,17 @@ than the API has.
 - **Consent is required and is never inferred.** A work file with no `consent` column is
   refused outright rather than defaulted, because a missing consent record is not consent.
   `S-1045` in the sample is skipped and counted separately.
+- **A boolean column is not a consent record, and the run says which rows had which.**
+  [`docs/consent-record.md`](docs/consent-record.md) is the shape of a dated record: one
+  guardian, one student, one channel, one purpose, one date, with an optional expiry and
+  withdrawal. A work file names one per row in a `consent_record` column and the run is
+  given the register with `--consent-records`. Seven checks run before a phone rings and
+  every one fails closed, including that consent to be texted is not consent to be
+  telephoned and that general permission to make contact is not permission to telephone
+  about an absence. An unrecognised key stops the register rather than being ignored,
+  because a misspelled `withdrawn_at` reads as a record nobody withdrew. Rows still
+  dialled on the boolean are counted and named as the district's open exposure rather
+  than folded into a total.
 - **A family the telephone cannot reach is not telephoned.** An optional `voice`
   column marks a guardian who is deaf, hard of hearing, or has a speech disability.
   `voice=no` is a gate, like consent: the row is never dialled, it is not counted as
