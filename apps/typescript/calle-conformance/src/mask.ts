@@ -19,7 +19,7 @@
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { quirksIn, type CallPayload } from "./quirks.js";
+import { quirksIn, type CallPayload } from "./quirks.ts";
 
 const RAW_DIR = "probe-results";
 const OUT_DIR = "fixtures/calls";

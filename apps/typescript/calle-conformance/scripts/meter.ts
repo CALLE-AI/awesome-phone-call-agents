@@ -33,7 +33,7 @@
 
 import { CalleClient } from "@call-e/calle";
 import { writeFile } from "node:fs/promises";
-import { unsupportedDestination } from "../src/unsupported-destination.js";
+import { unsupportedDestination } from "../src/unsupported-destination.ts";
 
 const UNROUTABLE = { phone: "+14155550100", region: "US", locale: "en-US" };
 

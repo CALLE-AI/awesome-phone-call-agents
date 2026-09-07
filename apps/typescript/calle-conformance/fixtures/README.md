@@ -33,7 +33,7 @@ On a failed attempt, startedAt carries no timezone designator while createdAt do
 
 **Consequence.** A parser reads the string as local time. Every duration and retry decision derived from it is wrong by the reader's own offset plus the platform's.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `failed-attempt-timestamp-lags-four-hours`
 
@@ -41,7 +41,7 @@ On a failed attempt, startedAt is about four hours behind createdAt.
 
 **Consequence.** An attempt appears to have started before the call it belongs to was created, so ordering by startedAt scrambles the timeline.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `raw-sip-code-as-failure-code`
 
@@ -49,7 +49,7 @@ attempt.failureCode carries a bare SIP status number, outside the documented enu
 
 **Consequence.** Code branching on the documented failure codes falls through to its default branch for every real failure.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `structured-result-without-conversation`
 
@@ -57,7 +57,7 @@ structuredResult is populated on an attempt with zero transcript turns.
 
 **Consequence.** A caller reading structuredResult first records an answer from a person who was never reached.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `summary-suggests-retry-for-unreachable-destination`
 
@@ -65,7 +65,7 @@ The summary proposes a retry window for a destination that cannot be reached at 
 
 **Consequence.** An automated retry loop keeps dialling a number that will never connect, spending quota on every pass.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `single-attempt-reported`
 
@@ -73,7 +73,7 @@ The recipient reports exactly one attempt for a call the carrier logged as many 
 
 **Consequence.** Dial volume, and anything metered by it, cannot be derived from the API response.
 
-Present in 7 of 10 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
+Present in 7 of 11 fixtures: `failed-404-0turns-09c72b.json`, `failed-486-0turns-d09b8b.json`, `failed-486-0turns-c64ac1.json`, `failed-603-0turns-42b9b8.json`, `failed-486-0turns-ba0ca6.json`, `failed-603-0turns-14ab2d.json`, `failed-603-0turns-d4734e.json`
 
 ### `connected-call-timestamps-are-well-formed`
 
@@ -81,7 +81,7 @@ On a call that connected, startedAt carries Z and agrees with createdAt.
 
 **Consequence.** This is the control. A fake that formats every timestamp the same way cannot reproduce the split between the success and failure paths.
 
-Present in 2 of 10 fixtures: `completed-no-failure-2turns-d1d516.json`, `completed-no-failure-7turns-f62388.json`
+Present in 3 of 11 fixtures: `completed-no-failure-2turns-d1d516.json`, `completed-no-failure-7turns-f62388.json`, `completed-no-failure-8turns-ff6b5c.json`
 
 ## Fixtures
 
@@ -95,6 +95,7 @@ Present in 2 of 10 fixtures: `completed-no-failure-2turns-d1d516.json`, `complet
 | `failed-486-0turns-c64ac1.json` | failed | `486` | 0 | 6 |
 | `failed-603-0turns-42b9b8.json` | failed | `603` | 0 | 6 |
 | `failed-486-0turns-ba0ca6.json` | failed | `486` | 0 | 6 |
+| `completed-no-failure-8turns-ff6b5c.json` | completed | - | 8 | 1 |
 | `failed-603-0turns-14ab2d.json` | failed | `603` | 0 | 6 |
 | `failed-603-0turns-d4734e.json` | failed | `603` | 0 | 6 |
 

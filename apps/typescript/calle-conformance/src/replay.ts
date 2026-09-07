@@ -17,7 +17,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { QUIRKS, quirksIn, type CallPayload } from "./quirks.js";
+import { QUIRKS, quirksIn, type CallPayload } from "./quirks.ts";
 
 const RENAMES: Record<string, string> = {
   transcript_turns: "transcriptTurns",
@@ -69,7 +69,10 @@ function jsonFiles(dir: string, acc: string[] = []): string[] {
   let entries: string[];
   try { entries = readdirSync(dir); } catch { return acc; }
   for (const name of entries) {
+    // probe-results holds unmasked captures. It is git-ignored and must never be
+    // scored: a corpus that reads its own private inputs is measuring nothing.
     if (name === "node_modules" || name === ".git" || name === "dist") continue;
+    if (name === "probe-results") continue;
     const full = join(dir, name);
     let s; try { s = statSync(full); } catch { continue; }
     if (s.isDirectory()) jsonFiles(full, acc);

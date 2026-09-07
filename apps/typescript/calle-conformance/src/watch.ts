@@ -18,8 +18,8 @@
  */
 
 import { CalleClient } from "@call-e/calle";
-import { Ledger } from "./ledger.js";
-import { unsupportedDestination } from "./unsupported-destination.js";
+import { Ledger } from "./ledger.ts";
+import { unsupportedDestination } from "./unsupported-destination.ts";
 
 const POLL_MS = 10 * 60 * 1000;
 const MAX_HOURS = 6;

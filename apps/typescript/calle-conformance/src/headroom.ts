@@ -18,8 +18,8 @@
 
 import { CalleClient } from "@call-e/calle";
 import { writeFile } from "node:fs/promises";
-import { Ledger } from "./ledger.js";
-import { unsupportedDestination } from "./unsupported-destination.js";
+import { Ledger } from "./ledger.ts";
+import { unsupportedDestination } from "./unsupported-destination.ts";
 
 const CEILING = 25;
 

@@ -97,6 +97,15 @@
       "turns": 0
     },
     {
+      "file": "completed-no-failure-8turns-ff6b5c.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 8
+    },
+    {
       "file": "failed-603-0turns-14ab2d.json",
       "quirks": [
         "failed-attempt-timestamp-has-no-zone",

@@ -14,7 +14,7 @@ import { readFileSync, readdirSync, mkdtempSync, cpSync, rmSync, existsSync } fr
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { QUIRKS, quirksIn, type CallPayload } from "../src/quirks.js";
+import { QUIRKS, quirksIn, type CallPayload } from "../src/quirks.ts";
 
 const FIXTURE_DIR = "fixtures/calls";
 const RAW_DIR = "probe-results";

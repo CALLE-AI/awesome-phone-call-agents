@@ -10,7 +10,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { QUIRKS } from "./quirks.js";
+import { QUIRKS } from "./quirks.ts";
 
 type Entry = { file: string; quirks: string[]; status: string; failureCode: string | null; turns: number };
 const index = JSON.parse(readFileSync("fixtures/index.json", "utf8")) as { calls: Entry[] };

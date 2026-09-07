@@ -10,7 +10,7 @@
  */
 
 import { readFileSync, rmSync } from "node:fs";
-import { Ledger, type RequestKind } from "./ledger.js";
+import { Ledger, type RequestKind } from "./ledger.ts";
 
 const lima = (d: Date) =>
   new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" }).format(d);

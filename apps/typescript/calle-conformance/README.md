@@ -3,6 +3,39 @@
 A corpus of real CALL-E API responses, and a checker that tells you which of them
 your code has never been tested against.
 
+## Run it first
+
+```bash
+node src/replay.ts ../../..
+```
+
+That is the whole setup. No `npm install`, no API key, no network, nothing
+dialled. Node 22 runs the TypeScript directly, and the only dependency in
+`package.json` is needed by the optional probes, not by this.
+
+```
+6 projects carrying call-shaped payloads, 7 quirks.
+A dot means the behaviour never appears in that project's payloads.
+
+project                            n    1  2  3  4  5  6  7
+---------------------------------  --  -- -- -- -- -- -- --
+apps/python/casechaser              7   .  .  .  .  .  .  x
+apps/python/redline                 1   .  .  .  .  .  .  x
+apps/python/ringdown                2   .  .  .  .  x  .  x
+apps/typescript/calle-conformance  11   x  x  x  x  x  x  x
+plugins/zapier-calle                3   .  .  .  .  .  .  x
+skills/verify-by-phone              1   .  .  .  .  .  .  .
+```
+
+Seven behaviours this API really emits, and the payloads six projects test
+against. A dot means that project has never seen that behaviour in a fixture.
+The bottom row is this corpus, which is where the behaviours come from. Any path
+works, so `node src/replay.ts ../some-app` scores a checkout that is not in this
+repository.
+
+`npm test` and `node src/docs.ts --check` run the same way, with nothing
+installed.
+
 ## The finding this exists to carry
 
 **On the free tier, every request that reaches the planner consumes one call from
@@ -62,7 +95,7 @@ coverage the probe stops being refused and rings that number for real.
 
 ## The corpus
 
-`fixtures/` holds ten real production responses, rewritten for publication. Seven
+`fixtures/` holds eleven real production responses, rewritten for publication. Seven
 behaviours a caller would not predict from the documented shape are declared in
 `src/quirks.ts` as executable predicates rather than prose, so one definition
 labels the corpus, verifies the rewriting, and scores third-party code.
@@ -78,31 +111,13 @@ so a behaviour cannot be documented without a predicate that decides it.
 
 ## The checker
 
-```bash
-npm install
-npm run replay -- ../../..
-```
-
-No API key. No network. Nothing is dialled. It reads the JSON fixtures a project
+The command is at the top of this file. It reads the JSON fixtures a project
 tests against, normalises the REST `snake_case` and SDK `camelCase` spellings, and
-reports which real behaviours those fixtures never contain.
+reports which real behaviours those fixtures never contain. Several paths can be
+scored at once, and `label=path` renames a row.
 
-Run from this directory against the repository root it produces:
-
-```
-project                            n    1  2  3  4  5  6  7
----------------------------------  --  -- -- -- -- -- -- --
-apps/python/casechaser              7   .  .  .  .  .  .  x
-apps/python/redline                 1   .  .  .  .  .  .  x
-apps/python/ringdown                2   .  .  .  .  x  .  x
-apps/typescript/calle-conformance  10   x  x  x  x  x  x  x
-plugins/zapier-calle                3   .  .  .  .  .  .  x
-skills/verify-by-phone              1   .  .  .  .  .  .  .
-```
-
-Its own row is the corpus. Any path works, so
-`npm run replay -- ../some-app another=../other-app` scores a checkout that is not
-in this repository.
+It skips `probe-results/`, which holds the unmasked captures. A corpus that scores
+its own private inputs is measuring nothing.
 
 ## What this does not prove
 
@@ -117,7 +132,7 @@ Files that carry transcript turns in a shape the checker cannot read are listed
 rather than counted as empty, because silently dropping a payload is the failure
 this corpus exists to expose.
 
-The corpus is ten responses from one account in one region. It is a floor, not a
+The corpus is eleven responses from one account in one region. It is a floor, not a
 specification.
 
 ## What it found
@@ -170,13 +185,13 @@ Each entry names the measurement that produced it.
 ## Running everything
 
 ```bash
-npm install
 npm test
-npm run replay -- ../../..
-npm run docs:check
+node src/replay.ts ../../..
+node src/docs.ts --check
 ```
 
-`npm test` is eight tests and touches no network. It includes leak tests that fail
+`npm install` is needed only for `npm run typecheck` and for the probes that
+contact the API. `npm test` is eight tests and touches no network. It includes leak tests that fail
 if a real phone number or an identifier from the private captures reaches
 `fixtures/`, verified by injecting one. Every number in the corpus is drawn from
 ranges reserved for documentation.

@@ -6,7 +6,7 @@
  * pretending the reading was free. See README, "How it was measured".
  */
 import { CalleClient } from "@call-e/calle";
-import { unsupportedDestination } from "./unsupported-destination.js";
+import { unsupportedDestination } from "./unsupported-destination.ts";
 
 const destination = unsupportedDestination();
 const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY ?? "" });
