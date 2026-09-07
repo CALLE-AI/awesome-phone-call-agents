@@ -480,6 +480,14 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
 # need an artifact that is deliberately not in the repository, so they cannot be made to run
 # on a clean checkout without committing the thing the privacy rules keep out.
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # The cost band's one check that reads the built page rather than the builder. It goes
+    # quiet on a checkout with nothing built, which is the same condition every other
+    # page-reading gate here skips on. The eight beside it in that file need no page and
+    # hold the arithmetic, so what is lost while it is quiet is only the claim that the
+    # band is rendered rather than merely computed.
+    "test_the_band_reaches_the_page_rather_than_only_the_test":
+        "skips when out/index.html has not been built, and it is the check that the cost "
+        "band is on the page at all rather than only in the function that makes it",
     # This one skips on a clean checkout today.
     "test_every_real_result_the_readme_promises_is_on_the_page":
         "reads out/index.html, which is built from receipts held outside this repository. "

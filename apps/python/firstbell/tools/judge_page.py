@@ -949,6 +949,155 @@ def _row_facts(item: dict, escalated: bool, tried: int) -> str:
     return " &middot; ".join(parts)
 
 
+def _figures() -> dict:
+    """The register, keyed by id. Every sourced number on this page comes from here.
+
+    `evidence/statistics.json` holds each externally sourced figure with its publisher,
+    its URL, the sentence it came from and the date it was read at source. Reading it at
+    build time rather than typing the numbers means the page cannot drift from the record
+    that `tests/test_claims.py` polices, and it means a corrected figure reaches the
+    deployment on the next build. One of them was corrected today: the enrolment below was
+    cited to a page that serves a different district.
+    """
+    record = json.loads((APP / "evidence" / "statistics.json").read_text(encoding="utf-8"))
+    return {f["id"]: f for f in record["figures"]}
+
+
+def money_facts(run: dict) -> dict:
+    """What this run costs and what it sits beside, computed rather than asserted.
+
+    A district administrator reading this page as a buyer found the gap and measured it:
+    the first cost figure on the page was at 77% of its depth, inside a terminal dump, and
+    the strings for a price appeared nowhere at all. Meanwhile the foot of the page cited
+    four figures about school budgets as sources for claims the page never made, which
+    reads like a citation list left behind after the paragraph was cut.
+
+    So the numbers are here, and the rule for them is the rule for everything else on this
+    page: the sourced ones come out of the register with their publishers, and the derived
+    ones are computed off the receipt by the same arithmetic the program prints, never
+    typed. `tests/test_money_block.py` fails if any of them is written by hand.
+    """
+    if str(APP) not in sys.path:
+        sys.path.insert(0, str(APP))
+    from dispatch.models import Escalation
+    from firstbell.domain import StaffCost, safeguarding_escalation
+
+    desk = StaffCost.us_school_office()
+    lead = StaffCost.us_school_safeguarding_lead()
+    figures = _figures()
+
+    def number(key: str) -> float:
+        return float(figures[key]["value"].replace(",", ""))
+
+    items = run.get("items") or []
+    placed = run.get("calls_placed") or 0
+    escalating = {
+        item.get("id") for item in items
+        if (item.get("structured_result") or {})
+        and safeguarding_escalation(item["structured_result"]) is not Escalation.NONE
+    }
+    closed = [item for item in items
+              if item.get("resolution") == "resolved" and item.get("id") not in escalating]
+    answered = [item for item in items
+                if item.get("resolution") in ("resolved", "undetermined")]
+    net_new = [item for item in items
+               if item.get("resolution") == "resolved" and item.get("id") in escalating]
+    removed = sum(item.get("attempts", 0) for item in closed)
+
+    # Per call, per minute that one manual attempt takes. Same ratio the program prints:
+    # every attempt billed, only the ones behind a closed record credited.
+    ceiling = (removed / placed) * (desk.hourly / 60.0) if placed else None
+    rate = (len(net_new) / len(answered)) if answered else None
+    added = None if rate is None else rate * (lead.hourly / 60.0)
+    # The bound, because a count of zero on seven calls is not a rate of zero. Same
+    # Clopper-Pearson the replay tool publishes, imported rather than reimplemented.
+    sys.path.insert(0, str(APP / "tools"))
+    from replay_escalation import upper_bound
+    bound = upper_bound(len(net_new), len(answered)) if answered else None
+    worst = None if (bound is None or ceiling is None) else (
+        ceiling * 3 - bound * (lead.hourly / 60.0) * 3)
+
+    return {
+        "sis": figures["chccs-sis-renewal"],
+        "enrolment": figures["chccs-enrolment"],
+        "per_student": number("chccs-sis-renewal") / number("chccs-enrolment"),
+        "allotment": figures["texas-basic-allotment"],
+        "per_absence": number("texas-basic-allotment") / 175,
+        "districts": figures["us-regular-districts"],
+        "schools": figures["us-public-schools"],
+        "placed": placed,
+        "removed": removed,
+        "ceiling_at_three": None if ceiling is None else ceiling * 3,
+        "net_new": len(net_new),
+        "answered": len(answered),
+        "added_at_three": None if added is None else added * 3,
+        "bound": bound,
+        "worst_at_three": worst,
+        "desk": desk,
+        "lead": lead,
+    }
+
+
+def money_markup(run: dict) -> str:
+    """Three numbers a district recognises, and the two nobody has."""
+    f = money_facts(run)
+    if f["ceiling_at_three"] is None:
+        return ""
+
+    def cite(figure: dict) -> str:
+        return (f'<a class=money-src href="{esc(figure["url"])}">'
+                f'{esc(figure["publisher"].split(",")[0])}</a>')
+
+    return "".join([
+        '<div class=money>',
+        '<div class=money-row>',
+
+        '<div class=money-cell>',
+        f'<p class=money-n>${f["sis"]["value"]}</p>',
+        '<p class=money-what>a year, for the system this would sit beside</p>',
+        f'<p class=money-why>One named district&#8217;s student records bundle, on its own '
+        f'board record, for {esc(f["enrolment"]["value"])} students. '
+        f'<b>${f["per_student"]:,.2f} a student a year.</b> One price on the record, not a '
+        f'market average. {cite(f["sis"])}</p>',
+        '</div>',
+
+        '<div class=money-cell>',
+        f'<p class=money-n>${f["per_absence"]:,.2f}</p>',
+        '<p class=money-what>one student, one day, where funding follows attendance</p>',
+        f'<p class=money-why>Texas funds ${f["allotment"]["value"]} per student in average '
+        'daily attendance, over a 175-day year. Seven states funded on attendance as of '
+        '2022. Explaining an absence does not make a student present, so this run claims '
+        f'none of it. {cite(f["allotment"])}</p>',
+        '</div>',
+
+        '<div class=money-cell>',
+        f'<p class=money-n>${f["ceiling_at_three"]:,.2f}</p>',
+        '<p class=money-what>a call, above which a person is cheaper</p>',
+        f'<p class=money-why>Not a saving: CALL-E publishes no price, so this is the '
+        f'ceiling. {f["removed"]} of {f["placed"]} attempts came off a desk at '
+        f'${f["desk"].hourly:,.2f} an hour, at three minutes an attempt. '
+        f'{f["net_new"]} of {f["answered"]} answered calls became new work for the '
+        f'safeguarding lead, so nothing is subtracted here. '
+        f'{f["answered"]} calls cannot rule out {100 * f["bound"]:.0f} per 100, and at '
+        + (f'that end the ceiling is <b>${f["worst_at_three"]:,.2f}</b>.</p>'
+           if f["worst_at_three"] > 0 else
+           'that end the callbacks cost more than the calls save. Which end it is, is '
+           'what a pilot measures in week one.</p>'),
+        '</div>',
+        '</div>',
+
+        '<p class=money-foot>The two numbers nobody has. CALL-E does not publish a price '
+        'per call, so no saving is claimed anywhere on this page. And how many unanswered '
+        'notifications a district handles in a morning is a number a school office has and '
+        'we do not, which is why every figure here is per call rather than per year. '
+        f'For scale only: the United States has {esc(f["districts"]["value"])} regular '
+        f'school districts and {esc(f["schools"]["value"])} public schools '
+        f'({cite(f["districts"])}). That is the size of the problem, not a claim about '
+        'adoption.</p>',
+        '</div>',
+    ])
+
+
 def queue_markup(run: dict) -> str:
     """The screen a school office opens on Monday, built from a receipt that already exists.
 
@@ -1284,11 +1433,19 @@ def path_markup() -> str:
          "Two conversations of different lengths, and the three fields underneath them."),
         ("act-03", "Three endings, not two",
          "What this software does with a call it could not get an answer to."),
+        # Added because a district administrator reading this page as a buyer could not
+        # find a cost on it. Three destinations were the whole point of this list and a
+        # fourth is a real cost to it, so the lead says which reader the fourth is for
+        # rather than pretending they are all the same reader.
+        ("act-04", "What it costs, and against what",
+         "For a buyer: the price above which a person is cheaper, beside what a district "
+         "already pays for the system this sits next to."),
     ]
     out = ['<div class=path>',
            '<p class=path-k>The two-minute path</p>',
-           '<p class=path-lead>Three things, in the order they answer the question. '
-           'Everything else here is the evidence behind them.</p>',
+           '<p class=path-lead>Three things, in the order they answer the question, and '
+           'a fourth if you are the person who has to pay for it. Everything else here is '
+           'the evidence behind them.</p>',
            '<ol class=path-steps>']
     for i, (anchor, title, why) in enumerate(steps, 1):
         out.append(f'<li><span class=path-n>{i:02d}</span>'
@@ -1680,7 +1837,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         body.append(f'<tr><td class=mono>{esc(mask_id(call_id))}</td><td>{pv}</td>'
                     f'{cells}'
                     f'<td><span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
-    body.append('</tbody></table></div></div></div>')
+    body.append('</tbody></table></div></div>')
+    body.append(money_markup(run))
+    body.append('</div>')
     add(act("04", "Check us against your billing", "".join(body)))
 
     # ---- Act 5: mutations

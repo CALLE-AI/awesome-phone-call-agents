@@ -1738,6 +1738,34 @@ button[data-copy][data-copied]::after {
 /* Whatever this receipt could not tell the page, said once above the rows rather than
  * repeated on each of them. Same measure and same ink as the shared-reason band, because
  * they are the same kind of sentence: something true of the whole queue. */
+/* The three numbers a district recognises. Set as one band rather than three cards,
+ * because a card grid at this width reads as a pricing page and this is not one: nothing
+ * here is a price. The figure leads, the label says what it is a figure of, and the
+ * provenance sits under both, which is the same order every other number on this page is
+ * set in. */
+.money { border: 1px solid var(--line); border-radius: 2px; margin: var(--space-3) 0 0; }
+.money-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.money-cell { padding: 1.05rem 1.15rem; border-left: 1px solid var(--line); }
+.money-cell:first-child { border-left: 0; }
+.money-n {
+  margin: 0; font-family: var(--display); font-size: var(--size-7);
+  line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.money-what {
+  margin: 0.35rem 0 0; font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-2); text-wrap: pretty;
+}
+.money-why {
+  margin: 0.6rem 0 0; font-size: var(--size-2); color: var(--ink-3);
+  max-width: 42ch; text-wrap: pretty;
+}
+.money-why b { font-weight: 400; color: var(--ink); }
+.money-src { color: var(--ink-3); }
+.money-foot {
+  margin: 0; padding: 0.85rem 1.15rem; border-top: 1px solid var(--line);
+  background: var(--paper); font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-3); max-width: none; text-wrap: pretty;
+}
 .queue-clockless {
   margin: 0; padding: 0.7rem 1.15rem;
   border-bottom: 1px solid var(--line);
@@ -1751,6 +1779,11 @@ button[data-copy][data-copied]::after {
   max-width: none;
 }
 @media (max-width: 46rem) {
+  /* Three columns at 390px gives each figure eight characters of width, so they stack.
+   * The rule moves to the top border of each cell for the same reason. */
+  .money-row { grid-template-columns: minmax(0, 1fr); }
+  .money-cell { border-left: 0; border-top: 1px solid var(--line); }
+  .money-cell:first-child { border-top: 0; }
   .queue-row { grid-template-columns: minmax(0, 1fr) 8rem; row-gap: 0.4rem; }
   .q-when { grid-column: 1 / -1; }
   .q-tried { text-align: left; grid-column: 1 / -1; }
