@@ -62,10 +62,24 @@ def distinct_items(receipts_dir: Path) -> list[dict]:
 
 
 def counts(receipts_dir: Path) -> dict:
+    """The counts under today's code, and the two the receipts recorded.
+
+    Re-filed, because a money figure is a claim about the software a district would be
+    buying and not about the version that placed the calls. The difference is one call:
+    `04-defect-a-refusal-scored-resolved.json` records this app reading a schema-valid
+    result whose every required field said "unknown" and writing `resolved`. That receipt
+    is committed uncorrected on purpose. Counting its `resolved` into a ceiling would
+    price a defect that has been fixed.
+
+    Both are written down. A reader who runs `tools/replay_escalation.py` gets the re-filed
+    number and a reader who opens a receipt gets the recorded one, and a file that carried
+    only one of them would leave them to discover the gap.
+    """
     from money_across_runs import _counts_from_items
 
     items = distinct_items(receipts_dir)
-    billed, removed, answered, net_new, escalated = _counts_from_items(items)
+    billed, removed, answered, net_new, escalated = _counts_from_items(items, refile=True)
+    _, was_removed, _, was_net_new, _ = _counts_from_items(items)
     return {
         "calls": len(items),
         "attempts_billed": billed,
@@ -76,6 +90,8 @@ def counts(receipts_dir: Path) -> dict:
         # A district asked for the figure that holds if our reading of "would have closed
         # on its own" is wrong every time, and it cannot be computed without this count.
         "escalated": escalated,
+        "attempts_removed_as_recorded": was_removed,
+        "net_new_escalations_as_recorded": was_net_new,
     }
 
 
@@ -95,6 +111,13 @@ def document(receipts_dir: Path, read_at: str) -> dict:
         "de_duplicated_by": (
             "call id, discarded before writing. Two receipts record the same two calls, "
             "because one of them is the replay that placed none."),
+        "filed_under": (
+            "today's code, by tools/replay_escalation.py, and not by the resolution each "
+            "receipt recorded. One call differs: S-3004 was written resolved by a version "
+            "of this app that read a schema-valid result with every required field set to "
+            "unknown and closed the record. Today it files as undetermined. The recorded "
+            "numbers are kept beside the re-filed ones because that receipt is committed "
+            "uncorrected and the difference between the two is the defect."),
         "placed_on": "2026-09-04",
         "read_at": read_at,
         "regenerate_with": "python tools/pool_recorded_calls.py --receipts DIR",

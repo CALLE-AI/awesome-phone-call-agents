@@ -230,7 +230,7 @@ the demo                         6      8       4   $0.59   $0.23   $0.35     50
 with consent records             3      3       2   $0.78   $0.62   $0.16     42.0%
 siblings on one number           1      1       0   $0.00   $0.00   $0.00      0.0%
 -----------------------------------------------------------------------------------
-all recorded calls              12     12       6   $0.59   $0.16   $0.43     34.3%
+all recorded calls              12     12       6   $0.59   $0.00   $0.59     34.3%
 ```
 
 Two kinds of row there, and the difference is worth more than any figure in the table.
@@ -246,18 +246,30 @@ called the numerator measured, and they were right to.
 The last row is the twelve calls that rang. Nobody chose that numerator, and it is the row
 to argue with:
 
-- Eleven of the twelve were answered, one became new work for the safeguarding lead, and
-  the net ceiling is **$0.43 a call**, higher than the demo run this entry leads with.
-- Eleven answered calls cannot rule out 36.4 net-new escalations per 100. The crossover is
-  34.3. **The bound is past the crossover**, so at that end of it the software costs a
-  district about four cents a call rather than saving forty-three.
-- Which end it is, is what a pilot measures in week one, and nothing here settles it.
-- The safeguarding rule marked five of those eleven answered calls. Only one counts as new
-  work, because the other four connected and gave nothing usable, so a person was ringing
-  those families back whatever software placed the call and the rule added the grade rather
-  than the callback. That reading is ours. Price all five as callbacks and the ceiling is a
-  **cost of $0.19 a call**. It over-counts on purpose, and it is the number to hold this
-  entry to.
+- Eleven of the twelve were answered, none of them became new work for the safeguarding
+  lead, and the net ceiling is **$0.59 a call**, higher than the demo run this entry leads
+  with.
+- Eleven answered calls cannot rule out 24 net-new escalations per 100, and the crossover is
+  34, so the bound sits inside it with about ten per hundred to spare. Even at the far end
+  the ceiling is $0.18 and the saving holds. A district running a higher alert rate, or
+  closing fewer records than this, walks into the loss, which is why the figure is printed
+  rather than waited for.
+- Those counts are re-filed under today's code rather than read off each receipt, and one
+  call differs. S-3004 is the call this entry is proudest of publishing: a parent said they
+  were at work and could not talk, CALL-E returned a schema-valid result with every required
+  field set to `unknown`, and this app wrote `resolved` and closed a record about a child
+  nobody had heard anything about. The receipt is committed uncorrected. Today that result
+  files as `undetermined`, so it is not a closed record and not a net-new escalation, and a
+  ceiling computed from the recorded word would price a defect that has been fixed. Both
+  numbers are in [`evidence/recorded-calls.json`](evidence/recorded-calls.json) and
+  `python tools/replay_escalation.py --receipts DIR` re-files every call in front of you.
+- The safeguarding rule marked five of those eleven answered calls and none of the five
+  counts as new work, because every one connected and gave nothing usable, so a person was
+  ringing those families back whatever software placed the call. What the rule added there
+  is the grade of the person who rings and a thirty-minute clock, not the ringing. That
+  reading is ours, so here is the figure that holds if it is wrong in all five cases: price
+  every marked call as a callback and the ceiling becomes a **cost of $0.19 a call**. It
+  over-counts on purpose, and it is the number to hold this entry to.
 
 The entry leads with the smaller of the two figures because the demo run is the one anybody
 can reproduce, and the larger one is printed beside it so that choice is visible rather than

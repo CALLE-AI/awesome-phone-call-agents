@@ -133,12 +133,29 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
     }
 
 
-def _counts_from_items(items: list[dict]) -> tuple[int, int, int, int, int]:
+def _counts_from_items(items: list[dict], *,
+                       refile: bool = False) -> tuple[int, int, int, int, int]:
     """Attempts billed, attempts removed, answered calls, net-new escalations, escalated.
 
-    Read the same way `firstbell/domain.py` reads them, off the structured result rather
-    than off a summary field, because a summary field is a claim and the result is the
-    evidence.
+    Read off the structured result rather than off a summary field, the same way
+    `firstbell/domain.py` reads them, because a summary field is a claim and the result is
+    the evidence.
+
+    `refile` decides which question is being asked, and the two have different answers on
+    the calls this project has actually placed.
+
+    False asks what the run did. That is what a receipt is: `resolution` is the word the
+    software wrote at the time, and `04-defect-a-refusal-scored-resolved.json` is committed
+    precisely because the word it wrote was wrong. A parent said they were at work and
+    could not talk, CALL-E returned a schema-valid result with every required field
+    "unknown", and this app wrote `resolved` and closed a record about a child nobody had
+    heard anything about.
+
+    True asks what today's code would do, which is the question any money figure is
+    really asking. `tools/replay_escalation.py` owns that rule and this calls it rather
+    than restating it: schema problems and a result that learned nothing are both
+    `undetermined`, so S-3004 stops being a closed record and stops being a net-new
+    escalation with it. One of these two numbers describes software that no longer exists.
     """
     from dispatch.models import Escalation
     from firstbell.domain import safeguarding_escalation
@@ -148,15 +165,27 @@ def _counts_from_items(items: list[dict]) -> tuple[int, int, int, int, int]:
         if (item.get("structured_result") or {})
         and safeguarding_escalation(item["structured_result"]) is not Escalation.NONE
     }
+
+    def closed(item: dict) -> bool:
+        """Whether this row is a record the run is entitled to have closed."""
+        if not refile:
+            return item.get("resolution") == "resolved"
+        result = item.get("structured_result")
+        if not isinstance(result, dict):
+            return False
+        from replay_escalation import file_today
+        return file_today(result, with_escalation=False) == "closed"
+
+    def answered_row(item: dict) -> bool:
+        """Whether somebody picked up, which no re-filing can change."""
+        return item.get("resolution") in ("resolved", "undetermined")
+
     billed = sum(item.get("attempts", item.get("attempts_made", 0)) for item in items)
     removed = sum(item.get("attempts", item.get("attempts_made", 0)) for item in items
-                  if item.get("resolution") == "resolved"
-                  and item.get("id") not in escalating)
-    answered = sum(1 for item in items
-                   if item.get("resolution") in ("resolved", "undetermined"))
+                  if closed(item) and item.get("id") not in escalating)
+    answered = sum(1 for item in items if answered_row(item))
     net_new = sum(1 for item in items
-                  if item.get("resolution") == "resolved"
-                  and item.get("id") in escalating)
+                  if closed(item) and item.get("id") in escalating)
     return billed, removed, answered, net_new, len(escalating)
 
 
@@ -265,7 +294,9 @@ def pooled_live_row() -> dict | None:
                           held["answered"], held["net_new_escalations"],
                           calls=held["calls"], escalated=held.get("escalated"))
     figures.update(run="all recorded calls", source="evidence/recorded-calls.json",
-                   live=True, pooled=True)
+                   live=True, pooled=True,
+                   net_new_as_recorded=held.get("net_new_escalations_as_recorded"),
+                   removed_as_recorded=held.get("attempts_removed_as_recorded"))
     return figures
 
 
@@ -337,41 +368,57 @@ def table(data: list[dict]) -> str:
         # The disclosure the whole table is for. A bound that crosses the crossover means
         # the software might cost a district money, and the number is four cents.
         worst = pooled["worst_case_ceiling"]
+        bound = 100 * pooled["net_new_bound"]
+        crossover = pooled["crossover_per_100"]
         lines += [
             f"{pooled['answered']} of them were answered and {pooled['net_new']} became "
             f"new work for the safeguarding lead: a rate of",
-            f"{100 * pooled['net_new'] / pooled['answered']:.1f} per 100. "
-            f"{pooled['answered']} answered calls cannot rule out "
-            f"{100 * pooled['net_new_bound']:.1f} per 100, and the crossover is "
-            f"{pooled['crossover_per_100']:.1f},",
-            "so the bound is past it:",
-            (f"at that end this software costs a district "
-             f"${abs(worst):,.2f} a call instead of saving "
-             f"${pooled['net_ceiling']:,.2f}."
-             if worst is not None and worst < 0 else
-             f"at that end the ceiling is ${worst:,.2f} and the saving holds."),
-            "Which end it is, is what a pilot measures in week one. It is not settled "
-            "here and",
-            "this table will not pretend otherwise.",
+            f"{100 * pooled['net_new'] / pooled['answered']:.0f} per 100. "
+            f"{pooled['answered']} answered calls cannot rule out {bound:.0f} per 100, "
+            f"and the crossover is {crossover:.0f},",
+        ]
+        # Both directions, because this comparison has changed direction once already and
+        # the sentence that asserted it did not move with the number.
+        if bound > crossover:
+            lines += [
+                "so the bound is past the crossover. At that end this software costs a "
+                f"district ${abs(worst or 0):,.2f}",
+                f"a call instead of saving ${pooled['net_ceiling']:,.2f}.",
+            ]
+        else:
+            lines += [
+                f"so the bound is inside the crossover with {crossover - bound:.0f} per "
+                "100 to spare. Even at the far",
+                f"end of it the ceiling is ${worst:,.2f} a call and the saving holds.",
+            ]
+        lines += [
+            "Which end it is, is what a pilot measures in week one, and a district running "
+            "a higher",
+            "alert rate or closing fewer records than this walks into the loss. So it is "
+            "printed.",
         ]
         # The other bound, and the worse one. `added` prices only the escalations this
         # software says it created. A district accepted the reasoning and asked for the
         # figure that holds if the reading is wrong every time, which is the one below.
         every = pooled.get("ceiling_if_every_escalation_is_new")
         if every is not None and (pooled.get("escalated") or 0) > pooled["net_new"]:
+            counted = ("none of them counts as new work"
+                       if not pooled["net_new"] else
+                       f"{pooled['net_new']} of them counts as new work")
             lines += [
                 "",
                 f"The safeguarding rule marked {pooled['escalated']} of those "
-                f"{pooled['answered']} answered calls and only "
-                f"{pooled['net_new']} is counted as new work,",
-                f"because the other {pooled['escalated'] - pooled['net_new']} connected "
-                "and gave nothing usable, so a person was ringing back",
-                "anyway and the rule added the grade rather than the callback. That "
-                "reading is ours.",
-                f"Price all {pooled['escalated']} as callbacks and the ceiling is "
-                + (f"a cost of ${abs(every):,.2f} a call."
-                   if every < 0 else f"${every:,.2f} a call."),
-                "It over-counts on purpose. It is the number to hold this entry to.",
+                f"{pooled['answered']} answered calls, and {counted}:",
+                f"the other {pooled['escalated'] - pooled['net_new']} connected and gave "
+                "nothing usable, so a person was ringing those",
+                "families back whatever placed the call and the rule added the grade "
+                "rather than the",
+                f"callback. That reading is ours. Price all {pooled['escalated']} as "
+                "callbacks and the ceiling is "
+                + (f"a cost of ${abs(every):,.2f}" if every < 0
+                   else f"${every:,.2f}"),
+                "a call. It over-counts on purpose and it is the number to hold this "
+                "entry to.",
             ]
     lines += [
         "",

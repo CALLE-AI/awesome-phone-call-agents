@@ -2,6 +2,7 @@
   "what_this_is": "Counts over every distinct call this software placed against api.heycall-e.com. No conversation, no telephone number, no call id, no field value: the same line evidence/api-shape.json draws, for the same reason, which is that the receipts themselves are not committed and evidence/README.md says why.",
   "why_it_is_here": "It is the only numerator in this entry that nobody chose. Every offline run takes its outcome mix from firstbell/scenario.py, which is what makes those runs reproducible and also means their money figures are a worked example rather than a measurement.",
   "de_duplicated_by": "call id, discarded before writing. Two receipts record the same two calls, because one of them is the replay that placed none.",
+  "filed_under": "today's code, by tools/replay_escalation.py, and not by the resolution each receipt recorded. One call differs: S-3004 was written resolved by a version of this app that read a schema-valid result with every required field set to unknown and closed the record. Today it files as undetermined. The recorded numbers are kept beside the re-filed ones because that receipt is committed uncorrected and the difference between the two is the defect.",
   "placed_on": "2026-09-04",
   "read_at": "2026-09-08",
   "regenerate_with": "python tools/pool_recorded_calls.py --receipts DIR",
@@ -10,7 +11,9 @@
     "attempts_billed": 12,
     "attempts_removed": 6,
     "answered": 11,
-    "net_new_escalations": 1,
-    "escalated": 5
+    "net_new_escalations": 0,
+    "escalated": 5,
+    "attempts_removed_as_recorded": 6,
+    "net_new_escalations_as_recorded": 1
   }
 }
