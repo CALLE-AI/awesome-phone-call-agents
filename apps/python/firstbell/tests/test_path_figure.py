@@ -101,3 +101,56 @@ def test_the_readme_shows_it():
     assert link, (
         "the figure is referenced without substantial alt text. GitHub renders it as an "
         "`<img>`, and the alt attribute is the only thing a screen reader gets there.")
+
+
+def _luminance(value: str) -> float:
+    channels = [int(value[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _ratio(ink: str, ground: str) -> float:
+    high, low = sorted((_luminance(ink), _luminance(ground)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def test_every_word_in_it_clears_wcag_aa_against_the_thing_behind_it():
+    """The ground is found by geometry, not by assumption, and none may go unfound.
+
+    A diagram is the one artifact where a colour pair is easy to lose track of: the ink is
+    set on the text and the ground is set on a rectangle somewhere else in the file, and
+    reversed-out labels on three coloured plates have three different grounds. The page has
+    a gate for exactly this and the README's drawing had none, so this reads the rectangles,
+    finds the smallest one containing each text baseline, and measures that pair.
+
+    `unmeasured` is asserted to be zero as well as the floor. A contrast gate that quietly
+    skips the runs it cannot resolve reports on the runs it happened to understand, which is
+    the shape that put two AA failures behind a PASS on the page.
+    """
+    body = FIGURE.read_text(encoding="utf-8")
+    rects = [(float(x), float(y), float(w), float(h), fill) for x, y, w, h, fill in
+             re.findall(r'<rect x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" '
+                        r'height="([\d.]+)"[^>]*?fill="(#[0-9A-Fa-f]{6})"', body)]
+    texts = [(float(x), float(y), fill) for x, y, fill in
+             re.findall(r'<text x="(-?[\d.]+)" y="(-?[\d.]+)"[^>]*?fill="(#[0-9A-Fa-f]{6})"',
+                        body)]
+    assert len(texts) > 20, f"only {len(texts)} text runs found, so this measured almost nothing"
+    assert rects, "no rectangles found, so nothing could be a ground"
+
+    unmeasured, failures = [], []
+    for x, y, ink in texts:
+        holding = sorted(
+            (r for r in rects if r[0] <= x <= r[0] + r[2] and r[1] <= y <= r[1] + r[3]),
+            key=lambda r: r[2] * r[3])
+        if not holding:
+            unmeasured.append(f"{ink} at {x},{y}")
+            continue
+        ground = holding[0][4]
+        found = _ratio(ink, ground)
+        if found < 4.5:
+            failures.append(f"{ink} on {ground} is {found:.2f}, needs 4.5")
+
+    assert not unmeasured, (
+        "these runs sit over no rectangle, so their contrast was not measured rather than "
+        "measured and passed: " + "; ".join(unmeasured))
+    assert not failures, "; ".join(failures)

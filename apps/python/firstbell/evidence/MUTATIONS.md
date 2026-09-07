@@ -289,6 +289,8 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 180 | Drop the mono fallback chain from the path figure, so a reader without the webfont gets the browser default at a different width | 1 |
 | 181 | Gut the path figure's `desc`, leaving a diagram a screen reader cannot report | 1 |
 | 182 | Hand-edit the committed path figure, so the README shows something its generator does not write | 1 |
+| 183 | Set an ending's second line in the palest ink the palette holds, on its own coloured plate, so a label on the page's own figure drops below WCAG AA | 1 |
+| 184 | Put the escalation panel's dark ink on a mid-grey plate, which is the pairing a drawing loses track of because the ink and the ground are set in two different places in the file | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

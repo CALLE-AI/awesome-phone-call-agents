@@ -35,9 +35,21 @@ through `video_facts.palette()`, the safeguarding window out of
 `firstbell.domain.SAFEGUARDING_CALLBACK_MINUTES`, and
 `test_the_path_figure_is_what_the_generator_writes_today` fails if the committed file is not
 what the script produces now. Every box in it is a branch a reader can find in
-`dispatch/scheduler.py`. It carries text, which the evidence page's own figure is forbidden
-to do, because a README is markdown: there is no HTML to put the labels in and no @font-face
-to load, so each family is declared with the widest fallback chain instead.
+`dispatch/scheduler.py`. Its 31 text runs are measured against the rectangle each one sits
+inside, geometrically rather than by assumption, and the worst clears WCAG AA at 5.96 with
+none unresolved.
+
+It carries text, which the evidence page's own figure is forbidden to do, and the reasons
+that figure gives are worth answering one at a time rather than waved past. There is no
+@font-face inside an SVG served as an image, so every family here is declared with the
+widest fallback chain and the layout was checked against it. A README is markdown, so there
+is no HTML beside the drawing to hold the labels the way the page holds its own. And the
+third reason stands as a real cost: a machine translation tool cannot see a word inside an
+image, so a reader who does not read English gets the drawing and not the labels, on a
+project whose argument is language access. The whole diagram is therefore also written out
+in the `desc` element and in the README's alt text, which is the version a screen reader and
+a translation tool both reach. That is a mitigation and not a fix, and the fix would be
+inlining the SVG in a surface that can hold HTML.
 
 `capture-stills.mjs` is a separate script; it does not modify `run.mjs`. The two code stills
 read the exact bytes of `dispatch/scheduler.py` at the line ranges they show, and the
