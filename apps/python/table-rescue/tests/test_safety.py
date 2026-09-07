@@ -147,6 +147,11 @@ class TestSanitize:
         assert "555" not in masked
         assert masked.endswith("00 twice")
 
+    def test_masks_comma_and_slash_grouped_forms(self):
+        masked = sanitize_text("dialed +1,415,555,0100 then 415/555/0100")
+        assert "961" not in masked
+        assert "567" not in masked
+
     def test_masks_unicode_digit_runs(self):
         masked = sanitize_text("number +８４９００００００００ there")
         assert "８４" not in masked

@@ -41,9 +41,10 @@ def mask_phone(phone: str) -> str:
 
 
 # A phone-like run: optional leading "+", then digits joined by the common
-# grouping separators. Only runs of seven or more digits are masked, so
-# ordinary small numbers (party sizes, times) survive sanitization.
-_PHONE_LIKE_RE = re.compile(r"\+?\d[\d\-.\s()]*")
+# grouping separators (including comma/slash grouping). Only runs of seven
+# or more digits are masked, so ordinary small numbers (party sizes, times)
+# survive sanitization.
+_PHONE_LIKE_RE = re.compile(r"\+?\d[\d\-.\s(),/]*")
 
 
 def sanitize_text(text: str | None) -> str:
