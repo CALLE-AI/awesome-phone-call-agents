@@ -191,8 +191,17 @@ def test_a_run_that_answered_nothing_does_not_kill_the_page_build():
     assert markup, "the band went silent instead of saying what it could not measure"
     assert "and nobody answered, so it says nothing" in markup
     assert "that rate needs an answered call" in markup
-    assert "per 100" not in markup, (
+    assert "cannot rule out" not in markup, (
         "the band states a bound on a run with no answered call to bound"
+    )
+    # This used to assert that "per 100" appeared nowhere, which is a stronger claim than
+    # the one that matters and it stopped being true when the band started naming the
+    # pooled figure over every recorded call. A rate from another run is allowed here; a
+    # rate from this one is not, because this one has no denominator. The narrowing is
+    # written down because loosening an assertion to make a suite green is the move this
+    # project spends its time catching.
+    assert "Across all 12 calls" in markup, (
+        "the pooled figure is the only measured one in the entry and the band dropped it"
     )
     # The other two figures in the cell are not properties of this run and have to survive
     # it: the price came off a billing panel and the headline ceiling off the demo run.

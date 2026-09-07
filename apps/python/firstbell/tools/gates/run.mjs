@@ -1737,6 +1737,13 @@ async function gateLinks(browser, base, slugs) {
  * block and then throws leaves a reader with no evidence at all, which is worse than no
  * console. And a console that animates but drops the rows leaves a demonstration with no
  * outcomes in it, so every tag the program printed has to reach the screen.
+ *
+ * The first of those two used to be waved through. This gate read the idle state, printed
+ * it in the pass line and asserted nothing about it, while the comment beside it said the
+ * empty block was the state "a reader would report as a blank panel". A reader did. The
+ * run block is the only route through this page to the program's own output, and it was
+ * roughly 940 by 350 of nothing in every screenshot until somebody pressed a button. So
+ * the order is now asserted: whole on load, playing when asked, whole again at the end.
  */
 async function gateRunConsole(browser, url) {
   const page = await browser.newPage();
@@ -1802,12 +1809,29 @@ async function gateRunConsole(browser, url) {
     .replace(/&amp;/g, "&");
   const shipped = unescape(block[1]);
 
-  /* Idle first: the console renders nothing until it is asked, so the block is empty on a
-   * page nobody has touched. That is the state a screenshot would catch and a reader would
-   * report as a blank panel, so it is asserted rather than assumed. */
+  /* On load, before anything is clicked: the whole run. This is the state a screenshot
+   * catches and the only state most readers will ever see. */
   const idle = await page.evaluate(() => {
     const out = document.querySelector("[data-run-out]");
-    return { text: out.textContent, state: document.querySelector("[data-run]").dataset.runState };
+    const box = document.querySelector("[data-run]");
+    return {
+      text: out.textContent,
+      state: box.dataset.runState ?? "",
+      skipHidden: Boolean(box.querySelector("[data-run-skip]")?.hidden),
+      playLabel: box.querySelector("[data-run-play]").textContent.trim(),
+    };
+  });
+
+  /* Then the animation, which is the part that is allowed to be optional. Press play,
+   * confirm it actually rewound and is running, then ask for the end. */
+  await page.click("[data-run-play]");
+  const playing = await page.evaluate(() => {
+    const box = document.querySelector("[data-run]");
+    return {
+      state: box.dataset.runState ?? "",
+      skipHidden: Boolean(box.querySelector("[data-run-skip]")?.hidden),
+      lines: box.querySelector("[data-run-out]").textContent.split("\n").length,
+    };
   });
 
   await page.click("[data-run-skip]");
@@ -1842,6 +1866,34 @@ async function gateRunConsole(browser, url) {
   }
 
   const normalise = (t) => t.replace(/\r\n/g, "\n").trimEnd();
+
+  /* The blank-panel check, which this gate used to leave to a reader. */
+  if (idle.state !== "done" || normalise(idle.text) !== normalise(shipped)) {
+    record("the run block", "FAIL",
+      `on load the block is in state "${idle.state}" holding `
+      + `${normalise(idle.text).split("\n").length} line(s) of the `
+      + `${normalise(shipped).split("\n").length} the page shipped. Act 08 is the only `
+      + "route through this page to the program's output and it has to be there before "
+      + "anybody clicks");
+    return;
+  }
+  if (!idle.skipHidden) {
+    record("the run block", "FAIL",
+      "the skip control is offered on a block that has nothing left to skip");
+    return;
+  }
+  if (playing.state !== "playing") {
+    record("the run block", "FAIL",
+      `pressing play left the block in state "${playing.state}", so the replay is gone `
+      + "and the control lies about what it does");
+    return;
+  }
+  if (playing.lines >= normalise(shipped).split("\n").length) {
+    record("the run block", "FAIL",
+      `pressing play did not rewind: ${playing.lines} line(s) are still on screen out of `
+      + `${normalise(shipped).split("\n").length}`);
+    return;
+  }
   if (normalise(done.text) !== normalise(shipped)) {
     const a = normalise(shipped), b = normalise(done.text);
     let at = 0;
@@ -1871,11 +1923,12 @@ async function gateRunConsole(browser, url) {
   }
 
   record("the run block", "PASS",
-    `${tags.length} outcome row(s) and ${normalise(shipped).split("\n").length} line(s) `
-    + `played and match the built page byte for byte. Idle state "${idle.state}" with the `
-    + `control reading "${found.playLabel}", finished state "${done.state}" reading `
-    + `"${done.playLabel}", and ${done.legendRows} legend row(s) built from the tags the `
-    + "run actually used. The page threw nothing",
+    `${tags.length} outcome row(s) and ${normalise(shipped).split("\n").length} line(s), `
+    + `whole on load with the control reading "${idle.playLabel}", rewound to `
+    + `${playing.lines} line(s) on play, and back to "${done.state}" reading `
+    + `"${done.playLabel}" byte for byte against the built page. `
+    + `${done.legendRows} legend row(s) built from the tags the run actually used. `
+    + "The page threw nothing",
     { lines: normalise(shipped).split("\n").length, tags: tags.length });
 }
 

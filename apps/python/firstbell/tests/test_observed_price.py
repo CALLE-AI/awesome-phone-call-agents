@@ -102,6 +102,96 @@ def test_the_readme_ceiling_table_is_what_the_tool_prints_now():
             f"the tool prints {line.rstrip()!r} and the README does not")
 
 
+def test_the_pooled_row_is_in_the_table_and_in_the_readme():
+    """The one row whose outcome mix nobody wrote down, on both surfaces.
+
+    Every other row in this table runs against a test double whose outcomes are bound in
+    `firstbell/scenario.py`, so the numerator of the figure this entry leads with was
+    chosen. A district buyer found that by reading the two files together. The answer is
+    the pooled row, and the answer is worth nothing if it can quietly stop being printed.
+    """
+    printed = table(rows(None)).splitlines()
+    pooled = next((row for row in rows(None) if row.get("pooled")), None)
+    assert pooled is not None, (
+        "the table no longer pools the recorded calls, which leaves every published "
+        "money figure resting on an outcome mix somebody chose")
+    line = next((l for l in printed if l.startswith("all recorded calls")), None)
+    assert line is not None, "the pooled row is computed and not printed"
+    assert line.rstrip() in README, (
+        f"the README does not carry the pooled row the tool prints:\n{line.rstrip()!r}")
+    assert f"${pooled['net_ceiling']:,.2f} a call" in README, (
+        "the README does not name the pooled net ceiling")
+
+
+def test_the_pooled_row_counts_each_recorded_call_once():
+    """Twelve calls, not fourteen, and the difference is a receipt that placed none.
+
+    `02-idempotent-replay-no-calls` records the same two call ids as `01`, because the
+    point of that receipt is that running the same work file twice dials nobody. A pooled
+    figure that summed the receipts would count those two twice, which is the class of
+    arithmetic this whole tool exists to stop, so it would be a defect in the fix for a
+    defect.
+    """
+    counts = json.loads(
+        (APP / "evidence" / "recorded-calls.json").read_text(encoding="utf-8"))["counts"]
+    assert counts["calls"] == 12, (
+        f"the entry says twelve real calls everywhere and this says {counts['calls']}")
+    assert counts["answered"] <= counts["calls"], (
+        "more calls were answered than were placed, which cannot happen")
+    assert counts["attempts_removed"] <= counts["attempts_billed"], (
+        "more attempts were removed than were billed, which cannot happen")
+    assert counts["net_new_escalations"] <= counts["answered"], (
+        "a call that nobody answered cannot have become new work")
+
+
+def test_the_committed_counts_are_the_ones_the_money_table_divides():
+    """One file, and everything that quotes it checked against it.
+
+    The receipts are not in this repository and `evidence/README.md` says why, so the
+    pooled row is computed from counts written into `evidence/`. If the tool ever grows a
+    second copy of those five integers, this is where it shows up.
+    """
+    from money_across_runs import figures_for, recorded_counts
+
+    held = recorded_counts()
+    assert held is not None, "evidence/recorded-calls.json is missing"
+    expected = figures_for(held["attempts_billed"], held["attempts_removed"],
+                           held["answered"], held["net_new_escalations"],
+                           calls=held["calls"])
+    pooled = next(row for row in rows(None) if row.get("pooled"))
+    for key in ("gross_ceiling", "added", "net_ceiling", "crossover_per_100",
+                "net_new_bound", "worst_case_ceiling"):
+        assert pooled[key] == expected[key], (
+            f"the pooled row's {key} is not what the committed counts give")
+
+
+def test_the_bound_past_the_crossover_is_published_rather_than_rounded_away():
+    """The worst case on the recorded calls is negative, and the entry says so.
+
+    This is the disclosure a buyer asked for and the one a vendor deck leaves out: on
+    eleven answered calls the one-sided bound on the net-new rate sits above the rate at
+    which the callbacks cost more than the attempts removed. A future run with more calls
+    may move it, and if it does this test says which sentence to rewrite rather than
+    letting the old one stand.
+    """
+    pooled = next(row for row in rows(None) if row.get("pooled"))
+    bound = 100 * pooled["net_new_bound"]
+    crossover = pooled["crossover_per_100"]
+    printed = table(rows(None))
+    if bound > crossover:
+        assert pooled["worst_case_ceiling"] < 0, (
+            "the bound is past the crossover, so the worst case has to be a loss")
+        assert "so the bound is past it" in printed, (
+            "the tool no longer says the bound is past the crossover")
+        assert "The bound is past the crossover" in README, (
+            "the README no longer discloses that the bound is past the crossover")
+    else:
+        assert pooled["worst_case_ceiling"] >= 0, (
+            "the bound is inside the crossover, so the worst case cannot be a loss")
+        assert "The bound is past the crossover" not in README, (
+            "the README still says the bound is past the crossover and it is not")
+
+
 def test_the_entry_leads_with_one_number_and_it_is_the_net_one():
     """`net`, not `gross`. The larger number is the one that ignores the added work.
 

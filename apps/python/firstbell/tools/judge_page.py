@@ -338,6 +338,17 @@ def commit_turns(call: dict, fields: list[str]) -> list[int]:
     return out
 
 
+def _recorded_call_total() -> int:
+    """How many calls this software has placed against the production API, from one file.
+
+    Typed into the first screen, it was four, because four is how many rows the register
+    shows and nobody noticed that the sentence had gone on to claim a total. Every other
+    surface reads `evidence/recorded-calls.json`, so this one does too.
+    """
+    return json.loads(
+        (EVIDENCE / "recorded-calls.json").read_text(encoding="utf-8"))["counts"]["calls"]
+
+
 def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> str:
     """The register: one row per call, one column per field, and one row still running.
 
@@ -568,8 +579,14 @@ def endings_markup(data: dict, cid: str, run: dict) -> str:
     out.append('</ol>')
 
     out.append('<div class=tally>')
+    # A call that connected and gave nothing usable is neither of the two words a vendor
+    # deck uses. It answered, and it did not close. Act 04 prices escalations per answered
+    # call, so this line has to say which number that is.
+    answered = counts["resolved"] + counts["undetermined"]
     out.append(f'<p class=tally-head>One committed run. {placed} calls placed, '
-               f'{resolved} answered.</p>')
+               f'{answered} answered, {resolved} closed with a usable reason. '
+               f'A call that connected and produced nothing usable is the difference, '
+               f'and it is not coverage.</p>')
     out.append('<div class=bar role=img aria-label="'
                + esc(", ".join(f'{counts[k]} {k}' for k in order if counts[k]))
                + f' of {placed} calls">')
@@ -1022,9 +1039,15 @@ def money_facts(run: dict) -> dict:
     # answered call and it was taken off a saving that is per billed attempt. One module,
     # four integers, and the bound comes back with them.
     sys.path.insert(0, str(APP / "tools"))
-    from money_across_runs import demo_row, figures_for, observed
+    from money_across_runs import demo_row, figures_for, observed, pooled_live_row
 
-    receipt = figures_for(placed, removed, len(answered), len(net_new), calls=placed)
+    receipt = figures_for(placed, removed, len(answered), len(net_new), calls=placed,
+                          escalated=len(escalating))
+    # Every call this software has placed against the production API, from the counts in
+    # `evidence/recorded-calls.json`. The band used to argue from whichever single receipt
+    # the page was pointed at, which is seven calls, while the rest of the entry says
+    # twelve. It is also the only numerator in the entry nobody chose.
+    pooled = pooled_live_row()
 
     return {
         "price": observed()["observed"],
@@ -1047,6 +1070,10 @@ def money_facts(run: dict) -> dict:
         "added_at_three": receipt["added"],
         "net_at_three": receipt["net_ceiling"],
         "bound": receipt["net_new_bound"],
+        "pooled": pooled,
+        # Where the saving stops. A bound with nothing to compare it against is a number
+        # a reader cannot use, and this page published one for a fortnight.
+        "crossover": receipt["crossover_per_100"],
         "worst_at_three": receipt["worst_case_ceiling"],
         "desk": desk,
         "lead": lead,
@@ -1098,10 +1125,15 @@ def money_markup(run: dict) -> str:
         #
         # It is the defect this project spends its time hunting, in its own page builder:
         # a quantity that cannot be measured, handled as though it always can be.
+        # Ten rows were read and thirteen is what the total divides into. The card
+        # printed the thirteen as though it had been counted, which is an inference
+        # dressed as an observation on the surface a judge reads first.
         f'<p class=money-why>CALL-E publishes no price, so the left figure is what it '
-        f'billed this account: {f["price"]["billed_events"]} events at '
-        f'${f["price"]["per_call_usd"]:,.2f}, ${f["price"]["period_total_usd"]:,.2f} over '
-        f'one month. The right figure is '
+        f'billed this account: {f["price"]["call_rows_read"]} rows on the usage panel, '
+        f'every one at ${f["price"]["per_call_usd"]:,.2f}, and a period total of '
+        f'${f["price"]["period_total_usd"]:,.2f} over one month that divides by it '
+        f'exactly, so {f["price"]["billed_events"]} events were priced the same. That '
+        f'last number is a division and not a row count. The right figure is '
         f'the demo run: {f["demo"]["attempts_removed"]} of '
         f'{f["demo"]["attempts_billed"]} attempts came off a desk at '
         f'${f["desk"].hourly:,.2f} an hour at three minutes each, less the safeguarding '
@@ -1140,7 +1172,11 @@ def money_markup(run: dict) -> str:
               'person was going there anyway'
               if f["escalated"] > f["net_new"] else '')
            + f'. {f["answered"]} calls cannot rule out '
-           f'{100 * f["bound"]:.0f} per 100. At that end '
+           f'{100 * f["bound"]:.0f} per 100, against a crossover of '
+           f'{f["crossover"]:.1f} per 100: above that rate the callbacks this software '
+           f'creates cost a district more than the attempts it removes, which is the '
+           f'sentence a school board asks for and the one a vendor deck leaves out. '
+           f'At the far end of the bound '
            + (f'the ceiling is ${f["worst_at_three"]:,.2f}. '
               # No None check here, deliberately. `worst_at_three` is None only when the
               # bound or the ceiling is None, the branch above catches the bound and the
@@ -1151,6 +1187,27 @@ def money_markup(run: dict) -> str:
               if f["worst_at_three"] > 0 else
               'the callbacks cost more than the calls save, and which end it is, is what '
               'a pilot measures in week one. '))
+        + (
+            # The pooled figure, and the worst bound on it. A page that publishes a
+            # ceiling and withholds the number that holds if its own classification is
+            # wrong is doing the thing this entry was built to argue against.
+            f'Across all {f["pooled"]["calls"]} calls this software has placed against '
+            f'the production API, the net ceiling is '
+            f'${f["pooled"]["net_ceiling"]:,.2f} and the crossover is '
+            f'{f["pooled"]["crossover_per_100"]:.1f} per 100, with '
+            f'{f["pooled"]["net_new"]} of {f["pooled"]["answered"]} answered calls '
+            f'measured at {100 * f["pooled"]["net_new"] / f["pooled"]["answered"]:.1f}. '
+            f'The safeguarding rule marked {f["pooled"]["escalated"]}, and pricing every '
+            f'one of those as a callback rather than only the ones this software says it '
+            f'created turns that into '
+            + ('a cost of $%.2f a call. That bound over-counts on purpose and it is the '
+               'number to hold this entry to. '
+               % abs(f["pooled"]["ceiling_if_every_escalation_is_new"])
+               if (f["pooled"]["ceiling_if_every_escalation_is_new"] or 0) < 0 else
+               '$%.2f a call. '
+               % (f["pooled"]["ceiling_if_every_escalation_is_new"] or 0))
+            if f["pooled"] and f["pooled"]["net_ceiling"] is not None
+               and f["pooled"]["answered"] else '')
         + '<code>python tools/money_across_runs.py</code> prints every run&#8217;s '
         'figures from one piece of arithmetic. '
         'How many unanswered '
@@ -1741,12 +1798,19 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
         register_markup(data, rows, hero, has_audio),
-        '<p class=hero-foot>Four real calls placed by this software, one row each. CALL-E is '
-        'the voice service that dials the number and holds the conversation; the three '
-        'columns are the three fields it hands back. The recordings are held outside '
-        'this repository; the transcript, the offsets and the shape of the waveform are what '
-        'CALL-E returned. Every call went to the author’s own line, scripted and consented, '
-        'and the pupil names in the transcripts are fictional.</p>',
+        # Four rows, twelve calls, and the page used to say only the first number.
+        # Everything else in the entry says twelve, so the first screen was the one place
+        # a reader could find the two numbers disagreeing.
+        f'<p class=hero-foot>Four of the {len(rows)} rows here, one per call. This '
+        f'software has placed {_recorded_call_total()} calls against CALL-E in total and '
+        'the money on this page is computed over all of them; these four are the ones '
+        'with a transcript on the page. CALL-E is the voice service that dials the '
+        'number and holds the '
+        'conversation; the three columns are the three fields it hands back. The '
+        'recordings are held outside this repository; the transcript, the offsets and the '
+        'shape of the waveform are what CALL-E returned. Every call went to the author’s '
+        'own line, scripted and consented, and the pupil names in the transcripts are '
+        'fictional.</p>',
     ]
     add(act("00", "The call", "".join(body), "hero"))
 
@@ -2084,8 +2148,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         'the offline path exercises the same SDK code as the live one.</p>',
         '<pre>pip install -r requirements-dev.txt\n'
         'python -m firstbell --work-file examples/absences.csv</pre>',
-        '<p class=dim>Produced by running exactly that when this page was built. Press '
-        'Run it to watch the rows land one at a time, or read the whole thing at once.</p>',
+        # The instruction used to name a button that no longer exists, and before that it
+        # was the only thing telling a reader why the block below was empty. The block
+        # ships whole now, so the instruction is about the optional part.
+        '<p class=dim>Produced by running exactly that when this page was built, and it '
+        'is all below. Watch it run to see the rows land one at a time.</p>',
         # The interactive surface, and the evidence, are one element. `console.js` reads
         # this block's own text and decides when each line appears; it never holds a copy.
         # With JavaScript off the whole run is already on the page and the controls do
@@ -2099,7 +2166,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         'All of it</button>'
         '</span>'
         '<span class=dim>&#8202;the real output of the command above, '
-        'played line by line</span>'
+        'verbatim</span>'
         '</div>',
         '<pre class=run data-run-out tabindex=0 role=region aria-live=off '
         'aria-label="What the offline run prints, verbatim. Scrolls sideways on a narrow '

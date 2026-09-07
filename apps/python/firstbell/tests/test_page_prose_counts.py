@@ -36,7 +36,7 @@ def _page() -> str:
 
 
 def test_the_hero_counts_the_calls_the_register_actually_shows():
-    """"Four real calls placed by this software, one row each" is a claim about a table.
+    """"Four of the four rows here, one per call" is a claim about a table.
 
     A fifth receipt arriving makes the register five rows and the sentence under it wrong,
     and nothing in the build would notice. The sentence is checked against the ids the
@@ -49,7 +49,7 @@ def test_the_hero_counts_the_calls_the_register_actually_shows():
     end = page.index("hero-foot", start)
     shown = sorted(set(re.findall(r"S-\d{4}", page[start:end])))
 
-    claim = re.search(r"class=hero-foot>(\w+) real calls placed by this software", page)
+    claim = re.search(r"class=hero-foot>(\w+) of the (\d+) rows here, one per call", page)
     assert claim, (
         "the sentence under the register has been reworded, so this gate is checking "
         "nothing; point it at whatever states the count now"
@@ -60,9 +60,35 @@ def test_the_hero_counts_the_calls_the_register_actually_shows():
         f"the register count is written as {claim.group(1)!r}, which this gate cannot turn "
         "into a number; widen the table rather than leaving the count unchecked"
     )
-    assert WORD[spelled] == len(shown), (
-        f"the page says {claim.group(1)} real calls and the register renders {len(shown)}: "
-        f"{shown}"
+    assert WORD[spelled] == len(shown) == int(claim.group(2)), (
+        f"the page says {claim.group(1)} of {claim.group(2)} rows and the register renders "
+        f"{len(shown)}: {shown}"
+    )
+
+
+def test_the_hero_names_the_same_call_total_as_the_evidence():
+    """The first screen said four and the rest of the entry said twelve.
+
+    Both were true and the page never said so, which is the harder kind of contradiction
+    to find: a reader carrying the first number down nine screens finds the second one and
+    has no way to tell which is the claim. The hero now names the total as well as the
+    rows, and the total is checked against `evidence/recorded-calls.json`, which is where
+    every other surface reads it from.
+    """
+    import json
+
+    page = _page()
+    total = json.loads(
+        (APP / "evidence" / "recorded-calls.json").read_text(encoding="utf-8")
+    )["counts"]["calls"]
+    claim = re.search(r"has placed (\d+) calls against CALL-E in total", page)
+    assert claim, (
+        "the first screen no longer names the total number of calls this software has "
+        "placed, which is the number every other surface uses"
+    )
+    assert int(claim.group(1)) == total, (
+        f"the first screen says {claim.group(1)} calls and the committed counts say "
+        f"{total}"
     )
 
 

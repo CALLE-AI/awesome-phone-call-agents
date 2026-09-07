@@ -71,12 +71,23 @@ that a district would have to be able to defend, and nothing here helps it defen
 **Half closed, and the open half is still the largest one on this page.** The schema half
 is done: [`docs/consent-record.md`](consent-record.md) is the shape of a dated consent
 record, `dispatch/consent.py` enforces it, and a work file can name one per row in a
-`consent_record` column. Seven checks run before a phone rings and every one fails closed:
+`consent_record` column. Eight checks run before a phone rings and every one fails closed:
 the record must be in the register, be for this student, not be withdrawn, not have
-expired, not be dated in the future, cover `voice` rather than text or email, and cover
-`attendance` rather than general contact. A run prints how many rows it dialled on a record
-and how many on a boolean, because a column that says yes is not a record and this page
-will not let that pass quietly.
+expired, not be dated in the future, cover `voice` rather than text or email, cover
+`attendance` rather than general contact, and name every telephone number on the row.
+
+The eighth is the one your counsel will care about most. Under the TCPA prior express
+consent attaches to the number called and not to the person the number belongs to. A row
+carries a fallback chain, this software works down it, and a record that names a pupil says
+nothing about which of two numbers may be dialled, so a row carrying any number the record
+does not name is refused outright rather than refused at the third attempt. A record that
+names no number at all still dials, because every register written before that field
+existed names none, and the run counts and prints those rows instead of passing them
+quietly. `--json` writes one line per call naming the record that authorised it and whether
+that record named the number that rang.
+
+A run also prints how many rows it dialled on a record and how many on a boolean, because a
+column that says yes is not a record and this page will not let that pass quietly.
 
 What stays open is the conversation, and it is the part that matters to you. Where the
 record lives and who may write one. How a parent withdraws, how fast that reaches the

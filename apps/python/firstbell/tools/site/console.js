@@ -66,6 +66,9 @@ export class RunConsole {
     this.lines = this.source.split('\n');
     this.timer = null;
     this.at = 0;
+    /* Whether a reader has asked to watch it play. Only the control label depends on it:
+     * "Again" is the wrong word for a button nobody has pressed. */
+    this.played = false;
 
     this.play = root.querySelector('[data-run-play]');
     this.skip = root.querySelector('[data-run-skip]');
@@ -79,10 +82,15 @@ export class RunConsole {
     this.play.addEventListener('click', () => (this.timer ? this.pause() : this.start()));
     if (this.skip) this.skip.addEventListener('click', () => this.finish());
 
-    /* Reduced motion gets the whole thing at once. An animation somebody has asked not to
-     * see is not a feature, and the text is the point either way. */
-    if (REDUCED) this.finish();
-    else this.render(0);
+    /* Everybody gets the whole thing at once, and the button replays it.
+     *
+     * This used to render zero lines and wait to be asked, which left the only route a
+     * non-programmer has to the program's output as an empty rectangle: on the page, in
+     * every screenshot, in print, and in the film. The animation is worth having and it is
+     * worth nothing as a precondition for the evidence. Reduced motion made no difference
+     * to this branch and now makes none to any of them, which is the tell that the
+     * animation was never carrying the content. */
+    this.finish();
   }
 
   legendMarkup() {
@@ -99,9 +107,13 @@ export class RunConsole {
     /* Keeps the newest line in view without moving the page under the reader. */
     this.out.scrollTop = this.out.scrollHeight;
     const done = this.at >= this.lines.length;
-    this.play.textContent = done ? 'Again' : this.timer ? 'Pause' : this.at ? 'Resume' : 'Run it';
+    this.play.textContent = done
+      ? (this.played ? 'Again' : 'Watch it run')
+      : this.timer ? 'Pause' : this.at ? 'Resume' : 'Run it';
     this.play.setAttribute('aria-label', done
-      ? 'Play the offline run again from the start'
+      ? (this.played
+        ? 'Play the offline run again from the start'
+        : 'Play the offline run one line at a time. The whole run is already below')
       : 'Play the offline run, one line at a time');
     if (this.skip) this.skip.hidden = done;
     this.root.dataset.runState = done ? 'done' : this.timer ? 'playing' : 'idle';
@@ -116,6 +128,7 @@ export class RunConsole {
   }
 
   start() {
+    this.played = true;
     if (this.at >= this.lines.length) this.at = 0;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.step(), 0);

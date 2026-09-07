@@ -46,7 +46,7 @@ makes, and each one can be checked without an API key.
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and twenty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
-| 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
+| 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The eight questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
 | 8 | [`call-e-feedback.md`](call-e-feedback.md) | Twelve findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
@@ -173,21 +173,14 @@ doing at anything under **$350**, because $0.35 is the price above which the des
 cheaper. Divide: $350 against $157,664 is twenty-two hundredths of one percent of that
 district's renewal.
 
-This sentence has now been wrong three times and every version of it is left here, because
-a reader checking one division should be able to check all of them. A draft said a quarter
-of one percent, which is $394 and was wrong in this project's own favour by half. It then
-said $590, which is thirty-seven hundredths of one percent and priced the safeguarding
-callbacks at nothing. It then said $210, which priced them per answered call and subtracted
-that from a saving priced per billed attempt: somebody reading this as a district finance
-office found the two figures were not on the same denominator, which is arithmetic that
-produces a number that is not a rate of anything. Correcting it raised the ceiling, so this
-correction happens to flatter the project that made it. The derivation is in
-`firstbell/domain.py` and the totals are printed on every run: for the demo run, four
-attempts removed at three minutes each is $4.71 of desk time, one callback at three minutes
-is $1.87 of counsellor time, and the difference over the eight attempts CALL-E billed is
-$0.35 an attempt.
+The run prints the whole of that in total dollars, so nobody has to trust two rates and a
+subtraction: four attempts removed at three minutes each is $4.71 of desk time, one
+safeguarding callback at three minutes is $1.87 of counsellor time, and the difference over
+the eight attempts CALL-E billed is $0.35 an attempt. This figure has been wrong three
+times and each version is written down under the table further down, rather than here,
+because a paragraph that recounts four superseded numbers is where the fifth one hides.
 
-Both halves of the comparison are labelled. The $210 is a ceiling this program computes
+Both halves of the comparison are labelled. The $350 is a ceiling this program computes
 from two sourced wages and prints on every run, not a price. The renewal is one district's
 bundle.
 
@@ -218,11 +211,11 @@ not, which is why every figure above is per call or per student rather than per 
 
 ## The same ceiling, on every run in this repository
 
-The ceiling is a division whose numerator is measured: the attempts sitting behind the
-records a run closed. So it moves between runs, and for a while this entry published
-$0.59, $0.50, $0.78 and $0.21 on three surfaces with nothing saying which run each one
-belonged to. One command now prints all of them from one piece of arithmetic, which is
-also what made the mismatched denominator findable:
+The ceiling is a division: the attempts sitting behind the records a run closed, over the
+attempts CALL-E billed. It moves between runs, and for a while this entry published $0.59,
+$0.50, $0.78 and $0.21 on three surfaces with nothing saying which run each one belonged
+to. One command now prints all of them from one piece of arithmetic, which is also what
+made the mismatched denominator findable:
 
 ```bash
 python tools/money_across_runs.py                    # the runs anybody can reproduce
@@ -231,11 +224,71 @@ python tools/money_across_runs.py --receipts DIR     # and the live ones, if you
 
 ```
 run                          calls billed removed   gross   added     net crossover
+                                                     $ per attempt, 3 min   per 100
 -----------------------------------------------------------------------------------
 the demo                         6      8       4   $0.59   $0.23   $0.35     50.4%
 with consent records             3      3       2   $0.78   $0.62   $0.16     42.0%
 siblings on one number           1      1       0   $0.00   $0.00   $0.00      0.0%
+-----------------------------------------------------------------------------------
+all recorded calls              12     12       6   $0.59   $0.16   $0.43     34.3%
 ```
+
+Two kinds of row there, and the difference is worth more than any figure in the table.
+
+The first three run against a test double, and their outcome mix is written down in
+[`firstbell/scenario.py`](firstbell/scenario.py): three answered, one ambiguous, one
+no-answer, one escalating. That is what lets a stranger reproduce them with one command and
+no account, and it also means somebody chose their numerator. Read them as a worked example
+of the arithmetic and not as a measurement of how families behave. Somebody reading this
+entry as a district buyer put that file next to an earlier version of this paragraph, which
+called the numerator measured, and they were right to.
+
+The last row is the twelve calls that rang. Nobody chose that numerator, and it is the row
+to argue with:
+
+- Eleven of the twelve were answered, one became new work for the safeguarding lead, and
+  the net ceiling is **$0.43 a call**, higher than the demo run this entry leads with.
+- Eleven answered calls cannot rule out 36.4 net-new escalations per 100. The crossover is
+  34.3. **The bound is past the crossover**, so at that end of it the software costs a
+  district about four cents a call rather than saving forty-three.
+- Which end it is, is what a pilot measures in week one, and nothing here settles it.
+- The safeguarding rule marked five of those eleven answered calls. Only one counts as new
+  work, because the other four connected and gave nothing usable, so a person was ringing
+  those families back whatever software placed the call and the rule added the grade rather
+  than the callback. That reading is ours. Price all five as callbacks and the ceiling is a
+  **cost of $0.19 a call**. It over-counts on purpose, and it is the number to hold this
+  entry to.
+
+The entry leads with the smaller of the two figures because the demo run is the one anybody
+can reproduce, and the larger one is printed beside it so that choice is visible rather than
+quiet. The receipts behind the last row are not in this repository and
+[`evidence/README.md`](evidence/README.md) says why;
+[`evidence/recorded-calls.json`](evidence/recorded-calls.json) holds the five counts, on the
+same line [`evidence/api-shape.json`](evidence/api-shape.json) draws, so the row is
+checkable from what is published. `python tools/pool_recorded_calls.py --receipts DIR
+--check` fails on drift between the two.
+
+<details>
+<summary>This figure has been wrong three times. Every version, and what was wrong with
+it.</summary>
+
+A quarter of one percent of the district renewal, which is $394 a thousand calls. Wrong in
+this project's own favour by half, and arithmetic nobody had checked.
+
+Then $590, which is thirty-seven hundredths of one percent. Correct arithmetic, and it
+priced the safeguarding callbacks the software creates at nothing, so it was the ceiling of
+a product that only removes work.
+
+Then $210. It priced the callbacks per answered call and took that off a saving priced per
+billed attempt, which is money subtracted from money on a different denominator and is not
+a rate of anything. Somebody reading the entry as a district finance office found it.
+Correcting it raised the ceiling to $350, so this correction flatters the project that made
+it, which is the reason to put it in writing rather than to make it quietly.
+
+The crossover moved with it, from 31.5 net-new escalations per 100 answered calls to 50.4,
+for the same reason and in the same direction.
+
+</details>
 
 `net` is the one this entry leads with, everywhere: **$0.35 a call** on the demo run, which
 is the run a reader can reproduce with one command and no account. `gross` and `added` are
@@ -700,10 +753,11 @@ than the API has.
   [`docs/consent-record.md`](docs/consent-record.md) is the shape of a dated record: one
   guardian, one student, one channel, one purpose, one date, with an optional expiry and
   withdrawal. A work file names one per row in a `consent_record` column and the run is
-  given the register with `--consent-records`. Seven checks run before a phone rings and
+  given the register with `--consent-records`. Eight checks run before a phone rings and
   every one fails closed, including that consent to be texted is not consent to be
-  telephoned and that general permission to make contact is not permission to telephone
-  about an absence. An unrecognised key stops the register rather than being ignored,
+  telephoned, that general permission to make contact is not permission to telephone
+  about an absence, and that a record naming one telephone does not authorise the other
+  number on the same row. An unrecognised key stops the register rather than being ignored,
   because a misspelled `withdrawn_at` reads as a record nobody withdrew. Rows still
   dialled on the boolean are counted and named as the district's open exposure rather
   than folded into a total.
@@ -937,7 +991,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 600 tests collected
+python -m pytest tests/ -q          # 605 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 

@@ -68,7 +68,7 @@ def _wages():
 
 
 def figures_for(placed: int, removed: int, answered: int, net_new: int,
-                calls: int | None = None) -> dict:
+                calls: int | None = None, escalated: int | None = None) -> dict:
     """The two ceilings and the crossover, from four integers.
 
     Every surface in this entry gets its numbers from here. The reason the arithmetic is
@@ -101,6 +101,18 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
     # staffed on. `firstbell/domain.py` derives the same number the same way.
     crossover = None if not answered else (
         (removed / answered) * desk.hourly / lead.hourly)
+    # The bound a district asked for. `added` prices the net-new escalations: the calls
+    # that would have closed without the safeguarding rule, so the callback is work the
+    # rule created. Every other escalated call connected and gave nothing usable, and
+    # somebody was ringing that family back whichever software placed the call, so what
+    # the rule adds there is the grade of the person who rings rather than the ringing.
+    #
+    # That reasoning is ours, which is the objection. A buyer signing a contract wants the
+    # figure that holds if our classification is wrong in every case it could be wrong in,
+    # so this prices every escalated row as a callback. It over-counts on purpose and it is
+    # the worst number in this entry.
+    all_escalations = None if (escalated is None or not placed) else (
+        (escalated / placed) * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT)
     return {
         "calls": calls,
         "attempts_billed": placed,
@@ -113,11 +125,16 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
         "net_new_bound": bound,
         "worst_case_ceiling": worst,
         "crossover_per_100": None if crossover is None else crossover * 100,
+        "escalated": escalated,
+        "added_if_every_escalation_is_new": all_escalations,
+        "ceiling_if_every_escalation_is_new": (
+            None if (gross is None or all_escalations is None)
+            else gross - all_escalations),
     }
 
 
-def _counts_from_items(items: list[dict]) -> tuple[int, int, int, int]:
-    """Attempts billed, attempts removed, answered calls, net-new escalations.
+def _counts_from_items(items: list[dict]) -> tuple[int, int, int, int, int]:
+    """Attempts billed, attempts removed, answered calls, net-new escalations, escalated.
 
     Read the same way `firstbell/domain.py` reads them, off the structured result rather
     than off a summary field, because a summary field is a claim and the result is the
@@ -140,7 +157,7 @@ def _counts_from_items(items: list[dict]) -> tuple[int, int, int, int]:
     net_new = sum(1 for item in items
                   if item.get("resolution") == "resolved"
                   and item.get("id") in escalating)
-    return billed, removed, answered, net_new
+    return billed, removed, answered, net_new, len(escalating)
 
 
 def from_run(run: dict) -> dict:
@@ -156,9 +173,12 @@ def from_run(run: dict) -> dict:
         return figures_for(run["attempts_billed"], run.get("attempts_removed") or 0,
                            run.get("answered_calls") or 0,
                            run.get("net_new_escalations") or 0,
-                           calls=run.get("calls_dialled"))
+                           calls=run.get("calls_dialled"),
+                           escalated=run.get("escalated_calls"))
     items = run.get("items") or []
-    return figures_for(*_counts_from_items(items), calls=len(items))
+    billed, removed, answered, net_new, escalated = _counts_from_items(items)
+    return figures_for(billed, removed, answered, net_new, calls=len(items),
+                       escalated=escalated)
 
 
 def offline_run(work_file: str, extra: list[str]) -> dict:
@@ -208,7 +228,45 @@ def rows(receipts_dir: Path | None) -> list[dict]:
             figures.update(run=path.stem, source=str(path.name),
                            live=bool(run.get("reached_production_api")))
             out.append(figures)
+    pooled = pooled_live_row()
+    if pooled is not None:
+        out.append(pooled)
     return out
+
+
+RECORDED = APP / "evidence" / "recorded-calls.json"
+
+
+def recorded_counts() -> dict | None:
+    """The five integers over every call that rang, read off the committed file.
+
+    Not off the receipts. The receipts are not in this repository and `evidence/README.md`
+    says why, so a row computed from them would be a figure a judge cannot check.
+    `tools/pool_recorded_calls.py` writes the counts, which carry no conversation, no
+    number, no call id and no field value, and `--check` compares them against the
+    receipts on a machine that has them.
+    """
+    if not RECORDED.exists():
+        return None
+    return json.loads(RECORDED.read_text(encoding="utf-8"))["counts"]
+
+
+def pooled_live_row() -> dict | None:
+    """One row over every call that actually rang, and the only unchosen numerator here.
+
+    The individual receipt rows are each one to seven calls, so the widest figures in this
+    table come from its narrowest samples. Pooling them gives the row a buyer should argue
+    with: twelve calls, eleven of them answered, and a worst case that goes negative.
+    """
+    held = recorded_counts()
+    if not held:
+        return None
+    figures = figures_for(held["attempts_billed"], held["attempts_removed"],
+                          held["answered"], held["net_new_escalations"],
+                          calls=held["calls"], escalated=held.get("escalated"))
+    figures.update(run="all recorded calls", source="evidence/recorded-calls.json",
+                   live=True, pooled=True)
+    return figures
 
 
 def observed() -> dict:
@@ -229,8 +287,14 @@ def money(value: float | None) -> str:
 def table(data: list[dict]) -> str:
     head = (f"{'run':28} {'calls':>5} {'billed':>6} {'removed':>7} {'gross':>7} "
             f"{'added':>7} {'net':>7} {'crossover':>9}")
-    lines = [head, "-" * len(head)]
+    # The three money columns are dollars per billed attempt at the three minutes an
+    # attempt is priced at. The run output prints the same three quantities per minute, so
+    # `added` read $0.08 there and $0.23 here with nothing on either saying which.
+    units = f"{'':50}{'$ per attempt, 3 min':>23} {'per 100':>9}"
+    lines = [head, units, "-" * len(head)]
     for row in data:
+        if row.get("pooled"):
+            lines.append("-" * len(head))
         lines.append(
             f"{row['run'][:28]:28} "
             + ("    ?" if row["calls"] is None else f"{row['calls']:>5}")
@@ -240,6 +304,7 @@ def table(data: list[dict]) -> str:
             + ("      n/a" if row["crossover_per_100"] is None
                else f"{row['crossover_per_100']:>8.1f}%"))
     desk, lead = _wages()
+    pooled = next((row for row in data if row.get("pooled")), None)
     lines += [
         "",
         f"gross      = attempts removed / attempts billed x ${desk.hourly:,.2f}/h desk "
@@ -251,21 +316,78 @@ def table(data: list[dict]) -> str:
         "             the only denominator on which one can be taken off the other",
         "crossover  = the net-new rate per 100 answered calls at which net reaches zero",
         "",
-        "The ceiling moves between runs because the numerator is measured: how many "
-        "attempts",
-        "sat behind the records a run closed. Nothing about the software differs between "
-        "these",
-        "rows. What differs is how many families picked up and said something usable.",
+        "Two kinds of row, and the difference matters more than any figure in the "
+        "table.",
+        "",
+        "The offline rows run against a test double, and their outcome mix is written "
+        "down in",
+        "firstbell/scenario.py: three answered, one ambiguous, one no-answer, one "
+        "escalating.",
+        "That is what makes them reproducible by a stranger with no account, and it "
+        "means",
+        "somebody chose their numerator. Read them as a worked example of the arithmetic, "
+        "not",
+        "as a measurement of how families behave.",
+        "",
+    ]
+    if pooled is not None:
+        lines.append(
+            f"The last row is the {pooled['calls']} calls that rang. It is the only "
+            "numerator here nobody picked.")
+        # The disclosure the whole table is for. A bound that crosses the crossover means
+        # the software might cost a district money, and the number is four cents.
+        worst = pooled["worst_case_ceiling"]
+        lines += [
+            f"{pooled['answered']} of them were answered and {pooled['net_new']} became "
+            f"new work for the safeguarding lead: a rate of",
+            f"{100 * pooled['net_new'] / pooled['answered']:.1f} per 100. "
+            f"{pooled['answered']} answered calls cannot rule out "
+            f"{100 * pooled['net_new_bound']:.1f} per 100, and the crossover is "
+            f"{pooled['crossover_per_100']:.1f},",
+            "so the bound is past it:",
+            (f"at that end this software costs a district "
+             f"${abs(worst):,.2f} a call instead of saving "
+             f"${pooled['net_ceiling']:,.2f}."
+             if worst is not None and worst < 0 else
+             f"at that end the ceiling is ${worst:,.2f} and the saving holds."),
+            "Which end it is, is what a pilot measures in week one. It is not settled "
+            "here and",
+            "this table will not pretend otherwise.",
+        ]
+        # The other bound, and the worse one. `added` prices only the escalations this
+        # software says it created. A district accepted the reasoning and asked for the
+        # figure that holds if the reading is wrong every time, which is the one below.
+        every = pooled.get("ceiling_if_every_escalation_is_new")
+        if every is not None and (pooled.get("escalated") or 0) > pooled["net_new"]:
+            lines += [
+                "",
+                f"The safeguarding rule marked {pooled['escalated']} of those "
+                f"{pooled['answered']} answered calls and only "
+                f"{pooled['net_new']} is counted as new work,",
+                f"because the other {pooled['escalated'] - pooled['net_new']} connected "
+                "and gave nothing usable, so a person was ringing back",
+                "anyway and the rule added the grade rather than the callback. That "
+                "reading is ours.",
+                f"Price all {pooled['escalated']} as callbacks and the ceiling is "
+                + (f"a cost of ${abs(every):,.2f} a call."
+                   if every < 0 else f"${every:,.2f} a call."),
+                "It over-counts on purpose. It is the number to hold this entry to.",
+            ]
+    lines += [
         "",
         "Read the call column before the money columns. A one-call and a two-call receipt "
-        "are",
-        "here because they are committed and leaving them out would be a choice about "
-        "which",
-        "evidence counts, but a ratio over two attempts is not a price and the widest "
-        "figures",
-        "in this table are the narrowest samples. The entry leads with the demo run, "
-        "which is",
-        "the one a reader can reproduce with one command and no account.",
+        "is",
+        "a receipt, and a ratio over two attempts is not a price, so the widest figures "
+        "among",
+        "the individual rows are its narrowest samples. The receipts themselves are not "
+        "in this",
+        "repository and evidence/README.md says why; evidence/recorded-calls.json holds "
+        "the",
+        "counts, at the line evidence/api-shape.json draws, so the pooled row is "
+        "checkable",
+        "from what is published. The entry leads with the demo run because it is the one "
+        "a",
+        "reader can reproduce with one command, and it names the pooled row beside it.",
     ]
 
     price = observed()["observed"]
@@ -295,6 +417,19 @@ def table(data: list[dict]) -> str:
             f"{demo['net_ceiling'] / per_call:.1f}x of headroom,",
             "on one month of one account's billing, at three minutes a manual attempt.",
         ]
+        # And the measured one, which is the figure a buyer should hold this entry to. It
+        # came out higher than the run the entry leads with, which is the only reason to
+        # be careful about saying so: a project quoting its best row is what this table
+        # was built to stop, so both are named and the smaller one keeps the headline.
+        if pooled and pooled["net_ceiling"]:
+            lines += [
+                f"On the {pooled['calls']} calls that rang: "
+                f"{money(pooled['net_ceiling'])} a call and "
+                f"{pooled['net_ceiling'] / per_call:.1f}x. The entry leads with",
+                "the smaller of the two because it is the one anybody can reproduce, "
+                "and the",
+                "larger one is here so that choice is visible rather than quiet.",
+            ]
     return "\n".join(lines)
 
 

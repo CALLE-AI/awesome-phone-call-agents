@@ -1,0 +1,154 @@
+"""Five integers from twelve real calls, written where a judge can check them.
+
+The receipts of the twelve calls placed against `api.heycall-e.com` are not in this
+repository and will not be. `evidence/README.md` says why: the maintainer of the list this
+entry is submitted to has required contributors to remove committed real-call transcripts
+and real-call-derived artifacts, including where the people on the call were team members
+playing a part and the numbers dialled were reserved. That describes these calls exactly,
+so the recordings live on the linked evidence page instead.
+
+That left the only measured money figure in the entry unauditable from the published
+artifact. Every reproducible row in `tools/money_across_runs.py` comes from an offline run
+whose outcome mix is written down in `firstbell/scenario.py`, so its numerator was chosen.
+The rows that measure anything came from files a reader cannot open.
+
+This writes the part a repository can hold, at the same line `evidence/api-shape.json`
+draws: counts and nothing else. No conversation, no telephone number, no call id, no field
+value, no name, no locale, no timestamp. Five integers and the date they were read. A
+reader can divide them and get the same $0.43 the entry publishes, and a reader who has the
+receipts can run this again and find out if it drifted.
+
+De-duplication by call id happens here and the ids do not survive into the file.
+`02-idempotent-replay-no-calls.json` records the same two call ids as `01`, because the
+point of that receipt is that a second run of the same work file places no call. Summing
+the receipts would count those two twice and print twelve calls as fourteen, which is the
+class of arithmetic this whole directory exists to catch.
+
+    python tools/pool_recorded_calls.py --receipts D:/calle-workshop/receipts
+
+Run it with no argument and it reads `FIRSTBELL_RECEIPTS`. Without either it prints what is
+committed and exits, so the default is never a silent rewrite.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import sys
+from pathlib import Path
+
+APP = Path(__file__).resolve().parent.parent
+if str(APP) not in sys.path:
+    sys.path.insert(0, str(APP))
+if str(APP / "tools") not in sys.path:
+    sys.path.insert(0, str(APP / "tools"))
+
+TARGET = APP / "evidence" / "recorded-calls.json"
+
+
+def distinct_items(receipts_dir: Path) -> list[dict]:
+    """Every call that rang, once each, in the order the first receipt recorded it."""
+    seen: dict[str, dict] = {}
+    for path in sorted(receipts_dir.glob("0*.json")):
+        run = json.loads(path.read_text(encoding="utf-8"))
+        if not run.get("reached_production_api"):
+            continue
+        for item in run.get("items") or []:
+            key = item.get("id")
+            if key is not None and key not in seen:
+                seen[key] = item
+    return list(seen.values())
+
+
+def counts(receipts_dir: Path) -> dict:
+    from money_across_runs import _counts_from_items
+
+    items = distinct_items(receipts_dir)
+    billed, removed, answered, net_new, escalated = _counts_from_items(items)
+    return {
+        "calls": len(items),
+        "attempts_billed": billed,
+        "attempts_removed": removed,
+        "answered": answered,
+        "net_new_escalations": net_new,
+        # Every call the safeguarding rule marked, not only the ones it created work on.
+        # A district asked for the figure that holds if our reading of "would have closed
+        # on its own" is wrong every time, and it cannot be computed without this count.
+        "escalated": escalated,
+    }
+
+
+def document(receipts_dir: Path, read_at: str) -> dict:
+    return {
+        "what_this_is": (
+            "Counts over every distinct call this software placed against "
+            "api.heycall-e.com. No conversation, no telephone number, no call id, no "
+            "field value: the same line evidence/api-shape.json draws, for the same "
+            "reason, which is that the receipts themselves are not committed and "
+            "evidence/README.md says why."),
+        "why_it_is_here": (
+            "It is the only numerator in this entry that nobody chose. Every offline run "
+            "takes its outcome mix from firstbell/scenario.py, which is what makes those "
+            "runs reproducible and also means their money figures are a worked example "
+            "rather than a measurement."),
+        "de_duplicated_by": (
+            "call id, discarded before writing. Two receipts record the same two calls, "
+            "because one of them is the replay that placed none."),
+        "placed_on": "2026-09-04",
+        "read_at": read_at,
+        "regenerate_with": "python tools/pool_recorded_calls.py --receipts DIR",
+        "counts": counts(receipts_dir),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
+                    help="directory holding the committed-nowhere call receipts")
+    ap.add_argument("--check", action="store_true",
+                    help="compare against the committed file and exit non-zero on drift")
+    args = ap.parse_args(argv)
+
+    if not args.receipts:
+        if TARGET.exists():
+            print(TARGET.read_text(encoding="utf-8"), end="")
+            print(f"\n# read from {TARGET.name}. Pass --receipts DIR to recompute.",
+                  file=sys.stderr)
+            return 0
+        print("no receipts directory and nothing committed to read", file=sys.stderr)
+        return 2
+
+    receipts_dir = Path(args.receipts)
+    if not receipts_dir.is_dir():
+        print(f"{receipts_dir} is not a directory", file=sys.stderr)
+        return 2
+
+    fresh = counts(receipts_dir)
+    if args.check:
+        if not TARGET.exists():
+            print(f"{TARGET.name} is missing", file=sys.stderr)
+            return 1
+        held = json.loads(TARGET.read_text(encoding="utf-8"))["counts"]
+        if held != fresh:
+            print(f"drift:\n  committed {held}\n  receipts  {fresh}", file=sys.stderr)
+            return 1
+        print(f"{TARGET.name} matches the receipts: {fresh}")
+        return 0
+
+    read_at = dt.date.today().isoformat()
+    if TARGET.exists():
+        # Keep the original read date unless the numbers moved, so a rerun that changes
+        # nothing does not put a fresh date on an unchanged file. A date that advances on
+        # its own is how a stale figure looks current.
+        held = json.loads(TARGET.read_text(encoding="utf-8"))
+        if held.get("counts") == fresh:
+            read_at = held.get("read_at", read_at)
+    TARGET.write_text(json.dumps(document(receipts_dir, read_at), indent=2) + "\n",
+                      encoding="utf-8", newline="\n")
+    print(f"wrote {TARGET.relative_to(APP)}: {fresh}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

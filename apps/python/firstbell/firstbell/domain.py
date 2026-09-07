@@ -498,6 +498,43 @@ class ImpactSummary:
             self.escalation_staff.hourly / 60.0)
 
     @property
+    def escalations_total(self) -> int:
+        """Every call the safeguarding rule marked, whatever the rest of the run did.
+
+        `net_new_escalations` is the part of this that is new work, and it is the honest
+        figure to price. This is the part a buyer counts when they open the queue, and the
+        two are different numbers for a reason a district is entitled to disbelieve.
+        """
+        return self.escalated + self.escalated_unresolved
+
+    @property
+    def ceiling_if_every_escalation_is_new(self) -> float | None:
+        """The ceiling that holds if every marked call costs a callback.
+
+        The ceiling above subtracts only the net-new escalations, on the argument
+        that a call which produced nothing usable was going to a person whatever software
+        placed it, so the safeguarding rule did not create that callback. The argument is
+        sound and it is ours, which is the objection a district made: the classification
+        decides the headline figure, so a buyer wants the number that survives it being
+        wrong in every case it could be wrong in.
+
+        This is that number. Every escalated call priced as a callback, at the safeguarding
+        lead's wage, over the attempts CALL-E billed, taken off the same gross. It
+        over-counts and it says so. What it over-counts is the grade of the person who
+        rings back rather than the ringing.
+
+        Per minute, like the other two, because how long a callback takes is a property of
+        a school and not of this software.
+        """
+        if (self.staff is None or self.escalation_staff is None
+                or not self.calls_placed or not self.answered):
+            return None
+        gross = (self.attempts_resolved / self.calls_placed) * (self.staff.hourly / 60.0)
+        added = (self.escalations_total / self.calls_placed) * (
+            self.escalation_staff.hourly / 60.0)
+        return gross - added
+
+    @property
     def escalation_break_even_rate(self) -> float | None:
         """The net-new escalation rate at which the saving turns into a loss.
 
@@ -761,6 +798,24 @@ class ImpactSummary:
                     f"                        over the {self.calls_placed} attempt(s) "
                     "billed",
                 ]
+                # And the bound on our own reading of that subtraction. `net` counts
+                # the escalations this run created; the rest were already going to a
+                # person. A district accepted the reasoning and asked for the figure that
+                # holds if we have it wrong in every case, so both are printed and the
+                # worse one is not in a footnote.
+                every = self.ceiling_if_every_escalation_is_new
+                total = self.escalations_total
+                if every is not None and total > net:
+                    out += [
+                        f"    if all {total} were new  {cur}{every * 3:,.2f} a call. The "
+                        f"{total - net} not counted above connected",
+                        "                        and gave nothing usable, so a person was "
+                        "ringing back",
+                        "                        anyway and the rule added the grade, not "
+                        "the callback.",
+                        "                        This bound assumes that reading is wrong "
+                        "every time.",
+                    ]
                 crossover = self.escalation_break_even_rate
                 if crossover is not None:
                     rate_now = self.net_new_escalation_rate or 0.0
