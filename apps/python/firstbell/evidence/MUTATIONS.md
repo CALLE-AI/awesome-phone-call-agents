@@ -312,6 +312,15 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 203 | Read a call that did not record who answered as a call answered by somebody who is not the guardian, which invents a fact about a call while trying to be careful | 7 |
 | 204 | Read everybody who answers as the guardian, which is the state this was written to leave | 7 |
 | 205 | Report closures made with nobody recorded as zero, which hides the exposure by publishing a total that looks clean | 3 |
+| 206 | Put the attempt count back under the word `calls placed`, six lines under a line saying six rows were attempted | 4 |
+| 207 | Count a row this run dialled but made no attempt on as a call | 1 |
+| 208 | Multiply an escalation bound that does not exist, which is what killed the whole page build on a run that answered nothing | 1 |
+| 209 | Dial a row carrying a number the record does not name | 2 |
+| 210 | Compare telephone numbers as text, so a register a person typed covers nothing | 2 |
+| 211 | Read a comma-joined string as one telephone number | 1 |
+| 212 | Count a refused row as a call that rested on a record naming no number | 1 |
+| 213 | Stop printing how many dialled rows nobody can point at a number for | 2 |
+| 214 | Record a refused row as exposure, which reports a family nobody rang | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -404,7 +413,7 @@ Worth saying plainly: the correction had been made once already, in a working tr
 lost before it was committed, and it came back. A fix that is not committed did not happen.
 
 Rows 69 and 70 are a count gate that had been reading one file while two stated the number.
-The app README's count has been checked since a blind reviewer found it stale. The index file
+The app README's count has been checked since a first-time reader found it stale. The index file
 next to the table was never covered, so it sat at "Forty-four test gates and eleven browser
 gates" while the table grew to sixty-eight, and it stayed wrong through every run of the gate
 written to catch exactly that. A checked number beside an unchecked one is the failure this
@@ -542,7 +551,7 @@ page with headers derived from its own bytes, so that gate serves it the same wa
 what the browser refused.
 
 The fourteenth is `document pages`, and it exists because five pages went up with nothing
-over them. A blind reviewer reading as a district operations director found that the two
+over them. Somebody coming to it as a district operations director found that the two
 documents deciding whether they would run a pilot were reachable only by cloning the
 repository, so the build began rendering `docs/` into pages. Publishing five unchecked pages
 on a site arguing that every claim carries the thing that checks it would have answered one
@@ -777,6 +786,45 @@ false, and seven tests fail on it. A call that did not say who answered did not 
 run counts those separately and prints the count, and that number is the exposure a
 district is being asked to accept rather than one this software gets to resolve on its
 behalf.
+
+Rows 206 to 208 came from a seat reading the code rather than from this ledger, and 206 is
+the one to be uncomfortable about. `calls_placed` sums `attempts_made`, and it printed as
+"calls placed 8" six lines under "attempted 6" on a run that dialled six rows. The
+arithmetic was right the whole time: the break-even divides attempts removed by attempts
+billed, and both sides were attempts. One word was wrong, on the first thing anybody runs,
+and the gate that guards the printed block asserts the README matches the program, so the
+wrong word was copied into the README and then held there by a passing test. Four tests
+fail on it now, and none of them existed before somebody found it by reading.
+
+A fourth mutation was planted and not caught, and it is recorded here rather than fixed:
+removing a `None` check from the worst-case ceiling comparison in `tools/judge_page.py`
+changed nothing, because that arm is unreachable with `None` once the branch above it
+exists. The check was deleted instead of a test being written for it. An unreachable guard
+reads as protection and provides none, and the way it announces itself is exactly this: a
+mutation nothing notices.
+
+Rows 209 to 214 are the number the permission attaches to. A district's data protection
+officer pointed out that the record names a pupil while the row carries two telephone
+numbers and the run works down them in order, so a permission covering the first number
+used to authorise a call to the second. 209 and 210 are the check and the reason it
+compares digits: a register a person maintains writes `+91 555 000 0001` and the export
+beside it writes `+915550000001`, and a check strict about punctuation would refuse real
+families about real absences.
+
+211 and 214 are the two worth reading. 211 was planted, survived, and was killed by fixing
+the test rather than the code. Refusing `phones` given as a string was already covered by
+the next line down, which refuses anything that is not a list, so deleting the specific
+branch changed the sentence a person reads and nothing a test looked at. The test asserted
+the phrase both messages share. It now asserts the part only the specific branch says,
+which is why a comma-joined string read as one telephone produces a record covering a
+number nobody has.
+
+214 is a guard this ledger would have called decorative a week ago. `summarise` already
+drops skipped rows from the exposure count, so recording a refused row as exposure printed
+the same number and was still false. The mutation is caught because the test went in at the
+source, which is the layer holding the record, rather than at the count where the mistake
+happens to cancel. An unreachable guard reads as protection and provides none: row 208's
+note above is the same lesson learned the other way round, by deleting one.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

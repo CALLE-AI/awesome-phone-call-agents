@@ -28,7 +28,7 @@ and nothing here is a screenshot.
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
 | It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 205 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 214 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
 the [evidence page](https://firstbell-evidence.vercel.app) with the recordings.
@@ -43,10 +43,10 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and five gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and fourteen gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
-| 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the seven checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
+| 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
 | 8 | [`call-e-feedback.md`](call-e-feedback.md) | Ten findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
 
@@ -222,7 +222,8 @@ What this run was worth
   undetermined         1   call happened, no usable answer, needs a person
   failed               1   nobody reached on any number
   skipped, no consent  1
-  calls placed         8   (no telephone call was placed)
+  attempts placed      8   on 6 call(s): a row with two numbers can take two
+                       (no telephone call was placed)
   resolution rate      50%   closed, not merely answered
 
   consent
@@ -839,7 +840,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 548 tests
+python -m pytest tests/ -q          # 563 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

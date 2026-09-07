@@ -320,10 +320,18 @@ class CsvSource:
                 # written before this column existed does.
                 reference = (row.get("consent_record") or "").strip() or None
                 refusal = None
+                names_no_number = False
                 if reference is not None and self.consent_register is not None:
+                    # Every number on the row, not the first. Consent attaches to the
+                    # number called and this run works down a fallback chain, so a
+                    # record that covers one of two numbers does not authorise the row.
+                    record = self.consent_register.get(reference)
                     refusal = consent_refusal(
-                        self.consent_register.get(reference), item_id, reference,
-                        self.today)
+                        record, item_id, reference, self.today, phones)
+                    # Recorded only when the row is actually going to be dialled on that
+                    # record. A refused row is not exposure: nobody is telephoned on it.
+                    names_no_number = (refusal is None and record is not None
+                                       and not record.phones)
                 elif reference is not None:
                     # A file that names records and a run given no register is the one
                     # case where dialling would be worse than refusing: the row looks
@@ -343,6 +351,7 @@ class CsvSource:
                         row.get("voice"), f"{self.path.name} line {line_number}"),
                     consent_record=reference,
                     consent_refusal=refusal,
+                    consent_names_no_number=names_no_number,
                 )
 
 

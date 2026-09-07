@@ -146,7 +146,7 @@ def test_a_number_inside_a_result_field_is_masked_in_the_receipt(tmp_path):
         reason="schema-valid answer received", attempts_made=1,
         numbers_tried=("+915550000001",), placed_by_this_run=True,
     )])
-    summary = SimpleNamespace(resolution_rate=1.0, calls_placed=1, rate=None,
+    summary = SimpleNamespace(resolution_rate=1.0, calls_placed=1, calls_dialled=1, rate=None,
                               funding_recovered=None)
     receipt = tmp_path / "receipt.json"
     _write_receipt(receipt, report=report, mode=RunMode(live=False), summary=summary,
@@ -307,7 +307,7 @@ def test_the_receipt_separates_targeting_the_api_from_reaching_it(tmp_path):
 def test_the_safeguarding_window_says_whose_it_is(capsys):
     """Thirty minutes is one district's mandate, and the report has to say so.
 
-    A blind reviewer reading the code asked for the window to be configurable, which is
+    Somebody reading the code asked for the window to be configurable, which is
     right: districts sit under different obligations. The risk in granting it is the
     opposite of the one it fixes. A report that prints a number with no provenance lets a
     reader take this project's default for their own policy, so the sentence names which
@@ -406,7 +406,7 @@ def test_a_call_the_run_cannot_account_for_has_its_id_printed(capsys):
     # And the totals it does not appear in have to say so, because CALL-E may bill it
     # while the attempt list it would be counted from was never read back.
     assert "count as 0 in every number below" in out
-    assert "calls placed         0" in out, (
+    assert "attempts placed      0" in out, (
         "the run prints zero calls placed for a call the vendor accepted; the caveat "
         "above is the only thing that makes that honest")
 

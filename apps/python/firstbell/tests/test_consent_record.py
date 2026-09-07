@@ -1,16 +1,16 @@
-"""The dated consent record, and the seven ways a row fails to have one.
+"""The dated consent record, and the eight ways a row fails to have one.
 
 `docs/the-legal-surface.md` has always said that the largest open question in this software
 is what a district's consent artifact actually is, and that a defensible answer replaces
 the boolean column with a reference to a dated record. It called that a schema change and
-a district conversation, then did the conversation half. A blind reviewer reading the entry
-as a district operations director put it precisely: a district cannot take anything home
+a district conversation, then did the conversation half. Somebody coming to the entry as a
+district operations director put it precisely: a district cannot take anything home
 from this except the argument.
 
 This is the schema half, and this file is what keeps it honest. Every check fails closed:
 a record that cannot be read, does not cover this student, covers text messages, covers
-general contact, has been withdrawn, has expired, or is dated tomorrow, all end the same
-way, which is that nobody's phone rings. The cost of being wrong in the other direction is
+general contact, has been withdrawn, has expired, is dated tomorrow, or names numbers and
+not the one on the row, all end the same way, which is that nobody's phone rings. The cost of being wrong in the other direction is
 a call to a family that asked not to be called, and no run summary makes that up to them.
 """
 from __future__ import annotations
@@ -291,8 +291,9 @@ def test_the_run_says_which_rows_rested_on_a_record_and_which_on_a_column():
 def test_the_shipped_example_register_covers_every_refusal():
     """The example is the artifact a district takes home, so it has to teach all of it.
 
-    Six records: one plain, one open-ended, one withdrawn, one expired, one for text
-    messages, one for general contact. Anything less would document the happy path.
+    Seven records: one plain, one open-ended, one withdrawn, one expired, one for
+    text messages, one for general contact, one naming a number. Anything less would
+    document the happy path.
     """
     import json
     from pathlib import Path
@@ -302,7 +303,206 @@ def test_the_shipped_example_register_covers_every_refusal():
     verdicts = {rid: refusal(rec, rec.student_id, rid, TODAY)
                 for rid, rec in register.items()}
     said = [v for v in verdicts.values() if v]
-    assert len(register) == 6
-    assert sum(1 for v in verdicts.values() if v is None) == 2
+    assert len(register) == 7
+    # Three pass on the record alone. The seventh is refused only once a row's numbers are
+    # handed to the check, which is the next test.
+    assert sum(1 for v in verdicts.values() if v is None) == 3
     for phrase in ("withdrawn on", "expired on", "covers sms", "covers general"):
         assert any(phrase in v for v in said), f"no record in the example demonstrates {phrase!r}"
+
+
+def test_a_record_that_names_numbers_refuses_a_row_carrying_another_one():
+    """The check the district's data protection officer asked for.
+
+    Under the TCPA the permission attaches to the number dialled and not to the pupil the
+    number belongs to. This software works down a fallback chain, so a record covering the
+    first of two numbers and nothing else would have authorised a call to the second.
+    """
+    record = _record(phones=["+15550100301"])
+    assert refusal(record, "S-1", "CR-1", TODAY, ("+15550100301",)) is None
+    said = refusal(record, "S-1", "CR-1", TODAY, ("+15550100301", "+15550100999"))
+    assert said is not None
+    assert "1 the record does not name" in said
+    assert "attaches to the number called" in said
+
+
+def test_the_number_check_compares_digits_and_not_punctuation():
+    """A register typed by a person and an export written by a system are one telephone.
+
+    Refusing `+1 555 010 0301` against `+15550100301` would refuse every register anybody
+    maintains by hand, which is a check that reads as strict and only stops real families
+    being called about a real absence.
+    """
+    record = _record(phones=["+1 (555) 010-0301"])
+    assert refusal(record, "S-1", "CR-1", TODAY, ("+15550100301",)) is None
+    assert record.covers_number("+15550100301")
+    assert not record.covers_number("+15550100302")
+
+
+def test_a_record_naming_no_number_still_dials_and_is_counted_instead():
+    """The exposure this leaves, stated rather than closed.
+
+    Every register written before the field existed names no numbers. Refusing those rows
+    would stop every deployment that has one, so they dial, and `ImpactSummary` prints how
+    many did. A count in the run is the honest version of not refusing them; silence would
+    be the software agreeing with itself.
+    """
+    assert refusal(_record(), "S-1", "CR-1", TODAY, ("+15550100301",)) is None
+
+
+def test_a_row_with_no_numbers_cannot_be_refused_for_its_numbers():
+    """`numbers=()` is the default, so every existing caller keeps its behaviour.
+
+    The check needs both halves: a record that names numbers and a row that carries some.
+    Missing either one is not evidence of anything.
+    """
+    assert refusal(_record(phones=["+15550100301"]), "S-1", "CR-1", TODAY) is None
+
+
+def test_phones_has_to_be_a_list_even_for_one_number():
+    """A comma-joined string read as one number produces a record covering nobody.
+
+    `"+15550100301,+15550100302"` is a register somebody exported wrong. Read as a single
+    telephone it covers neither number on the row, which refuses a family whose permission
+    is on file, and the reason printed would be about a number nobody has.
+    """
+    with pytest.raises(RegisterError) as caught:
+        record_from(_raw(phones="+15550100301,+15550100302"), "record 1")
+    said = str(caught.value)
+    assert "even for one number" in said, (
+        "the generic 'not a list' refusal already stops a string, so the only thing this "
+        "branch adds is the reason, and a test asserting the generic phrase would pass "
+        "with the reason deleted")
+    assert "comma-joined" in said
+
+
+def test_phones_refuses_an_entry_that_is_not_a_telephone_number():
+    for bad in ([""], ["   "], [None], [42], [["+15550100301"]]):
+        with pytest.raises(RegisterError):
+            record_from(_raw(phones=bad), "record 1")
+
+
+def test_phones_is_in_the_schema_the_docs_are_generated_from():
+    """The field has to be in `RECORD_SCHEMA` or the documented shape omits it.
+
+    `docs/consent-record.md` has a field table, and a schema that does not carry the field
+    is a document that tells a district the record cannot hold a number.
+    """
+    assert "phones" in RECORD_SCHEMA["properties"]
+    assert RECORD_SCHEMA["properties"]["phones"]["type"] == "array"
+    assert "phones" not in REQUIRED
+
+
+def test_the_shipped_example_refuses_the_row_whose_number_is_not_named():
+    """The register and the work file beside it have to still agree after this change.
+
+    The register's own comment claims it covers every way a row is refused. There are
+    eight ways now, and a claim like that is worth exactly as much as the test under it.
+    """
+    import csv
+    import json
+    from pathlib import Path
+    app = Path(__file__).resolve().parent.parent
+    register = load_register(json.loads(
+        (app / "examples" / "consent-register.json").read_text(encoding="utf-8")))
+    rows = list(csv.DictReader(
+        (app / "examples" / "absences-with-consent.csv").read_text(
+            encoding="utf-8").splitlines()))
+
+    verdicts = {}
+    for row in rows:
+        reference = (row["consent_record"] or "").strip()
+        if not reference:
+            continue
+        numbers = tuple(n.strip() for n in row["phones"].split(",") if n.strip())
+        verdicts[row["id"]] = refusal(
+            register.get(reference), row["id"], reference, TODAY, numbers)
+
+    assert verdicts["S-1041"] is None, (
+        "CR-2026-0401 names both numbers on its row, so it dials")
+    assert verdicts["S-1042"] is None, (
+        "CR-2026-0402 names none, which is the case the run counts rather than refuses")
+    assert "the record does not name" in (verdicts["S-1048"] or ""), (
+        "CR-2026-0407 names one of the two numbers S-1048 carries")
+    assert sum(1 for v in verdicts.values() if v) == 5, (
+        "five of the eight example rows are refused, and docs/consent-record.md says so")
+
+
+def test_the_run_counts_the_rows_that_rested_on_a_record_naming_no_number():
+    """The count is the whole reason those rows are allowed to dial at all."""
+    from dispatch.models import ItemResult, Resolution, WorkItem
+    from firstbell.domain import summarise
+
+    def result(item_id, record, no_number, skipped=False):
+        return ItemResult(
+            item=WorkItem(id=item_id, phones=("+15550100301",), consent_record=record,
+                          consent_names_no_number=no_number),
+            resolution=Resolution.SKIPPED if skipped else Resolution.RESOLVED,
+            reason="x", attempts_made=0 if skipped else 1, placed_by_this_run=not skipped)
+
+    s = summarise([result("S-1", "CR-1", True), result("S-2", "CR-2", False),
+                   result("S-3", "CR-3", True, skipped=True)], live=False)
+    assert s.dialled_on_a_record == 2
+    assert s.dialled_on_a_record_naming_no_number == 1, (
+        "a skipped row is not exposure, because nobody was telephoned on it")
+    text = "\n".join(s.lines())
+    assert "no number named" in text
+    assert "attaches to the number" in text, (
+        "the count needs the reason beside it, or it reads as a statistic")
+
+
+def test_the_no_number_count_is_printed_under_consent_and_not_beside_the_totals():
+    """It belongs under the paperwork, next to the boolean count it is a cousin of.
+
+    Printed among the totals it would read as an outcome of the calling, which it is not.
+    It is a fact about the district's records.
+    """
+    from dispatch.models import ItemResult, Resolution, WorkItem
+    from firstbell.domain import summarise
+
+    s = summarise([ItemResult(
+        item=WorkItem(id="S-1", phones=("+15550100301",), consent_record="CR-1",
+                      consent_names_no_number=True),
+        resolution=Resolution.RESOLVED, reason="x", attempts_made=1,
+        placed_by_this_run=True)], live=False)
+    lines = s.lines()
+    consent_at = next(i for i, line in enumerate(lines) if line.strip() == "consent")
+    count_at = next(i for i, line in enumerate(lines) if "no number named" in line)
+    assert count_at > consent_at
+
+
+def test_a_refused_row_is_not_recorded_as_a_record_that_named_no_number(tmp_path):
+    """The flag is about rows that are going to be dialled, and only those.
+
+    `summarise` already drops skipped rows from the count, so setting the flag on a refused
+    row would print the same number today and be wrong the first time somebody counts a
+    different way. The source is the layer holding the record, so it is the layer that has
+    to know the difference between exposure and a refusal.
+    """
+    import json
+    from dispatch.sources import CsvSource
+
+    (tmp_path / "register.json").write_text(json.dumps({"records": [
+        {"id": "CR-NONE", "student_id": "S-1", "channel": "voice",
+         "purpose": "attendance", "given_at": "2026-08-01"},
+        {"id": "CR-WITHDRAWN", "student_id": "S-2", "channel": "voice",
+         "purpose": "attendance", "given_at": "2026-08-01",
+         "withdrawn_at": "2026-09-01"},
+        {"id": "CR-COVERED", "student_id": "S-3", "channel": "voice",
+         "purpose": "attendance", "given_at": "2026-08-01",
+         "phones": ["+15550100303"]},
+    ]}), encoding="utf-8")
+    (tmp_path / "work.csv").write_text(
+        "id,phones,consent,consent_record\n"
+        "S-1,+15550100301,yes,CR-NONE\n"
+        "S-2,+15550100302,yes,CR-WITHDRAWN\n"
+        "S-3,+15550100303,yes,CR-COVERED\n",
+        encoding="utf-8", newline="\n")
+
+    register = load_register(json.loads(
+        (tmp_path / "register.json").read_text(encoding="utf-8")))
+    flags = {item.id: item.consent_names_no_number
+             for item in CsvSource(tmp_path / "work.csv",
+                                   consent_register=register, today=TODAY).items()}
+    assert flags == {"S-1": True, "S-2": False, "S-3": False}, (
+        "S-2 is refused, so nobody is telephoned on it and it is not exposure")

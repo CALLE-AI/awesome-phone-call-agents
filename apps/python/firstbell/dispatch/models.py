@@ -150,6 +150,13 @@ class WorkItem:
     # can act on. Set by the source, never by the dispatcher: whether a permission covers
     # this call is a property of the district's paperwork, not of telephony.
     consent_refusal: str | None = None
+    # True when a dated record authorised this row and named no telephone number at all.
+    # Consent attaches to the number called, so a record that names a pupil and no number
+    # is the district's remaining exposure rather than a pass. It is a pass here, because
+    # every register written before that field existed has no numbers in it and refusing
+    # those rows would stop every deployment that has one. So the run counts them and
+    # prints the count, which is the honest version of not refusing them.
+    consent_names_no_number: bool = False
     # False when the office has recorded that the phone cannot reach this family: a
     # guardian who is deaf, hard of hearing, or has a speech disability. This app cannot
     # discover that by dialling, and dialling anyway files them under "nobody answered",

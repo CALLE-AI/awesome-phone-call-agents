@@ -440,6 +440,7 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
         "counts": report.counts(),
         "resolution_rate": round(summary.resolution_rate, 4),
         "calls_placed": summary.calls_placed,
+        "calls_dialled": summary.calls_dialled,
         "funding_rate": (None if summary.rate is None else {
             "amount": summary.rate.amount, "currency": summary.rate.currency,
             "jurisdiction": summary.rate.jurisdiction, "year": summary.rate.year,
@@ -659,6 +660,11 @@ def main(argv: list[str] | None = None) -> int:
             "counts": report.counts(),
             "funding_recovered": summary.funding_recovered,
             "attempts_billed": summary.calls_placed,
+            # Named for what it is, beside the legacy key that holds the same
+            # number under a word that means something else. A reader billed per
+            # call wants the second of these.
+            "attempts_placed": summary.calls_placed,
+            "calls_dialled": summary.calls_dialled,
             "attempts_removed": summary.attempts_resolved,
             "attempts_still_open": summary.attempts_open,
             "break_even_per_call_minute": summary.break_even_per_call_minute,
@@ -676,10 +682,39 @@ def main(argv: list[str] | None = None) -> int:
             "consent": {
                 "dialled_on_a_record": summary.dialled_on_a_record,
                 "dialled_on_a_boolean": summary.dialled_on_a_boolean,
+                "dialled_on_a_record_naming_no_number":
+                    summary.dialled_on_a_record_naming_no_number,
                 "refused_on_a_record": [
                     {"id": r.item.id, "record": r.item.consent_record,
                      "why": r.item.consent_refusal}
                     for r in report.results if r.item.consent_refusal
+                ],
+                # One row per call this run placed, saying what authorised it and which
+                # number it reached. Every refusal was already itemised with its record
+                # and its reason, and every approval was two integers, so the run could
+                # say in detail why it did not ring a family and could not say what let
+                # it ring one. A data protection officer reads the second list, not the
+                # first, and there was no second list.
+                #
+                # `numbers_tried` is here because consent attaches to a number and not
+                # only to a student. A row carries a fallback chain, the run works down
+                # it, and a record that names a student says nothing about which of two
+                # numbers was reached. That gap is real and is named in
+                # `docs/consent-record.md`; this is the part of it a receipt can close,
+                # which is saying which number the call actually went to.
+                "authorised": [
+                    {
+                        "id": r.item.id,
+                        "record": r.item.consent_record,
+                        "basis": ("a dated record" if r.item.consent_record
+                                  else "a boolean column"),
+                        "numbers_tried": list(r.masked_numbers),   # masked, never raw
+                        "attempts": r.attempts_made,
+                        "call_id": r.call_id,
+                        "placed_by_this_run": r.placed_by_this_run,
+                    }
+                    for r in report.results
+                    if r.resolution is not Resolution.SKIPPED and r.attempts_made
                 ],
             },
             # The window this run judged its escalations against, and whether anybody

@@ -31,7 +31,8 @@ from datetime import date
 # What a record must carry, and what it may. `id` is what a work file points at;
 # `student_id` is what stops one family's permission being read as another's.
 REQUIRED = ("id", "student_id", "channel", "purpose", "given_at")
-OPTIONAL = ("guardian_name", "expires_at", "withdrawn_at", "evidence", "recorded_by")
+OPTIONAL = ("guardian_name", "expires_at", "withdrawn_at", "evidence",
+            "recorded_by", "phones")
 
 CHANNELS = ("voice", "sms", "email")
 PURPOSES = ("attendance", "emergency", "general")
@@ -59,6 +60,13 @@ RECORD_SCHEMA = {
                          "description": "ISO 8601 date. Any value means withdrawn"},
         "evidence": {"type": "string"},
         "recorded_by": {"type": "string"},
+        "phones": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "The numbers this permission covers. Absent means the record "
+                           "names a student and no number, which the run counts and "
+                           "reports rather than treating as any number",
+        },
     },
 }
 
@@ -86,6 +94,22 @@ class ConsentRecord:
     evidence: str = ""
     recorded_by: str = ""
     guardian_name: str = ""
+    # The numbers this permission covers, compared on digits. Empty means the record
+    # names a student and no number.
+    phones: tuple[str, ...] = ()
+
+    def covers_number(self, number: str) -> bool:
+        """Whether this record names the number about to be dialled.
+
+        Compared on digits, so `+1 555 010 0301` in a register and `+15550100301` in a
+        work file are one telephone. A record naming no numbers covers none of them and
+        this returns False for every number, because the caller has to be able to tell
+        "this record does not cover that number" from "this record names no numbers at
+        all", and those are different sentences to a family.
+        """
+        want = "".join(ch for ch in number if ch.isdigit())
+        return any("".join(ch for ch in held if ch.isdigit()) == want
+                   for held in self.phones)
 
 
 def _as_date(value: object, field: str, where: str) -> date:
@@ -100,6 +124,32 @@ def _as_date(value: object, field: str, where: str) -> date:
         raise RegisterError(
             f"{where}: {field} is {value!r} and does not parse as an ISO 8601 date "
             f"({err}). Use YYYY-MM-DD.") from err
+
+
+def _as_phones(value: object, where: str) -> tuple[str, ...]:
+    """The numbers on a record, or a refusal about the shape they arrived in.
+
+    A bare string is refused rather than read as one number. `"+15550100301,+15550100302"`
+    in a field declared as a list is a register somebody exported wrong, and reading it as
+    a single telephone number produces a record that covers a number nobody has.
+    """
+    if value in (None, ""):
+        return ()
+    if isinstance(value, str):
+        raise RegisterError(
+            f"{where}: phones is a string. It has to be a list, even for one number, "
+            "because a comma-joined string read as one number produces a record covering "
+            "a telephone nobody has.")
+    if not isinstance(value, list):
+        raise RegisterError(f"{where}: phones has to be a list, not "
+                            f"{type(value).__name__}")
+    out = []
+    for entry in value:
+        if not isinstance(entry, str) or not entry.strip():
+            raise RegisterError(f"{where}: phones contains {entry!r}, which is not a "
+                                "telephone number")
+        out.append(entry.strip())
+    return tuple(out)
 
 
 def record_from(raw: object, where: str) -> ConsentRecord:
@@ -144,6 +194,7 @@ def record_from(raw: object, where: str) -> ConsentRecord:
         evidence=str(raw.get("evidence") or "").strip(),
         recorded_by=str(raw.get("recorded_by") or "").strip(),
         guardian_name=str(raw.get("guardian_name") or "").strip(),
+        phones=_as_phones(raw.get("phones"), where),
     )
 
 
@@ -183,12 +234,28 @@ def load_register(payload: object, where: str = "the consent register") -> dict[
 
 
 def refusal(record: ConsentRecord | None, student_id: str, reference: str,
-            today: date) -> str | None:
+            today: date, numbers: tuple[str, ...] = ()) -> str | None:
     """Why this row may not be dialled on this record, or None if it may.
 
-    Seven checks, in the order that puts the family's own decision first. Each returns a
+    Eight checks, in the order that puts the family's own decision first. Each returns a
     sentence an attendance officer can act on, because the person holding the queue is the
     one who has to have the conversation.
+
+    The eighth is about the number, and it exists because a district's data protection
+    officer asked for it and was right. Under the TCPA consent attaches to the number
+    called and not to the person the number belongs to. A record naming a student says
+    nothing about which of two numbers on a row may be dialled, and this software works a
+    fallback chain, so a row with a good record and a second number nobody agreed to would
+    have dialled the second number.
+
+    `numbers` is every number on the row rather than the one about to be tried, because a
+    row is either dialled or it is not, and refusing at the third number after two calls
+    have gone out is a refusal that arrives too late to matter.
+
+    A record naming no numbers passes this check. That is the open exposure rather than a
+    decision: a register written before this field existed has no numbers in it, refusing
+    every such row would stop every deployment that has one, and instead the run counts
+    and prints how many rows rested on a record that named no number.
     """
     if record is None:
         return (f"consent record {reference!r} is not in the register. A reference to a "
@@ -213,4 +280,12 @@ def refusal(record: ConsentRecord | None, student_id: str, reference: str,
         return (f"consent record {reference!r} covers {record.purpose}, not "
                 f"{PURPOSE_REQUIRED}. A general permission to make contact is not "
                 "permission to telephone about an absence.")
+    if record.phones and numbers:
+        uncovered = [n for n in numbers if not record.covers_number(n)]
+        if uncovered:
+            return (f"consent record {reference!r} covers "
+                    f"{len(record.phones)} number(s) and this row carries "
+                    f"{len(uncovered)} the record does not name. Consent attaches to the "
+                    "number called, and this software works down a fallback chain, so a "
+                    "row is dialled only when the record covers every number on it.")
     return None

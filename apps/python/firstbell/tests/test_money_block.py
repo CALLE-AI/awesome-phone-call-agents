@@ -151,3 +151,57 @@ def test_the_band_reaches_the_page_rather_than_only_the_test():
     assert "class=money" in page
     for value in ("157,664", "13.89", "35.51", "13,303", "99,297"):
         assert value in page, f"{value} is computed and never shown"
+
+
+def test_a_run_that_answered_nothing_does_not_kill_the_page_build():
+    """The band's own third outcome, and it was missing.
+
+    A run that placed calls and answered none has no escalation rate, because the
+    denominator is zero. `bound` and `worst_at_three` come back None, and the old code
+    multiplied them: `TypeError: unsupported operand type(s) for *: 'int' and 'NoneType'`,
+    which killed the whole page build rather than one paragraph.
+
+    The guard above the paragraph asked whether the ceiling existed, and on this run the
+    ceiling is `0.0`, which is a number. That is the shape of the defect this project
+    spends its time hunting, in its own page builder: a quantity that cannot be measured,
+    handled as though it always can be.
+
+    Every other test in this file reads the one committed receipt where every row was
+    answered and every row made exactly one attempt, so none of them could reach it.
+    """
+    run = {"calls_placed": 3, "items": [
+        {"id": "S-1", "resolution": "failed", "attempts": 2, "structured_result": None},
+        {"id": "S-2", "resolution": "failed", "attempts": 1, "structured_result": None},
+    ]}
+    import judge_page
+
+    facts = judge_page.money_facts(run)
+    assert facts["answered"] == 0
+    assert facts["bound"] is None and facts["worst_at_three"] is None
+    assert facts["ceiling_at_three"] == 0.0, (
+        "the ceiling is no longer a number on this run, so the guard above the paragraph "
+        "would catch it and this test would stop testing anything"
+    )
+
+    markup = judge_page.money_markup(run)
+    assert markup, "the band went silent instead of saying what it could not measure"
+    assert "Nobody answered on this run" in markup
+    assert "a rate needs a call that produced an answer" in markup
+    assert "per 100" not in markup, (
+        "the band states a bound on a run with no answered call to bound"
+    )
+
+
+def test_a_run_with_one_answered_call_still_states_the_bound():
+    """The branch above must not swallow the ordinary case."""
+    import judge_page
+
+    run = {"calls_placed": 2, "items": [
+        {"id": "S-1", "resolution": "resolved", "attempts": 1,
+         "structured_result": {"parent_confirmed_aware": "yes", "spoke_with": "guardian",
+                               "reason_category": "illness", "expected_return": "today"}},
+        {"id": "S-2", "resolution": "failed", "attempts": 1, "structured_result": None},
+    ]}
+    markup = judge_page.money_markup(run)
+    assert "per 100" in markup, "the bound stopped being published on a run that has one"
+    assert "Nobody answered on this run" not in markup

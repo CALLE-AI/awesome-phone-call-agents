@@ -117,7 +117,7 @@ def test_the_prose_numbers_match_the_program_too():
 
     # The two counts the prose restates in words, taken from the same run.
     attempted = re.search(r"^\s+attempted\s+(\d+)", printed, re.M)
-    placed = re.search(r"^\s+calls placed\s+(\d+)", printed, re.M)
+    placed = re.search(r"^\s+attempts placed\s+(\d+)", printed, re.M)
     assert attempted and placed, "the run summary no longer prints attempted and placed"
     words = {5: "Five", 6: "Six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
     a, c = int(attempted.group(1)), int(placed.group(1))
@@ -363,7 +363,7 @@ NUMBER_WORDS = {n: _in_words(n) for n in range(1000)}
 def test_the_readme_states_the_real_number_of_mutations():
     """The third count in this README to go stale, and the first one caught from outside.
 
-    A blind reviewer found "Twenty-two gates" and "Thirteen of them" in a file whose own
+    A first-time reader found "Twenty-two gates" and "Thirteen of them" in a file whose own
     mutation table had twenty-six rows. The test-count gate next door had been passing the
     whole time, which is the trap: a checked number sitting beside an unchecked one makes
     the unchecked one look checked.

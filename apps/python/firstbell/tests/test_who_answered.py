@@ -180,3 +180,61 @@ def test_the_disclosure_is_still_the_first_thing_spoken():
 
     assert build_task(WorkItem(id="S-1", phones=("+15550100001",))).startswith(
         AI_DISCLOSURE)
+
+
+# --- the word over the number ---------------------------------------------------------
+
+
+def test_the_attempt_count_is_never_printed_under_the_word_calls():
+    """The one defect a reader met without looking for it.
+
+    `calls_placed` sums `attempts_made`, and it printed as "calls placed 8" six lines
+    under "attempted 6" on a run that dialled six rows. Nothing could catch it: the
+    arithmetic was right because the break-even divides attempts by attempts, and the gate
+    on the printed block asserts the README matches the program, so a wrong word is copied
+    into the README and then defended there.
+
+    So the assertion is about the word, not the number. A count that means attempts may
+    not appear under a heading that says calls.
+    """
+    from dispatch import ItemResult, Resolution, WorkItem
+    from firstbell.domain import summarise
+
+    # One row, two guardian numbers, the first of which did not answer. Two attempts, one
+    # call, and the pair of numbers this line has to keep apart.
+    two_tries = ItemResult(
+        item=WorkItem(id="S-1", phones=("+15550100001", "+15550100002")),
+        resolution=Resolution.RESOLVED, escalation=Escalation.NONE,
+        structured_result={"parent_confirmed_aware": "yes", "spoke_with": "guardian"},
+        attempts_made=2, placed_by_this_run=True)
+    summary = summarise([two_tries])
+    printed = "\n".join(summary.lines())
+
+    assert summary.calls_placed == 2, "calls_placed no longer holds the attempt count"
+    assert summary.calls_dialled == 1, "calls_dialled no longer holds the row count"
+
+    import re
+
+    under_calls = re.search(r"^\s+calls placed\s+(\d+)", printed, re.M)
+    assert under_calls is None or int(under_calls.group(1)) == summary.calls_dialled, (
+        f"the run prints {under_calls.group(1)} under the words 'calls placed' and "
+        f"dialled {summary.calls_dialled} call(s)"
+    )
+    attempts = re.search(r"^\s+attempts placed\s+(\d+)", printed, re.M)
+    assert attempts and int(attempts.group(1)) == summary.calls_placed, (
+        "the attempt count is not printed under a heading that says attempts"
+    )
+    assert f"on {summary.calls_dialled} call(s)" in printed, (
+        "the run states an attempt count without saying how many calls it is spread over, "
+        "which is the pair of numbers a district billed per call has to tell apart"
+    )
+
+
+def test_a_row_dialled_with_no_attempt_is_not_a_call():
+    from dispatch import ItemResult, Resolution, WorkItem
+    from firstbell.domain import summarise
+
+    nothing = ItemResult(item=WorkItem(id="S-1", phones=("+15550100001",)),
+                         resolution=Resolution.SKIPPED, attempts_made=0,
+                         placed_by_this_run=True)
+    assert summarise([nothing]).calls_dialled == 0

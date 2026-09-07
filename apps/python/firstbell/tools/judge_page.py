@@ -799,7 +799,7 @@ LEAD_MUTATIONS = {
 def three_endings_figure() -> str:
     """The three words the product turns on, shown once instead of defined three times.
 
-    A blind seat reading this page as a school district administrator listed `resolved`,
+    A reader coming to this page cold, as a school district administrator, listed `resolved`,
     `undetermined` and `failed` among the words they could not follow, having met all three
     as a table column. A sentence explaining three outcomes is a paragraph. Three outcomes
     drawn once is a glance.
@@ -1073,16 +1073,35 @@ def money_markup(run: dict) -> str:
         '<div class=money-cell>',
         f'<p class=money-n>${f["ceiling_at_three"]:,.2f}</p>',
         '<p class=money-what>a call, above which a person is cheaper</p>',
+        # Three endings here as well, and the third one is why this is a branch rather
+        # than a format string. A run that placed calls and answered none has no
+        # escalation rate: the denominator is zero, so `bound` and `worst_at_three` are
+        # None, and multiplying None raised a TypeError that killed the whole page build.
+        # The guard above only asked whether the ceiling existed, and on that run the
+        # ceiling is 0.0, which is a number.
+        #
+        # It is the defect this project spends its time hunting, in its own page builder:
+        # a quantity that cannot be measured, handled as though it always can be.
         f'<p class=money-why>Not a saving: CALL-E publishes no price, so this is the '
         f'ceiling. {f["removed"]} of {f["placed"]} attempts came off a desk at '
         f'${f["desk"].hourly:,.2f} an hour, at three minutes an attempt. '
-        f'{f["net_new"]} of {f["answered"]} answered calls became new work for the '
-        f'safeguarding lead, so nothing is subtracted here. '
-        f'{f["answered"]} calls cannot rule out {100 * f["bound"]:.0f} per 100, and at '
-        + (f'that end the ceiling is <b>${f["worst_at_three"]:,.2f}</b>.</p>'
-           if f["worst_at_three"] > 0 else
-           'that end the callbacks cost more than the calls save. Which end it is, is '
-           'what a pilot measures in week one.</p>'),
+        + ('Nobody answered on this run, so it says nothing at all about what the '
+           'safeguarding rule adds: a rate needs a call that produced an answer, and '
+           'there is no such call here. The ceiling above is the desk time only.</p>'
+           if not f["answered"] or f["bound"] is None else
+           f'{f["net_new"]} of {f["answered"]} answered calls became new work for the '
+           f'safeguarding lead, so nothing is subtracted here. '
+           f'{f["answered"]} calls cannot rule out {100 * f["bound"]:.0f} per 100, and at '
+           + (f'that end the ceiling is <b>${f["worst_at_three"]:,.2f}</b>.</p>'
+              # No None check here, deliberately. `worst_at_three` is None only when the
+              # bound or the ceiling is None, the branch above catches the bound and the
+              # guard at the top of this function returns early on the ceiling, so this
+              # arm is unreachable with None. A mutation that removed a None check here
+              # was not caught by any test, which is how an unreachable guard announces
+              # itself: it reads as protection and provides none.
+              if f["worst_at_three"] > 0 else
+              'that end the callbacks cost more than the calls save. Which end it is, is '
+              'what a pilot measures in week one.</p>')),
         '</div>',
         '</div>',
 
@@ -1101,7 +1120,7 @@ def money_markup(run: dict) -> str:
 def queue_markup(run: dict) -> str:
     """The screen a school office opens on Monday, built from a receipt that already exists.
 
-    A blind seat reading this page as a district administrator scored it 16 of 25 and put
+    A reader coming to this page cold, as a district administrator, put
     this first among the things that would raise it: "Show the screen my secretary opens
     Monday morning. The only interface on this page is a terminal. No district buys a
     terminal."
@@ -1174,7 +1193,7 @@ def queue_markup(run: dict) -> str:
     # so the same two sentences were set four times in a 46ch column: twenty-four lines of
     # identical prose, which is most of the height of the one screen on this page that is
     # supposed to read like a working queue. Reading fatigue was the highest-scoring
-    # complaint a blind seat left about this page, and repetition is the cheapest kind of it
+    # complaint a first-time reader left about this page, and repetition is the cheapest kind of it
     # to remove, because nothing is lost: a clerk still learns the reason before the first
     # row, and each row keeps the three things that differ.
     #
@@ -1353,7 +1372,7 @@ def sources_markup() -> str:
 def takeaway_markup() -> str:
     """The two pieces of this that are worth something to somebody who is not us.
 
-    Both blind reviewers arrived at the same complaint from opposite seats. The platform
+    Two readers arrived at the same complaint from opposite directions. The platform
     engineer wrote that the transferable work is `calle_double` and that it is "filed where
     nobody will find it". The district operations director wrote that the n8n recipe "appears
     in the README only, not the page and not the video". Neither of them was going to clone a
@@ -1396,9 +1415,9 @@ def further_markup() -> str:
     """The one block on this page whose links leave it.
 
     Placed after the last act, because it is what a reader does next rather than part of
-    the argument. Two lists: the documents, and the outside numbers. A blind reviewer
-    reading as a district operations director found both unreachable and scored the entry
-    on what they could reach, which is the correct thing for them to have done.
+    the argument. Two lists: the documents, and the outside numbers. Somebody coming to it as a district
+    operations director found both unreachable and judged the entry on what they could
+    reach, which is the correct thing for them to have done.
     """
     return (
         '<section class="further inner inner-margin" aria-labelledby=h-further>'
@@ -1659,7 +1678,7 @@ def build(has_audio: bool, repo_url: str | None = None,
     hero = "S-4105"
     rows = [pair["en"] for pair in data["pairs"]]
     cue = cue_for(calls[hero], "left for school")
-    # A blind reviewer read the first viewport and could not name the product. They were
+    # A reader met the first viewport and could not name the product. They were
     # right to be unable to: `firstbell` appeared in the visible text of this page exactly
     # twice, in the browser tab and in a shell command nine screens down. The best sentence
     # in the entry was in README.md and had never been on the page a judge opens first.
@@ -1697,7 +1716,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         'school, having watched her leave for it that morning.</p>',
         # Not written for this page. This is what the program prints at the head of its
         # own escalation queue, and it was sitting nine screens below here, in terminal
-        # text, as the last thing a reader met. A blind seat called it the strongest
+        # text, as the last thing a reader met. A reader called it the strongest
         # sentence in the entry and reached it after the point they had stopped reading.
         '<p class=stakes>A school would have to answer these within 30 minutes.</p>',
         '<p class=stakes-src>Printed by the run itself, above the cases it refuses to '

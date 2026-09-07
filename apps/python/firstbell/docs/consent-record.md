@@ -1,7 +1,7 @@
 # The consent record
 
 A boolean column that says `yes` is not a consent record. This is the shape of one, the
-seven things checked before a phone rings, and the three decisions that stay with the
+eight things checked before a phone rings, and the three decisions that stay with the
 district.
 
 `docs/the-legal-surface.md` has said since the first draft that this is the largest open
@@ -22,7 +22,7 @@ different and smaller claim.
 ## One record
 
 One record is one permission: a named guardian, for one student, on one channel, for one
-purpose, given on a date.
+purpose, given on a date, and for the numbers it names.
 
 ```json
 {
@@ -34,6 +34,7 @@ purpose, given on a date.
   "given_at": "2026-08-14",
   "expires_at": "2027-07-31",
   "withdrawn_at": null,
+  "phones": ["+91 555 000 0001", "+91 555 000 0011"],
   "evidence": "enrolment pack 2026-27, section 4, signed",
   "recorded_by": "attendance office"
 }
@@ -47,6 +48,7 @@ purpose, given on a date.
 | `purpose` | yes | `attendance`, `emergency` or `general` |
 | `given_at` | yes | ISO 8601 date. Not in the future |
 | `expires_at` | no | ISO 8601 date. Absent means open-ended |
+| `phones` | no | The numbers this permission covers. A list, even for one |
 | `withdrawn_at` | no | ISO 8601 date. Any value at all means withdrawn |
 | `evidence` | no | Where the signature or the log entry is, in your words |
 | `recorded_by` | no | Which desk recorded it |
@@ -62,7 +64,7 @@ contact you about your child" cannot be read as permission to telephone about an
 A district that ticked one box at enrolment has not agreed to this specific call, and a
 schema that cannot express the difference invites the reading that it has.
 
-## The seven checks, all failing closed
+## The eight checks, all failing closed
 
 A row is dialled only if every one of these holds, in this order. Each failure prints its
 own sentence, because a record withdrawn last week and a mistyped date are the same outcome
@@ -77,6 +79,48 @@ the queue is the person who has to have them.
 5. `given_at` is not in the future.
 6. `channel` is `voice`. This software telephones people.
 7. `purpose` is `attendance`.
+8. If the record names numbers, it names every number on the row.
+
+## Consent attaches to a number, not to a child
+
+The eighth check is the newest and it is here because a district's data protection officer
+read the seven above and asked the obvious question: which telephone did the family agree
+to? Under the US Telephone Consumer Protection Act the permission attaches to the number
+called. The record names a pupil. A work file row carries a fallback chain, one number and
+then the next, and this software works down it. So a record covering the first number and
+saying nothing about the second used to authorise a call to the second.
+
+The row is refused rather than the number, and that is deliberate. Trying the first number,
+reaching nobody, and stopping at the second is a refusal that arrives after a call has
+already gone out. A row is either dialled or it is not.
+
+```
+  [skip ] S-1048  no recorded consent to be called: consent record 'CR-2026-0407' covers 1 number(s) and this row carries 1 the record does not name. Consent attaches to the number called, and this software works down a fallback chain, so a row is dialled only when the record covers every number on it.
+```
+
+Numbers are compared on their digits. `+91 555 000 0001` in a register a person maintains
+and `+915550000001` in an export a system wrote are one telephone, and refusing that pair
+would be a check that reads as careful while stopping real calls about real absences.
+
+**A record that names no numbers still dials, and the run says how many did.** That is the
+exposure left rather than a decision anybody is happy with. Every register written before
+this field existed names no numbers, refusing all of those rows would stop every deployment
+that has one, and a silent pass would be the software agreeing with itself. So the run
+counts them:
+
+```
+  consent
+    on a record        2   dated, voice, attendance, not withdrawn
+    on a boolean       1   a column that says yes, which is not a record
+                           docs/consent-record.md is the schema that replaces it
+    no number named    1   of the records above, this many name a pupil
+                           and no telephone number. Consent attaches to the number
+                           called, so these are the rows nobody can point
+                           at a number for
+```
+
+Adding numbers to your register turns that third line into nothing, which is the point of
+printing it.
 
 A malformed record, a duplicate id, or an empty register stops the run instead of refusing
 rows one at a time. A register with one bad record in it is a document somebody has to look
@@ -92,15 +136,17 @@ python -m firstbell \
 ```
 
 The work file gains one optional column, `consent_record`, beside the `consent` column it
-already needs. The example register carries six records covering every refusal: one plain,
-one open-ended, one withdrawn, one expired, one for text messages only, one for general
-contact. Four of the seven example rows are refused, each with its reason:
+already needs. The example register carries seven records covering every refusal: one plain
+naming both numbers on its row, one open-ended naming none, one withdrawn, one expired, one
+for text messages only, one for general contact, one naming one of the two numbers its row
+carries. Five of the eight example rows are refused, each with its reason:
 
 ```
   [skip ] S-1043  no recorded consent to be called: consent record 'CR-2026-0403' was withdrawn on 2026-09-01.
   [skip ] S-1044  no recorded consent to be called: consent record 'CR-2025-0088' expired on 2026-07-31.
   [skip ] S-1045  no recorded consent to be called: consent record 'CR-2026-0405' covers sms, not voice. This software telephones people.
   [skip ] S-1046  no recorded consent to be called: consent record 'CR-2026-0406' covers general, not attendance. A general permission to make contact is not permission to telephone about an absence.
+  [skip ] S-1048  no recorded consent to be called: consent record 'CR-2026-0407' covers 1 number(s) and this row carries 1 the record does not name. Consent attaches to the number called, and this software works down a fallback chain, so a row is dialled only when the record covers every number on it.
 ```
 
 ## The column is optional, and the run says who is still on a boolean
@@ -114,9 +160,14 @@ prints which rows rested on which:
     on a record        2   dated, voice, attendance, not withdrawn
     on a boolean       1   a column that says yes, which is not a record
                            docs/consent-record.md is the schema that replaces it
+    no number named    1   of the records above, this many name a pupil
+                           and no telephone number. Consent attaches to the number
+                           called, so these are the rows nobody can point
+                           at a number for
 ```
 
-The second line is your open exposure, in the run rather than left for counsel to find.
+The second and third lines are your open exposure, in the run rather than left for counsel
+to find.
 That is the same move the run makes with attempts still open: name the thing you cannot
 vouch for instead of folding it into a total.
 
@@ -138,8 +189,10 @@ look better documented than a boolean row while being checked less.
 
 ## What checks this
 
-`tests/test_consent_record.py`, twenty-seven tests: one per refusal, one per required
-field, the unknown-key refusal, the register-level failures, and one that reads the shipped
-example register and fails if it stops demonstrating all four kinds of refusal. The schema
+`tests/test_consent_record.py`, thirty-seven tests: one per refusal, one per required
+field, the unknown-key refusal, the register-level failures, the digits-only number
+comparison, the count of rows that rested on a record naming no number, and two that read
+the shipped example register beside the work file and fail if the pair stops demonstrating
+every kind of refusal. The schema
 constant published here is asserted against the code that enforces it, because a schema
 document that has drifted from its checker is worse than no document.

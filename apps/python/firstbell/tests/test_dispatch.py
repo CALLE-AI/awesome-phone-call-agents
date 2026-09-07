@@ -772,7 +772,7 @@ def test_the_summary_separates_the_three_provenances():
     s = summarise([made, replay, dunno], live=True)
     assert (s.calls_placed, s.calls_replayed, s.calls_unknown_provenance) == (2, 1, 3)
     text = "\n".join(s.lines())
-    assert "calls placed         2" in text
+    assert "attempts placed      2" in text
     assert "calls replayed       1" in text
     assert "provenance unknown   3" in text
 

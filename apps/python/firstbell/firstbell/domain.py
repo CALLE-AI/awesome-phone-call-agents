@@ -338,12 +338,29 @@ class ImpactSummary:
     undetermined: int
     failed: int
     skipped_no_consent: int
+    # Despite the name, this holds the number of ATTEMPTS this run placed: `summarise`
+    # sums `attempts_made` into it. The name is kept because it is in the receipt shape
+    # and in the `--json` a deployment may already read, and `calls_dialled` below is the
+    # count of rows. The printed block names both rather than one under the other's word.
+    #
+    # For a while it printed as "calls placed 8" six lines under "attempted 6", on the
+    # committed demo where six rows were dialled and two of them have two guardian
+    # numbers. Nothing could catch it: the arithmetic was right, because the break-even
+    # divides attempts removed by attempts billed and both sides are attempts. What was
+    # wrong was one word, and the gate on the printed block asserts the README matches the
+    # program, so the wrong word was copied into the README and then defended there.
+    #
+    # The distinction is a billing question rather than a pedantic one. A district billed
+    # per call and a district billed per attempt read a different number off this run.
     calls_placed: int
     # Skips are not one thing. A family that never consented is closed business; a
     # family the phone cannot reach is open work on somebody's desk. Counting both as
     # `skipped_no_consent`, which is what this did, also reported a cancelled run as a
     # wave of consent refusals.
     skipped_no_voice: int = 0
+    # Rows this run put a call on the wire for, which is what `calls_placed` sounds like
+    # and is not. Six on the committed demo, against eight attempts.
+    calls_dialled: int = 0
     skipped_not_dialled: int = 0
     # Rows held because another absence on the same telephone number is being called. Its
     # own bucket, because it is the only skip in the run that is not a statement about the
@@ -389,6 +406,14 @@ class ImpactSummary:
     # and counsel will ask which rows were which.
     dialled_on_a_record: int = 0
     dialled_on_a_boolean: int = 0
+    # Of the rows on a record, how many rested on a record that named no telephone number.
+    # Under the TCPA the permission attaches to the number dialled and not to the pupil the
+    # number belongs to, and this software works down a fallback chain, so a record naming
+    # a pupil says nothing about which of two numbers on the row may be rung. A record that
+    # does name numbers is checked, and a row carrying a number the record does not name is
+    # refused before dialling. This count is what is left: the rows nobody can point at a
+    # number for. It is printed rather than refused, and `docs/consent-record.md` says why.
+    dialled_on_a_record_naming_no_number: int = 0
     # The wage the escalation queue is paid at. Separate from `staff` because they are
     # different grades: one is the desk this run clears and the other is the post this
     # run adds work to.
@@ -544,7 +569,10 @@ class ImpactSummary:
                "another way to reach them"] if self.skipped_no_voice else []),
             *([f"  skipped, not dialled {self.skipped_not_dialled}   cancelled, or "
                "stopped by another gate"] if self.skipped_not_dialled else []),
-            f"  calls placed         {self.calls_placed}{'' if self.live else '   (no telephone call was placed)'}",
+            f"  attempts placed      {self.calls_placed}   on {self.calls_dialled} "
+            "call(s): a row with two numbers can take two",
+            *([] if self.live else
+              ["                       (no telephone call was placed)"]),
         ]
         if self.calls_replayed:
             out.append(
@@ -573,6 +601,16 @@ class ImpactSummary:
                            "that says yes, which is not a record")
                 out.append("                           docs/consent-record.md is the "
                            "schema that replaces it")
+            if self.dialled_on_a_record_naming_no_number:
+                out.append(
+                    f"    no number named    "
+                    f"{self.dialled_on_a_record_naming_no_number}   of the records above, "
+                    "this many name a pupil")
+                out.append("                           and no telephone number. Consent "
+                           "attaches to the number")
+                out.append("                           called, so these are the rows "
+                           "nobody can point")
+                out.append("                           at a number for")
 
         closed = self.closed_with_a_guardian + self.closed_with_no_answerer_recorded
         if closed:
@@ -757,7 +795,13 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         dialled_on_a_record=sum(1 for r in results
                                 if r.item.consent_record is not None
                                 and r.resolution is not Resolution.SKIPPED),
+        dialled_on_a_record_naming_no_number=sum(
+            1 for r in results
+            if r.item.consent_names_no_number
+            and r.resolution is not Resolution.SKIPPED),
         calls_placed=buckets[True] if calls_placed is None else calls_placed,
+        calls_dialled=sum(1 for r in results
+                          if r.placed_by_this_run is True and r.attempts_made > 0),
         calls_replayed=buckets[False],
         calls_unknown_provenance=buckets[None],
         live=live,
