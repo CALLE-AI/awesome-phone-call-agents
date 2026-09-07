@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from .safety import validate_phone_syntax
+
 
 class ReservationStatus(str, Enum):
     PENDING_CONFIRM = "PENDING_CONFIRM"
@@ -10,6 +12,7 @@ class ReservationStatus(str, Enum):
     RESCHEDULED = "RESCHEDULED"
     NO_ANSWER = "NO_ANSWER"
     RECOVERED = "RECOVERED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
 
 
 class WaitlistStatus(str, Enum):
@@ -19,6 +22,7 @@ class WaitlistStatus(str, Enum):
     DECLINED = "DECLINED"
     NO_ANSWER = "NO_ANSWER"
     EXHAUSTED = "EXHAUSTED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
 
 
 class CallStatus(str, Enum):
@@ -33,6 +37,7 @@ class CallStatus(str, Enum):
     SKIPPED_DUPLICATE = "SKIPPED_DUPLICATE"
     SKIPPED_OUT_OF_WINDOW = "SKIPPED_OUT_OF_WINDOW"
     CANCELLED_BY_OPERATOR = "CANCELLED_BY_OPERATOR"
+    UNCERTAIN = "UNCERTAIN"
 
 
 @dataclass
@@ -47,6 +52,7 @@ class Reservation:
 
     @classmethod
     def from_line(cls, line: dict) -> "Reservation":
+        validate_phone_syntax(line["phone"])
         return cls(
             booking_id=line["booking_id"],
             name=line["name"],
@@ -83,6 +89,7 @@ class WaitlistEntry:
 
     @classmethod
     def from_line(cls, line: dict) -> "WaitlistEntry":
+        validate_phone_syntax(line["phone"])
         return cls(
             entry_id=line["entry_id"],
             name=line["name"],
@@ -118,6 +125,7 @@ class CallOutcome:
     notes: str | None = None
     transcript_ref: str | None = None
     call_cost_id: str | None = None
+    uncertainty_reason: str | None = None
 
     @classmethod
     def from_payload(cls, run_id: str, target_id: str, payload: dict) -> "CallOutcome":
@@ -129,4 +137,5 @@ class CallOutcome:
             notes=payload.get("notes"),
             transcript_ref=payload.get("transcript_ref"),
             call_cost_id=payload.get("call_cost_id"),
+            uncertainty_reason=payload.get("uncertainty_reason"),
         )
