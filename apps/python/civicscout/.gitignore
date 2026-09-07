@@ -1,0 +1,25 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Excluded Hackathon Submission Documents & PDFs
+submission/
+submissions/
+CALL-E*.pdf
+*.pdf
+implementation_plan*
+task_list*
+
+# Virtual environments & IDE
+venv/
+.venv/
+env/
+.idea/
+.vscode/
