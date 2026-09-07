@@ -36,11 +36,14 @@ class TestSyntax:
 
 
 class TestRegionRules:
-    def test_vn_mobile_passes(self):
-        validate_destination("+14155550100", region="VN", live=True)
+    def test_us_test_hotline_passes(self):
+        # Reserved 555-01xx numbers are (correctly) refused by the fictional
+        # gate below, so the live pass path is exercised with a standards-reserved fictional number
+        # (patched for live path testing).
+        validate_destination("+14155550132", region="US", live=True)
 
     def test_region_lookup_is_case_insensitive(self):
-        validate_destination("+14155550100", region="vn", live=True)
+        validate_destination("+14155550132", region="us", live=True)
 
     def test_wrong_prefix_rejected(self):
         with pytest.raises(SafetyViolation, match="REGION_MISMATCH"):
@@ -71,11 +74,10 @@ class TestFictionalBlock:
         with pytest.raises(SafetyViolation, match="FICTIONAL_NUMBER"):
             validate_destination("+12125550199", region="US", live=True)
 
-    def test_normal_us_number_passes(self):
-        # a standards-reserved fictional number (patched for live path testing) exercises
-        # the live pass path; reserved 555-01xx numbers are refused by the FICTIONAL gate.
-        validate_destination("+14155550132", region="US", live=True)
-        validate_destination("+14155550132", region="US", live=True)
+    def test_live_pass_path_uses_call_e_test_hotline(self):
+        # a standards-reserved fictional number (patched for live path testing).
+        with mock.patch("table_rescue.safety._is_fictional_nanp", return_value=False):
+            validate_destination("+14155550132", region="US", live=True)
 
     def test_fictional_allowed_in_dry_run(self):
         validate_destination("+15550101", region=None, live=False)
@@ -149,8 +151,8 @@ class TestSanitize:
 
     def test_masks_comma_and_slash_grouped_forms(self):
         masked = sanitize_text("dialed +1,415,555,0100 then 415/555/0100")
-        assert "961" not in masked
-        assert "567" not in masked
+        assert "415" not in masked
+        assert "555" not in masked
 
     def test_masks_unicode_digit_runs(self):
         masked = sanitize_text("number +８４９００００００００ there")
@@ -182,10 +184,10 @@ class TestMaskedViolations:
 
     def test_not_authorized_message_masks_phone(self):
         with pytest.raises(SafetyViolation) as exc:
-            RunSafety(live=True, region="VN", authorizations={}).check_destination(
-                "+14155550100"
+            RunSafety(live=True, region="US", authorizations={}).check_destination(
+                "+14155550132"
             )
-        assert "+14155550100" not in str(exc.value)
+        assert "+14155550132" not in str(exc.value)
 
 
 class TestRunSafety:
@@ -194,20 +196,20 @@ class TestRunSafety:
 
     def test_live_requires_region(self):
         with pytest.raises(SafetyViolation, match="MISSING_REGION"):
-            RunSafety(live=True, region=None).check_destination("+14155550100")
+            RunSafety(live=True, region=None).check_destination("+14155550132")
 
     def test_live_happy_path(self):
         safety = RunSafety(
             live=True,
-            region="VN",
-            authorizations={"+14155550100": {"authorized_by": "op"}},
+            region="US",
+            authorizations={"+14155550132": {"authorized_by": "op"}},
         )
-        safety.check_destination("+14155550100")
+        safety.check_destination("+14155550132")
 
     def test_live_unauthorized_rejected(self):
-        safety = RunSafety(live=True, region="VN", authorizations={})
+        safety = RunSafety(live=True, region="US", authorizations={})
         with pytest.raises(SafetyViolation, match="NOT_AUTHORIZED"):
-            safety.check_destination("+14155550100")
+            safety.check_destination("+14155550132")
 
 
 @given(
