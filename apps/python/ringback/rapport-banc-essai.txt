@@ -1,0 +1,186 @@
+==============================================================================
+  RINGBACK — BANC D'ESSAI DE BOUT EN BOUT (simulation uniquement)
+  Rapport du 04/09/2026
+==============================================================================
+
+EN UNE LIGNE : TOUT PASSE — 661/661 contrôles, 121/121 combinaisons parcourues.
+
+------------------------------------------------------------------------------
+1. LES VERROUS DE SÉCURITÉ (aucun appel réel ne peut partir d'ici)
+------------------------------------------------------------------------------
+  ✅ Préparer l'essai en conditions réelles ne passe aucun appel
+  ✅ Le masquage des numéros tient sur les 256 pages servies pendant ce banc
+  ✅ Le client d'appels est le SIMULATEUR
+  ✅ L'application n'est pas en mode réel
+  ✅ La clé CALLE_API_KEY est absente de ce processus
+  ✅ Construire un client d'appels RÉELS est impossible ici
+  ✅ Le mot « --appels-reels » n'est jamais employé par le banc
+  ✅ Le journal d'audit des appels réels n'a pas bougé
+  ✅ La base de données réelle du produit n'a pas bougé
+
+------------------------------------------------------------------------------
+2. LE COMPTE DES CAS
+------------------------------------------------------------------------------
+  Contrôles exécutés ........................ 661
+     dont passés ............................ 661
+     dont en échec .......................... 0
+  Combinaisons (nature × départ × issue) ... 121 parcourues
+     dont entièrement bonnes ................ 121
+     dont fautives .......................... 0
+  Produit complet des trois axes ............ 1050
+     (la plupart n'existent pas dans le produit : voir les
+      cases « · sans objet » des tableaux, et la section 6)
+  Paires nature × issue   ......... 61 bonnes / 0 fautives sur 61 parcourues
+  Paires départ × nature  ......... 34 bonnes / 0 fautives sur 34 parcourues
+  Paires départ × issue   ......... 114 bonnes / 0 fautives sur 114 parcourues
+
+  Légende : ✅ passé   ❌ échoué   ⬜ non couvert   · sans objet
+
+------------------------------------------------------------------------------
+3. TABLEAU A — chaque NATURE de campagne face à chaque ISSUE d'appel
+------------------------------------------------------------------------------
+     colonne 1 = 51 · accepte
+     colonne 2 = 52 · refuse
+     colonne 3 = 53 · pas de réponse
+     colonne 4 = 54 · propose un report
+     colonne 5 = 55 · veut déplacer sans conclure
+     colonne 6 = 56 · pas de réponse puis oui à la relance
+     colonne 7 = 🚫 ne plus appeler
+     colonne 8 = sans numéro
+     colonne 9 = doublon
+     colonne 10 = fiche supprimée en cours de route
+                                 1   2   3   4   5   6   7   8   9  10
+📞 Créneau libéré                ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ✅   ✅ 
+🔔 Rappel de rendez-vous         ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅ 
+✅ Confirmation de rendez-vous   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ✅   ✅ 
+📆 Déplacement de rendez-vous    ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅ 
+🗓 Prise de rendez-vous          ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ✅   ✅ 
+
+------------------------------------------------------------------------------
+   TABLEAU B — chaque POINT DE DÉPART face à chaque NATURE de campagne
+------------------------------------------------------------------------------
+     colonne 1 = 📞 Créneau libéré
+     colonne 2 = 🔔 Rappel de rendez-vous
+     colonne 3 = ✅ Confirmation de rendez-vous
+     colonne 4 = 📆 Déplacement de rendez-vous
+     colonne 5 = 🗓 Prise de rendez-vous
+                                                             1   2   3   4   5
+L'assistant en 3 étapes (⚠ bloquants, campagne « prête »)   ✅   ✅   ✅   ✅   ✅ 
+Étape 3 — collage d'une liste                               ✅   ✅   ✅   ✅   ✅ 
+Étape 3 — fichier CSV                                       ⬜   ⬜   ✅   ⬜   ⬜ 
+Étape 3 — agenda ICS                                        ⬜   ✅   ⬜   ⬜   ⬜ 
+Étape 3 — la base : rendez-vous à venir                     ⬜   ⬜   ⬜   ✅   ⬜ 
+Étape 3 — la base : rendez-vous manqués                     ⬜   ✅   ⬜   ⬜   ⬜ 
+Étape 3 — la base : rendez-vous annulés                     ⬜   ✅   ⬜   ⬜   ✅ 
+Étape 3 — la base : déplacés en attente                     ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — la base : tous les clients                        ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : 📵 injoignables                          ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : ❌ refus                                 ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : 🙋 à rappeler par un humain              ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : ✅ acceptés                              ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : 🔁 à recontacter                         ⬜   ⬜   ⬜   ⬜   ✅ 
+Étape 3 — reprise : tous les contacts                       ⬜   ⬜   ⬜   ⬜   ✅ 
+La file d'appels (tout rappeler, puis exécuter)             ·   ·   ·   ·   · 
+La cascade directe (page Cascade « premier oui »)           ✅   ·   ·   ·   · 
+L'option « décaler en cascade » (son parcours entier)       ✅   ·   ·   ·   · 
+Déplacer une JOURNÉE entière (son parcours entier)          ·   ·   ·   ✅   · 
+👥 Clients — un état à traiter (§4)                          ·   ✅   ✅   ✅   ✅ 
+📅 Le planning — un trou, ou un rendez-vous (§5)             ✅   ·   ·   ✅   · 
+
+------------------------------------------------------------------------------
+   TABLEAU C — chaque POINT DE DÉPART face à chaque ISSUE d'appel
+------------------------------------------------------------------------------
+     colonne 1 = 51 · accepte
+     colonne 2 = 52 · refuse
+     colonne 3 = 53 · pas de réponse
+     colonne 4 = 54 · propose un report
+     colonne 5 = 55 · veut déplacer sans conclure
+     colonne 6 = 56 · pas de réponse puis oui à la relance
+     colonne 7 = 🚫 ne plus appeler
+     colonne 8 = sans numéro
+     colonne 9 = doublon
+     colonne 10 = fiche supprimée en cours de route
+                                                             1   2   3   4   5   6   7   8   9  10
+L'assistant en 3 étapes (⚠ bloquants, campagne « prête »)   ·   ·   ·   ·   ·   ·   ·   ·   ·   · 
+Étape 3 — collage d'une liste                               ✅   ✅   ✅   ✅   ✅   ✅   ✅   ·   ✅   ✅ 
+Étape 3 — fichier CSV                                       ✅   ✅   ✅   ✅   ✅   ✅   ✅   ·   ✅   ✅ 
+Étape 3 — agenda ICS                                        ⬜   ⬜   ✅   ⬜   ⬜   ⬜   ⬜   ✅   ⬜   ⬜ 
+Étape 3 — la base : rendez-vous à venir                     ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜ 
+Étape 3 — la base : rendez-vous manqués                     ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜ 
+Étape 3 — la base : rendez-vous annulés                     ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ⬜   ✅   ⬜ 
+Étape 3 — la base : déplacés en attente                     ⬜   ✅   ✅   ✅   ✅   ✅   ⬜   ⬜   ✅   ⬜ 
+Étape 3 — la base : tous les clients                        ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ⬜   ✅   ⬜ 
+Étape 3 — reprise : 📵 injoignables                          ⬜   ⬜   ✅   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜ 
+Étape 3 — reprise : ❌ refus                                 ⬜   ✅   ⬜   ⬜   ✅   ✅   ⬜   ⬜   ⬜   ⬜ 
+Étape 3 — reprise : 🙋 à rappeler par un humain              ⬜   ⬜   ⬜   ⬜   ✅   ⬜   ⬜   ⬜   ⬜   ⬜ 
+Étape 3 — reprise : ✅ acceptés                              ✅   ⬜   ⬜   ✅   ⬜   ✅   ⬜   ⬜   ⬜   ⬜ 
+Étape 3 — reprise : 🔁 à recontacter                         ⬜   ⬜   ✅   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜ 
+Étape 3 — reprise : tous les contacts                       ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ⬜   ⬜   ⬜ 
+La file d'appels (tout rappeler, puis exécuter)             ✅   ✅   ✅   ✅   ✅   ✅   ✅   ✅   ⬜   ⬜ 
+La cascade directe (page Cascade « premier oui »)           ✅   ✅   ✅   ✅   ✅   ✅   ✅   ·   ✅   ⬜ 
+L'option « décaler en cascade » (son parcours entier)       ✅   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜   ⬜ 
+Déplacer une JOURNÉE entière (son parcours entier)          ✅   ⬜   ✅   ⬜   ✅   ⬜   ⬜   ⬜   ⬜   ⬜ 
+👥 Clients — un état à traiter (§4)                          ·   ·   ·   ·   ·   ·   ·   ·   ·   · 
+📅 Le planning — un trou, ou un rendez-vous (§5)             ·   ·   ·   ·   ·   ·   ·   ·   ·   · 
+
+------------------------------------------------------------------------------
+4. LES ÉCHECS, UN PAR UN
+------------------------------------------------------------------------------
+  Aucun échec.
+
+------------------------------------------------------------------------------
+5. À VÉRIFIER À LA MAIN (ce banc n'a pas de souris)
+------------------------------------------------------------------------------
+  • Compléter à la main les colonnes ⚠ d'une grille venue des « annulés » ou des « déplacés »
+    → Étape 3 : taper la date et le motif dans chaque ligne de la grille, puis « Valider ».
+  • Le dévoilement en cascade des options (une option qui révèle ses sous-options)
+    → Étape 2 : décocher puis recocher « Recontacter » et vérifier que le bloc de relance apparaît et disparaît sans que la page se recharge.
+  • Les boutons ⏸ Pause et ⏹ Arrêter pendant une campagne
+    → Lancer une campagne d'au moins 10 contacts, cliquer ⏸ pendant qu'elle tourne, vérifier que l'appel en cours s'achève puis que rien ne repart.
+  • Le téléchargement des fichiers CSV (grille et liste de cascade)
+    → Cliquer « Exporter en CSV » et ouvrir le fichier reçu : les numéros y sont en clair, c'est voulu et annoncé.
+  • La modale d'édition d'un rendez-vous depuis le planning
+    → Planning : cliquer une case occupée, changer l'heure dans la modale, enregistrer, et vérifier que seule la zone du planning se recharge.
+  • Le confort de lecture (couleurs, contrastes, taille des caractères)
+    → Ouvrir chaque page et juger à l'œil ; aucun banc ne peut le faire à votre place.
+  • Le mode APPELS RÉELS (les trois verrous)
+    → Ce banc ne l'approche JAMAIS. Pour l'éprouver, il faut la clé CALLE_API_KEY, l'option --appels-reels et taper APPELER : à faire à la main, en connaissance de cause.
+  • L'ISSUE d'un vrai appel — ce que l'agent comprend de ce que vous DITES au téléphone
+    → Aucun banc ne peut en juger : ici, l'issue est décidée par le simulateur ; au téléphone, elle dépend de vos phrases et de la compréhension du français par l'agent. C'est l'objet de l'essai en conditions réelles : déclarez votre 🧪 numéro d'essai dans ⚙ Réglages, préparez la campagne d'essai, puis suivez PROCEDURE-ESSAI-REEL.md — c'est VOUS qui constatez, appel par appel, si le résultat rendu est fidèle.
+
+------------------------------------------------------------------------------
+6. CE QUI N'EST PAS COUVERT, ET POURQUOI
+------------------------------------------------------------------------------
+  · La file d'appels (tout rappeler, puis exécuter) : La file d'appels ne demande pas de nature : elle rappelle les rendez-vous manqués et fabrique sa campagne « manqués ».
+  · La cascade directe (page Cascade « premier oui ») : La page Cascade ne fait qu'une seule nature : « créneau libéré ».
+  · 👥 Clients — un état à traiter (§4) : La porte 👥 ne propose que les natures qu'un ÉTAT peut désigner (table etats_clients.TRAITEMENT) : prise de rendez-vous, rappel, confirmation et déplacement. La cinquième, « créneau libéré », part du PLANNING — d'une place qui se libère, jamais de l'état d'un client. « Rappel d'appel manqué » en dépendait aussi, mais son état (« il a cherché à nous joindre ») n'était jamais produit par le moteur : la nature a été retirée le 03/08/2026, et l'état avec elle.
+  · 📅 Le planning — un trou, ou un rendez-vous (§5) : La porte 📅 ne propose que les deux natures qui partent d'une PLACE : « créneau libéré » (un trou) et « déplacement » (un rendez-vous). Rappel et confirmation s'y feront par SÉLECTION d'une journée ou d'une semaine (§5) : ce geste-là n'est pas construit.
+  · L'assistant en 3 étapes (⚠ bloquants, campagne « prête ») : Le parcours en 3 étapes se juge sur ses refus ⚠ et sur la campagne « prête », pas sur une issue d'appel.
+  · 👥 Clients — un état à traiter (§4) : La porte 👥 n'appelle personne : elle ouvre l'assistant à l'étape 2. Aucune issue d'appel ne peut donc en naître — c'est ce que le banc mesure.
+  · 📅 Le planning — un trou, ou un rendez-vous (§5) : La porte 📅 n'appelle personne non plus : elle ouvre l'assistant, ou applique la règle d'annulation. Aucune issue d'appel ne peut en naître.
+  ⬜ Toute case ⬜ des tableaux est un trou de couverture ASSUMÉ :
+     ce banc ne l'a pas parcourue. Elle n'est pas « bonne », elle
+     est INCONNUE.
+  · Agenda ICS : les autres participants de l'agenda d'exemple n'ont pas de terminaison 51-56 ; leur issue est tirée au hasard (graine fixée), le banc ne leur attribue donc aucune case de la matrice.
+  · L'option d'annulation a été parcourue dans ses DEUX réglages (nature « 🔔 Rappel de rendez-vous », départ « collage ») : sans elle le message interdit de proposer une date et le client passe « 📞 le client rappellera » ; avec elle, un accord devient un déplacement, avec sa ligne ↔ au cahier. Le simulateur ne LIT pas le message — le banc mesure donc ce que le message DIT, et ce que le produit ÉCRIT dans chacune des deux issues, jamais ce que l'agent aurait « compris ».
+  · Le seuil de remplacement (12 h — la valeur du propriétaire, réglable dans ⚙ Réglages) a été parcouru DES DEUX CÔTÉS, avec de VRAIS rendez-vous : l'un dans plusieurs semaines (supprimé, compensation proposée), l'autre dans deux heures (laissé « annulé », avec l'explication et le moyen d'agir à la main). Le banc a aussi mesuré ce qui compte le plus : la proposition n'appelle PERSONNE — elle ouvre l'assistant, et c'est tout.
+  · Le trou Q7 (« un oui pour une autre date ne libérait pas l'ancienne place ») a été parcouru sur la cascade DIRECTE, dans ses deux branches — « accepté » et « autre date convenue » — et dans les trois situations de reconnaissance : client connu à un seul rendez-vous (l'ancien part), ligne collée inconnue (rien n'est touché), client à plusieurs rendez-vous à venir (rien n'est touché non plus, et l'écran le dit).
+  · Masquage : la zone de collage de la page Cascade et les exports CSV contiennent volontairement les numéros en clair (c'est la liste que l'utilisateur collerait lui-même). Ces pages sont donc écartées du contrôle de masquage, à dessein.
+  · Chaque voie de remplissage (CSV, agenda ICS, les cinq sources de la base, les six reprises de campagne) est éprouvée avec UNE nature, choisie pour être la plus naturelle avec elle. Les autres croisements « voie × nature » restent ⬜ : ils sont possibles dans le produit, ce banc ne les a simplement pas parcourus.
+  · Une reprise de campagne FILTRÉE par état ne peut rencontrer que les issues des personnes qui étaient dans cet état : une reprise des « ❌ refus » ne croisera jamais un « 51 accepte ». Les ⬜ de ces lignes ne sont pas des oublis, c'est la nature du filtre.
+  · Le cas « contact sans numéro » ne peut naître que d'un agenda ICS ou être compté comme écarté par une source de la base : un collage, un CSV et une liste de cascade passent tous par le validateur de numéro, qui refuse la ligne. D'où les ⬜ de la colonne « sans numéro » pour les autres natures.
+
+------------------------------------------------------------------------------
+7. COMMENT CE RAPPORT EST FABRIQUÉ
+------------------------------------------------------------------------------
+  • Base JETABLE dans un dossier temporaire, détruite à la fin.
+    La base réelle donnees/ringback.db n'est jamais ouverte.
+  • Serveur web sur le port 8779 (le produit vit sur 8770).
+  • Jeu de données : celui du produit (ringback/jeu_essai.py),
+    75 clients et 112 rendez-vous, numéros de fiction
+    Arcep — aucun ne peut sonner chez quelqu'un.
+  • Date de référence : 04/09/2026 à 12 h 00. C'est la
+    SEULE date relative ; tout le reste en découle. Le rapport ne
+    porte pas d'heure, pour être comparable d'une exécution à
+    l'autre le même jour.
+
