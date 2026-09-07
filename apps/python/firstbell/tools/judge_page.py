@@ -1045,6 +1045,48 @@ def sources_markup() -> str:
     return f'<ul class=sources>{"".join(rows)}</ul>'
 
 
+def takeaway_markup() -> str:
+    """The two pieces of this that are worth something to somebody who is not us.
+
+    Both blind reviewers arrived at the same complaint from opposite seats. The platform
+    engineer wrote that the transferable work is `calle_double` and that it is "filed where
+    nobody will find it". The district operations director wrote that the n8n recipe "appears
+    in the README only, not the page and not the video". Neither of them was going to clone a
+    repository to discover it. So the page says it, with the number of tests behind each and
+    the one command that checks it.
+    """
+    rows = [
+        ("The offline CALL-E",
+         "docs/the-offline-calle.html",
+         "A CALL-E written from the published API, mounted on the SDK's own transport, so "
+         "the client under test is the shipped one. Every offline run in this entry is "
+         "measured against it, and the record proving it matches production compares 11 "
+         "recorded responses path by path and type by type.",
+         "python tools/double_conformance.py --check",
+         "44 tests"),
+        ("The same rule as an n8n recipe",
+         None,
+         "The three-outcome classifier is not locked inside a Python CLI. It ships as an "
+         "importable n8n workflow, generated from the tested module by a committed script "
+         "so the two cannot drift, inactive on import with a dry run that places no calls "
+         "and needs no API key.",
+         "node --test examples/classify.test.mjs examples/workflow-shape.test.mjs",
+         "27 tests, no n8n installed"),
+    ]
+    items = []
+    for title, href, why, command, count in rows:
+        head = (f'<a href="{href}">{esc(title)}</a>' if href else esc(title))
+        items.append(
+            f'<li><p class=take-h>{head}</p>'
+            f'<p class=take-why>{esc(why)}</p>'
+            f'<p class=take-run><code>{esc(command)}</code> '
+            f'<span class=take-n>{esc(count)}</span></p></li>')
+    return (
+        '<p class=further-k>Two pieces of this you can take</p>'
+        f'<ul class=take-list>{"".join(items)}</ul>'
+    )
+
+
 def further_markup() -> str:
     """The one block on this page whose links leave it.
 
@@ -1059,6 +1101,7 @@ def further_markup() -> str:
         '<h2 class=further-lead id=h-further>Everything this rests on, and how to leave '
         'this page to check it.</h2>'
         + doc_pages.index_markup()
+        + takeaway_markup()
         + '<p class=further-k>The outside figures, and who published them</p>'
         + sources_markup()
         + '</section>'

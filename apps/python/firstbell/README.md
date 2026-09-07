@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and forty-seven gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and fifty-nine gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Nine findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and why a Goal cannot carry a family whose language the deployment does not fix | 2 min |
@@ -38,12 +38,48 @@ below is checked by a test, so a line number here cannot quietly rot.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:329`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:300`.
+  `firstbell/cli.py:315`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
   `dispatch/scheduler.py:342`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
+
+### Where the work comes from, and the morning nobody does
+
+An operations reviewer said the plainest true thing anyone has said about this: "nobody
+hand-uploads a CSV every morning at scale". A pilot that needs one lasts a week.
+
+`--work-file` names a file. It is what a judge runs, because a demo that needs credentials
+to somebody else's database is a demo nobody runs.
+
+`--work-drop` names the directory a system of record already writes its nightly export to,
+and reads the newest file in it. Every SIS in this market can be scheduled to do that; it is
+an afternoon of work for a district's IT department and needs no cooperation from this
+project. What is deliberately absent is an adapter against one vendor's private API, because
+it could not be exercised from this tree and would ship as a code path nobody has run.
+
+Taking the person out of the morning takes out the person who would have noticed, so the
+drop is mostly refusals:
+
+- **A stale export is refused**, because the overnight job not running leaves yesterday's
+  file in place, and calling from it telephones the families of children who are at a desk
+  to ask why they are absent. `--drop-max-age-hours` moves the line, because 02:00 and 06:00
+  are different agreements. It cannot remove it.
+- **An export already called from is refused**, by content rather than by filename, so a job
+  that rewrites the same rows under a new date stamp does not get through. The ledger beside
+  the drop says, in its own header, what deleting a line permits.
+- **A file that fails validation is not recorded as called-from**, or fixing the export and
+  putting it back would meet a refusal for having been seen.
+
+Twelve rules in that path were broken on purpose and each one failed the suite: rows 148 to
+159 of [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md). Seven of the twelve are cases a
+probe found by running the reader against twenty-four hostile files rather than by reading
+it. Two crashed with an exception that was not a `SourceError`, and five were accepted when
+accepting them ends with the wrong thing happening to a family. The worst was a row with
+fewer cells than its header: `csv.DictReader` fills the gaps with `None`, an unknown consent
+value used to be read as a no, and the two together reported a truncated export line as a
+family who had refused.
 
 The offline default stubs none of that. It builds a real client at
 `calle_double/transport.py:88` and mounts the double on that client's own httpx transport,
@@ -531,7 +567,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 329 tests
+python -m pytest tests/ -q          # 371 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

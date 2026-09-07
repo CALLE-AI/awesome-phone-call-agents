@@ -254,8 +254,42 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 145 | Put the animation data back behind a URL, so the policy refuses the fetch and the figure never plays | 1 |
 | 146 | Hide the replaced still with `element.hidden`, which SVG does not implement, leaving it in the layout beside the animation | 1 |
 | 147 | Size the animation to twice the still it replaces, so the page under it moves | 1 |
+| 148 | Read a consent value nobody defined as a no, so a district whose export writes `consented` has every family dropped and reported as having refused | 1 |
+| 149 | Read a row with fewer cells than its header, so a truncated export line becomes a family with no consent | 2 |
+| 150 | Read a row with more cells than its header, so the surplus travels into the spoken instruction under the key `None` | 1 |
+| 151 | Accept a column that appears twice, silently discarding one of the two values, which for `phones` or `consent` is the one that decides whether a family is called | 1 |
+| 152 | Let a file that is not the promised encoding raise `UnicodeDecodeError` instead of naming the encoding it tried | 1 |
+| 153 | Read a file containing a NUL byte, so a half-written export is treated as text and a child's name is spoken with a gap in it | 1 |
+| 154 | Let a cell past the CSV field limit raise `_csv.Error`, which names neither the file nor the cause | 1 |
+| 155 | Call from an export older than the window, which telephones the families of children who are in school today | 2 |
+| 156 | Call from an export already called from, telephoning every family in it twice | 2 |
+| 157 | Key the processed ledger on the filename rather than the content, so a job that rewrites the same rows under a new date stamp gets through | 1 |
+| 158 | Record an export as called-from before its rows are known to be readable, which strands the operator who fixes it | 1 |
+| 159 | Drop the sentence in the ledger header saying what deleting a line permits | 1 |
 
-Rows 142 to 144 are the only ones here that test a rule which did not exist before the
+Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
+fed the input path twenty-four hostile files and recorded what each one did: two crashed
+with an exception that was not a `SourceError`, and five were accepted when accepting them
+ends with the wrong thing happening to a family. The suite was green throughout, 329 tests
+at that point, so none of this was a rule that failed. It was a set of cases nobody had
+written down.
+
+Two of the probe's own expectations were wrong, which is worth recording because a probe
+that is never wrong is a probe that only asks what it already knows. A phone number that is
+not E.164 and a locale nobody supports are both read by the source and both place zero
+calls, because refusing to dial is the dispatcher's job. Running the whole pipeline settled
+it; arguing about it would not have.
+
+Row 149 is the worst of them. `csv.DictReader` fills a short row's missing columns with
+None, the old consent reader treated anything it did not recognise as a no, and the two
+together turned a truncated export line into a family reported as having refused. A
+truncated line is exactly what a killed overnight job leaves behind, and `DropSource` reads
+whatever that job left without a person in the way. Row 154's mutation had to be redone: the
+first attempt removed the guard in a way that would not parse, so the suite failed to
+collect rather than failing a test, and a collection error is not evidence that anything is
+being checked.
+
+Rows 142 to 144 test a rule that test a rule which did not exist before the
 mutation was written. A security pass found the double authorises any bearer token, which
 is correct and is what lets the whole entry run without a CALL-E account, and that it
 would bind wherever `--host` pointed. Nothing had gone wrong. The three rows are the three

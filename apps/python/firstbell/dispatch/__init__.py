@@ -16,7 +16,7 @@ from .models import (
     mask,
     redact_free_text,
 )
-from .sources import CsvSource, MemorySource, SourceError, WorkSource
+from .sources import CsvSource, DropSource, MemorySource, SourceError, WorkSource
 from .scheduler import Cancelled, RetryPolicy, WaveDispatcher, default_idempotency_key
 from .validation import UnsupportedSchema, is_valid, problems
 
@@ -26,5 +26,5 @@ __all__ = [
     "mask", "redact_free_text",
     "NO_CONSENT", "NO_VOICE_CHANNEL", "CANCELLED",
     "is_valid", "problems", "UnsupportedSchema",
-    "WorkSource", "CsvSource", "MemorySource", "SourceError",
+    "WorkSource", "CsvSource", "DropSource", "MemorySource", "SourceError",
 ]

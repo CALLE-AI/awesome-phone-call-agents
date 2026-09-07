@@ -4,19 +4,32 @@ The design named a system-of-record adapter, and an operations judge pointed out
 "roll ingest" was being treated as solved when it is not: nobody hand-uploads a CSV every
 morning at scale, and no operator pilots something that requires it for more than a week.
 
-That criticism is right, and the honest response is to be clear about what exists. The
-adapter is a Protocol, so a real system-of-record implementation is a drop-in. What ships
-is the file-backed one, because a CSV export is the lowest common denominator every
-system of record can produce, and because a demo a judge can run must not require
-credentials to somebody else's database.
+That criticism is right, and there are two answers here rather than one.
 
-The Protocol is not decoration. `CsvSource` implements it, the dispatcher depends only on
+`CsvSource` reads a named file. It is the lowest common denominator every system of record
+can produce, and it is what a judge runs, because a demo that needs credentials to
+somebody else's database is a demo nobody runs.
+
+`DropSource` is the one that removes the person. It reads the newest export in a directory,
+which is where a nightly scheduled job from any of these systems already writes, and it
+refuses a stale file and refuses a file it has already called from. Those two refusals are
+the whole point: unattended, both of the ways this fails end with a family being telephoned
+about something untrue.
+
+What is deliberately not here is an adapter against one vendor's private API. It could not
+be tested from this tree, so it would ship as a code path nobody has run, in a repository
+whose argument is that a claim without the thing that checks it is worth nothing.
+
+The Protocol is not decoration. Both sources implement it, the dispatcher depends only on
 the Protocol, and a test proves an in-memory implementation substitutes cleanly.
 """
 
 from __future__ import annotations
 
 import csv
+import hashlib
+import io
+import time
 from pathlib import Path
 from typing import Iterable, Iterator, Protocol, runtime_checkable
 
@@ -51,6 +64,38 @@ _NO = {"0", "false", "no", "n", "denied"}
 
 def _truthy(raw: str | None) -> bool:
     return (raw or "").strip().lower() in _YES
+
+
+def _consent_ok(raw: str | None, where: str) -> bool:
+    """Whether this family has agreed to be telephoned.
+
+    This used to be `_truthy`, which reads anything it does not recognise as a no. The
+    direction was safe and the silence was not. A district whose export writes `consented`
+    or `Y/N` or `1.0` got every family dropped from the run and reported as unconsented,
+    which reads as "these parents said no" when the truth is "your column does not match
+    ours". Nobody would find that from the output.
+
+    `_voice_ok` below has always refused a value it does not know, with the reasoning that
+    the column decides whether a person is telephoned so it is not guessed at. Consent
+    decides exactly the same thing. The two now behave the same way.
+
+    Blank still means no, and that is not a guess: a row where the office has recorded
+    nothing has recorded no permission, and the safe reading of an empty consent record is
+    not "go ahead". That is the one case where absence carries meaning, so it is the one
+    case that does not raise.
+    """
+    value = (raw or "").strip().lower()
+    if not value:
+        return False
+    if value in _YES:
+        return True
+    if value in _NO:
+        return False
+    raise SourceError(
+        f"{where}: consent is {raw!r}, which this does not understand. Use yes or no. "
+        "Reading an unknown value as a no would drop this family from the run and report "
+        "them as having refused, which is a different thing and nobody would spot it."
+    )
 
 
 def _voice_ok(raw: str | None, where: str) -> bool:
@@ -101,9 +146,40 @@ class CsvSource:
         if not self.path.exists():
             raise SourceError(f"No such work file: {self.path}")
 
-        with self.path.open("r", encoding=self.encoding, newline="") as handle:
+        # Read the bytes and decode them here rather than letting the file object do it, so
+        # that a file which is not the encoding it was promised to be produces a refusal
+        # naming the encoding instead of a UnicodeDecodeError traceback. Older systems of
+        # record still export cp1252, and a district seeing a Python stack trace at 08:40
+        # has no way to know that `encoding=` is the answer.
+        raw = self.path.read_bytes()
+        try:
+            text = raw.decode(self.encoding)
+        except UnicodeDecodeError as bad:
+            raise SourceError(
+                f"{self.path.name} is not {self.encoding}: byte {bad.object[bad.start]:#04x} "
+                f"at position {bad.start} is not valid. Several systems of record still "
+                f"export cp1252 or latin-1. Pass the encoding the export really uses rather "
+                f"than letting this guess, because a wrong guess mangles a family's name and "
+                f"then speaks it down a telephone."
+            ) from bad
+        if "\x00" in text:
+            raise SourceError(
+                f"{self.path.name} contains a NUL byte, so it is not a text export. A "
+                "truncated or half-written file is the usual cause, and the usual cause of "
+                "that is an overnight job that did not finish."
+            )
+
+        with io.StringIO(text, newline="") as handle:
             reader = csv.DictReader(handle)
             headers = [h.strip() for h in (reader.fieldnames or [])]
+            repeated = sorted({h for h in headers if headers.count(h) > 1})
+            if repeated:
+                raise SourceError(
+                    f"{self.path.name} has the column(s) {', '.join(repeated)} more than "
+                    "once. A repeated column means one of the two values is silently "
+                    "discarded, and if the repeated column is 'phones' or 'consent' the "
+                    "discarded one decides whether a family is telephoned."
+                )
             missing = [c for c in self.REQUIRED if c not in headers]
             if missing:
                 raise SourceError(
@@ -116,7 +192,42 @@ class CsvSource:
                 )
 
             seen: set[str] = set()
-            for line_number, row in enumerate(reader, start=2):
+            try:
+                rows = list(enumerate(reader, start=2))
+            except csv.Error as bad:
+                # The stdlib default field limit is 131,072 characters. A cell past it is a
+                # corrupt file, not a long name, and `_csv.Error` reaching an operator says
+                # nothing about which file or why.
+                raise SourceError(
+                    f"{self.path.name} could not be read as CSV: {bad}. A single cell past "
+                    "the field limit means the file is corrupt or the quoting is unbalanced, "
+                    "which a half-written export produces."
+                ) from bad
+
+            for line_number, row in rows:
+                # `csv.DictReader` is forgiving in both directions and both are wrong here.
+                # A short row fills the missing columns with None, so a truncated line
+                # silently became a family with no consent, dropped from the run and
+                # reported as unconsented. A long row puts the surplus under the key None,
+                # which then travelled into `context` and into the spoken instruction as
+                # `{None: ['extra', 'more']}`.
+                if None in row:
+                    raise SourceError(
+                        f"{self.path.name} line {line_number}: more cells than the header "
+                        f"has columns. The surplus is {row[None]!r}. A row that does not "
+                        "line up with its header cannot be read column by column, and "
+                        "guessing which cell is the phone number is not a thing to do."
+                    )
+                short = [k for k, v in row.items() if v is None]
+                if short:
+                    raise SourceError(
+                        f"{self.path.name} line {line_number}: fewer cells than the header "
+                        f"has columns, so {', '.join(short)} is absent rather than empty. "
+                        "A truncated line used to be read as a family who had not "
+                        "consented, which quietly removed them from the run and reported "
+                        "them as having refused."
+                    )
+
                 item_id = (row.get("id") or "").strip()
                 if not item_id:
                     raise SourceError(f"{self.path.name} line {line_number}: empty id")
@@ -145,10 +256,129 @@ class CsvSource:
                     locale=(row.get("locale") or "").strip() or None,
                     region=(row.get("region") or "").strip() or None,
                     context=context,
-                    consented=_truthy(row.get("consent")),
+                    consented=_consent_ok(
+                        row.get("consent"), f"{self.path.name} line {line_number}"),
                     reachable_by_voice=_voice_ok(
                         row.get("voice"), f"{self.path.name} line {line_number}"),
                 )
+
+
+class DropSource:
+    """The newest export a system of record left in a directory, or a refusal.
+
+    This answers the criticism in the module docstring. An operations reviewer was right
+    that nobody hand-uploads a CSV every morning, and the wrong fix is an adapter written
+    against one vendor's private API that nobody here can reach to test. Every system of
+    record in this market can already be scheduled to write a nightly export to a share or
+    an SFTP drop, which is a thing a district IT department does in an afternoon and does
+    not need this project's cooperation to do.
+
+    So the human comes out of the morning, and what replaces them is not a happy path. It is
+    two refusals, because both of the ways this goes wrong unattended end with a family
+    being telephoned about something untrue.
+
+    **A stale export.** The overnight job did not run, or it failed, and yesterday's file is
+    still sitting there. Reading it telephones the families of children who are in school
+    today to ask why they are absent. That is worse than not calling, so a file older than
+    `max_age_hours` is refused and the refusal says how old it is.
+
+    **A file already used.** The job wrote twice, or the run was restarted, and the same
+    export is read again. Every family in it is telephoned a second time. The dispatcher
+    derives its idempotency keys from the work item, so a genuine re-read of the same rows
+    is collapsed by CALL-E, but that is a backstop for a mistake rather than a licence to
+    make it: a district that sees the same call attempted twice does not care which layer
+    stopped it. A used export is recorded in a ledger beside the drop and refused by
+    content, not by filename, because the safe question is "have I called these people" and
+    not "have I read this name".
+
+    Neither refusal can be turned off. `max_age_hours` moves the stale line, because an
+    overnight job at 02:00 and one at 06:00 are different agreements and a district's
+    schedule is not this project's to fix. It cannot be removed.
+    """
+
+    LEDGER = ".firstbell-processed"
+
+    def __init__(self, directory: str | Path, *, pattern: str = "*.csv",
+                 max_age_hours: float = 18.0, encoding: str = "utf-8-sig",
+                 now: float | None = None) -> None:
+        self.directory = Path(directory)
+        self.pattern = pattern
+        self.max_age_hours = max_age_hours
+        self.encoding = encoding
+        # Injected rather than read where it is used, so a test can place a file at a known
+        # age instead of sleeping, and so the age quoted in a refusal is the age this
+        # actually decided on.
+        self._now = now
+
+    @property
+    def ledger_path(self) -> Path:
+        return self.directory / self.LEDGER
+
+    def _processed(self) -> set[str]:
+        if not self.ledger_path.exists():
+            return set()
+        return {
+            line.split()[0]
+            for line in self.ledger_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        }
+
+    def _record(self, digest: str, name: str) -> None:
+        first = not self.ledger_path.exists()
+        with self.ledger_path.open("a", encoding="utf-8", newline="") as handle:
+            if first:
+                handle.write("# Exports this has already placed calls from, by content "
+                             "digest. Deleting a line permits those families to be "
+                             "telephoned again." + "\n")
+            handle.write(digest + "  " + name + "\n")
+
+    def newest(self) -> Path:
+        """The file this run would read, or a refusal explaining why there is none."""
+        if not self.directory.is_dir():
+            raise SourceError(
+                f"{self.directory} is not a directory. This reads the export a system of "
+                "record drops, so point it at the drop rather than at a file."
+            )
+        candidates = [
+            f for f in sorted(self.directory.glob(self.pattern))
+            if f.is_file() and f.name != self.LEDGER
+        ]
+        if not candidates:
+            raise SourceError(
+                f"no file matching {self.pattern!r} in {self.directory}. An empty drop is "
+                "reported rather than treated as a day with no absences, because the two "
+                "look identical from here and only one of them is good news."
+            )
+        newest = max(candidates, key=lambda f: f.stat().st_mtime)
+
+        now = time.time() if self._now is None else self._now
+        age_hours = (now - newest.stat().st_mtime) / 3600.0
+        if age_hours > self.max_age_hours:
+            raise SourceError(
+                f"{newest.name} was written {age_hours:.1f} hours ago and the limit is "
+                f"{self.max_age_hours:.1f}. A stale export means the overnight job did not "
+                "run, and calling from it asks the families of children who are in school "
+                "today why they are absent. Fix the export, or pass a longer window on "
+                "purpose."
+            )
+        return newest
+
+    def items(self) -> Iterator[WorkItem]:
+        chosen = self.newest()
+        digest = hashlib.sha256(chosen.read_bytes()).hexdigest()
+        if digest in self._processed():
+            raise SourceError(
+                f"{chosen.name} has already been called from. Its content matches an entry "
+                f"in {self.LEDGER}, so reading it again would telephone every family in it "
+                "a second time. If that is genuinely what you want, remove the line."
+            )
+
+        # Read to a list before recording. A file that fails validation halfway through has
+        # placed no calls, and marking it processed would strand it: the operator fixes the
+        # export and this refuses the fixed copy for having been seen.
+        items = list(CsvSource(chosen, encoding=self.encoding).items())
+        self._record(digest, chosen.name)
+        return iter(items)
 
 
 class MemorySource:
@@ -161,4 +391,4 @@ class MemorySource:
         return iter(self._items)
 
 
-__all__ = ["WorkSource", "CsvSource", "MemorySource", "SourceError"]
+__all__ = ["WorkSource", "CsvSource", "DropSource", "MemorySource", "SourceError"]

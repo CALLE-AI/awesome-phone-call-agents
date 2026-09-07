@@ -1761,6 +1761,30 @@ button[data-copy][data-copied]::after {
 .read-list a { font-family: var(--ui); font-size: var(--size-3); font-weight: 600; }
 .read-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
             margin: 0; max-width: none; }
+/* The two reusable pieces. Named `tk-` rather than `take-` because `.take-n` already
+ * belongs to the act cards eight hundred lines up, and one stylesheet cannot mean two
+ * things by the same name. Two columns at the same breakpoint as the document list above
+ * it, because they read as one block of "and now what". */
+.take-list { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid;
+             gap: var(--space-3); }
+@media (min-width: 52rem) {
+  .take-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+}
+.take-list li { display: grid; gap: var(--space-1); align-content: start;
+                border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.take-h { font-family: var(--ui); font-size: var(--size-3); font-weight: 600;
+          margin: 0; color: var(--ink); }
+.take-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+            margin: 0; max-width: none; }
+.take-run { margin: 0.4rem 0 0; display: grid; gap: 0.3rem; }
+/* `anywhere` because the n8n command is 62 characters and the column is narrower than that
+ * at every width below the breakpoint. The overflow gate walks six widths and this is the
+ * shape that failed it once already, on a filename in a paragraph. */
+.take-run code { font-family: var(--mono); font-size: var(--size-1); color: var(--ink);
+                 overflow-wrap: anywhere; }
+.take-run .take-n { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3);
+                    border-top: 0; padding-top: 0; min-width: 0; display: block; }
+
 .sources { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .sources li { border-top: 1px solid var(--line); padding-top: var(--space-2); }
 .sources .num { font-family: var(--mono); font-variant-numeric: tabular-nums;

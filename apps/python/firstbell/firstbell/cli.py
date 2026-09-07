@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 
 from dispatch import (
     CsvSource,
+    DropSource,
     DispatchReport,
     Escalation,
     Resolution,
@@ -165,8 +166,22 @@ def build_parser() -> argparse.ArgumentParser:
         description="Phone the families whose absence notification went unanswered, "
                     "in their own language, and bring back a structured reason.",
     )
-    parser.add_argument("--work-file", required=True, type=Path,
-                        help="CSV of unexplained absences. Needs id, phones, consent.")
+    # Exactly one of the two. A run that was given both would have to choose, and choosing
+    # for an operator between "the file I named" and "whatever is in the drop" is choosing
+    # who gets telephoned.
+    where = parser.add_mutually_exclusive_group(required=True)
+    where.add_argument("--work-file", type=Path,
+                       help="CSV of unexplained absences. Needs id, phones, consent.")
+    where.add_argument("--work-drop", type=Path,
+                       help="Directory a system of record writes its nightly export to. "
+                            "Reads the newest file in it, refuses one older than "
+                            "--drop-max-age-hours, and refuses one it has already called "
+                            "from. This is the unattended path.")
+    parser.add_argument("--drop-max-age-hours", type=float, default=18.0,
+                        help="With --work-drop, how old an export may be before it is "
+                             "refused. A stale export means the overnight job did not run, "
+                             "and calling from it telephones the families of children who "
+                             "are in school today (default: 18).")
     parser.add_argument("--concurrency", type=int, default=3,
                         help="Maximum calls in flight at once. This is the only brake "
                              "CALL-E offers, so it is a safety setting (default: 3).")
@@ -327,7 +342,7 @@ def _client_and_mode(args: argparse.Namespace):
 
 def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                    api_responded: bool | None = None,
-                   summary, args: argparse.Namespace) -> None:
+                   summary, args: argparse.Namespace, came_from: str | None = None) -> None:
     """Evidence, not a claim.
 
     A receipt records what actually happened on one run: which calls were placed, what came
@@ -354,7 +369,9 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
         "reached_production_api": (None if api_responded is None
                                    else mode.reached_production and api_responded),
         "generated": date.today().isoformat(),
-        "work_file": str(args.work_file),
+        # Whichever way the work arrived. Told by main(), which knows the actual file the
+        # drop resolved to; derived here when a test builds a receipt directly.
+        "work_file": came_from or str(args.work_file or args.work_drop),
         "concurrency": args.concurrency,
         "counts": report.counts(),
         "resolution_rate": round(summary.resolution_rate, 4),
@@ -396,8 +413,22 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     rate = _rate_from(args)
 
+    # One name for wherever the work came from. Three places downstream printed
+    # `args.work_file`, which is None on the drop path, so a receipt would have recorded
+    # `"work_file": "None"` and the ceiling refusal would have told an operator to go and
+    # check a file called None.
+    if args.work_drop is not None:
+        source = DropSource(args.work_drop, max_age_hours=args.drop_max_age_hours)
+        try:
+            came_from = str(source.newest())
+        except SourceError as err:
+            print(f"Could not read the work file: {err}", file=sys.stderr)
+            return 2
+    else:
+        source = CsvSource(args.work_file)
+        came_from = str(args.work_file)
     try:
-        items = list(CsvSource(args.work_file).items())
+        items = list(source.items())
     except SourceError as err:
         print(f"Could not read the work file: {err}", file=sys.stderr)
         return 2
@@ -431,13 +462,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(
             f"This run would phone {len(would_dial)} families, more than the {ceiling}-call "
             f"ceiling.\nNothing has been dialled.\n"
-            f"If {args.work_file} is the file you meant, say the number on purpose:\n"
+            f"If {came_from} is the file you meant, say the number on purpose:\n"
             f"  --max-calls {len(would_dial)}\n"
             "If it is not the file you meant, --limit takes the first N rows instead."
         )
 
     print(mode.banner())
-    print(f"{len(items)} row(s) from {args.work_file}, concurrency {args.concurrency}.")
+    print(f"{len(items)} row(s) from {came_from}, concurrency {args.concurrency}.")
     print()
 
     for item in items:
@@ -477,7 +508,7 @@ def main(argv: list[str] | None = None) -> int:
         _print_human(report, summary, args.safeguarding_minutes)
 
     if args.receipt:
-        _write_receipt(args.receipt, report=report, mode=mode, summary=summary, args=args,
+        _write_receipt(args.receipt, report=report, mode=mode, summary=summary, args=args, came_from=came_from,
                        api_responded=dispatcher.api_responded)
         print(f"\nReceipt written to {args.receipt}")
 
