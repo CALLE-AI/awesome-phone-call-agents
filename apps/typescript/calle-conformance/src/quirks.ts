@@ -144,6 +144,18 @@ export const QUIRKS: Quirk[] = [
         (a) => a.failureCode == null && hasZone(a.startedAt) && turnsOf(a).length > 0,
       ),
   },
+  {
+    id: "recipient-speaks-after-the-agent-stops",
+    title: "The transcript continues after the agent's last turn",
+    consequence:
+      "Reading the answer as the turn that follows the question can take a fragment the recipient was still speaking, while the real answer arrives after the agent has already said goodbye.",
+    holds: (c) =>
+      attemptsOf(c).some((a) => {
+        const turns = turnsOf(a) as Array<{ speaker?: unknown }>;
+        const last = turns.map((t) => t?.speaker).lastIndexOf("bot");
+        return last !== -1 && turns.slice(last + 1).some((t) => t?.speaker === "user");
+      }),
+  },
 ];
 
 /** Which quirks a payload exhibits. */

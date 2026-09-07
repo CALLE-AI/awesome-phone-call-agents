@@ -14,20 +14,20 @@ dialled. Node 22 runs the TypeScript directly, and the only dependency in
 `package.json` is needed by the optional probes, not by this.
 
 ```
-6 projects carrying call-shaped payloads, 7 quirks.
+6 projects carrying call-shaped payloads, 8 quirks.
 A dot means the behaviour never appears in that project's payloads.
 
-project                            n    1  2  3  4  5  6  7
----------------------------------  --  -- -- -- -- -- -- --
-apps/python/casechaser              7   .  .  .  .  .  .  x
-apps/python/redline                 1   .  .  .  .  .  .  x
-apps/python/ringdown                2   .  .  .  .  x  .  x
-apps/typescript/calle-conformance  11   x  x  x  x  x  x  x
-plugins/zapier-calle                3   .  .  .  .  .  .  x
-skills/verify-by-phone              1   .  .  .  .  .  .  .
+project                            n    1  2  3  4  5  6  7  8
+---------------------------------  --  -- -- -- -- -- -- -- --
+apps/python/casechaser              7   .  .  .  .  .  .  x  .
+apps/python/redline                 1   .  .  .  .  .  .  x  .
+apps/python/ringdown                2   .  .  .  .  x  .  x  .
+apps/typescript/calle-conformance  15   x  x  x  x  x  x  x  x
+plugins/zapier-calle                3   .  .  .  .  .  .  x  .
+skills/verify-by-phone              1   .  .  .  .  .  .  .  .
 ```
 
-Seven behaviours this API really emits, and the payloads six projects test
+Eight behaviours this API really emits, and the payloads six projects test
 against. A dot means that project has never seen that behaviour in a fixture.
 The bottom row is this corpus, which is where the behaviours come from. Any path
 works, so `node src/replay.ts ../some-app` scores a checkout that is not in this
@@ -131,10 +131,19 @@ coverage the probe stops being refused and rings that number for real.
 
 ## The corpus
 
-`fixtures/` holds eleven real production responses, rewritten for publication. Seven
+`fixtures/` holds fifteen real production responses, rewritten for publication. Eight
 behaviours a caller would not predict from the documented shape are declared in
 `src/quirks.ts` as executable predicates rather than prose, so one definition
 labels the corpus, verifies the rewriting, and scores third-party code.
+
+Behaviour 8 is the newest and the one nothing else in this repository has seen.
+On six of the seven connected calls in the corpus, the recipient goes on speaking
+after the agent's final turn. Twice the answer to the agent's own question arrives
+after it has said goodbye, because it accepted a fragment the recipient was still
+mid-word on and closed. `taskCompleted` came back true at 0.86 to 0.95 confidence,
+labelled high, on every one. Code that reads the answer as the turn following the
+question takes `"I'm an"` on one of these calls; the real answer is two turns
+later.
 
 Among them: on a failed attempt `startedAt` carries no timezone designator and
 sits about four hours behind `createdAt`, while on a call that connected it
@@ -168,7 +177,7 @@ Files that carry transcript turns in a shape the checker cannot read are listed
 rather than counted as empty, because silently dropping a payload is the failure
 this corpus exists to expose.
 
-The corpus is eleven responses from one account in one region. It is a floor, not a
+The corpus is fifteen responses from one account in one region. It is a floor, not a
 specification.
 
 ## What it found
@@ -205,12 +214,15 @@ a number and treats whoever answers as the intended recipient is making an
 assumption no payload can confirm. This corpus inherits that limit rather than
 solving it, and no predicate here should be read as evidence about identity.
 
-One more, recorded as an open question rather than a finding. In the call of
-7 September 2026 that became `completed-no-failure-8turns-ff6b5c.json`, the task
-ended with "Do not say anything else" and the agent spoke a sentence the task did
-not contain. The response reported `taskCompleted: true` with a completion
-confidence of 0.92, labelled high. That is one call. It is not enough to claim
-anything, and it is written here so that it is not quietly forgotten.
+An open question from 7 September was tested and closed. One call whose task
+ended with "Do not say anything else" produced a sentence the task did not
+contain, at 0.92 confidence. `scripts/compliance.ts` repeated it four times with
+a task that enumerates the exact sentences the agent may speak, so that
+"unauthorised" is decidable rather than argued. The agent complied in all four.
+The reading was wrong, and the likely cause was a task written in prose that left
+room, not a platform ignoring an instruction. The experiment is kept because the
+four calls it placed are in the corpus and because a refuted guess is cheaper to
+publish than to repeat.
 
 ## Known ceilings
 
@@ -275,7 +287,8 @@ Some scripts under `scripts/` do place calls, and none of them is needed to
 evaluate this work. Each prints what it would send and stops; a flag naming the
 side effect is the only thing that makes it dial. `scripts/live-connected.ts`
 places one call, and `scripts/meter.ts` deliberately consumes a day of allowance in
-order to measure it.
+order to measure it. `scripts/compliance.ts` places one call per run to test
+whether the agent speaks outside a task that enumerates its permitted sentences.
 
 `npm run live` previews the connected-call probe. Its default destination is
 `+1 276-322-9632`, the English testing hotline CALL-E published on 7 September 2026

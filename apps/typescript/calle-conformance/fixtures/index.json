@@ -9,9 +9,50 @@
       "turns": 0
     },
     {
+      "file": "completed-no-failure-9turns-549d84.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 9
+    },
+    {
+      "file": "completed-no-failure-7turns-8a9aeb.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 7
+    },
+    {
+      "file": "completed-no-failure-8turns-0f3ac1.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 8
+    },
+    {
+      "file": "completed-no-failure-7turns-4260e0.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 7
+    },
+    {
       "file": "completed-no-failure-2turns-d1d516.json",
       "quirks": [
-        "connected-call-timestamps-are-well-formed"
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
       ],
       "status": "completed",
       "failureCode": null,
@@ -20,7 +61,8 @@
     {
       "file": "completed-no-failure-7turns-f62388.json",
       "quirks": [
-        "connected-call-timestamps-are-well-formed"
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
       ],
       "status": "completed",
       "failureCode": null,

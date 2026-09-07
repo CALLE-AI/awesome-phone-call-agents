@@ -21,7 +21,8 @@
     "headroom": "node --env-file-if-exists=.env src/headroom.ts",
     "live": "node --env-file-if-exists=.env scripts/live-connected.ts",
     "report": "node src/replay.ts ../../.. --html report.html",
-    "gate": "node src/replay.ts ../../.. --require all"
+    "gate": "node src/replay.ts ../../.. --require all",
+    "compliance": "node --env-file-if-exists=.env scripts/compliance.ts"
   },
   "dependencies": {
     "@call-e/calle": "0.7.0"
