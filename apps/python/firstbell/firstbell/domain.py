@@ -182,6 +182,34 @@ class StaffCost:
             year=2025,
         )
 
+    @classmethod
+    def us_school_safeguarding_lead(cls) -> "StaffCost":
+        """The wage the work this app *adds* is paid at, which is not the wage it removes.
+
+        A district buyer read the run and named the gap: the arithmetic prices the labour
+        taken off the desk at a secretary's wage and prices the labour it creates at
+        nothing. A call the safeguarding rule holds open goes to the designated
+        safeguarding lead, a role a US district staffs with a counsellor or an
+        administrator, and that hour costs more than the hour saved.
+
+        Counsellors are the cheaper of the two plausible posts, so this figure understates
+        the added cost in the same direction 2,080 hours understates the saved one. Pass
+        `--escalation-annual` with your own grade.
+        """
+        return cls(
+            annual=77_800.0,
+            currency="$",
+            hours_per_year=2_080,
+            occupation="School and career counselors and advisors",
+            industry="Elementary and secondary schools; local",
+            source="US Bureau of Labor Statistics, Occupational Outlook Handbook",
+            source_url=(
+                "https://www.bls.gov/ooh/community-and-social-service/"
+                "school-and-career-counselors.htm"
+            ),
+            year=2025,
+        )
+
     @property
     def hourly(self) -> float:
         return self.annual / self.hours_per_year
@@ -298,6 +326,10 @@ class ImpactSummary:
     escalated_unresolved: int = 0
     resolved_by_language: dict[str, int] = field(default_factory=dict)
     open_by_language: dict[str, int] = field(default_factory=dict)
+    # The wage the escalation queue is paid at. Separate from `staff` because they are
+    # different grades: one is the desk this run clears and the other is the post this
+    # run adds work to.
+    escalation_staff: StaffCost | None = None
 
     @property
     def closed(self) -> int:
@@ -315,6 +347,51 @@ class ImpactSummary:
         """
         attempted = self.resolved + self.undetermined + self.failed
         return (self.closed / attempted) if attempted else 0.0
+
+    @property
+    def answered(self) -> int:
+        """Calls where somebody picked up and a conversation happened.
+
+        The denominator for anything about what the escalation rule does, because a call
+        nobody answered could not have confirmed or failed to confirm anything.
+        """
+        return self.resolved + self.undetermined
+
+    @property
+    def net_new_escalations(self) -> int:
+        """Cases the rest of the pipeline would have closed, and this rule holds open.
+
+        `escalated` counts exactly this and has since the schema-valid fix: a row that
+        reached `resolved` satisfied the schema and said something, so without the
+        safeguarding rule it would have been closed and nobody would have called back.
+        `escalated_unresolved` is the other kind, already on somebody's desk for a
+        different reason, and it is not counted here.
+
+        The name is the point. A buyer staffing a rota cannot use a total escalation rate,
+        because most of it is work they were already doing. This is the part that is new.
+        """
+        return self.escalated
+
+    @property
+    def net_new_escalation_rate(self) -> float | None:
+        """Net-new escalations per answered call. None when nothing was answered."""
+        return (self.net_new_escalations / self.answered) if self.answered else None
+
+    @property
+    def escalation_cost_per_call_lead_minute(self) -> float | None:
+        """What the rule adds per call, for every minute one callback takes a lead.
+
+        Same shape as `break_even_per_call_minute` and for the same reason: how long a
+        safeguarding callback takes is a property of a school and not of this software, so
+        the quantity published is a rate and the school supplies the minutes.
+
+        It is subtracted from the break-even rather than reported beside it, because a
+        ceiling that ignores the labour the rule creates is a ceiling that is too high.
+        """
+        rate = self.net_new_escalation_rate
+        if rate is None or self.escalation_staff is None:
+            return None
+        return rate * (self.escalation_staff.hourly / 60.0)
 
     @property
     def non_english_resolved(self) -> int:
@@ -450,12 +527,43 @@ class ImpactSummary:
                 f"                        so cheaper than the desk below {cur}"
                 f"{ceiling * 3:,.2f} a call at 3 minutes an attempt",
             ] + _cited(self.staff.cite(), indent=24)
+
+            added = self.escalation_cost_per_call_lead_minute
+            if added is None:
+                out += [
+                    "",
+                    "  work this run adds   not computed",
+                    "                       Either nothing was answered, or no "
+                    "escalation wage",
+                    "                       was supplied. Pass --escalation-annual.",
+                ]
+            else:
+                assert self.escalation_staff is not None
+                net = self.net_new_escalations
+                left = ceiling * 3 - added * 3
+                out += [
+                    "",
+                    "  work this run adds",
+                    f"    net-new escalations {net} of {self.answered} answered call(s) "
+                    "would have closed",
+                    "                        without the safeguarding rule, so they are "
+                    "work",
+                    "                        that did not exist before this run",
+                    f"    added               {cur}{added:,.2f} per call, for every "
+                    "minute one callback",
+                    "                        takes the safeguarding lead",
+                    f"    ceiling after it    {cur}{left:,.2f} a call, at 3 minutes for "
+                    "each of the two",
+                    f"                        (from {cur}{ceiling * 3:,.2f}: the line "
+                    "above ignores this)",
+                ] + _cited(self.escalation_staff.cite(), indent=24)
         return out
 
 
 def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
               live: bool = False, rate: FundingRate | None = None,
-              staff: StaffCost | None = None) -> ImpactSummary:
+              staff: StaffCost | None = None,
+              escalation_staff: StaffCost | None = None) -> ImpactSummary:
     """`calls_placed` is derived unless a caller overrides it.
 
     A call an idempotency key replayed was not placed by this run, was not billed, and
@@ -492,6 +600,7 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         live=live,
         rate=rate,
         staff=staff,
+        escalation_staff=escalation_staff,
         escalated=sum(1 for r in results if r.escalation is not Escalation.NONE
                       and r.resolution is Resolution.RESOLVED),
         escalated_unresolved=sum(1 for r in results

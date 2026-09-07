@@ -254,6 +254,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--staff-hours", type=int, default=None,
                         help="Paid hours a year behind --staff-annual. Default 2,080, "
                              "which reads a ten-month contract as cheaper than it is.")
+    parser.add_argument("--escalation-annual", type=float, default=None,
+                        help="Annual cost of the post that answers a safeguarding "
+                             "callback. Defaults to a sourced US school counsellor "
+                             "median, which is the cheaper of the two posts a district "
+                             "staffs the role with.")
     parser.add_argument("--no-staff-cost", action="store_true",
                         help="Leave the staff-time arithmetic out of the summary.")
     parser.add_argument("--receipt", type=Path, default=None,
@@ -285,6 +290,32 @@ def _rate_from(args: argparse.Namespace) -> FundingRate | None:
         amount=args.funding_rate, currency=args.funding_currency,
         jurisdiction=args.funding_jurisdiction, source=args.funding_source,
         source_url=args.funding_url, year=args.funding_year,
+    )
+
+
+def _escalation_staff_from(args: argparse.Namespace) -> StaffCost | None:
+    """The wage the queue this run fills is answered at.
+
+    Off with `--no-staff-cost` for the same reason the other one is: a run told to leave
+    the money arithmetic out should leave all of it out, not the half that flatters.
+    """
+    if args.no_staff_cost:
+        return None
+    default = StaffCost.us_school_safeguarding_lead()
+    if args.escalation_annual is None and args.staff_hours is None:
+        return default
+    return StaffCost(
+        annual=(args.escalation_annual if args.escalation_annual is not None
+                else default.annual),
+        currency=default.currency,
+        hours_per_year=(args.staff_hours if args.staff_hours is not None
+                        else default.hours_per_year),
+        occupation=default.occupation,
+        industry=default.industry,
+        source=("supplied on the command line, not sourced by this tool"
+                if args.escalation_annual is not None else default.source),
+        source_url="" if args.escalation_annual is not None else default.source_url,
+        year=date.today().year if args.escalation_annual is not None else default.year,
     )
 
 
@@ -468,6 +499,10 @@ def _check_numbers(args: argparse.Namespace) -> str | None:
     if args.staff_hours is not None and args.staff_hours <= 0:
         return (f"--staff-hours {args.staff_hours} would divide an annual wage by zero or "
                 "less, and the break-even figure is built on that division.")
+    if args.escalation_annual is not None and args.escalation_annual <= 0:
+        return (f"--escalation-annual {args.escalation_annual} is not a wage. The work "
+                "this run adds cannot be priced at nothing, which is the error the "
+                "figure exists to correct.")
     if args.staff_annual is not None and args.staff_annual <= 0:
         return (f"--staff-annual {args.staff_annual} is not a wage, so nothing computed "
                 "from it would be a cost.")
@@ -576,7 +611,8 @@ def main(argv: list[str] | None = None) -> int:
     report = dispatcher.run(items)
 
     summary = summarise(report.results, live=mode.reached_production, rate=rate,
-                        staff=_staff_from(args))
+                        staff=_staff_from(args),
+                        escalation_staff=_escalation_staff_from(args))
 
     if args.json:
         print(json.dumps({

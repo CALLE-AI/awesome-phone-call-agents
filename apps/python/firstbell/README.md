@@ -28,7 +28,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and eighty-four gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and eighty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`call-e-feedback.md`](call-e-feedback.md) | Nine findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and why a Goal cannot carry a family whose language the deployment does not fix | 2 min |
@@ -45,7 +45,7 @@ below is checked by a test, so a line number here cannot quietly rot.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:356`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:335`.
+  `firstbell/cli.py:366`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
   `dispatch/scheduler.py:369`. The run still polls, because a report cannot be printed from
@@ -231,6 +231,19 @@ What this run was worth
                         Source: US Bureau of Labor Statistics, Occupational Outlook Handbook
                         https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm
 
+  work this run adds
+    net-new escalations 1 of 5 answered call(s) would have closed
+                        without the safeguarding rule, so they are work
+                        that did not exist before this run
+    added               $0.12 per call, for every minute one callback
+                        takes the safeguarding lead
+    ceiling after it    $0.21 a call, at 3 minutes for each of the two
+                        (from $0.59: the line above ignores this)
+                        $37.40/hour, from $77,800 over 2,080 h. School and career counselors and
+                        advisors, Elementary and secondary schools; local, 2025. Source: US
+                        Bureau of Labor Statistics, Occupational Outlook Handbook
+                        https://www.bls.gov/ooh/community-and-social-service/school-and-career-counselors.htm
+
 3 case(s) need a person. Nothing here is closed:
   1 of those cases is safeguarding: the parent did not confirm they already knew.
   A school would have to answer these within 30 minutes (this project's default, which no district has agreed to).
@@ -262,6 +275,56 @@ is why it is left to them: how long one of these calls takes its own staff. At t
 minutes an attempt this run is cheaper than the desk below **$0.59 a call**, on a median of
 **$48,980** for secretaries and administrative assistants in educational services. Change
 the minutes, or pass `--staff-annual`, and the ceiling moves with it.
+
+## The work this run adds, at the grade it lands on
+
+That ceiling was too high, and a district operations director reading the run found the
+reason before any test did. The arithmetic priced the labour taken off the desk and priced
+the labour it creates at nothing.
+
+A call the safeguarding rule holds open is work that did not exist before the call. On the
+committed run one of the five answered calls is that: schema-valid, complete, and not
+closed, so without the rule it would have been filed as done and nobody would have rung
+back. It goes to the designated safeguarding lead rather than to the office desk, and that
+post costs more. The median for school and career counselors and advisors in local
+elementary and secondary schools is **$77,800**, which is 1.59 times the desk wage, and
+counsellors are the cheaper of the two posts a district staffs the role with.
+
+So the run prints both halves and says which one the first ignores:
+
+```
+  work this run adds
+    net-new escalations 1 of 5 answered call(s) would have closed
+                        without the safeguarding rule, so they are work
+                        that did not exist before this run
+    added               $0.12 per call, for every minute one callback
+                        takes the safeguarding lead
+    ceiling after it    $0.21 a call, at 3 minutes for each of the two
+                        (from $0.59: the line above ignores this)
+```
+
+**$0.21, not $0.59.** That is this project's own headline number cut by two thirds by its
+own arithmetic, and it is the honest one. Pass `--escalation-annual` to price the post at
+your district's grade.
+
+Two things follow that a school should hear before a vendor tells them otherwise. The
+net-new rate is what a rota is staffed against, and it is not the alert rate: on eleven
+real calls the rule fired five times and **moved nothing**, because every one of those was
+already going to a person for a different reason. And zero on eleven calls is not a rate
+of zero. `python tools/replay_escalation.py --receipts <dir>` files every real call twice
+under today's code, with the rule and without it, and prints what eleven calls can and
+cannot rule out:
+
+```
+Net-new escalations: 0 of 11 answered call(s), 0 per 100.
+11 call(s) cannot rule out 24 per 100 (exact one-sided 95%), so this is the figure a rota
+is staffed against and the count above is not.
+```
+
+Twenty-four per hundred is a wide interval because eleven calls is a small sample, and the
+sample is small because every one of those calls was placed to a consenting adult who knew
+what it was. The bound is computed rather than guessed (Clopper-Pearson, solved on the
+binomial tail, `tools/replay_escalation.py`), and a pilot's first job is to shrink it.
 
 ## Three outcomes, not two
 
@@ -612,7 +675,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 412 tests
+python -m pytest tests/ -q          # 435 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

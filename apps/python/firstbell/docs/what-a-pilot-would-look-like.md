@@ -31,18 +31,34 @@ afterwards is a description rather than a result. This is the part that is skipp
 
 ## What is measured during it
 
-The same four, plus three the software produces:
+The same four, plus four the software produces:
 
 5. Closed without a person: an explicit confirmation received and the record closed.
 6. Escalated: routed to a person because nothing confirmed the guardian already knew.
 7. Reached in the family's own language, as a fraction of families whose preferred language
    is not English.
+8. **Net-new escalations**: of those in 6, the ones the rest of the pipeline would have
+   closed. Per hundred answered calls, with the count of answered calls beside it.
 
 Note which direction each is expected to move. 1, 2 and 3 should fall. 5 should be well below
 the total, because a tool that closes most records is either being asked easy questions or is
 closing things it should not. **A resolution rate near 100% is a red flag in this pilot, not a
 success.** The number to watch is 6 divided by 7: how much human work each escalation costs
 against how much reach it buys.
+
+Measure 8 is the one this pilot exists to produce, and 6 on its own is not a substitute for
+it. Most of 6 is work the office was already doing: the call produced nothing usable, so it
+was going to a person whatever rule was in force. 8 is the part that is new, and it is the
+only one of the eight that decides whether the safeguarding lead's rota has to change. The
+run prints it, and `tools/replay_escalation.py` computes it for calls already placed by
+filing each one twice under today's code, with the rule and without it.
+
+Two weeks of pilot data is enough to move it and not enough to settle it. On the eleven
+real calls behind this work the count is zero, and eleven calls cannot rule out twenty-four
+per hundred. Read the bound rather than the count until the sample is large enough that
+they agree, and staff against the bound. A stop rule below trips on a missed callback, so
+the cost of reading the count instead is a rota built for a queue that turns out to be four
+times longer.
 
 ## Who owns what
 

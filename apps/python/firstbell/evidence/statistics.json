@@ -116,6 +116,28 @@
       "published": "2025-07-01",
       "read_at_source": "2026-09-07",
       "note": "An annual figure per student in attendance, not a per-absence figure. Dividing it by an instructional-day count gives roughly $35.51 at 175 days or $34.53 at 180, which is arithmetic on a divisor that varies by district size and year, and is labelled arithmetic wherever it appears. Texas raised the allotment from $6,160 through HB2 of the 89th Legislature."
+    },
+    {
+      "id": "us-school-office-wage",
+      "value": "48,980",
+      "claim": "US dollars, median annual wage for secretaries and administrative assistants in educational services, which is the grade of the work this app takes off a school office desk",
+      "publisher": "US Bureau of Labor Statistics",
+      "url": "https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm",
+      "quote": "In May 2025, the median annual wages for secretaries and administrative assistants in some of the top industries in which they worked were as follows: [...] Educational services; state, local, and private 48,980",
+      "published": "2026-08-27",
+      "read_at_source": "2026-09-07",
+      "note": "The industry figure, not the whole-occupation median, which is $48,310 on the same page. A reader who checks only the summary block finds the smaller number and concludes the citation is wrong; the industry table is where this one is. `published` is the page's own last-modified date. The app divides it by 2,080 hours, which reads a ten-month school contract as cheaper per hour than it is, and a salary excludes the benefits paid on top: both errors make the desk look cheap and this app look worse."
+    },
+    {
+      "id": "us-school-counselor-wage",
+      "value": "77,800",
+      "claim": "US dollars, median annual wage for school and career counselors and advisors in local elementary and secondary schools, which is the grade the work this app creates lands on",
+      "publisher": "US Bureau of Labor Statistics",
+      "url": "https://www.bls.gov/ooh/community-and-social-service/school-and-career-counselors.htm",
+      "quote": "In May 2025, the median annual wages for school and career counselors and advisors in some of the top industries in which they worked were as follows: Elementary and secondary schools; local $77,800",
+      "published": "2026-08-27",
+      "read_at_source": "2026-09-07",
+      "note": "Added because a district buyer read the run and found the arithmetic priced the labour removed and not the labour added. A safeguarding callback goes to the designated safeguarding lead, a post a US district staffs with a counsellor or an administrator. Counsellors are the cheaper of the two, so this understates the added cost in the same direction the 2,080 hours understates the saved one. It is 1.59 times the desk wage, which is why the run's ceiling falls from $0.59 to $0.21 a call once the added work is paid for."
     }
   ]
 }

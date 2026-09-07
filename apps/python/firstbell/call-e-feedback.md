@@ -1,12 +1,13 @@
 # CALL-E feedback from building firstbell
 
-Eight findings from building an absence-calling app on CALL-E and placing twelve real calls
+Ten findings from building an absence-calling app on CALL-E and placing twelve real calls
 with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026.
 
 They are collected here because they were scattered. Until now they lived in a code comment,
 a `docs/` file and three README bullets, which is a bad place for the one thing in this
-contribution that is about your platform rather than about our app. Six are reproducible from
-this repository with no account. Two need our call records, and we will hand those over.
+contribution that is about your platform rather than about our app. Eight are reproducible
+from this repository with no account. Two need our call records, and we will hand those
+over.
 
 Ordered by what we think they cost you, not by when we found them.
 
@@ -34,10 +35,39 @@ termination control available, and it arrives too late by construction.
 and `max_turns` on the task as a backstop the agent cannot talk its way past. The backstop
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
-Anchor: `README.md:442-450` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:750-754` ("Platform-side call termination").
+Anchor: `README.md:505-513` ("The escape hatch is instructed, not enforced") and
+limitation 3 at `README.md:813-817` ("Platform-side call termination").
 
-## 2. `structured_result` is returned in two places, and callers guess wrong
+## 2. Webhook deliveries are unsigned, and your SDK is where we found out
+
+**Severity: second only to finding 1, and the only one here that is a security defect
+rather than a gap.** `verify` and `unwrap` are both deprecated, and their own docstrings
+say "current CALL-E webhooks are unsigned" and that they must not be used to parse current
+deliveries. So a receiver has no way to tell a delivery from your platform apart from one
+posted by anybody who has learned the URL.
+
+For this application that is not abstract. A forged `call.completed` carrying a fabricated
+`structured_result` closes a record about a child nobody has heard from, and it closes it
+with a note saying a parent confirmed they knew. The receiving school sees a resolved case.
+Nobody goes looking.
+
+We re-validate every payload against the same subset of the schema we validate a polled
+result against, which is why this app does not trust a delivery it already received
+(`dispatch/validation.py`). That catches a malformed forgery. It cannot catch a well-formed
+one, because the thing missing is authentication and no amount of schema checking is
+authentication.
+
+**What we would use:** an HMAC signature header over the raw body with a documented signing
+secret, a timestamp in the signed material so a captured delivery cannot be replayed later,
+and `verify` undeprecated. Until then, say in the webhooks reference that deliveries are
+unsigned, in the reference itself rather than only in a deprecated method's docstring. A
+developer who never opens the SDK source will not find it, and the ones building on
+webhooks are the ones who need to know.
+
+Anchor: `calle_double/server.py` (the double delivers unsigned on purpose, matching you)
+and `dispatch/validation.py` (why a received payload is re-checked).
+
+## 3. `structured_result` is returned in two places, and callers guess wrong
 
 A single-recipient call came back with the per-recipient `structured_result` null and the
 task-level one fully populated. Read the per-recipient field alone and a completed call looks
@@ -67,7 +97,7 @@ three apps here are working around it.
 
 Anchor: `dispatch/scheduler.py`, the single-recipient condition on the fallback.
 
-## 3. Attempts carry a numeric SIP code, task level carries a symbolic name
+## 4. Attempts carry a numeric SIP code, task level carries a symbolic name
 
 We built our test double to emit symbolic failure names at attempt level, because that is what
 the task-level vocabulary uses and nothing said otherwise. A real call contradicted it: the
@@ -82,7 +112,7 @@ vocabulary marked as task level only, and a short table mapping the codes you ac
 We wrote that table ourselves because a queue row reading "the call failed with 603" is not
 something a school secretary can act on.
 
-## 4. One call gave three incompatible accounts of itself
+## 5. One call gave three incompatible accounts of itself
 
 The platform returned SIP `603 Decline`, a `failure_message` naming the user as having hung
 up, and an attempt whose `started_at` and `completed_at` were the same second, which says the
@@ -98,14 +128,14 @@ beyond what all three agree on, which is that nobody answered.
 will send it with the submission rather than publish it here. It is a real call to a real
 number, and this repository asks contributors to keep those out of what they commit.
 
-## 5. No sandbox, no dry run, no test key
+## 6. No sandbox, no dry run, no test key
 
 There is no test credential, no dry-run flag and no sandbox host in the OpenAPI spec, either
 SDK, the guides, or this integrations repository.
 
 The consequence is visible in your own repository: every runnable app here ships a hand
 written fake, each one a separate guess at your behaviour. Ours is `calle_double/`, and
-finding 3 above is what a wrong guess costs. We wrote a conformance harness to compare the
+finding 4 above is what a wrong guess costs. We wrote a conformance harness to compare the
 double against recorded real responses, and it found twenty-six checks that agreed with each
 other and with the same wrong model.
 
@@ -113,7 +143,7 @@ other and with the same wrong model.
 response fixtures. Fixtures alone would do. The expensive part is not the network, it is not
 knowing what the shapes are.
 
-## 6. `canceled` is a status with no way to reach it
+## 7. `canceled` is a status with no way to reach it
 
 The call status enum includes `canceled`. There is no cancel endpoint. Nothing in the 76 apps
 in this repository calls one, because there is nothing to call: every hit on `cancel` across
@@ -130,7 +160,7 @@ API does not serve.
 **What we would use:** `POST /v1/calls/{id}/cancel`, or a note in the reference saying the
 state is reachable only by your side, so integrators stop looking for the endpoint.
 
-## 7. `locale` is undersold in your own schema
+## 8. `locale` is undersold in your own schema
 
 Your schema calls `locale` a "BCP 47 hint". We ran eight matched-pair live calls, the same four
 scenarios in en-IN and ta-IN, and extraction was faithful to the transcript twelve times out of
@@ -147,7 +177,7 @@ measured was better than best effort. We are reporting a feature you are underse
 The measurement and its three comparisons that did not match are in
 `docs/locale-is-not-only-a-hint.md`.
 
-## 8. India is an international line, and the caller ID says Oakland
+## 9. India is an international line, and the caller ID says Oakland
 
 Calls to Indian mobiles arrived showing a `+1` caller ID attributed to Oakland, California.
 
@@ -161,7 +191,7 @@ this in India.
 **What we would use:** local presence numbers for IN, or a clear statement of which regions can
 carry a recognisable caller ID today, so integrators cost the problem before they build.
 
-## 9. A Goal fixes the callee's language, so a multilingual caller cannot use Goals
+## 10. A Goal fixes the callee's language, so a multilingual caller cannot use Goals
 
 We did not use the Goals resource. This is why, and it is a design consequence rather than an
 omission.
@@ -213,11 +243,11 @@ Not everything here is a complaint, and three of these decisions saved us real t
   named. Our code still polls, so we are getting the benefit of your taxonomy without using
   the mechanism, and closing that is our next change rather than a request.
 - **Structured extraction held up in a second language on a real telephone line**, which is
-  finding 7 and the reason this app is worth building at all.
+  finding 8 and the reason this app is worth building at all.
 
 ## How to reproduce
 
-Six of the eight need no account and no key:
+Eight of the ten need no account and no key:
 
 ```bash
 cd apps/python/firstbell
@@ -225,5 +255,5 @@ python -m pytest tests/ -q
 python -m firstbell --work-file examples/absences.csv
 ```
 
-Findings 4 and 8 are observations from live calls and cannot be reproduced from this
+Findings 5 and 9 are observations from live calls and cannot be reproduced from this
 repository. The call identifiers behind them travel with the submission.

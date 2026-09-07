@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -30,8 +31,42 @@ from dispatch import Escalation  # noqa: E402
 from dispatch.validation import problems  # noqa: E402
 from firstbell.domain import SAFEGUARDING_CALLBACK_MINUTES  # noqa: E402
 from firstbell.domain import RESULT_SCHEMA, safeguarding_escalation  # noqa: E402
+from firstbell.domain import StaffCost  # noqa: E402
 
 UNINFORMATIVE = frozenset({"unknown"})
+
+
+def upper_bound(events: int, trials: int, alpha: float = 0.05) -> float:
+    """The exact one-sided upper confidence limit on a rate, as a fraction.
+
+    A count of zero is not a rate of zero, and on a sample this small the difference is
+    the whole answer. Twelve calls that moved nothing are consistent with a rule that
+    moves one call in five, and a district staffing a rota needs the number it might have
+    to staff rather than the number that happened.
+
+    Clopper-Pearson, solved by bisection on the binomial tail so this needs no scientific
+    stack: the limit is the rate at which observing this few events or fewer would itself
+    be unlikely. For zero events it is the closed form 1 - alpha ** (1 / n), and the
+    bisection agrees with it, which is how the loop was checked.
+    """
+    if trials <= 0:
+        raise ValueError("An upper bound on nothing is not a bound.")
+    if events >= trials:
+        return 1.0
+
+    def tail(p: float) -> float:
+        """P(X <= events) for X binomial on this many trials at this rate."""
+        return sum(math.comb(trials, k) * p ** k * (1 - p) ** (trials - k)
+                   for k in range(events + 1))
+
+    low, high = 0.0, 1.0
+    for _ in range(200):
+        mid = (low + high) / 2
+        if tail(mid) > alpha:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2
 
 
 def learned_nothing(result: dict) -> bool:
@@ -134,6 +169,31 @@ def main(argv=None) -> int:
               "person, because every required field had come back uninformative and the "
               "older rule had it first. The gap this rule closes is a parent who did not "
               "know and then gave a complete answer, and none of these calls is that.")
+
+    # The quantity a district staffs a rota from, which is not the alert rate above. A
+    # buyer reading this entry named its absence as the one thing stopping them signing:
+    # the alert rate is mostly work they were already doing, and what they have to hire
+    # for is the part the rule creates. It is published with its bound because on twelve
+    # calls a count of zero and a rate of zero are not the same statement.
+    lead = StaffCost.us_school_safeguarding_lead()
+    desk = StaffCost.us_school_office()
+    bound = upper_bound(len(moved), len(seen))
+    per_call = bound * (lead.hourly / 60.0)
+    print()
+    print(f"Net-new escalations: {len(moved)} of {len(seen)} answered call(s), "
+          f"{100.0 * len(moved) / len(seen):.0f} per 100. Cases that would have closed "
+          "without the rule.")
+    print(f"{len(seen)} call(s) cannot rule out {100 * bound:.0f} per 100 (exact "
+          "one-sided 95%), so this is the figure a rota is staffed against and the count "
+          "above is not.")
+    print(f"At the top of that interval the rule adds {lead.currency}{per_call:,.2f} a "
+          "call for every minute one callback takes the safeguarding lead, at "
+          f"{lead.currency}{lead.hourly:,.2f}/hour, against the "
+          f"{desk.currency}{desk.hourly:,.2f}/hour desk whose time the calls save. The "
+          "run prints both wages and the ceiling that comes out of them.")
+    print(f"The added grade is {lead.occupation}, {lead.industry}, {lead.year}.")
+    print(f"Source: {lead.source}")
+    print(f"  {lead.source_url}")
     return 0
 
 
