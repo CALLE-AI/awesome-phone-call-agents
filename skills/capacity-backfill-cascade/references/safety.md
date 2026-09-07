@@ -64,6 +64,35 @@ The workflow respects these hard limits:
 
 When the budget is exhausted, stop before placing the next call and write back state.
 
+## Destination Allowlist and Origin Pinning
+
+Live destinations must pass region-aware E.164 validation and appear in the
+operator's `authorized_destinations.jsonl` allowlist, keyed on the exact E.164
+string. Before the first call, the run prints a manifest of every destination
+and requires typed confirmation; every dial re-checks authorization.
+
+The MCP origin is pinned to `https://seleven-mcp-sg.airudder.com`. A
+`--base-url` value outside that allowlist - including any `http://` origin - is
+rejected before any network call, so credentials can never be sent to an
+arbitrary or insecure origin.
+
+## Uncertain Outcomes Stop the Run
+
+Outcomes are classified from the explicit `OUTCOME:` token only. Prose-only
+summaries, unparseable or wrong-family tokens, no-answer after retries, and
+provider failures all mark the target NEEDS_REVIEW and stop the run
+(exit code 2) before anyone else is called; keyword hints from the transcript
+appear in the report for the human reviewer only.
+
+After human review, continue with:
+
+```bash
+table-rescue resume --run-id <run-id> --data-dir <dir>
+```
+
+Resume retries only NEEDS_REVIEW/pending targets; settled targets are never
+re-dialed, and operator-cancelled runs refuse to resume.
+
 ## Duplicate Prevention
 
 Each run has a unique run ID. The engine tracks which targets were dialed in that run.

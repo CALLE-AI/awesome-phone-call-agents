@@ -44,6 +44,13 @@ accepts. Works for restaurants, tours, classes, and any booking system with a wa
 - Reruns with the same run id skip already-dialled targets (duplicate prevention).
 - Cancel a run with `table-rescue cancel --run-id <id>`; later runs refuse to dial.
 - Mask phone numbers in any output you produce; never log full numbers or tokens.
+- Live destinations must pass region-aware E.164 validation and appear in the
+  operator's `authorized_destinations.jsonl` allowlist; the run prints a
+  manifest and requires confirmation before the first call.
+- The MCP origin is pinned; `--base-url` cannot point anywhere else.
+- Uncertain outcomes (no answer, unparseable or wrong-family tokens, provider
+  failures) mark the target NEEDS_REVIEW and stop the run; use
+  `table-rescue resume` after human review.
 - Out of scope: medical, legal, financial, and emergency content.
 
 ## References

@@ -10,3 +10,4 @@ build/
 state/
 data/reservations.jsonl
 data/waitlist.jsonl
+data/authorized_destinations.jsonl

@@ -20,22 +20,41 @@ inside a call budget.
 
 ## Safety model
 
-- Dry-run by default: outcomes come from `data/fixtures/dry_run_outcomes.jsonl`; no
-  network access.
-- Live calls need `--live` plus a `--max-calls` budget (default 10). The engine stops
-  before dialing once the budget is exhausted.
-- Consent: records with `consent: false` are never dialled (audited as
-  SKIPPED_NO_CONSENT).
-- Disclosure by design: every call goal instructs the agent to identify itself as an
-  automated assistant before proceeding.
-- Idempotency: reruns with the same `--run-id` skip already-dialled targets
-  (SKIPPED_DUPLICATE).
-- Cancel: `table-rescue cancel --run-id <id>` marks the run cancelled; later
-  invocations with the same run id refuse to dial.
-- Call window: live calls are refused outside `--call-window-start/end`
-  (default 09:00-21:00 local).
-- All sample phone numbers are fictional reserved numbers; reports mask numbers to the
-  last two digits.
+Every guard lives in `table_rescue/safety.py` and is enforced by code, not
+configuration.
+
+| Threat | Control | Reviewer item |
+| --- | --- | --- |
+| Misdirected live dials | Region-aware E.164 validation at load time; per-region calling code and national length checks; reserved fictional NANP numbers (555 block) can never be dialed live | 1 |
+| Unauthorized destinations | Operator-curated `data/authorized_destinations.jsonl` allowlist keyed on the exact E.164 string; a printed manifest requires typed confirmation before the first call; every dial re-checks authorization | 1 |
+| Credential exfiltration | The MCP origin is pinned to `https://seleven-mcp-sg.airudder.com`; `--base-url` values outside the allowlist (including any `http://` origin) are rejected before any network call, including `calle auth` | 2 |
+| Double-booking after an uncertain call | Outcomes are classified from the explicit `OUTCOME:` token only, per leg family; prose keywords are informational hints; NO_ANSWER/UNCERTAIN/ERROR mark the target NEEDS_REVIEW and stop the run (exit code 2) before anyone else is called | 3 |
+| Run continuation | `table-rescue resume --run-id <id>` retries only NEEDS_REVIEW/pending targets after human review; settled targets are never re-dialed; operator-cancelled runs refuse resume | 3 |
+
+Exit codes: `0` success, `2` reconciliation required, `3` budget exhausted,
+`1` other errors. `table-rescue preflight` validates every live prerequisite
+without placing calls (`--json` for CI).
+
+### Verification matrix
+
+| Reviewer concern | Proof |
+| --- | --- |
+| "models accept arbitrary strings" | `tests/test_models.py::test_reservation_from_line_rejects_non_e164_phone` |
+| "bundled non-reserved sample numbers can reach the live path" | `tests/test_safety.py::TestFictionalBlock`, `tests/test_cli.py::test_run_live_fictional_number_never_reaches_dial` |
+| "region-aware E.164 validation" | `tests/test_safety.py::TestRegionRules` |
+| "exact operator authorization" | `tests/test_safety.py::TestRunSafety`, `tests/test_cli.py::test_run_live_aborts_on_missing_authorization` |
+| "no credential to arbitrary/insecure origin" | `tests/test_calle_client.py::test_mcp_client_rejects_foreign_origin`, `tests/test_safety.py::TestOrigin` |
+| "no-answer and ambiguous outcomes must stop" | `tests/test_engine.py::test_waitlist_no_answer_never_advances_to_next_recipient`, `e2e/test_full_run.py::test_uncertain_outcome_stops_run_and_never_conflicts` |
+| "no conflicting offer after an uncertain call" | `tests/test_calle_client.py::test_map_terminal_status_token_only_decisions`, `tests/test_calle_client.py::test_prose_without_token_is_never_decisive` |
+
+Dry-run by default: outcomes come from `data/fixtures/dry_run_outcomes.jsonl`; no
+network access. Other standing guards: live calls need `--live` plus a `--max-calls`
+budget (default 10) and stay inside `--call-window-start/end` (default 09:00-21:00
+local); records with `consent: false` are never dialled (SKIPPED_NO_CONSENT); every
+call goal instructs the agent to identify itself as an automated assistant; reruns
+with the same `--run-id` skip already-dialled targets (SKIPPED_DUPLICATE);
+`table-rescue cancel --run-id <id>` marks a run cancelled and later invocations
+refuse to dial; reports mask numbers to the last two digits.
 
 ## Setup
 
@@ -71,6 +90,24 @@ Live (real calls through CALL-E MCP Streamable HTTP using the CALL-E CLI token c
 table-rescue run --run-id live-1 --live --max-calls 6
 ```
 
+Validate every live prerequisite without placing any call:
+
+```bash
+table-rescue preflight --data-dir data --region VN
+```
+
+Machine-readable (CI):
+
+```bash
+table-rescue preflight --data-dir data --region VN --json
+```
+
+After a run stops with NEEDS REVIEW (exit code 2), review the report, then:
+
+```bash
+table-rescue resume --run-id run-20260910-190000 --data-dir data
+```
+
 Cancel a run:
 
 ```bash
@@ -98,7 +135,9 @@ n8n/Dify plugins) are the natural next step.
 ## Credential handling
 
 Access tokens are read from the CALL-E CLI token cache at call time, held in memory
-only, and never written to app state or logs.
+only, and never written to app state or logs. Tokens are sent only to the pinned
+official MCP origin (`https://seleven-mcp-sg.airudder.com`); any other `--base-url`
+is rejected before any network call.
 
 ## Tests
 
@@ -131,24 +170,29 @@ phone you control.
   "artificial voice" provisions, which require prior express consent
   ([FCC 24-17](https://www.fcc.gov/document/fcc-makes-ai-generated-voices-robocalls-illegal)).
   The consent flag, masked reports, and call-window guard implement this position.
-- **Structured results need a protocol plus a fallback.** Structured-output techniques
+- **Structured results need a protocol, not prose.** Structured-output techniques
   improve machine-readability of LLM responses but do not guarantee semantic validity;
   empirical studies document failure modes such as well-formed but wrong or missing
-  fields ([Song et al. 2026, arXiv:2606.09395](https://arxiv.org/abs/2606.09395)). The OUTCOME
-  token protocol, keyword fallback, and ERROR escalation are a pragmatic
-  trust-but-verify design for the same problem on voice summaries.
+  fields ([Song et al. 2026, arXiv:2606.09395](https://arxiv.org/abs/2606.09395)). Outcomes are
+  classified from the explicit `OUTCOME:` token only: a prose-only summary stops the
+  run for review (UNCERTAIN), and keyword hints from the transcript appear in the
+  report for the human reviewer. This is a pragmatic trust-but-verify design for the
+  same problem on voice summaries.
 - **Idempotency keys and budgets are proven reliability patterns.** Duplicate-call
   prevention mirrors idempotency-key practice in payment APIs, and the stop-before-dial
   call budget is a circuit-breaker against runaway automation.
 - **Escalate ambiguity to humans.** No-answer and error targets get exactly one retry,
-  then a staff escalation in the report - human-in-the-loop practice for consequential
+  then the run stops (exit code 2) with the target marked NEEDS_REVIEW for a staff
+  escalation in the report - human-in-the-loop practice for consequential
   automated actions, in the spirit of disclosure-by-design that the first
   consumer phone-calling agent adopted after public debate ([Google Duplex, 2018](https://research.google/blog/google-duplex-an-ai-system-for-accomplishing-real-world-tasks-over-the-phone/)).
 
 ## Limitations
 
 - Cascade runs only for reservations cancelled during the same run.
-- One retry per no-answer target (`--no-answer-retries`).
+- One retry per no-answer target (`--no-answer-retries`); afterwards the target is
+  marked NEEDS_REVIEW and the run stops with exit code 2 and a Needs review report
+  section - uncertain outcomes never advance the cascade on their own.
 
 ## References
 
