@@ -48,7 +48,7 @@ describe("call safety policy", () => {
     expect(sanitized.nested.transcript_turns[0].text).toContain("+141•••••106");
     expect(sanitized.nested.evidence[0].numeric).toBe("[phone masked]");
     expect(sanitized.authorization).toBe("[redacted]");
-    expect(sanitizeText("Call (415) 555-2671")).toContain("[phone masked]");
+    expect(sanitizeText("Call (415) 555-0107")).toContain("[phone masked]");
     expect(sanitizeText("Call 14155550106")).toContain("[phone masked]");
     expect(sanitizeText("https://example.test/call?phone=%2B14155550106")).not.toContain("14155550106");
     expect(sanitizeText("job_1788605144770_b12483")).toBe("job_1788605144770_b12483");
