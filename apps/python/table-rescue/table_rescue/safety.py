@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+E164_RE = re.compile(r"\+[1-9]\d{6,14}")
 
 # region -> (calling code, min national digits, max national digits)
 REGION_CALLING_CODES: dict[str, tuple[str, int, int]] = {
@@ -34,7 +34,8 @@ class SafetyViolation(RuntimeError):
 
 
 def validate_phone_syntax(phone: str) -> None:
-    if not E164_RE.match(phone):
+    # fullmatch rejects trailing newlines that "$" would otherwise tolerate.
+    if not E164_RE.fullmatch(phone):
         raise SafetyViolation("INVALID_E164", phone)
 
 
@@ -94,12 +95,17 @@ def validate_origin(base_url: str) -> None:
 def load_authorizations(path: str | Path) -> dict[str, dict]:
     authorizations: dict[str, dict] = {}
     with open(path, "r", encoding="utf-8") as handle:
-        for line in handle:
+        for lineno, line in enumerate(handle, start=1):
             stripped = line.strip()
             if not stripped:
                 continue
-            row = json.loads(stripped)
-            phone = row["phone"]
+            try:
+                row = json.loads(stripped)
+                phone = row["phone"]
+            except (json.JSONDecodeError, KeyError) as error:
+                raise SafetyViolation(
+                    "INVALID_AUTHORIZATION_FILE", f"{path}: line {lineno}: {error}"
+                ) from error
             if phone in authorizations:
                 raise SafetyViolation("DUPLICATE_AUTHORIZATION", phone)
             authorizations[phone] = row

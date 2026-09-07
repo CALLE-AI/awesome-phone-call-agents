@@ -19,7 +19,7 @@ class TestSyntax:
     @pytest.mark.parametrize(
         "phone",
         ["", "14155550100", "+04155550100", "+1 415 555 0100", "+1415555010?",
-        "0012345", "+abc"],
+        "0012345", "+abc", "+14155550100\n"],
     )
     def test_rejects_non_e164(self, phone):
         with pytest.raises(SafetyViolation, match="INVALID_E164"):
@@ -29,6 +29,9 @@ class TestSyntax:
 class TestRegionRules:
     def test_vn_mobile_passes(self):
         validate_destination("+14155550100", region="VN", live=True)
+
+    def test_region_lookup_is_case_insensitive(self):
+        validate_destination("+14155550100", region="vn", live=True)
 
     def test_wrong_prefix_rejected(self):
         with pytest.raises(SafetyViolation, match="REGION_MISMATCH"):
@@ -105,6 +108,18 @@ class TestAuthorization:
         row = '{"phone": "+14155550100", "authorized_by": "op"}\n'
         path.write_text(row + row, encoding="utf-8")
         with pytest.raises(SafetyViolation, match="DUPLICATE_AUTHORIZATION"):
+            load_authorizations(path)
+
+    def test_malformed_json_line_rejected(self, tmp_path):
+        path = tmp_path / "authorized_destinations.jsonl"
+        path.write_text("not json\n", encoding="utf-8")
+        with pytest.raises(SafetyViolation, match="INVALID_AUTHORIZATION_FILE"):
+            load_authorizations(path)
+
+    def test_row_missing_phone_rejected(self, tmp_path):
+        path = tmp_path / "authorized_destinations.jsonl"
+        path.write_text('{"name": "Guest"}\n', encoding="utf-8")
+        with pytest.raises(SafetyViolation, match="INVALID_AUTHORIZATION_FILE"):
             load_authorizations(path)
 
 
