@@ -188,6 +188,101 @@ def test_preflight_json_output(tmp_path, capsys):
     assert exit_code == 1
 
 
+def _write_uncertain_then_accept_fixtures(data_dir):
+    (data_dir / "fixtures" / "first.jsonl").write_text(
+        '{"target_id": "R-001", "status": "CANCELLED", "new_slot": null, '
+        '"notes": "cannot make it"}\n'
+        '{"target_id": "W-001", "status": "UNCERTAIN", "new_slot": null, '
+        '"notes": "line went quiet", "uncertainty_reason": "PROVIDER_FAILED"}\n',
+        encoding="utf-8",
+    )
+    (data_dir / "fixtures" / "second.jsonl").write_text(
+        '{"target_id": "W-001", "status": "ACCEPTED", "new_slot": null, '
+        '"notes": "we will come"}\n'
+        '{"target_id": "R-001", "status": "CANCELLED", "new_slot": null, '
+        '"notes": "cannot make it"}\n',
+        encoding="utf-8",
+    )
+
+
+def test_resume_completes_story_after_uncertain_stop(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    _write_uncertain_then_accept_fixtures(data_dir)
+    state_dir = tmp_path / "state"
+    first = main(
+        [
+            "run",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(state_dir),
+            "--run-id", "story-1",
+            "--fixture", str(data_dir / "fixtures" / "first.jsonl"),
+            "--call-window-start", "00:00",
+            "--call-window-end", "23:59",
+        ]
+    )
+    assert first == 2  # reconciliation required
+    waitlist = read_jsonl(data_dir / "waitlist.jsonl")
+    assert waitlist[0]["status"] == "NEEDS_REVIEW"
+    report = (state_dir / "runs" / "story-1" / "report.md").read_text(encoding="utf-8")
+    assert "Needs review" in report
+
+    second = main(
+        [
+            "resume",
+            "--run-id", "story-1",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(state_dir),
+            "--run-id-new", "story-2",
+            "--fixture", str(data_dir / "fixtures" / "second.jsonl"),
+            "--call-window-start", "00:00",
+            "--call-window-end", "23:59",
+        ]
+    )
+    assert second == 0
+    reservations = read_jsonl(data_dir / "reservations.jsonl")
+    waitlist = read_jsonl(data_dir / "waitlist.jsonl")
+    assert reservations[0]["status"] == "RECOVERED"
+    assert waitlist[0]["status"] == "ACCEPTED"
+    report2 = (state_dir / "runs" / "story-2" / "report.md").read_text(encoding="utf-8")
+    assert "Resumed from run: story-1" in report2
+
+
+def test_resume_skips_settled_targets(tmp_path):
+    data_dir = write_sample_data(tmp_path)
+    _write_uncertain_then_accept_fixtures(data_dir)
+    state_dir = tmp_path / "state"
+    main(
+        ["run", "--data-dir", str(data_dir), "--state-dir", str(state_dir),
+         "--run-id", "skip-1", "--fixture", str(data_dir / "fixtures" / "first.jsonl"),
+         "--call-window-start", "00:00", "--call-window-end", "23:59"]
+    )
+    # R-001 was CANCELLED (settled, certain) in run skip-1; the second fixture
+    # would return CANCELLED again if re-dialed. Resume must NOT dial R-001:
+    second = main(
+        ["resume", "--run-id", "skip-1",
+         "--data-dir", str(data_dir), "--state-dir", str(state_dir),
+         "--run-id-new", "skip-2",
+         "--fixture", str(data_dir / "fixtures" / "second.jsonl"),
+         "--call-window-start", "00:00", "--call-window-end", "23:59"]
+    )
+    assert second == 0
+    audit = read_jsonl(state_dir / "runs" / "skip-2" / "audit.jsonl")
+    dialed = [row["target_id"] for row in audit if row["status"] in
+              {"CONFIRMED", "CANCELLED", "RESCHEDULED", "ACCEPTED", "DECLINED",
+               "NO_ANSWER", "UNCERTAIN"}]
+    assert dialed == ["W-001"]  # only the needs-review target is retried
+
+
+def test_resume_missing_source_run_fails_cleanly(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    exit_code = main(
+        ["resume", "--run-id", "nope",
+         "--data-dir", str(data_dir), "--state-dir", str(tmp_path / "state")]
+    )
+    assert exit_code == 1
+    assert "no audit log" in capsys.readouterr().err
+
+
 def test_module_entrypoint_runs():
     import subprocess
     import sys

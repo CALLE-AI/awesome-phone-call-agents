@@ -12,7 +12,7 @@ from .engine import (
     EngineConfig,
     ReconciliationRequiredError,
 )
-from .models import CallOutcome, CallStatus, ReservationStatus
+from .models import CallOutcome, CallStatus, ReservationStatus, WaitlistStatus
 from .report import render_report
 from .safety import (
     RunSafety,
@@ -87,6 +87,30 @@ def build_parser() -> argparse.ArgumentParser:
     cancel.add_argument("--run-id", required=True)
     cancel.add_argument("--state-dir", default="state")
     cancel.set_defaults(func=cmd_cancel)
+
+    resume = subparsers.add_parser(
+        "resume", help="Retry the uncertain/pending targets of a stopped run"
+    )
+    resume.add_argument("--run-id", required=True, help="Source run to resume from")
+    resume.add_argument("--run-id-new", default=None, help="New run id (default: resume-<timestamp>)")
+    resume.add_argument("--data-dir", default="data")
+    resume.add_argument("--state-dir", default="state")
+    resume.add_argument("--fixture", default=None)
+    resume.add_argument("--live", action="store_true")
+    resume.add_argument("--max-calls", type=int, default=10)
+    resume.add_argument("--party-size-tolerance", type=int, default=0)
+    resume.add_argument("--avg-check-per-guest", type=float, default=None)
+    resume.add_argument("--no-answer-retries", type=int, default=1)
+    resume.add_argument("--call-window-start", default="09:00")
+    resume.add_argument("--call-window-end", default="21:00")
+    resume.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    resume.add_argument("--channel", default=DEFAULT_CHANNEL)
+    resume.add_argument("--cache-root", default=DEFAULT_CACHE_ROOT)
+    resume.add_argument("--calle-command", default="calle")
+    resume.add_argument("--region", default=None)
+    resume.add_argument("--language", default=None)
+    resume.add_argument("--yes", action="store_true")
+    resume.set_defaults(func=cmd_resume)
     return parser
 
 
@@ -274,6 +298,47 @@ def _run_pipeline(
     print(report)
     print(f"Report: {report_path}")
     return exit_code
+
+
+REVIEWABLE_RESERVATION = {ReservationStatus.NEEDS_REVIEW, ReservationStatus.NO_ANSWER}
+REVIEWABLE_WAITLIST = {WaitlistStatus.NEEDS_REVIEW, WaitlistStatus.NO_ANSWER}
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    data_dir = Path(args.data_dir)
+    state_dir = Path(args.state_dir)
+    source_audit = AuditLog(state_dir / "runs" / args.run_id)
+    if not source_audit.path.exists():
+        print(
+            f"ERROR: no audit log for run {args.run_id} under "
+            f"{state_dir / 'runs'}.",
+            file=sys.stderr,
+        )
+        return 1
+    reservations_path = data_dir / "reservations.jsonl"
+    waitlist_path = data_dir / "waitlist.jsonl"
+    if not reservations_path.exists() or not waitlist_path.exists():
+        print(
+            "ERROR: data files not found; resume expects the stores written "
+            "by the source run.",
+            file=sys.stderr,
+        )
+        return 1
+    reservations = load_reservations(reservations_path)
+    waitlist = load_waitlist(waitlist_path)
+    # A human reviewed the stopped run: re-eligible the uncertain targets.
+    for reservation in reservations:
+        if reservation.status in REVIEWABLE_RESERVATION:
+            reservation.status = ReservationStatus.PENDING_CONFIRM
+    for entry in waitlist:
+        if entry.status in REVIEWABLE_WAITLIST:
+            entry.status = WaitlistStatus.WAITING
+    run_id = args.run_id_new or f"resume-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    fixture = args.fixture or str(data_dir / "fixtures" / "dry_run_outcomes.jsonl")
+    return _run_pipeline(
+        args, run_id, reservations, waitlist, state_dir, data_dir, fixture,
+        resumed_from=args.run_id, refill_cancelled=True,
+    )
 
 
 def cmd_cancel(args: argparse.Namespace) -> int:
