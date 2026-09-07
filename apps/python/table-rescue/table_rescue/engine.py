@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime, time as dt_time
 
 from .calle_client import (
+    LEG_CONFIRM,
+    LEG_OFFER,
     CallClient,
     CallRequest,
     build_confirm_goal,
@@ -16,11 +18,23 @@ from .models import (
     WaitlistEntry,
     WaitlistStatus,
 )
+from .safety import RunSafety
 from .stores import AuditLog
 
 
 class BudgetExceededError(RuntimeError):
     """Raised before dialing when the live-call budget for a run is exhausted."""
+
+
+class ReconciliationRequiredError(RuntimeError):
+    """Raised when an uncertain outcome stops the run for human review."""
+
+
+UNCERTAIN_OUTCOMES = {
+    CallStatus.NO_ANSWER,
+    CallStatus.UNCERTAIN,
+    CallStatus.ERROR,
+}
 
 
 @dataclass
@@ -34,11 +48,16 @@ class EngineConfig:
 
 class CascadeEngine:
     def __init__(
-        self, client: CallClient, audit: AuditLog, config: EngineConfig | None = None
+        self,
+        client: CallClient,
+        audit: AuditLog,
+        config: EngineConfig | None = None,
+        safety: RunSafety | None = None,
     ):
         self.client = client
         self.audit = audit
         self.config = config or EngineConfig()
+        self.safety = safety or RunSafety()
         self.calls_made = 0
 
     def _skip(self, run_id: str, target_id: str, status: CallStatus) -> CallOutcome:
@@ -57,6 +76,7 @@ class CascadeEngine:
         consent: bool,
         goal: str,
         now: datetime,
+        leg: str,
         allow_duplicate: bool = False,
     ) -> CallOutcome:
         if self.audit.is_cancelled():
@@ -71,7 +91,10 @@ class CascadeEngine:
             raise BudgetExceededError(
                 f"call budget of {self.config.max_calls} exhausted; stopping before dialing"
             )
-        request = CallRequest(run_id=run_id, target_id=target_id, phone=phone, goal=goal)
+        self.safety.check_destination(phone)
+        request = CallRequest(
+            run_id=run_id, target_id=target_id, phone=phone, goal=goal, leg=leg
+        )
         outcome = self.client.place_call(request)
         self.calls_made += 1
         self.audit.append(outcome)
@@ -90,6 +113,7 @@ class CascadeEngine:
             consent=reservation.consent,
             goal=goal,
             now=now,
+            leg=LEG_CONFIRM,
         )
         if (
             outcome.status == CallStatus.NO_ANSWER
@@ -102,7 +126,15 @@ class CascadeEngine:
                 consent=reservation.consent,
                 goal=goal,
                 now=now,
+                leg=LEG_CONFIRM,
                 allow_duplicate=True,
+            )
+        if outcome.status in UNCERTAIN_OUTCOMES:
+            reservation.status = ReservationStatus.NEEDS_REVIEW
+            raise ReconciliationRequiredError(
+                f"target {reservation.booking_id} returned {outcome.status.value} "
+                f"({outcome.uncertainty_reason or 'no certain result'}); run stopped "
+                "for reconciliation before any further calls"
             )
         self._apply_confirm(reservation, outcome)
         return outcome
@@ -112,7 +144,6 @@ class CascadeEngine:
             CallStatus.CONFIRMED: ReservationStatus.CONFIRMED,
             CallStatus.CANCELLED: ReservationStatus.CANCELLED,
             CallStatus.RESCHEDULED: ReservationStatus.RESCHEDULED,
-            CallStatus.NO_ANSWER: ReservationStatus.NO_ANSWER,
         }
         new_status = transitions.get(outcome.status)
         if new_status is not None:
@@ -162,6 +193,7 @@ class CascadeEngine:
                 consent=entry.consent,
                 goal=goal,
                 now=now,
+                leg=LEG_OFFER,
             )
             placed.append(outcome)
             if outcome.status == CallStatus.ACCEPTED:
@@ -170,9 +202,14 @@ class CascadeEngine:
                 break
             if outcome.status == CallStatus.DECLINED:
                 entry.status = WaitlistStatus.DECLINED
-            elif outcome.status == CallStatus.NO_ANSWER:
-                entry.status = WaitlistStatus.NO_ANSWER
-            else:
-                # Skip outcomes and ERROR: keep the entry on the waitlist.
-                entry.status = WaitlistStatus.WAITING
+                continue
+            if outcome.status in UNCERTAIN_OUTCOMES:
+                entry.status = WaitlistStatus.NEEDS_REVIEW
+                raise ReconciliationRequiredError(
+                    f"waitlist target {entry.entry_id} returned "
+                    f"{outcome.status.value} "
+                    f"({outcome.uncertainty_reason or 'no certain result'}); "
+                    "cascade stopped before offering the slot to anyone else"
+                )
+            entry.status = WaitlistStatus.WAITING
         return placed

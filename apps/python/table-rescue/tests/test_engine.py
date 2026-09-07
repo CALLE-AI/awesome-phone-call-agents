@@ -2,7 +2,12 @@ from datetime import datetime, time as dt_time, timezone
 
 import pytest
 
-from table_rescue.engine import BudgetExceededError, CascadeEngine, EngineConfig
+from table_rescue.engine import (
+    BudgetExceededError,
+    CascadeEngine,
+    EngineConfig,
+    ReconciliationRequiredError,
+)
 from table_rescue.models import (
     CallOutcome,
     CallStatus,
@@ -12,6 +17,7 @@ from table_rescue.models import (
     WaitlistStatus,
 )
 from table_rescue.stores import AuditLog
+from table_rescue.safety import RunSafety, SafetyViolation
 
 NOW = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
 SLOT = "2026-09-10T19:00:00+07:00"
@@ -181,10 +187,87 @@ def test_party_size_tolerance_allows_smaller_parties(tmp_path):
     assert engine.select_candidates(slot, [bigger]) == []
 
 
+def test_confirm_uncertain_marks_needs_review_and_stops(tmp_path):
+    engine, client, _ = make_engine(
+        tmp_path,
+        {"R-001": [{"status": "UNCERTAIN", "uncertainty_reason": "UNPARSEABLE_SUMMARY"}]},
+    )
+    reservation = make_reservation()
+    with pytest.raises(ReconciliationRequiredError, match="R-001"):
+        engine.confirm_reservation("run-1", reservation, NOW)
+    assert reservation.status == ReservationStatus.NEEDS_REVIEW
+
+
+def test_confirm_no_answer_after_retries_stops(tmp_path):
+    engine, client, _ = make_engine(
+        tmp_path,
+        {"R-001": [{"status": "NO_ANSWER"}, {"status": "NO_ANSWER"}]},
+    )
+    reservation = make_reservation()
+    with pytest.raises(ReconciliationRequiredError):
+        engine.confirm_reservation("run-1", reservation, NOW)
+    assert client.dialed == ["R-001", "R-001"]
+    assert reservation.status == ReservationStatus.NEEDS_REVIEW
+
+
+def test_waitlist_no_answer_never_advances_to_next_recipient(tmp_path):
+    payloads = {
+        "W-001": [{"status": "NO_ANSWER"}],
+        "W-002": [{"status": "ACCEPTED"}],
+    }
+    engine, client, _ = make_engine(tmp_path, payloads)
+    slot = make_reservation()
+    slot.status = ReservationStatus.CANCELLED
+    entries = [make_entry("W-001", priority=1), make_entry("W-002", priority=2)]
+    with pytest.raises(ReconciliationRequiredError):
+        engine.fill_slot("run-1", slot, entries, NOW)
+    assert client.dialed == ["W-001"]
+    assert entries[0].status == WaitlistStatus.NEEDS_REVIEW
+    assert entries[1].status == WaitlistStatus.WAITING
+
+
+def test_waitlist_declined_still_advances(tmp_path):
+    payloads = {
+        "W-001": [{"status": "DECLINED"}],
+        "W-002": [{"status": "ACCEPTED"}],
+    }
+    engine, client, _ = make_engine(tmp_path, payloads)
+    slot = make_reservation()
+    entries = [make_entry("W-001", priority=1), make_entry("W-002", priority=2)]
+    placed = engine.fill_slot("run-1", slot, entries, NOW)
+    assert [o.status for o in placed] == [CallStatus.DECLINED, CallStatus.ACCEPTED]
+
+
+def test_live_gate_blocks_unvalidated_destination_before_dialing(tmp_path):
+    audit = AuditLog(tmp_path / "runs" / "run-1")
+    client = FakeClient({})
+    safety = RunSafety(live=True, region="VN", authorizations={})
+    engine = CascadeEngine(client, audit, safety=safety)
+    # A VN run dialing a NANP sample number is blocked as REGION_MISMATCH,
+    # an earlier gate than authorization; any SafetyViolation before dialing
+    # satisfies the fail-closed property.
+    with pytest.raises(
+        SafetyViolation, match="FICTIONAL_NUMBER|NOT_AUTHORIZED|REGION_MISMATCH"
+    ):
+        engine.confirm_reservation("run-1", make_reservation(), NOW)
+    assert client.dialed == []
+
+
+def test_live_gate_blocks_authorized_but_fictional(tmp_path):
+    audit = AuditLog(tmp_path / "runs" / "run-1")
+    client = FakeClient({})
+    safety = RunSafety(
+        live=True, region="US", authorizations={"+15550101": {"authorized_by": "op"}}
+    )
+    engine = CascadeEngine(client, audit, safety=safety)
+    with pytest.raises(SafetyViolation, match="FICTIONAL_NUMBER"):
+        engine.confirm_reservation("run-1", make_reservation(), NOW)
+
+
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-DIAL_STATUSES = ["CONFIRMED", "CANCELLED", "NO_ANSWER"]
+DIAL_STATUSES = ["CONFIRMED", "CANCELLED", "NO_ANSWER", "UNCERTAIN"]
 
 
 @given(
@@ -204,7 +287,7 @@ def test_engine_never_exceeds_budget(tmp_path_factory, statuses, max_calls):
     try:
         for i in range(len(statuses)):
             engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
-    except BudgetExceededError:
+    except (BudgetExceededError, ReconciliationRequiredError):
         pass
     assert engine.calls_made <= max_calls
     assert len(client.dialed) <= max_calls
@@ -222,7 +305,10 @@ def test_engine_never_dials_a_target_twice_in_one_run(tmp_path_factory, statuses
     }
     engine, client, _ = make_engine(tmp_path, payloads, EngineConfig(no_answer_retries=0))
     for i in range(len(statuses)):
-        engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
+        try:
+            engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
+        except ReconciliationRequiredError:
+            break
         second = engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
         assert second.status == CallStatus.SKIPPED_DUPLICATE
     assert len(client.dialed) == len(set(client.dialed))
