@@ -25,6 +25,40 @@ Powered by **CALL-E's autonomous telephony engine**, Mazō proactively calls fou
 
 ---
 
+## 🛑 Not an Open-Ended Chatbot: An Extraction & Planning Engine
+
+Most conversational AI assistants suffer from **"infinite conversation syndrome"**—they invite endless back-and-forth rambling, open-ended chit-chat, and pseudo-productivity that delays actual execution. 
+
+**Mazō is fundamentally different: It is NOT an open-ended chatbot.**
+
+Mazō is built as a **strictly bounded, cognitive extraction and planning pipeline** designed to move you from confusion to execution in under 5 minutes:
+
+### 1. Active Intent & Friction Extraction
+Mazō does not wait for you to compose a structured prompt. Instead, it actively interviews you, extracts raw thoughts, and filters out cognitive noise to isolate:
+- **The True Bottleneck**: What is actually blocking forward progress vs. manufactured urgency?
+- **Core Priority Milestone**: The single highest-leverage outcome required today.
+- **Hidden Obstacles & Assumptions**: Unspoken fears, perfectionism loops, or dependency blockers.
+
+### 2. Concrete Plan Formulation (Not Endless Brainstorming)
+Once the problem is extracted, Mazō immediately synthesizes an **actionable execution plan**:
+- Breakdowns into 15-to-90 minute time blocks.
+- Explicit hard deadlines (e.g. *"Complete pitch deck slides 1–5 by 5:00 PM today"*).
+- Clear, actionable countermeasure protocols for anticipated friction.
+
+### 3. Strict 4-Phase Bounded Interaction Protocol
+Every Mazō session follows a deterministic, 4-phase finite state machine:
+```
+[Phase 1: Triage] ──▶ [Phase 2: Challenge] ──▶ [Phase 3: Plan Formulation] ──▶ [Phase 4: Exit & Lock]
+  (Identify Core         (Strip Excuses &       (Synthesize Concrete Milestone,   (Extract JSON, Schedule
+    Bottleneck)             Overthinking)          Deadlines & Protocols)           Follow-up, End Session)
+```
+
+### 4. Enforced Disengagement
+When the plan is formulated and the commitment is made, **Mazō deliberately ends the conversation.** 
+Its parting instruction is always the same: *"Put the phone down and execute."* Mazō explicitly refuses to keep chatting once a plan is locked.
+
+---
+
 ## 🏗️ Architecture & Workflow
 
 ```
