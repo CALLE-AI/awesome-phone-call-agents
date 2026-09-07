@@ -87,7 +87,7 @@ runtime or for the tests.
 python3 -m unittest discover -s tests -t . -q
 ```
 
-57 tests. None of them opens a socket: the CALL-E transport is injected, so the
+61 tests. None of them opens a socket: the CALL-E transport is injected, so the
 adapter is exercised against recorded responses, including the poll ceiling and
 the documented error codes.
 
@@ -111,7 +111,8 @@ the right letters.
 ## What it does to CALL-E
 
 Contract source: `https://docs.heycall-e.com/openapi/calle.openapi.yaml`
-(CALL-E Developer API 0.6.0).
+(CALL-E Developer API 0.7.0, re-fetched and exercised against the live API on
+2026-09-07).
 
 - `POST /v1/calls` — one recipient, one hop, with `result_schema` describing the
   seven fields the chain reads back, and an `Idempotency-Key` derived from
@@ -122,6 +123,32 @@ Contract source: `https://docs.heycall-e.com/openapi/calle.openapi.yaml`
 - A poll ceiling that is reached raises rather than returns. The call may still
   be running; its outcome is unknown, and an unknown outcome must be reconciled
   by a person before the case dials anyone again.
+
+### What the live API actually accepted
+
+Both statements below are measurements against `https://api.heycall-e.com` on
+2026-09-07, not readings of the specification.
+
+- **`result_schema` may not use union types.** The first live request was
+  refused with `400 result_schema_invalid`, detail `unsupported JSON Schema
+  type at $.properties.answer_summary: ['string', 'null']`. The six optional
+  fields previously declared `["string", "null"]`; a field that may be absent
+  is now typed `string` and left out of `required`, and its description tells
+  the extraction model to omit the key rather than send a null. Local
+  validation was already absence-tolerant (`result.get`), so nothing
+  downstream changed — but the schema this app sends could never have been
+  accepted, and no fixture test could have shown that.
+- **Outbound calls to KR are not currently supported, in any language.**
+  `en-US` to a `+82` number is refused with `422 call_not_ready` — *"recognized
+  as KR with English, which is not currently supported for outbound calls"* —
+  and `ko-KR` with `422 … recognized as KR/Korean, which is not currently
+  supported for calling*. The live path in this repository has therefore been
+  exercised as far as the platform's region policy allows: authentication,
+  request construction, schema acceptance, and the refusal itself are real; no
+  outbound leg has been completed against a supported destination.
+
+Both refusals are fail-closed and surfaced verbatim. The chain does not
+advance, and no state is written as though a call had happened.
 
 The task text is assembled by code, never written per case, so every hop
 discloses automation the same way and closes with the same two questions. From

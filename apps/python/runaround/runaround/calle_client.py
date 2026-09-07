@@ -1,7 +1,7 @@
 """CALL-E Developer API adapter for one hop.
 
 Contract source: ``https://docs.heycall-e.com/openapi/calle.openapi.yaml``
-(CALL-E Developer API 0.6.0).
+(CALL-E Developer API 0.7.0).
 
 * ``POST /v1/calls`` with ``task`` and ``result_schema``, bearer auth, optional
   ``Idempotency-Key``.
@@ -45,6 +45,28 @@ POLL_MAX_ATTEMPTS = 120
 
 class CallEError(RuntimeError):
     """Raised when CALL-E cannot be used for this hop."""
+
+
+#: Statuses on which CALL-E states that the call task was not created.
+#: Measured on 2026-09-07: an unsupported ``result_schema`` answers 400
+#: ``result_schema_invalid``, and an unsupported region answers 422
+#: ``call_not_ready``. In both the request was rejected before dialling.
+NOT_PLACED_STATUSES = frozenset({400, 422})
+
+
+class CallNotPlaced(CallEError):
+    """Raised when CALL-E refused the request and no call exists.
+
+    This is narrower than :class:`CallEError` on purpose. A transport error,
+    a timeout, or a 5xx leaves the question "did a phone ring?" open, and an
+    open question must be reconciled by a person. A 400 or a 422 answers it:
+    nothing was dialled, so the hop it was going to be may be withdrawn.
+    """
+
+    def __init__(self, message: str, *, status: int, code: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.code = code
 
 
 class Transport(Protocol):
@@ -185,7 +207,10 @@ class CallEClient:
         error = payload.get("error") or {}
         code = error.get("code", "internal_error")
         message = error.get("message", "no message")
-        raise CallEError(f"CALL-E returned {status} {code}: {message}")
+        text = f"CALL-E returned {status} {code}: {message}"
+        if status in NOT_PLACED_STATUSES:
+            raise CallNotPlaced(text, status=status, code=code)
+        raise CallEError(text)
 
     def create_call(
         self, *, body: dict[str, Any], key: str | None = None

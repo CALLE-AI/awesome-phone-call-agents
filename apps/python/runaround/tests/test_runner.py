@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from runaround import chain, evidence
-from runaround.calle_client import idempotency_key
+from runaround.calle_client import CallNotPlaced, idempotency_key
 from runaround.case import build_case, load_case, save_case
 from runaround.cli import DEMO_INTAKE, main
 from runaround.runner import FixturePlacer, RunRefused, plan_hop, run_chain, run_hop
@@ -29,6 +29,54 @@ class RunnerTestCase(unittest.TestCase):
 
     def placer(self, name):
         return FixturePlacer.from_file(FIXTURES / name)
+
+
+class RefusedRequestTests(RunnerTestCase):
+    """A request CALL-E rejected is not a call that happened."""
+
+    class RefusingPlacer:
+        """Rejects the way the live API rejected an unsupported schema."""
+
+        def __init__(self):
+            self.attempts = 0
+
+        def place(self, *, body, key, destination):
+            self.attempts += 1
+            raise CallNotPlaced(
+                "CALL-E returned 400 result_schema_invalid: "
+                "result_schema is not supported.",
+                status=400,
+                code="result_schema_invalid",
+            )
+
+    def test_a_rejected_request_costs_no_hop_and_no_budget(self):
+        case = self.open_demo()
+        placer = self.RefusingPlacer()
+        before = case.status
+
+        with self.assertRaises(RunRefused) as refused:
+            run_hop(case=case, placer=placer, data_dir=self.data)
+
+        self.assertIn("result_schema_invalid", str(refused.exception))
+        self.assertEqual(placer.attempts, 1)
+        # No phone rang, so nothing about the case may have moved.
+        self.assertEqual(case.hops_used(), 0)
+        self.assertEqual(case.status, before)
+        # And the refusal is not remembered as a call in the saved file.
+        self.assertEqual(load_case(self.data, case.case_id).hops_used(), 0)
+
+    def test_the_next_attempt_is_still_allowed_to_call(self):
+        case = self.open_demo()
+        with self.assertRaises(RunRefused):
+            run_hop(case=case, placer=self.RefusingPlacer(), data_dir=self.data)
+
+        # The desk authorized at intake is still the next desk to call: a
+        # rejected request must not consume the authorization either.
+        hop = run_hop(
+            case=case, placer=self.placer("chain_loop.json"), data_dir=self.data
+        )
+        self.assertEqual(hop.index, 1)
+        self.assertEqual(case.hops_used(), 1)
 
 
 class ChainRunTests(RunnerTestCase):

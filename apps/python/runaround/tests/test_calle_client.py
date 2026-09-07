@@ -14,6 +14,7 @@ from typing import Any
 from runaround.calle_client import (
     CallEClient,
     CallEError,
+    CallNotPlaced,
     assert_approved_origin,
     build_create_call_body,
     extract_structured_result,
@@ -164,6 +165,26 @@ class ErrorTests(unittest.TestCase):
         with self.assertRaises(CallEError) as raised:
             api.create_call(body={"task": "x"})
         self.assertIn("unsupported_region", str(raised.exception))
+
+    def test_a_rejected_request_is_distinguishable_from_an_unknown_one(self):
+        # Measured against the live API on 2026-09-07. Both of these say the
+        # call task was never created, which is what lets the runner withdraw
+        # the hop instead of leaving it in flight.
+        for status, code in ((400, "result_schema_invalid"), (422, "call_not_ready")):
+            with self.subTest(status=status):
+                api = client([(status, {"error": {"code": code, "message": "no"}})])
+                with self.assertRaises(CallNotPlaced) as raised:
+                    api.create_call(body={"task": "x"})
+                self.assertEqual(raised.exception.status, status)
+                self.assertEqual(raised.exception.code, code)
+
+    def test_an_ambiguous_failure_is_not_reported_as_not_placed(self):
+        # A 5xx may have created the call before failing to say so. The hop
+        # stays, and a person reconciles it.
+        api = client([(503, {"error": {"code": "unavailable", "message": "no"}})])
+        with self.assertRaises(CallEError) as raised:
+            api.create_call(body={"task": "x"})
+        self.assertNotIsInstance(raised.exception, CallNotPlaced)
 
     def test_a_create_response_without_an_id_is_refused(self):
         api = client([(201, {"status": "queued"})])

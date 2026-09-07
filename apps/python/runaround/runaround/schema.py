@@ -21,14 +21,14 @@ YES_NO_UNKNOWN = ["yes", "no", "unknown"]
 #: will keep dialling on nothing.
 HOP_RESULT_SCHEMA: dict[str, Any] = {
     "type": "object",
+    # 🔴 CALL-E rejects union types (``['string', 'null']``) with
+    # ``result_schema_invalid``: measured against the live API on 2026-09-07,
+    # ``unsupported JSON Schema type at $.properties.a``. Absence is therefore
+    # expressed by omitting the key, not by a null, and only the two enum
+    # fields the chain cannot move without are required.
     "required": [
         "owns_request",
         "question_answered",
-        "answer_summary",
-        "referral_target_name",
-        "referral_target_phone",
-        "referral_quote",
-        "reference_number",
     ],
     "properties": {
         "owns_request": {
@@ -52,42 +52,42 @@ HOP_RESULT_SCHEMA: dict[str, Any] = {
             ),
         },
         "answer_summary": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": (
                 "One sentence stating the answer in the words the person "
-                "used. Null when question_answered is not yes."
+                "used. Omit this field when question_answered is not yes."
             ),
         },
         "referral_target_name": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": (
                 "Name of the organization or desk this person said to "
-                "contact next. Null when no referral was given."
+                "contact next. Omit this field when no referral was given."
             ),
         },
         "referral_target_phone": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": (
                 "Phone number in E.164 format that this person gave for the "
-                "referral, for example +15550100. Null when no number was "
+                "referral, for example +15550100. Omit this field when no number was "
                 "spoken. Do not construct, complete, or look up a number that "
                 "was not said on the call."
             ),
         },
         "referral_quote": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": (
                 "The words the person actually used to refer the caller "
-                "elsewhere, quoted from the transcript. Null when no referral "
-                "was given. Do not paraphrase and do not supply this field "
+                "elsewhere, quoted from the transcript. Omit this field when "
+                "no referral was given. Do not paraphrase and do not supply this field "
                 "unless the referral was spoken."
             ),
         },
         "reference_number": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": (
                 "Case, ticket, or claim reference the person read out for "
-                "this request. Null when none was given."
+                "this request. Omit this field when none was given."
             ),
         },
     },

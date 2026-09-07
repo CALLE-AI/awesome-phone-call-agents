@@ -16,6 +16,7 @@ from typing import Any, Protocol
 from runaround import chain, schema
 from runaround.calle_client import (
     CallEClient,
+    CallNotPlaced,
     build_create_call_body,
     extract_structured_result,
     idempotency_key,
@@ -176,6 +177,7 @@ def run_hop(
     # The hop is written before the call so an interrupted run shows a call
     # that may have happened, rather than no record at all.
     case.hops.append(hop)
+    pending_before = case.pending_desk
     case.pending_desk = None
     save_case(data_dir, case)
 
@@ -197,7 +199,19 @@ def run_hop(
         case_id=case.case_id, hop_index=hop_index, destination=desk.phone
     )
 
-    call = placer.place(body=body, key=key, destination=desk.phone)
+    try:
+        call = placer.place(body=body, key=key, destination=desk.phone)
+    except CallNotPlaced as refusal:
+        # CALL-E rejected the request itself, so no phone rang and the hop
+        # that was written a moment ago never happened. Withdraw it: a hop
+        # that cost nothing must not cost the budget, and `status` must not
+        # report a call that does not exist. Anything less certain than this
+        # -- a timeout, a 5xx, a transport error -- keeps the hop, because
+        # there the question "did a phone ring?" is still open.
+        case.hops.pop()
+        case.pending_desk = pending_before
+        save_case(data_dir, case)
+        raise RunRefused(str(refusal)) from refusal
     hop.call_id = call.get("id")
     hop.call_status = str(call.get("status", "failed"))
 
