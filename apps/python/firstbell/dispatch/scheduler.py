@@ -470,6 +470,11 @@ class WaveDispatcher:
             attempts_made=len(attempts),
             numbers_tried=tried, transcript=transcript,
             placed_by_this_run=self._was_placed_now(call),
+            # Verbatim, and only if the provider sent a string. A queue derives the
+            # thirty-minute callback deadline from this, so a value this code made up
+            # would be a deadline nobody has to meet.
+            completed_at=(call.get("completed_at")
+                          if isinstance(call.get("completed_at"), str) else None),
         )
 
         status = call.get("status")

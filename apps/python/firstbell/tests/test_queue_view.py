@@ -129,3 +129,92 @@ def test_no_parents_own_words_are_published_in_the_queue():
         assert note[:25] not in markup, (
             f"the queue publishes the free text note for {item['id']}"
         )
+
+
+# The two facts a district administrator found missing from this screen: which language the
+# callback has to be made in, and when the thirty-minute window closes. Both come off the
+# receipt or are left out. A queue that invented either would be telling an attendance
+# office something about a real family that nobody measured.
+
+def _markup(items: list[dict]) -> str:
+    import judge_page
+    return judge_page.queue_markup({"items": items})
+
+
+def _item(sid: str, **extra) -> dict:
+    base = {"id": sid, "resolution": "undetermined", "numbers_tried": ["+91 555 ***"],
+            "structured_result": {"reason_category": "unknown",
+                                  "expected_return": "unknown"}}
+    base.update(extra)
+    return base
+
+
+def test_the_language_comes_from_the_roster_field_when_the_receipt_carries_one():
+    out = _markup([_item("S-1", locale="ta-IN"), _item("S-2", locale="en-IN")])
+    assert "Tamil" in out and "English" in out
+    assert "read from the script" not in out, (
+        "the receipt said what the language was, so nothing was inferred and the page "
+        "should not claim it was")
+
+
+def test_an_unknown_locale_tag_prints_itself_rather_than_being_guessed_at():
+    """A wrong language on this row sends the wrong person to the phone."""
+    out = _markup([_item("S-1", locale="pt-BR")])
+    assert "pt-BR" in out
+
+
+def test_the_language_is_measured_from_the_transcript_when_the_receipt_predates_the_field():
+    """The committed run has no `locale`, and the script of what was said is a measurement.
+
+    Two of its four queued cases were conducted in Tamil. That is a staffing fact: half
+    that queue cannot be worked by whoever is free.
+    """
+    tamil = _item("S-1", transcript=[{"speaker": "agent",
+                                      "text": "வணக்கம், பள்ளியிலிருந்து அழைக்கிறேன்"}])
+    english = _item("S-2", transcript=[{"speaker": "agent", "text": "Hello, the school"}])
+    out = _markup([tamil, english])
+    assert "Tamil" in out and "English" in out
+    assert "read from the script of the call's own transcript" in out
+    assert "1 of the 2 were conducted in Tamil" in out, (
+        "the count in that sentence has to be derived; a typed one is true of one receipt")
+
+
+def test_a_row_with_neither_a_locale_nor_a_transcript_shows_no_language():
+    out = _markup([_item("S-1", transcript=[])])
+    assert "Tamil" not in out and "English" not in out
+    assert "read from the script" not in out
+
+
+def test_an_escalated_row_shows_the_deadline_its_own_end_time_implies():
+    from firstbell.domain import SAFEGUARDING_CALLBACK_MINUTES
+    assert SAFEGUARDING_CALLBACK_MINUTES == 30
+    out = _markup([_item("S-1", completed_at="2026-09-04T09:12:00+00:00")])
+    assert "answered 09:12, call back by" in out
+    assert "<b>09:42</b>" in out, "the deadline is the end time plus the promised window"
+    assert "records no per-call end time" not in out
+
+
+def test_a_row_that_is_not_escalated_carries_no_callback_clock():
+    """The window is a promise about safeguarding cases and not about every callback."""
+    plain = _item("S-1", structured_result={}, resolution="failed",
+                  completed_at="2026-09-04T09:12:00+00:00")
+    out = _markup([plain])
+    assert "call back by" not in out
+
+
+def test_an_unreadable_end_time_shows_no_clock_rather_than_a_wrong_one():
+    out = _markup([_item("S-1", completed_at="the fourth of September")])
+    assert "call back by" not in out
+    assert "records no per-call end time" in out, (
+        "a timestamp this page could not read is a deadline it does not know, and the "
+        "page says so rather than going quiet")
+
+
+def test_the_note_is_one_paragraph_rather_than_one_per_row():
+    """Reading fatigue was the loudest complaint about this page.
+
+    Four rows each admitting the same missing field is twenty-four lines of identical
+    prose, which is the defect the shared-reason band was written to remove.
+    """
+    out = _markup([_item(f"S-{n}") for n in range(1, 5)])
+    assert out.count("class=queue-clockless") == 1

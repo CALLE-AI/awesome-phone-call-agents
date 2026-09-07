@@ -144,9 +144,9 @@ already exists, and one district's is on the public record: Chapel Hill-Carrboro
 Schools approved $157,664 for its 2024-25 student-information-system renewal, out of the
 capital outlay technology budget
 ([board agenda abstract, 15 August 2024](https://chccs.granicus.com/MetaViewer.php?view_id=2&clip_id=646&meta_id=45974)),
-for a district of 11,386 students
-([US News, citing NCES CCD](https://www.usnews.com/education/k12/north-carolina/districts/chapel-hill-carrboro-city-schools-102495)).
-That is about $13.85 a student a year, which is a division rather than a published figure,
+for a district of 11,353 students in that same year
+([NCES Common Core of Data](https://nces.ed.gov/ccd/districtsearch/district_detail.asp?ID2=3700720)).
+That is about $13.89 a student a year, which is a division rather than a published figure,
 for a bundle rather than a bare licence, in one district rather than a market.
 
 Against that, this app's own ceiling. At three minutes of staff time an attempt, a thousand
@@ -675,7 +675,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 435 tests
+python -m pytest tests/ -q          # 443 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's

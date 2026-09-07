@@ -37,7 +37,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -858,6 +858,97 @@ def three_endings_figure() -> str:
             'three. The third one is the whole argument.</figcaption></figure>')
 
 
+# The languages this run's roster actually holds, spelled the way a school office would
+# say them. A BCP 47 tag on a queue row is a tag; a clerk deciding who can take the
+# callback needs the language. Unknown tags fall through and print as themselves rather
+# than being guessed at, because a wrong language on this row sends the wrong person.
+LOCALE_NAMES = {
+    "en-IN": "English",
+    "en-US": "English",
+    "en-GB": "English",
+    "ta-IN": "Tamil",
+    "hi-IN": "Hindi",
+    "es-US": "Spanish",
+}
+
+# The window this project promises on a safeguarding case, imported rather than typed so
+# the queue and the rule cannot disagree about it.
+if str(APP) not in sys.path:
+    sys.path.insert(0, str(APP))
+from firstbell.domain import SAFEGUARDING_CALLBACK_MINUTES  # noqa: E402
+
+
+def _clock(item: dict, escalated: bool) -> str:
+    """When the call ended, and when the callback window on it closes.
+
+    A district administrator reading the published queue found the gap: four rows sorted
+    under "Speak to this family first", with no time raised and no minutes left against
+    the thirty minutes this project promises. They could not act on "first". The position
+    was shown and the clock never was.
+
+    Read off the receipt, never derived from the build's own clock. A deadline this page
+    computed from the moment somebody happened to rebuild it would be a countdown against
+    nothing, and on this page that is worse than an empty cell. The committed run predates
+    the field, so it says so, which is the honest version of not knowing.
+    """
+    if not escalated:
+        return ""
+    ended = item.get("completed_at")
+    if not isinstance(ended, str) or not ended:
+        return ""
+    try:
+        at = datetime.fromisoformat(ended.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    due = at + timedelta(minutes=SAFEGUARDING_CALLBACK_MINUTES)
+    return (f'<span class=q-clock>answered {at:%H:%M}, call back by '
+            f'<b>{due:%H:%M}</b></span>')
+
+
+# The Tamil block. A transcript is the text of what was actually said, so the script it
+# is written in is a measurement of the language the call was conducted in rather than an
+# assumption about it.
+_TAMIL = re.compile(r"[\u0B80-\u0BFF]")
+
+
+def _language(item: dict) -> tuple[str, str]:
+    """The language of the call, and where that came from.
+
+    Returns an empty label rather than guessing. The receipt's own `locale` is
+    authoritative and is used whenever it is there. The run this page is built from
+    predates that field, so the fallback reads the script of the transcript: two of the
+    four cases in the queue were conducted in Tamil and two in English, which is a
+    staffing fact and not a decoration. A clerk sending an English speaker to ring a
+    Tamil-speaking family has moved the work rather than assigned it.
+    """
+    locale = item.get("locale")
+    if isinstance(locale, str) and locale.strip():
+        return LOCALE_NAMES.get(locale, locale), "locale"
+    turns = item.get("transcript") or []
+    if not turns:
+        return "", ""
+    said = " ".join(t.get("text", "") for t in turns if isinstance(t, dict))
+    if not said.strip():
+        return "", ""
+    return ("Tamil" if _TAMIL.search(said) else "English"), "transcript"
+
+
+def _row_facts(item: dict, escalated: bool, tried: int) -> str:
+    """The three things that differ between rows, in the order a clerk needs them.
+
+    Language first, because it decides who on the rota can take the call at all.
+    """
+    parts = []
+    label, _source = _language(item)
+    if label:
+        parts.append(f'<span class=q-locale>{esc(label)}</span>')
+    clock = _clock(item, escalated)
+    if clock:
+        parts.append(clock)
+    parts.append(f'{tried} number{"" if tried == 1 else "s"} tried')
+    return " &middot; ".join(parts)
+
+
 def queue_markup(run: dict) -> str:
     """The screen a school office opens on Monday, built from a receipt that already exists.
 
@@ -953,6 +1044,44 @@ def queue_markup(run: dict) -> str:
     if shared:
         out.append(f'<p class=queue-why>All {len(rows)} for the same reason. '
                    f'{esc(shared[0])}<b>{esc(shared[1])}</b></p>')
+    # Said once, when no row can show a clock. The rows this page is built from were
+    # placed before the receipt recorded a per-call end time, and the thirty-minute
+    # window is measured from that moment, so this page can show the position the rule
+    # gives a case and cannot show its deadline. The field is recorded now; this receipt
+    # is the one already published, and replacing it with a newer run to make the screen
+    # look better would be the trade this whole entry argues against.
+    # One note under the rows, holding whatever this receipt could not tell the page.
+    #
+    # There were two paragraphs here for a while, one about the language and one about the
+    # clock, and two stacked admissions above four rows is the same reading fatigue the
+    # shared-reason band was written to remove. Every count in it is derived: a sentence
+    # that says "two of the four" and means it only for one receipt is the kind of typed
+    # number this project deletes on sight.
+    inferred = [item for _, _e, item, _r in rows if _language(item)[1] == "transcript"]
+    tamil = sum(1 for item in inferred if _language(item)[0] == "Tamil")
+    escalating = [item for _, escalated, item, _res in rows if escalated]
+    clockless = escalating and not any(_clock(item, True) for item in escalating)
+    notes = []
+    if inferred:
+        notes.append(
+            f"The language on {len(inferred)} of these rows is read from the script of "
+            "the call's own transcript, because this receipt predates the roster field "
+            "that records it")
+        if tamil:
+            notes.append(
+                f"{tamil} of the {len(rows)} were conducted in Tamil, so this queue "
+                "needs a Tamil speaker on the rota rather than whoever is free")
+    if clockless:
+        notes.append(
+            f"each carries a {SAFEGUARDING_CALLBACK_MINUTES}-minute callback window and "
+            "this receipt records no per-call end time, so the deadline is not shown. "
+            "The field is written now, it was not on 4 September, and a countdown "
+            "computed from the moment this page was built would be a deadline against "
+            "nothing")
+    if notes:
+        out.append("<p class=queue-clockless>"
+                   + ". ".join(note[0].upper() + note[1:] for note in notes)
+                   + ".</p>")
     out.append(f'<ol class="queue-list{" is-shared" if shared else ""}">')
 
     for _, escalated, item, resolution in rows:
@@ -972,7 +1101,7 @@ def queue_markup(run: dict) -> str:
             f'{body}'
             f'<p class="state state-{"undetermined" if escalated else resolution}">'
             f'{esc(label)}</p>'
-            f'<p class=q-tried>{tried} number{"" if tried == 1 else "s"} tried</p>'
+            f'<p class=q-tried>{_row_facts(item, escalated, tried)}</p>'
             '</li>')
     out.append('</ol>')
     out.append('<p class=queue-foot>Every row is a real call from '

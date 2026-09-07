@@ -93,18 +93,18 @@
       "quote": "the annual renewal of the PowerSchool, LLC Contract for 2024-25",
       "published": "2024-08-15",
       "read_at_source": "2026-09-07",
-      "note": "A bundle, not a bare student-information-system licence: it covers the core SIS plus Enrollment Registration with additional languages, Enrollment School Choice, PowerPack, Unified Talent Professional Learning, State Data Validation and Naviance. One district's price, on the record, rather than a market average. Divided by the district's enrolment it is about $13.85 a student a year, which is arithmetic and is labelled as such wherever it appears."
+      "note": "A bundle, not a bare student-information-system licence: it covers the core SIS plus Enrollment Registration with additional languages, Enrollment School Choice, PowerPack, Unified Talent Professional Learning, State Data Validation and Naviance. One district's price, on the record, rather than a market average. Divided by the district's enrolment it is about $13.89 a student a year, which is arithmetic and is labelled as such wherever it appears."
     },
     {
       "id": "chccs-enrolment",
-      "value": "11,386",
-      "claim": "Students enrolled in Chapel Hill-Carrboro City Schools, 2024-25",
-      "publisher": "U.S. News Education, citing National Center for Education Statistics Common Core of Data",
-      "url": "https://www.usnews.com/education/k12/north-carolina/districts/chapel-hill-carrboro-city-schools-102495",
-      "quote": "Chapel Hill-Carrboro City Schools ... 11,386 students",
-      "published": "2025-01-01",
+      "value": "11,353",
+      "claim": "students enrolled in Chapel Hill-Carrboro City Schools, North Carolina, in the 2024-25 school year, which is the year of the system renewal priced above it",
+      "publisher": "National Center for Education Statistics, Common Core of Data, US Department of Education",
+      "url": "https://nces.ed.gov/ccd/districtsearch/district_detail.asp?ID2=3700720",
+      "quote": "District Details (2024-2025 school year; Fiscal data from 2022-2023) [...] Chapel Hill-Carrboro City Schools [...] Total Students: 11,353",
+      "published": "2026-01-01",
       "read_at_source": "2026-09-07",
-      "note": "Secondary: US News republishing NCES CCD rather than the CCD table itself. It is the denominator of the per-student arithmetic beside 157,664, so it is registered rather than left in prose, and it is the weaker of the two sources in that sentence."
+      "note": "This figure replaces one that was wrong in two ways, and both are the kind this register exists to catch. It said 11,386 students, citing a US News district page. 11,386 is a real number, but it is the 2023-24 CCD year, confirmed against the Urban Institute's mirror of the same federal data (year 2023 returns enrollment 11386 and 21 schools; year 2024 returns 11353 and 20 schools). And the URL cited carried the wrong district id (102495): two independent fetchers both return a page titled Howells-Dodge Consolidated Schools, a 297-student district in Nebraska, at HTTP 200 with no redirect. The correct US News id is 111172. The federal source is cited instead of the aggregator, and the year now matches the renewal it is divided into. The district's own site says only \"more than 11,000 students\", and North Carolina's ADM report is behind a dashboard that serves nothing without JavaScript, so neither can carry this claim."
     },
     {
       "id": "texas-basic-allotment",

@@ -1726,6 +1726,24 @@ button[data-copy][data-copied]::after {
   margin: 0; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
   font-variant-numeric: tabular-nums; text-align: right;
 }
+/* The language and the deadline sit in the same column as the attempt count, because a
+ * clerk reads that column to decide who takes the call and by when. They are the two
+ * facts a district administrator found missing from this screen, and the reason the
+ * column is a stack rather than one line is that the attempt count was the only thing
+ * in it and read as the point of the row. */
+.q-tried .q-locale,
+.q-tried .q-clock { display: block; }
+.q-tried .q-locale { color: var(--ink); }
+.q-tried .q-clock b { font-weight: 400; color: var(--ink); }
+/* Whatever this receipt could not tell the page, said once above the rows rather than
+ * repeated on each of them. Same measure and same ink as the shared-reason band, because
+ * they are the same kind of sentence: something true of the whole queue. */
+.queue-clockless {
+  margin: 0; padding: 0.7rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+  max-width: 62ch; text-wrap: pretty;
+}
 .queue-foot {
   margin: 0; padding: 0.8rem 1.15rem;
   border-top: 1px solid var(--line); background: var(--paper);
@@ -1736,6 +1754,11 @@ button[data-copy][data-copied]::after {
   .queue-row { grid-template-columns: minmax(0, 1fr) 8rem; row-gap: 0.4rem; }
   .q-when { grid-column: 1 / -1; }
   .q-tried { text-align: left; grid-column: 1 / -1; }
+  /* At this width the stack becomes one line: three short facts side by side read as one
+   * row, where three stacked lines per row make four rows look like twelve. */
+  .q-tried .q-locale,
+  .q-tried .q-clock { display: inline; }
+  .q-tried .q-locale::after { content: " \00b7 "; color: var(--ink-3); }
   /* Two columns here, so the desktop placement above would point at columns that do not
    * exist. The id takes the row, the state and the count sit side by side under it. */
   .queue-list.is-shared .q-when { grid-column: 1 / -1; }

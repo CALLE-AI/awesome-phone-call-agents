@@ -449,6 +449,12 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 "provider_call_id": r.provider_call_id,
                 "numbers_tried": list(r.masked_numbers),   # masked, never raw
                 "attempts": r.attempts_made,
+                # The family's own language, and when the provider says the call ended.
+                # Both are on the row rather than derivable from it: a queue needs the
+                # language to know who can answer the callback, and the callback window
+                # is measured from that timestamp. Null where the payload carried none.
+                "locale": r.item.locale or None,
+                "completed_at": r.completed_at,
                 # True placed, False replayed by an idempotency key, null undetermined.
                 # A receipt that counted a replay as a call would overstate the cost.
                 "placed_by_this_run": r.placed_by_this_run,

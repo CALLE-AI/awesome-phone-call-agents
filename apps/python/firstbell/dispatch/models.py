@@ -188,6 +188,14 @@ class ItemResult:
     # to be dialled and nothing is owed. This one is different. The call was not placed
     # because the channel cannot carry it, so the work did not go away, it moved.
     needs_another_channel: bool = False
+    # When the provider says the call ended, verbatim from its payload. A safeguarding
+    # callback window is thirty minutes from this moment, so a queue without it can show
+    # a position and cannot show a clock, which is what a district buyer reading the
+    # published queue found: four identical rows under "Speak to this family first", no
+    # time raised and no minutes left. None means the payload carried none, and a queue
+    # that filled that in from its own clock would be inventing the one number the rule
+    # is measured against.
+    completed_at: str | None = None
 
     @property
     def masked_numbers(self) -> tuple[str, ...]:
