@@ -155,6 +155,13 @@ class WorkItem:
     # discover that by dialling, and dialling anyway files them under "nobody answered",
     # which is a record that says the family was unreachable when the channel was.
     reachable_by_voice: bool = True
+    # Set when another absence on the same telephone number is being called this run, and
+    # holds the id of the row that is. `dispatch/households.py` explains why this row is
+    # held rather than closed on the other call's answer: the structured result has one
+    # subject in it, and three records closed on one subject is an answer this program was
+    # never given.
+    household_held_for: str | None = None
+    held_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id:

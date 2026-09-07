@@ -12,7 +12,8 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
-from dispatch import NO_CONSENT, Escalation, ItemResult, Resolution, WorkItem
+from dispatch import (HOUSEHOLD_HELD, NO_CONSENT, Escalation, ItemResult,
+                      Resolution, WorkItem)
 
 # What a usable answer looks like. Kept small on purpose: every field here is one the
 # office actually needs to close the record, and nothing is asked that a parent would not
@@ -300,6 +301,11 @@ class ImpactSummary:
     # wave of consent refusals.
     skipped_no_voice: int = 0
     skipped_not_dialled: int = 0
+    # Rows held because another absence on the same telephone number is being called. Its
+    # own bucket, because it is the only skip in the run that is not a statement about the
+    # family, and because it is the number a district is buying: calls this run did not
+    # place that a row-per-call run would have.
+    held_same_household: int = 0
     calls_replayed: int = 0
     calls_unknown_provenance: int = 0
     live: bool = False
@@ -400,6 +406,33 @@ class ImpactSummary:
         return rate * (self.escalation_staff.hourly / 60.0)
 
     @property
+    def escalation_break_even_rate(self) -> float | None:
+        """The net-new escalation rate at which the saving turns into a loss.
+
+        Set the two quantities above equal to each other and the minutes cancel, as long
+        as a callback is given the same number of minutes as a manual attempt, which is
+        the assumption the ceiling is already published under. What is left is a ratio of
+        two wages and nothing else:
+
+            (attempts removed / attempts billed) x secretary wage / lead wage
+
+        A ceiling published without its crossover invites the reader to assume there is
+        not one. There is: above this rate the callbacks the safeguarding rule creates
+        cost a district more than the attempts the run removes, and the arithmetic that
+        makes this software worth buying is the same arithmetic that says at what point it
+        stops being. A buyer staffing a rota is entitled to the number rather than to the
+        derivation.
+
+        It is a property of this run, not a constant. A run that closes fewer records
+        removes fewer attempts, and the rate it can absorb falls with them.
+        """
+        if (self.staff is None or self.escalation_staff is None
+                or not self.calls_placed or not self.escalation_staff.hourly):
+            return None
+        return ((self.attempts_resolved / self.calls_placed)
+                * self.staff.hourly / self.escalation_staff.hourly)
+
+    @property
     def non_english_resolved(self) -> int:
         return sum(n for loc, n in self.resolved_by_language.items()
                    if not loc.lower().startswith("en"))
@@ -450,6 +483,12 @@ class ImpactSummary:
             f"  undetermined         {self.undetermined}   call happened, no usable answer, needs a person",
             f"  failed               {self.failed}   nobody reached on any number",
             f"  skipped, no consent  {self.skipped_no_consent}",
+            *([f"  held, same household {self.held_same_household}   calls this run did "
+               "not place, because the",
+               "                       same number was already being called about "
+               "another",
+               "                       absence. Each one still goes to a person."]
+              if self.held_same_household else []),
             *([f"  no voice channel     {self.skipped_no_voice}   never dialled, needs "
                "another way to reach them"] if self.skipped_no_voice else []),
             *([f"  skipped, not dialled {self.skipped_not_dialled}   cancelled, or "
@@ -577,7 +616,19 @@ class ImpactSummary:
                     "each of the two",
                     f"                        (from {cur}{ceiling * 3:,.2f}: the line "
                     "above ignores this)",
-                ] + _cited(self.escalation_staff.cite(), indent=24)
+                ]
+                crossover = self.escalation_break_even_rate
+                if crossover is not None:
+                    rate_now = self.net_new_escalation_rate or 0.0
+                    out += [
+                        f"    saving ends at      {crossover * 100:,.1f} net-new per 100 "
+                        "answered calls. Above that,",
+                        "                        the callbacks this rule creates cost "
+                        "more than the",
+                        f"                        attempts the run removes. This run "
+                        f"measured {rate_now * 100:,.1f}.",
+                    ]
+                out += _cited(self.escalation_staff.cite(), indent=24)
         return out
 
 
@@ -621,7 +672,11 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         skipped_not_dialled=(counts[Resolution.SKIPPED]
                              - sum(1 for r in results
                                    if (r.reason or "").startswith(NO_CONSENT))
-                             - sum(1 for r in results if r.needs_another_channel)),
+                             - sum(1 for r in results if r.needs_another_channel)
+                             - sum(1 for r in results
+                                   if (r.reason or "").startswith(HOUSEHOLD_HELD))),
+        held_same_household=sum(1 for r in results
+                                if (r.reason or "").startswith(HOUSEHOLD_HELD)),
         dialled_on_a_boolean=sum(1 for r in results
                                  if r.item.consented and r.item.consent_record is None
                                  and r.resolution is not Resolution.SKIPPED),

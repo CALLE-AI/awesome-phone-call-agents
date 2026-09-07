@@ -1,0 +1,4 @@
+sourcedId,givenName,familyName,phone,sms,consent,locale,region
+S-2201,,,+15550100201,+15550100901,yes,en-US,US
+S-2202,,,+15550100202,,yes,ta-IN,IN
+S-2203,,,,+15550100903,yes,en-US,US

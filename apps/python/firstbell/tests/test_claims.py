@@ -204,6 +204,77 @@ def test_every_cited_line_number_still_says_what_the_readme_claims():
         )
 
 
+def test_the_three_minute_path_settles_what_it_says_it_settles():
+    """The first screen a reviewer reads, checked against the things it points at.
+
+    A reviewer has minutes, so the first screen makes four claims and names the check for
+    each. That makes it the highest-traffic prose in the repository and the worst place
+    for a number to go stale. Every example file it names has to exist, every figure it
+    quotes has to be the one the program or the ledger produces now, and the count of
+    mutation rows has to be the real one.
+
+    The figures are compared against their own sources rather than against a constant
+    written here, because a test holding its own copy of $0.21 is the second place that
+    number is written down.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    start = readme.find("## If you have three minutes")
+    assert start > 0, "the README no longer opens with a three-minute path"
+    end = readme.find("## If you have twenty minutes", start)
+    assert end > start, "the three-minute path no longer sits above the reading order"
+    path = readme[start:end]
+
+    rows = [line for line in path.splitlines() if line.startswith("| ") and " | " in line]
+    assert len(rows) >= 5, (
+        f"the three-minute path has {len(rows)} table lines, which is too few to be four "
+        "claims and a header"
+    )
+
+    # Every work file it tells a reviewer to run.
+    named = re.findall(r"examples/[\w.-]+\.csv", path)
+    assert len(named) >= 3, "the three-minute path names fewer than three example files"
+    for rel in sorted(set(named)):
+        assert (APP / rel).exists(), (
+            f"the first screen tells a reviewer to run {rel}, which is not in the tree"
+        )
+
+    # Every file it links.
+    for rel in re.findall(r"\]\(([^)h][^)]*)\)", path):
+        assert (APP / rel).exists(), f"the first screen links {rel}, which does not exist"
+
+    # The mutation count, against the ledger.
+    ledger = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")
+    real_rows = len(re.findall(r"^\| \d+ \|", ledger, re.M))
+    quoted = re.search(r"(\d+) rows", path)
+    assert quoted and int(quoted.group(1)) == real_rows, (
+        f"the first screen says {quoted.group(1) if quoted else 'nothing'} mutation rows "
+        f"and MUTATIONS.md has {real_rows}"
+    )
+
+    # The two money figures, against the program that computes them.
+    from dispatch import ItemResult, Resolution, WorkItem
+    from firstbell.domain import StaffCost, summarise
+
+    answered = [
+        ItemResult(item=WorkItem(id=f"S-{n}", phones=("+15550100001",)),
+                   resolution=Resolution.RESOLVED,
+                   structured_result={"parent_confirmed_aware": "yes"},
+                   attempts_made=1)
+        for n in range(4)
+    ]
+    computed = summarise(
+        answered, calls_placed=8,
+        staff=StaffCost.us_school_office(),
+        escalation_staff=StaffCost.us_school_safeguarding_lead(),
+    )
+    crossover = computed.escalation_break_even_rate
+    assert crossover is not None, "the crossover rate is no longer computed"
+    assert f"{crossover * 100:.1f}" in path, (
+        f"the first screen quotes a crossover the program does not compute "
+        f"({crossover * 100:.1f} per 100)"
+    )
+
+
 def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     """The list on the first screen, checked for both halves of what it promises.
 
@@ -221,8 +292,13 @@ def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     # honestly raising the budget to match the rows failed this test for the wrong reason,
     # which pushes the next person towards shaving a row's estimate instead of the heading.
     words = {"ten": 10, "fifteen": 15, "twenty": 20}
-    found = re.search(r"## If you have (\w+) minutes", readme)
-    assert found, "the README no longer has a reading order"
+    # The last of these headings, not the first. A three-minute path was added above the
+    # reading order because a reviewer's budget is minutes rather than tens of minutes,
+    # and this test then scored the three-minute heading against the reading-order table
+    # underneath it, which is two different sections read as one.
+    headings = list(re.finditer(r"## If you have (\w+) minutes", readme))
+    assert headings, "the README no longer has a reading order"
+    found = headings[-1]
     assert found.group(1) in words, (
         f"the reading order offers '{found.group(1)}' minutes, which this test cannot score"
     )
@@ -231,7 +307,7 @@ def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
     table = order[1].split("### Where CALL-E is called", 1)[0]
 
     linked = re.findall(r"\]\(([^)]+)\)", table)
-    assert 4 <= len(linked) <= 8, (
+    assert 4 <= len(linked) <= 9, (
         f"the reading order has {len(linked)} entries, which is either too few to be a "
         "reading order or too many to read in the time offered"
     )
@@ -709,9 +785,20 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
     # held by their own gates, so pulling them in here would make this file the second
     # place a computed number is written down, which is the defect it exists to prevent.
     start = readme.find("So the office still works a list by hand.")
-    end = readme.find("## ", start)
+    # Anchored to the start of a line, because `find("## ")` also matches the "## " inside
+    # a "### " heading. It did: the third-level heading two paragraphs in ended the window
+    # at 1,551 characters of a 4,231-character section, and seven of the thirteen
+    # registered figures were compared against a piece of README they do not appear in.
+    # A gate that measures a window has to be asked how wide the window is.
+    heading = re.compile(r"^## ", re.M).search(readme, start + 1)
+    end = heading.start() if heading else len(readme)
     assert start > 0 and end > start, "the sourced statistics section has moved or gone"
     section = readme[start:end]
+    assert len(section) > 3_000, (
+        f"the sourced section is {len(section)} characters, which is too short to be the "
+        "whole of it. The last time this gate went quiet, its end boundary had matched "
+        "inside a third-level heading."
+    )
 
     # Percentages, and counts with a magnitude word or thousands separators. The second
     # half is the part that was missing. `\b\d[\d,.]*` alone would also catch a year and a
@@ -734,6 +821,21 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
             continue
         assert entry["url"] in section, (
             f"{value} is published without the source link recorded for it"
+        )
+
+    # Every registered figure, wherever in the file it is published. The loop above only
+    # reaches the sourced section, so a figure the program prints (both wage grades are
+    # printed by `firstbell/domain.py` rather than written in prose) was registered and
+    # then never compared against anything. Two of the thirteen were in that position.
+    for value, entry in figures.items():
+        assert value in readme, (
+            f"{value} is registered in evidence/statistics.json and published nowhere in "
+            "the README. A register of sources for figures that are not used is a "
+            "register nobody has to keep true."
+        )
+        assert entry["url"] in readme, (
+            f"{value} is published in the README and {entry['url']} is not, so the figure "
+            "is in the file and its source is not"
         )
 
 

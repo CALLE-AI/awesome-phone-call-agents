@@ -27,7 +27,9 @@ from urllib.parse import urlparse
 from dispatch.consent import RegisterError, load_register
 from dispatch import (
     CsvSource,
+    calls_removed,
     DropSource,
+    group_households,
     DispatchReport,
     Escalation,
     Resolution,
@@ -581,6 +583,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.limit is not None:
         items = items[: args.limit]
+
+    # One call per household. Applied after --limit rather than before, so that the rows
+    # a reviewer asked for are the rows they get and the grouping happens inside that set
+    # rather than deciding which rows it contains.
+    items, households = group_households(items)
+    removed = calls_removed(households)
+    if removed:
+        print(f"{removed} row(s) share a telephone number with an earlier absence, so "
+              f"{removed} fewer call(s) will be placed. Each held row still goes to a "
+              "person: one answer covers one named child.")
 
     client, mode, double = _client_and_mode(args)
 

@@ -300,6 +300,14 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 191 | Let one family's consent record cover any row that points at it, which turns a register with one good record into a permission for the roster | 1 |
 | 192 | Ignore an unrecognised key on a consent record instead of refusing it, so a misspelled `withdrawn_at` reads as a record nobody withdrew | 1 |
 | 193 | Count a row refused on a dated record by exact reason rather than by prefix, which files a family who withdrew consent under the bucket for a cancelled run | 1 |
+| 194 | Resolve a header row matching two export formats by order instead of refusing it, so which column is the identifier is decided by the order this file lists formats in | 1 |
+| 195 | Let a recognised export with no consent column dial anyway, which is the reading of a missing permission this software exists to refuse | 5 |
+| 196 | Take only the first source column for a phone number, so a row carrying a number under `sms` alone has none | 2 |
+| 197 | Hold a sibling behind a row nobody was going to dial, which reports a call saved that was never going to be placed | 3 |
+| 198 | Drop the id fallback on an unparseable number, which collects every row whose number is punctuation into one household | 1 |
+| 199 | Dial the last row of a household instead of the one the export put first, so a receipt cannot be read against the district's own file | 6 |
+| 200 | Stop telling the dialled row who else in the house is absent, which asks a parent about one child while two more of hers are held | 1 |
+| 201 | Count held rows in no bucket, which reports a household the run grouped as a run somebody cancelled | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
@@ -739,6 +747,23 @@ nor any other: the row landed in `skipped_not_dialled`, which is the bucket for 
 somebody cancelled. The count was right, every total added up, and one family's withdrawal
 was reported as a scheduling artifact. It was found by writing the test rather than by the
 suite, because nothing before it had two reasons that both meant the same thing.
+
+Rows 194 to 201 are the district's own export and the household grouping, and 195 is the
+one to read. OneRoster and Clever both carry `phone` and `sms`, and neither carries a
+column saying a guardian agreed to be telephoned by an automated system about an absence,
+because contactability is a fact a system of record holds and permission is not. Turning
+off the check that notices that does not produce an error: it produces a run that
+telephones every family in a district's export on the strength of a column that says how
+to reach them. Five tests fail, and the reason five rather than one is that the refusal is
+also the sentence the reader is shown, and three of those tests are about the sentence.
+
+Row 199 is the quiet one. Dialling the last row of a household instead of the first still
+places one call per household and still holds two rows, so every total in the run is
+identical and the arithmetic checks out. What changes is which child the call is about,
+and a district reconciling a receipt against the file it exported finds the run answered
+about a row it did not expect. Six tests fail, which is more than any other row here, and
+that is only because the ordering was written down as a decision before it was written as
+code.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

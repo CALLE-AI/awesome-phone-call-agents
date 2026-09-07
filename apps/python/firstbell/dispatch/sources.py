@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Iterable, Iterator, Protocol, runtime_checkable
 
 from .consent import refusal as consent_refusal
+from .dialects import DialectError, consent_refusal as dialect_consent_refusal, recognise
 from .models import WorkItem
 
 
@@ -141,9 +142,15 @@ class CsvSource:
     REQUIRED = ("id", "phones")
 
     def __init__(self, path: str | Path, *, encoding: str = "utf-8-sig",
-                 consent_register: dict | None = None, today: date | None = None) -> None:
+                 consent_register: dict | None = None, today: date | None = None,
+                 column_map: dict[str, tuple[str, ...]] | None = None) -> None:
         self.path = Path(path)
         self.encoding = encoding
+        # The district's own column names, when it has supplied them. None means the
+        # header row is read against the built-in formats instead. Set after a run so the
+        # caller can print which format was recognised.
+        self.column_map = column_map
+        self.dialect = None
         # The district's dated consent records, keyed on id, or None when the run was
         # given none. `today` is injectable because an expiry check that reads the wall
         # clock cannot be tested at the boundary, and the boundary is the whole point of
@@ -201,16 +208,26 @@ class CsvSource:
                     "discarded, and if the repeated column is 'phones' or 'consent' the "
                     "discarded one decides whether a family is telephoned."
                 )
-            missing = [c for c in self.REQUIRED if c not in headers]
+            # Which export format this is. A district's own export does not carry the
+            # column names this repository's examples use, and refusing it for that is a
+            # refusal about spelling. `dispatch/dialects.py` carries the mapping and the
+            # reason a rename can never produce the consent column.
+            try:
+                self.dialect = recognise(headers, custom=self.column_map,
+                                         where=self.path.name)
+            except DialectError as bad:
+                raise SourceError(str(bad)) from bad
+            renamed = sorted(set(headers) | set(self.dialect.mapping))
+            missing = [c for c in self.REQUIRED if c not in renamed]
             if missing:
                 raise SourceError(
-                    f"{self.path.name} is missing required column(s): {', '.join(missing)}"
+                    f"{self.path.name} reads as {self.dialect.name} and is still missing "
+                    f"required column(s) after translation: {', '.join(missing)}"
                 )
-            if "consent" not in headers:
-                raise SourceError(
-                    f"{self.path.name} has no 'consent' column. Add one. A missing consent "
-                    "record is not the same as consent, and this will not guess."
-                )
+            no_consent = dialect_consent_refusal(headers, self.dialect,
+                                                 where=self.path.name)
+            if no_consent:
+                raise SourceError(no_consent)
 
             seen: set[str] = set()
             try:
@@ -246,6 +263,11 @@ class CsvSource:
                 # is about exactly that and it has to still be able to see it.
                 row = {(k.strip() if isinstance(k, str) else k): v
                        for k, v in raw_row.items()}
+
+                # Under the names the rest of this program uses. The source columns are
+                # kept as well, so a receipt shows the district the column it recognises.
+                if self.dialect.mapping:
+                    row = self.dialect.rename(row)
 
                 # `csv.DictReader` is forgiving in both directions and both are wrong here.
                 # A short row fills the missing columns with None, so a truncated line

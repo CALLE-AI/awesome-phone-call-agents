@@ -227,7 +227,17 @@ class WaveDispatcher:
 
         callable_items: list[WorkItem] = []
         for item in items:
-            if item.consent_refusal:
+            if item.held_reason:
+                # Another absence on this telephone number is being called this run. First
+                # in the chain because it is the only one of these that says nothing about
+                # the family: they consented, the phone reaches them, and the reason this
+                # row is not a call is that the same call is already being placed. Filing
+                # it under consent or reachability would report a fact about a household
+                # that is not true of it.
+                report.results.append(ItemResult(
+                    item=item, resolution=Resolution.SKIPPED, reason=item.held_reason,
+                ))
+            elif item.consent_refusal:
                 # A dated record that does not cover this call. Checked before the boolean
                 # because it is the more specific statement: a row carrying a record that
                 # was withdrawn last week has a `consent` column that still says yes, and

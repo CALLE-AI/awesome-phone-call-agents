@@ -16,6 +16,7 @@ from .models import (
     mask,
     redact_free_text,
 )
+from .households import HOUSEHOLD_HELD, calls_removed, group as group_households
 from .sources import CsvSource, DropSource, MemorySource, SourceError, WorkSource
 from .scheduler import Cancelled, RetryPolicy, WaveDispatcher, default_idempotency_key
 from .validation import UnsupportedSchema, is_valid, problems
@@ -24,7 +25,8 @@ __all__ = [
     "WaveDispatcher", "RetryPolicy", "Cancelled", "default_idempotency_key",
     "WorkItem", "ItemResult", "DispatchReport", "Resolution", "Escalation",
     "mask", "redact_free_text",
-    "NO_CONSENT", "NO_VOICE_CHANNEL", "CANCELLED",
+    "NO_CONSENT", "NO_VOICE_CHANNEL", "CANCELLED", "HOUSEHOLD_HELD",
+    "group_households", "calls_removed",
     "is_valid", "problems", "UnsupportedSchema",
     "WorkSource", "CsvSource", "DropSource", "MemorySource", "SourceError",
 ]

@@ -18,9 +18,24 @@ Everything in that drawing is a branch in `dispatch/scheduler.py`. It is generat
 `tools/site/page.css` and its safeguarding window out of `firstbell/domain.py`, so it
 cannot describe a version of this program that no longer exists.
 
+## If you have three minutes
+
+Four claims, and the command or the file that settles each. Nothing here needs an API key
+and nothing here is a screenshot.
+
+| Claim | Check it |
+|---|---|
+| A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
+| It costs less than the desk, and the run says where that stops being true | The same command with `--staff-annual 48980 --escalation-annual 77800`. It prints a ceiling of **$0.21 a call**, and **31.5 net-new escalations per 100** as the rate above which the saving becomes a loss |
+| A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv`, then `examples/absences-siblings.csv`, which places two calls for four rows |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 201 rows, each with the change made and the number of tests that noticed |
+
+Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
+the [evidence page](https://firstbell-evidence.vercel.app) with the recordings.
+
 ## If you have twenty minutes
 
-Read these eight files in this order. Between them they contain every claim this directory
+Read these nine files in this order. Between them they contain every claim this directory
 makes, and each one can be checked without an API key.
 
 | # | File | What it settles | Time |
@@ -28,28 +43,29 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | One hundred and ninety-three gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and one gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the seven checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
 | 8 | [`call-e-feedback.md`](call-e-feedback.md) | Ten findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
+| 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
 
 ### Where CALL-E is called at runtime
 
 Four lines do all of it, and the default offline run reaches three of them. Every anchor
 below is checked by a test, so a line number here cannot quietly rot.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:375`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:385`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:451`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:461`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:367`, rather than as a string match on a message.
+  `dispatch/scheduler.py:377`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:372`.
+  `firstbell/cli.py:374`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:380`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:390`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -150,12 +166,18 @@ for a district of 11,353 students in that same year
 That is about $13.89 a student a year, which is a division rather than a published figure,
 for a bundle rather than a bare licence, in one district rather than a market.
 
-Against that, this app's own ceiling. At three minutes of staff time an attempt, a thousand
-of these calls is worth doing at anything under **$590**, because $0.59 is the price above
-which the desk is cheaper. A thousand calls is a quarter of one percent of that district's
-renewal. Both halves of that comparison are arithmetic and both are labelled: the $590 is a
-ceiling this program computes from a sourced wage and prints on every run, not a price, and
-the renewal is one district's bundle.
+Against that, this app's own ceiling. At three minutes of staff time an attempt, and after
+subtracting the safeguarding callbacks the run creates, a thousand of these calls is worth
+doing at anything under **$210**, because $0.21 is the price above which the desk is
+cheaper. Divide: $210 against $157,664 is thirteen hundredths of one percent of that
+district's renewal. Before the callbacks were priced the same sentence said $590, which is
+thirty-seven hundredths of one percent, and an earlier draft of it said a quarter of one
+percent, which is $394 and was wrong in this project's own favour by half. The arithmetic
+is left in because a reader checking one division should be able to check all three.
+
+Both halves of the comparison are labelled. The $210 is a ceiling this program computes
+from two sourced wages and prints on every run, not a price. The renewal is one district's
+bundle.
 
 There is a revenue side too, in some states. Texas funds on average daily attendance at a
 Basic Allotment of $6,215 per student for 2025-26
@@ -244,6 +266,9 @@ What this run was worth
                         takes the safeguarding lead
     ceiling after it    $0.21 a call, at 3 minutes for each of the two
                         (from $0.59: the line above ignores this)
+    saving ends at      31.5 net-new per 100 answered calls. Above that,
+                        the callbacks this rule creates cost more than the
+                        attempts the run removes. This run measured 20.0.
                         $37.40/hour, from $77,800 over 2,080 h. School and career counselors and
                         advisors, Elementary and secondary schools; local, 2025. Source: US
                         Bureau of Labor Statistics, Occupational Outlook Handbook
@@ -330,6 +355,38 @@ Twenty-four per hundred is a wide interval because eleven calls is a small sampl
 sample is small because every one of those calls was placed to a consenting adult who knew
 what it was. The bound is computed rather than guessed (Clopper-Pearson, solved on the
 binomial tail, `tools/replay_escalation.py`), and a pilot's first job is to shrink it.
+
+### Where the saving turns into a loss
+
+Both numbers are useless without the third one, so the run prints it: **31.5 net-new
+escalations per 100 answered calls**, above which the callbacks the rule creates cost a
+district more than the attempts the run removes. It is not a constant and not an estimate.
+Set the two quantities equal and the minutes cancel, leaving a ratio of the two wages
+against how many attempts this run actually removed:
+
+```
+(4 attempts removed / 8 attempts billed) x $23.55 / $37.40 = 0.315
+```
+
+Put the three side by side, because this is the whole commercial question in one line.
+
+| | Net-new per 100 answered calls |
+|---|---|
+| Measured on the committed offline run | 20.0 |
+| Measured on eleven real calls | 0 |
+| What eleven real calls cannot rule out | 24 |
+| Where the saving becomes a loss | **31.5** |
+
+Twenty-four is under thirty-one and a half, so on the evidence that exists the run is on
+the right side of its own crossover, by seven and a half calls in a hundred. That is a
+thin margin to buy on, and stating it thinly is the point: a district running this at a
+higher alert rate than the sample, or closing fewer records than this run closes, walks
+into the loss without the software saying a word. So the software says it. A run that
+removes fewer attempts absorbs a lower rate, and the figure moves down with it.
+
+A vendor would publish $0.21 and stop. The reason to publish 31.5 as well is that a school
+board is going to ask the question in the meeting, and the answer should already be in the
+run rather than improvised at the table.
 
 ## Three outcomes, not two
 
@@ -691,7 +748,7 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 479 tests
+python -m pytest tests/ -q          # 510 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
