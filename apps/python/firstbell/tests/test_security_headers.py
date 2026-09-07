@@ -56,6 +56,19 @@ def _headers() -> dict[str, str]:
     return {h["key"]: h["value"] for h in rules[0]["headers"]}
 
 
+def _page() -> str:
+    """The built page, or the same skip `_headers` would have taken.
+
+    Three tests read `PAGE` as their first statement, so on a fresh clone they raised
+    `FileNotFoundError` instead of skipping, and the suite reported five failures where the
+    README promises two skips. The guard existed and was in `_headers`, which those three
+    reached only afterwards. Measured on a clean `git clone`: 5 failed, 313 passed.
+    """
+    if not PAGE.exists():
+        pytest.skip("no built page; run tools/judge_page.py with --receipts first")
+    return PAGE.read_text(encoding="utf-8")
+
+
 def _directives() -> dict[str, list[str]]:
     policy = _headers()["Content-Security-Policy"]
     out: dict[str, list[str]] = {}
@@ -125,7 +138,7 @@ def test_the_policy_names_no_origin_the_page_does_not_reach():
     it stays behind because nothing breaks when it does. Every origin in the policy has to
     still appear in the page that policy governs.
     """
-    page = PAGE.read_text(encoding="utf-8")
+    page = _page()
     granted = {s for sources in _directives().values() for s in sources
                if s.startswith("https://")}
     assert granted, "the policy grants no origin at all, which no longer matches this page"
@@ -145,7 +158,7 @@ def test_every_inline_block_in_the_page_is_covered_by_a_hash():
     that agrees perfectly with its own mistake. This reads the shipped page independently
     and checks the digests it computes are the digests being granted.
     """
-    page = PAGE.read_text(encoding="utf-8")
+    page = _page()
     style_src = " ".join(_directives().get("style-src", []))
     script_src = " ".join(_directives().get("script-src", []))
 
@@ -179,7 +192,7 @@ def test_the_only_inline_handler_is_the_one_that_loads_the_fonts():
     way with nobody deciding to. There is one, it flips a print stylesheet to all once the
     fonts land, and it is the reason the page paints on fallbacks instead of blanking.
     """
-    page = PAGE.read_text(encoding="utf-8")
+    page = _page()
     handlers = [(n, b) for n, _, b in re.findall(r"""\son([a-z]+)=(["'])(.*?)\2""", page, re.S)]
     assert handlers == [("load", "this.media='all'")], (
         f"the page's inline handlers are {handlers}, which is not the single font-loading "

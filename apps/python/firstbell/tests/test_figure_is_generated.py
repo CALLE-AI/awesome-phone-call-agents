@@ -31,6 +31,13 @@ def test_the_committed_figure_is_what_the_generator_makes_today():
         [sys.executable, "tools/make_figure.py", "--check"],
         cwd=APP, capture_output=True, text=True,
     )
+    # Exit 3 is could-not-measure, which is what an unbuilt checkout gets: the figure is
+    # generated rather than committed, so the first run has nothing to compare against.
+    # `--check` used to report that as "changed" and exit 1, so a fresh clone failed here
+    # and then passed on the second run, having written the figure while checking for it.
+    if proc.returncode == 3:
+        pytest.skip("no figure to compare against yet: " + proc.stdout.strip())
+
     assert proc.returncode == 0, (
         "running tools/make_figure.py twice does not give the same bytes, so the "
         "figure the page ships depends on when it was built:\n"

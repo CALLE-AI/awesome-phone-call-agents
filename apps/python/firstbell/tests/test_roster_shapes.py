@@ -214,3 +214,54 @@ def test_consent_and_voice_disagree_about_a_blank_and_agree_about_everything_els
 
     blank_voice = b"id,phones,voice,consent,pupil\nA-1,+15551230001,,yes,Ada\n"
     assert read(tmp_path, blank_voice)[0].reachable_by_voice is True
+
+
+# --------------------------------------------------------------------------
+# The header, which nothing checked. A bug hunt found this and rated it the
+# worst defect in the project, correctly.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("header", [
+    b"id,phones,consent, voice,pupil",
+    b"id,phones,consent,voice ,pupil",
+    b"id, phones , consent , voice , pupil",
+    b" id,phones,consent,voice,pupil",
+])
+def test_a_padded_header_still_reads_the_column_it_names(tmp_path, header):
+    """One space after a comma used to telephone a family that cannot use a telephone.
+
+    The header was stripped to decide which columns exist and the row was then read by its
+    raw key, so `consent, voice` passed every check and `row.get("voice")` returned None.
+    `_voice_ok` reads a blank as yes by design, because a family whose accessibility need
+    nobody recorded is dialled. So a guardian the office had recorded as unreachable by
+    voice, which the models module documents as deaf, hard of hearing, or with a speech
+    disability, was telephoned, and the call was filed as an answer. No error and no log
+    line.
+
+    Written as four spellings because the defect is about whitespace and one example only
+    proves the one place it was tried.
+    """
+    payload = header + b"\nS-1,+15551230001,yes,no,Ada\n"
+    item = read(tmp_path, payload)[0]
+    assert item.id == "S-1", "a padded id column"
+    assert item.consented is True, "a padded consent column"
+    assert item.reachable_by_voice is False, (
+        "the row says voice=no and this read it as yes, which is the telephone call that "
+        "should not have happened"
+    )
+
+
+def test_the_unpadded_control_reads_the_same(tmp_path):
+    """The test above is only evidence if the clean spelling agrees with it."""
+    item = read(tmp_path, b"id,phones,consent,voice,pupil\nS-1,+15551230001,yes,no,Ada\n")[0]
+    assert (item.id, item.consented, item.reachable_by_voice) == ("S-1", True, False)
+
+
+def test_a_padded_duplicate_is_still_a_duplicate(tmp_path):
+    """Stripping the names makes `voice` and ` voice` the same column, which they are.
+
+    So this has to land on the duplicate refusal rather than quietly keeping one.
+    """
+    with pytest.raises(SourceError) as refused:
+        read(tmp_path, b"id,phones,consent,voice, voice\nS-1,+15551230001,yes,no,yes\n")
+    assert "voice" in str(refused.value)

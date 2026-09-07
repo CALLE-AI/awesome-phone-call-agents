@@ -106,6 +106,13 @@ def test_the_counts_are_the_numbers_the_rest_of_the_suite_already_agrees_on():
     """Cross-check against the readers the page uses, so two things must move together."""
     from judge_page import mutation_rows
 
+    # The sibling twenty lines down guards for exactly this file and this one did not, so on
+    # a fresh clone `browser_gate_count()` did the right thing, refused with "cannot be
+    # measured", and failed a test that had no way to know the report was absent. The gate
+    # report is a build artifact and is not committed on purpose.
+    if not (APP / "tools" / "gates" / "gate-report.json").exists():
+        pytest.skip("no gate report; run node tools/gates/run.mjs first")
+
     facts = {
         "mutations": video_facts.mutation_count(),
         "gates": video_facts.browser_gate_count(),

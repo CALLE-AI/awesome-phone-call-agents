@@ -282,7 +282,20 @@ class ImpactSummary:
     # Cases that came back schema-valid and are still not closed. Counted separately
     # because the alternative is counting them twice: once as an answer received, and
     # again, silently, inside a rate that says the work is done.
+    #
+    # Schema-valid is load-bearing and used not to be. `closed` subtracts this from
+    # `resolved`, and the count was taken across every result whatever its resolution. The
+    # scheduler attaches an escalation to a schema-invalid answer and to one whose every
+    # required field says unknown, and both of those are UNDETERMINED, so they were
+    # subtracted from a number they were never in. One such row on its own printed
+    # `resolved 0`, `resolution rate -100%` and `funding recovered $-50.00`. Mixed into a
+    # real run it printed 29% where the answer was 43%, which is the dangerous version
+    # because it looks like a figure.
     escalated: int = 0
+    # Escalations on rows that never reached `resolved`. Not part of the subtraction above,
+    # because they were not in `resolved` to begin with, and reported because a safeguarding
+    # flag on a call that produced nothing usable is the most urgent thing in the run.
+    escalated_unresolved: int = 0
     resolved_by_language: dict[str, int] = field(default_factory=dict)
     open_by_language: dict[str, int] = field(default_factory=dict)
 
@@ -348,6 +361,9 @@ class ImpactSummary:
             f"  resolved             {self.resolved}   schema-valid reason on record",
             *([f"  of those, escalated  {self.escalated}   answer received, still not closed"]
               if self.escalated else []),
+            *([f"  escalated, no answer {self.escalated_unresolved}   flagged for a person "
+               f"on a call that produced nothing usable"]
+              if self.escalated_unresolved else []),
             f"  undetermined         {self.undetermined}   call happened, no usable answer, needs a person",
             f"  failed               {self.failed}   nobody reached on any number",
             f"  skipped, no consent  {self.skipped_no_consent}",
@@ -476,7 +492,11 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         live=live,
         rate=rate,
         staff=staff,
-        escalated=sum(1 for r in results if r.escalation is not Escalation.NONE),
+        escalated=sum(1 for r in results if r.escalation is not Escalation.NONE
+                      and r.resolution is Resolution.RESOLVED),
+        escalated_unresolved=sum(1 for r in results
+                                 if r.escalation is not Escalation.NONE
+                                 and r.resolution is not Resolution.RESOLVED),
         attempts_resolved=sum(r.attempts_made for r in results
                               if r.resolution is Resolution.RESOLVED
                               and not r.needs_a_human),

@@ -155,6 +155,18 @@ class CsvSource:
         try:
             text = raw.decode(self.encoding)
         except UnicodeDecodeError as bad:
+            # Name it when the bytes say what it is. A UTF-16 byte order mark is the most
+            # likely wrong encoding in this market by a distance: it is what Excel's
+            # "Unicode Text" export writes and what PowerShell 5's `Export-Csv` writes by
+            # default, so a district's own scheduled export produces it without anybody
+            # choosing it. Telling them to try cp1252 would send them the wrong way.
+            if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+                raise SourceError(
+                    f"{self.path.name} starts with a UTF-16 byte order mark, so it is "
+                    "UTF-16 rather than " + self.encoding + ". Excel's Unicode Text export "
+                    "and PowerShell's Export-Csv both write that by default. Pass "
+                    "encoding=utf-16, or have the export write UTF-8."
+                ) from bad
             raise SourceError(
                 f"{self.path.name} is not {self.encoding}: byte {bad.object[bad.start]:#04x} "
                 f"at position {bad.start} is not valid. Several systems of record still "
@@ -204,7 +216,28 @@ class CsvSource:
                     "which a half-written export produces."
                 ) from bad
 
-            for line_number, row in rows:
+            for line_number, raw_row in rows:
+                # Read the row under the same names the header check used.
+                #
+                # This is the worst defect anything has found in this project. The header
+                # was stripped to decide which columns exist and the row was then read by
+                # its raw key, so a work file written `consent, voice` passed every check
+                # and `row.get("voice")` returned None. `_voice_ok` reads a blank as yes,
+                # by design, because a family whose accessibility need nobody recorded is
+                # dialled. So one space after a comma telephoned a guardian the office had
+                # recorded as unreachable by voice: deaf, hard of hearing, or with a speech
+                # disability. No error, no log line, and the call was filed as an answer.
+                #
+                # `_voice_ok`'s own docstring stated the rule it was failing: "a typo in
+                # this column decides whether a person gets phoned, and guessing at it is
+                # how a spelling mistake becomes an accessibility complaint." It guarded
+                # the value. Nothing guarded the name.
+                #
+                # The `None` key from a surplus cell is left alone, because the next check
+                # is about exactly that and it has to still be able to see it.
+                row = {(k.strip() if isinstance(k, str) else k): v
+                       for k, v in raw_row.items()}
+
                 # `csv.DictReader` is forgiving in both directions and both are wrong here.
                 # A short row fills the missing columns with None, so a truncated line
                 # silently became a family with no consent, dropped from the run and
