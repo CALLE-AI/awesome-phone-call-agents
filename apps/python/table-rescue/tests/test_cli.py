@@ -75,6 +75,75 @@ def test_run_missing_data_files_fails_cleanly(tmp_path, capsys):
     assert "not found" in capsys.readouterr().err
 
 
+def test_run_live_requires_region(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    exit_code = main(
+        [
+            "run", "--live",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(tmp_path / "state"),
+            "--run-id", "live-1",
+        ]
+    )
+    assert exit_code == 1
+    assert "--region" in capsys.readouterr().err
+
+
+def test_run_live_requires_allowlist_file(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    exit_code = main(
+        [
+            "run", "--live", "--region", "US",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(tmp_path / "state"),
+            "--run-id", "live-1",
+        ]
+    )
+    assert exit_code == 1
+    assert "authorized_destinations" in capsys.readouterr().err
+
+
+def test_run_live_aborts_on_missing_authorization(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    (data_dir / "authorized_destinations.jsonl").write_text(
+        '{"phone": "+15550101", "authorized_by": "op", '
+        '"authorized_at": "2026-09-07T00:00:00+07:00"}\n',
+        encoding="utf-8",
+    )
+    exit_code = main(
+        [
+            "run", "--live", "--region", "US",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(tmp_path / "state"),
+            "--run-id", "live-1",
+        ]
+    )
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "+15550111" in err  # W-001 not authorized; nothing dialed
+
+
+def test_run_live_fictional_number_never_reaches_dial(tmp_path, capsys):
+    data_dir = write_sample_data(tmp_path)
+    (data_dir / "authorized_destinations.jsonl").write_text(
+        '{"phone": "+15550101", "authorized_by": "op", '
+        '"authorized_at": "2026-09-07T00:00:00+07:00"}\n'
+        '{"phone": "+15550111", "authorized_by": "op", '
+        '"authorized_at": "2026-09-07T00:00:00+07:00"}\n',
+        encoding="utf-8",
+    )
+    exit_code = main(
+        [
+            "run", "--live", "--region", "US", "--yes",
+            "--data-dir", str(data_dir),
+            "--state-dir", str(tmp_path / "state"),
+            "--run-id", "live-1",
+        ]
+    )
+    assert exit_code == 1
+    assert "FICTIONAL_NUMBER" in capsys.readouterr().err
+
+
 def test_module_entrypoint_runs():
     import subprocess
     import sys
