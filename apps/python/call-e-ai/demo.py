@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 
 
 def validate_number(number):
-    """Accept an international E.164-style phone number."""
-    return bool(re.fullmatch(r"\+[1-9]\d{1,14}", number))
+    """Accept an international E.164 phone number containing ASCII digits."""
+    return bool(re.fullmatch(r"\+[1-9][0-9]{1,14}", number))
 
 
 def mask_number(number):
@@ -21,10 +21,10 @@ def main():
     print("CALL-E AI | Local Demo")
     print("No real phone calls will be made.\n")
 
-    number = input("Enter phone number (e.g. +14155552671): ").strip()
+    number = input("Enter an authorized E.164 phone number: ").strip()
 
     if not validate_number(number):
-        print("Invalid number. Use E.164 format, such as +14155552671.")
+        print("Invalid number. Use E.164 format with ASCII digits.")
         return
 
     purpose = input("What is the purpose of the call? ").strip()
@@ -33,9 +33,9 @@ def main():
         print("A call purpose is required.")
         return
 
-    consent = input("Do you have permission to contact this person? (yes/no): ")
+    consent = input("Are you authorized to contact this destination? (yes/no): ")
     if consent.strip().lower() != "yes":
-        print("Cancelled: permission is required.")
+        print("Cancelled: destination authorization is required.")
         return
 
     print("\n--- SIMULATED CALL ---")

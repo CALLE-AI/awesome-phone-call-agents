@@ -1,17 +1,33 @@
-# CALL-E AI
-CALL-E AI is an AI-powered phone call agent designed to make phone conversations easier and more automated.
-## What it does
-CALL-E AI allows an AI agent to interact with callers, understand the conversation, and respond appropriately.
-## Features
-- AI-powered phone conversations
-- Understands caller requests
-- Generates appropriate responses
-- Designed to automate common phone-call interactions
+# CALL-E AI — Local Phone-Call Workflow Demo
+
+CALL-E AI is a small, strictly offline demonstration of a phone-call agent workflow. It shows how an operator can provide an E.164 phone number, describe a call purpose, confirm permission, and preview a simulated conversation.
+
+This is a local reference demo, not a production calling service. It does not connect to a telephone network, place real calls, use an AI model, or require API credentials.
+
 ## Requirements
-- Python 3
-- Internet connection
-- Required API credentials should be configured using environment variables. Do not store API keys or secrets directly in the code.
-## Running the application
-Follow the project setup instructions, install the required dependencies, configure the required environment variables, and run the Python application.
-## Safety
-Do not use real or private phone numbers in examples or repository files. Users should review the agent configuration before initiating calls.
+
+- Python 3.9 or newer
+- No external Python packages
+- No API keys or paid services
+
+## Run locally
+
+Open a terminal in this directory and run:
+
+```bash
+python3 demo.py
+```
+
+Use only a fictional or standards-reserved example number. The demo requires an explicit purpose and confirmation that the destination is authorized, then masks the number in its output.
+
+## Workflow boundary
+
+- The demo is fake-only and performs no network requests or real-world side effects.
+- Each invocation previews exactly one simulated call; it creates no jobs, retries, or recurring schedules.
+- Closing the process cancels the local preview. There is no provider-side call to cancel or roll back.
+- No credentials are read, stored, logged, or transmitted.
+- The simulated result is illustrative only and must not be used for medical, legal, financial, emergency, or other high-stakes decisions.
+
+## Safe validation
+
+Run the demo with a reserved fictional number such as `+12025550123`, enter a purpose, and answer `yes` to the permission prompt. Verify that the output says no real call was placed and shows only the masked destination.
