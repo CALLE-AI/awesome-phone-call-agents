@@ -5,7 +5,7 @@ import { book } from "./book";
 import { parseRequest } from "./intake";
 import { discoverByRequest } from "./discovery";
 import { isE164, maskPhone } from "./phone";
-import { isAuthorized } from "./authz";
+import { canPlaceAnotherCall, isAuthorized, maxCalls } from "./authz";
 import * as board from "./board";
 import type { Vendor } from "./types";
 import vendorsCache from "../fixtures/vendors.json";
@@ -20,6 +20,7 @@ const MOCK = process.env.MOCK !== "false";
 
 const request = process.argv.slice(2).join(" ") || "cheapest haircut in San Francisco";
 const { goal, bar, category, location, budget: parsedBudget } = await parseRequest(request);
+let callsPlaced = 0;
 
 board.header(request);
 
@@ -58,7 +59,7 @@ if (testPhones && testPhones.length > 0) {
 } else if (location) {
   // Discover real businesses for this category + location (OSM, no key).
   try {
-    vendors = await discoverByRequest(category, location, 6);
+    vendors = await discoverByRequest(category, location, maxCalls());
   } catch {
     /* fall through to cache */
   }
@@ -82,14 +83,26 @@ if (!MOCK && vendors.length > 0) {
     );
     process.exit(0);
   }
-  console.log(`  About to place REAL calls to ${authorized.length} authorized numbers:`);
-  for (const v of authorized) console.log(`    - ${v.name}  ${maskPhone(v.phoneE164)}`);
+  // Hard ceiling, applied AFTER the allowlist filter and BEFORE the prompt, so
+  // the number the operator confirms is the number that will actually be dialed.
+  const cap = maxCalls();
+  const toDial = authorized.slice(0, cap);
+  if (authorized.length > cap) {
+    console.log(
+      `  ${authorized.length} authorized shops, but MAX_CALLS=${cap}. ` +
+        `Calling the first ${cap}; the rest are skipped.`
+    );
+  }
+
+  console.log(`  About to place REAL calls to ${toDial.length} authorized numbers:`);
+  for (const v of toDial) console.log(`    - ${v.name}  ${maskPhone(v.phoneE164)}`);
   const answer = prompt(`  Type "yes" to confirm:`);
   if (answer?.trim().toLowerCase() !== "yes") {
     console.log(`  Not confirmed. No calls placed.\n`);
     process.exit(0);
   }
-  vendors = authorized; // dial only the authorized subset
+  vendors = toDial; // dial only the authorized subset, capped by MAX_CALLS
+  callsPlaced = toDial.length;
   console.log("");
 }
 
@@ -122,6 +135,8 @@ if (ranked.length === 0) {
   const pick = choosePick(ranked.length);
   if (pick === null) {
     console.log(`\n  No booking made.\n`);
+  } else if (!MOCK && !canPlaceAnotherCall(callsPlaced)) {
+    console.log(`\n  MAX_CALLS=${maxCalls()} reached. No booking call placed.\n`);
   } else {
     const winnerQuote = ranked[pick]!;
     const service = location ? `${category} in ${location}` : category;
