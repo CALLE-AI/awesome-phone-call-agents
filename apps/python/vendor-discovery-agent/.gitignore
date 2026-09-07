@@ -1,0 +1,24 @@
+# Database — contains real phone numbers, never commit
+vendor_discovery.db
+*.db
+
+# Call logs — contain run IDs and phone fragments
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+*.env
+
+# Local test scripts
+call_four.py
+london_run.py
+get_vendors.py
+
+# OS
+.DS_Store
+Thumbs.db

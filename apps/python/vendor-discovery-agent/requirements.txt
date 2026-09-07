@@ -1,0 +1,7 @@
+groq>=1.0.0
+requests>=2.32.0
+flask>=3.0.0
+timezonefinder>=6.0.0
+openpyxl>=3.1.0
+tzdata>=2024.1
+reportlab>=4.0.0
