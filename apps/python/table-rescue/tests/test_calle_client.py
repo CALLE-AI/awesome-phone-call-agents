@@ -1,26 +1,64 @@
 from table_rescue.calle_client import (
+    LEG_CONFIRM,
+    LEG_OFFER,
     CallRequest,
     DryRunClient,
     build_confirm_goal,
     build_offer_goal,
+    keyword_hint,
     map_terminal_status,
-    parse_outcome,
+    parse_outcome_token,
 )
 from table_rescue.models import CallStatus
+from table_rescue.safety import SafetyViolation
 
 
-def test_parse_outcome_reads_trailing_token():
-    assert parse_outcome("thanks, OUTCOME: CANCELLED") == CallStatus.CANCELLED
-    assert parse_outcome("no token here") is None
-    assert parse_outcome(None) is None
+def test_parse_outcome_token_reads_only_explicit_token():
+    assert parse_outcome_token("thanks, OUTCOME: CANCELLED") == CallStatus.CANCELLED
+    assert parse_outcome_token("agent said outcome: cancelled") == CallStatus.CANCELLED
+    assert parse_outcome_token("no token here") is None
+    assert parse_outcome_token(None) is None
+    assert parse_outcome_token("OUTCOME: BANANA") is None
 
 
-def test_map_terminal_status():
-    assert map_terminal_status("COMPLETED", "OUTCOME: ACCEPTED") == CallStatus.ACCEPTED
-    assert map_terminal_status("COMPLETED", "garbage") == CallStatus.ERROR
-    assert map_terminal_status("VOICEMAIL", None) == CallStatus.NO_ANSWER
-    assert map_terminal_status("DECLINED", None) == CallStatus.DECLINED
-    assert map_terminal_status("FAILED", None) == CallStatus.ERROR
+def test_keyword_hint_is_informational_only():
+    assert keyword_hint("The guest will cancel the booking.") == "cancel"
+    assert keyword_hint("Guest would like to reschedule to Friday.") == "reschedul"
+    assert keyword_hint("no decision was reached") is None
+
+
+def test_map_terminal_status_token_only_decisions():
+    assert (
+        map_terminal_status("COMPLETED", "OUTCOME: ACCEPTED", LEG_OFFER)
+        == CallStatus.ACCEPTED
+    )
+    assert (
+        map_terminal_status("COMPLETED", "garbage", LEG_CONFIRM)
+        == CallStatus.UNCERTAIN
+    )
+    assert (
+        map_terminal_status("COMPLETED", "The guest confirmed they will keep it.", LEG_CONFIRM)
+        == CallStatus.UNCERTAIN
+    )
+    assert (
+        map_terminal_status("COMPLETED", "OUTCOME: ACCEPTED", LEG_CONFIRM)
+        == CallStatus.UNCERTAIN
+    )
+    assert (
+        map_terminal_status("COMPLETED", "OUTCOME: CONFIRMED", LEG_OFFER)
+        == CallStatus.UNCERTAIN
+    )
+    assert map_terminal_status("VOICEMAIL", None, LEG_CONFIRM) == CallStatus.NO_ANSWER
+    assert map_terminal_status("DECLINED", None, LEG_CONFIRM) == CallStatus.DECLINED
+    assert map_terminal_status("FAILED", None, LEG_CONFIRM) == CallStatus.UNCERTAIN
+    assert map_terminal_status("EXPIRED", None, LEG_OFFER) == CallStatus.UNCERTAIN
+
+
+def test_mcp_client_rejects_foreign_origin():
+    with pytest.raises(SafetyViolation, match="ORIGIN_NOT_ALLOWED"):
+        McpCallClient(base_url="https://evil.example.com")
+    with pytest.raises(SafetyViolation, match="ORIGIN_NOT_ALLOWED"):
+        McpCallClient(base_url="http://seleven-mcp-sg.airudder.com")
 
 
 def test_goal_builders_include_outcome_protocol():
@@ -100,7 +138,8 @@ def test_mcp_client_executes_plan_run_poll(tmp_path):
     }
     client = make_mcp_client(tmp_path, script)
     request = CallRequest(
-        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm",
+        leg=LEG_CONFIRM,
     )
     outcome = asyncio.run(client._execute(request))
     assert outcome.status == CallStatus.CANCELLED
@@ -108,8 +147,10 @@ def test_mcp_client_executes_plan_run_poll(tmp_path):
 
 
 def test_mcp_client_reads_nested_post_summary(tmp_path):
-    # Regression: the real get_call_run payload nests the summary under
-    # "result" and the agent states the outcome in prose, not an OUTCOME token.
+    # The real get_call_run payload nests the summary under "result" and the
+    # agent often states the outcome in prose, not an OUTCOME token. Prose is
+    # never decisive: the outcome is UNCERTAIN and the summary is kept for
+    # human reconciliation (with a keyword hint appended to the notes).
     script = {
         "plan_call": [{"plan_id": "p1", "confirm_token": "c1", "ready_to_run": True}],
         "run_call": [{"run_id": "call-1"}],
@@ -127,11 +168,14 @@ def test_mcp_client_reads_nested_post_summary(tmp_path):
     }
     client = make_mcp_client(tmp_path, script)
     request = CallRequest(
-        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm",
+        leg=LEG_CONFIRM,
     )
     outcome = asyncio.run(client._execute(request))
-    assert outcome.status == CallStatus.CONFIRMED
+    assert outcome.status == CallStatus.UNCERTAIN
+    assert outcome.uncertainty_reason == "UNPARSEABLE_SUMMARY"
     assert outcome.notes is not None and "successfully confirmed" in outcome.notes
+    assert "hint: confirm" in outcome.notes
 
 
 def test_mcp_client_retries_transient_not_ready_plan(tmp_path):
@@ -152,10 +196,11 @@ def test_mcp_client_retries_transient_not_ready_plan(tmp_path):
     }
     client = make_mcp_client(tmp_path, script)
     request = CallRequest(
-        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm",
+        leg=LEG_CONFIRM,
     )
     outcome = asyncio.run(client._execute(request))
-    assert outcome.status == CallStatus.CONFIRMED
+    assert outcome.status == CallStatus.UNCERTAIN
 
 
 def test_mcp_client_plan_retry_exhaustion_raises_with_detail(tmp_path):
@@ -176,11 +221,3 @@ def test_ensure_access_token_requires_login():
     client._run_calle_json = lambda args: {"usable": False}
     with pytest.raises(RuntimeError, match="not logged in"):
         client.ensure_access_token()
-
-
-def test_parse_outcome_hardening():
-    assert parse_outcome("agent said outcome: cancelled") == CallStatus.CANCELLED
-    assert parse_outcome("The guest will cancel the booking.") == CallStatus.CANCELLED
-    assert parse_outcome("Guest would like to reschedule to Friday.") == CallStatus.RESCHEDULED
-    assert parse_outcome("OUTCOME: BANANA but guest confirmed") == CallStatus.CONFIRMED
-    assert parse_outcome("no decision was reached") is None

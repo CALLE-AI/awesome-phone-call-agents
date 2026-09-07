@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .models import CallOutcome, CallStatus
+from .safety import validate_origin
 from .stores import read_jsonl
 
 DEFAULT_BASE_URL = "https://seleven-mcp-sg.airudder.com"
@@ -29,21 +30,24 @@ TERMINAL_STATUSES = {
 }
 OUTCOME_RE = re.compile(r"\bOUTCOME:\s*([A-Z_]+)\b", re.IGNORECASE)
 
+LEG_CONFIRM = "confirm"
+LEG_OFFER = "offer"
+
+# A status only counts as decisive on the leg whose goal template asked for
+# it; anything else is UNCERTAIN and stops the run for reconciliation.
+CONFIRM_FAMILY = frozenset(
+    {CallStatus.CONFIRMED, CallStatus.CANCELLED, CallStatus.RESCHEDULED}
+)
+OFFER_FAMILY = frozenset({CallStatus.ACCEPTED, CallStatus.DECLINED})
+
+# Prose hints are recorded for the human reviewer; they never classify.
+HINT_KEYWORDS: tuple[str, ...] = ("cancel", "reschedul", "accept", "declin", "confirm")
+
 # plan_call can report ready_to_run=false transiently when the callee was just
 # called (observed live: back-to-back calls to the same number). Retry with a
 # pause before giving up.
 PLAN_RETRY_ATTEMPTS = 3
 PLAN_RETRY_DELAY_SECONDS = 10.0
-
-# Last-resort keyword hints when the agent omits the OUTCOME token. Order matters:
-# negative/definitive verbs are checked before the affirmative "confirm".
-KEYWORD_FALLBACKS: tuple[tuple[str, CallStatus], ...] = (
-    ("cancel", CallStatus.CANCELLED),
-    ("reschedul", CallStatus.RESCHEDULED),
-    ("accept", CallStatus.ACCEPTED),
-    ("declin", CallStatus.DECLINED),
-    ("confirm", CallStatus.CONFIRMED),
-)
 
 CONFIRM_GOAL = (
     "You are an automated calling assistant working for a restaurant. Begin the call "
@@ -71,6 +75,7 @@ class CallRequest:
     target_id: str
     phone: str
     goal: str
+    leg: str = LEG_CONFIRM
 
 
 class CallClient(Protocol):
@@ -85,31 +90,57 @@ def build_offer_goal(name: str, party_size: int, slot: str) -> str:
     return OFFER_GOAL.format(name=name, party_size=party_size, slot=slot)
 
 
-def parse_outcome(summary: str | None) -> CallStatus | None:
-    """Parse the OUTCOME token; fall back to keyword hints before giving up."""
+def parse_outcome_token(summary: str | None) -> CallStatus | None:
+    """Read the explicit OUTCOME token; no keyword fallback, ever."""
     if not summary:
         return None
     match = OUTCOME_RE.search(summary)
-    if match:
-        try:
-            return CallStatus(match.group(1).upper())
-        except ValueError:
-            pass
+    if not match:
+        return None
+    try:
+        return CallStatus(match.group(1).upper())
+    except ValueError:
+        return None
+
+
+def keyword_hint(summary: str | None) -> str | None:
+    """Informational prose hint for the staff report; never a decision."""
+    if not summary:
+        return None
     lowered = summary.lower()
-    for keyword, status in KEYWORD_FALLBACKS:
+    for keyword in HINT_KEYWORDS:
         if keyword in lowered:
-            return status
+            return keyword
     return None
 
 
-def map_terminal_status(status: str, summary: str | None) -> CallStatus:
-    if status == "COMPLETED":
-        return parse_outcome(summary) or CallStatus.ERROR
+def map_terminal_status(status: str, summary: str | None, leg: str) -> CallStatus:
     if status in {"NO_ANSWER", "BUSY", "VOICEMAIL"}:
         return CallStatus.NO_ANSWER
     if status == "DECLINED":
         return CallStatus.DECLINED
-    return CallStatus.ERROR
+    if status == "COMPLETED":
+        token = parse_outcome_token(summary)
+        family = CONFIRM_FAMILY if leg == LEG_CONFIRM else OFFER_FAMILY
+        if token is not None and (
+            token in family or token is CallStatus.NO_ANSWER
+        ):
+            return token
+        return CallStatus.UNCERTAIN
+    return CallStatus.UNCERTAIN
+
+
+def uncertainty_reason_for(status: str, summary: str | None, leg: str) -> str | None:
+    """Explain why an outcome is uncertain, for the Needs Review report."""
+    if status == "COMPLETED":
+        token = parse_outcome_token(summary)
+        family = CONFIRM_FAMILY if leg == LEG_CONFIRM else OFFER_FAMILY
+        if token is None:
+            return "UNPARSEABLE_SUMMARY"
+        if not (token in family or token is CallStatus.NO_ANSWER):
+            return "WRONG_FAMILY_TOKEN"
+        return None
+    return "PROVIDER_FAILED"
 
 
 def compact_summary(summary: Any) -> str | None:
@@ -171,6 +202,7 @@ class McpCallClient:
         plan_retry_delay_seconds: float = PLAN_RETRY_DELAY_SECONDS,
         client_factory: Callable[[], Any] | None = None,
     ):
+        validate_origin(base_url)
         self.base_url = base_url.rstrip("/")
         self.channel = channel
         self.server_url = f"{self.base_url}/mcp/{channel.strip().lower() or DEFAULT_CHANNEL}"
@@ -317,14 +349,25 @@ class McpCallClient:
             status = str(payload.get("status") or "").upper()
             if status in TERMINAL_STATUSES:
                 summary = extract_post_summary(payload)
+                mapped = map_terminal_status(status, summary, request.leg)
+                notes = compact_summary(summary)
+                if mapped is CallStatus.UNCERTAIN:
+                    hint = keyword_hint(summary)
+                    if hint:
+                        notes = f"{notes} [hint: {hint}]" if notes else f"[hint: {hint}]"
                 return CallOutcome(
                     run_id=request.run_id,
                     target_id=request.target_id,
-                    status=map_terminal_status(status, summary),
+                    status=mapped,
                     new_slot=None,
-                    notes=compact_summary(summary),
+                    notes=notes,
                     transcript_ref=call_run_id,
                     call_cost_id=call_run_id,
+                    uncertainty_reason=(
+                        uncertainty_reason_for(status, summary, request.leg)
+                        if mapped is CallStatus.UNCERTAIN
+                        else None
+                    ),
                 )
             if loop.time() >= deadline:
                 raise TimeoutError(
