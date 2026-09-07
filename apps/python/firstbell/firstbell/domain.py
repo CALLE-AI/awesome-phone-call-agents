@@ -666,6 +666,17 @@ class ImpactSummary:
                            "that says yes, which is not a record")
                 out.append("                           docs/consent-record.md is the "
                            "schema that replaces it")
+                # The command that runs the defensible path, printed where the weak one
+                # is counted. A reader who ran the documented demo saw six rows dialled
+                # on a boolean and no route to the alternative, so the path every reader
+                # sees was the one this project argues against.
+                if not self.dialled_on_a_record:
+                    out.append("                           this run used none. For the "
+                               "path with records:")
+                    out.append("                           python -m firstbell "
+                               "--work-file examples/absences-with-consent.csv \\")
+                    out.append("                             --consent-records "
+                               "examples/consent-register.json")
             if self.dialled_on_a_record_naming_no_number:
                 out.append(
                     f"    no number named    "

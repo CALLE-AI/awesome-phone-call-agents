@@ -59,8 +59,10 @@ disclosed to in English? The answer is on a real call. Work item `S-4106`, `ta-I
 
 That is the first thing said, before anything is asked, and it is the disclosure the FCC
 ruling is about. It is not a translation this project wrote: the locale is one column in
-the work file, and the recording is in `evidence/receipts`. The English call opens with the
-same sentence in English. Whether a district's counsel accepts a machine translation of a
+the work file, and the recording is on the [evidence
+page](https://firstbell-evidence.vercel.app), which is where every recording lives and not
+in this repository, for the reason [`evidence/README.md`](../evidence/README.md) gives. The
+English call opens with the same sentence in English. Whether a district's counsel accepts a machine translation of a
 disclosure as the disclosure is a question for them, and it is not answered here.
 
 **The gap, stated plainly.** A CSV column reading `yes` is a data structure, not a legal
@@ -103,16 +105,20 @@ should be changed on purpose with a name attached.
 permit recording with one party's consent; a minority require all parties to consent.
 Placing a call across a state line can engage both states' rules.
 
-**What this repository does.** It never records. CALL-E's dashboard holds recordings of calls
-placed through it, and this app has no route to them: there is no audio field on any of the
-three production responses captured under `tests/data`, and `/recording`, `/audio`,
+**What this repository does.** Recordings of these calls exist, on CALL-E's dashboard and
+on this project's evidence page, and they are of calls between the author and the author's
+own line made for demonstration. That is said first because the rest of this answer reads
+like a stronger claim than it is.
+
+This app never records and has no route to a recording: there is no audio field on any of
+the three production responses captured under `tests/data`, and `/recording`, `/audio`,
 `/recordings` and `/v1/recordings` all return 404. That is a limitation of the platform
-rather than a decision made here, and it happens to be the safer default.
+rather than a decision made here, and it happens to be the safer default. What a district
+would be relying on, then, is that the software cannot fetch what the platform keeps, which
+is not the same as the platform not keeping it.
 
 **Open.** Whether the district's own retention obligations require it to keep a recording it
-currently cannot fetch, and what its position is in an all-party state. Note that the
-recordings published on the evidence page are of calls between the author and the author's
-own line, made for demonstration.
+currently cannot fetch, and what its position is in an all-party state.
 
 ## 4. What is kept, for how long, and who deletes it?
 

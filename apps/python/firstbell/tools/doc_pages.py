@@ -52,7 +52,7 @@ PUBLISHED: list[tuple[str, str, str, str]] = [
     ("the-legal-surface",
      "docs/the-legal-surface.md",
      "The legal surface",
-     "Seven questions a district's counsel asks before this software telephones a "
+     "Eight questions a district's counsel asks before this software telephones a "
      "parent. FERPA, the TCPA, COPPA, retention, and which of them are still open."),
     ("locale-is-not-only-a-hint",
      "docs/locale-is-not-only-a-hint.md",

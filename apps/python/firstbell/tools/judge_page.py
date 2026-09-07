@@ -1217,6 +1217,12 @@ def money_markup(run: dict) -> str:
         f'regular school districts and {esc(f["schools"]["value"])} public schools '
         f'({cite(f["districts"])}). That is the size of the problem, not a claim about '
         'adoption.</p>',
+        # The act ends by saying a pilot settles which end of the bound a district is on,
+        # and then offered no way to read what a pilot would be. Two buyers found that
+        # document at the foot of the page or not at all.
+        '<p class=money-next><a href="docs/what-a-pilot-would-look-like.html">'
+        'What a pilot would look like</a>: two schools, six weeks, and the four numbers '
+        'measured before this software telephones anybody.</p>',
         '</div>',
     ])
 
@@ -1376,9 +1382,17 @@ def queue_markup(run: dict) -> str:
             f'<p class=q-tried>{_row_facts(item, escalated, tried)}</p>'
             '</li>')
     out.append('</ol>')
+    # The receipt this queue is built from is not in the repository and saying so here
+    # is the difference between evidence and an assertion. A reader who went looking for
+    # the file and did not find it had grounds to distrust the whole act.
     out.append('<p class=queue-foot>Every row is a real call from '
                '<code>06-locale-matched-pairs.json</code>, sorted by the same rule the '
-               'program uses. Nothing here was arranged for the picture.</p>')
+               'program uses. Nothing here was arranged for the picture. That receipt is '
+               'not in the repository, because the recordings and the receipts of real '
+               'calls are held on the <a href="https://firstbell-evidence.vercel.app" '
+               'rel="noopener">evidence page</a> instead; the counts behind every money '
+               'figure on this page are committed in '
+               '<code>evidence/recorded-calls.json</code>.</p>')
     out.append('</div>')
     return "".join(out)
 
@@ -1575,16 +1589,26 @@ def path_markup() -> str:
         ("act-08", "Run it, here, now",
          "The offline run plays line by line: seven rows, three endings, and the totals. "
          "No account, no key, nothing dialled."),
+        # The only entry that leaves this page, and it is here because two readers coming
+        # to the entry as district buyers said the same thing: this document is what
+        # decides whether they pilot, and it was reachable only from the foot of a page
+        # with nine acts above it. A menu of five in-page anchors is a menu that assumes
+        # the reader's question is answered on the page.
+        ("docs/what-a-pilot-would-look-like.html", "What a pilot would look like",
+         "Two schools, six weeks, the four numbers measured before switch-on, and the "
+         "children this software is not allowed to telephone. Leaves this page."),
     ]
     out = ['<div class=path>',
            '<p class=path-k>The two-minute path</p>',
            '<p class=path-lead>Three things, in the order they answer the question, a '
-           'fourth if you are the person who has to pay for it, and one you can press. '
-           'Everything else here is the evidence behind them.</p>',
+           'fourth if you are the person who has to pay for it, one you can press, and '
+           'the document a district would decide on. Everything else here is the evidence '
+           'behind them.</p>',
            '<ol class=path-steps>']
     for i, (anchor, title, why) in enumerate(steps, 1):
+        href = anchor if "/" in anchor else f"#{anchor}"
         out.append(f'<li><span class=path-n>{i:02d}</span>'
-                   f'<a href="#{anchor}">{esc(title)}</a>'
+                   f'<a href="{href}">{esc(title)}</a>'
                    f'<p class=path-why>{esc(why)}</p></li>')
     out.append('</ol></div>')
     return "".join(out)
@@ -1922,8 +1946,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'collapses again.</p>',
         # The opening sentence of the note above, word for word.
         pull("This app made the first mistake itself."),
-        f'<p class=dim>Counts read from one committed run of {placed} calls, '
-        '<code>06-locale-matched-pairs.json</code>. '
+        f'<p class=dim>Counts read from one recorded run of {placed} calls, '
+        '<code>06-locale-matched-pairs.json</code>, which is on the evidence page rather '
+        'than in the repository. '
         f'{open_rows} of {placed} rows are still open and every one of them is named. The '
         'rate is resolved over attempted, so an open row can only ever pull it down.</p>',
     ]

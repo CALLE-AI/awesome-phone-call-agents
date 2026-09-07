@@ -334,6 +334,9 @@ What this run was worth
   consent
     on a boolean       6   a column that says yes, which is not a record
                            docs/consent-record.md is the schema that replaces it
+                           this run used none. For the path with records:
+                           python -m firstbell --work-file examples/absences-with-consent.csv \
+                             --consent-records examples/consent-register.json
 
   who answered, on the records this run closed
     a guardian         3   the call recorded a parent or guardian on the line
@@ -1163,37 +1166,23 @@ to take the sentence above on trust.
 ### The history was rewritten, and here is how much
 
 Eighty-three of the one hundred and sixty-three commits in this directory carry a committer
-date later than their author date, and the largest gap is thirty-eight hours. That is what
-a rebase looks like in the log, and it happened: branches were squashed, messages were
-corrected, and one range was reordered so that a fix did not sit above the commit it
-depended on.
+date later than their author date, the largest gap being thirty-eight hours. Branches were
+squashed, messages corrected, one range reordered.
 
-One of those rewrites has a reason worth naming, because it removed things a reviewer
-would otherwise expect to find. The maintainer of the list this contributes to has
-required, on several pull requests, that a contributor take committed real-call transcripts
-and every real-call-derived artifact out of the tree, and has said the requirement holds
-even where the people on the call were team members playing a part and the numbers dialled
-were reserved ones. Both describe this project exactly. So the recordings and the receipts
-came out of the history rather than only out of the head of the branch, which is a rewrite
-rather than a deletion, and they live outside the repository instead
+One of those rewrites removed things a reviewer would expect to find. The maintainer of the
+list this contributes to has required, on several pull requests, that a contributor take
+committed real-call transcripts and every real-call-derived artifact out of the tree, and
+has said the requirement holds even where the people on the call were team members playing
+a part and the numbers dialled were reserved ones. Both describe this project exactly. So
+the recordings and the receipts came out of the history rather than only out of the head of
+the branch, and they live outside the repository instead
 ([`evidence/README.md`](evidence/README.md) says where). A tree that quietly lost twelve
-calls' worth of evidence, in an entry whose argument is that every claim carries the thing
-that checks it, is worth explaining before somebody notices the gap.
+calls' worth of evidence, in an entry arguing that every claim carries the thing that
+checks it, is worth saying out loud.
 
-Nothing was backdated to look earlier than it was, and the sentence above is checkable in
-the direction that matters, because the earliest committer date in the directory is the one
-`git log` prints and no rewrite can make it earlier than the day the work happened. But an
-author date is a value the person rewriting chooses, so a reader comparing the two columns
-should be told which one to trust rather than discovering the discrepancy and wondering.
-
-```bash
-git log --format='%at %ct' -- :/apps/python/firstbell |
-  awk '{d=$2-$1; if (d>60) n++} END {print n" of "NR" rewritten"}'
-```
-
-The reason this is here at all: a reviewer who finds eighty-three rewritten commits in an
-entry that argues about honest measurement has found something the entry did not mention,
-and at that point the argument is worth less than the discrepancy.
+Nothing was backdated. The earliest committer date is what `git log` prints and no rewrite
+makes it earlier than the day the work happened; an author date is a value the person
+rewriting chooses, so trust the committer column.
 
 ## Attribution
 

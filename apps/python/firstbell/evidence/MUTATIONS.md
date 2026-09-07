@@ -25,8 +25,8 @@ been written when fewer of the output gates existed, which is the same drift tha
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
 
-**Every machine-applicable row was re-measured again on 6 September 2026**, against a suite
-that had grown to 239 tests. Thirty-seven rows can be applied by a script. Twenty-nine came
+**Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
+rows can be applied by a script. Twenty-nine came
 back exactly as published. Eight had moved, all upward: row 2 (five to eight), row 4 (one to
 two), row 7 (three to seven), row 8 (twenty to twenty-two), row 20 (three to four), row 32
 (two to four), row 39 (one to three) and row 40 (one to two). Every one of the eight is the

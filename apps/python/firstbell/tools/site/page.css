@@ -1882,6 +1882,16 @@ button[data-copy][data-copied]::after {
   background: var(--paper); font-family: var(--ui); font-size: var(--size-2);
   color: var(--ink-3); max-width: none; text-wrap: pretty;
 }
+/* The way out of the money act. It is the only link inside an act that leaves the page,
+ * so it reads as a destination rather than as another line of the footnote: the act ends
+ * by saying a pilot settles which end of the bound a district is on, and two readers who
+ * came to this entry as buyers could not find what a pilot would be. */
+.money-next {
+  margin: 0; padding: 0.85rem 1.15rem; border-top: 1px solid var(--line-strong);
+  background: var(--paper-deep); font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-2); max-width: none; text-wrap: pretty;
+}
+.money-next a { font-weight: 600; }
 .queue-clockless {
   margin: 0; padding: 0.7rem 1.15rem;
   border-bottom: 1px solid var(--line);
