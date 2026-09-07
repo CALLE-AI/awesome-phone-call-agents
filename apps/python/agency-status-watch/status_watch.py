@@ -31,8 +31,9 @@ from pathlib import Path
 # Strict ASCII E.164: '+' + country code 1-9 + up to 14 ASCII digits. `[0-9]` not `\d`,
 # which in Python str patterns also matches non-ASCII digits (Arabic-Indic etc.).
 E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
-# Any E.164-shaped run of digits inside free text (output sanitization).
-PHONE_LIKE_RE = re.compile(r"(?<![0-9])\+?[1-9][0-9]{7,14}(?![0-9])")
+# Candidate phone runs inside free text. The replacement callback below checks
+# digit count so ordinary dates are not mistaken for phone numbers.
+PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])\+?[0-9][0-9\s().-]{6,}[0-9](?![A-Za-z0-9])")
 TERMINAL_STATUSES = {
     "BUSY", "CANCELED", "CANCELLED", "COMPLETED", "DECLINED",
     "EXPIRED", "FAILED", "NO_ANSWER", "VOICEMAIL",
@@ -45,9 +46,8 @@ RETRY_AFTER_CALL_FAILURE_DAYS = 1
 # Decaying re-check cadence after an in_process result: +1d, +2d, +4d, +8d.
 DECAY_INTERVAL_DAYS = [1, 2, 4, 8]
 DEFAULT_MAX_CHECKS = 5
-SECRET_KEYS = {"confirm_token", "access_token", "refresh_token", "session_secret"}
-# Free-text fields that could echo provider stderr or spoken PII into reports/state.
-FREE_TEXT_KEYS = {"notes", "detail", "needs_human_reason", "spoke_with", "next_action"}
+SECRET_KEYS = {"confirm_token", "access_token", "refresh_token", "session_secret",
+               "api_key", "password", "authorization", "secret", "token"}
 # Structured-answer contract bound before the watch state machine acts on it.
 STATUS_CATEGORIES = {
     "approved", "denied", "pending_action", "more_info_needed",
@@ -98,10 +98,16 @@ def mask_ref(ref: str) -> str:
 
 def scrub(obj):
     if isinstance(obj, dict):
-        return {k: ("***" if k in SECRET_KEYS else scrub(v)) for k, v in obj.items()}
+        return {k: ("***" if is_secret_key(k) else scrub(v)) for k, v in obj.items()}
     if isinstance(obj, list):
         return [scrub(v) for v in obj]
     return obj
+
+
+def is_secret_key(key: str) -> bool:
+    normalized = str(key).strip().lower().replace("-", "_")
+    return (normalized in SECRET_KEYS or normalized.endswith("_token")
+            or normalized.endswith("_secret") or normalized.endswith("_api_key"))
 
 
 def redact_free_text(text: str, secrets: list[str]) -> str:
@@ -111,7 +117,14 @@ def redact_free_text(text: str, secrets: list[str]) -> str:
     `needs_human_reason`, etc. Mask full phone numbers and any caller-supplied
     secret/reference strings so personal data cannot leak into reports or state files.
     """
-    out = PHONE_LIKE_RE.sub("+•••••••••", text)
+    def mask_candidate(match: re.Match) -> str:
+        candidate = match.group(0)
+        digits = re.sub(r"[^0-9]", "", candidate)
+        if (candidate.lstrip().startswith("+") and 8 <= len(digits) <= 15) or 10 <= len(digits) <= 15:
+            return "+•••••••••"
+        return candidate
+
+    out = PHONE_LIKE_RE.sub(mask_candidate, text)
     for s in secrets:
         if s:
             out = out.replace(s, "••••")
@@ -124,13 +137,11 @@ def scrub_output(obj, secrets: list[str]):
 
     def walk(node):
         if isinstance(node, dict):
-            return {
-                k: (redact_free_text(v, secrets) if k in FREE_TEXT_KEYS and isinstance(v, str)
-                    else walk(v))
-                for k, v in node.items()
-            }
+            return {k: walk(v) for k, v in node.items()}
         if isinstance(node, list):
             return [walk(v) for v in node]
+        if isinstance(node, str):
+            return redact_free_text(node, secrets)
         return node
 
     return walk(data)
@@ -357,8 +368,7 @@ def classify(state: dict, call: dict) -> dict:
     drift = validate_answer_schema(answer)
     if call["disposition"] != "completed":
         # Transient outcomes (no answer, voicemail, busy) retry on the shortest step.
-        if call["disposition"] in {"no_answer", "voicemail", "busy", "declined", "expired",
-                                   "failed", "canceled", "cancelled"}:
+        if call["disposition"] in {"no_answer", "voicemail", "busy", "declined"}:
             return {"watch": "watching", "next_check_due": utcnow() + timedelta(days=RETRY_AFTER_CALL_FAILURE_DAYS),
                     "needs_human_reason": None, "category": None}
         if call["disposition"] == "needs_recovery":

@@ -236,6 +236,17 @@ class FixtureTests(unittest.TestCase):
         self.assertNotIn("+14155550172", out)
         self.assertNotIn("WPR-2026-08847-A", out)
 
+    def test_output_deeply_redacts_arbitrary_fields_and_formatted_phones(self):
+        report = {
+            "call": {
+                "answer": {"unexpected": "Call (415) 555-0172", "provider_token": "private"},
+                "detail": "safe",
+            }
+        }
+        rendered = json.dumps(status_watch.scrub_output(report, []))
+        self.assertNotIn("415", rendered)
+        self.assertNotIn("private", rendered)
+
     def test_stderr_and_detail_redacted_on_cli_failure(self):
         with tempfile.TemporaryDirectory() as state_dir:
             env = {"AGENCY_STATUS_WATCH_STATE_DIR": state_dir}
@@ -260,6 +271,14 @@ class FixtureTests(unittest.TestCase):
         code, out = run_main(["--request", str(SAMPLE), "--fixture", str(HAPPY)])
         self.assertEqual(code, 0)
         self.assertNotIn("ctok_", out)
+
+    def test_ambiguous_terminal_failure_stops_for_human_reconciliation(self):
+        verdict = status_watch.classify(
+            {"checks_done": 0, "max_checks": 5},
+            {"disposition": "failed", "answer": {}, "detail": "provider failure"},
+        )
+        self.assertEqual(verdict["watch"], "needs_human")
+        self.assertIsNone(verdict["next_check_due"])
 
 
 class StateTests(unittest.TestCase):
