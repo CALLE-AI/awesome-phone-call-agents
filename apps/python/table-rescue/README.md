@@ -74,6 +74,11 @@ npm install -g @call-e/cli
 calle auth login --base-url https://seleven-mcp-sg.airudder.com --channel openagent_oauth
 ```
 
+Live runs also need a region and an operator-curated allowlist: put every real
+destination phone (exact E.164 string) in `data/authorized_destinations.jsonl`
+(copy `data/authorized_destinations.sample.jsonl` for the format), then run
+`table-rescue preflight` to validate everything before dialing.
+
 ## Usage
 
 Dry-run (no calls):
@@ -84,10 +89,12 @@ cp data/waitlist.sample.jsonl data/waitlist.jsonl
 table-rescue run --run-id smoke-1 --avg-check-per-guest 25
 ```
 
-Live (real calls through CALL-E MCP Streamable HTTP using the CALL-E CLI token cache):
+Live (real calls through CALL-E MCP Streamable HTTP using the CALL-E CLI token
+cache; requires `--region` and every destination present in
+`data/authorized_destinations.jsonl` - see Setup and the Safety model):
 
 ```bash
-table-rescue run --run-id live-1 --live --max-calls 6
+table-rescue run --run-id live-1 --live --region VN --max-calls 6
 ```
 
 Validate every live prerequisite without placing any call:
