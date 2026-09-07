@@ -248,8 +248,20 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 139 | Ask `safeguarding_escalation` only of rows whose resolution is `resolved`, so the four escalating cases in the run the page draws render as ordinary callbacks in the office queue | 1 |
 | 140 | Let the report say the safeguarding window is this project's default whatever window was passed, so a district reads its own agreed clock into a number nobody chose | 1 |
 | 141 | Accept `--webhook-url` and stop forwarding it to CALL-E, so a district's endpoint is promised an event that is never asked for | 1 |
+| 142 | Let `is_loopback` answer yes to every address, so the double binds to a network on a flag nobody had to type | 1 |
+| 143 | Parse `--i-know-this-is-open` and never consult it, leaving a guard that is written down and not run | 1 |
+| 144 | Drop the override from the refusal text, so an operator with a real reason to open the port reads a wall instead of a choice | 1 |
 
-Row 140 is the newest rule and it arrived as a concession. A reviewer reading the code
+Rows 142 to 144 are the only ones here that test a rule which did not exist before the
+mutation was written. A security pass found the double authorises any bearer token, which
+is correct and is what lets the whole entry run without a CALL-E account, and that it
+would bind wherever `--host` pointed. Nothing had gone wrong. The three rows are the three
+ways the new refusal could be present and useless: a check that always passes, a flag
+nothing reads, and a message that refuses without saying how to proceed. Row 143 is the
+slow one, because the only honest way to prove the parser reaches the guard is to run the
+command an operator runs.
+
+Row 140 arrived as a concession and it arrived as a concession. A reviewer reading the code
 asked for `SAFEGUARDING_CALLBACK_MINUTES` to be configurable, because thirty minutes is one
 district's mandate and not every district's, and they were right. The risk in granting it
 is the opposite of the one it fixes: a report that prints a window with no provenance lets

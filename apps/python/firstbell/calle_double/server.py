@@ -18,6 +18,7 @@ nothing installed.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import threading
@@ -162,16 +163,59 @@ def serve(double: CalleDouble | None = None, *, host: str = "127.0.0.1",
     return server
 
 
+def is_loopback(host: str) -> bool:
+    """Is this address one only the machine itself can reach?
+
+    Anything that will not parse as an address is treated as reachable from elsewhere.
+    That is the safe direction to be wrong in: a hostname this cannot read is refused and
+    the operator sees why, rather than opened and nobody told.
+    """
+    if host in ("localhost", ""):
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def refuse_an_open_bind(host: str, acknowledged: bool) -> None:
+    """Make an open bind a decision rather than a default.
+
+    `_authorized` accepts any non-empty bearer token, which is correct for a double: a
+    double that demanded a real key would not be usable without an account, and that is
+    the whole point of it. It also means the only thing keeping this server private is
+    the interface it listens on. An operator reaching it from a phone or a container
+    reaches for `--host 0.0.0.0` and gets a service anyone on that network can create
+    calls against and read every transcript out of. So say so, once, and let them say
+    they meant it.
+    """
+    if acknowledged or is_loopback(host):
+        return
+    raise SystemExit(
+        f"--host {host} would put this server on an interface other machines can reach, "
+        "and it accepts any bearer token at all, on purpose, so that it works without a "
+        "CALL-E account. Anyone who can reach it can place calls against it and read "
+        "back every transcript it holds. Nothing here dials a phone and none of the data "
+        "is real, which is why this is a refusal you can override rather than a wall: "
+        "add --i-know-this-is-open if a reachable double is what you want."
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="A CALL-E that dials nobody.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
+        "--i-know-this-is-open", action="store_true",
+        help="Permit a bind other machines can reach. See --host.",
+    )
+    parser.add_argument(
         "--every-call-fails", action="store_true",
         help="Make every recipient go unanswered, for exercising failure paths.",
     )
     args = parser.parse_args()
+    refuse_an_open_bind(args.host, args.i_know_this_is_open)
 
     double = CalleDouble()
     if args.every_call_fails:

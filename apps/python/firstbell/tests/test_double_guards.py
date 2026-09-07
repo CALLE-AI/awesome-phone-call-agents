@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import pathlib
 import socket
 import urllib.error
 import urllib.request
@@ -37,8 +38,11 @@ import urllib.request
 import pytest
 
 from calle_double import CalleDouble, DoubleError, Outcome, build_transport, regions
+from calle_double import server
 from calle_double.server import serve
 from tests.fixtures import IN_A
+
+APP = pathlib.Path(__file__).resolve().parent.parent
 
 SCHEMA = {"type": "object", "required": ["reason"]}
 TERMINAL = ("completed", "failed", "canceled")
@@ -265,3 +269,76 @@ def test_a_number_that_is_not_e164_resolves_to_no_region():
     assert regions.resolve("") is None
     assert regions.resolve("not a number") is None
     assert regions.resolve(IN_A) is not None, "a real E.164 number must still resolve"
+
+
+# ---------------------------------------------------------------------------
+# calle_double/server.py -- the bind. Not a guard that existed and went untested: a
+# guard that did not exist. A security pass on 7 September found the double accepts any
+# bearer token, on purpose, and would bind anywhere it was told to, by default.
+# ---------------------------------------------------------------------------
+
+def test_a_bind_only_this_machine_can_reach_needs_no_permission():
+    """The default has to stay silent, or the refusal becomes noise people learn to pass.
+
+    Four spellings of the same interface. `localhost` is here because it is what an
+    operator types, and refusing it would teach them to reach for the override on a bind
+    that was never open.
+    """
+    for host in ("127.0.0.1", "127.0.0.53", "::1", "localhost"):
+        server.refuse_an_open_bind(host, acknowledged=False)
+        assert server.is_loopback(host), f"{host} reaches this machine and nothing else"
+
+
+def test_a_bind_other_machines_can_reach_is_refused_until_it_is_asked_for():
+    """The finding this closes: `--host 0.0.0.0` on a server that authorises anybody.
+
+    Any non-empty bearer token is accepted, which is correct for a double and is what
+    lets a judge run the whole entry with no CALL-E account. It also means the interface
+    is the only thing keeping the server private. The refusal names the host, says what
+    is reachable, and says how to proceed anyway, because the data is fictional and an
+    operator who wants a reachable double has a real reason to.
+    """
+    for host in ("0.0.0.0", "192.168.1.9", "::", "example.internal"):
+        with pytest.raises(SystemExit) as refused:
+            server.refuse_an_open_bind(host, acknowledged=False)
+        message = str(refused.value)
+        assert host in message, "a refusal that does not name the host is a puzzle"
+        assert "--i-know-this-is-open" in message, (
+            "the refusal has to say how to proceed, or it reads as a bug in the tool"
+        )
+
+
+def test_an_operator_who_says_they_meant_it_is_not_argued_with():
+    """An override that still refuses is an override nobody trusts twice."""
+    server.refuse_an_open_bind("0.0.0.0", acknowledged=True)
+
+
+def test_a_hostname_this_cannot_read_is_refused_rather_than_opened():
+    """Which way to be wrong.
+
+    `is_loopback` reads addresses, not DNS. A name it cannot parse could resolve to the
+    machine itself or to anything at all, and it will not find out. Refusing costs an
+    operator one flag; opening costs them a server they did not know was reachable.
+    """
+    assert not server.is_loopback("loopback.example.com")
+    assert not server.is_loopback("127.0.0.1.evil.test")
+    with pytest.raises(SystemExit):
+        server.refuse_an_open_bind("loopback.example.com", acknowledged=False)
+
+
+def test_the_flag_reaches_the_refusal_from_the_command_line():
+    """The parser and the guard, together, because either alone can be right and useless.
+
+    A guard nothing calls is decoration, and the way that happens is a flag named one
+    thing in `add_argument` and read as another. This drives `main` the way an operator
+    does, with the arguments on the command line.
+    """
+    import subprocess
+    import sys
+
+    refused = subprocess.run(
+        [sys.executable, "-m", "calle_double.server", "--host", "0.0.0.0", "--port", "0"],
+        cwd=str(APP), capture_output=True, text=True, timeout=60,
+    )
+    assert refused.returncode != 0, "the process bound anyway"
+    assert "--i-know-this-is-open" in refused.stderr, refused.stderr[-400:]

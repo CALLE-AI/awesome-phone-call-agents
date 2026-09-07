@@ -35,7 +35,7 @@ and `max_turns` on the task as a backstop the agent cannot talk its way past. Th
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
 Anchor: `README.md:356-364` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:651-655` ("Platform-side call termination").
+limitation 3 at `README.md:658-662` ("Platform-side call termination").
 
 ## 2. `structured_result` is returned in two places, and callers guess wrong
 
@@ -123,7 +123,7 @@ For us this is not cosmetic. Our only brake on a run that is going wrong is the 
 cap, because once a call is placed we cannot recall it. That makes a wave of calls to families
 an operation with no stop button, which is a hard thing to hand to a school office.
 
-We looked hard enough to write a test about it. `tests/test_double_guards.py:203-210` ("v1/calls/x/cancel") posts to
+We looked hard enough to write a test about it. `tests/test_double_guards.py:211-218` ("v1/calls/x/cancel") posts to
 `/v1/calls/x/cancel` and asserts a 404, because our double must not invent a route the real
 API does not serve.
 
