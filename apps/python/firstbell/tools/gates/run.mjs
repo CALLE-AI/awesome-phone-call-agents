@@ -1933,6 +1933,112 @@ async function gateRunConsole(browser, url) {
 }
 
 
+async function gateReplayControls(browser, url) {
+  const page = await browser.newPage();
+  /* Short on purpose. The defect this gate exists for needs the duet's bar readable while
+   * its lanes are still under the threshold that starts them, which is what a phone in
+   * landscape does to a two-lane act. */
+  await page.setViewport({ width: 900, height: 420 });
+  const thrown = [];
+  page.on("pageerror", (err) => thrown.push(String(err)));
+  await page.goto(url, { waitUntil: "load" });
+
+  /* Straight after load, having scrolled nothing. The hero group starts itself a frame
+   * after boot, so its control is allowed to be here; every other group is waiting. */
+  const atLoad = await page.evaluate(() => {
+    const all = [...document.querySelectorAll("[data-replay], [data-replay-group]")];
+    if (!all.length) return { missing: "no replay control is on the page at all" };
+    return {
+      controls: all.map((b) => ({
+        group: b.dataset.replayGroup ?? "hero",
+        words: b.textContent.trim(),
+        hidden: b.hidden,
+      })),
+    };
+  });
+
+  if (atLoad.missing) {
+    await page.close();
+    record("replay controls", "FAIL", atLoad.missing);
+    return;
+  }
+
+  const groups = atLoad.controls.map((c) => c.group);
+  if (new Set(groups).size !== groups.length) {
+    await page.close();
+    record("replay controls", "FAIL",
+      `two replay controls claim the same group: ${groups.join(", ")}. One of them replays `
+      + "a scene it does not belong to");
+    return;
+  }
+
+  const blank = atLoad.controls.find((c) => !c.words);
+  if (blank) {
+    await page.close();
+    record("replay controls", "FAIL",
+      `the replay control for the ${blank.group} scene carries no words, so a reader `
+      + "cannot tell what pressing it does");
+    return;
+  }
+
+  /* Every one of them says "again", so every one of them is a claim about the past. */
+  const early = atLoad.controls.filter((c) => c.group !== "hero" && !c.hidden);
+  if (early.length) {
+    await page.close();
+    record("replay controls", "FAIL",
+      `${early.length} replay control(s) are on screen before their scene has run, `
+      + `starting with the ${early[0].group} scene reading `
+      + `${JSON.stringify(early[0].words)}. Nothing has scrolled yet, so that scene has `
+      + "not played and the control is offering to repeat something that has not happened");
+    return;
+  }
+
+  const heroControl = atLoad.controls.find((c) => c.group === "hero");
+  if (heroControl && heroControl.hidden) {
+    await page.close();
+    record("replay controls", "FAIL",
+      "the hero scene starts itself a frame after boot and its replay control is still "
+      + "hidden, so the one scene that has played cannot be played again");
+    return;
+  }
+
+  /* Now walk the page, which starts each remaining scene as it comes into view, and ask
+   * again. A control that never appears is the other half of the same defect. */
+  await fullScroll(page);
+  await new Promise((r) => setTimeout(r, 900));
+
+  const afterScroll = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-replay], [data-replay-group]")].map((b) => ({
+      group: b.dataset.replayGroup ?? "hero",
+      hidden: b.hidden,
+    })));
+
+  const stillHidden = afterScroll.filter((c) => c.hidden);
+  await page.close();
+
+  if (thrown.length) {
+    record("replay controls", "FAIL",
+      `the page threw while the replay controls were under test: ${thrown[0]}`);
+    return;
+  }
+  if (stillHidden.length) {
+    record("replay controls", "FAIL",
+      `${stillHidden.length} replay control(s) are still hidden after the whole page has `
+      + `been scrolled, starting with the ${stillHidden[0].group} scene. Either the scene `
+      + "never ran or the control that replays it is unreachable");
+    return;
+  }
+
+  record("replay controls", "PASS",
+    `${atLoad.controls.length} replay control(s), each naming its own scene: `
+    + atLoad.controls.map((c) => `${c.group} ${JSON.stringify(c.words)}`).join(", ")
+    + `. At 900x420 before any scroll, ${atLoad.controls.length - 1} of them were hidden `
+    + "and the hero's was not, and all of them are offered once their scene has run. No "
+    + "control offers to repeat something the reader has not seen",
+    { controls: atLoad.controls.length });
+}
+
+
 async function gateDocs(browser, base, slugs) {
   const best = new Map();
   const census = new Map();
@@ -2106,6 +2212,7 @@ async function main() {
       browser, url, docSlugs.map((d) => base + "/docs/" + d + ".html")));
     await runGate("the page under its own Content-Security-Policy", () => gateCsp(browser));
     await runGate("the run block", () => gateRunConsole(browser, url));
+    await runGate("replay controls", () => gateReplayControls(browser, url));
     await runGate("document pages", () => gateDocs(browser, base, docSlugs));
     await runGate("every link on every page resolves",
       () => gateLinks(browser, base, docSlugs));

@@ -122,7 +122,19 @@ function wireScene() {
     return;
   }
 
-  const run = (members) => members.forEach((p) => p.runScene());
+  /* Running a group also reveals the one button that replays it, for the reason written
+   * over `runScene`: a control offering a replay of something that has not happened is the
+   * page claiming a state the reader has not reached. */
+  const run = (members) => {
+    members.forEach((p) => p.runScene());
+    const name = members[0]?.root?.closest('[data-group]')?.dataset.group;
+    if (!name) return;
+    // Compared rather than interpolated: building the selector out of the group name puts
+    // a value inside a quoted attribute, and the escaping gate is right to refuse that.
+    for (const b of document.querySelectorAll('[data-replay-group]')) {
+      if (b.dataset.replayGroup === name) b.removeAttribute('hidden');
+    }
+  };
 
   const hero = groups.get('hero');
   // Off the first frame after boot rather than from boot itself, so a scene cannot lengthen
@@ -157,9 +169,6 @@ function wireScene() {
     const members = sceneGroups().get(b.dataset.replayGroup);
     if (members) run(members);
   });
-  for (const b of document.querySelectorAll('[data-replay-group]')) {
-    b.removeAttribute('hidden');
-  }
 }
 
 /* ---- three endings ---------------------------------------------------------------------

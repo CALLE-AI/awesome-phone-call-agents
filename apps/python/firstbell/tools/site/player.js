@@ -162,6 +162,12 @@ export class CallPlayer {
   /* Silent, and it does not touch the audio element. The recording is what the play button
    * is for; this is the shape of the call, drawn at the speed it happened. */
   runScene() {
+    // Now there is something to play again, so now the control that offers it appears. It
+    // used to appear at boot, which put the word on screen before the scene had run: the
+    // hero starts itself a frame after boot and never noticed, but the duet waits until its
+    // act is 40% on screen, and on a short viewport its bar can be read before that.
+    const again = this.root.querySelector('[data-replay]');
+    if (again) again.removeAttribute('hidden');
     if (REDUCED) { this.sceneSettle(); return; }
     this.stopScene();
     this.scene = this.buildSchedule();
@@ -221,9 +227,6 @@ export class CallPlayer {
    * after, which is why there is no announce() call in this method.
    */
   upgrade() {
-    // The scene exists, so the control that replays it may exist too.
-    const again = this.root.querySelector('[data-replay]');
-    if (again) again.removeAttribute('hidden');
     this.canvas.removeAttribute('aria-hidden');
     this.canvas.setAttribute('role', 'slider');
     this.canvas.setAttribute('tabindex', '0');
