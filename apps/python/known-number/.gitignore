@@ -4,3 +4,7 @@ state/
 __pycache__/
 *.pyc
 .pytest_cache/
+live/
+.env.local
+*.egg-info/
+run_live.sh
