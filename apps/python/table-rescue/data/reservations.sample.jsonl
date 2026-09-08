@@ -1,0 +1,3 @@
+{"booking_id": "R-001", "name": "Fictional Guest One", "phone": "+15550101", "party_size": 4, "slot": "2026-09-10T19:00:00+07:00", "consent": true, "status": "PENDING_CONFIRM"}
+{"booking_id": "R-002", "name": "Fictional Guest Two", "phone": "+15550102", "party_size": 2, "slot": "2026-09-10T18:30:00+07:00", "consent": true, "status": "PENDING_CONFIRM"}
+{"booking_id": "R-003", "name": "Fictional Guest Three", "phone": "+15550103", "party_size": 6, "slot": "2026-09-10T20:00:00+07:00", "consent": false, "status": "PENDING_CONFIRM"}

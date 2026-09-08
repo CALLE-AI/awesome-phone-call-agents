@@ -33,6 +33,7 @@ Current apps:
 | [`python/callback-scam-screener`](python/callback-scam-screener/) | Python | Screens a callback-scam phone number from a suspicious email by having CALL-E dial it first, transparently as an AI, and score the transcript against a scam-signal checklist — preview-by-default, a dev/test dial allowlist, one screening call per number, and configurable daily call/LLM-spend caps, all enforced in code. |
 | [`python/webhook-result-receiver`](python/webhook-result-receiver/) | Python | Durable at-least-once CALL-E terminal webhook ingestion with SQLite deduplication, conflict detection, and authenticated Calls API reconciliation. |
 | [`python/mobilize`](python/mobilize/) | Python | Parallel wave dispatch to a consented pool under a deadline: stops calling the moment enough people confirm, and scores how firm each "yes" actually is instead of trusting every stated agreement. Ships a 300-trial zero-cost evaluation harness with a measured accuracy result, a crash-safe ledger, and an MCP server. |
+| [`python/refcheck-ai`](python/refcheck-ai/) | Python | Employment reference checks where the question template compiles into a CALL-E `result_schema`, so extraction and validation happen server-side with no second LLM; unsigned terminal webhooks are de-duplicated and re-verified against the Calls API, and an unanswered question is recorded as missing evidence instead of a neutral score. |
 | [`python/batch-runner`](python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
 | [`python/broker-login-client`](python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`typescript/broker-login-client`](typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
@@ -48,6 +49,8 @@ Current apps:
 | [`typescript/callsweep`](typescript/callsweep/) | TypeScript | Calls many local businesses, haggles each one down toward your budget on the call, ranks their offers by the best overall deal (price, what's included, availability), and books the one you pick. Dry-run no-call path by default with fictional sample shops. |
 | [`python/casechaser`](python/casechaser/) | Python | Chases an open claim, refund, repair, or delivery case to closure: every company promise becomes a dated, quoted commitment, broken ones climb a fixed escalation ladder, offers and denials stop at the customer, and a masked evidence pack is ready for the written complaint. Fixture mode by default. |
 | [`python/agency-status-watch`](python/agency-status-watch/) | Python | Recurring status watch for phone-only government application files: CALL-E navigates the agency's published IVR, reads back the status of your own application by reference number, and returns it as structured JSON, re-checking on a decaying cadence until terminal, action-required, or budget spent. Fixture-first with a consent-gated live path. |
+
+- [OneReach service follow-up](typescript/onereach-service-followup/) - Standalone Node.js CALL-E appointment workflow with a no-call default, validated outcomes, and signed webhook handling.
 
 Suggested grouping:
 
