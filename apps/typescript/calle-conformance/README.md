@@ -3,6 +3,9 @@
 A corpus of real CALL-E API responses, and a checker that tells you which of them
 your code has never been tested against.
 
+Two and a half minute walkthrough, with the captured call it starts from:
+https://youtu.be/EIjuAj0jOxA
+
 ## Run it first
 
 ```bash
