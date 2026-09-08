@@ -5,9 +5,9 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the five marked **needs the built page**. Those five are held by a gate that reads
-`out/index.html`, which is built from records of real calls kept outside this repository, so on
-a clean checkout it skips and they measure zero. Rows 86 to 88 break the same builder and are
+the fifteen marked **needs the built page**. Those fifteen are held by gates
+that read `out/index.html`, which is built from records of real calls kept outside this
+repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
 checkout.
 
@@ -24,6 +24,21 @@ A count also grows as the suite does. Row 2 read three until it was re-measured,
 been written when fewer of the output gates existed, which is the same drift that put stale
 line numbers in the proof images. Reproducing a row and getting a larger number is that,
 not a disagreement about the rule.
+
+**24 rows were added on 8 September 2026**, for the six gates written that day: the
+counts the take-away card prints beside its two commands, the directories those commands and
+act 08's need before they will run, any sentence placing a receipt on the evidence page, the
+escalation queue's row count against the committed record, the channel gate being demonstrated
+by a shipped export rather than only by fixtures, and the stat card no longer stating a
+collected count as though every test ran. Each was measured against the whole suite when it
+was written, and each is applied by a script.
+
+One of them is worth reading twice. The receipts gate let row 243 through on its first
+measurement: that sentence names the evidence page before it names the receipts, and the gate
+needed the thing before the location. Nothing had shipped in that shape, so it was a blind
+spot rather than a hole under a live defect, and the gate now reads the claim in both
+directions. The count published for that row is the re-measurement, because the zero was a
+fact about a gate that no longer exists.
 
 **Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
 rows can be applied by a script. Twenty-nine came
@@ -335,6 +350,30 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 226 | Shorten an identifier too short to have a middle | 1 |
 | 227 | Load a scenario that answers on a negative index | 1 |
 | 228 | Report every authorised call as one whose number was named | 1 |
+| 229 | Label the two-file `node --test` command on the take-away card with the classifier file's own count, so the card offers 27 for a command that runs 35 **Needs the built page.** | 1 |
+| 230 | Drop the `cd` from that command, so it names two files that are not under the directory this page puts a reader in and runs nothing at all **Needs the built page.** | 1 |
+| 231 | Label `double_conformance.py --check` with a test count, which is what it carried before: that command runs no tests and prints one line **Needs the built page.** | 1 |
+| 232 | State the node suite as 32 passing in the plugin's `manifest.json` | 1 |
+| 233 | State the classifier's own count as 24 in that manifest | 1 |
+| 234 | State the node suite as 32 passing in the plugin README | 1 |
+| 235 | Say the receipts are on the evidence page in `evidence/README.md`, with a pronoun carrying the subject across the full stop, which is how the sentence was written | 1 |
+| 236 | Say it in the README's money paragraph | 1 |
+| 237 | Say it in the README's reading list | 1 |
+| 238 | Say it in the README's privacy paragraph, eighty lines below the other one | 1 |
+| 239 | Say it of the replay receipt in `docs/receipt-provenance.md`, which is the receipt carrying the claim that no telephone rang | 1 |
+| 240 | Say it in the provenance line `make_shape_fixtures.py` stamps inside every generated fixture | 2 |
+| 241 | Say it in that file's own docstring | 1 |
+| 242 | Say it in the comment over the generated response fixtures in `tests/test_dispatch.py` | 1 |
+| 243 | Say it in the footer under the escalation queue, with the page named first and the receipts after it, which is the wording the first version of the gate walked past **Needs the built page.** | 2 |
+| 244 | Say it in the caption under act 03, which is the page telling a reader that a file is on the page **Needs the built page.** | 1 |
+| 245 | Print one more queue row in the footer than the page drew **Needs the built page.** | 2 |
+| 246 | Take the row the telephone cannot reach out of the district export, returning the channel gate to being demonstrated by nothing | 2 |
+| 247 | Rename the channel column in that export, so every row reads as reachable | 2 |
+| 248 | State the collected test count flat on the stat card, where two of them skip **Needs the built page.** | 2 |
+| 249 | Point the transcript provenance at a document that is in no clone of this repository **Needs the built page.** | 2 |
+| 250 | Have the transcript provenance call the waveforms the only audio that ships, on a build that ships the recordings and plays them **Needs the built page.** | 2 |
+| 251 | State four runtime call sites above a list of five | 2 |
+| 252 | Drop the directory from act 08, so neither of the two commands it prints runs from the root of a fresh clone **Needs the built page.** | 2 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

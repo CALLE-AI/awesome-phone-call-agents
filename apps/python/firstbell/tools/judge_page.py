@@ -406,6 +406,29 @@ def _node_suite_size() -> tuple[int, int]:
     return written("classify.test.mjs"), written("workflow-shape.test.mjs")
 
 
+def _suite_pair() -> tuple[int, int]:
+    """How many of the collected tests run on a build like this one, out of the README.
+
+    The stat card said "624 tests" and 622 of them run: two skip, with named reasons, and a
+    clean checkout skips more. A flat count on the first screen is the overstatement this
+    repository spends five mutation rows preventing everywhere else.
+
+    The page cannot measure the pair for itself. Collecting is cheap and `test_count` does
+    it, but a pass-and-skip pair needs the suite to run, and the suite reads the page this
+    function is building. So it comes from the README, which states the measurement, whose
+    collected count is held against a live collection by
+    `test_the_readme_states_the_real_number_of_tests`, and whose pair is held against the
+    card by a gate in `tests/test_page_prose_counts.py`.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    found = re.search(r"the same suite\s+reports \*\*(\d+) passed, (\d+) skipped\*\*", readme)
+    if not found:
+        raise SystemExit(
+            "the README no longer states the built-tree pair where the page reads it, so "
+            "the stat card cannot say how many of the collected tests run")
+    return int(found.group(1)), int(found.group(2))
+
+
 def _conformance_figures() -> tuple[int, int, int]:
     """What the conformance record holds, rather than a test count typed beside its command.
 
@@ -2105,9 +2128,17 @@ def build(has_audio: bool, repo_url: str | None = None,
     # One of the four is filled. A grid of four equal numbers makes a reader rank them, and
     # the page already knows the answer: the count of real calls is the number that decides
     # whether the other three are worth reading, so it is the one that carries the field.
-    for num, label, lead in ((test_count(), "tests", False),
+    ran, _skipped = _suite_pair()
+    for num, label, lead in ((test_count(), f"tests, {ran} of them run here", False),
                              (len(muts), "rules broken on purpose to prove a test notices", False),
-                             (len(call_rows), "real calls, each one checkable against CALL-E’s billing", True),
+                             # Not "each one checkable against CALL-E's billing", which
+                             # a reader cannot do: the ids on that table are shortened and
+                             # the unshortened list is published nowhere, so only CALL-E can
+                             # accept. The count is the part anybody can check, and act 04
+                             # says who can match a row.
+                             (len(call_rows),
+                              "real calls, counted in "
+                              "evidence/recorded-calls.json", True),
                              ("none", "CALL-E account needed to run the demo", False)):
         body.append(f'<div class=cell{" data-lead" if lead else ""}>'
                     f'<div class=num>{esc(num)}</div>'
@@ -2207,8 +2238,10 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=act-num>04</div><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
         '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
         'here, shortened at both ends, alongside the structured answer each call brought '
-        'back, so any row can be taken to the vendor&#8217;s records and checked against a '
-        'source with no stake in these claims.</p>',
+        'back, so CALL-E can match any row to their own records, which is a source with no '
+        'stake in these claims. A reader who is not CALL-E can check the count rather than '
+        'the rows: it is committed in <code>evidence/recorded-calls.json</code>, and the '
+        'note below says why the identifiers are cut.</p>',
         '<p class=note>The identifiers are shortened on purpose. A live call id is not a '
         'credential, because another account&#8217;s key cannot read our call, but it is an '
         'artifact of a real call to a real number and this repository asks contributors to '
@@ -2435,7 +2468,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<p>No API key, no signup, no telephone call. The local double is mounted as an '
         '<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so '
         'the offline path exercises the same SDK code as the live one.</p>',
-        '<pre>pip install -r requirements-dev.txt\n'
+        # The directory, because neither line runs from the root of a fresh clone and
+        # the page said nothing about where to be. The same defect the take-away card had,
+        # on the command this act is named after.
+        '<pre>cd apps/python/firstbell\n'
+        'pip install -r requirements-dev.txt\n'
         'python -m firstbell --work-file examples/absences.csv</pre>',
         # The instruction used to name a button that no longer exists, and before that it
         # was the only thing telling a reader why the block below was empty. The block

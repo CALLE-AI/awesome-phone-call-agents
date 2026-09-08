@@ -178,6 +178,20 @@ a guardian who could not take the call was dialled, reached nothing, and was fil
 failure, which on a report reads as nobody answered. The family was reachable. The channel
 was not, and the record said the opposite.
 
+The gate is demonstrated rather than described, in the export a district already produces:
+
+    python -m firstbell --work-file examples/absences-oneroster.csv
+
+    [HUMAN] S-2204       this family is not reachable by a voice call; nothing was
+                         dialled and somebody has to reach them another way
+
+For a while it was described and not demonstrated, which is a weaker thing than it reads as.
+The rule was held by nine tests over CSVs written inside those tests, and no shipped work
+file carried the column at all, so a reviewer running everything in this repository never saw
+the refusal happen. A district buyer found that by checking all four files.
+[`district-ingest.md`](district-ingest.md) has what filling that column costs, because no
+student information system carries it and no vendor can populate it for a district.
+
 **What is still not built.** There is no relay support, no TTY path and no SMS fallback.
 firstbell does not send the other message; it declines to send the wrong one and hands the
 case to a person. There is also still no stated behaviour when a family's language is outside

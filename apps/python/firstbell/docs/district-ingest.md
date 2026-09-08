@@ -70,6 +70,39 @@ so no rename can produce it.
 boolean is not a consent record. A real export is where that stops being an argument: it
 does not have the boolean either.
 
+## The other column no export has, and what filling it costs
+
+`voice` is the same shape of problem and it is not solved the same way. No export carries a
+column saying the telephone cannot reach this guardian: a guardian who is deaf, hard of
+hearing, or has a speech disability. OneRoster does not have it, Clever does not have it, and
+`phone` does not mean answerable.
+
+Here the run does not stop, and that is deliberate. A blank cell means reachable, because the
+other default is to stop calling every family nobody has recorded anything about, which is
+worse than calling one who cannot answer. So on day one in a district that has not filled it,
+the column is blank for every pupil and this software dials a deaf parent exactly as their
+current dialler does. The difference only starts when the column is populated.
+
+`examples/absences-oneroster.csv` carries one row with it filled, `S-2204`, and the run prints
+what the gate does:
+
+```
+[HUMAN] S-2204       this family is not reachable by a voice call; nothing was dialled
+                     and somebody has to reach them another way
+
+  no voice channel     1   never dialled, needs another way to reach them
+```
+
+Four rows, four endings, one command: a reason on record, the platform refusing a language,
+nobody answered, and a guardian the telephone cannot reach.
+
+**Populating it is work nobody can do for a district.** The office already knows: it is in
+special education records and in whatever the family liaison keeps. A district operations
+director who reviewed this put their own numbers on it. Two pilot schools is around forty
+rows, a spreadsheet and an afternoon. Fourteen schools and nine thousand pupils is a data
+project with a governance owner, and no vendor can hand it over. That is a scaling limit
+rather than a pilot limit, and it is worth knowing before signing rather than after.
+
 ## One call per household
 
 Three siblings off with the same virus used to be three calls to the same mother inside a

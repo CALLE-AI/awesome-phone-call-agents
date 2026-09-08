@@ -11,6 +11,8 @@ not a failure, it goes to a person, and the column that drives it is never guess
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from calle_double import CalleDouble, Outcome, build_client
@@ -227,3 +229,39 @@ def test_the_summary_stays_quiet_about_a_run_that_had_neither(double):
     assert "skipped, no consent" in printed
     assert "no voice channel" not in printed
     assert "skipped, not dialled" not in printed
+def test_a_shipped_export_exercises_the_channel_gate(capsys):
+    """The rule above was correct, tested nine ways, and fired in no run anybody could run.
+
+    Every test in this file writes its own CSV into a temporary directory, and none of the
+    four shipped work files carried a `voice` column, so a district buyer who checked all
+    four found a gate that would never fire in their district either. Their objection was not
+    that the code was wrong. It was that "optional" was carrying the sentence in
+    `docs/the-legal-surface.md`, and that a reviewer running everything here would never see
+    the refusal happen.
+
+    So it happens in the export a district already produces, and this holds it there. A row
+    deleted from that file, or the column dropped out of it, fails here rather than quietly
+    returning the rule to being demonstrated by nothing.
+    """
+    from firstbell.cli import main
+
+    export = Path(__file__).resolve().parent.parent / "examples" / "absences-oneroster.csv"
+    assert main(["--work-file", str(export)]) == 0
+    printed = capsys.readouterr().out
+
+    assert "not reachable by a voice call" in printed, (
+        "no shipped work file reaches the channel gate, so the rule in "
+        "docs/the-legal-surface.md is described and never demonstrated")
+    assert "no voice channel" in printed, (
+        "the run holds the row back and the summary does not count it, so a reader totting "
+        "up the outcomes finds a row missing")
+
+    # Four endings in one run is the argument this file carries for a buyer: the platform
+    # declining a language and the software declining a channel, side by side.
+    for ending in ("schema-valid answer received",
+                   "Spanish is not available",
+                   "nobody answered",
+                   "not reachable by a voice call"):
+        assert ending in printed, (
+            f"this run no longer shows {ending!r}, so it no longer shows four different "
+            f"endings from one command")

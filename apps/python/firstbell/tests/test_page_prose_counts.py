@@ -15,6 +15,7 @@ that are deliberately outside this repository. That skip is declared in
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -131,3 +132,65 @@ def test_the_locale_fold_counts_the_comparisons_it_contains():
         f"the fold says {shape.group(1)} scenarios with {shape.group(2)} fields each, which "
         f"is {WORD[scenarios] * WORD[fields]} comparisons, and claims {claim.group(1)}"
     )
+def test_the_stat_card_does_not_say_every_collected_test_runs_here():
+    """A flat count on the first screen, for a suite where two of them skip.
+
+    The card said "624 tests" and 622 of them run: two skip with named reasons, and a clean
+    checkout skips more again. This repository spends five mutation rows on stopping an
+    undeclared skip, and the register was pointed at everything except its own first screen.
+    A district buyer counted the difference.
+
+    The card reads the pair out of the README rather than carrying a copy of it, so this
+    holds the two together: the number on the card is the number the README measured.
+    """
+    markup = _page()
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+
+    measured = re.search(r"the same suite\s+reports \*\*(\d+) passed, (\d+) skipped\*\*", readme)
+    assert measured, "the README no longer states the pair the card is built from"
+    ran = int(measured.group(1))
+
+    card = re.search(r"<div class=lbl>tests, (\d+) of them run here</div>", markup)
+    assert card, (
+        "the stat card states a flat test count again, which reads as every collected test "
+        "having run, and two of them skip")
+    assert int(card.group(1)) == ran, (
+        f"the card says {card.group(1)} of the tests run here and the README measured {ran}")
+
+
+def test_the_embedded_provenance_names_files_a_reader_can_open():
+    """The block that vouches for all eight transcripts, checked like any other citation.
+
+    It named `07-locale-experiment.md`, which sits in the receipts directory the recordings
+    are held in and in no clone of this repository. The committed write-up of that experiment
+    is `docs/locale-is-not-only-a-hint.md`. It also said the waveform peaks are "the only
+    representation of the audio that ships here", which is true of the tree and false of the
+    page it is embedded in, where the recordings sit beside `index.html` and a control on
+    each call plays them.
+
+    Nine sentences of that shape were fixed in the prose on the same day, and the gate
+    written for those could not see this one, because it is inside a JSON island rather than
+    in a paragraph. So this reads the island.
+    """
+    markup = _page()
+    island = re.search(r"<script id=call-data type=application/json>(.*?)</script>",
+                       markup, re.S)
+    assert island, "the call data island is gone, and the whole page is built from it"
+    provenance = json.loads(island.group(1))["_provenance"]
+
+    missing = []
+    for text in provenance.values():
+        for named in re.findall(r"\b[\w./-]+\.(?:md|csv|json)\b", text):
+            if not (APP / named).exists() and not (APP.parents[2] / named).exists():
+                missing.append(named)
+    assert not missing, (
+        "the provenance for every transcript on this page names files a reader cannot open: "
+        + ", ".join(sorted(set(missing)))
+    )
+
+    # And what it says about the audio has to be true of the page it is embedded in, not
+    # only of the tree the page was built from.
+    if "data-audio=present" in markup:
+        assert "in the tree" in provenance["audio"], (
+            "the provenance says the waveforms are the only representation of the audio "
+            "that ships, on a build that ships the recordings and plays them")

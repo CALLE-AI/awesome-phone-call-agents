@@ -182,15 +182,29 @@ def test_every_cited_line_number_still_says_what_the_readme_claims():
     # Both documents, because the pictures drifted while the README stayed right. The
     # captions inside the PNGs are derived by `capture-stills.mjs` at render time; this
     # checks the prose beside them, which is the half a reader quotes.
-    documents = {"README.md": 4, "docs/images/README.md": 4}
+    documents = {"README.md": 5, "docs/images/README.md": 4}
     pairs = []
     for name, least in documents.items():
-        found = ANCHOR.findall((APP / name).read_text(encoding="utf-8"))
+        body = (APP / name).read_text(encoding="utf-8")
+        found = ANCHOR.findall(body)
         assert len(found) >= least, (
             f"expected at least {least} runtime anchors in {name}, found {len(found)}. "
             "If they were removed on purpose, lower this number deliberately."
         )
         pairs.extend(found)
+
+        # And the count the prose states, against the list under it. A floor can only ever
+        # be too low: the README said "Four lines do all of it" above five anchored bullets
+        # for as long as this gate had been passing, because five is at least four. A
+        # district buyer counted the bullets.
+        stated = re.search(r"\b([A-Z][a-z]+) lines do all of it", body)
+        if stated:
+            spoken = stated.group(1).lower()
+            claimed = NUMBER_WORDS_SMALL.get(spoken)
+            assert claimed is not None, f"{spoken!r} is not a number this gate can read"
+            assert claimed == len(found), (
+                f"{name} says {spoken} lines do all of it and carries {len(found)} "
+                f"anchored lines")
 
     for symbol, path, line in pairs:
         target = APP / path
@@ -1684,6 +1698,18 @@ def test_the_take_away_card_prints_commands_that_can_be_run():
                 f"`{command}` names {arg}, which does not exist under {head[3:].strip()}, "
                 f"so a reader who runs it gets nothing")
 
+    # Act 08 is called "Run it yourself" and printed two commands with no directory, so
+    # neither ran from the root of a fresh clone. Same claim, same gate.
+    block = re.search(r"<pre>(cd [^<]*)</pre>", markup)
+    assert block, (
+        "the command block in act 08 names no directory, so a reader who clones the "
+        "repository and follows it is in the wrong place for both lines")
+    where = root / block.group(1).splitlines()[0][3:].strip()
+    assert where.is_dir(), f"act 08 says to be in {where}, which this repository has not got"
+    assert (where / "requirements-dev.txt").is_file(), (
+        "act 08 tells a reader to install from a requirements file that is not in the "
+        "directory it puts them in")
+
     classifier, shape = _node_suite_counts()
     node_row = [count for raw, count in rows if "node --test" in raw]
     assert len(node_row) == 1, "the n8n row is not on the page under a node command"
@@ -1713,6 +1739,18 @@ LOCATED_THERE = re.compile(
     r"\b(?:are|is|were|was|live|lives|held|sit|sits|published)\b"
     r"(?P<between>[^.;:!?]{0,40}?)"
     r"\bon (?:the|that)\b[^.;:!?]{0,30}?\b(?:evidence|linked) page\b", re.I)
+# The same claim with its halves swapped: "on the evidence page, which is where the receipts
+# of real calls are held". A mutation in that shape survived the first version of this gate,
+# because the version above needs the thing named before the location. Nothing shipped in
+# this shape; it is the shape anybody rewording the sentence would reach for next.
+LOCATED_THERE_REVERSED = re.compile(
+    r"\bon (?:the|that)\b[^.;:!?]{0,30}?\b(?:evidence|linked) page\b"
+    # The window runs past the noun as well as up to it, because a denial written this way
+    # round lands after it. "on the linked page while the receipt files are on neither
+    # surface" is the honest sentence and "on the evidence page, which is where the receipts
+    # of real calls are held" is the false one, and everything before the noun is the same.
+    r"(?P<between>[^.;:!?]{0,70}?(?:receipts?\b|\b\d\d-[a-z0-9-]+\.json\b)"
+    r"[^.;:!?]{0,45})", re.I)
 A_DENIAL = re.compile(r"\b(?:not|never|neither|nor|outside)\b", re.I)
 A_PRONOUN = re.compile(r"^(?:\W*)(?:they|it|those|these|both)\b", re.I)
 # What counts as naming a receipt: the word, or one of the six files by name. The caption
@@ -1753,18 +1791,41 @@ def test_nothing_sends_a_reader_to_the_evidence_page_for_a_receipt():
     `evidence/recorded-calls.json`, which names all six receipts and carries no conversation,
     no telephone number and no call id.
     """
-    surfaces = [(path.name, _as_a_reader_sees_it(
-                    path.read_text(encoding="utf-8", errors="replace")))
+    def read(where: str, path: Path) -> tuple[str, str]:
+        """One surface, with the mutation ledger's own rows taken out of it first.
+
+        Eleven rows in `evidence/MUTATIONS.md` record a change whose whole text is the
+        sentence this gate refuses, so the gate flagged the repository's record of itself,
+        in the file and again in the copy of that table the page renders. A ledger row
+        describes a change somebody made on purpose and reverted. It is not a claim.
+
+        Only that ledger, and only its rows. The README makes real claims inside tables,
+        two of which this gate caught, and the prose around the ledger's table stays in
+        scope. Both cuts happen before the text is flattened, because flattening removes
+        the newlines and the tags a row is recognised by.
+        """
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if where == "MUTATIONS.md":
+            text = "\n".join(ln for ln in text.splitlines() if not ln.startswith("|"))
+        elif where == "out/index.html":
+            text = re.sub(r"<tr>.*?</tr>", " ", text, flags=re.S)
+        return where, _as_a_reader_sees_it(text)
+
+    surfaces = [read(path.name, path)
                 for path in _tracked_paths()
                 if path.suffix in {".md", ".py"} and "test_claims" not in path.name]
 
     page = APP / "out" / "index.html"
     if page.is_file():
-        surfaces.append(("out/index.html", _as_a_reader_sees_it(
-            page.read_text(encoding="utf-8", errors="replace"))))
+        surfaces.append(read("out/index.html", page))
 
     claiming = []
     for where, body in surfaces:
+        for found in LOCATED_THERE_REVERSED.finditer(body):
+            if A_DENIAL.search(found.group("between")):
+                continue
+            claiming.append(f"{where}: " + " ".join(found.group(0).split())[:170])
+
         for found in LOCATED_THERE.finditer(body):
             if A_DENIAL.search(found.group("between")):
                 continue
