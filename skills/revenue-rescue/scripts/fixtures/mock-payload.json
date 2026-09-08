@@ -1,0 +1,9 @@
+{
+  "customer_id": "cus_fixture_123456",
+  "customer_phone": "+14045639785",
+  "trigger_id": "evt_stripe_failed_fixture_987",
+  "amount": 249.00,
+  "failure_reason": "expired_card",
+  "is_disputed": false,
+  "timestamp": "2026-09-09T14:30:00Z"
+}
