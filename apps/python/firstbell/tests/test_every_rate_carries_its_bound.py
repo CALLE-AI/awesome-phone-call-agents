@@ -250,6 +250,48 @@ def test_the_card_says_what_each_bound_is_a_rate_of():
         "the card prints two bounds and names neither quantity in words")
 
 
+def test_the_card_names_which_figure_to_quote_and_never_promises_the_ceiling():
+    """The largest label on this page used to say save over a number the README calls a
+    ceiling.
+
+    A district buyer in a blind seat read the card, counted four money figures across the
+    entry and said they could not tell which one it stood behind. Two answers belong in the
+    card rather than eighty lines under it: the smaller figure to quote, which is the demo
+    run's because one command reproduces it, and the cost this becomes under the reading
+    that prices every escalated call as a callback.
+
+    Both are checked against what `money_across_runs` computes, not against a literal,
+    because a card that hard codes a price is the defect the rest of this page is about.
+    """
+    card = html.unescape(_card())
+    pooled = _pooled()
+
+    headline = re.search(r"<dt>([^<]*)</dt>", card)
+    assert headline, "the money card no longer opens with a label"
+    label = headline.group(1).lower()
+    assert "can save" not in label or label.startswith("the most"), (
+        f"the card's first label reads {headline.group(1)!r}, which promises a saving. The "
+        "figure under it prices every removed attempt at a desk rate nobody has audited, "
+        "and the README calls it a ceiling and not a saving")
+
+    import money_across_runs
+    demo = money_across_runs.demo_row()["net_ceiling"]
+    every = pooled["ceiling_if_every_escalation_is_new"]
+    assert every < 0, (
+        "the pessimistic reading is no longer a cost, so the sentence this gate checks is "
+        "about something that has stopped being true")
+
+    assert f"${demo:,.2f}" in card, (
+        f"the card does not name the figure to quote (${demo:,.2f}, the demo run's), so a "
+        "reader is left to pick between the four money numbers on this page")
+    assert f"${abs(every):,.2f}" in card, (
+        f"the card does not name the cost the widest reading prices out to "
+        f"(${abs(every):,.2f} a call), which is the figure a finance office plans against")
+    assert demo < pooled["net_ceiling"], (
+        "the figure the card tells a reader to quote is no longer the smaller of the two, "
+        "so the sentence saying it is the smaller one has gone false")
+
+
 def test_the_card_foot_counts_the_rates_it_actually_prints():
     """The sentence under the rows says how many of them are rates. It has to be right.
 

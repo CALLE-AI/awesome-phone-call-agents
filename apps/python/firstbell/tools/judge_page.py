@@ -131,14 +131,28 @@ def esc(value: object) -> str:
 
 
 def esc_code(value: object) -> str:
-    """Escape, then turn markdown code spans into real ones.
+    """Escape, then turn markdown code spans and bold into real ones.
 
     The mutation table is lifted out of MUTATIONS.md, where identifiers are wrapped in
     backticks. Rendering those literally puts a row of stray punctuation on the page for
     every mutation. Escaping runs first, so the only thing this can introduce is the code
-    tag itself.
+    and strong tags themselves.
+
+    The bold pass was missing for as long as the table has existed, and the argument in the
+    paragraph above was already the argument for adding it: twenty-six rows carry
+    `**Needs the built page.**` and every one of them showed the asterisks to a reader.
+    Code spans run first so a pair of asterisks inside one stays inside it, and bold runs
+    before italic so a pair of them is not read as two italics around nothing.
+
+    The italic pass came from sweeping the built page for the rest of the same class rather
+    than from a third report. It closes one row, the one that says to flag a result if
+    *any* required field is unknown rather than *all* of them, where the emphasis is the
+    whole distinction being drawn. The body of a span cannot contain `<`, so an unpaired
+    asterisk cannot swallow the tags either pass above it produced.
     """
-    return re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(value))
+    out = re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(value))
+    out = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", out)
+    return re.sub(r"\*([^*<]+)\*", r"<em>\1</em>", out)
 
 
 # ---- reading the evidence ---------------------------------------------------------------
@@ -1290,6 +1304,18 @@ def _money_key_block(f: dict) -> str:
     # spends its time arguing against. The count in the foot is derived for the same
     # reason: a sentence saying "these three rates" over two rates is a small lie that
     # nothing would have caught.
+    # The figure to quote, and the figure to plan against. Both derived: a card that hard
+    # codes either one is the defect this page spends four thousand words on.
+    demo = (f.get("demo") or {}).get("net_ceiling")
+    every = pooled.get("ceiling_if_every_escalation_is_new")
+    quote = ""
+    if demo is not None and every is not None and every < 0:
+        quote = (
+            f'Quote the demo run&#8217;s ${demo:,.2f} rather than the ceiling above: it is '
+            'the smaller of the two and one command reproduces it. Plan against the '
+            f'${abs(every):,.2f} a call this becomes if every escalated call is priced as '
+            'a callback, which is the reading this entry holds itself to. ')
+
     worse, widest, how_many = "", "", "two"
     if pooled.get("escalated_bound") is not None and pooled.get("escalated"):
         how_many = "three"
@@ -1305,7 +1331,12 @@ def _money_key_block(f: dict) -> str:
             'on that assumption this is a cost and not a saving. ')
     return (
         '<dl class=money-key>'
-        '<div><dt>What it can save, a call</dt>'
+        # "The most", not "what it can save". The README calls this figure a ceiling and
+        # not a saving, eighty lines from where the card's largest label promised one, and
+        # a reviewer read the label rather than the qualification. A ceiling is the honest
+        # word for a number computed by pricing every removed attempt at a desk rate
+        # nobody has audited, so the label says it.
+        '<div><dt>The most one call can save</dt>'
         f'<dd>${pooled["net_ceiling"]:,.2f}</dd></div>'
         '<div><dt>Where that becomes a loss</dt>'
         f'<dd>{pooled["crossover_per_100"]:.1f} per 100 answered calls</dd></div>'
@@ -1326,6 +1357,12 @@ def _money_key_block(f: dict) -> str:
         f'is the one denominator on this page nobody chose, and these {how_many} rates '
         'are per answered call, because one of those calls reached nobody. '
         + widest +
+        # Which of them to quote, in the card rather than eighty lines below it. A district
+        # buyer read this block, counted four money figures across the page and could not
+        # tell which one the entry stood behind, so the two that answer that are named here
+        # and both are derived. The smaller one is the demo run's, which is the figure this
+        # entry leads with everywhere else because one command reproduces it.
+        quote +
         'The paragraph below is '
         'the same '
         'figures with the objections they answer, and the demo run&#8217;s own numbers are '
@@ -2477,18 +2514,18 @@ def build(has_audio: bool, repo_url: str | None = None,
          "a United States number today. The twelve real calls went to Indian numbers, "
          "where Tamil and Hindi are available.",
          "Nothing in this app changes it. Run "
-         "<code>python -m firstbell --work-file examples/absences-oneroster.csv</code> and "
+         "`python -m firstbell --work-file examples/absences-oneroster.csv` and "
          "the second row prints the refusal in the platform's own words. Until it changes, "
          "the part of this that works in a United States district is the three outcomes, "
          "the consent gate and the structured reason, over whichever dialler the district "
          "already owns. That is a command and not a consolation: "
-         "<code>python tools/adopt_call_records.py --records "
+         "`python tools/adopt_call_records.py --records "
          "examples/other-dialler-records.jsonl --consent-register "
-         "examples/other-dialler-consent.json</code> files six calls this software never "
+         "examples/other-dialler-consent.json` files six calls this software never "
          "placed, says why each landed where it did, and audits all six against the "
          "district's own consent register. One of them carries a transcript in which a "
          "parent says plainly that the child is at home with her, and it still goes to a "
-         "person, because reading a guardian&#8217;s confirmation out of prose is the "
+         "person, because reading a guardian’s confirmation out of prose is the "
          "defect this entry was built to catch wearing better clothes. "
          "It also narrows the ceiling above: it binds while CALL-E places the call, and a "
          "district with Spanish-speaking families can keep the multilingual dialler it "
@@ -2520,9 +2557,14 @@ def build(has_audio: bool, repo_url: str | None = None,
             'complaint, because a limit you can read is worth more than a claim you '
             'cannot check.</p>',
             '</div><div class=artifact><ul class=limits>']
+    # `esc_code` and not `esc`. These two strings carry commands a reader is meant to run,
+    # and under plain `esc` the markup around them was escaped, so act 07 shipped a literal
+    # ``python -m firstbell ...`` on the page the page itself labels read this one
+    # first. The helper escapes and then promotes backticks, so nothing raw can get through
+    # and the commands still render. Same helper the mutation table uses, for the same reason.
     for limit, closes in limits:
-        body.append(f'<li><p class=limit>{esc(limit)}</p>'
-                    f'<p class=closes>{esc(closes)}</p></li>')
+        body.append(f'<li><p class=limit>{esc_code(limit)}</p>'
+                    f'<p class=closes>{esc_code(closes)}</p></li>')
     body.append('</ul></div></div>')
     add(act("07", "What is not true", "".join(body), "act-deep", margin=True))
 

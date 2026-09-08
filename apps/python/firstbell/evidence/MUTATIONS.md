@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the twenty-four marked **needs the built page**. Those twenty-four are held by gates
+the thirty marked **needs the built page**. Those thirty are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -576,6 +576,30 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 280 | Abort instead of reporting could-not-measure when there is nothing to read, folding a third outcome back into a failure | 1 |
 | 281 | Audit another dialler's calls without passing the numbers they were placed to, so a consent record covering a different number than the one dialled passes. Consent attaches to the number called | 1 |
 | 282 | Judge a call nobody answered on the result attached to it, and treat a record that does not say whether it was answered as though nobody was there | 1 |
+| 283 | Escape the limits list in act 07 with the escaper that escapes everything, so the two commands that section tells a reader to run reach the page as literal backticks instead of code **Needs the built page.** | 1 |
+| 284 | Write the markup into the limits data as well, which is the shape act 07 really shipped: the command a reader is told to run arrives with its code tags visible as text around it, and an apostrophe arrives as a numeric character reference **Needs the built page.** | 4 |
+| 285 | Promote the backticks in a mutation row and stop, which is what the page did for as long as the table has existed: twenty-six rows show the marker under this table with its asterisks **Needs the built page.** | 1 |
+| 286 | Promote bold and stop, so the one row drawing a distinction between any required field and all of them shows the emphasis as punctuation instead **Needs the built page.** | 1 |
+| 287 | Label the ceiling on the money card as what a call can save, eighty lines from a README that calls the same figure a ceiling and not a saving **Needs the built page.** | 1 |
+| 288 | Drop the sentence naming which of the four money figures to quote and which to plan against, leaving a reader to pick **Needs the built page.** | 1 |
+
+Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
+four read the built page, and the fourth reads the builder, so a clean checkout measures
+one rather than nothing. That fourth gate is there because the first three cannot run for
+most readers, and the mistake being caught is markup written into data that an escaper is
+going to see, which is a property of the source.
+
+Rows 283 and 284 were found by a reviewer reading the page rather than by anyone reading
+the code. The defect had shipped for days under a suite that was green at the 662 tests it
+had, because the file about escaping was about the other direction: it proves a hostile
+value cannot escape its attribute, and says nothing about an honest value being escaped
+twice. Rows 285 to 288 came from sweeping the rest of the page for the same class
+afterwards, and two of them are the same helper knowing one markdown syntax and stopping.
+Row 285 also went in with a gate that measured zero against it: the first version matched
+a pair of asterisks, and removing the bold pass while the italic pass stayed produced a
+stray asterisk either side of a real emphasis tag, which is neither of the two shapes it
+looked for. A correct page carries no asterisk in its prose at all, so that is what the
+gate asks now.
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
