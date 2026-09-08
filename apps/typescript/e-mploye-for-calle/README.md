@@ -10,6 +10,35 @@ The prototype ships with three task templates using the same virtual employee an
 
 The public demo offers three guided scenarios. All templates share the same preview → approval → call → evidence → human decision flow.
 
+## Primary business case
+
+The primary judging story is **Appointment desk**: a service team can prepare confirmation and rescheduling calls without silently changing its calendar. Lead follow-up and shift coordination reuse the same governed workflow.
+
+As an illustrative operating scenario, a team handling 40 appointments per day with 25% requiring a four-minute phone follow-up has roughly 40 minutes of manual calling work to route through E-mploye. This is a planning example, not a measured customer result; the product's value is that the routine work is prepared and documented while a manager keeps the final decision.
+
+## Judge quick path
+
+The fastest public evaluation is:
+
+1. Open the [public demo](https://e-mploye-for-calle.vercel.app).
+2. Choose **Appointment reschedule**.
+3. Preview the exact task and request approval.
+4. Authorize the sandbox call.
+5. Review the structured result, transcript, and audit events.
+6. Apply or reject the proposed appointment change.
+
+The path is deterministic, uses no CALL-E credits, and takes less than 90 seconds. The live adapter is separately documented and remains server-only.
+
+### Visual proof of the workflow
+
+The same appointment scenario is visible at each decision boundary:
+
+![Appointment configuration](public/judge/appointment-configure.jpg)
+
+![Structured result and evidence](public/judge/appointment-result.jpg)
+
+![Human decision before applying the change](public/judge/appointment-decision.jpg)
+
 ## Safety-first behavior
 
 - Fake mode is the default and places no real calls.
@@ -64,6 +93,8 @@ CALLE_DEFAULT_REGION=MX
 Never put `CALLE_API_KEY` or `CALLE_TEST_PHONE` in frontend variables or commit them. A live-capable HTTP server also requires the separate `EMPLOYE_API_TOKEN` and rejects every API route without `Authorization: Bearer <token>`; never reuse the CALL-E API key as this app token. For a private dashboard build, set `VITE_EMPLOYE_API_TOKEN` to that app token (it is visible to the browser and must only be used on a private deployment), or place the dashboard behind an authenticated proxy. Before a live run, set one controlled E.164 test number through these server-only variables, verify the destination region and locale, and keep the manager approval step enabled. The public Vercel deployment overrides these values and stays fake-only. If a provider-readiness piece is missing, the server safely falls back to the fake provider; if the live flag is enabled without the app token, every live-capable route fails closed with 503 instead of serving data.
 
 The test number must belong to a CALL-E-supported recipient region and the region/locale must match. Argentina (`AR`) is not currently listed. The published integration guide says that international destinations use CALL-E's international phone lines and are primarily intended for testing; buying a phone number in the dashboard is not documented as a prerequisite for the one-shot Calls API. See the [CALL-E integrations guide](https://github.com/CALLE-AI/call-e-integrations#-supported-regions-and-languages) before attempting a live call.
+
+For a controlled live proof when the operator is in Argentina, use a temporary trial voice number in a CALL-E-supported country only if the number can legally receive the call and the operator controls the account. Do not use public shared “receive calls online” inboxes. The [live test runbook](docs/LIVE_CALL_E_TEMP_NUMBER.md) describes the Twilio trial route, its restrictions, and the sanitization checklist without embedding any real number or credential.
 
 The live provider uses the official TypeScript server SDK `@call-e/calle` to create an asynchronous CALL-E task and read status, structured evidence, transcripts, and developer events. The SDK maps the documented `POST /v1/calls`, `GET /v1/calls/{call_id}`, and events contracts while preserving the stable idempotency key. Provider cancellation is not claimed because the current SDK/API contract does not expose a cancellation operation. The provider tests use mocked HTTP `201`/`200` responses to verify the SDK contract without placing a call.
 
