@@ -36,7 +36,7 @@ def _page() -> str:
 
 
 def test_the_hero_counts_the_calls_the_register_actually_shows():
-    """"Four of the four rows here, one per call" is a claim about a table.
+    """"Four rows here, one per call" is a claim about a table.
 
     A fifth receipt arriving makes the register five rows and the sentence under it wrong,
     and nothing in the build would notice. The sentence is checked against the ids the
@@ -49,7 +49,7 @@ def test_the_hero_counts_the_calls_the_register_actually_shows():
     end = page.index("hero-foot", start)
     shown = sorted(set(re.findall(r"S-\d{4}", page[start:end])))
 
-    claim = re.search(r"class=hero-foot>(\w+) of the (\d+) rows here, one per call", page)
+    claim = re.search(r"class=hero-foot>(\w+) rows here, one per call", page)
     assert claim, (
         "the sentence under the register has been reworded, so this gate is checking "
         "nothing; point it at whatever states the count now"
@@ -60,9 +60,9 @@ def test_the_hero_counts_the_calls_the_register_actually_shows():
         f"the register count is written as {claim.group(1)!r}, which this gate cannot turn "
         "into a number; widen the table rather than leaving the count unchecked"
     )
-    assert WORD[spelled] == len(shown) == int(claim.group(2)), (
-        f"the page says {claim.group(1)} of {claim.group(2)} rows and the register renders "
-        f"{len(shown)}: {shown}"
+    assert WORD[spelled] == len(shown), (
+        f"the page says {claim.group(1)} rows and the register renders {len(shown)}: "
+        f"{shown}"
     )
 
 

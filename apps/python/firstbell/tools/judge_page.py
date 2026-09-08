@@ -338,6 +338,12 @@ def commit_turns(call: dict, fields: list[str]) -> list[int]:
     return out
 
 
+def _spelled(n: int) -> str:
+    """A small count in words. The hero read "Four of the 4 rows here" for a morning."""
+    return {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+            8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}.get(n, str(n))
+
+
 def _recorded_call_total() -> int:
     """How many calls this software has placed against the production API, from one file.
 
@@ -1610,8 +1616,8 @@ def path_markup() -> str:
         # holds. It goes at the end of the list and not the start: somebody who has not
         # heard a call yet has no reason to care what a console prints.
         ("act-08", "Run it, here, now",
-         "The offline run plays line by line: seven rows, three endings, and the totals. "
-         "No account, no key, nothing dialled."),
+         "The whole offline run is on the page: seven rows, three endings, and the totals. "
+         "A button replays it line by line. No account, no key, nothing dialled."),
         # The only entry that leaves this page, and it is here because two readers coming
         # to the entry as district buyers said the same thing: this document is what
         # decides whether they pilot, and it was reachable only from the foot of a page
@@ -1848,7 +1854,8 @@ def build(has_audio: bool, repo_url: str | None = None,
         # Four rows, twelve calls, and the page used to say only the first number.
         # Everything else in the entry says twelve, so the first screen was the one place
         # a reader could find the two numbers disagreeing.
-        f'<p class=hero-foot>Four of the {len(rows)} rows here, one per call. This '
+        f'<p class=hero-foot>{_spelled(len(rows)).capitalize()} rows here, one per call. '
+        'This '
         f'software has placed {_recorded_call_total()} calls against CALL-E in total and '
         'the money on this page is computed over all of them; these four are the ones '
         'with a transcript on the page. CALL-E is the voice service that dials the '
