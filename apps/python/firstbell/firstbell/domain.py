@@ -47,6 +47,14 @@ RESULT_SCHEMA: dict[str, Any] = {
         },
         "free_text_note": {"type": "string"},
     },
+    # The strictest thing CALL-E offers, and this project could not reach it until a
+    # platform engineer pointed at the checker that banned the keyword. Their own
+    # documentation lists `additionalProperties: false` as supported and names it as one of
+    # the four sources of hard validation, so an answer carrying a field nobody declared is
+    # now refused on their side as well as here. Six fields is the whole vocabulary a school
+    # office reads; a seventh arriving unannounced is a question about the schema, not an
+    # answer about a child.
+    "additionalProperties": False,
 }
 
 def safeguarding_escalation(result: dict[str, Any]) -> Escalation:

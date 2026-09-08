@@ -156,3 +156,47 @@ def test_a_malformed_5xx_body_is_retried_and_never_called_a_failure():
     assert len(set(keys)) == 1, "a retry after a malformed body must reuse the key"
     assert result.resolution is Resolution.UNDETERMINED, (
         f"a request that may have reached CALL-E came back {result.resolution.value}")
+# --------------------------------------------------------------------------
+# Defect 4b: the same body, one layer lower. A reader with the platform's own SDK open
+# pointed out that `response.json()` is `json.loads(self.content)` over raw bytes, so a
+# body that is not valid UTF-8 raises `UnicodeDecodeError` before any JSON parsing starts.
+# The clause fixed for defect 4 named only `json.JSONDecodeError`, so this one still
+# escaped it and was reported FAILED: "nobody reached on any number", about a request that
+# may have arrived and started a telephone ringing.
+# --------------------------------------------------------------------------
+
+def test_a_5xx_body_that_is_not_utf8_is_retried_and_never_called_a_failure():
+    """A proxy error page in another encoding. `latin-1` bytes through `json.loads` raise
+    UnicodeDecodeError, which is a ValueError and is not a JSONDecodeError."""
+    keys = []
+
+    class calls:
+        @staticmethod
+        def create(**kwargs):
+            keys.append(kwargs["idempotency_key"])
+            # What httpx does: json.loads over the raw body. The bytes are a real 502 page
+            # from a proxy that answers in Latin-1, which is not valid UTF-8.
+            json.loads("<html>502 Passerelle indisponible</html>".encode("latin-1")
+                       .replace(b"i", b"\xe9"))
+            raise AssertionError("those bytes decoded, so this test proves nothing")
+
+        @staticmethod
+        def get(call_id):
+            raise AssertionError("creation never succeeded; nothing to poll")
+
+    class Client:
+        pass
+
+    Client.calls = calls
+    dispatcher = _dispatcher(Client(), retry=RetryPolicy(max_attempts=3))
+    report = dispatcher.run([WorkItem(id="S-6", phones=(IN_A,))])
+    result = report.results[0]
+
+    assert len(keys) == 3, (
+        f"a body that will not decode was not retried: {len(keys)} attempt(s). This is the "
+        f"class of failure a retry exists to absorb")
+    assert len(set(keys)) == 1, "a retry after an undecodable body must reuse the key"
+    assert result.resolution is Resolution.UNDETERMINED, (
+        f"a request that may have reached CALL-E came back {result.resolution.value}, "
+        f"which prints as nobody reached on any number")
+    assert "may have been placed" in result.reason, result.reason

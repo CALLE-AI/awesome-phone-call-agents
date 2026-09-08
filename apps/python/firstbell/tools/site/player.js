@@ -224,7 +224,7 @@ export class CallPlayer {
    * the tab order, because with the script off nothing draws it and nothing moves it: a
    * role=slider that ignores every arrow key is a promise the page cannot keep. Here the
    * keys are already bound, so the promise is good. select() sets the value straight
-   * after, which is why there is no announce() call in this method.
+   * after, which is why there is no announcePlayhead() call in this method.
    */
   upgrade() {
     this.canvas.removeAttribute('aria-hidden');
@@ -288,7 +288,7 @@ export class CallPlayer {
     this.renderTurns();
     this.renderResult();
     this.resize();
-    this.announce();
+    this.announcePlayhead();
     // Switching language mid-listen keeps listening, because that IS the demonstration: the
     // words change completely and the result underneath them does not move.
     if (wasPlaying && !silent) this.play();
@@ -315,7 +315,7 @@ export class CallPlayer {
     a.currentTime = this.t;
     a.play().then(() => { this.playing = true; this.loop(); }).catch(() => { this.playing = false; });
     this.root.dataset.playing = 'true';
-    this.announce(true);
+    this.announceControl(true);
   }
 
   pause() {
@@ -323,18 +323,29 @@ export class CallPlayer {
     if (this.audio) this.audio.pause();
     this.root.dataset.playing = 'false';
     cancelAnimationFrame(this.raf);
-    this.announce(false);
+    this.announceControl(false);
   }
 
   // The icon swaps in CSS off root.dataset.playing, so a sighted reader always knew which
   // state the control was in and a screen reader never did: the button shipped
   // aria-label="Play this call" and kept it while the call was playing. The switches at
   // select() already did this correctly, so this is the same treatment, not a new idea.
-  announce(playing) {
+  //
+  // The words come off the button rather than out of here, and the visible label and the
+  // accessible name are set from the same string, so they cannot say different things. That
+  // matters more than it sounds: the visible words are the ones a reader is told to look
+  // for, and an accessible name that does not contain them is a control a voice user can
+  // see and cannot ask for. Three controls share this and each names its own recording.
+  announceControl(playing) {
     const b = this.root.querySelector('[data-play]');
     if (!b) return;
-    b.setAttribute('aria-label', playing ? 'Pause this call' : 'Play this call');
+    const words = playing
+      ? (b.dataset.wordsPause || 'Pause this call')
+      : (b.dataset.wordsPlay || 'Play this call');
+    b.setAttribute('aria-label', words);
     b.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    const label = b.querySelector('[data-play-label]');
+    if (label) label.textContent = words;
   }
 
   seek(sec) {
@@ -346,14 +357,14 @@ export class CallPlayer {
     if (this.audio) this.audio.currentTime = this.t;
     this.sync();
     this.draw();
-    this.announce();
+    this.announcePlayhead();
     this.showClock();
   }
 
   /* Where the playhead is, in the words a screen reader will say. The range belongs to
    * whichever call is selected, and the two languages are different lengths, so the
    * maximum moves when the reader switches. */
-  announce() {
+  announcePlayhead() {
     // Round once, then read every number off the rounded value. Rounding the seconds for
     // valuemax and flooring them for the spoken text put "0:59 of 0:59" next to a maximum
     // of 60 on a call of 59.6 seconds.

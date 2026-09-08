@@ -1933,6 +1933,164 @@ async function gateRunConsole(browser, url) {
 }
 
 
+async function gateRecordingReachable(browser, url) {
+  /* A recording on this page is the strongest thing on it, and for every build since the
+   * audio flag was added there was no way to start one: `out/audio/` held eight files and
+   * `<html>` said `data-audio=absent`, so no control was rendered at all. The two duet
+   * lanes had never had one in any build. Eighteen gates passed over that. */
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  const thrown = [];
+  page.on("pageerror", (err) => thrown.push(String(err)));
+  await page.goto(url, { waitUntil: "load" });
+
+  const state = await page.evaluate(async () => {
+    const flag = document.documentElement.dataset.audio || "absent";
+    const players = [...document.querySelectorAll("[data-player]")].map((p, i) => {
+      const b = p.querySelector("[data-play]");
+      return {
+        i,
+        id: p.dataset.player,
+        words: b ? (b.querySelector("[data-play-label]")?.textContent || "").trim() : null,
+        name: b ? (b.getAttribute("aria-label") || "").trim() : null,
+      };
+    });
+    const replays = [...document.querySelectorAll("[data-replay], [data-replay-group]")]
+      .map((b) => b.textContent.trim());
+
+    /* The bytes, asked for the way the player asks for them. A 200 with a zero-length body
+     * is a file the server has and the browser cannot play. */
+    const clips = [];
+    if (flag === "present") {
+      for (const p of players) {
+        const href = "audio/" + String(p.id).split(",")[0] + ".m4a";
+        try {
+          const r = await fetch(href);
+          const buf = await r.arrayBuffer();
+          clips.push({ href, status: r.status, bytes: buf.byteLength });
+        } catch (err) {
+          clips.push({ href, status: 0, bytes: 0, error: String(err) });
+        }
+      }
+    }
+    return { flag, players, replays, clips };
+  });
+
+  if (!state.players.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      "no element on the page carries data-player, so no call can be played at all");
+    return;
+  }
+
+  if (state.flag !== "present") {
+    /* A build with no recordings is a real build: it is what a reviewer cloning the
+     * repository gets, because the recordings are deliberately not committed. What it may
+     * not do is offer a control with nothing behind it. */
+    const offered = state.players.filter((p) => p.words !== null);
+    await page.close();
+    if (offered.length) {
+      record("the recording is reachable", "FAIL",
+        `the page says it has no audio and still offers ${offered.length} control(s) to `
+        + `play it, starting with ${JSON.stringify(offered[0].words)}. Pressing it can do `
+        + "nothing, which is the page making a promise it cannot keep");
+      return;
+    }
+    record("the recording is reachable", "COULD NOT MEASURE",
+      `this build carries no audio (data-audio=absent), so reachability cannot be measured. `
+      + `${state.players.length} player(s) correctly offer no control. Rebuild with `
+      + "--audio-dir to measure it");
+    return;
+  }
+
+  const silent = state.players.filter((p) => p.words === null);
+  if (silent.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `${silent.length} of ${state.players.length} call(s) on a page that has audio have `
+      + `no control to start it, beginning with ${silent[0].id}. The recording is on the `
+      + "server and there is nothing on the page that reaches it");
+    return;
+  }
+
+  const unnamed = state.players.filter((p) => !p.name.includes(p.words));
+  if (unnamed.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `the control for ${unnamed[0].id} shows ${JSON.stringify(unnamed[0].words)} and is `
+      + `named ${JSON.stringify(unnamed[0].name)} to assistive technology. A reader told to `
+      + "press the words they can see cannot ask for a name that does not contain them");
+    return;
+  }
+
+  /* The defect that started this gate: the only control with words on it said "Play the
+   * call again" and replayed the transcript in silence, so the words that promised sound
+   * belonged to the control that could not make any. */
+  const both = state.players.filter((p) => state.replays.includes(p.words));
+  if (both.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `${JSON.stringify(both[0].words)} is on the control that plays the recording and on `
+      + "a control that replays a scene in silence. One of them is lying to a reader");
+    return;
+  }
+
+  const bad = state.clips.filter((c) => c.status !== 200 || c.bytes < 1024);
+  if (bad.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `${bad[0].href} answered ${bad[0].status} with ${bad[0].bytes} byte(s). The control `
+      + "is on the page and the recording behind it is not");
+    return;
+  }
+
+  /* Press each one. A control that changes neither the state nor its own words is not
+   * wired to anything, which is how the two lanes shipped. */
+  const pressed = await page.evaluate(async () => {
+    const out = [];
+    for (const p of document.querySelectorAll("[data-player]")) {
+      const b = p.querySelector("[data-play]");
+      const before = (b.querySelector("[data-play-label]")?.textContent || "").trim();
+      b.click();
+      await new Promise((r) => setTimeout(r, 120));
+      out.push({
+        id: p.dataset.player,
+        playing: p.dataset.playing,
+        before,
+        after: (b.querySelector("[data-play-label]")?.textContent || "").trim(),
+      });
+      b.click();
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    return out;
+  });
+
+  await page.close();
+
+  if (thrown.length) {
+    record("the recording is reachable", "FAIL",
+      `the page threw while the recordings were under test: ${thrown[0]}`);
+    return;
+  }
+
+  const dead = pressed.filter((p) => p.playing !== "true" || p.after === p.before);
+  if (dead.length) {
+    record("the recording is reachable", "FAIL",
+      `pressing the control for ${dead[0].id} left the player reading `
+      + `data-playing=${JSON.stringify(dead[0].playing)} and its words unchanged at `
+      + `${JSON.stringify(dead[0].after)}. The control is drawn and wired to nothing`);
+    return;
+  }
+
+  record("the recording is reachable", "PASS",
+    `${state.players.length} call(s) on the page, each with its own control naming what it `
+    + `plays (${state.players.map((p) => JSON.stringify(p.words)).join(", ")}), each `
+    + `answering 200 with ${Math.min(...state.clips.map((c) => c.bytes))} bytes or more, `
+    + `and each moving to playing with its words flipped when pressed. None of them shares `
+    + `its words with the ${state.replays.length} silent replay control(s)`,
+    { calls: state.players.length, clips: state.clips.length });
+}
+
 async function gateReplayControls(browser, url) {
   const page = await browser.newPage();
   /* Short on purpose. The defect this gate exists for needs the duet's bar readable while
@@ -2213,6 +2371,8 @@ async function main() {
     await runGate("the page under its own Content-Security-Policy", () => gateCsp(browser));
     await runGate("the run block", () => gateRunConsole(browser, url));
     await runGate("replay controls", () => gateReplayControls(browser, url));
+    await runGate("the recording is reachable",
+      () => gateRecordingReachable(browser, url));
     await runGate("document pages", () => gateDocs(browser, base, docSlugs));
     await runGate("every link on every page resolves",
       () => gateLinks(browser, base, docSlugs));

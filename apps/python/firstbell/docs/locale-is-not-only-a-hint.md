@@ -1,7 +1,8 @@
 # What `locale` actually does
 
-CALL-E's schema documents `locale` as a **"BCP 47 hint"**. The word hint sets a low
-expectation. Ten real calls say the expectation is wrong, and they also say the failure sits
+CALL-E's schema documents `locale` as a **"BCP 47 locale hint for the conversation"**, on
+the `locale` attribute of `CallTaskRecipientRequest` in `calle/generated/models/`. The word
+hint sets a low expectation. Ten real calls say the expectation is wrong, and they also say the failure sits
 somewhere other than where you would look for it.
 
 Ten, and then eight, and the difference between those two numbers matters enough to state

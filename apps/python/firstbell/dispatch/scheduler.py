@@ -367,8 +367,17 @@ class WaveDispatcher:
                 reason=f"the call was placed and its outcome could not be read back: "
                        f"{redact(failure.why)}",
             )
-        with self._lock:
-            self._in_flight.discard(call_id)
+        # Only a call that finished leaves the in-flight set. `_await_terminal` returns
+        # a synthetic dict at its deadline rather than raising, so this used to discard the
+        # id of a call that was still ringing: `_classify` read `_timed_out` and correctly
+        # said undetermined, while `report.not_recallable` came back empty because the id
+        # had already gone. A reader was told the call did not reach a terminal status in
+        # time and given nothing to reconcile against a bill. That list is exactly the
+        # channel for a call this run placed and cannot account for, and this is the most
+        # certain case of it: the call is not merely unreadable, it is still live.
+        if not final.get("_timed_out"):
+            with self._lock:
+                self._in_flight.discard(call_id)
 
         try:
             return self._classify(item, final)
@@ -391,8 +400,28 @@ class WaveDispatcher:
 
         key = self._idempotency_key(item)
         last: str = ""
+        # Whether a request has already gone out for this item and nothing came back.
+        #
+        # This is the one bit of state that has to cross the loop boundary. The clause
+        # below knows a timeout or an undecodable body means a request may have arrived and
+        # started a telephone ringing, and it used to know it only until the loop
+        # re-entered: a cancel landing during the backoff raised `Cancelled`, and `run()`
+        # printed "cancelled before dispatch" about a request that had been dispatched.
+        #
+        # It is not an exotic path. A sibling item taking a code in FATAL_ERRORS, of which
+        # `insufficient_balance` is the likeliest on a real wave, cancels the run, and the
+        # items sleeping in a create backoff are exactly the ones the platform was already
+        # slow to answer.
+        unanswered = False
         for attempt in range(1, self._retry.max_attempts + 1):
             if self._cancel.is_set() or self._fatal:
+                if unanswered:
+                    return ItemResult(
+                        item=item, resolution=Resolution.UNDETERMINED,
+                        reason="the run was cancelled while a request that may already "
+                               f"have been placed was waiting to be retried, under "
+                               f"idempotency key {key!r}, so retrying it later cannot "
+                               f"call twice: " + last)
                 raise Cancelled
             try:
                 return self._client.calls.create(
@@ -424,7 +453,8 @@ class WaveDispatcher:
                     return ItemResult(item=item, resolution=Resolution.FAILED,
                                       failure_code=err.code, reason=last)
                 self._sleep(self._retry.delay_for(attempt))
-            except (CalleTimeoutError, CalleConnectionError, json.JSONDecodeError) as err:
+            except (CalleTimeoutError, CalleConnectionError,
+                    json.JSONDecodeError, UnicodeDecodeError) as err:
                 # A timeout is not an answer. These two subclass Exception rather than
                 # CalleAPIError, so they used to walk past the branch above into the
                 # dispatcher's catch-all and be recorded as FAILED, which reads as "nobody
@@ -441,7 +471,19 @@ class WaveDispatcher:
                 # a retry exists to absorb. The status code is not recoverable from this
                 # exception, so it is treated the same as a timeout rather than guessed at.
                 #
-                # `_api_responded` is deliberately not set: nothing answered.
+                # UnicodeDecodeError is the same defect one layer lower, and this clause
+                # named only the JSON one until a reader pointed at it. `response.json()`
+                # is `json.loads(self.content)` over raw bytes, so a body that is not valid
+                # UTF-8, which is what a proxy in another locale can return, fails before
+                # any JSON parsing happens. Both are ValueError subclasses and catching
+                # that would be shorter; it would also catch a mistake in the request this
+                # code builds and report it as a call that may have been placed, which is
+                # the one sentence that must never be printed without cause.
+                #
+                # `_api_responded` is deliberately not set: nothing answered. And this
+                # is where `unanswered` is raised, one line from the comment explaining why
+                # it matters, so the two cannot drift apart.
+                unanswered = True
                 last = f"{type(err).__name__}: {redact(str(err))}"
                 if attempt == self._retry.max_attempts:
                     return ItemResult(

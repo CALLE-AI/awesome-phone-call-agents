@@ -4,9 +4,13 @@ Why re-validate at all, when CALL-E validates `result_schema` server side and re
 null `structured_result` when it cannot fill it?
 
 Because the result can reach us over a channel we cannot authenticate. CALL-E webhooks are
-currently unsigned: the SDK's `verify` and `unwrap` are both deprecated and their
-docstrings say "current CALL-E webhooks are unsigned ... must not be used to parse current
-deliveries." So anything arriving by webhook is an untrusted hint. We re-fetch over the
+currently unsigned, and the SDK says so itself: `unwrap`'s docstring reads "current CALL-E
+webhooks are unsigned ... must not be used to parse current deliveries"
+(`calle/webhooks.py:23-24`), and `verify`, deprecated alongside it, says CALL-E "no longer
+sends timestamp or signature headers" (`calle/webhooks.py:13-15`). One quotation, two
+methods, and the attribution matters: only one of them forbids the use, and the other offers
+itself to anyone running their own signing layer. So anything arriving by webhook is an
+untrusted hint. We re-fetch over the
 authenticated API, and we still check the shape before acting on it, because a result that
 drives a real-world decision should not be trusted on the strength of one hop.
 
@@ -21,7 +25,8 @@ from __future__ import annotations
 
 from typing import Any
 
-_SUPPORTED_KEYWORDS = {"type", "required", "properties", "enum", "description"}
+_SUPPORTED_KEYWORDS = {"type", "required", "properties", "enum", "description",
+                       "additionalProperties"}
 
 _TYPES: dict[str, type | tuple[type, ...]] = {
     "string": str,
@@ -48,6 +53,20 @@ def assert_supported(schema: dict[str, Any]) -> None:
         )
     if schema.get("type") not in (None, "object"):
         raise UnsupportedSchema("Top-level result_schema must be an object schema.")
+    # `false` only, and the platform is the reason for both halves.
+    #
+    # `CreateCallRequest.result_schema` lists `additionalProperties: false` among its
+    # supported features and `additionalProperties: true` among the unsupported ones, and
+    # says hard validation comes from `type`, `required`, `enum` and `additionalProperties`.
+    # This checker used to refuse the keyword outright, which made the strictest control
+    # CALL-E offers unreachable from here: the shipped schema could not ask the platform to
+    # reject an answer carrying a field nobody declared. A platform engineer reading this
+    # file found it and quoted their own documentation back.
+    if "additionalProperties" in schema and schema["additionalProperties"] is not False:
+        raise UnsupportedSchema(
+            "additionalProperties is supported here only as false, which is the only value "
+            "CALL-E supports; true is on their unsupported list and anything else is not a "
+            "rule either of us implements.")
     for name, prop in (schema.get("properties") or {}).items():
         unknown = set(prop) - _SUPPORTED_KEYWORDS
         if unknown:
@@ -96,6 +115,17 @@ def problems(value: Any, schema: dict[str, Any]) -> list[str]:
         return [f"expected an object, got {type(value).__name__}"]
 
     found: list[str] = []
+    # The same rule locally that the schema asks CALL-E to apply. Passing a keyword upstream
+    # and ignoring it here is the exact failure this module was written against: a validator
+    # that walks past the rule it does not implement is worse than no validator. CALL-E
+    # documents object schemas as strict by default and returns null rather than an
+    # off-schema answer, so this fires on a result that reached us some other way, which is
+    # the case the module exists for.
+    if schema.get("additionalProperties") is False:
+        declared = set(schema.get("properties") or {})
+        for key in sorted(set(value) - declared):
+            found.append(f"field {key!r} is not declared in the schema")
+
     for key in schema.get("required") or []:
         if key not in value:
             found.append(f"missing required field {key!r}")

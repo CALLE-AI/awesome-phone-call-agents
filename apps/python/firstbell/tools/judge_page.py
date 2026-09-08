@@ -249,61 +249,28 @@ def cue_for(call: dict, marker: str) -> int:
 
 # ---- fragments --------------------------------------------------------------------------
 
-def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
-    """One player, switching between the calls in `ids`.
+def hear_button(play_words: str, pause_words: str) -> str:
+    """The control that starts a recording, wherever a recording is on the page.
 
-    The result block renders filled at first paint and only dims during playback. Starting it
-    empty would hide committed evidence behind an interaction, and would show blank rows to
-    anyone with JavaScript off.
+    One function because there are three of these and they were not the same. The hero had
+    an unlabelled circle whose only name was an aria-label, and the two duet lanes had
+    nothing at all, so the English and Tamil calls that act 02 is built to compare could not
+    be heard in any build. A reader looking for the sound found the button that said "Play
+    the call again", which replays the transcript in silence.
+
+    The words are arguments and they travel in the markup, which is the rule the replay
+    button beside it already follows: `announce` in player.js reads them back out of the
+    element when the state flips, so the visible label and the accessible name are the same
+    string and neither can be edited without the other moving.
     """
-    first = data["calls"][ids[0]]
-    out = [f'<div class=player data-player="{esc(",".join(ids))}" data-cue="{cue}" '
-           f'data-playing=false>']
-
-    out.append('<div class=transport>')
-    if has_audio:
-        out.append(
-            '<button class=play data-play type=button aria-label="Play this call">'
-            '<svg class=i-play viewBox="0 0 12 14" aria-hidden=true><path d="M0 0l12 7-12 7z"/></svg>'
+    return (f'<button class=hear data-play type=button '
+            f'data-words-play="{esc(play_words)}" data-words-pause="{esc(pause_words)}" '
+            f'aria-label="{esc(play_words)}" aria-pressed=false>'
+            '<svg class=i-play viewBox="0 0 12 14" aria-hidden=true>'
+            '<path d="M0 0l12 7-12 7z"/></svg>'
             '<svg class=i-pause viewBox="0 0 12 14" aria-hidden=true>'
-            '<path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg></button>')
-        out.append(f'<span class=cue>Listen from {cue // 60}:{cue % 60:02d}</span>')
-    else:
-        out.append('<p class="cue no-audio">The recordings are not in this repository, '
-                   'because the contribution checklist asks contributors not to commit call '
-                   'recordings. Every word below is the transcript CALL-E returned, and the '
-                   'shape is measured from the audio.</p>')
-    out.append('<span class=switch role=group aria-label="Language">')
-    for rid in ids:
-        c = data["calls"][rid]
-        out.append(f'<button type=button data-switch="{esc(rid)}" aria-pressed=false>'
-                   f'{esc(c["locale"])}</button>')
-    out.append('</span></div>')
-
-    out.append('<div class=stage>')
-    # Blank and silent until a script can stand behind it. Clicking the waveform seeks,
-    # and seeking moves the transcript highlight with or without a recording, so it is a
-    # control and a keyboard has to reach it. All of that is player.js. Served on its own
-    # it draws nothing and does nothing, so announcing it as a slider here would be telling
-    # a reader without JavaScript that arrow keys work when they do not. CallPlayer.upgrade
-    # adds the role, the tab stop and the value, in the same breath as the key handler.
-    out.append('<canvas data-waveform aria-hidden=true></canvas>')
-    out.append(turns_markup(call))
-    out.append('</div>')
-
-    out.append('<div class=result data-result data-state=in>')
-    out.append('<h3>What CALL-E returned</h3>')
-    out.append('<p class=note-free data-note>' + esc(first.get("note") or "") + '</p>')
-    out.append('<dl>')
-    for field in data["fieldOrder"]:
-        out.append(f'<dt>{esc(FIELD_LABEL[field])}</dt>'
-                   f'<dd data-field="{esc(field)}">{esc(first["structured"].get(field, "·"))}</dd>')
-    out.append('</dl>')
-    conf = first.get("confidence")
-    if conf is not None:
-        out.append(f'<p class=conf>completion confidence <b data-conf>{esc(conf)}</b></p>')
-    out.append('</div></div>')
-    return "".join(out)
+            '<path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg>'
+            f'<span data-play-label>{esc(play_words)}</span></button>')
 
 
 def commit_turns(call: dict, fields: list[str]) -> list[int]:
@@ -453,6 +420,33 @@ def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> 
     return "".join(out)
 
 
+# The browser caps the wait between one turn and the next at this, in player.js, and
+# `tests/test_claims.py` holds the two copies to the same number. It is not a silence
+# threshold: it applies to the interval however it was spent, which is why the caption below
+# says what it does rather than calling it a trimmed silence.
+SCENE_GAP_MAX = 1.5
+
+
+def scene_seconds(call: dict) -> float:
+    """How long the scene takes to show a call, by the rule the browser uses.
+
+    `CallPlayer.buildSchedule` walks the turn offsets and the call's length, drops a mark
+    that does not move forward, and adds the interval to the previous mark capped at
+    SCENE_GAP_MAX. A minute of call with fourteen turns comes out around nineteen seconds,
+    which is what a reader watching the first screen actually sees.
+    """
+    marks = [t["offset_seconds"] for t in call["turns"]] + [call["seconds"]]
+    total = 0.0
+    last: float | None = None
+    for m in marks:
+        if last is not None:
+            if m <= last:
+                continue
+            total += min(m - last, SCENE_GAP_MAX)
+        last = m
+    return total
+
+
 def scene_call(call: dict, has_audio: bool) -> str:
     """The call itself, drawn inside the register row that is waiting on it.
 
@@ -466,18 +460,14 @@ def scene_call(call: dict, has_audio: bool) -> str:
     out.append('<canvas data-waveform aria-hidden=true></canvas>')
     out.append('<div class=scene-bar>')
     if has_audio:
-        out.append(
-            '<button class=play data-play type=button aria-label="Play this call">'
-            '<svg class=i-play viewBox="0 0 12 14" aria-hidden=true><path d="M0 0l12 7-12 7z"/></svg>'
-            '<svg class=i-pause viewBox="0 0 12 14" aria-hidden=true>'
-            '<path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg></button>')
+        out.append(hear_button("Hear the recording", "Pause the recording"))
     out.append(f'<span class=scene-clock data-clock>0:00 / {mins}:{secs:02d}</span>')
     # Served hidden, and CallPlayer.upgrade shows it, for the same reason the canvas is
     # served without its slider role: with no script there is no scene to play again, and a
     # button that answers nothing is the page making a promise it cannot keep. It is in the
     # markup rather than built in JavaScript so that its words live with the rest of them.
     out.append('<button class=replay type=button data-replay hidden>'
-               'Play the call again</button>')
+               'Run the transcript again</button>')
     out.append('</div>')
     out.append('<ol class=turns data-turns aria-live=off tabindex=0 '
         'aria-label="What was said on the call, turn by turn. Scrolls, so it takes '
@@ -494,10 +484,18 @@ def scene_call(call: dict, has_audio: bool) -> str:
     # Two claims the scene would otherwise make silently. Both are cheaper to print than to
     # be caught on: a judge who works out either of them for themselves stops believing the
     # rest of the page, and this one is built entirely out of things that can be checked.
-    out.append(f'<p class=scene-note>The {mins}:{secs:02d} recording, played at its own '
-               'speed with silences over 1.5 seconds shortened; the timestamps are CALL-E’s. '
-               'Each field is marked at the answer it came from. CALL-E returned all three '
-               'together when the call ended.</p>')
+    # Two lengths, because there are two things here and the caption used to describe
+    # neither. The recording is 59.54 seconds and it plays whole at its own speed. The scene
+    # is about nineteen, because the wait between one turn and the next is capped, and that
+    # cap does not know whether the wait was silence or speech. A reader timed the scene at
+    # roughly three times speed against a caption promising its own speed, and was right to.
+    scene = scene_seconds(call)
+    out.append(f'<p class=scene-note>The recording runs {mins}:{secs:02d} and plays whole '
+               'at its own speed. The scene above it is shorter, about '
+               f'{scene:.0f} seconds, because the wait between one turn and the next is '
+               f'capped at {SCENE_GAP_MAX} seconds however it was spent; the timestamps are '
+               'CALL-E’s own. Each field is marked at the answer it came from. CALL-E '
+               'returned all three together when the call ended.</p>')
     out.append('</div>')
     return "".join(out)
 
@@ -524,7 +522,7 @@ def turns_markup(call: dict) -> str:
     return "".join(out)
 
 
-def lane_markup(data: dict, cid: str, label: str) -> str:
+def lane_markup(data: dict, cid: str, label: str, has_audio: bool) -> str:
     """One side of the duet: a call, its clock, its three fields and its transcript.
 
     Everything is served at the value CALL-E returned, exactly as the register is, so a
@@ -539,7 +537,11 @@ def lane_markup(data: dict, cid: str, label: str) -> str:
            f'data-commits="{esc(",".join(str(c) for c in commits))}">']
     out.append(f'<div class=lane-head><b class=lane-lang>{esc(label)}</b>'
                f'<span class=lane-id>{esc(cid)}</span>'
-               f'<span class=scene-clock data-clock>0:00 / {mins}:{secs:02d}</span></div>')
+               # Named by language, because the whole point of this act is that these are
+               # two different conversations and a reader has to be able to choose one.
+               + (hear_button(f"Hear the {label} call", f"Pause the {label} call")
+                  if has_audio else "")
+               + f'<span class=scene-clock data-clock>0:00 / {mins}:{secs:02d}</span></div>')
     out.append('<canvas data-waveform aria-hidden=true></canvas>')
     out.append('<div class=lane-fields data-result data-live=off>')
     for f in fields:
@@ -569,18 +571,20 @@ def duet_markup(data: dict, en: str, ta: str, has_audio: bool) -> str:
     """
     en_c, ta_c = data["calls"][en], data["calls"][ta]
     out = ['<div class=duet data-group=duet>']
-    out.append(lane_markup(data, en, "English"))
-    out.append(lane_markup(data, ta, "Tamil"))
+    out.append(lane_markup(data, en, "English", has_audio))
+    out.append(lane_markup(data, ta, "Tamil", has_audio))
     out.append('</div>')
     out.append('<div class=duet-bar>')
     # Served hidden for the same reason the hero's replay is: with no script there is no
     # scene to play again, and a button that answers nothing is a promise the page cannot
     # keep. app.js shows it once both lanes are real players.
     out.append('<button class=replay type=button data-replay-group=duet hidden>'
-               'Play both again</button>')
+               'Run both again</button>')
     out.append(f'<span class=duet-len>{en_c["seconds"]:.0f}s and '
-               f'{ta_c["seconds"]:.0f}s of real recording, each played at its own speed '
-               'with silences over 1.5 seconds shortened</span>')
+               f'{ta_c["seconds"]:.0f}s of real recording, each playing whole at its own '
+               f'speed; the two scenes take about {scene_seconds(en_c):.0f}s and '
+               f'{scene_seconds(ta_c):.0f}s, because the wait between turns is capped at '
+               f'{SCENE_GAP_MAX} seconds</span>')
     out.append('</div>')
     return "".join(out)
 
@@ -1863,8 +1867,9 @@ def build(has_audio: bool, repo_url: str | None = None,
     add('<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">')
     add('<title>firstbell: it calls the parents who never replied</title>')
     add('<meta name=description content="Software that telephones the families of absent '
-        'schoolchildren in the language that family speaks, and refuses to close a case it '
-        'could not get an answer to. Every claim carries the thing that checks it.">')
+        'schoolchildren and refuses to close a case it could not get an answer to. It calls '
+        'in whichever language CALL-E offers for that country, which in the United States '
+        'today means English. Every claim carries the thing that checks it.">')
     # Without this the browser asks for /favicon.ico on every load and the server answers
     # 404. An empty data URI answers it with nothing, from the document, costing no request.
     add('<link rel=icon href="data:,">')
@@ -1926,9 +1931,15 @@ def build(has_audio: bool, repo_url: str | None = None,
     body = [
         '<div class=masthead>',
         '<p class=wordmark>firstbell</p>',
+        # The first sentence a buyer reads, and it used to promise language access.
+        # A director of student services put it plainly: taken to a board, "in the language
+        # that family speaks" is a claim a trustee can disprove by reading one page of
+        # CALL-E's region table, and the meeting ends there. So the claim and its limit
+        # arrive together, in that order, on the first screen rather than in act 07.
         '<p class=standfirst>Phones the families whose absence notification went '
-        'unanswered, in the language that family speaks, and brings back a structured '
-        'reason a school office can act on.</p>',
+        'unanswered and brings back a structured reason a school office can act on. It '
+        'calls in whichever language CALL-E offers for that country, which in the United '
+        'States today means English.</p>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',

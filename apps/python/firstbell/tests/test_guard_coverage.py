@@ -455,3 +455,89 @@ def test_a_result_that_is_not_an_object_is_a_problem_not_a_crash(value):
     """
     found = problems(value, SCHEMA)
     assert found and "expected an object" in found[0]
+def test_a_call_still_running_at_the_deadline_keeps_its_id_in_the_report():
+    """The one list that exists for a call this run placed and cannot account for.
+
+    `_await_terminal` returns a synthetic dict at its deadline rather than raising, so
+    `_handle` discarded the id from `_in_flight` and only then classified it. The
+    resolution was right, undetermined, and `report.not_recallable` came back empty, so a
+    reader was told the call had not finished and given nothing to reconcile against a
+    bill. This is the most certain case that list has: the call is not merely unreadable,
+    it is still live.
+    """
+    reads = {"n": 0}
+
+    class calls:
+        @staticmethod
+        def create(**kwargs):
+            return {"id": "call_live", "status": "queued"}
+
+        @staticmethod
+        def get(call_id):
+            reads["n"] += 1
+            # Never terminal, which is what a call that is still ringing looks like.
+            return {"id": call_id, "status": "in_progress", "recipients": [{}]}
+
+    class Client:
+        pass
+
+    Client.calls = calls
+    run = dispatcher(client=Client(), call_timeout_seconds=0.0)
+    report = run.run([WorkItem(id="S-7", phones=(IN_A,), consented=True)])
+    result = report.results[0]
+
+    assert result.resolution is Resolution.UNDETERMINED, (
+        f"a call that never finished came back {result.resolution.value}")
+    assert result.call_id == "call_live"
+    assert report.not_recallable == ["call_live"], (
+        f"the call is still live and not_recallable is {report.not_recallable}. Its id is "
+        f"the only thing a reader can take to a bill")
+def test_a_cancel_during_a_create_backoff_does_not_say_nothing_was_dispatched():
+    """The reason string is affirmative, so being wrong in it is worse than being silent.
+
+    `run()` turns `Cancelled` into SKIPPED with "cancelled before dispatch". The retry loop
+    raised it at the top of every attempt, including the attempt after a request had gone
+    out and nothing had come back, so a POST that may have been accepted and billed was
+    reported as never sent. A platform engineer reading the loop found it and named the
+    likeliest trigger: a sibling item taking `insufficient_balance`, which cancels the run
+    while every slow item is mid-backoff.
+
+    The cancel arrives through the `sleep` seam, which is already a constructor parameter.
+    That makes this a unit test rather than a race: the cancel lands at exactly the instant
+    the defect needs and at no other.
+    """
+    from calle import CalleTimeoutError
+
+    sent = {"n": 0}
+    holder = {}
+
+    class calls:
+        @staticmethod
+        def create(**kwargs):
+            sent["n"] += 1
+            raise CalleTimeoutError("CALL-E API request timed out.")
+
+        @staticmethod
+        def get(call_id):
+            raise AssertionError("creation never succeeded; nothing to poll")
+
+    class Client:
+        pass
+
+    Client.calls = calls
+    run = dispatcher(client=Client(), retry=RetryPolicy(max_attempts=3),
+                     sleep=lambda _s: holder["run"].cancel())
+    holder["run"] = run
+    report = run.run([WorkItem(id="S-8", phones=(IN_A,), consented=True)])
+    result = report.results[0]
+
+    assert sent["n"] == 1, f"the fixture sent {sent['n']} request(s), not one"
+    assert result.resolution is not Resolution.SKIPPED, (
+        "a request went out and was never answered, and the run reported "
+        f"{result.resolution.value} with the reason {result.reason!r}, which states that "
+        "nothing was dispatched")
+    assert result.resolution is Resolution.UNDETERMINED, result.resolution
+    assert "may already have been placed" in result.reason, result.reason
+    assert "S-8" in result.reason, (
+        "the reason has to carry the idempotency key, because a request with no call id "
+        "cannot enter not_recallable and the key is the only handle for reconciling it")

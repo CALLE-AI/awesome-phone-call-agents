@@ -17,7 +17,8 @@ was not produced from the thing it describes goes stale the moment either one ch
 
 ```bash
 python tools/make_path_figure.py                   # writes the-path-of-one-absence.svg
-python tools/judge_page.py out                     # builds out/, no audio
+python tools/judge_page.py out --receipts ../receipts              # the page
+python tools/judge_page.py out --receipts ../receipts --audio-dir ../audio   # and the calls
 cd tools/gates && npm install                      # once
 node run.mjs                                        # writes tools/gates/shots/*.png
 node capture-stills.mjs                             # writes the three proof-*.png
@@ -103,10 +104,10 @@ well as the entry README.
 
 - `proof-call-site.png`: the only occurrence of `calls.create` in this codebase is
   `self._client.calls.create(` at
-  `dispatch/scheduler.py:398`, inside `def _create_with_retries` at
-  `dispatch/scheduler.py:389`.
+  `dispatch/scheduler.py:427`, inside `def _create_with_retries` at
+  `dispatch/scheduler.py:398`.
 - `proof-classification.png`: `def _classify` at
-  `dispatch/scheduler.py:513` returns exactly seven times and the still labels every one of them,
+  `dispatch/scheduler.py:555` returns exactly seven times and the still labels every one of them,
   including `ItemResult(**base, resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:549` and `resolution=Resolution.RESOLVED, structured_result=result,` at
-  `dispatch/scheduler.py:585`.
+  `dispatch/scheduler.py:591` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:627`.

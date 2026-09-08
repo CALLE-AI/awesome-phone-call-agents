@@ -43,15 +43,19 @@ and `max_turns` on the task as a backstop the agent cannot talk its way past. Th
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
 Anchor: `README.md:739-747` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:1129-1133` ("Platform-side call termination").
+limitation 3 at `README.md:1143-1147` ("Platform-side call termination").
 
 ## 2. Webhook deliveries are unsigned, and your SDK is where we found out
 
 **Severity: second only to finding 1, and the only one here that is a security defect
-rather than a gap.** `verify` and `unwrap` are both deprecated, and their own docstrings
-say "current CALL-E webhooks are unsigned" and that they must not be used to parse current
-deliveries. So a receiver has no way to tell a delivery from your platform apart from one
-posted by anybody who has learned the URL.
+rather than a gap.** `verify` and `unwrap` are both deprecated. `unwrap`'s docstring says
+"current CALL-E webhooks are unsigned" and that it "must not be used to parse current
+deliveries" (`calle/webhooks.py:23-24`); `verify`'s says CALL-E "no longer sends timestamp or
+signature headers" and that the method "remains available for integrations that use their own
+compatible signing layer" (`calle/webhooks.py:13-15`). So a receiver has no way to tell a
+delivery from your platform apart from one posted by anybody who has learned the URL, and the
+one method whose docstring leaves a door open leaves it open onto a signing layer you no
+longer take part in.
 
 For this application that is not abstract. A forged `call.completed` carrying a fabricated
 `structured_result` closes a record about a child nobody has heard from, and it closes it
@@ -169,7 +173,9 @@ state is reachable only by your side, so integrators stop looking for the endpoi
 
 ## 8. `locale` is undersold in your own schema
 
-Your schema calls `locale` a "BCP 47 hint". We ran eight matched-pair live calls, the same four
+Your schema calls `locale` a "BCP 47 locale hint for the conversation", on the `locale`
+attribute of `CallTaskRecipientRequest` in `calle/generated/models/`. The word hint sets a
+low expectation. We ran eight matched-pair live calls, the same four
 scenarios in en-IN and ta-IN, and extraction was faithful to the transcript twelve times out of
 twelve in both languages.
 
@@ -284,9 +290,10 @@ it completely.
 
 While we are on that surface: there is no published price per call anywhere in the
 documentation, so we priced our own account instead. Thirteen billed events at $0.05 each,
-$0.65 over the month to 7 September, every call between 35 seconds and 1 minute 50. All of
-them under two minutes, which means we cannot tell a flat price per call from a per-minute
-price rounded up to a two-minute minimum, and that distinction decides whether a district
+$0.65 over the month to 7 September across thirteen billed events. The panel showed us ten
+call rows and every duration on them fell between 35 seconds and 1 minute 50, all under two
+minutes, which means we cannot tell a flat price per call from a per-minute price rounded up
+to a two-minute minimum, and that distinction decides whether a district
 can afford a wave of long calls. `evidence/observed-price.json` records what we saw and the
 three things it cannot settle. Publishing the rate and the rounding rule would let anybody
 building on you write a number down instead of a range.
@@ -330,7 +337,8 @@ nothing better to use).
 
 ## 14. `_request` decodes JSON before it knows there is any, so a proxy page raises the wrong error
 
-**Severity: small, two lines, and it turns your outage into our crash.** `calle/calls.py`:
+**Severity: small, two lines, and it turns your outage into our crash.** In both
+`calle/calls.py` and `calle/goals.py:133-134`, which are the same two lines twice:
 
 ```python
 if response.status_code >= 400:
@@ -351,7 +359,8 @@ any host that returns an HTML error page.
 
 **What we would use:** decode inside a `try`, and on failure raise `CalleConnectionError`
 with the status code and the first part of the body. The status code is the useful half and
-it is already in hand.
+it is already in hand. Fix both copies: a maintainer who patches the file we cite and ships
+is still shipping this on every goal run, which is why we say where the second one is.
 
 ## 15. A timeout waiting for a call and a timeout on the socket are the same exception class
 
@@ -384,8 +393,8 @@ signature change.
 
 ## 16. `create_and_wait` raises `KeyError` on a response body without an id
 
-**Severity: smallest of these, and it is the one that loses a placed call.**
-`calle/calls.py`:
+**Severity: smallest of these, and it is the one that loses a placed call.** In
+`calle/calls.py`, and again at `calle/goals.py:120` as `str(run["id"])`:
 
 ```python
 call = self.create(**kwargs)
@@ -401,9 +410,11 @@ poll, nothing to reconcile against billing, and nothing to tell an office about 
 that may be ringing.
 
 We hit the same shape on our own create path and defend against it at
-`dispatch/scheduler.py` with a comment that reads "This used to be `call["id"]`": we treat a
-missing id as a call that may have been placed and report it as not recallable, rather than
-as a call that failed.
+`dispatch/scheduler.py` with a comment that reads "This used to be `call["id"]`": a missing
+id gives the third resolution, undetermined, with a reason saying the call was created and
+its outcome could not be read back, rather than failed. It cannot enter the run's
+not-recallable list, because that list is keyed on call ids and this response carried none,
+which is its own argument for returning one.
 
 **What we would use:** raise `CalleConnectionError` naming the missing field, so the
 exception says the response was unusable rather than dying on a dictionary lookup. Or

@@ -485,31 +485,29 @@ code { font-size: 0.88em; }
 .reg-row[data-live="on"] { background: var(--live); }
 
 /* ---- the call player ----------------------------------------------------------------- */
-.player { display: grid; gap: 1.5rem; }
-@media (min-width: 62rem) {
-  .player { grid-template-columns: minmax(0, 1fr) 19rem; }
-  .player > .transport { grid-column: 1 / -1; }
-}
-
-.transport { display: flex; align-items: center; gap: 1rem; }
-
-.play {
+/* The control that starts a recording. It is a pill with words in it rather than the
+   3.25rem circle that used to sit here, because the circle's only name was an aria-label:
+   a reader looking for the sound read the one control that had words, which says "again"
+   and replays the transcript in silence. It matches `.replay` on purpose. The two sit next
+   to each other and the difference between them is what they do, not how they look. */
+.hear {
+  display: inline-flex; align-items: center; gap: 0.45rem;
   flex: none;
-  width: 3.25rem; height: 3.25rem;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: inherit;
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: 2px;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  display: grid; place-items: center;
-  transition: border-color var(--dur-micro) var(--ease-out),
+  transition: color var(--dur-micro) var(--ease-both),
+              border-color var(--dur-micro) var(--ease-both),
               transform var(--dur-micro) var(--ease-out);
 }
-.play:hover { border-color: currentColor; }
-.play:active { transform: scale(0.96); }
-.play svg { width: 1.05rem; height: 1.05rem; fill: currentColor; }
-[data-playing="true"] .play .i-play,
-[data-playing="false"] .play .i-pause { display: none; }
+.hear:hover { color: var(--ink); border-color: currentColor; }
+.hear:active { transform: scale(0.97); }
+.hear svg { width: 0.6rem; height: 0.7rem; fill: currentColor; flex: none; }
+[data-playing="true"] .hear .i-play,
+[data-playing="false"] .hear .i-pause { display: none; }
 
 canvas[data-waveform] {
   display: block; width: 100%; height: 4.5rem; cursor: pointer;

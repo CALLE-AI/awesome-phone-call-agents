@@ -2,9 +2,10 @@
 
 **[Evidence page](https://firstbell-evidence.vercel.app)** &middot; every real call, every broken rule, and the offline run. Built by `tools/judge_page.py` from the call recordings, which are held outside this repository: see [`evidence/README.md`](evidence/README.md) for why.
 
-Phones the families whose absence notification went unanswered, in the language that
-family speaks, and brings back a structured reason a school office can act on. Offline by
-default: the demo below dials nobody and needs no CALL-E account.
+Phones the families whose absence notification went unanswered and brings back a
+structured reason a school office can act on. It calls in whichever language CALL-E offers
+for that country, which in the United States today means English. Offline by default: the
+demo below dials nobody and needs no CALL-E account.
 
 ```bash
 pip install -r requirements.txt
@@ -65,17 +66,17 @@ makes, and each one can be checked without an API key.
 Four lines do all of it, and the default offline run reaches three of them. Every anchor
 below is checked by a test, so a line number here cannot quietly rot.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:398`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:427`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:474`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:516`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:390`, rather than as a string match on a message.
+  `dispatch/scheduler.py:399`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
   `firstbell/cli.py:374`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:403`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:432`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -975,21 +976,35 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 612 tests collected
+python -m pytest tests/ -q          # 618 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**612 is the number collected, and two different pairs add up to it.** Some of these gates
+**618 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **593 passed, 19 skipped**.
-The nineteen name what is missing rather than passing quietly: eight want a built page,
+A clean checkout of this commit into an empty directory reports **598 passed, 20 skipped**.
+The twenty name what is missing rather than passing quietly: nine want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **610 passed, 2 skipped**. Both pairs are measured,
-both add up to 612, and the difference between them is what a reader has on their disk.
+run the gates and the same suite reports **616 passed, 2 skipped**. Both pairs are measured,
+both add up to 618, and the difference between them is what a reader has on their disk.
+
+Building the page is one command, and it takes the recordings separately because they are
+not in this repository:
+
+```bash
+python tools/judge_page.py out --receipts <dir>                      # the page
+python tools/judge_page.py out --receipts <dir> --audio-dir <dir>    # with the recordings
+node tools/gates/run.mjs                                             # then the gates
+```
+
+Without `--audio-dir` the page says so on `<html>`, renders no control that offers a
+recording, and prints the sentence explaining why the audio is absent. That is the build a
+reviewer gets, and it is a complete page: every word of every transcript is in it, and the
+waveform is measured from the audio rather than drawn.
 
 A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
 this entry is about, and `-rs` prints each one so nothing hides behind a dot.
@@ -1128,7 +1143,7 @@ is a thing you can describe well enough to be refused.
 
 3. **Platform-side call termination.** The escape hatch is instructed and not enforced
    because CALL-E exposes no `end_call`, no `max_turns` and no maximum duration. Written up
-   with the other eleven platform findings in
+   with the other fifteen platform findings in
    [`call-e-feedback.md`](call-e-feedback.md); until it is answered a prompt is the only
    lever, and it is not binding.
 

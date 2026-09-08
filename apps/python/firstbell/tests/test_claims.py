@@ -23,6 +23,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 APP = Path(__file__).resolve().parent.parent
 COUNT = re.compile(r"(\d+) tests? collected")
 
@@ -536,16 +538,36 @@ def test_every_surface_states_the_real_number_of_platform_findings():
         "call-e-feedback.md": feedback,
         "README.md": (APP / "README.md").read_text(encoding="utf-8"),
     }
+
+    # Every phrase that counts findings, and the two numbers either of them may be.
+    #
+    # A reader with the platform's SDK open found "the other eleven platform findings" in
+    # the README six lines under a sentence that already said sixteen. This gate had read
+    # every surface for a wrong count and walked past that one twice over: it searched for
+    # `<word> findings` and there is a word in between, and it knew only the total, while
+    # "the other fifteen" is the true way to write that sentence about a file of sixteen.
+    # So it now knows the idiom. Anything after "the other" is one less than the total,
+    # one word may sit between the count and the noun, and no third number is allowed.
+    spoken = "|".join(words[n] for n in sorted(words))
+    phrase = re.compile(
+        rf"(?P<other>the other\s+)?\b(?P<word>{spoken})\b(?:\s+[a-z-]+)?\s+findings",
+        re.I)
+    by_word = {word: n for n, word in words.items()}
+
     for rel, text in surfaces.items():
-        assert re.search(rf"\b{right}\b findings", text, re.I), (
-            f"{rel} does not say '{right} findings' and the file holds {found}"
-        )
-        for other, word in words.items():
-            if other == found:
-                continue
-            assert not re.search(rf"\b{word}\b findings", text, re.I), (
-                f"{rel} still says '{word} findings' somewhere and the file holds {found}"
+        totals = 0
+        for m in phrase.finditer(text):
+            said = by_word[m.group("word").lower()]
+            want = found - 1 if m.group("other") else found
+            assert said == want, (
+                f"{rel} says {m.group(0)!r} and the file holds {found} findings, so that "
+                f"number should be {words[want]}"
             )
+            totals += 0 if m.group("other") else 1
+        assert totals, (
+            f"{rel} never states the total: it does not say '{right} findings' anywhere, "
+            f"and the file holds {found}"
+        )
 
 
 def test_the_readme_states_the_real_number_of_mutations():
@@ -743,7 +765,118 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
 # is the one that hides: under `-q` it prints the same dot a pass does. Both entries below
 # need an artifact that is deliberately not in the repository, so they cannot be made to run
 # on a clean checkout without committing the thing the privacy rules keep out.
+def test_what_the_page_says_about_audio_is_what_the_build_holds():
+    """A build that ships recordings has to say so, and one that says it has none must not.
+
+    `out/audio/` held eight recordings of real calls while `<html>` said
+    `data-audio=absent`, which meant no control was rendered, nothing on the page referenced
+    a single clip, and the strongest artifact this entry owns was unreachable in every build
+    since the flag was added. The cause was a documented command with the flag missing from
+    it. Nothing in eighteen browser gates or six hundred tests could see it, because both
+    halves were internally consistent: the page was a correct no-audio page and the
+    directory was a correct set of recordings.
+
+    The browser gate next door asks whether a control reaches the bytes. This asks the
+    question that cannot be asked from inside the page: whether the two halves agree.
+    """
+    page = APP / "out" / "index.html"
+    if not page.is_file():
+        pytest.skip("no built page; run tools/judge_page.py with --receipts first")
+    markup = page.read_text(encoding="utf-8", errors="replace")
+    clips = sorted((APP / "out" / "audio").glob("*.m4a")) if (APP / "out" / "audio").is_dir() \
+        else []
+    says_present = "data-audio=present" in markup
+
+    if clips and not says_present:
+        raise AssertionError(
+            f"out/audio holds {len(clips)} recording(s) and the page says it has no audio, "
+            f"so nothing on it can reach {clips[0].name}. Rebuild with --audio-dir")
+    if says_present and not clips:
+        raise AssertionError(
+            "the page says its audio is present and out/audio holds no .m4a file, so every "
+            "control on it asks for a recording the build does not have")
+
+    if says_present:
+        # Every call the page draws a player for has to have its own file, because the
+        # player builds the URL out of the id: a missing one is a control that answers 404.
+        ids = {i for group in re.findall(r'data-player="([^"]+)"', markup)
+               for i in group.split(",")}
+        have = {c.stem for c in clips}
+        assert ids, "the page says it has audio and draws no player at all"
+        missing = sorted(ids - have)
+        assert not missing, (
+            f"the page draws a player for {', '.join(missing)} and out/audio holds no "
+            f"recording for it, so its control answers 404")
+def test_every_documented_way_to_build_the_page_still_works():
+    """A command in this repository's own documentation that cannot run.
+
+    `docs/images/README.md` printed `python tools/judge_page.py out` and `--receipts` became
+    mandatory some time after that line was written, so the documented build exits 3 with the
+    trouble text. Nothing noticed, and the consequence was not a wrong sentence: it is that
+    the page was rebuilt for weeks by hand from a half-remembered command, without
+    `--audio-dir`, so eight recordings of real calls sat in `out/audio/` with no control on
+    the page that could reach one.
+
+    Read as text rather than run, because running it needs the receipts. What it asks is
+    whether each documented invocation carries the arguments the tool refuses to work
+    without, which is a question the argument parser can answer for itself.
+    """
+    required = {"--receipts"}
+    documented = []
+    for path in _tracked_paths():
+        if path.suffix != ".md":
+            continue
+        for n, line in enumerate(
+                path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            stripped = line.strip()
+            if not re.match(r"^\$?\s*python[0-9.]*\s+\S*judge_page\.py\b", stripped):
+                continue
+            documented.append((path, n, stripped.split("#")[0].strip()))
+
+    assert documented, (
+        "no documented way to build the page was found at all, which means either this "
+        "test cannot see the documentation or the documentation stopped saying how")
+
+    for path, n, cmd in documented:
+        missing = sorted(flag for flag in required if flag not in cmd)
+        assert not missing, (
+            f"{path.name}:{n} documents `{cmd}` and tools/judge_page.py exits 3 without "
+            f"{', '.join(missing)}. A reader following this line gets the trouble text")
+def test_the_scene_gap_cap_is_the_same_number_in_both_copies_of_the_rule():
+    """One rule, two languages, and a caption that prints it.
+
+    `player.js` caps the wait between turns at GAP_MAX and `judge_page.py` recomputes the
+    same schedule at build time so the caption can say how long the scene takes. Two copies
+    of a constant is a drift waiting to happen, and this one is printed on the first screen:
+    if the browser capped at 2.0 and the caption said 1.5, the page would be describing a
+    scene nobody watched. That is the defect the caption had before, in a smaller way. It
+    read "played at its own speed with silences over 1.5 seconds shortened" while the
+    recording played whole and the scene ran about three times faster than the call.
+    """
+    js = (APP / "tools" / "site" / "player.js").read_text(encoding="utf-8")
+    found = re.search(r"^const GAP_MAX = ([0-9.]+);", js, re.M)
+    assert found, "player.js no longer declares GAP_MAX, so the caption cannot be checked"
+
+    sys.path.insert(0, str(APP / "tools"))
+    import judge_page
+
+    assert float(found.group(1)) == judge_page.SCENE_GAP_MAX, (
+        f"player.js caps the wait between turns at {found.group(1)}s and judge_page.py "
+        f"computes the caption from {judge_page.SCENE_GAP_MAX}s, so the page states a "
+        f"length no reader will see")
+
+    # And the schedule itself, against the rule written out by hand.
+    call = {"seconds": 20.0,
+            "turns": [{"offset_seconds": 0.0}, {"offset_seconds": 1.0},
+                      {"offset_seconds": 9.0}, {"offset_seconds": 9.0},
+                      {"offset_seconds": 12.0}]}
+    # 0 -> 1 is 1.0, 1 -> 9 caps at 1.5, the repeat of 9 is not a segment, 9 -> 12 caps at
+    # 1.5, and 12 -> 20 caps at 1.5.
+    assert judge_page.scene_seconds(call) == 5.5, judge_page.scene_seconds(call)
+
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    "test_what_the_page_says_about_audio_is_what_the_build_holds":
+        "needs a page built by tools/judge_page.py, which needs the call receipts",
     # The mark on any row this software closed while learning nothing, checked against the
     # built page. It needs `out/index.html`, which is built from the receipts and so cannot
     # exist in a clean clone. What is lost while this is quiet is the guarantee that the
@@ -930,6 +1063,38 @@ def test_no_gate_skips_without_saying_so():
     assert not module_level, (
         "these files switch off every test in them from module scope, which no per-test note "
         "can describe: " + ", ".join(sorted(set(module_level)))
+    )
+
+    # A file that can skip has to be able to skip.
+    #
+    # This file reached 1,300 lines without importing pytest, because every gate in it that
+    # cannot always run reported its could-not-measure some other way. The audio gate added
+    # on 8 September calls `pytest.skip` when there is no built page, and in a tree with a
+    # built page that branch never runs, so it raised `NameError: name 'pytest' is not
+    # defined` the first time it was executed, in a worktree of a clean snapshot. A test
+    # that cannot skip fails instead, and the person who would have found it is a reviewer
+    # cloning the repository.
+    #
+    # The check is static because the defect is: a branch that has never run cannot be
+    # caught by running the suite in the one tree where it is unreachable.
+    missing_import = []
+    for path in sorted((APP / "tests").glob("test_*.py")):
+        body = path.read_text(encoding="utf-8")
+        if "pytest." not in body:
+            continue
+        tree = ast.parse(body)
+        imported = any(
+            (isinstance(node, ast.Import)
+             and any(a.name == "pytest" or a.name.startswith("pytest.")
+                     for a in node.names))
+            or (isinstance(node, ast.ImportFrom) and node.module == "pytest")
+            for node in ast.walk(tree))
+        if not imported:
+            missing_import.append(path.name)
+    assert not missing_import, (
+        "these files reach for pytest and never import it, so the branch that does raises "
+        "NameError the first time it runs, which is whenever the artifact it skips for is "
+        "absent: " + ", ".join(missing_import)
     )
 
     undeclared = sorted(set(skipping) - set(GATES_THAT_CANNOT_ALWAYS_RUN))
