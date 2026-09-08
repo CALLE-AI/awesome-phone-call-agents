@@ -208,7 +208,22 @@ for (const root of roots) {
 const sorted = [...rows.values()].sort((a, b) => a.project.localeCompare(b.project));
 const width = Math.max(24, ...sorted.map((r) => r.project.length));
 
-process.stdout.write(`\n${sorted.length} projects carrying call-shaped payloads, ${QUIRKS.length} quirks.\n`);
+// The corpus size is printed by the program that owns it, not quoted from a
+// README. A figure a reader cannot see the tool produce is a figure they have to
+// take on trust, and this tool exists to remove that.
+const corpusSize = (() => {
+  try {
+    const index = JSON.parse(readFileSync(join(import.meta.dirname, "..", "fixtures", "index.json"), "utf8")) as {
+      calls?: unknown[];
+    };
+    return Array.isArray(index.calls) ? index.calls.length : 0;
+  } catch {
+    return 0;
+  }
+})();
+
+process.stdout.write(`\ncorpus: ${corpusSize} real responses, ${QUIRKS.length} behaviours declared as predicates.\n`);
+process.stdout.write(`${sorted.length} projects carry call-shaped payloads to score against them.\n`);
 process.stdout.write(`A dot means the behaviour never appears in that project's payloads.\n\n`);
 
 process.stdout.write(`${"project".padEnd(width)}  n   ${QUIRKS.map((_, i) => String(i + 1).padStart(2)).join(" ")}\n`);
