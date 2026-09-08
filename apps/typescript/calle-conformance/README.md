@@ -3,8 +3,8 @@
 A corpus of real CALL-E API responses, and a checker that tells you which of them
 your code has never been tested against.
 
-Two and a half minute walkthrough, with the captured call it starts from:
-https://youtu.be/EIjuAj0jOxA
+Three minute walkthrough, opening on the captured call it started from:
+https://youtu.be/tAwQ147nacg
 
 ## The call this started with
 
