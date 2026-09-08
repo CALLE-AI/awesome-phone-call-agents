@@ -139,6 +139,40 @@ def load_request(path: Path) -> ChangeRequest:
     return ChangeRequest.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
 
+CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambiguity
+
+
+def verification_code(request: "ChangeRequest", secret: str = "") -> str:
+    """Six-character one-time code for this request.
+
+    Derived from the request as received plus an optional deployment secret,
+    so the same ticket always yields the same code (idempotent re-runs) while
+    a tampered request yields a different one. The code goes in the written
+    change notice sent to the vendor's address on file; the vendor reads it
+    back on the call.
+    """
+    import hashlib
+
+    payload = "|".join(
+        [
+            secret,
+            request.ticket_id,
+            request.vendor_id,
+            request.received_on.isoformat(),
+            request.requested_by_name,
+            request.new_bank_name,
+            request.new_account_last4,
+        ]
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).digest()
+    return "".join(CODE_ALPHABET[b % len(CODE_ALPHABET)] for b in digest[:6])
+
+
+def normalize_code(text: str) -> str:
+    """Upper-case and strip separators, spaces, and hyphens a caller may add."""
+    return re.sub(r"[^A-Z0-9]", "", text.upper())
+
+
 def mask_phone(phone: str) -> str:
     """Keep the country code and last two digits; hide the rest."""
     if len(phone) < 6:

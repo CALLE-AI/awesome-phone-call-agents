@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .models import ChangeRequest, VendorRecord, load_request, load_vendors, mask_phone
+from .models import ChangeRequest, VendorRecord, load_request, load_vendors, mask_phone, verification_code
 from .policy import DEFAULT_MIN_KNOWN_PHONE_AGE_DAYS, evaluate
 from .reconcile import reconcile
 from .render import audit_record, memo
@@ -101,7 +101,14 @@ def cmd_preview(args: argparse.Namespace) -> int:
         out["recipient"] = {"phones": [mask_phone(vendor.known_phone)], "region": vendor.region, "locale": vendor.locale}
         out["metadata"] = build_metadata(request, vendor)
         out["idempotency_key"] = idempotency_key(request)
-        out["secret_free_task"] = (request.new_account_last4 not in out["task"]) and (request.new_bank_name.lower() not in out["task"].lower())
+        out["verification_code_for_written_notice"] = verification_code(request, _code_secret())
+        task_l = out["task"].lower()
+        out["payment_free_task"] = (
+            request.new_account_last4 not in out["task"]
+            and request.new_bank_name.lower() not in task_l
+            and vendor.current_bank_name.lower() not in task_l
+            and "bank" not in task_l.replace("banking, account, or payment information", "")
+        )
     print(json.dumps(out, indent=2))
     return 0 if decision.allowed else 1
 
@@ -194,13 +201,17 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
 
 def _finish(args, request, vendor, call, store: TicketStore, *, approver, mode) -> int:
-    rec = reconcile(request, vendor, call)
-    record = audit_record(request, vendor, rec, call=call, approver=approver, mode=mode)
+    rec = reconcile(request, vendor, call, code_secret=_code_secret())
+    record = audit_record(request, vendor, rec, call=call, approver=approver, mode=mode, code_secret=_code_secret())
     store.save(request.ticket_id, {**(store.load(request.ticket_id) or {}), "call_id": call.get("id"), "status": call.get("status"), "audit": record})
     memo_path = store.root / f"{request.ticket_id}.memo.md"
     memo_path.write_text(memo(record, request, vendor), encoding="utf-8")
     print(json.dumps({"ok": True, "verdict": rec.verdict.value, "memo": str(memo_path), "audit": record}, indent=2))
     return 0 if rec.verdict.releases_change else 3
+
+
+def _code_secret() -> str:
+    return os.environ.get("KNOWN_NUMBER_CODE_SECRET", "")
 
 
 def _client():

@@ -7,16 +7,16 @@
   "score": 0.93,
   "label": "high"
  },
- "summary": "Contact confirmed the change and read back matching details.",
+ "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
  "evidence": [
-  "Contact said: \"Yes, we moved to Meridian Commerce Bank, the account ends in four four seven two.\""
+  "Contact said: \"Yes, we asked for that. The code on the notice is H E 4 N F 5, and yes, the notice is what we asked for.\""
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_bank_name": "Meridian Commerce Bank",
-  "stated_account_last4": "4472",
+  "stated_verification_code": "HE4NF5",
+  "notice_matches_request": "yes",
   "request_channel_confirmed": "yes",
   "alternate_details_offered": false,
   "call_disposition": "spoke_with_contact"
@@ -31,7 +31,7 @@
    "region": "US",
    "status": "completed",
    "structured_result": null,
-   "summary": "Contact confirmed the change and read back matching details.",
+   "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
    "attempts": [
     {
      "id": "att_1",
@@ -39,12 +39,12 @@
      "status": "completed",
      "started_at": "2026-09-05T09:00:05Z",
      "completed_at": "2026-09-05T09:02:40Z",
-     "summary": "Contact confirmed the change and read back matching details.",
+     "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
      "transcript_turns": [
       {
        "offset_seconds": 0,
        "speaker": "bot",
-       "text": "Hello, I am an automated assistant calling on behalf of the accounts payable team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
+       "text": "Hello, I am an automated assistant calling on behalf of the supplier administration team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
       },
       {
        "offset_seconds": 9,

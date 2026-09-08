@@ -13,7 +13,8 @@ def test_preview_is_secret_free_and_offline():
     r = run("preview", "--request", "examples/change_request.json", "--vendors", "examples/vendors.json")
     assert r.returncode == 0, r.stdout + r.stderr
     out = json.loads(r.stdout)
-    assert out["secret_free_task"] is True
+    assert out["payment_free_task"] is True
+    assert len(out["verification_code_for_written_notice"]) == 6
     assert out["recipient"]["phones"] == ["+12*******47"]
 
 

@@ -9,14 +9,14 @@
  },
  "summary": "Contact says no change was requested.",
  "evidence": [
-  "Contact said: \"No. We have not changed anything, we are still with First Harbor.\""
+  "Contact said: \"No. We have not asked to change anything.\""
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "no",
-  "stated_bank_name": "",
-  "stated_account_last4": "",
+  "stated_verification_code": "",
+  "notice_matches_request": "unknown",
   "request_channel_confirmed": "unknown",
   "alternate_details_offered": false,
   "call_disposition": "spoke_with_contact"
@@ -44,7 +44,7 @@
       {
        "offset_seconds": 0,
        "speaker": "bot",
-       "text": "Hello, I am an automated assistant calling on behalf of the accounts payable team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
+       "text": "Hello, I am an automated assistant calling on behalf of the supplier administration team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
       },
       {
        "offset_seconds": 9,
