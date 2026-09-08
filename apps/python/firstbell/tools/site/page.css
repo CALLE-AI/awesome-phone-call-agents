@@ -1782,6 +1782,14 @@ button[data-copy][data-copied]::after {
 }
 @media (max-width: 40rem) {
   .fig-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+
+  /* The first screen's own argument, applied to the device most readers will use. 8vh of
+     head room and 40px under the masthead are laptop numbers: at 390x844 they put the
+     register's waiting row, which is the one object act 00 exists to show, 27px under the
+     fold. A district buyer reading this page on a phone withheld half a point for exactly
+     that. Measured at 390x844, 412x915 and 360x740 after the change. */
+  .act-00 { padding-top: 3vh; padding-bottom: var(--space-5); }
+  .masthead { margin-bottom: var(--space-3); }
 }
 
 /* ---- the queue a school office actually opens -------------------------------------------- */

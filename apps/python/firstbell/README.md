@@ -996,21 +996,21 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 619 tests collected
+python -m pytest tests/ -q          # 620 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**619 is the number collected, and two different pairs add up to it.** Some of these gates
+**620 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **599 passed, 20 skipped**.
-The twenty name what is missing rather than passing quietly: nine want a built page,
+A clean checkout of this commit into an empty directory reports **599 passed, 21 skipped**.
+The twenty-one name what is missing rather than passing quietly: ten want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **617 passed, 2 skipped**. Both pairs are measured,
-both add up to 619, and the difference between them is what a reader has on their disk.
+run the gates and the same suite reports **618 passed, 2 skipped**. Both pairs are measured,
+both add up to 620, and the difference between them is what a reader has on their disk.
 
 Building the page is one command, and it takes the recordings separately because they are
 not in this repository:

@@ -813,12 +813,55 @@ def repo_link_markup(repo_url: str | None) -> str:
     the branch is not pushed, and a link to a repository that does not exist yet is worse
     than no link, so the URL is a build input rather than a constant. Rebuild with
     `--repo-url` once there is something to point at.
+
+    Printing nothing was the wrong conclusion from that, and a district buyer found it by
+    doing what act 08 asks: they took the commands, went looking for the code, and found
+    that the word GitHub appears nowhere on the page. A judge who opens the deployed link
+    first, which is what the submission form points at, had no route to anything this page
+    tells them to run. Where the source lives is a fact today even when the URL is not, so
+    the fact goes out and the link replaces it on the next build.
     """
     if not repo_url:
+        # Nothing here, and the fact in act 08 instead. See `where_it_lives`: these two
+        # sentences in the masthead cost 255 vertical pixels on a 390px phone and put the
+        # call itself under the fold, which is the other half of the same buyer's report.
         return ""
     safe = html.escape(repo_url, quote=True)
     return (f'<p class=source-link><a href="{safe}" rel="noopener">'
             f'Source, tests and receipts on GitHub</a></p>')
+
+
+def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
+    """What has no link yet, said where a reader goes looking for it.
+
+    A district buyer took the two commands act 08 gives, went to fetch the code, and found
+    that the words GitHub, film and video appeared nowhere in 250KB of markup. Both absences
+    were deliberate, on the rule that a link to an unpushed branch or an unpublished video is
+    worse than no link. Saying nothing at all was the wrong conclusion from a true rule: on a
+    page judged in part on its demo, silence cannot be told apart from having no demo, and a
+    judge who opens the deployed link first had no route to anything this page told them to
+    run.
+
+    So the fact goes out without an anchor, in the act that asks for it, and each sentence
+    disappears the moment its URL exists. Nothing here is clickable, so nothing here can be
+    clicked and fail.
+    """
+    out = []
+    if not repo_url:
+        out.append(
+            '<p>Source, tests and receipts: a pull request into '
+            '<code>CALLE-AI/awesome-phone-call-agents</code>, under '
+            '<code>apps/python/firstbell</code>. This build carries no link to it because '
+            'the branch was not pushed when the page was built, so the pull request is in '
+            'the submission form instead.</p>')
+    if not video_url:
+        out.append(
+            f'<p>A demo film runs {_film_running_time()} and is measured in '
+            '<code>evidence/film.json</code>, which records its length, its shot count, how '
+            'much of it carries sound and the digest of the file. This build carries no link '
+            'to it because it was not uploaded when the page was built, so the link is in '
+            'the submission form instead.</p>')
+    return "".join(out)
 
 
 def video_link_markup(video_url: str | None) -> str:
@@ -839,7 +882,7 @@ def video_link_markup(video_url: str | None) -> str:
     and this reads that.
     """
     if not video_url:
-        return ""
+        return ""      # and the fact in act 08. See `where_it_lives`.
     safe = html.escape(video_url, quote=True)
     return (f'<p class=source-link><a href="{safe}" rel="noopener">'
             f'Watch the demo, {_film_running_time()}</a></p>')
@@ -2347,6 +2390,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'screen.">' + esc(offline_run()) + '</pre>',
         '<div class=runlegend data-run-legend></div>',
         '</div>',
+        # Where to get it, for a reader who has just been told twice to run it. This is
+        # empty on a build that carries both links, because then the masthead has them.
+        where_it_lives(repo_url, video_url),
     ]
     add(act("08", "Run it yourself", "".join(body), margin=True))
 

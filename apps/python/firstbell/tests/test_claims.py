@@ -873,8 +873,38 @@ def test_the_scene_gap_cap_is_the_same_number_in_both_copies_of_the_rule():
     # 0 -> 1 is 1.0, 1 -> 9 caps at 1.5, the repeat of 9 is not a segment, 9 -> 12 caps at
     # 1.5, and 12 -> 20 caps at 1.5.
     assert judge_page.scene_seconds(call) == 5.5, judge_page.scene_seconds(call)
+def test_the_page_says_where_its_source_is_and_whether_a_film_exists():
+    """Act 08 is called "Run it yourself" and the page never said where to get it.
+
+    A district buyer took the two commands act 08 gives, went looking for the code, and
+    found that "github", "film" and "video" appeared zero times in 250KB of markup. Both
+    absences were deliberate: a link to an unpushed branch or an unpublished video is worse
+    than no link. Saying nothing at all was the wrong conclusion, because a judge opening the
+    deployed link, which is what the submission form points at, had no route to anything the
+    page told them to run.
+
+    Two builds have to satisfy this. With the URLs, a link. Without them, the fact and where
+    the link will be. The gate accepts either and refuses silence.
+    """
+    page = APP / "out" / "index.html"
+    if not page.is_file():
+        pytest.skip("no built page; run tools/judge_page.py with --receipts first")
+    markup = page.read_text(encoding="utf-8", errors="replace")
+
+    source = ("github" in markup.lower()
+              or "awesome-phone-call-agents" in markup)
+    assert source, (
+        "the page names no repository and carries no source link, so a judge who opens it "
+        "first cannot reach the code act 08 tells them to run")
+
+    film = "demo film" in markup.lower() or "watch the demo" in markup.lower()
+    assert film, (
+        "the page never mentions a film, and one of the four criteria is Product Experience "
+        "and Demo. A reader cannot tell an unlinked film from no film")
 
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    "test_the_page_says_where_its_source_is_and_whether_a_film_exists":
+        "needs a page built by tools/judge_page.py, which needs the call receipts",
     "test_what_the_page_says_about_audio_is_what_the_build_holds":
         "needs a page built by tools/judge_page.py, which needs the call receipts",
     # The mark on any row this software closed while learning nothing, checked against the
@@ -1484,17 +1514,38 @@ def test_the_demo_video_is_linked_when_there_is_one_to_link():
     The fix cannot be a constant, because the rules require the video to be "uploaded to and
     made publicly visible on YouTube or Vimeo" and a link to something nobody has published
     is worse than no link. So it is a build input, and this is the gate on both halves of
-    that: a URL passed in reaches the page, and no URL leaves no dangling markup.
+    that: a URL passed in reaches the page, and no URL leaves nothing to click.
+
+    This used to require the no-URL case to print nothing at all, and a district buyer showed
+    that was half a rule: on a page judged in part on its demo, silence cannot be told apart
+    from having no demo, and act 08 told them to run code without saying where to get it. The
+    rule now has a place as well as a shape. The masthead carries a link or nothing, because
+    an explanation of a missing link is not worth the top of the page and measured out at 255
+    vertical pixels of a phone screen. `where_it_lives` states the fact in act 08, which is
+    the act that asks a reader to run it, and each sentence disappears when its URL exists.
     """
     import sys
 
     sys.path.insert(0, str(APP / "tools"))
-    from judge_page import video_link_markup
+    from judge_page import repo_link_markup, video_link_markup, where_it_lives
 
-    assert video_link_markup(None) == "", (
-        "the page would carry an empty video link, which reads as a broken one"
-    )
-    assert video_link_markup("") == ""
+    for name, empty in (("video", video_link_markup(None)),
+                        ("repo", repo_link_markup(None))):
+        assert empty == "", (
+            f"the {name} block puts something in the masthead with no URL behind it")
+
+    note = where_it_lives(None, None)
+    assert "<a " not in note and "href" not in note, (
+        "act 08 offers something to click with no URL behind it")
+    assert "awesome-phone-call-agents" in note, (
+        "act 08 tells a reader to run the code and does not say where the code is")
+    assert "demo film" in note and "submission form" in note, (
+        "act 08 does not say a film exists, so a reader cannot tell an unlinked film from "
+        "no film")
+
+    # And nothing when both links exist, because then the masthead has them and repeating
+    # them at the foot of act 08 is a second thing to keep true.
+    assert where_it_lives("https://example.test/repo", "https://youtu.be/abc123") == ""
 
     markup = video_link_markup("https://youtu.be/abc123")
     assert "https://youtu.be/abc123" in markup
