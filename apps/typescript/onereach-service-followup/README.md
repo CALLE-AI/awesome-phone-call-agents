@@ -2,7 +2,51 @@
 
 A standalone integration example extracted around OneReach's CALL-E boundary. An approved, synthetic service appointment becomes a CALL-E task; a structured result becomes an actionable Operations handoff. OneReach is the wider workflow product at [onereach.my](https://onereach.my). Its proprietary platform source is not required to run this example.
 
-**Local contribution candidate, not yet published or accepted.** The console demonstration is a standalone reference, not the full OneReach UI. Dry-run output is synthetic and never evidence of a real phone call.
+**Public contribution: [PR #372](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/372).** Maintainer acceptance is separate from publication. The console demonstration is a standalone reference, not the full OneReach UI. Dry-run output is synthetic and never evidence of a real phone call.
+
+## How OneReach manages the task before and after CALL-E
+
+OneReach owns the business workflow: understanding the operator's goal, preparing a reviewable plan, managing execution, and tracking the next action. CALL-E is the outbound calling provider used when the operator chooses a calling workflow. Other OneReach communication surfaces include WhatsApp and web chat, with their own workflows; choosing CALL-E does not imply automatic routing or fallback between these channels.
+
+```mermaid
+flowchart TD
+  A[Operator goal and business records] --> B[OneReach AI-assisted task preparation]
+  B --> C[Required fields, recipients, script, outcomes and action rules]
+  C --> D[Validation and human approval of a versioned plan]
+  D --> E[Selected communication workflow]
+  E --> F[Outbound voice through CALL-E]
+  E --> G[Other separately configured channel workflows]
+  F --> H[CALL-E task, recipient, result schema and correlation metadata]
+  H --> I[Customer conversation]
+  I --> J[Verified webhook and provider reconciliation]
+  J --> K[OneReach outcome and next-action tracking]
+  K --> L[Close, policy retry, suppression or assigned human follow-up]
+```
+
+### Task lifecycle
+
+1. **Prepare the work.** The operator supplies the business objective and recipient records. OneReach's AI-assisted preparation resolves the workflow requirements into a structured plan: objective, expected outcomes, caller identity and disclosure, required business fields, recipient snapshot, conversation script, and prohibited actions. Missing information must be resolved before the plan is ready.
+2. **Review and approve.** OneReach validates the plan and records human approval of its version. The plan also defines execution timing, application retry policy, contact basis, and which outcomes should create follow-up work. AI-generated text alone does not authorize a call.
+3. **Dispatch the selected calling task.** For CALL-E voice execution, the worker checks workspace/run state and recipient suppression before sending recipient-specific instructions. The SDK payload includes the phone, region, locale, task, result schemas, webhook URL, and workspace/run/plan/dispatch correlation metadata. A stable idempotency key identifies the dispatch.
+4. **Track execution and reconcile.** OneReach associates CALL-E's task and recipient identifiers with its stored run and attempts. Verified webhook events and provider retrieval update the execution record. An uncertain provider response must be reconciled rather than treated as permission for a fresh call.
+5. **Turn the answer into work.** OneReach maps the result to the workflow's action rules: record completion, schedule a policy-controlled follow-up, suppress future contact, or create a human task in the responsible queue. A conversation outcome is distinct from completion of the downstream business action: a reschedule request still needs a confirmed calendar change.
+
+### Task types represented in the OneReach platform
+
+These are the platform's defined workflow families, not additional implementations or live-call evidence shipped in this small example.
+
+| Workflow | Work prepared by OneReach | CALL-E conversation purpose | Follow-up owner |
+| --- | --- | --- | --- |
+| Overdue invoice follow-up | Approved invoice context and permitted outcomes | Capture payment status, a stated promise date, dispute, or callback request | Finance |
+| Service and appointment reminders | Existing appointment and allowed alternate times | Confirm attendance or capture a reschedule, cancellation, or question | Operations |
+| HR interview and onboarding scheduling | Administrative event details and approved slots | Confirm or reschedule an interview/onboarding event and capture questions | HR; no candidate scoring or hiring decisions |
+| Social lead introduction booking | Consented enquiry context, approved product information and assigned agent | Confirm interest and capture an introductory-call time or callback request | Sales follow-up |
+
+The same preparation → approval → dispatch → result → action pattern can be adapted to further defined tasks by supplying their required fields, permitted conversation, result schema, and outcome rules. This is an extension pattern, not a claim that every arbitrary task or channel is already implemented. Provider capabilities and each task's business constraints still apply.
+
+### What this public commit demonstrates
+
+This directory implements the **service appointment** slice of that lifecycle: an already-approved synthetic input, CALL-E dispatch, reconciliation, result validation, and a returned Operations action. It does not include the private AI planner, approval UI, scheduler, multi-channel configuration, or team task database. Those platform responsibilities are explained above so maintainers can understand where the reusable CALL-E boundary fits without needing the proprietary repository.
 
 ## Quick start — no account, credentials, or phone call
 
@@ -75,6 +119,6 @@ The timestamp window deliberately rejects old deliveries; recover by polling, no
 
 This example uses the official `@call-e/calle` 0.2.2 SDK and its supported create/get/events/webhook interfaces. Local tests make no network requests and no calls. Passing them does not prove live telephony, provider performance, or a deployment at onereach.my. The hackathon video should independently show the live OneReach UI and an authorized CALL-E call.
 
-Public release scope is this directory only; no parent repository, database, accounts, platform prompts, billing, or internal configuration is included. Before contributing, review this directory and the upstream [contribution guide](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/CONTRIBUTING.md). Proposed destination: `apps/typescript/onereach-service-followup/` (confirm against upstream validation before opening the PR).
+Public release scope is this directory only; no parent repository, database, accounts, platform prompts, billing, or internal configuration is included. Before contributing, review this directory and the upstream [contribution guide](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/CONTRIBUTING.md). Contribution location: `apps/typescript/onereach-service-followup/`.
 
 License: MIT for the files in this example directory only. It does not license the private OneReach platform or grant rights to third-party trademarks.
