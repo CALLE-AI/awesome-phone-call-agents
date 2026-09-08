@@ -1,0 +1,5 @@
+CALLE_API_KEY=iams_live_...
+CALLE_BASE_URL=https://api.heycall-e.com
+FIRM_NAME=Nota.Lawyer
+REVIEW_TOKEN=choose-a-long-random-string
+WEBHOOK_SECRET=choose-another-long-random-string

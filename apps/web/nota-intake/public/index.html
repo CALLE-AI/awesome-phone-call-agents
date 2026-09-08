@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nota.Lawyer — Request a consultation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#12213f;--ink2:#3b4863;--muted:#6b7590;--paper:#f7f3ec;--card:#fffdf9;--line:#e6dfd2;--brass:#b8862b;--brass2:#8f6717;--teal:#0b7a75;--teal2:#095e5a;--ok:#1f7a4d;--err:#b3261e;--shadow:0 10px 30px rgba(18,33,63,.08)}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;font:16px/1.55 Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px 60px}
+  /* top bar */
+  .bar{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+  .brand{font:700 22px/1 Fraunces,serif;letter-spacing:.2px}.brand span{color:var(--brass)}
+  .lang{display:flex;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px}
+  .lang button{background:none;border:0;border-radius:999px;padding:7px 14px;cursor:pointer;font:600 14px Inter,sans-serif;color:var(--ink2)}
+  .lang button.on{background:var(--ink);color:#fff}
+  /* hero */
+  .hero{padding:26px 0 18px}
+  h1{font:700 clamp(34px,5vw,50px)/1.08 Fraunces,serif;margin:0 0 14px;letter-spacing:-.01em}
+  h1 em{font-style:normal;color:var(--brass2)}
+  .lead{font-size:18px;color:var(--ink2);margin:0 0 22px;max-width:620px}
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
+  .how div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:14px;color:var(--ink2)}
+  .how b{display:block;font-size:15px;color:var(--ink);margin-bottom:4px}
+  .how i{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brass);color:#fff;font:700 13px Inter,sans-serif;font-style:normal;margin-right:8px;vertical-align:-6px}
+  @media(max-width:640px){.how{grid-template-columns:1fr}}
+  /* form */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow);margin-top:14px}
+  .step{padding:8px 0 22px;border-bottom:1px dashed var(--line);margin-bottom:22px}.step:last-of-type{border:0;margin-bottom:0}
+  .step h2{display:flex;align-items:center;gap:12px;font:700 22px/1.2 Fraunces,serif;margin:0 0 6px}
+  .step h2 i{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;font:700 15px Inter,sans-serif;font-style:normal;flex:none}
+  .step p.help{margin:0 0 14px;color:var(--muted);font-size:15px}
+  .types{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media(max-width:560px){.types{grid-template-columns:1fr}}
+  .type{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s}
+  .type:hover{border-color:#cdb98f}.type.on{border-color:var(--brass);background:#fff8e8;box-shadow:0 0 0 3px #f1e3bf}
+  .type .ic{font-size:26px;line-height:1;margin-top:2px}.type b{display:block;font-size:16px}.type small{display:block;color:var(--muted);font-size:13px;margin-top:2px;line-height:1.35}
+  label{display:block;font-weight:600;margin:16px 0 6px}
+  .hint{color:var(--muted);font-size:13.5px;margin-top:6px}
+  input,select,textarea{width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 3px #d4ebe9}
+  textarea{min-height:88px;resize:vertical}
+  .row{display:grid;grid-template-columns:170px 1fr;gap:10px}@media(max-width:480px){.row{grid-template-columns:1fr}}
+  .field.bad input,.field.bad select{border-color:var(--err)}.field .err{display:none;color:var(--err);font-size:13.5px;margin-top:6px;font-weight:500}.field.bad .err{display:block}
+  .langbox{background:#f3f7f7;border:1px solid #d4e6e4;border-radius:12px;padding:12px 14px;margin-top:8px;font-size:14px;color:var(--ink2)}
+  .consent{display:flex;gap:12px;align-items:flex-start;margin-top:18px;background:#fbf7ee;border:1px solid #efe4c8;border-radius:12px;padding:14px;font-size:14.5px;line-height:1.45}
+  .consent input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--teal)}
+  button.go{margin-top:20px;width:100%;padding:17px;border:0;border-radius:12px;background:var(--teal);color:#fff;font:700 18px Inter,sans-serif;cursor:pointer;box-shadow:0 8px 20px rgba(11,122,117,.25)}
+  button.go:hover{background:var(--teal2)}button.go[disabled]{opacity:.6;cursor:wait;box-shadow:none}
+  .under{text-align:center;color:var(--muted);font-size:13.5px;margin-top:10px}
+  .msg{margin-top:16px;padding:14px 16px;border-radius:12px;display:none;font-weight:500}.msg.err{display:block;background:#fbe9e7;color:var(--err)}
+  /* success */
+  .done{display:none;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:var(--shadow);margin-top:14px}
+  .done.show{display:block}.done h2{font:700 30px/1.15 Fraunces,serif;margin:0 0 8px}.done .big{font-size:18px;color:var(--ink2);margin:0 0 18px}
+  .ring{display:flex;align-items:center;gap:14px;background:#e8f4f3;border:1px solid #c9e3e0;border-radius:14px;padding:16px;margin-bottom:20px}
+  .ring .ph{font-size:34px;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(6deg)}}
+  .done h3{font:700 16px Inter,sans-serif;margin:16px 0 8px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em}
+  .done ul{margin:0;padding:0;list-style:none}.done li{padding:8px 0 8px 32px;position:relative;border-top:1px solid var(--line)}.done li:before{content:"✓";position:absolute;left:6px;color:var(--ok);font-weight:700}
+  .done .note{margin-top:18px;font-size:14px;color:var(--muted)}
+  footer{margin-top:22px;color:var(--muted);font-size:13.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="brand">Nota<span>.</span>Lawyer</div>
+    <div class="lang"><button data-l="en" class="on">English</button><button data-l="es">Español</button><button data-l="id">Bahasa</button></div>
+  </div>
+
+  <section class="hero">
+    <h1 data-i="h1"></h1>
+    <p class="lead" data-i="lead"></p>
+    <div class="how">
+      <div><b><i>1</i><span data-i="how1"></span></b><span data-i="how1b"></span></div>
+      <div><b><i>2</i><span data-i="how2"></span></b><span data-i="how2b"></span></div>
+      <div><b><i>3</i><span data-i="how3"></span></b><span data-i="how3b"></span></div>
+    </div>
+  </section>
+
+  <form id="f" class="card" novalidate>
+    <div class="step">
+      <h2><i>1</i><span data-i="s1"></span></h2>
+      <p class="help" data-i="s1help"></p>
+      <div class="types" id="types"></div>
+      <div class="field" id="f_type"><div class="err" data-i="e_type"></div></div>
+    </div>
+
+    <div class="step">
+      <h2><i>2</i><span data-i="s2"></span></h2>
+      <p class="help" data-i="s2help"></p>
+      <div class="field" id="f_name">
+        <label data-i="name"></label>
+        <input name="name" autocomplete="name" data-ph="name_ph">
+        <div class="hint" data-i="name_hint"></div><div class="err" data-i="e_name"></div>
+      </div>
+      <div class="field" id="f_phone">
+        <label data-i="phone"></label>
+        <div class="row"><select name="cc" id="cc"></select><input name="num" inputmode="tel" autocomplete="tel-national" data-ph="phone_ph"></div>
+        <div class="hint" data-i="phone_hint"></div><div class="err" data-i="e_phone"></div>
+      </div>
+      <div class="langbox"><b data-i="ilang"></b>: <span id="langlist"></span><br><span id="langnote"></span></div>
+      <div class="field" id="f_locale" style="margin-top:10px"><label data-i="ilang_pick" style="margin-top:8px"></label><select name="locale" id="locale"></select></div>
+      <div class="field" id="f_email">
+        <label data-i="email"></label>
+        <input name="email" type="email" autocomplete="email" placeholder="name@example.com">
+        <div class="hint" data-i="email_hint"></div><div class="err" data-i="e_email"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><i>3</i><span data-i="s3"></span></h2>
+      <p class="help" data-i="s3help"></p>
+      <textarea name="matter" maxlength="500" id="matter"></textarea>
+      <div class="hint" data-i="matter_hint"></div>
+      <label class="consent field" id="f_consent"><input type="checkbox" name="consent"><span data-i="consent"></span></label>
+      <div class="field" id="f_consent2"><div class="err" data-i="e_consent"></div></div>
+      <button class="go" type="submit" data-i="go"></button>
+      <div class="under" data-i="under"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </form>
+
+  <section class="done" id="done">
+    <h2 data-i="d_title"></h2>
+    <p class="big" id="d_phone"></p>
+    <div class="ring"><div class="ph">📞</div><div data-i="d_ring"></div></div>
+    <h3 data-i="d_h_call"></h3>
+    <ul><li data-i="d_c1"></li><li data-i="d_c2"></li><li data-i="d_c3"></li><li data-i="d_c4"></li></ul>
+    <h3 data-i="d_h_after"></h3>
+    <ul><li data-i="d_a1"></li><li data-i="d_a2"></li></ul>
+    <p class="note" data-i="d_note"></p>
+  </section>
+
+  <footer data-i="foot"></footer>
+</div>
+<script>
+const I18N = {
+  en: {
+    h1: "Tell us what you need. <em>We'll call you back in a minute.</em>",
+    lead: "No long forms. Pick the kind of help you need, leave your number, and our intake assistant calls you to take down the details — in your language, when it suits you.",
+    how1: "Pick a topic", how1b: "Real estate, a will, a trust, a lawsuit, or something else.",
+    how2: "Leave your number", how2b: "Your phone rings within about a minute.",
+    how3: "Answer a few questions", how3b: "About 3 minutes. An attorney reviews and follows up.",
+    s1: "What do you need help with?", s1help: "Tap one. This decides which questions we'll ask on the call.",
+    e_type: "Please pick a topic so we know what to ask.",
+    s2: "How do we reach you?", s2help: "We call the number you enter here. Make sure you can answer it in the next few minutes.",
+    name: "Your name", name_ph: "e.g. Maria Lopez", name_hint: "We'll ask for you by this name when you pick up.", e_name: "Please enter your name (letters only).",
+    phone: "Phone number", phone_ph: "917 555 0100", phone_hint: "Choose your country, then type the number the way you'd dial it locally — no country code needed.", e_phone: "Please enter a phone number with at least 6 digits.",
+    ilang: "Languages we can call this number in", ilang_pick: "Language for the call", langnote_ok: "The call will be in the language you choose above.",
+    langnote_es: "Spanish calls are not available for US numbers yet. Your call will be in English — you can still describe your matter in Spanish below and an attorney who reads Spanish will see it.",
+    langnote_id: "Bahasa Indonesia is available for US numbers.",
+    email: "Email (optional)", email_hint: "If you add it, we'll just confirm it on the call instead of asking you to spell it.", e_email: "That doesn't look like an email address.",
+    s3: "Anything we should know before we call?", s3help: "Optional. One or two sentences is plenty — the assistant will ask the rest.",
+    matter_ph: { real_estate: "e.g. I'm selling my house and the buyer is trying to back out", will: "e.g. I have two kids and no will yet", trust: "e.g. I want to put my house in a trust for my daughter", lawsuit: "e.g. I got court papers from my old landlord", other: "e.g. A vendor didn't deliver what they promised" },
+    matter_hint: "Don't include passwords, ID numbers or financial account numbers.",
+    consent: "Yes, call me at this number. I understand this call only collects information — it is not legal advice, and it doesn't make me a client until an attorney confirms in writing.",
+    e_consent: "Please tick the box so we're allowed to call you.",
+    go: "Call me now", under: "Takes about a minute to ring · about 3 minutes on the phone · no cost",
+    err: "We couldn't place the call: {m}",
+    d_title: "Done — your phone is about to ring.", d_phone: "We're calling {phone} now.",
+    d_ring: "It may show as a number you don't recognize. Please pick up — the assistant will ask for you by name.",
+    d_h_call: "What happens on the call", d_c1: "The assistant confirms it's you and says clearly that this is intake, not legal advice.",
+    d_c2: "It asks about your {topic} matter — a few short questions, in your words.", d_c3: "It asks who else is involved, so the firm can check for conflicts.", d_c4: "It confirms your email and the best time to reach you.",
+    d_h_after: "What happens after", d_a1: "An attorney at Nota.Lawyer reviews your answers.", d_a2: "The firm follows up by phone or email to set up your consultation.",
+    d_note: "Missed the call? Just submit the form again and we'll call back.",
+    foot: "Which languages we can call in depends on the country of your phone number. Nothing on this page or on the call is legal advice."
+  },
+  es: {
+    h1: "Díganos qué necesita. <em>Le llamamos en un minuto.</em>",
+    lead: "Sin formularios largos. Elija el tipo de ayuda, deje su número y nuestra asistente de admisión le llama para tomar los datos — en su idioma, cuando le convenga.",
+    how1: "Elija un tema", how1b: "Bienes raíces, un testamento, un fideicomiso, una demanda u otro asunto.",
+    how2: "Deje su número", how2b: "Su teléfono suena en aproximadamente un minuto.",
+    how3: "Responda unas preguntas", how3b: "Unos 3 minutos. Un abogado revisa y se comunica.",
+    s1: "¿Con qué necesita ayuda?", s1help: "Toque una opción. Esto decide qué preguntas haremos en la llamada.",
+    e_type: "Por favor elija un tema para saber qué preguntar.",
+    s2: "¿Cómo le contactamos?", s2help: "Llamamos al número que escriba aquí. Asegúrese de poder contestar en los próximos minutos.",
+    name: "Su nombre", name_ph: "p. ej. María López", name_hint: "Preguntaremos por usted con este nombre al contestar.", e_name: "Por favor escriba su nombre (solo letras).",
+    phone: "Número de teléfono", phone_ph: "917 555 0100", phone_hint: "Elija su país y escriba el número como lo marcaría localmente — sin código de país.", e_phone: "Escriba un número de teléfono con al menos 6 dígitos.",
+    ilang: "Idiomas en que podemos llamar a este número", ilang_pick: "Idioma de la llamada", langnote_ok: "La llamada será en el idioma que elija arriba.",
+    langnote_es: "Las llamadas en español aún no están disponibles para números de EE. UU. Su llamada será en inglés — puede describir su asunto en español abajo y lo verá un abogado que lee español.",
+    langnote_id: "Bahasa Indonesia está disponible para números de EE. UU.",
+    email: "Correo electrónico (opcional)", email_hint: "Si lo agrega, solo lo confirmaremos en la llamada en vez de pedirle que lo deletree.", e_email: "Eso no parece un correo electrónico.",
+    s3: "¿Algo que debamos saber antes de llamar?", s3help: "Opcional. Una o dos frases bastan — la asistente preguntará el resto.",
+    matter_ph: { real_estate: "p. ej. Estoy vendiendo mi casa y el comprador quiere echarse atrás", will: "p. ej. Tengo dos hijos y todavía no tengo testamento", trust: "p. ej. Quiero poner mi casa en un fideicomiso para mi hija", lawsuit: "p. ej. Recibí papeles de la corte de mi antiguo arrendador", other: "p. ej. Un proveedor no entregó lo prometido" },
+    matter_hint: "No incluya contraseñas, números de identificación ni números de cuentas.",
+    consent: "Sí, llámenme a este número. Entiendo que la llamada solo recopila información — no es asesoría legal y no me convierte en cliente hasta que un abogado lo confirme por escrito.",
+    e_consent: "Marque la casilla para que podamos llamarle.",
+    go: "Llámenme ahora", under: "Suena en aproximadamente un minuto · unos 3 minutos al teléfono · sin costo",
+    err: "No pudimos realizar la llamada: {m}",
+    d_title: "Listo — su teléfono está por sonar.", d_phone: "Estamos llamando al {phone} ahora.",
+    d_ring: "Puede aparecer como un número desconocido. Por favor conteste — la asistente preguntará por usted por su nombre.",
+    d_h_call: "Qué pasa en la llamada", d_c1: "La asistente confirma que es usted y aclara que es admisión, no asesoría legal.",
+    d_c2: "Pregunta sobre su asunto de {topic} — unas preguntas cortas, en sus palabras.", d_c3: "Pregunta quién más está involucrado, para que el despacho verifique conflictos.", d_c4: "Confirma su correo y la mejor hora para localizarle.",
+    d_h_after: "Qué pasa después", d_a1: "Un abogado de Nota.Lawyer revisa sus respuestas.", d_a2: "El despacho se comunica por teléfono o correo para programar su consulta.",
+    d_note: "¿Perdió la llamada? Envíe el formulario de nuevo y volveremos a llamar.",
+    foot: "Los idiomas disponibles dependen del país de su número. Nada en esta página ni en la llamada es asesoría legal."
+  },
+  id: {
+    h1: "Ceritakan kebutuhan Anda. <em>Kami telepon balik dalam satu menit.</em>",
+    lead: "Tanpa formulir panjang. Pilih jenis bantuan, tinggalkan nomor Anda, dan asisten penerimaan kami menelepon untuk mencatat detailnya — dalam bahasa Anda, saat Anda siap.",
+    how1: "Pilih topik", how1b: "Properti, surat wasiat, trust, gugatan, atau hal lain.",
+    how2: "Tinggalkan nomor", how2b: "Telepon Anda berdering dalam sekitar satu menit.",
+    how3: "Jawab beberapa pertanyaan", how3b: "Sekitar 3 menit. Pengacara meninjau dan menghubungi kembali.",
+    s1: "Bantuan apa yang Anda butuhkan?", s1help: "Pilih satu. Ini menentukan pertanyaan yang kami ajukan saat menelepon.",
+    e_type: "Silakan pilih topik agar kami tahu apa yang harus ditanyakan.",
+    s2: "Bagaimana kami menghubungi Anda?", s2help: "Kami menelepon nomor yang Anda masukkan di sini. Pastikan Anda bisa mengangkatnya dalam beberapa menit ke depan.",
+    name: "Nama Anda", name_ph: "mis. Budi Santoso", name_hint: "Kami akan menyebut nama ini saat Anda mengangkat telepon.", e_name: "Mohon isi nama Anda (huruf saja).",
+    phone: "Nomor telepon", phone_ph: "917 555 0100", phone_hint: "Pilih negara, lalu ketik nomor seperti Anda menelepon secara lokal — tanpa kode negara.", e_phone: "Masukkan nomor telepon minimal 6 digit.",
+    ilang: "Bahasa yang bisa kami gunakan untuk nomor ini", ilang_pick: "Bahasa untuk panggilan", langnote_ok: "Panggilan akan menggunakan bahasa yang Anda pilih di atas.",
+    langnote_es: "Panggilan berbahasa Spanyol belum tersedia untuk nomor AS.",
+    langnote_id: "Bahasa Indonesia tersedia untuk nomor AS.",
+    email: "Email (opsional)", email_hint: "Jika diisi, kami hanya akan memastikannya saat panggilan, tanpa meminta Anda mengejanya.", e_email: "Itu tidak terlihat seperti alamat email.",
+    s3: "Ada yang perlu kami ketahui sebelum menelepon?", s3help: "Opsional. Satu atau dua kalimat cukup — asisten akan menanyakan sisanya.",
+    matter_ph: { real_estate: "mis. Saya menjual rumah dan pembeli ingin membatalkan", will: "mis. Saya punya dua anak dan belum punya wasiat", trust: "mis. Saya ingin memasukkan rumah ke trust untuk putri saya", lawsuit: "mis. Saya menerima surat pengadilan dari mantan pemilik kontrakan", other: "mis. Vendor tidak mengirim yang dijanjikan" },
+    matter_hint: "Jangan sertakan kata sandi, nomor identitas, atau nomor rekening.",
+    consent: "Ya, telepon saya di nomor ini. Saya paham panggilan ini hanya mengumpulkan informasi — bukan nasihat hukum, dan saya belum menjadi klien sampai seorang pengacara mengonfirmasi secara tertulis.",
+    e_consent: "Centang kotak agar kami boleh menelepon Anda.",
+    go: "Telepon saya sekarang", under: "Berdering dalam sekitar satu menit · sekitar 3 menit di telepon · gratis",
+    err: "Kami tidak dapat melakukan panggilan: {m}",
+    d_title: "Selesai — telepon Anda akan segera berdering.", d_phone: "Kami sedang menelepon {phone} sekarang.",
+    d_ring: "Mungkin muncul sebagai nomor tak dikenal. Mohon angkat — asisten akan menyebut nama Anda.",
+    d_h_call: "Apa yang terjadi saat panggilan", d_c1: "Asisten memastikan itu Anda dan menyatakan dengan jelas bahwa ini penerimaan, bukan nasihat hukum.",
+    d_c2: "Ia bertanya tentang perkara {topic} Anda — beberapa pertanyaan singkat, dengan kata-kata Anda.", d_c3: "Ia menanyakan siapa lagi yang terlibat, agar firma dapat memeriksa benturan kepentingan.", d_c4: "Ia memastikan email Anda dan waktu terbaik untuk menghubungi.",
+    d_h_after: "Apa yang terjadi setelahnya", d_a1: "Seorang pengacara di Nota.Lawyer meninjau jawaban Anda.", d_a2: "Firma menghubungi lewat telepon atau email untuk mengatur konsultasi Anda.",
+    d_note: "Terlewat panggilannya? Kirim formulir lagi dan kami akan menelepon kembali.",
+    foot: "Bahasa yang tersedia bergantung pada negara nomor telepon Anda. Tidak ada di halaman ini atau di panggilan yang merupakan nasihat hukum."
+  }
+};
+
+let REGIONS = {"1":{"region":"US","country":"United States","line":"Local","locales":[["en-US","English"],["id","Bahasa Indonesia"]]}};
+let MATTERS = {};
+let CC = [], LOCALES = {}, lang = (["es","id"].find(l => (navigator.language||"en").toLowerCase().startsWith(l))) || "en", chosenType = "";
+const $ = s => document.querySelector(s);
+const cc = $("#cc"), loc = $("#locale"), msg = $("#msg"), typesEl = $("#types");
+const flag = r => String.fromCodePoint(...[...r].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+function t(k, vars={}) { return String(I18N[lang][k] ?? k).replace(/{(\w+)}/g, (_,x)=>vars[x]??""); }
+function buildCountries() {
+  CC = Object.entries(REGIONS).map(([v, r]) => [v, `${flag(r.region)} +${v} ${r.region}`, r.country, r.line])
+    .sort((a, b) => (a[3] === b[3] ? a[2].localeCompare(b[2]) : a[3] === "Local" ? -1 : 1));
+  LOCALES = Object.fromEntries(Object.entries(REGIONS).map(([v, r]) => [v, r.locales]));
+  const cur = cc.value; cc.innerHTML = ""; CC.forEach(([v,label]) => cc.add(new Option(label, v))); cc.value = CC.some(c=>c[0]===cur) ? cur : "1";
+}
+function renderTypes() {
+  typesEl.innerHTML = "";
+  for (const [id, m] of Object.entries(MATTERS)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "type" + (id===chosenType?" on":""); b.dataset.id = id;
+    b.innerHTML = `<span class="ic">${m.icon}</span><span><b>${m.label[lang]||m.label.en}</b><small>${m.blurb[lang]||m.blurb.en}</small></span>`;
+    b.onclick = () => { chosenType = id; renderTypes(); $("#f_type").classList.remove("bad"); $("#matter").placeholder = t("matter_ph")[id] || ""; };
+    typesEl.appendChild(b);
+  }
+  $("#matter").placeholder = chosenType ? (I18N[lang].matter_ph[chosenType] || "") : "";
+}
+function render() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i]").forEach(el => { const v = I18N[lang][el.dataset.i]; if (typeof v === "string") { el.dataset.i==="h1" ? el.innerHTML = v : el.textContent = v; } });
+  document.querySelectorAll("[data-ph]").forEach(el => el.placeholder = t(el.dataset.ph));
+  document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("on", b.dataset.l===lang));
+  const opts = LOCALES[cc.value]||[]; const cur = loc.value; loc.innerHTML = "";
+  opts.forEach(([v,l]) => loc.add(new Option(l, v)));
+  const pref = opts.find(o=>o[0].startsWith(lang)) || opts.find(o=>o[0].startsWith("en"));
+  loc.value = opts.some(o=>o[0]===cur) ? cur : (pref||opts[0])[0];
+  $("#langlist").textContent = opts.map(o=>o[1]).join(" · ");
+  let note = t("langnote_ok");
+  if (lang==="es" && !opts.some(o=>o[0].startsWith("es"))) note = t("langnote_es");
+  else if (lang==="id" && cc.value==="1") note = t("langnote_id");
+  $("#langnote").textContent = note;
+  renderTypes();
+}
+document.querySelectorAll(".lang button").forEach(b => b.onclick = () => { lang = b.dataset.l; render(); });
+cc.onchange = render;
+buildCountries(); render();
+fetch("/regions.json").then(r => r.json()).then(j => { REGIONS = j; buildCountries(); render(); }).catch(() => {});
+fetch("/api/matters").then(r => r.json()).then(j => { MATTERS = j.matters; renderTypes(); }).catch(() => {
+  MATTERS = {other:{icon:"💬",label:{en:"Something else"},blurb:{en:"Tell us on the call."}}}; renderTypes(); });
+
+function bad(id, on) { const f = document.getElementById(id); f.classList.toggle("bad", on); return on; }
+$("#f").onsubmit = async e => {
+  e.preventDefault(); const f = e.target; msg.className = "msg";
+  const digits = f.num.value.replace(/\D/g,""); const phone = "+" + cc.value + digits;
+  let problems = 0;
+  problems += bad("f_type", !chosenType);
+  problems += bad("f_name", !/^\p{L}[\p{L}\s'.-]{1,}$/u.test(f.name.value.trim()));
+  problems += bad("f_phone", digits.length < 6);
+  problems += bad("f_email", !!f.email.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.value.trim()));
+  problems += bad("f_consent2", !f.consent.checked);
+  if (problems) { document.querySelector(".field.bad").scrollIntoView({behavior:"smooth", block:"center"}); return; }
+  const btn = f.querySelector("button.go"); btn.disabled = true;
+  try {
+    const r = await fetch("/api/intake", {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({name:f.name.value.trim(), phone, email:f.email.value.trim(), lang, locale:loc.value, matter_type:chosenType, matter:f.matter.value.trim(), consent:true})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || j.error || r.status);
+    showDone(phone);
+  } catch (err) { msg.className = "msg err"; msg.textContent = t("err", {m: err.message}); }
+  btn.disabled = false;
+};
+function showDone(phone) {
+  const topic = (MATTERS[chosenType]?.label?.[lang] || MATTERS[chosenType]?.label?.en || "").toLowerCase();
+  $("#f").style.display = "none"; document.querySelector(".hero").style.display = "none";
+  const d = $("#done"); d.classList.add("show");
+  $("#d_phone").textContent = t("d_phone", {phone});
+  d.querySelector("[data-i=d_c2]").textContent = t("d_c2", {topic});
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+</script>
+</body>
+</html>

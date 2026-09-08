@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nota.Lawyer — Intake console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#12213f;--ink2:#3b4863;--muted:#6b7590;--paper:#f7f3ec;--card:#fffdf9;--line:#e6dfd2;--brass:#b8862b;--brass2:#8f6717;--teal:#0b7a75;--teal2:#095e5a;--ok:#1f7a4d;--err:#b3261e;--shadow:0 10px 30px rgba(18,33,63,.07)}
+  *{box-sizing:border-box}body{margin:0;font:15px/1.5 Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 20px 70px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand{font:700 22px/1 Fraunces,serif}.brand span{color:var(--brass)}.brand small{font:500 14px Inter,sans-serif;color:var(--muted);margin-left:10px}
+  input,button,select,textarea{font:inherit;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 3px #d4ebe9}
+  button{cursor:pointer;font-weight:600}button.pri{background:var(--teal);color:#fff;border-color:var(--teal)}button.pri:hover{background:var(--teal2)}
+  button.ghost{background:#fff;color:var(--ink)}button[disabled]{opacity:.55;cursor:wait}
+  .stats{display:flex;gap:8px;flex-wrap:wrap}.stat{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--ink2)}.stat b{color:var(--ink)}
+  .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#c9a227;margin-right:6px;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.3}}
+  /* gate */
+  .gate{max-width:440px;margin:80px auto;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:var(--shadow)}
+  .gate h1{font:700 28px Fraunces,serif;margin:0 0 6px}.gate p{color:var(--muted);margin:0 0 16px}.gate input{width:100%;margin-bottom:10px}.gate button{width:100%}
+  .gate .err{color:var(--err);font-size:14px;margin-top:8px;display:none}
+  /* layout */
+  .cols{display:grid;grid-template-columns:360px 1fr;gap:18px;margin-top:18px;align-items:start}@media(max-width:900px){.cols{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+  .panel h2{font:700 21px Fraunces,serif;margin:0 0 4px}.panel .sub{color:var(--muted);font-size:13.5px;margin:0 0 12px}
+  label{display:block;font-weight:600;font-size:13.5px;margin:12px 0 5px}.help{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .panel input,.panel select,.panel textarea{width:100%}textarea{min-height:64px;resize:vertical}
+  .row{display:grid;grid-template-columns:132px 1fr;gap:8px}
+  .field.bad input,.field.bad select{border-color:var(--err)}.field .ferr{display:none;color:var(--err);font-size:12.5px;margin-top:4px}.field.bad .ferr{display:block}
+  .confirm{display:none;margin-top:14px;background:#fff8e8;border:1px solid #efe0b8;border-radius:12px;padding:12px 14px;font-size:14px}.confirm.show{display:block}
+  .confirm .acts{display:flex;gap:8px;margin-top:10px}.confirm button{flex:1}
+  .progress{display:none;margin-top:14px;background:#e8f4f3;border:1px solid #c9e3e0;border-radius:12px;padding:12px 14px;font-size:14px}.progress.show{display:block}
+  .progress b{display:block;margin-bottom:2px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .chip{background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink2)}.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .toolbar input[type=search]{flex:1;min-width:160px}.toolbar select{padding:7px 10px}
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-top:12px;box-shadow:var(--shadow)}
+  .top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+  .who{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.who b{font:700 19px Fraunces,serif}
+  .type{display:inline-flex;align-items:center;gap:6px;background:#fff8e8;border:1px solid #efe0b8;color:#6b4e0d;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600}
+  .src{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#eef}
+  .pill.interviewed{background:#e2f3ea;color:#1f6b45}.pill.calling{background:#fff1d6;color:#8a5a00}.pill.failed,.pill.incomplete{background:#fbe4e2;color:#a3261e}
+  .meta{color:var(--muted);font-size:12.5px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 26px;margin:12px 0 2px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .kv{display:grid;grid-template-columns:150px 1fr;gap:2px 10px;padding:5px 0;border-bottom:1px solid #f0eae0}.kv dt{color:var(--muted);font-size:12.5px}.kv dd{margin:0;font-weight:500;font-size:14px}
+  .kv.hi dd{color:#7a2e0f;font-weight:700}
+  .sec{font:700 11.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--brass);margin:12px 0 2px}
+  details{margin-top:10px}summary{cursor:pointer;font-weight:600;color:var(--ink2);font-size:14px}
+  .turn{margin:3px 0;padding:6px 10px;border-radius:8px;font-size:13.5px}.turn.bot{background:#f3f4f8}.turn.user{background:#e8f4f3}.turn b{color:var(--teal);margin-right:6px}
+  .summary{background:#f8f5ee;border-left:3px solid var(--brass);padding:9px 12px;border-radius:0 10px 10px 0;margin-top:10px;font-size:13.5px}
+  .fail{background:#fbe9e7;color:var(--err);padding:9px 12px;border-radius:10px;margin-top:10px;font-size:13.5px}
+  .rem{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .rem .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.rem input[type=datetime-local]{padding:8px 10px}
+  .remrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13.5px;background:#fbf9f4;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .badge{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}.badge.yes{background:#e2f3ea;color:#1f6b45}.badge.no{background:#fbe4e2;color:#a3261e}.badge.wait{background:#fff1d6;color:#8a5a00}.badge.unk{background:#eee;color:#555}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;display:none;box-shadow:0 10px 30px rgba(0,0,0,.25)}.toast.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="gate" id="gate">
+    <h1>Intake console</h1>
+    <p>Staff only. Enter the review token to see intakes and place calls.</p>
+    <input id="tok" type="password" placeholder="Review token" autocomplete="current-password">
+    <button class="pri" id="login">Open console</button>
+    <div class="err" id="gateerr">That token didn't work.</div>
+  </section>
+
+  <div id="app" style="display:none">
+    <header>
+      <div class="brand">Nota<span>.</span>Lawyer <small>Intake console</small></div>
+      <div class="stats" id="stats"></div>
+      <div><button class="ghost" id="refresh">Refresh</button> <button class="ghost" id="logout">Lock</button></div>
+    </header>
+
+    <div class="cols">
+      <aside class="panel">
+        <h2>Call a client</h2>
+        <p class="sub">For walk-ins, voicemails and phone leads. The assistant calls them now and runs the intake for the topic you pick.</p>
+        <form id="callform" novalidate>
+          <div class="field" id="c_name"><label>Client's name</label><input name="name" placeholder="e.g. Maria Lopez"><div class="ferr">Enter a name (letters only).</div></div>
+          <div class="field" id="c_phone"><label>Phone</label><div class="row"><select name="cc" id="ccc"></select><input name="num" inputmode="tel" placeholder="917 555 0100"></div><div class="help">Country first, then the number as dialed locally.</div><div class="ferr">Enter at least 6 digits.</div></div>
+          <div class="field" id="c_type"><label>Topic</label><select name="type" id="ctype"></select><div class="help">Picks the question set for the call.</div></div>
+          <div class="field"><label>Language</label><select name="locale" id="clocale"></select><div class="help" id="clangnote"></div></div>
+          <div class="field"><label>Note for the assistant (optional)</label><textarea name="note" maxlength="300" placeholder="e.g. Left a voicemail about eviction papers"></textarea></div>
+          <div class="field"><label>Client email (optional)</label><input name="email" type="email" placeholder="name@example.com"></div>
+          <button class="pri" type="submit" style="width:100%;margin-top:14px">Review &amp; place call</button>
+        </form>
+        <div class="confirm" id="confirm"></div>
+        <div class="progress" id="progress"></div>
+      </aside>
+
+      <main>
+        <div class="toolbar" id="chips"></div>
+        <div class="toolbar">
+          <input type="search" id="q" placeholder="Search name, phone, other party…">
+          <select id="st"><option value="all">Any status</option><option value="calling">Calling</option><option value="interviewed">Interviewed</option><option value="incomplete">Incomplete</option><option value="failed">Failed</option></select>
+        </div>
+        <div id="list"></div>
+      </main>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nice = k => k.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
+const flag = r => String.fromCodePoint(...[...r].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+let TOKEN = "", MATTERS = {}, REGIONS = {}, DATA = [], filter = "all", timer = null, watching = null;
+try { TOKEN = localStorage.getItem("nota_tok") || ""; } catch {}
+function toast(m, ms=3200) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), ms); }
+const api = (path) => fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN));
+
+async function boot() {
+  const [m, r] = await Promise.all([fetch("/api/matters").then(r=>r.json()), fetch("/regions.json").then(r=>r.json())]);
+  MATTERS = m.matters; REGIONS = r;
+  const ct = $("#ctype"); Object.entries(MATTERS).forEach(([id, x]) => ct.add(new Option(`${x.icon} ${x.label.en}`, id)));
+  const cc = $("#ccc"); Object.entries(REGIONS).sort((a,b)=>(a[1].line===b[1].line ? a[1].country.localeCompare(b[1].country) : a[1].line==="Local"?-1:1))
+    .forEach(([v, x]) => cc.add(new Option(`${flag(x.region)} +${v} ${x.region}`, v)));
+  cc.value = "1"; cc.onchange = fillLocales; fillLocales();
+  renderChips();
+}
+function fillLocales() {
+  const reg = REGIONS[$("#ccc").value]; const sel = $("#clocale"); sel.innerHTML = "";
+  (reg?.locales||[]).forEach(([v,l]) => sel.add(new Option(l, v)));
+  $("#clangnote").textContent = reg ? `${reg.country}: ${reg.locales.map(l=>l[1]).join(", ")}${reg.line==="International" ? " · international line (CALL-E marks these as testing-grade)" : ""}` : "";
+}
+async function unlock() {
+  TOKEN = $("#tok").value.trim(); if (!TOKEN) return;
+  const r = await api("/api/intakes");
+  if (!r.ok) { $("#gateerr").style.display = "block"; return; }
+  try { localStorage.setItem("nota_tok", TOKEN); } catch {}
+  $("#gate").style.display = "none"; $("#app").style.display = "block";
+  DATA = (await r.json()).intakes; await boot(); draw(); schedule();
+}
+$("#login").onclick = unlock; $("#tok").addEventListener("keydown", e => { if (e.key === "Enter") unlock(); });
+$("#logout").onclick = () => { try { localStorage.removeItem("nota_tok"); } catch {} location.reload(); };
+$("#refresh").onclick = () => load(true);
+if (TOKEN) { $("#tok").value = TOKEN; unlock(); }
+
+async function load(sync) {
+  const r = await api(`/api/intakes${sync ? "?sync=1" : ""}`);
+  if (!r.ok) { toast("Couldn't load intakes (" + r.status + ")"); return; }
+  DATA = (await r.json()).intakes; draw(); schedule();
+}
+function schedule() {
+  clearTimeout(timer);
+  const busy = DATA.some(x => x.status === "calling" || (x.reminders||[]).some(r => !["completed","failed"].includes(r.calle_status)));
+  if (busy) timer = setTimeout(() => load(true), 15000);
+}
+
+/* ---------- Call a client ---------- */
+function bad(id, on) { const f = document.getElementById(id); f.classList.toggle("bad", on); return on; }
+let pending = null;
+$("#callform").onsubmit = e => {
+  e.preventDefault(); const f = e.target;
+  const digits = f.num.value.replace(/\D/g,""); const phone = "+" + $("#ccc").value + digits;
+  let p = 0; p += bad("c_name", !/^\p{L}[\p{L}\s'.-]{1,}$/u.test(f.name.value.trim())); p += bad("c_phone", digits.length < 6);
+  if (p) return;
+  const m = MATTERS[$("#ctype").value]; const langName = $("#clocale").selectedOptions[0].textContent;
+  pending = { name: f.name.value.trim(), phone, email: f.email.value.trim(), lang: "en", locale: $("#clocale").value, matter_type: $("#ctype").value, matter: f.note.value.trim(), consent: true, source: "staff" };
+  const c = $("#confirm"); c.innerHTML = `<b>Ready to call ${esc(pending.name)} at ${esc(phone)}</b><br>${m.icon} ${esc(m.label.en)} intake · in ${esc(langName)} · the assistant states it is not legal advice and collects consent on the call.
+    <div class="acts"><button class="pri" id="go">Place the call now</button><button class="ghost" id="cancel">Cancel</button></div>`;
+  c.classList.add("show"); $("#progress").classList.remove("show");
+  $("#cancel").onclick = () => c.classList.remove("show");
+  $("#go").onclick = placeCall;
+};
+async function placeCall() {
+  const b = $("#go"); b.disabled = true; b.textContent = "Placing…";
+  const r = await fetch("/api/intake", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pending) });
+  const j = await r.json().catch(() => ({}));
+  $("#confirm").classList.remove("show");
+  if (!r.ok) { toast("CALL-E declined: " + (j.message || j.error || r.status), 6000); return; }
+  $("#callform").reset(); $("#ccc").value = "1"; fillLocales();
+  const pr = $("#progress"); pr.classList.add("show"); pr.innerHTML = `<b><span class="live"></span>Calling ${esc(pending.name)}…</b>CALL-E is dialing ${esc(pending.phone)}. This panel updates as the call progresses.`;
+  watching = j.id; await load(false); watch();
+}
+async function watch() {
+  if (!watching) return;
+  const r = await api(`/api/intakes?id=${encodeURIComponent(watching)}&sync=1`); if (!r.ok) return;
+  const rec = (await r.json()).intakes[0]; const i = DATA.findIndex(x => x.id === rec.id); if (i >= 0) DATA[i] = rec; else DATA.unshift(rec); draw();
+  const pr = $("#progress");
+  if (rec.status === "calling") { pr.innerHTML = `<b><span class="live"></span>On the line with ${esc(rec.form.name)}…</b>${esc(rec.calle_status)} · checking again in 8 seconds.`; setTimeout(watch, 8000); return; }
+  const m = MATTERS[rec.form.matter_type] || {}; watching = null;
+  pr.innerHTML = rec.status === "interviewed"
+    ? `<b>✓ Interview complete — ${esc(rec.form.name)}</b>${esc(m.label?.en||"")} intake captured with ${esc(rec.confidence?.label||"")} confidence. Record is at the top of the list.`
+    : `<b>Call ended: ${esc(rec.status)}</b>${esc(rec.failure || rec.summary || "No live answer.")} You can try again from this panel.`;
+  toast(rec.status === "interviewed" ? "Intake complete" : "Call ended: " + rec.status);
+}
+
+/* ---------- Records ---------- */
+function renderChips() {
+  const counts = {}; DATA.forEach(x => { const k = x.form.matter_type || "other"; counts[k] = (counts[k]||0)+1; });
+  $("#chips").innerHTML = [["all","All"], ...Object.entries(MATTERS).map(([id,m]) => [id, `${m.icon} ${m.label.en}`])]
+    .map(([id,l]) => `<span class="chip ${filter===id?"on":""}" data-f="${id}">${l}${id==="all"?` ${DATA.length}`:(counts[id]?` ${counts[id]}`:"")}</span>`).join("");
+  document.querySelectorAll("[data-f]").forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); draw(); });
+  const calling = DATA.filter(x=>x.status==="calling").length;
+  $("#stats").innerHTML = `<span class="stat"><b>${DATA.filter(x=>x.status==="interviewed").length}</b> interviewed</span><span class="stat">${calling?'<span class="live"></span>':''}<b>${calling}</b> calling</span><span class="stat"><b>${DATA.reduce((n,x)=>n+(x.reminders||[]).length,0)}</b> reminders</span>`;
+}
+$("#q").oninput = draw; $("#st").onchange = draw;
+function draw() {
+  renderChips();
+  const q = $("#q").value.trim().toLowerCase(); const st = $("#st").value;
+  const rows = DATA.filter(x => (filter==="all" || (x.form.matter_type||"other")===filter) && (st==="all" || x.status===st)
+    && (!q || JSON.stringify([x.form.name, x.form.phone, x.result?.full_name, x.result?.other_parties, x.result?.opposing_party, x.result?.matter_summary]).toLowerCase().includes(q)));
+  $("#list").innerHTML = rows.length ? rows.map(card).join("") : `<div class="card empty">${DATA.length ? "No intakes match those filters." : "No intakes yet. They appear here about a minute after a client submits the form — or use “Call a client”."}</div>`;
+  document.querySelectorAll("[data-remind]").forEach(b => b.onclick = () => remind(b.dataset.remind));
+}
+function kv(k, v, hi) { return v ? `<div class="kv ${hi?"hi":""}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>` : ""; }
+function whenText(iso) { const d = new Date(iso); return d.toLocaleString(undefined, { weekday:"long", month:"long", day:"numeric", hour:"numeric", minute:"2-digit" }); }
+function card(x) {
+  const res = x.result || {}; const mt = x.form.matter_type || "other"; const m = MATTERS[mt] || {icon:"💬",label:{en:"Other"},fields:[]};
+  const typeFields = (m.fields||[]).filter(k => res[k] && !["none","unknown"].includes(String(res[k]).toLowerCase()));
+  const base = [
+    ["Phone", `${x.form.phone} · ${x.form.region} · ${x.form.locale}`], ["Email", res.email && res.email !== "none" ? res.email : x.form.email],
+    ["Summary", res.matter_summary || x.form.matter], ["Other parties (conflict check)", res.other_parties || res.opposing_party, true],
+    ["Urgency", res.urgency], ["Deadline / court date", res.deadline_or_court_date], ["Best time to call", res.best_time_to_call],
+    ["Consent to contact", res.consent_to_contact], ["Confidence", x.confidence ? `${x.confidence.label} (${x.confidence.score})` : ""],
+  ].map(([k,v,h]) => kv(k,v,h)).join("");
+  const extra = typeFields.map(k => kv(nice(k), res[k])).join("");
+  const turns = (x.transcript||[]).map(t => `<div class="turn ${t.speaker==="bot"?"bot":"user"}"><b>${t.speaker==="bot"?"Assistant":"Client"}</b>${esc(t.text)}</div>`).join("");
+  const rems = (x.reminders||[]).map(r => {
+    const c = r.result?.confirmed; const cls = r.status==="calling" ? "wait" : c==="yes" ? "yes" : c==="no" ? "no" : "unk";
+    const label = r.status==="calling" ? "calling…" : c==="yes" ? "confirmed" : c==="no" ? "can't make it" : (r.status==="failed" ? "no answer" : "unknown");
+    return `<div class="remrow">📅 <b>${esc(r.when)}</b><span class="badge ${cls}">${label}</span>${r.result?.reschedule_request ? `<span>wants: ${esc(r.result.reschedule_request)}</span>` : ""}<span class="meta">${new Date(r.created_at).toLocaleString()}</span></div>`;
+  }).join("");
+  const minDt = new Date(Date.now()+3600e3).toISOString().slice(0,16);
+  return `<div class="card">
+    <div class="top"><div class="who"><span class="pill ${x.status}">${esc(x.status)}</span><b>${esc(res.full_name || x.form.name)}</b><span class="type">${m.icon} ${esc(m.label.en)}</span><span class="src">${x.form.source==="staff"?"staff call":"web form"}</span></div>
+      <div class="meta">${new Date(x.created_at).toLocaleString()}</div></div>
+    <div class="grid"><div>${base}</div><div>${extra ? `<div class="sec">${esc(m.label.en)} details</div>${extra}` : `<div class="sec">${esc(m.label.en)} details</div><div class="meta" style="padding:6px 0">${x.status==="calling" ? "Collecting…" : "No type-specific details captured."}</div>`}</div></div>
+    ${x.summary ? `<div class="summary"><b>CALL-E summary:</b> ${esc(x.summary)}</div>` : ""}${x.failure ? `<div class="fail">${esc(x.failure)}</div>` : ""}
+    ${turns ? `<details><summary>Transcript (${(x.transcript||[]).length} turns)</summary>${turns}</details>` : ""}
+    <div class="rem"><div class="line"><b style="font-size:13.5px">Consultation reminder</b><input type="datetime-local" id="when_${x.id}" min="${minDt}"><button class="ghost" data-remind="${x.id}">Call to remind</button><span class="meta">Calls now, in ${esc(x.form.locale)}, and asks them to confirm.</span></div>${rems}</div>
+  </div>`;
+}
+async function remind(id) {
+  const el = document.getElementById("when_"+id); if (!el.value) { el.focus(); toast("Pick the consultation date and time first"); return; }
+  const when = whenText(el.value);
+  const r = await fetch(`/api/remind?token=${encodeURIComponent(TOKEN)}`, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ id, when }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { toast("CALL-E declined: " + (j.message || j.error), 6000); return; }
+  toast("Reminder call placed for " + when); load(true);
+}
+</script>
+</body>
+</html>
