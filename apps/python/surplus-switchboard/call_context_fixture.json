@@ -1,0 +1,12 @@
+{
+  "consented": true,
+  "consent_reference": "fictional-test-opt-in",
+  "phone": "+12025550123",
+  "call_not_before": 9000,
+  "call_before": 11000,
+  "partner_id": "near",
+  "batch_id": "demo",
+  "category": "produce",
+  "operator_name": "Fictional demonstration kitchen",
+  "offered_portions": 12
+}

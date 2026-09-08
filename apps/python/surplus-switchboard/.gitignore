@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+private/
+real-context.json
+provider-result*.json
+private-preview*.json
+private-review*.json
+private-handoff*.json

@@ -1,0 +1,131 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Surplus Switchboard</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#142b33;background:#f4f7f5}*{box-sizing:border-box}body{margin:0}header{background:#102f35;color:#fff;padding:32px max(24px,calc((100vw - 1180px)/2))}header p{color:#c6dcdb;max-width:760px;line-height:1.65}h1{font-size:clamp(28px,4vw,44px);letter-spacing:-1.2px;margin:8px 0}h2{font-size:19px;margin:0 0 16px}.eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:#9cdbbd}main{max-width:1228px;margin:0 auto;padding:24px}.notice{border-left:4px solid #b56c2d;background:#fff5e8;padding:14px 18px;line-height:1.5;font-size:14px;margin-bottom:24px}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}.panel{background:#fff;border:1px solid #d7e2de;border-radius:14px;padding:24px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px}.metric{padding:16px 12px;background:#eef5f2;border-radius:10px;font-size:12px}.metric b{display:block;font-size:25px;letter-spacing:-.6px;margin-top:8px}textarea{width:100%;height:340px;border:1px solid #c8d7d1;border-radius:8px;padding:14px;font:12px/1.55 ui-monospace,monospace;color:#233e41;background:#fbfdfb;resize:vertical}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}button{border:0;background:#165d4e;color:white;padding:12px 17px;border-radius:8px;font-weight:700;cursor:pointer}button.secondary{background:#e4ede9;color:#173d34}button:disabled{opacity:.55;cursor:progress}.status{font-size:14px;line-height:1.55;margin:16px 0;min-height:22px}.row{display:flex;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid #e4ebe7;font-size:14px}.row strong{white-space:nowrap}.bars{height:125px;display:flex;align-items:flex-end;gap:5px;padding:10px 0}.bar{flex:1;min-height:2px;background:#367d69;border-radius:4px 4px 0 0}.small{color:#5e756e;font-size:12px;line-height:1.6}pre{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f6f3;padding:14px;border-radius:8px;font-size:11px}summary{cursor:pointer;font-size:14px;font-weight:700}footer{max-width:1228px;margin:0 auto;padding:0 24px 30px;font-size:12px;color:#60756c}.badge{display:inline-block;font-size:11px;font-weight:700;background:#e2f0e8;color:#215442;border-radius:12px;padding:5px 10px;margin-bottom:16px}.error{color:#a33425}
+@media(max-width:800px){.grid{grid-template-columns:1fr}main{padding:16px}.panel{padding:18px}.metrics{grid-template-columns:repeat(3,1fr)}header{padding:28px 20px}.metric b{font-size:22px}}
+</style></head><body><header><div class="eyebrow">CAPACITY BEFORE COMMITMENT · LOCAL RESEARCH PROTOTYPE</div><h1>Surplus Switchboard</h1><p>Turn confirmed receiving capacity into a constrained surplus-food proposal—not just a list of places to call.</p></header><main><div class="notice"><strong>Simulation, not a live service.</strong> This demo uses invented partners and fixtures. CALL-E live calling has not been tested. Human clearance is required for food safety, capacity and any actual handoff.</div><div class="grid"><section class="panel"><h2>1. Inspect the planning inputs</h2><div class="small">Edit the JSON to test a constraint. The Python engine validates every run. Sample data is fictional.</div><div class="controls"><button id="run">Run local optimizer</button><button id="reset" class="secondary">Reset example</button></div><label for="input" class="small">Scenario JSON</label><textarea id="input" spellcheck="false"></textarea><p id="status" class="status" aria-live="polite">Loading bundled example…</p></section><section class="panel"><h2>2. Review the result</h2><span class="badge">Human decision required</span><div id="metrics" class="metrics"></div><div id="visual"></div><div id="detail"></div><div class="controls"><button id="download" class="secondary">Save result JSON</button></div><details><summary>Inspect computation evidence</summary><pre id="raw"></pre></details></section></div></main><footer>No account required for this local demonstration. No phone calls, device control, food allocation, or external posting occurs from this interface.</footer>
+<script>
+const KIND='surplus';let result=null,revision=0;const $=id=>document.getElementById(id);
+const embeddedSample={
+  "now": 10000,
+  "confirmation_ttl": 3600,
+  "batches": [
+    {
+      "id": "flex",
+      "portions": 6,
+      "category": "produce",
+      "ready_at": 9000,
+      "expires_at": 20000,
+      "operator_cleared": true
+    },
+    {
+      "id": "limited",
+      "portions": 6,
+      "category": "bread",
+      "ready_at": 9000,
+      "expires_at": 20000,
+      "operator_cleared": true
+    }
+  ],
+  "partners": [
+    {
+      "id": "near",
+      "capacity": 6,
+      "confirmed_at": 9990,
+      "receive_by": 20000,
+      "manager_verified": true,
+      "accepts": [
+        "produce",
+        "bread"
+      ]
+    },
+    {
+      "id": "far",
+      "capacity": 6,
+      "confirmed_at": 9990,
+      "receive_by": 20000,
+      "manager_verified": true,
+      "accepts": [
+        "produce"
+      ]
+    }
+  ],
+  "lanes": [
+    {
+      "batch": "flex",
+      "partner": "near",
+      "minutes": 1
+    },
+    {
+      "batch": "flex",
+      "partner": "far",
+      "minutes": 2
+    },
+    {
+      "batch": "limited",
+      "partner": "near",
+      "minutes": 3
+    }
+  ],
+  "description": "Constructed fictional case, not field data. Nearest-first uses the only partner able to receive bread for flexible produce."
+}
+;const embeddedResult={
+  "status": "proposal_requires_human_approval",
+  "portions": 12,
+  "portion_minutes": 30,
+  "allocations": [
+    {
+      "batch": "flex",
+      "partner": "far",
+      "minutes": 2,
+      "arrival_at": 10120,
+      "portions": 6
+    },
+    {
+      "batch": "limited",
+      "partner": "near",
+      "minutes": 3,
+      "arrival_at": 10180,
+      "portions": 6
+    }
+  ],
+  "rejected_lanes": [],
+  "input_sha256": "eaadd31a0495384361b252eae09ba8633c6cfa9f6cfb7ec5701e6474fae3c3d1",
+  "max_flow_certificate": {
+    "flow": 12,
+    "cut_capacity": 12,
+    "sink_reachable": false
+  },
+  "assumptions": [
+    "All lanes independently available; not a vehicle-routing solution.",
+    "Portions are homogeneous integer units within each batch.",
+    "Capacity freshness and safety clearance are supplied by people.",
+    "No actual food, transport, cost, or environmental savings measured."
+  ],
+  "nearest_first_baseline": {
+    "portions": 6,
+    "portion_minutes": 6
+  }
+}
+;
+function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
+function metric(label,value){const e=element('div',label,'metric');e.append(element('b',value));$('metrics').append(e);}
+function row(left,right){const e=element('div',undefined,'row');e.append(element('span',left),element('strong',right));$('detail').append(e);}
+function clearResult(){revision++;result=null;$('download').disabled=true;$('metrics').replaceChildren();$('detail').replaceChildren();$('visual').replaceChildren();$('raw').textContent='No result for the current inputs. Run the optimizer after correcting any errors.';}
+function render(r){result=r;$('download').disabled=false;$('metrics').replaceChildren();$('detail').replaceChildren();$('visual').replaceChildren();$('raw').textContent=JSON.stringify(r,null,2);
+ if(KIND==='surplus'){
+ metric('Proposed portions',String(r.portions));metric('Nearest-first baseline',String(r.nearest_first_baseline.portions));metric('Flow / cut check',r.max_flow_certificate.flow===r.max_flow_certificate.cut_capacity?'PASS':'FAIL');
+ r.allocations.forEach(a=>row(a.batch+' → '+a.partner,a.portions+' portions'));
+ row('Secondary objective',r.portion_minutes+' portion-minutes');
+ r.rejected_lanes.forEach(l=>row(l.batch+' → '+l.partner,l.reason));
+ $('detail').append(element('p','This is an exact allocation for the stated model, not a van route. Capacity is shared across batches. Stale confirmations, expiry, incompatible categories and missing human clearance block lanes.','small'));
+ }else{
+ const m=r.metrics;if(!m){metric('Search status',r.status);$('detail').append(element('p','No valid schedule returned. This is not proof of infeasibility when the search budget was exhausted.','small'));return;}
+ metric('Baseline peak',(r.earliest_start_baseline.peak_watts/1000).toFixed(1)+' kW');metric('Scheduled peak',(m.peak_watts/1000).toFixed(1)+' kW');metric('Total energy',m.energy_kwh.toFixed(2)+' kWh');
+ const chart=element('div',undefined,'bars');const max=Math.max(...m.load_watts);m.load_watts.forEach((w,i)=>{const b=element('div',undefined,'bar');b.style.height=(w/max*100)+'%';b.title='Slot '+i+': '+w+' watts';chart.append(b)});$('visual').append(chart,element('p','Scheduled load by slot. Bars show modeled power, not measured energy savings.','small'));
+ Object.entries(r.starts).forEach(([job,start])=>row(job,'Start slot '+start));row('Search status',r.status);row('Estimated carbon',m.carbon_g.toFixed(1)+' g');row('Estimated tariff cost','$'+m.cost_dollars.toFixed(4));
+ $('detail').append(element('p','Priorities: minimize peak power, then input-based carbon, then input-based tariff. Total energy does not change. Forecasts and loads are fictional; no device is controlled.','small'));
+ }}
+async function run(){const b=$('run');b.disabled=true;clearResult();const requestRevision=revision;$('status').className='status';$('status').textContent='Computing the current inputs…';try{const d=JSON.parse($('input').value);if(location.protocol==='file:')throw new Error('To compute edited inputs, run python app.py and open its localhost address.');const res=await fetch('/solve',{method:'POST',headers:{'Content-Type':'application/json','X-Local-Demo':'1'},body:JSON.stringify(d)});const r=await res.json();if(requestRevision!==revision)return;if(!res.ok)throw new Error(r.error||'Validation failed');render(r);$('status').textContent='Python computation completed. Inspect the result and assumptions.';}catch(e){if(requestRevision===revision){clearResult();$('status').textContent=e.message;$('status').className='status error'}}finally{b.disabled=false;}}
+$('input').addEventListener('input',()=>{clearResult();$('status').className='status';$('status').textContent='Inputs changed. Run the optimizer to compute a new proposal.'});
+$('run').onclick=run;$('reset').onclick=()=>{clearResult();$('status').className='status';$('input').value=JSON.stringify(embeddedSample,null,2);render(embeddedResult);$('status').textContent='Bundled, actually computed example loaded. No live services were used.'};$('download').onclick=()=>{if(result===null)return;const blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'});const a=element('a');a.href=URL.createObjectURL(blob);a.download=KIND+'-result.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};$('reset').click();
+</script></body></html>
