@@ -658,9 +658,12 @@ class ImpactSummary:
         # went quiet about it would be the software agreeing with itself.
         if self.dialled_on_a_record or self.dialled_on_a_boolean:
             out += ["", "  consent"]
-            if self.dialled_on_a_record:
-                out.append(f"    on a record        {self.dialled_on_a_record}   dated, "
-                           "voice, attendance, not withdrawn")
+            # Printed at zero as well. A run that dialled nothing on a record used to
+            # omit the line entirely, which reads as an absence of information about the
+            # good path rather than as a count of zero on it, and the omitted line is the
+            # one a district's counsel is looking for.
+            out.append(f"    on a record        {self.dialled_on_a_record}   dated, "
+                       "voice, attendance, not withdrawn")
             if self.dialled_on_a_boolean:
                 out.append(f"    on a boolean       {self.dialled_on_a_boolean}   a column "
                            "that says yes, which is not a record")
