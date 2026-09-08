@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+E164 = re.compile(r"^\+[1-9][0-9]{7,14}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
 SAFE_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,'&()/+-]{1,95}$")
-PHONE_LIKE = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
+PHONE_LIKE = re.compile(r"(?<!\w)\+?[1-9][0-9]{7,14}(?!\w)")
 REQUESTS = {
     "REQUEST_RETAKE": "a sharp overhead photo in even lighting with the entire parcel in frame",
     "REQUEST_WIDER_VIEW": "one wider photo showing the entire parcel and its edges",

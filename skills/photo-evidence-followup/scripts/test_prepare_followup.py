@@ -56,6 +56,10 @@ class PrepareFollowupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "E.164"):
             MODULE.build_preview(trace("REQUEST_RETAKE"), request(phone="416-555-0199"))
 
+    def test_rejects_unicode_digits(self) -> None:
+        with self.assertRaisesRegex(ValueError, "E.164"):
+            MODULE.build_preview(trace("REQUEST_RETAKE"), request(phone="+1416555019٩"))
+
     def test_task_discloses_ai_and_forbids_sensitive_requests(self) -> None:
         task = MODULE.build_preview(trace("REQUEST_LABEL_PHOTO"), request())["task"]
         self.assertIn("AI calling assistant", task)
