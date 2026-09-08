@@ -2109,7 +2109,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'recordings are held outside this repository; the transcript, the offsets and the '
         'shape of the waveform are what CALL-E returned. Every call went to the author’s '
         'own line, scripted and consented, and the pupil names in the transcripts are '
-        'fictional.</p>',
+        'fictional. CALL-E offers one language for each country, and for a United States '
+        'number that language is English: <a href="#act-01">act 01</a> says what that '
+        'costs and <a href="#act-07">act 07</a> is the run that shows it.</p>',
     ]
     add(act("00", "The call", "".join(body), "hero"))
 
