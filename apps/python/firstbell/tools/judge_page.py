@@ -349,6 +349,15 @@ def _recorded_call_total() -> int:
         (EVIDENCE / "recorded-calls.json").read_text(encoding="utf-8"))["counts"]["calls"]
 
 
+def _film_running_time() -> str:
+    """`2 min 58`, from the measurement, or nothing at all if it has not been measured."""
+    facts = EVIDENCE / "film.json"
+    if not facts.exists():
+        return "the demo"
+    seconds = json.loads(facts.read_text(encoding="utf-8"))["seconds"]
+    return f"{int(seconds // 60)} min {int(round(seconds % 60)):02d}"
+
+
 def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> str:
     """The register: one row per call, one column per field, and one row still running.
 
@@ -763,20 +772,25 @@ def repo_link_markup(repo_url: str | None) -> str:
 def video_link_markup(video_url: str | None) -> str:
     """The demo, or nothing.
 
-    Same rule as the source link and for a worse reason. The video existed for weeks, two
-    minutes and fifty three seconds of it, four recordings of real calls, and it was linked
-    from no README, no page and no submission field, so no judge could reach it. It is not
-    linked from a constant because the rules require it to be "uploaded to and made
-    publicly visible on YouTube or Vimeo", and a link to a video nobody has published yet
-    is worse than no link.
+    Same rule as the source link and for a worse reason. The film existed for weeks, four
+    recordings of real calls, and it was linked from no README, no page and no submission
+    field, so no judge could reach it. It is not linked from a constant because the rules
+    require it "uploaded to and made publicly visible on YouTube or Vimeo", and a link to a
+    video nobody has published yet is worse than no link.
 
     Rebuild with `--video-url` the moment it is up.
+
+    The running time is read rather than written. It said 2 min 53 here for a fortnight,
+    and a re-render made the cut five seconds longer and this line wrong, along with the
+    same figure in the README and in this docstring. The film is not in the repository, so
+    `make-receipt.py` measures the file and writes `evidence/film.json` beside RECEIPT.md,
+    and this reads that.
     """
     if not video_url:
         return ""
     safe = html.escape(video_url, quote=True)
     return (f'<p class=source-link><a href="{safe}" rel="noopener">'
-            f'Watch the demo, 2 min 53</a></p>')
+            f'Watch the demo, {_film_running_time()}</a></p>')
 
 
 def marginalia(label: str, body: str) -> str:

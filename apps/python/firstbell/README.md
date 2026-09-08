@@ -11,12 +11,14 @@ pip install -r requirements.txt
 python -m firstbell --work-file examples/absences.csv
 ```
 
-There is a demo film, 2 minutes 53, and every voice in it is from a real call this software
-placed. Its running time, byte size and hash are measured rather than typed, and the same
-measurement records what it does not have: no narration is mixed into the built cut, and
-44 seconds of it from 2:13 carry no sound at all. The public link is in the submission form
-rather than here, because the file is not uploaded yet and a link to an unpublished video is
-worse than no link.
+There is a demo film, 2 minutes 58, and every voice in it is from a real call this software
+placed. Its running time, byte size and hash are measured rather than typed, into
+[`evidence/film.json`](evidence/film.json), which is where that figure comes from: it read
+2 minutes 53 in three places until a re-render made the cut longer and made all three wrong
+at once. The same measurement records what the film does not have. No narration is mixed
+into the built cut, and 37% of the running time carries sound at all. The public link is in
+the submission form rather than here, because the file is not uploaded yet and a link to an
+unpublished video is worse than no link.
 
 ![The path of one absence row, left to right. Two checks come first: a family with no consent is never dialled, and a family the telephone cannot reach goes straight to a person. Then a short instruction in the family's own language, with the automated-caller disclosure before anything is asked. Then CALL-E places the call, under a cap on how many families are rung at once, one idempotency key per row, polled to the end. Then exactly one of three endings: resolved, owned by nobody; undetermined and failed, both owned by a person. A safeguarding escalation runs as a second axis, leaving resolved and undetermined but never failed, because a call that reached nobody has no answer to read a rule against.](docs/images/the-path-of-one-absence.svg)
 
