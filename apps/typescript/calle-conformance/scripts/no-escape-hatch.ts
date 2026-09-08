@@ -88,14 +88,13 @@ await writeFile(
 
 /**
  * The point of this probe is that a value came back at all, so the report needs
- * the shape rather than the words. Terminal output gets pasted into issues, so
- * --print-result prints the values as an operator's decision rather than a
- * default. The saved evidence file is unaffected and is git-ignored.
+ * the shape rather than the words. Terminal output gets pasted into issues, and
+ * there is no flag to print the values: an opt-in is still a route, and a flag in
+ * a README is a thing people paste without reading. The saved evidence file is
+ * unaffected and is git-ignored.
  */
-const showResult = process.argv.includes("--print-result");
 const describeResult = (v: unknown): string => {
   if (v === null || v === undefined) return "null";
-  if (showResult) return JSON.stringify(v);
   if (typeof v !== "object") return `1 value, ${typeof v}`;
   const keys = Object.keys(v as Record<string, unknown>);
   return `${keys.length} keys: ${keys.join(", ")}`;
