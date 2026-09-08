@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the nineteen marked **needs the built page**. Those nineteen are held by gates
+the twenty marked **needs the built page**. Those twenty are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -70,6 +70,35 @@ what the run does, and both rows put the overclaim back.
 Rows 253 to 255 were measured twice. The first pass ran while the README's own test count was
 one revision behind, so each came back a point high: the mutation's catch plus a failure with
 nothing to do with it. The counts published here are the second pass, against a green suite.
+
+**Rows 262 to 265 were added on 8 September 2026**, for the denominator gate. An audit of
+the tree found two of the four defects. This suite found none of them, and it is worth saying
+so plainly: 261 rows above this one and 636 tests did not stop a sentence quoting the wrong
+number out of this entry's own committed record.
+
+`evidence/recorded-calls.json` is the one numerator here nobody chose. It records twelve calls
+placed, eleven of them answered, and it keeps two versions of the net-new escalation count on
+purpose: what every call comes to re-filed under today's code, and what the receipts said
+before one case was corrected from resolved to undetermined. Keeping both is the honest thing.
+Quoting the wrong one is not.
+
+`evidence/README.md` listed the file's own integers and ended on the stale one, two paragraphs
+above the section narrating the correction that made it zero. `docs/the-money-in-full.md` put
+"12 real calls" against three rows of a table headed "Net-new per 100 answered calls" and
+called the sample twelve in the prose under it, while its own prose two paragraphs earlier said
+eleven and README's copy of the same table had always said eleven. Looking for what those two
+had in common found the fourth: the money card on the page read "What 12 calls cannot rule out"
+over a bound computed from `answered`, eleven lines above a paragraph that reads it correctly
+out of the same record. An escalation cannot happen on a call nobody answered.
+
+The gate took two attempts, and the first one is the more useful thing to record. It allowed a
+nearby sentence explaining the gap between placed and answered to excuse a match, over a window
+of 180 characters. In a table that window reaches the next row, so a wrong cell was excused by
+the correct cell beside it and row 263 survived its first measurement. On the built page the
+whole money card flattens into one run with no full stop in it, so the footnote under the card
+excused the label above it and row 265 survived too. Every check is now scoped to one sentence,
+one table cell, or one block element, which is the unit a reader actually reads. Both counts
+published here are from after that.
 
 **Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
 rows can be applied by a script. Twenty-nine came
@@ -414,6 +443,10 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 259 | Strip the flag, the environment variable and the committed file out of one COULD-NOT-MEASURE message, leaving a reviewer told what is missing and nowhere to go for it | 1 |
 | 260 | Say in the README that the OneRoster run prints the platform refusing Spanish on a real call, when no call has been placed in Spanish and the refusal is the double's | 1 |
 | 261 | Say the same in the caption under act 01, in the words the reviewer who asked for that caption wrote it in **Needs the built page.** | 1 |
+| 262 | State the escalation count the receipts recorded before the correction as the current one, in the file that narrates the correction two paragraphs below it | 1 |
+| 263 | Offer the calls placed as the sample in all three rows of a table whose column is a rate per answered call | 1 |
+| 264 | Call the sample twelve calls in the sentence a district is told to take from that table, where the figures are over the eleven that answered | 1 |
+| 265 | Label the bound on the money card with the calls placed rather than the calls answered, eleven lines above a paragraph that reads it correctly out of the same record **Needs the built page.** | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

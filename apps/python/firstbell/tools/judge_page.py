@@ -1286,11 +1286,17 @@ def _money_key_block(f: dict) -> str:
         f'<dd>${pooled["net_ceiling"]:,.2f}</dd></div>'
         '<div><dt>Where that becomes a loss</dt>'
         f'<dd>{pooled["crossover_per_100"]:.1f} per 100 answered calls</dd></div>'
-        f'<div><dt>What {pooled["calls"]} calls cannot rule out</dt>'
+        # The answered count, not the placed one. The bound is a rate per answered call,
+        # computed in money_across_runs.figures_for from `answered`, and one of the calls
+        # reached nobody. This card said twelve for a figure over eleven, which is the same
+        # defect an audit found in two other places on the same day.
+        f'<div><dt>What {pooled["answered"]} answered calls cannot rule out</dt>'
         f'<dd>{100 * pooled["net_new_bound"]:.0f} per 100</dd></div>'
         '</dl>'
-        '<p class=money-key-foot>Measured over every call this software has placed, which '
-        'is the one denominator on this page nobody chose. The paragraph below is the same '
+        '<p class=money-key-foot>The sample is every call this software has placed, which '
+        'is the one denominator on this page nobody chose, and these two rates are per '
+        'answered call, because one of those calls reached nobody. The paragraph below is '
+        'the same '
         'figures with the objections they answer, and the demo run&#8217;s own numbers are '
         'in the two cards above.</p>')
 

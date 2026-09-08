@@ -120,9 +120,9 @@ Put the three side by side, because this is the whole commercial question in one
 |---|---|---|
 | Measured on the committed offline run | 20.0 | offline, authored mix |
 | Where the saving becomes a loss on that run | 50.4 | offline, authored mix |
-| Measured on the calls that rang | 0 | 12 real calls |
-| What those calls cannot rule out | 24 | 12 real calls |
-| Where the saving becomes a loss on them | **34.3** | 12 real calls |
+| Measured on the calls that rang | 0 | 11 answered calls |
+| What those calls cannot rule out | 24 | 11 answered calls |
+| Where the saving becomes a loss on them | **34.3** | 11 answered calls |
 
 Read the last three rows together and ignore the first two for this purpose. Twenty-four
 against 34.3 leaves about ten per hundred to spare, which is what the README and
@@ -136,8 +136,10 @@ page, where the same bound is set against a third crossover for a single receipt
 with three conclusions and nothing saying which to staff against. It is the one on the calls
 that rang: 34.3, because that denominator is the only one nobody chose.
 
-What a district should take from the table is that the sample is twelve calls, so the row
-that matters is the bound and not the count. A district running at a higher alert rate than the
+What a district should take from the table is that the sample is eleven answered calls, so
+the row that matters is the bound and not the count. Twelve were placed and one of them
+reached nobody, and an escalation cannot happen on a call nobody answered, so eleven is the
+denominator every figure in those three rows is over. A district running at a higher alert rate than the
 sample, or closing fewer records than this run closes, walks into the loss without the
 software saying a word. So the software says it. A run that removes fewer attempts absorbs
 a lower rate, and the figure moves down with it.
