@@ -1,0 +1,62 @@
+{
+  "id": "evt_seed_B",
+  "type": "call.completed",
+  "created_at": "2026-09-07T18:05:00Z",
+  "data": {
+    "id": "call_seed_B",
+    "object": "call_task",
+    "status": "completed",
+    "task": "Call +12025550123 and reschedule Dana Lewis's appointment to a haircut on 2026-09-10 at 15:30 America/New_York. Confirm the new day and time.",
+    "recipients": [
+      {
+        "id": "rcp_B",
+        "phones": ["+12025550123"],
+        "locale": "en-US",
+        "region": "US",
+        "status": "completed",
+        "structured_result": {
+          "appointment_date": "2026-09-10",
+          "appointment_time": "15:00",
+          "timezone": "America/New_York",
+          "confirmed": true
+        },
+        "summary": "Rescheduled to Thursday at 3 PM.",
+        "attempts": [
+          {
+            "id": "att_B1",
+            "phone": "+12025550123",
+            "status": "completed",
+            "started_at": "2026-09-07T18:00:00Z",
+            "ended_at": "2026-09-07T18:02:30Z",
+            "summary": "Rescheduled to Thursday at 3 PM.",
+            "transcript_turns": [
+              { "offset_seconds": 0, "speaker": "bot", "text": "You'd like to move your appointment. What day works better for you?" },
+              { "offset_seconds": 5, "speaker": "user", "text": "Thursday would be good." },
+              { "offset_seconds": 8, "speaker": "bot", "text": "Okay, Thursday. And what time?" },
+              { "offset_seconds": 11, "speaker": "user", "text": "Thursday at 3... no wait, make it 3:30." },
+              { "offset_seconds": 15, "speaker": "bot", "text": "Alright, I've noted that down. Thanks." }
+            ],
+            "provider_call_id": "prov_B1",
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": {
+      "appointment_date": "2026-09-10",
+      "appointment_time": "15:00",
+      "timezone": "America/New_York",
+      "confirmed": true
+    },
+    "summary": "Rescheduled to Thursday at 3 PM.",
+    "task_completed": true,
+    "completion_confidence": { "score": 0.9, "label": "high" },
+    "evidence": ["Caller said 'Thursday at 3'"],
+    "metadata": { "verification_id": "ver_seed_B", "hold_id": "hold_seed_B_run", "intent": "reschedule" },
+    "failure_code": null,
+    "failure_message": null,
+    "created_at": "2026-09-07T18:00:00Z",
+    "completed_at": "2026-09-07T18:02:31Z"
+  }
+}

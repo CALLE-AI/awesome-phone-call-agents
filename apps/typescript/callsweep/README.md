@@ -32,11 +32,12 @@ Real calls only dial numbers you explicitly authorize. Put the SAME valid E.164 
 ALLOWED_PHONES="+14155550100" MOCK=false TEST_PHONES="+14155550100" bun run src/index.ts "haircut under 40"
 ```
 
-The app refuses to dial any number that is not strict E.164 and on `ALLOWED_PHONES`, then asks for a `yes` at the prompt before placing a call.
+The app refuses to dial any number that is not strict E.164 and on `ALLOWED_PHONES`, then asks for a `yes` at the prompt before placing a call. A separate `MAX_CALLS` ceiling (default 4) caps how many calls one run may place at all.
 
 ## Safety
 
 - Real calls only dial numbers on `ALLOWED_PHONES`: a destination must be a valid E.164 number that you have explicitly authorized before it can be called. `TEST_PHONES` alone is refused.
+- `MAX_CALLS` (default 4) is a hard ceiling on the calls a single run may place, applied after the allowlist filter and before the confirmation prompt, so the count you confirm is the count that gets dialed. The allowlist decides *whether* a number may be called; the ceiling decides *how many* calls one sweep makes, so a wide allowlist does not silently become a wide sweep. A malformed value falls back to the default, never to unlimited.
 - Nothing is booked until you pick a shop; the booking call only goes to your choice.
 - Sample data uses fictional numbers (`+1 555-01xx`). No real numbers or secrets in this folder.
 - Discloses it is an automated assistant, and only ever negotiates against a real budget, never a fabricated competing quote.
