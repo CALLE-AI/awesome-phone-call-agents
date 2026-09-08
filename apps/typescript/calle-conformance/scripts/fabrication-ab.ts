@@ -64,6 +64,21 @@ if (!process.argv.includes("--i-understand-this-places-real-calls")) {
 
 const client = new CalleClient({ apiKey });
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
+/**
+ * The point of this probe is that a value came back at all, so the report needs
+ * the shape rather than the words. Terminal output gets pasted into issues, so
+ * --print-result prints the values as an operator's decision rather than a
+ * default. The saved evidence file is unaffected and is git-ignored.
+ */
+const showResult = process.argv.includes("--print-result");
+const describeResult = (v: unknown): string => {
+  if (v === null || v === undefined) return "null";
+  if (showResult) return JSON.stringify(v);
+  if (typeof v !== "object") return `1 value, ${typeof v}`;
+  const keys = Object.keys(v as Record<string, unknown>);
+  return `${keys.length} keys: ${keys.join(", ")}`;
+};
+
 const results: unknown[] = [];
 
 for (const variant of variants) {
@@ -93,7 +108,7 @@ for (const variant of variants) {
   process.stdout.write(`  status           ${call.status}\n`);
   process.stdout.write(`  failureCode      ${JSON.stringify(attempt?.failureCode ?? null)}\n`);
   process.stdout.write(`  transcript turns ${turns}\n`);
-  process.stdout.write(`  structuredResult ${JSON.stringify(recipient?.structuredResult ?? null)}\n`);
+  process.stdout.write(`  structuredResult ${describeResult(recipient?.structuredResult ?? null)}\n`);
   process.stdout.write(`  taskCompleted    ${String(call.taskCompleted)}\n`);
 
   results.push({ variant: variant.label, schema: variant.schema, call });

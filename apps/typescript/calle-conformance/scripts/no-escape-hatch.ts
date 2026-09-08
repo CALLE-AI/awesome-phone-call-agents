@@ -86,10 +86,25 @@ await writeFile(
   "utf8",
 );
 
+/**
+ * The point of this probe is that a value came back at all, so the report needs
+ * the shape rather than the words. Terminal output gets pasted into issues, so
+ * --print-result prints the values as an operator's decision rather than a
+ * default. The saved evidence file is unaffected and is git-ignored.
+ */
+const showResult = process.argv.includes("--print-result");
+const describeResult = (v: unknown): string => {
+  if (v === null || v === undefined) return "null";
+  if (showResult) return JSON.stringify(v);
+  if (typeof v !== "object") return `1 value, ${typeof v}`;
+  const keys = Object.keys(v as Record<string, unknown>);
+  return `${keys.length} keys: ${keys.join(", ")}`;
+};
+
 process.stdout.write(`status            ${call.status}\n`);
 process.stdout.write(`failureCode       ${JSON.stringify(attempt?.failureCode ?? null)}\n`);
 process.stdout.write(`transcript turns  ${turns.length}\n`);
-process.stdout.write(`structuredResult  ${JSON.stringify(value)}\n`);
+process.stdout.write(`structuredResult  ${describeResult(value)}\n`);
 process.stdout.write(`taskCompleted     ${String(call.taskCompleted)}\n`);
 process.stdout.write(`evidence          ${JSON.stringify(call.evidence ?? null)}\n`);
 
