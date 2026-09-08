@@ -953,11 +953,11 @@ need something this repository cannot ship: the twelve call recordings, which ar
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **587 passed, 18 skipped**.
+A clean checkout of this commit into an empty directory reports **588 passed, 18 skipped**.
 The eighteen name what is missing rather than passing quietly: seven want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **603 passed, 2 skipped**. Both pairs are measured,
+run the gates and the same suite reports **604 passed, 2 skipped**. Both pairs are measured,
 both add up to 606, and the difference between them is what a reader has on their disk.
 
 A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
