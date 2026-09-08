@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
