@@ -171,7 +171,9 @@ project tests against, and nothing more. It does not mean the code mishandles th
 behaviour, and it does not mean the project is wrong. Several of the projects above
 handle cases this corpus does not contain at all.
 
-Exit status is not a verdict. The checker never fails a build.
+Exit status is a verdict only when you ask for one. With no `--require`, the
+checker reports and exits 0, whatever it found. With `--require`, it is a gate
+and it exits 20 or 45 on purpose, and the section above says what each means.
 
 Files that carry transcript turns in a shape the checker cannot read are listed
 rather than counted as empty, because silently dropping a payload is the failure
@@ -278,6 +280,19 @@ were derived from, so they skip from a clean checkout and say why. They are kept
 rather than deleted because they are the tests that prove the masking held, and
 they run for anyone holding the captures. The captures themselves are never
 published.
+
+## Where the key can go, and what the terminal prints
+
+`CALLE_BASE_URL` decides where the API key is sent, so it is a credential
+destination rather than a convenience setting. `src/endpoint.ts` validates it:
+https only, and only a CALL-E origin. Anything else is refused with a message
+saying why, instead of being handed to the client. Six tests cover it, including
+a path that tries to smuggle a different destination past an allowed origin.
+
+Destinations printed by the probes are masked to their country code and last two
+digits, because terminal output ends up pasted into issues and screen recordings.
+The published testing hotline is the one exception and stays legible, since it is
+public.
 
 ## Side effects
 

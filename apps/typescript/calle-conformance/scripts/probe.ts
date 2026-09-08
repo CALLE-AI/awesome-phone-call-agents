@@ -21,6 +21,7 @@
 import { CalleClient } from "@call-e/calle";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { baseUrl, maskPhone } from "../src/endpoint.ts";
 
 const RESULTS_DIR = "probe-results";
 const RUN_ID = new Date().toISOString().replace(/[:.]/g, "-");
@@ -85,7 +86,7 @@ function readEnv() {
   }
   return {
     apiKey,
-    baseUrl: process.env.CALLE_BASE_URL ?? "https://api.heycall-e.com",
+    baseUrl: baseUrl(),
     ownPhone: process.env.CALLE_OWN_PHONE ?? "",
     ownRegion: process.env.CALLE_OWN_REGION ?? "US",
     ownLocale: process.env.CALLE_OWN_LOCALE ?? "en-US",

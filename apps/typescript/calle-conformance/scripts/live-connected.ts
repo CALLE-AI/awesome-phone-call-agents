@@ -22,9 +22,10 @@
 
 import { CalleClient } from "@call-e/calle";
 import { mkdir, writeFile } from "node:fs/promises";
+import { maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
 
 /** The English testing hotline CALL-E publishes for integration testing. */
-const TESTING_HOTLINE = "+12763229632";
+const TESTING_HOTLINE = PUBLIC_TESTING_HOTLINE;
 
 const REQUIRED_LINE = "This is an automated call from an AI assistant.";
 
@@ -52,8 +53,7 @@ const phone = process.env.CALLE_TEST_PHONE ?? TESTING_HOTLINE;
 const region = process.env.CALLE_TEST_REGION ?? "US";
 const locale = process.env.CALLE_TEST_LOCALE ?? "en-US";
 
-process.stdout.write(`Destination   ${phone} (${region} ${locale})`);
-process.stdout.write(phone === TESTING_HOTLINE ? "  [CALL-E testing hotline]\n" : "\n");
+process.stdout.write(`Destination   ${maskPhone(phone)} (${region} ${locale})\n`);
 process.stdout.write(`Task          ${TASK}\n`);
 process.stdout.write(`Required line "${REQUIRED_LINE}"\n\n`);
 

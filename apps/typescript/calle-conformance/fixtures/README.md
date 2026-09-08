@@ -111,6 +111,40 @@ Present in 6 of 15 fixtures: `completed-no-failure-9turns-549d84.json`, `complet
 | `failed-603-0turns-14ab2d.json` | failed | `603` | 0 | 6 |
 | `failed-603-0turns-d4734e.json` | failed | `603` | 0 | 6 |
 
+## Who was on the other end
+
+A corpus of captured responses invites one question before any other: whose
+conversation is this. The answer here is that there is not one. Every counterpart
+in these transcripts is a machine, and each is identifiable from its own words in
+the payload:
+
+| what answered | how you can tell, from the fixture itself |
+| --- | --- |
+| the CALL-E English testing hotline, published by a maintainer on 7 September 2026 for exactly this | it introduces itself: `I'm an AI voice agent for this hotline` |
+| a carrier test platform | every one of its turns is prefixed `This is an automated call generated on a carrier test platform` |
+| a provider trial gate | its single turn is the verification notice it plays to unverified numbers |
+
+No private individual is recorded here, no conversation between people, and
+nothing anybody said in confidence. The task prompts are the author's own.
+
+What was rewritten, and what was deliberately not:
+
+- **Numbers** are replaced with ones from ranges reserved for documentation.
+  `test/corpus.test.ts` fails if a number outside those ranges reaches this
+  directory, verified by injecting a real one.
+- **Identifiers** are replaced with deterministic synthetic values. Not one
+  identifier from the private captures appears here, and a test compares the two
+  sets to keep it that way.
+- **Absolute times** are rebased onto a fixed synthetic instant, so no fixture
+  says when any call happened.
+- **Relative times are preserved on purpose.** The gap between `createdAt` and a
+  failed attempt's `startedAt`, and the offsets between turns, are the evidence
+  for three of the behaviours below. Normalising them would delete the finding
+  rather than protect anybody, since an interval identifies nobody.
+
+The private captures these were derived from are never published, and the two
+tests that check the rewriting against them skip from a clean checkout and say so.
+
 ## Regenerating
 
 ```bash

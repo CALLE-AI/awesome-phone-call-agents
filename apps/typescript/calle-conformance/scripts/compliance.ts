@@ -24,9 +24,10 @@
 
 import { CalleClient } from "@call-e/calle";
 import { mkdir, writeFile } from "node:fs/promises";
+import { maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
 
 /** The English testing hotline CALL-E publishes for integration testing. */
-const TESTING_HOTLINE = "+12763229632";
+const TESTING_HOTLINE = PUBLIC_TESTING_HOTLINE;
 
 const ALLOWED = [
   "This is an automated call from an AI assistant.",

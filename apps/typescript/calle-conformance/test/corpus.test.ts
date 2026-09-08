@@ -64,6 +64,29 @@ describe("the corpus carries no real data", () => {
     assert.deepEqual(leaked, [], `identifiers reached the corpus: ${leaked.join(", ")}`);
   });
 
+  test("no transcript turn carries contact details of any kind", () => {
+    // A reviewer asked for the corpus to be removed on the grounds that it holds
+    // real call content. It does, and this asserts what that content cannot be:
+    // no address, no link, no dialable number reaches the published turns.
+    const PATTERNS: Array<[string, RegExp]> = [
+      ["an email address", /[\w.+-]+@[\w-]+\.[\w.]{2,}/],
+      ["a URL", /https?:\/\/[^\s"']+/],
+      ["a phone number outside the reserved ranges", /\+(?!1202555|1415555|1212555|1800555|1312555|447700900)\d{8,}/],
+    ];
+    for (const file of fixtureFiles) {
+      const payload = JSON.parse(readFileSync(join(FIXTURE_DIR, file), "utf8")) as CallPayload;
+      const spoken = (payload.recipients ?? [])
+        .flatMap((r) => r.attempts ?? [])
+        .flatMap((a) => a.transcriptTurns ?? [])
+        .map((t) => t.text)
+        .join(" ");
+      for (const [what, pattern] of PATTERNS) {
+        const hit = spoken.match(pattern);
+        assert.equal(hit, null, `${file} carries ${what}: ${hit?.[0] ?? ""}`);
+      }
+    }
+  });
+
   test("no vendor name or credential prefix appears", () => {
     for (const forbidden of ["telnyx", "twilio", "iams_live", "iams_test", "abuse@"]) {
       assert.ok(
