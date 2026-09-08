@@ -125,5 +125,15 @@ def build_metadata(request: ChangeRequest, vendor: VendorRecord) -> dict[str, st
     }
 
 
-def idempotency_key(request: ChangeRequest) -> str:
-    return f"known-number:{request.ticket_id}"
+def idempotency_key(request: ChangeRequest, task: str = "") -> str:
+    """One key per ticket *and* per exact task text.
+
+    CALL-E binds an idempotency key to the first request body it sees, even
+    when that request was rejected by the planner. Keying on the task text as
+    well means a revised script after a rejection is a new request, while an
+    accidental double-run of the same script is still de-duplicated.
+    """
+    import hashlib
+
+    suffix = hashlib.sha256(task.encode("utf-8")).hexdigest()[:8] if task else "0"
+    return f"known-number:{request.ticket_id}:{suffix}"

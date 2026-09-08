@@ -100,7 +100,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
         out["result_schema"] = RESULT_SCHEMA
         out["recipient"] = {"phones": [mask_phone(vendor.known_phone)], "region": vendor.region, "locale": vendor.locale}
         out["metadata"] = build_metadata(request, vendor)
-        out["idempotency_key"] = idempotency_key(request)
+        out["idempotency_key"] = idempotency_key(request, out["task"])
         out["verification_code_for_written_notice"] = verification_code(request, _code_secret())
         task_l = out["task"].lower()
         out["payment_free_task"] = (
@@ -143,12 +143,13 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return cmd_status(args)
 
     client = _client()
+    task = build_task(request, vendor, company_name=args.company)
     payload = {
-        "task": build_task(request, vendor, company_name=args.company),
+        "task": task,
         "recipient": {"phone": vendor.known_phone, "region": vendor.region, "locale": vendor.locale},
         "result_schema": RESULT_SCHEMA,
         "metadata": build_metadata(request, vendor),
-        "idempotency_key": idempotency_key(request),
+        "idempotency_key": idempotency_key(request, task),
     }
     created = client.calls.create(**payload)
     call_id = str(created["id"])

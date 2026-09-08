@@ -31,4 +31,6 @@ def test_schema_is_json_serialisable_and_closed():
 
 
 def test_idempotency_key_is_per_ticket(request_v0417):
-    assert idempotency_key(request_v0417) == "known-number:AP-2026-1183"
+    assert idempotency_key(request_v0417) == "known-number:AP-2026-1183:0"
+    a = idempotency_key(request_v0417, "task A")
+    assert a == idempotency_key(request_v0417, "task A") and a != idempotency_key(request_v0417, "task B")
