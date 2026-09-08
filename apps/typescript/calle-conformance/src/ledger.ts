@@ -12,10 +12,11 @@
  * and eliminates the ones that disagree. It is an instrument for finding the
  * accounting rule, and only afterwards a guard that enforces it.
  *
- * The counter is readable without placing a call: payload validation runs
- * before the rate limiter but destination screening runs after it, so a
- * well-formed request aimed at an unsupported region returns 422 under the cap
- * and 429 carrying { limit, window_hours, count } at it.
+ * The counter is readable without placing a call. A well-formed request aimed
+ * at an unsupported region answers 422 while there is headroom and 429 carrying
+ * { limit, window_hours, count } once there is none. That is the observation.
+ * Which component decides first is an inference about internals a black-box
+ * caller cannot see, and it is not needed: the two responses are enough.
  *
  * Nothing here places a call.
  */

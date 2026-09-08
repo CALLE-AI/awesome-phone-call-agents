@@ -15,6 +15,7 @@
     "docs:check": "node src/docs.ts --check",
     "peek": "node --env-file-if-exists=.env src/peek.ts",
     "replay": "node src/replay.ts",
+    "drift": "node --env-file-if-exists=.env src/drift.ts",
     "watch": "node --env-file-if-exists=.env src/watch.ts",
     "ledger": "node --env-file-if-exists=.env src/ledger-report.ts",
     "test": "node --test test/*.test.ts",

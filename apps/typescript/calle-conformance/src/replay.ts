@@ -31,52 +31,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { QUIRKS, quirksIn, type CallPayload } from "./quirks.ts";
-
-const RENAMES: Record<string, string> = {
-  transcript_turns: "transcriptTurns",
-  failure_code: "failureCode",
-  failure_message: "failureMessage",
-  structured_result: "structuredResult",
-  started_at: "startedAt",
-  created_at: "createdAt",
-  completed_at: "completedAt",
-  provider_call_id: "providerCallId",
-  task_completed: "taskCompleted",
-  completion_confidence: "completionConfidence",
-};
-
-function normalise(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(normalise);
-  if (node === null || typeof node !== "object") return node;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-    out[RENAMES[k] ?? k] = normalise(v);
-  }
-  return out;
-}
-
-/** A payload is call-shaped if it has recipients carrying attempts. */
-function callsIn(node: unknown, found: CallPayload[] = []): CallPayload[] {
-  if (Array.isArray(node)) { node.forEach((n) => callsIn(n, found)); return found; }
-  if (node === null || typeof node !== "object") return found;
-  const o = node as Record<string, unknown>;
-  const rs = o.recipients;
-  if (Array.isArray(rs) && rs.some((r) => r !== null && typeof r === "object" && Array.isArray((r as Record<string, unknown>).attempts))) {
-    found.push({
-      id: String(o.id ?? "unknown"),
-      object: String(o.object ?? ""),
-      status: String(o.status ?? ""),
-      createdAt: String(o.createdAt ?? ""),
-      completedAt: (o.completedAt as string) ?? null,
-      taskCompleted: Boolean(o.taskCompleted),
-      failureCode: (o.failureCode as string) ?? null,
-      structuredResult: o.structuredResult ?? null,
-      recipients: rs as CallPayload["recipients"],
-    });
-  }
-  Object.values(o).forEach((v) => callsIn(v, found));
-  return found;
-}
+import { normalise, callsIn } from "./payloads.ts";
 
 function jsonFiles(dir: string, acc: string[] = []): string[] {
   let entries: string[];
