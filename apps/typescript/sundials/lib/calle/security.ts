@@ -103,6 +103,35 @@ export function validatePhoneNumber(phone: string): { valid: boolean; error?: st
   return { valid: true };
 }
 
+export function sameE164(left?: string | null, right?: string | null): boolean {
+  if (!left || !right) return false;
+  return compactE164(left) === compactE164(right);
+}
+
+export const CALL_CONSENT_MAX_AGE_MS = 15 * 60 * 1000;
+
+export function validateCallConsent(
+  phoneNumber: string,
+  consent: { e164?: unknown; acceptedAt?: unknown; allowOneRetry?: unknown } | null | undefined
+): { ok: true; e164: string; acceptedAt: string; allowOneRetry: boolean } | { ok: false; error: string } {
+  if (!consent || typeof consent !== "object") {
+    return { ok: false, error: "Confirm the automated call to this number before sending." };
+  }
+  if (consent.allowOneRetry !== true) {
+    return { ok: false, error: "Confirm the automated call and the one follow-up if nobody answers." };
+  }
+  const e164 = typeof consent.e164 === "string" ? compactE164(consent.e164) : "";
+  if (!sameE164(e164, phoneNumber)) {
+    return { ok: false, error: "Call consent must match the phone number you entered." };
+  }
+  const acceptedAt = typeof consent.acceptedAt === "string" ? consent.acceptedAt : "";
+  const acceptedMs = Date.parse(acceptedAt);
+  if (!Number.isFinite(acceptedMs) || Date.now() - acceptedMs > CALL_CONSENT_MAX_AGE_MS || acceptedMs > Date.now() + 60_000) {
+    return { ok: false, error: "Call consent expired. Confirm again and resend." };
+  }
+  return { ok: true, e164, acceptedAt, allowOneRetry: true };
+}
+
 export function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const timestamps = ipRequestHistory.get(ip) || [];

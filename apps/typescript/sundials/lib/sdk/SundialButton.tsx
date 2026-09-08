@@ -80,8 +80,9 @@ export function SundialButton({
                   ×
                 </button>
                 <h2 id="sdw-button-dialog-title">Speak with a lead engineer</h2>
-                <p className="sdw-lead">Share how we can reach you. No calendar booking required.</p>
+                <p className="sdw-lead">Confirm the number an automated assistant should call now. The call may be recorded.</p>
                 <CaptureForm
+                  key={String(open)}
                   brandName="Harbor"
                   formCta="talk_to_sales"
                   variant="compact"
@@ -99,13 +100,17 @@ export function SundialButton({
                       phoneNumber: payload.phone,
                       contactEmail: payload.email,
                       contactName: payload.name || contactName || undefined,
-                      leadContext
+                      leadContext,
+                      callConsent: payload.callConsent
                     });
                     setSending(false);
                     if (ok) {
                       setSubmitted(true);
-                      window.setTimeout(() => setOpen(false), 2200);
                     }
+                  }}
+                  onStopFollowUp={async (phone) => {
+                    const result = await sundials.stopFollowUp(phone);
+                    if (!result.ok) throw new Error(result.message || "Could not stop the follow-up.");
                   }}
                 />
               </div>

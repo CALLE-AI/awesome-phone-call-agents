@@ -2,7 +2,7 @@ import { brainCallDirectives, getBrainConfigForAccount, retryDelayHoursOrSkip } 
 import { newEntityId } from "../ids.ts";
 import { isMissedPickup } from "../intent/opportunity.ts";
 import type { BrainConfig, SundialCallRecord } from "../types.ts";
-import { validatePhoneNumber } from "./security.ts";
+import { validatePhoneNumber, sameE164 } from "./security.ts";
 import { dispatchLiveCalleCall, liveCalleCreateInput, type LiveCallContext } from "./live-binding.ts";
 import { isInFlightStatus } from "./sync-live.ts";
 
@@ -83,6 +83,8 @@ export function isRetryEligibleFailure(call: SundialCallRecord): boolean {
   if (call.retryScheduledAt) return false;
   if (isDisqualifiedCall(call)) return false;
   if (!call.rawPhoneNumber) return false;
+  if (call.callConsentAllowOneRetry !== true) return false;
+  if (!sameE164(call.callConsentE164, call.rawPhoneNumber)) return false;
   return isMissedPickup(call);
 }
 
@@ -141,7 +143,10 @@ function enqueueRetry(store: RetryStore, parent: SundialCallRecord, delayHours: 
     retryOfCallId: parent.id,
     retryCount: 1,
     retryScheduledAt: scheduledAt,
-    retryDueAt
+    retryDueAt,
+    callConsentE164: parent.callConsentE164,
+    callConsentAt: parent.callConsentAt,
+    callConsentAllowOneRetry: parent.callConsentAllowOneRetry
   };
   parent.retryScheduledAt = scheduledAt;
   parent.retryDueAt = retryDueAt;
@@ -165,6 +170,29 @@ export function maybeScheduleFailedCallRetry(store: RetryStore, call: SundialCal
   return enqueueRetry(store, call, delayHours);
 }
 
+export function stopFollowUpsForVisitor(
+  store: RetryStore,
+  visitorId: string | undefined,
+  phone?: string
+): number {
+  if (!visitorId) return 0;
+  let cancelled = 0;
+  for (const call of [...store.peekCalls()]) {
+    if (call.visitorId !== visitorId) continue;
+    if (phone && !sameE164(call.rawPhoneNumber, phone) && !sameE164(call.callConsentE164, phone)) continue;
+    call.callConsentAllowOneRetry = false;
+    if (isQueuedRetry(call) && call.status === "queued") {
+      call.status = "failed";
+      call.errorReason = "Retry cancelled: the visitor stopped the follow-up.";
+      call.retryCancelReason = "the visitor stopped the follow-up.";
+      call.endedAt = new Date().toISOString();
+      cancelled += 1;
+    }
+    store.saveCall(call);
+  }
+  return cancelled;
+}
+
 function concurrentDial(store: RetryStore, visitorId: string | undefined, exceptCallId: string): boolean {
   if (!visitorId) return false;
   return store.peekCalls().some((call) => {
@@ -180,6 +208,10 @@ function fireDueRetry(store: RetryStore, retry: SundialCallRecord): void {
   const latest = store.peekCalls().find((row) => row.id === retry.id);
   if (!latest || latest.status !== "queued" || latest.retryFiredAt || latest.calleCallId) return;
   if (concurrentDial(store, latest.visitorId, latest.id)) return;
+  if (latest.callConsentAllowOneRetry !== true || !sameE164(latest.callConsentE164, latest.rawPhoneNumber)) {
+    cancelRetry(store, latest, "call consent no longer matches this number.");
+    return;
+  }
 
   latest.retryFiredAt = new Date().toISOString();
   store.saveCall(latest);

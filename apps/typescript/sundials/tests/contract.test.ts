@@ -5,7 +5,8 @@ import {
   maskPhoneNumber,
   checkRateLimit,
   validateEmail,
-  maskEmail
+  maskEmail,
+  validateCallConsent
 } from "../lib/calle/security.ts";
 import { createFixtureCallRecord } from "../lib/calle/fixture.ts";
 import { SundialsDatabase } from "../lib/db.ts";
@@ -54,7 +55,9 @@ import { readWorkspaceSettings, writeWorkspaceSettings } from "../lib/console/wo
 import { parseTheme } from "../lib/console/theme.ts";
 import { authenticateSdkRequest } from "../lib/sdk/auth.ts";
 import { DEFAULT_RETRY_DELAY_HOURS, defaultBrainConfig, defaultBrainGoals, enabledGoals, HARBOR_OPENING_SCRIPT, MAX_RETRY_DELAY_HOURS, MIN_RETRY_DELAY_HOURS, normalizeBrainConfig, normalizeRetryDelayHours, readBrainConfig, writeBrainConfig } from "../lib/brain/config.ts";
-import { liveCreateInputForRecord } from "../lib/calle/retry.ts";
+import { liveCreateInputForRecord, stopFollowUpsForVisitor } from "../lib/calle/retry.ts";
+import { ingestCalleWebhook } from "../lib/calle/webhook.ts";
+import { parseTrackingConsent, serializeTrackingConsent, TRACKING_CONSENT_TTL_MS } from "../lib/sdk/tracking-consent.ts";
 import { applyGeminiCallProfile, buildCallProfilePrompt, clampPainCategory, hasGeminiBriefing, mergeBrainExtraction, mergePainCatalogs, resolvePainCategory, sanitizeTranscriptForGemini } from "../lib/brain/extract.ts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -99,6 +102,47 @@ test("security: validates E.164 phone numbers correctly", () => {
   assert.equal(validatePhoneNumber("15550192831").valid, false);
   assert.equal(validatePhoneNumber("+33123456789").valid, false);
   assert.match(validatePhoneNumber("+33123456789").error || "", /supported list/i);
+});
+
+test("security: call consent must match the destination, be recent, and allow one retry", () => {
+  const phone = "+15550192831";
+  const fresh = {
+    e164: phone,
+    acceptedAt: new Date().toISOString(),
+    allowOneRetry: true as const
+  };
+  const ok = validateCallConsent(phone, fresh);
+  assert.equal(ok.ok, true);
+  if (ok.ok) {
+    assert.equal(ok.e164, phone);
+    assert.equal(ok.allowOneRetry, true);
+  }
+
+  const missing = validateCallConsent(phone, undefined);
+  assert.equal(missing.ok, false);
+
+  const mismatch = validateCallConsent(phone, { ...fresh, e164: "+6555501010" });
+  assert.equal(mismatch.ok, false);
+
+  const noRetry = validateCallConsent(phone, { ...fresh, allowOneRetry: false });
+  assert.equal(noRetry.ok, false);
+
+  const stale = validateCallConsent(phone, {
+    ...fresh,
+    acceptedAt: new Date(Date.now() - 16 * 60 * 1000).toISOString()
+  });
+  assert.equal(stale.ok, false);
+});
+
+test("tracking consent: durable localStorage values and expired session records are unknown", () => {
+  assert.equal(parseTrackingConsent("granted"), "unknown");
+  assert.equal(parseTrackingConsent("denied"), "unknown");
+  const now = Date.now();
+  assert.equal(parseTrackingConsent(serializeTrackingConsent("granted", now), now), "granted");
+  assert.equal(
+    parseTrackingConsent(serializeTrackingConsent("granted", now - TRACKING_CONSENT_TTL_MS - 1), now),
+    "unknown"
+  );
 });
 
 test("security: validates and masks lead emails", () => {
@@ -1579,4 +1623,122 @@ test("console: scheduled retry journey shows due time and no raw ids", () => {
   assert.equal(status.headline, "Retry scheduled");
   assert.match(status.detail, /follow-up ring/i);
   assert.doesNotMatch(status.detail, /aaaaaaaa/);
+});
+
+test("retry: missing or mismatched call consent does not schedule a follow-up", () => {
+  withBrain({ retryDelayHours: 1 }, () => {
+    const store = new SundialsDatabase(":memory:");
+    store.saveCall(missedPickupRecord({ callConsentAllowOneRetry: false }));
+    assert.equal(store.peekCalls().filter((call) => Boolean(call.retryOfCallId)).length, 0);
+
+    store.saveCall(missedPickupRecord({ id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff", callConsentE164: "+6555501010" }));
+    assert.equal(store.peekCalls().filter((call) => Boolean(call.retryOfCallId)).length, 0);
+  });
+});
+
+test("retry: stop follow-up revokes consent and cancels the queued retry", () => {
+  withBrain({ retryDelayHours: 1 }, () => {
+    const store = new SundialsDatabase(":memory:");
+    const parent = missedPickupRecord();
+    store.saveCall(parent);
+    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === parent.id).length, 1);
+
+    const cancelled = stopFollowUpsForVisitor(store, parent.visitorId, parent.rawPhoneNumber);
+    assert.equal(cancelled, 1);
+    const retry = store.peekCalls().find((call) => call.retryOfCallId === parent.id);
+    assert.equal(retry?.status, "failed");
+    assert.match(retry?.errorReason || "", /stopped the follow-up/i);
+    assert.equal(store.peekCalls().find((call) => call.id === parent.id)?.callConsentAllowOneRetry, false);
+  });
+});
+
+test("webhook: unknown or dry-run ids are not writable from the body", async () => {
+  const store = new SundialsDatabase(":memory:");
+  const missing = await ingestCalleWebhook(store, { callId: "calle_missing" }, async () => {
+    throw new Error("must not fetch CALL-E for an unknown id");
+  });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.status, 404);
+
+  const dry = createFixtureCallRecord("+15550192831", session(), "Alex", "alex@example.com");
+  dry.calleCallId = undefined;
+  dry.dryRun = true;
+  store.saveCall(dry);
+  const noCalle = await ingestCalleWebhook(
+    store,
+    {
+      callId: dry.id,
+      transcript: [{ speaker: "user", text: "ATTACKER PLANTED THIS" }]
+    },
+    async () => {
+      throw new Error("must not fetch CALL-E without a calleCallId");
+    }
+  );
+  assert.equal(noCalle.ok, false);
+  if (!noCalle.ok) assert.equal(noCalle.status, 404);
+});
+
+test("webhook: ignores body transcript and re-fetches CALL-E", async () => {
+  const store = new SundialsDatabase(":memory:");
+  const local = createFixtureCallRecord("+15550192831", session(), "Alex", "alex@example.com");
+  local.status = "dialing";
+  local.dryRun = false;
+  local.calleCallId = "calle_hook_1";
+  local.transcript = undefined;
+  local.fullTranscript = undefined;
+  local.leadDossier = undefined;
+  local.opportunityProfile = undefined;
+  store.saveCall(local);
+
+  const remote = {
+    id: "calle_hook_1",
+    status: "completed",
+    taskCompleted: true,
+    summary: "Qualified a CRM replacement lead.",
+    completedAt: new Date().toISOString(),
+    failureCode: null,
+    failureMessage: null,
+    recipients: [
+      {
+        attempts: [
+          {
+            startedAt: new Date(Date.now() - 90_000).toISOString(),
+            completedAt: new Date().toISOString(),
+            failureMessage: null,
+            transcriptTurns: [
+              { speaker: "bot", text: "This is an automated assistant calling on behalf of Harbor sales.", offset_seconds: 1 },
+              { speaker: "user", text: "We need to replace Salesforce next month.", offset_seconds: 8 }
+            ]
+          }
+        ]
+      }
+    ]
+  } as unknown as Call;
+
+  const result = await ingestCalleWebhook(
+    store,
+    {
+      callId: "calle_hook_1",
+      status: "completed",
+      transcript: [{ speaker: "user", text: "ATTACKER PLANTED THIS" }],
+      recordingUrl: "https://evil.example/recording.mp3",
+      extractedIntelligence: { intentTier: "hot", warmthScore: 9.9, nextStep: "Send contract" }
+    },
+    async (id) => {
+      assert.equal(id, "calle_hook_1");
+      return remote;
+    }
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.call.status, "completed");
+  assert.doesNotMatch(result.call.fullTranscript || "", /ATTACKER PLANTED/);
+  assert.match(result.call.transcript?.[1]?.text || "", /Salesforce/);
+  assert.notEqual(result.call.recordingUrl, "https://evil.example/recording.mp3");
+  assert.notEqual(result.call.leadDossier?.nextStep, "Send contract");
+
+  const unverified = await ingestCalleWebhook(store, { callId: "calle_hook_1" }, async () => null);
+  assert.equal(unverified.ok, false);
+  if (!unverified.ok) assert.equal(unverified.status, 401);
 });

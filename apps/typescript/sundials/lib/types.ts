@@ -72,6 +72,14 @@ export interface WebSessionContext {
   accountId?: string;
 }
 
+export interface CallConsent {
+  /** Compact E.164 the lead agreed to be called at. */
+  e164: string;
+  acceptedAt: string;
+  /** At most one host follow-up if nobody answers. */
+  allowOneRetry: boolean;
+}
+
 export interface DispatchCallRequest {
   phoneNumber: string;
   contactEmail: string;
@@ -86,6 +94,7 @@ export interface DispatchCallRequest {
   sessionContext: WebSessionContext;
   customPromptContext?: Record<string, string>;
   turnstileToken?: string;
+  callConsent?: CallConsent;
 }
 
 export interface DispatchCallResponse {
@@ -194,6 +203,9 @@ export interface SundialCallRecord {
   retryDueAt?: string;
   retryFiredAt?: string;
   retryCancelReason?: string;
+  callConsentE164?: string;
+  callConsentAt?: string;
+  callConsentAllowOneRetry?: boolean;
 }
 
 export interface SpeedToLeadMetrics {

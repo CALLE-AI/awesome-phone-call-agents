@@ -432,6 +432,7 @@ export const db = {
   getSession: (id: string) => getSundialsDb().getSession(id),
   saveCall: (call: SundialCallRecord) => getSundialsDb().saveCall(call),
   getCall: (id: string) => getSundialsDb().getCall(id),
+  peekCalls: () => getSundialsDb().peekCalls(),
   getAllCalls: () => getSundialsDb().getAllCalls(),
   refreshLiveCalls: (taskId?: string) => getSundialsDb().refreshLiveCalls(taskId),
   getMetrics: () => getSundialsDb().getMetrics(),
@@ -454,9 +455,10 @@ export const db = {
 };
 
 export function toPublicCall(call: SundialCallRecord): SundialCallRecord {
-  const { rawPhoneNumber, rawContactEmail, ...pub } = call;
+  const { rawPhoneNumber, rawContactEmail, callConsentE164, ...pub } = call;
   void rawPhoneNumber;
   void rawContactEmail;
+  void callConsentE164;
   return pub;
 }
 

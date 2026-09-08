@@ -286,6 +286,25 @@
   color: var(--sdw-muted);
 }
 
+.sdw-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--sdw-text);
+}
+
+.sdw-consent-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.sdw-consent-check strong {
+  font-weight: 700;
+}
+
 .sdw-thanks {
   padding: 1.25rem 0;
   text-align: center;
@@ -299,6 +318,10 @@
   margin-top: 0.25rem;
   font-size: 0.875rem;
   color: var(--sdw-muted);
+}
+
+.sdw-thanks .sdw-btn {
+  margin-top: 1rem;
 }
 
 .sdw-spin {

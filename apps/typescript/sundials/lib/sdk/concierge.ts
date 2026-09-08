@@ -2,12 +2,17 @@
 
 import type { ConciergeCta, IdentifiedLead, WebSessionContext } from "@/lib/types";
 import { newEntityId } from "@/lib/ids";
+import { compactE164 } from "@/lib/calle/security";
 import { HARBOR_PUBLIC_SDK_KEY, SUNDIALS_API_KEY_HEADER } from "./public-key";
 import { ctaOpensWidget, scDatasetProperties } from "./cta-dataset";
+import {
+  parseTrackingConsent,
+  serializeTrackingConsent,
+  TRACKING_CONSENT_STORAGE_KEY
+} from "./tracking-consent";
 
 const VISITOR_KEY = "sundials_visitor_id";
 const SESSION_KEY = "sundials_session_id";
-const CONSENT_KEY = "sundials_intent_consent";
 
 export type IntentConsent = "unknown" | "granted" | "denied";
 
@@ -71,6 +76,7 @@ class SundialsClient {
   private pointerOnPage = false;
   private consentListeners = new Set<() => void>();
   private openListeners = new Set<(cta: ConciergeCta) => void>();
+  private lastDispatchPhone: string | null = null;
 
   public init(config: SundialsConfig): void {
     this.config = {
@@ -112,9 +118,12 @@ class SundialsClient {
 
   public consentStatus(): IntentConsent {
     if (this.config.requireConsent === false) return "granted";
-    const stored = safeLocal()?.getItem(CONSENT_KEY);
-    if (stored === "granted" || stored === "denied") return stored;
-    return "unknown";
+    safeLocal()?.removeItem(TRACKING_CONSENT_STORAGE_KEY);
+    const session = safeSession();
+    const stored = session?.getItem(TRACKING_CONSENT_STORAGE_KEY) ?? null;
+    const status = parseTrackingConsent(stored);
+    if (stored && status === "unknown") session?.removeItem(TRACKING_CONSENT_STORAGE_KEY);
+    return status;
   }
 
   public canObserve(): boolean {
@@ -122,7 +131,8 @@ class SundialsClient {
   }
 
   public grantConsent(): void {
-    safeLocal()?.setItem(CONSENT_KEY, "granted");
+    safeLocal()?.removeItem(TRACKING_CONSENT_STORAGE_KEY);
+    safeSession()?.setItem(TRACKING_CONSENT_STORAGE_KEY, serializeTrackingConsent("granted"));
     this.notifyConsent();
     this.pageView(typeof window !== "undefined" ? window.location.pathname : undefined);
     void this.flush();
@@ -131,8 +141,40 @@ class SundialsClient {
   public denyConsent(): void {
     this.pauseHover();
     this.queue = [];
-    safeLocal()?.setItem(CONSENT_KEY, "denied");
+    safeLocal()?.removeItem(TRACKING_CONSENT_STORAGE_KEY);
+    safeSession()?.setItem(TRACKING_CONSENT_STORAGE_KEY, serializeTrackingConsent("denied"));
     this.notifyConsent();
+  }
+
+  public rememberDispatchPhone(phone: string): void {
+    this.lastDispatchPhone = compactE164(phone);
+  }
+
+  public async stopFollowUp(phone?: string): Promise<{ ok: boolean; message?: string }> {
+    const compact = compactE164(phone || this.lastDispatchPhone || "");
+    if (!compact) return { ok: false, message: "No phone number to stop." };
+    const endpoint = `${this.config.apiEndpoint || "/api/sundials"}/stop`;
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [SUNDIALS_API_KEY_HEADER]: this.getApiKey()
+        },
+        body: JSON.stringify({
+          accountId: this.config.accountId,
+          visitorId: this.visitorId(),
+          phoneNumber: compact
+        })
+      });
+      const data = (await res.json()) as { success?: boolean; message?: string };
+      if (!res.ok || !data.success) {
+        return { ok: false, message: data.message || "Could not stop the follow-up." };
+      }
+      return { ok: true };
+    } catch (err: unknown) {
+      return { ok: false, message: err instanceof Error ? err.message : "Could not stop the follow-up." };
+    }
   }
 
   private notifyConsent() {
@@ -378,7 +420,8 @@ export const SundialsApi = {
   denyConsent: () => sundials.denyConsent(),
   consentStatus: () => sundials.consentStatus(),
   getApiKey: () => sundials.getApiKey(),
-  open: (cta: ConciergeCta = "talk_to_sales") => sundials.requestOpen(cta)
+  open: (cta: ConciergeCta = "talk_to_sales") => sundials.requestOpen(cta),
+  stopFollowUp: (phone?: string) => sundials.stopFollowUp(phone)
 };
 
 if (typeof window !== "undefined") {

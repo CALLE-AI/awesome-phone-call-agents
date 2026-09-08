@@ -107,6 +107,7 @@ export function Sundials(props: SundialsConfig) {
     company?: string;
     companySize?: string;
     useCase?: string;
+    callConsent: { e164: string; acceptedAt: string; allowOneRetry: boolean };
   }) => {
     setSending(true);
     sundials.identify({
@@ -127,15 +128,12 @@ export function Sundials(props: SundialsConfig) {
       visitorId: sundials.visitorId(),
       sessionId: sundials.sessionId(),
       accountId: config.accountId,
-      declaredCta: formCta === "get_demo" ? "get_demo" : "talk_to_sales"
+      declaredCta: formCta === "get_demo" ? "get_demo" : "talk_to_sales",
+      callConsent: payload.callConsent
     });
     setSending(false);
     if (ok) {
       setSubmitted(true);
-      window.setTimeout(() => {
-        setOpen(false);
-        setSubmitted(false);
-      }, 2200);
     }
   };
 
@@ -197,15 +195,20 @@ export function Sundials(props: SundialsConfig) {
             {formCta === "get_demo" ? `Get a ${config.brandName} demo` : `Talk to ${config.brandName} sales`}
           </h2>
           <p className="sdw-lead">
-            Share how we can reach you. A teammate or automated assistant may follow up by phone.
+            Confirm the number an automated assistant should call now. The call may be recorded.
           </p>
           <CaptureForm
+            key={`${formCta}-${open}`}
             brandName={config.brandName}
             formCta={formCta}
             sending={sending}
             error={error}
             submitted={submitted}
             onSubmit={handleSubmit}
+            onStopFollowUp={async (phone) => {
+              const result = await sundials.stopFollowUp(phone);
+              if (!result.ok) throw new Error(result.message || "Could not stop the follow-up.");
+            }}
           />
         </div>
       </dialog>

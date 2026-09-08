@@ -5,7 +5,9 @@ import {
   checkRateLimit,
   maskPhoneNumber,
   validateEmail,
-  maskEmail
+  maskEmail,
+  compactE164,
+  validateCallConsent
 } from "@/lib/calle/security";
 import { dispatchLiveCalleCall } from "@/lib/calle/live-binding";
 import { brainCallDirectives, getBrainConfigForAccount } from "@/lib/brain/config";
@@ -64,6 +66,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const compactPhone = compactE164(phoneNumber);
+    const consent = validateCallConsent(compactPhone, body.callConsent);
+    if (!consent.ok) {
+      return NextResponse.json({ success: false, message: consent.error }, { status: 400 });
+    }
+
     if (declaredCta === "learn_more") {
       return NextResponse.json(
         { success: false, message: "Learn more does not start a call." },
@@ -85,7 +93,7 @@ export async function POST(req: NextRequest) {
       visitorId: resolvedVisitor,
       accountId: resolvedAccount,
       email: contactEmail.trim(),
-      phone: phoneNumber,
+      phone: compactPhone,
       company,
       name: contactName,
       companySize,
@@ -106,7 +114,7 @@ export async function POST(req: NextRequest) {
           event: cta === "get_demo" ? "demo_requested" : "identify",
           properties: {
             email: contactEmail.trim(),
-            phone: phoneNumber,
+            phone: compactPhone,
             company,
             name: contactName,
             companySize,
@@ -115,7 +123,7 @@ export async function POST(req: NextRequest) {
         },
         {
           event: "phone_provided",
-          properties: { phone: phoneNumber }
+          properties: { phone: compactPhone }
         }
       ]
     });
@@ -128,8 +136,8 @@ export async function POST(req: NextRequest) {
       id: callId,
       sessionId: resolvedSession,
       visitorId: resolvedVisitor,
-      phoneNumber: maskPhoneNumber(phoneNumber),
-      rawPhoneNumber: phoneNumber,
+      phoneNumber: maskPhoneNumber(compactPhone),
+      rawPhoneNumber: compactPhone,
       contactEmail: maskEmail(contactEmail),
       rawContactEmail: contactEmail.trim(),
       contactName: contactName || "Web Prospect",
@@ -146,7 +154,10 @@ export async function POST(req: NextRequest) {
       durationSec: 0,
       intentSnapshot: snapshot.intent,
       behaviorSnapshot: snapshot.behavior,
-      session: sessionContext
+      session: sessionContext,
+      callConsentE164: consent.e164,
+      callConsentAt: consent.acceptedAt,
+      callConsentAllowOneRetry: consent.allowOneRetry
     };
 
     db.saveCall(initialCall);
@@ -165,7 +176,7 @@ export async function POST(req: NextRequest) {
       after(async () => {
         try {
           const liveRes = await dispatchLiveCalleCall(
-            phoneNumber,
+            compactPhone,
             sessionContext,
             contactName,
             email,

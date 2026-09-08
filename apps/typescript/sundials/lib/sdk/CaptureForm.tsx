@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { ConciergeCta } from "@/lib/types";
+import type { CallConsent, ConciergeCta } from "@/lib/types";
+import { compactE164, validatePhoneNumber } from "@/lib/calle/security";
 
 const COUNTRY_CODES = [
   { code: "+1", label: "+1 US/CA" },
@@ -19,6 +20,7 @@ export interface CapturePayload {
   company?: string;
   companySize?: string;
   useCase?: string;
+  callConsent: CallConsent;
 }
 
 export function CaptureForm({
@@ -28,7 +30,8 @@ export function CaptureForm({
   sending,
   error,
   submitted,
-  onSubmit
+  onSubmit,
+  onStopFollowUp
 }: {
   brandName: string;
   formCta: ConciergeCta;
@@ -37,6 +40,7 @@ export function CaptureForm({
   error: string | null;
   submitted: boolean;
   onSubmit: (payload: CapturePayload) => Promise<void> | void;
+  onStopFollowUp?: (phone: string) => Promise<void> | void;
 }) {
   const [selectedCountry, setSelectedCountry] = useState("+1");
   const [localNumber, setLocalNumber] = useState("");
@@ -45,16 +49,33 @@ export function CaptureForm({
   const [company, setCompany] = useState("");
   const [companySize, setCompanySize] = useState("");
   const [useCase, setUseCase] = useState("");
+  const [callConsentChecked, setCallConsentChecked] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
+  const [submittedPhone, setSubmittedPhone] = useState("");
+
+  const compactPhone = compactE164(`${selectedCountry}${localNumber.replace(/[^0-9]/g, "")}`);
+  const phoneValid = validatePhoneNumber(compactPhone).valid;
+  const phoneLabel = phoneValid ? compactPhone : "the number you enter";
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!callConsentChecked) return;
+    const phone = compactPhone;
+    setSubmittedPhone(phone);
     await onSubmit({
       email: email.trim(),
-      phone: `${selectedCountry}${localNumber.replace(/[^0-9]/g, "")}`,
+      phone,
       name: name.trim() || undefined,
       company: company.trim() || undefined,
       companySize: companySize.trim() || undefined,
-      useCase: useCase.trim() || undefined
+      useCase: useCase.trim() || undefined,
+      callConsent: {
+        e164: phone,
+        acceptedAt: new Date().toISOString(),
+        allowOneRetry: true
+      }
     });
   };
 
@@ -62,9 +83,40 @@ export function CaptureForm({
     return (
       <div className="sdw-thanks">
         <p>
-          <strong>Thank you.</strong>
+          <strong>{stopped ? "Follow-up stopped." : "Thank you."}</strong>
         </p>
-        <p>{brandName} has your details.</p>
+        {stopped ? (
+          <p>No further automated call will be placed to that number from this request.</p>
+        ) : (
+          <>
+            <p>
+              {brandName} has your details. An automated assistant will call the number you confirmed. If nobody
+              answers, at most one follow-up may be placed.
+            </p>
+            {onStopFollowUp ? (
+              <button
+                className="sdw-btn sdw-btn-ghost sdw-btn-full"
+                type="button"
+                disabled={stopping}
+                onClick={async () => {
+                  setStopping(true);
+                  setStopError(null);
+                  try {
+                    await onStopFollowUp(submittedPhone);
+                    setStopped(true);
+                  } catch (err: unknown) {
+                    setStopError(err instanceof Error ? err.message : "Could not stop the follow-up.");
+                  } finally {
+                    setStopping(false);
+                  }
+                }}
+              >
+                {stopping ? "Stopping…" : "Stop the follow-up"}
+              </button>
+            ) : null}
+            {stopError ? <p className="sdw-error">{stopError}</p> : null}
+          </>
+        )}
       </div>
     );
   }
@@ -86,7 +138,14 @@ export function CaptureForm({
         <div className="sdw-field">
           <label htmlFor={`sdw-phone-${formCta}`}>Phone</label>
           <div className="sdw-phone">
-            <select value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value)} aria-label="Country code">
+            <select
+              value={selectedCountry}
+              onChange={(e) => {
+                setSelectedCountry(e.target.value);
+                setCallConsentChecked(false);
+              }}
+              aria-label="Country code"
+            >
               {COUNTRY_CODES.map((code) => (
                 <option key={code.code} value={code.code}>
                   {code.label}
@@ -99,7 +158,10 @@ export function CaptureForm({
               required
               autoComplete="tel-national"
               value={localNumber}
-              onChange={(e) => setLocalNumber(e.target.value)}
+              onChange={(e) => {
+                setLocalNumber(e.target.value);
+                setCallConsentChecked(false);
+              }}
             />
           </div>
         </div>
@@ -156,14 +218,25 @@ export function CaptureForm({
             </div>
           </>
         ) : null}
+        <label className="sdw-consent-check" htmlFor={`sdw-call-consent-${formCta}`}>
+          <input
+            id={`sdw-call-consent-${formCta}`}
+            type="checkbox"
+            required
+            checked={callConsentChecked}
+            onChange={(e) => setCallConsentChecked(e.target.checked)}
+          />
+          <span>
+            I agree that an automated assistant for {brandName} will call <strong>{phoneLabel}</strong> now. The call
+            may be recorded. If nobody answers, {brandName} may try this same number once. I can stop that follow-up
+            from the thank-you screen.
+          </span>
+        </label>
         {error ? <p className="sdw-error">{error}</p> : null}
-        <button className="sdw-btn sdw-btn-primary sdw-btn-full" type="submit" disabled={sending}>
+        <button className="sdw-btn sdw-btn-primary sdw-btn-full" type="submit" disabled={sending || !callConsentChecked}>
           {sending ? <span className="sdw-spin" aria-hidden /> : null}
           {sending ? "Sending details…" : "Send details"}
         </button>
-        <p className="sdw-fineprint">
-          By sending, you agree {brandName} may contact you at this email and phone number.
-        </p>
       </fieldset>
     </form>
   );

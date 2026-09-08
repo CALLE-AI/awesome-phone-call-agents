@@ -5,7 +5,7 @@ import type {
   TranscriptEntry,
   WebSessionContext
 } from "../types.ts";
-import { maskEmail, maskPhoneNumber } from "./security.ts";
+import { maskEmail, maskPhoneNumber, compactE164 } from "./security.ts";
 import { harborFixtureOpportunity } from "../intent/opportunity.ts";
 import { newEntityId } from "../ids.ts";
 
@@ -25,6 +25,7 @@ export function createFixtureCallRecord(
     behavior?: SundialCallRecord["behaviorSnapshot"];
   }
 ): SundialCallRecord {
+  const compactPhone = compactE164(phoneNumber);
   const callId = newEntityId();
   const speedToDial = parseFloat((18 + Math.random() * 9).toFixed(1));
   const duration = Math.floor(78 + Math.random() * 25);
@@ -85,8 +86,8 @@ export function createFixtureCallRecord(
     id: callId,
     sessionId: session.id,
     visitorId: extras?.visitorId || session.visitorId,
-    phoneNumber: maskPhoneNumber(phoneNumber),
-    rawPhoneNumber: phoneNumber,
+    phoneNumber: maskPhoneNumber(compactPhone),
+    rawPhoneNumber: compactPhone,
     contactEmail: maskEmail(email),
     contactName: contactName || "Inbound lead",
     company,
@@ -112,6 +113,9 @@ export function createFixtureCallRecord(
     opportunityProfile: opportunity,
     intentSnapshot: extras?.intent,
     behaviorSnapshot: extras?.behavior,
-    session
+    session,
+    callConsentE164: compactPhone,
+    callConsentAt: new Date().toISOString(),
+    callConsentAllowOneRetry: true
   };
 }

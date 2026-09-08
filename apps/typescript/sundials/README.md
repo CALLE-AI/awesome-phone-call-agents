@@ -113,7 +113,7 @@ PRIORITIZE  dashboard queue
 ANALYTICS  Improve call objective and webpage with data
 ```
 
-Live mode does **not** use a webhook. Status and console poll CALL-E `GET /v1/calls/{id}`. That same poll fires at most one host-side retry when `retryDueAt` is due (Brain `retryDelayHours`, default 1 hour). Dry-run advances on read and still persists a queued retry. No seed data. Settings can overlay mock analytics and a curated leads/calls queue (`lib/console/fixtures/`) without writing SQLite.
+Live mode can take a CALL-E webhook as a **ping only**. `POST /api/sundials/webhook` ignores `transcript`, `recordingUrl`, `extractedIntelligence`, and status from the body. If `callId` (or `id`) matches a known `calleCallId`, Sundials re-fetches `GET /v1/calls/{id}` with the server key and runs the same snapshot mapper as status/console polling. Unknown ids return 404; a failed CALL-E verify returns 401. That same poll/webhook path fires at most one host-side retry when `retryDueAt` is due (Brain `retryDelayHours`, default 1 hour). Dry-run advances on read and still persists a queued retry. No seed data. Settings can overlay mock analytics and a curated leads/calls queue (`lib/console/fixtures/`) without writing SQLite.
 
 `/app/brain` is the qualification brief, not a voice studio. Paste a website (`/demo` uses the Harbor fixture and does not fetch the network) or upload a text file. Brain scrapes company copy and drafts a report. Edit the report in place or ask Copilot. Call policy covers retry delay and the opening script. Agent voice, tone, and manner are not configured here.
 
@@ -146,7 +146,7 @@ Optional:
 - `position="bottom-left"` — move the launcher
 - `showLauncher={false}` — hide the floating card and use your own buttons
 - `<SundialButton />` — put a trigger wherever you want; it opens the same modal
-- `useSundial().scheduleCall(...)` — headless dispatch (alias of `dispatchCall`) for a page you design yourself, like Harbor `/demo/contact`
+- `useSundial().scheduleCall(...)` — headless dispatch (alias of `dispatchCall`). Prefer `CaptureForm` so the destination-bound checkbox is included. Headless calls still need `callConsent` matching the E.164 or dispatch returns 400
 
 Existing site buttons stay yours. Mark them to **track** or to **open the widget**:
 
@@ -169,7 +169,10 @@ Identity is the browser `visitorId` in `localStorage` (`sundials_visitor_id`), n
 - E.164 required (`+` plus an allowlisted country: +1, +44, +49, +61, +65, +81). Unknown codes are rejected, not routed as US
 - Emergency / premium destinations blocked
 - Dispatch rate limit 5/min/IP; event batches 60/min/IP
-- Explicit Allow before page/CTA/hover tracking; Decline still allows Talk to sales
-- Explicit consent copy on Talk to sales / Get Demo
+- Explicit Allow before page/CTA/hover tracking; Decline still allows Talk to sales. Tracking consent is session-only and expires after about 5 minutes
+- Call consent is a required checkbox on the SDK `CaptureForm`. It names the exact E.164, discloses a recorded automated call now, and at most one follow-up if nobody answers
+- Dispatch rejects missing, stale, or mismatched call consent. The one follow-up is skipped unless that consent still matches the destination
+- Thank-you screen includes Stop the follow-up, which cancels a queued retry
+- Webhook is a ping: re-fetch the CALL-E call and apply the snapshot mapper. Body transcript, recording URL, and extracted intelligence are ignored
 - Agent discloses automated assistant; does not recite clickstream or hover time
 - No calendar booking, no auto-dial, no fingerprinting

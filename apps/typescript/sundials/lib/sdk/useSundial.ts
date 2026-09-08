@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { CallStatus, DispatchCallResponse, LeadContext, SundialCallRecord } from "@/lib/types";
+import type { CallConsent, CallStatus, DispatchCallResponse, LeadContext, SundialCallRecord } from "@/lib/types";
 import { sundials } from "./concierge";
 import { HARBOR_PUBLIC_SDK_KEY, SUNDIALS_API_KEY_HEADER } from "./public-key";
 
@@ -22,6 +22,7 @@ export interface DispatchCallParams {
   accountId?: string;
   declaredCta?: "talk_to_sales" | "get_demo";
   leadContext?: LeadContext;
+  callConsent?: CallConsent;
 }
 
 export function useSundial(options: UseSundialOptions = {}) {
@@ -91,6 +92,7 @@ export function useSundial(options: UseSundialOptions = {}) {
           sessionContext.leadContext = { ...sessionContext.leadContext, ...params.leadContext };
         }
 
+        sundials.rememberDispatchPhone(params.phoneNumber);
         const res = await fetch(`${apiEndpoint}/dispatch`, {
           method: "POST",
           headers: {
@@ -108,7 +110,8 @@ export function useSundial(options: UseSundialOptions = {}) {
             sessionId: params.sessionId || sundials.sessionId(),
             accountId: params.accountId || sessionContext.accountId,
             declaredCta: params.declaredCta || "talk_to_sales",
-            sessionContext
+            sessionContext,
+            callConsent: params.callConsent
           })
         });
 

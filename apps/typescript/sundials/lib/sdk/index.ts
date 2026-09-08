@@ -1,3 +1,4 @@
+export { CaptureForm, type CapturePayload } from "./CaptureForm";
 export { Sundials } from "./Sundials";
 export { SundialButton } from "./SundialButton";
 export { useSundial } from "./useSundial";
