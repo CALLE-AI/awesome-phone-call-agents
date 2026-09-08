@@ -49,9 +49,11 @@ looks exactly like a fresh one.
 Each item carries `placed_by_this_run` as **true, false, or null**, and the summary counts
 all three separately: placed, replayed, and unknown provenance. The receipt for the replay
 run reads `calls placed 0, calls replayed 2`. No phone rang and the account was not charged,
-which the vendor's usage page confirms independently of our log. That receipt is on the
-[evidence page](https://firstbell-evidence.vercel.app) rather than in this tree, for the
-reason [`../evidence/README.md`](../evidence/README.md) gives.
+which the vendor's usage page confirms independently of our log. That receipt file is in
+neither this tree nor on the [evidence page](https://firstbell-evidence.vercel.app), for the
+reason [`../evidence/README.md`](../evidence/README.md) gives. What is committed is the count
+it produced: [`../evidence/recorded-calls.json`](../evidence/recorded-calls.json) records
+`02-idempotent-replay-no-calls.json` as two calls with none of them placed by that run.
 
 ## 4. Answer "unknown" rather than guessing
 

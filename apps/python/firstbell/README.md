@@ -41,8 +41,12 @@ and nothing here is a screenshot.
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 228 rows, each with the change made and the number of tests that noticed |
 
-Twelve of these calls were real, to real telephones, on 2026-09-04. The receipts are on
-the [evidence page](https://firstbell-evidence.vercel.app) with the recordings.
+Twelve of these calls were real, to real telephones, on 2026-09-04. The recordings are on
+the [evidence page](https://firstbell-evidence.vercel.app), with each call's transcript
+and its shortened id. The receipt files are on neither that page nor in this tree, for the
+reason [`evidence/README.md`](evidence/README.md) gives, so what travels with the code is the
+arithmetic they produced: [`evidence/recorded-calls.json`](evidence/recorded-calls.json) names
+all six and holds the counts behind every money figure here.
 
 ## If you have twenty minutes
 
@@ -53,7 +57,7 @@ makes, and each one can be checked without an API key.
 | --- | --- | --- | --- |
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
-| 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
+| 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and twenty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
@@ -131,7 +135,10 @@ an importable n8n workflow in
 [`plugins/firstbell-absence-calls`](../../../plugins/firstbell-absence-calls/), with the
 classifier extracted into a plain module so `node --test examples/classify.test.mjs` runs
 its twenty-seven tests without n8n installed, and the workflow regenerated from that module by
-a committed script so the two cannot drift apart. It ships with its schedule trigger
+a committed script so the two cannot drift apart. Both `node` commands run from that
+directory and not from here, and both name their files: `node --test examples/` resolves the
+directory as a module on node 22 and fails before it reads a test, which looks exactly like a
+broken suite. The shape tests add eight more, and the plugin's README runs the pair. It ships with its schedule trigger
 disabled and a dry run that places no calls and needs no API key.
 
 ## The problem
@@ -917,8 +924,10 @@ says what would be reachable, and tells you how to proceed anyway.
 
 ## Evidence from real calls
 
-Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. Their receipts are on
-the [evidence page](https://firstbell-evidence.vercel.app) and **not in this tree**,
+Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. The recording of each
+one, its transcript and its shortened id are on the
+[evidence page](https://firstbell-evidence.vercel.app). The receipt files are on **neither
+that page nor in this tree**,
 because the maintainer of this list requires that committed real-call artifacts be removed
 and has said the requirement holds even where the people on the call were team members
 playing a part and the numbers were reserved ones. That describes these calls exactly, so
@@ -996,21 +1005,29 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 620 tests collected
+python -m pytest tests/ -q          # 624 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**620 is the number collected, and two different pairs add up to it.** Some of these gates
+**624 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **599 passed, 21 skipped**.
-The twenty-one name what is missing rather than passing quietly: ten want a built page,
-seven want a page and its policy, two want a gate report, one wants the gate screenshots,
-and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **618 passed, 2 skipped**. Both pairs are measured,
-both add up to 620, and the difference between them is what a reader has on their disk.
+A clean checkout of this commit into an empty directory reports **602 passed, 22
+skipped**. The twenty-two name what is missing rather than passing quietly: thirteen want a
+built page, four want the page and its Content-Security-Policy, three want a gate report,
+one wants the gate screenshots, and one is a run whose rows are all of one kind, so the
+ordering it would check proves nothing. Build the page and run the gates and the same suite
+reports **622 passed, 2 skipped**. Both pairs are measured, both add up to 624, and the
+difference between them is what a reader has on their disk.
+
+The very first run in a fresh clone reports one more skip and one fewer pass, 601 and 23.
+The figure on the first screen is generated rather than committed, so
+`tools/make_figure.py --check` has nothing to compare its output against until it has run
+once: it reports could-not-measure, writes the figure while checking for it, and passes on
+every run after that. Two runs of the same suite on the same commit giving two pairs is
+worth saying rather than leaving a reader to wonder which of us miscounted.
 
 Building the page is one command, and it takes the recordings separately because they are
 not in this repository:
@@ -1214,6 +1231,8 @@ in `THIRD-PARTY-NOTICES.md`.
 
 Every phone number in this repository is fictional and unassignable, and
 `tests/test_privacy.py` fails if one is not. The calls described above went to a real
-handset, mine, and no number that reached it is committed here: the receipts holding it are
-on the linked page, where it is masked. Those two sentences are both true and they are
-eighty lines apart, which was worth closing rather than leaving a reader to reconcile.
+handset, mine, and no number that reached it is published anywhere: not here, and not on
+the linked page, which carries the recordings and the transcripts with every identifier
+shortened at both ends. The receipts that hold the number are on neither surface. Those two
+sentences are both true and they are eighty lines apart, which was worth closing rather
+than leaving a reader to reconcile.

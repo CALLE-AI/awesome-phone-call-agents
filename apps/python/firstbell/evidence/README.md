@@ -1,8 +1,16 @@
 # Evidence
 
-Twelve calls were placed against `api.heycall-e.com` on 2026-09-04, and their receipts are
-**not in this directory**. They are on the [evidence page](https://firstbell-evidence.vercel.app),
-which is linked, not committed.
+Twelve calls were placed against `api.heycall-e.com` on 2026-09-04, and their receipt files
+are **not in this directory and not on the evidence page either**. This paragraph used to say
+they were on that page, and a reader who went looking found recordings.
+
+What is published is the same material with the identifiers taken out. The
+[evidence page](https://firstbell-evidence.vercel.app) carries the recording of each call, its
+transcript turn by turn, its waveform and a shortened id, and it is linked rather than
+committed. What travels with the code is the arithmetic, in `recorded-calls.json`: all six
+receipt files by name, how many calls each one placed, how many were answered and how many
+needed a human, and the counts behind every money figure in this entry. No conversation, no
+telephone number, no call id.
 
 That is deliberate, and it is not our rule. The maintainer of this list has required, on
 several pull requests, that a contributor remove committed real-call transcripts and every

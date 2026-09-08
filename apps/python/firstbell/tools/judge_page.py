@@ -182,13 +182,29 @@ def mask_id(value: str) -> str:
     keep = 4 if len(body) > 10 else 2
     # A body whose two ends are the whole body would be published entire by the line
     # below, and for `abc` it would print `ab…bc`, repeating a character to do it. The
-    # number masker in `firstbell/redaction.py` already refuses that: below the length at
+    # number masker in `dispatch/models.py` already refuses that: below the length at
     # which the ends hide something, show none of it. Nothing here reaches this branch,
     # because a CALL-E call id is 26 characters and a provider id is 32, which is the
     # reason to close it now rather than after something shorter arrives.
     if len(body) <= keep * 2:
         return f"{head}{sep}…"
     return f"{head}{sep}{body[:keep]}…{body[-keep:]}"
+
+
+def receipt_counts(name: str) -> dict[str, int]:
+    """One receipt's row out of the committed record, for a page that cannot show the file.
+
+    `evidence/recorded-calls.json` is the only artifact in this entry that carries what the
+    receipts produced without carrying anything from the calls themselves. It names each
+    receipt, so a reader who cannot open one can still check a count taken from it, which is
+    what the queue footer needs and what it used to promise the wrong way.
+    """
+    record = json.loads(
+        (EVIDENCE / "recorded-calls.json").read_text(encoding="utf-8"))
+    for row in record["per_receipt"]:
+        if row["receipt"] == name:
+            return row
+    raise KeyError(f"{name} is in no row of evidence/recorded-calls.json")
 
 
 def recovered_provider_ids() -> dict[str, str]:
@@ -371,6 +387,40 @@ def _film_running_time() -> str:
         return "the demo"
     seconds = json.loads(facts.read_text(encoding="utf-8"))["seconds"]
     return f"{int(seconds // 60)} min {int(round(seconds % 60)):02d}"
+
+
+def _node_suite_size() -> tuple[int, int]:
+    """How many tests the n8n recipe ships, counted rather than remembered.
+
+    `test(` at the start of a line is how both files are written, and it is what the gate on
+    the README's count reads, so the page and the gate cannot disagree about the method. Two
+    numbers because the two files answer different questions and the surfaces name them
+    separately: the classifier rule, and the shape of the workflow it is inlined into.
+    """
+    examples = APP.parents[2] / "plugins" / "firstbell-absence-calls" / "examples"
+
+    def written(name: str) -> int:
+        body = (examples / name).read_text(encoding="utf-8")
+        return len([ln for ln in body.splitlines() if ln.startswith("test(")])
+
+    return written("classify.test.mjs"), written("workflow-shape.test.mjs")
+
+
+def _conformance_figures() -> tuple[int, int, int]:
+    """What the conformance record holds, rather than a test count typed beside its command.
+
+    `double_conformance.py --check` runs no tests. It reads `evidence/api-shape.json`, walks
+    every key path the recorded production responses carry, and prints one line. So the card
+    prints what that establishes: how many responses were compared, how many paths they
+    carry, and how many of those the double does not emit.
+    """
+    record = json.loads(
+        (EVIDENCE / "api-shape.json").read_text(encoding="utf-8"))
+    # `api_paths` is the mapping of path to the JSON types seen there, and
+    # `missing_in_double` the list of paths our model does not emit, so both are counted
+    # rather than read. Only `responses_compared` is already a number.
+    return (int(record["responses_compared"]), len(record["api_paths"]),
+            len(record["missing_in_double"]))
 
 
 def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> str:
@@ -1545,14 +1595,23 @@ def queue_markup(run: dict) -> str:
     # The receipt this queue is built from is not in the repository and saying so here
     # is the difference between evidence and an assertion. A reader who went looking for
     # the file and did not find it had grounds to distrust the whole act.
+    #
+    # It sent a reader to the evidence page for a receipt that is not published there:
+    # that page carries the recordings, the transcripts and the shortened ids, and no
+    # receipt file. So this now says where each thing is, and prints the two numbers from
+    # the one committed record that let a reader check these rows without the file.
+    counted = receipt_counts("06-locale-matched-pairs.json")
     out.append('<p class=queue-foot>Every row is a real call from '
                '<code>06-locale-matched-pairs.json</code>, sorted by the same rule the '
-               'program uses. Nothing here was arranged for the picture. That receipt is '
-               'not in the repository, because the recordings and the receipts of real '
-               'calls are held on the <a href="https://firstbell-evidence.vercel.app" '
-               'rel="noopener">evidence page</a> instead; the counts behind every money '
-               'figure on this page are committed in '
-               '<code>evidence/recorded-calls.json</code>.</p>')
+               'program uses. Nothing here was arranged for the picture. The recordings '
+               'are on the <a href="https://firstbell-evidence.vercel.app" '
+               'rel="noopener">evidence page</a>; the receipt file is on neither that page '
+               'nor in the repository, for the reason <code>evidence/README.md</code> '
+               'gives. The count holds without it: '
+               '<code>evidence/recorded-calls.json</code> records that receipt&#8217;s '
+               f'{counted["calls"]} calls and the {counted["escalated"]} of them that '
+               f'needed a human, which is the {len(rows)} rows here, and it carries the '
+               'counts behind every money figure on this page.</p>')
     out.append('</div>')
     return "".join(out)
 
@@ -1656,24 +1715,34 @@ def takeaway_markup() -> str:
     in the README only, not the page and not the video". Neither of them was going to clone a
     repository to discover it. So the page says it, with the number of tests behind each and
     the one command that checks it.
+
+    Both of those were wrong, and a buyer found them by running them. The n8n command named
+    two files and printed the count of one of them, and from the directory this page puts a
+    reader in it found neither file. The other row printed "44 tests" next to a command that
+    runs no tests and a figure that matched no file in the tree. A caption nobody executes is
+    where a stale number lives longest, so both are now derived and both commands start with
+    `cd`.
     """
+    compared, paths, missing = _conformance_figures()
+    classifier, shape = _node_suite_size()
     rows = [
         ("The offline CALL-E",
          "docs/the-offline-calle.html",
          "A CALL-E written from the published API, mounted on the SDK's own transport, so "
-         "the client under test is the shipped one. Every offline run in this entry is "
-         "measured against it, and the record proving it matches production compares 11 "
-         "recorded responses path by path and type by type.",
-         "python tools/double_conformance.py --check",
-         "44 tests"),
+         f"the client under test is the shipped one. Every offline run in this entry is "
+         f"measured against it, and the record proving it matches production compares "
+         f"{compared} recorded responses path by path and type by type.",
+         "cd apps/python/firstbell && python tools/double_conformance.py --check",
+         f"{paths} API paths, {missing} missing"),
         ("The same rule as an n8n recipe",
          None,
          "The three-outcome classifier is not locked inside a Python CLI. It ships as an "
          "importable n8n workflow, generated from the tested module by a committed script "
          "so the two cannot drift, inactive on import with a dry run that places no calls "
          "and needs no API key.",
-         "node --test examples/classify.test.mjs examples/workflow-shape.test.mjs",
-         "27 tests, no n8n installed"),
+         "cd plugins/firstbell-absence-calls && node --test "
+         "examples/classify.test.mjs examples/workflow-shape.test.mjs",
+         f"{classifier + shape} tests, no n8n installed"),
     ]
     items = []
     for title, href, why, command, count in rows:
@@ -2120,9 +2189,12 @@ def build(has_audio: bool, repo_url: str | None = None,
         'collapses again.</p>',
         # The opening sentence of the note above, word for word.
         pull("This app made the first mistake itself."),
+        # It sent a reader to the evidence page for a receipt not published there. That
+        # page carries the recordings and the transcripts of these calls, and no receipt.
         f'<p class=dim>Counts read from one recorded run of {placed} calls, '
-        '<code>06-locale-matched-pairs.json</code>, which is on the evidence page rather '
-        'than in the repository. '
+        '<code>06-locale-matched-pairs.json</code>, a receipt held outside this repository '
+        'and published nowhere, whose counts are committed in '
+        '<code>evidence/recorded-calls.json</code>. '
         f'{open_rows} of {placed} rows are still open and every one of them is named. The '
         'rate is resolved over attempted, so an open row can only ever pull it down.</p>',
     ]

@@ -2057,9 +2057,10 @@ button[data-copy][data-copied]::after {
 .take-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
             margin: 0; max-width: none; }
 .take-run { margin: 0.4rem 0 0; display: grid; gap: 0.3rem; }
-/* `anywhere` because the n8n command is 62 characters and the column is narrower than that
- * at every width below the breakpoint. The overflow gate walks six widths and this is the
- * shape that failed it once already, on a filename in a paragraph. */
+/* `anywhere` because the n8n command is 109 characters, since it gained the `cd` that makes
+ * it runnable, and the column is narrower than that at every width. The overflow gate walks
+ * six widths and this is the shape that failed it once already, on a filename in a
+ * paragraph. */
 .take-run code { font-family: var(--mono); font-size: var(--size-1); color: var(--ink);
                  overflow-wrap: anywhere; }
 .take-run .take-n { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3);

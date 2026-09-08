@@ -9,8 +9,9 @@ Three of the defects this dispatcher guards against were found by placing real c
 a while the recorded responses themselves were the fixtures. They are not any more. The
 upstream maintainer requires that no real-call artifact sit in the tree, and that requirement
 holds even for a call somebody placed to their own phone using a reserved number, which is
-what these were. So the recordings stay where they were made, outside this repository, and are
-published as receipts on the linked page instead.
+what these were. So the recordings stay where they were made, outside this repository, and the
+linked page publishes them with the transcript of each call and a shortened id. The receipt
+files are on neither surface; the counts they produced are in evidence/recorded-calls.json.
 
 That leaves a real question: if the fixture is authored, what stops it from being whatever
 shape makes the tests pass?
@@ -145,8 +146,9 @@ PROVENANCE = (
     "whose likeness to the production API is measured by tools/double_conformance.py and "
     "gated by test_the_double_emits_every_field_the_real_api_returns. The spoken turns were "
     "written for this fixture and are not a transcript of any call. No real-call artifact is "
-    "committed to this repository; the receipts for the calls that were placed live on the "
-    "linked evidence page."
+    "committed to this repository. The recordings and transcripts of the calls that were "
+    "placed are on the linked evidence page; their receipt files are in neither place, and "
+    "the counts those receipts produced are in evidence/recorded-calls.json."
 )
 
 

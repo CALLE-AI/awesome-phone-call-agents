@@ -57,7 +57,7 @@ shapes carried `parent_confirmed_aware`, every completed row escalated, and the 
 printed a resolution rate of zero while all 26 tests passed.
 
 ```
-node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 32 passing
+node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 35 passing
 node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
 

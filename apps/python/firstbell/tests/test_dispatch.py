@@ -513,9 +513,10 @@ def test_any_work_source_substitutes_for_the_csv_one(double):
 # -- the response shapes real calls turned up -------------------------------
 #
 # Every fixture below is generated, by tools/make_shape_fixtures.py, from the offline
-# double. None of them is a recording. The recordings that first showed these shapes were
-# made against the production API on 2026-09-04 and are published as receipts on the linked
-# evidence page; they are not in this repository, because the upstream maintainer requires
+# double. None of them is a recording. The calls that first showed these shapes were made
+# against the production API on 2026-09-04, and the linked evidence page publishes their
+# recordings and transcripts. Their receipt files are in neither place, because the
+# upstream maintainer requires
 # that no real-call artifact be committed, and that holds for a call placed to the author's
 # own phone on a reserved number, which is what these were.
 #

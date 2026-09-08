@@ -903,6 +903,10 @@ def test_the_page_says_where_its_source_is_and_whether_a_film_exists():
         "and Demo. A reader cannot tell an unlinked film from no film")
 
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    "test_the_queue_rows_are_the_number_the_committed_record_holds":
+        "needs a page built by tools/judge_page.py, which needs the call receipts",
+    "test_the_take_away_card_prints_commands_that_can_be_run":
+        "needs a page built by tools/judge_page.py, which needs the call receipts",
     "test_the_page_says_where_its_source_is_and_whether_a_film_exists":
         "needs a page built by tools/judge_page.py, which needs the call receipts",
     "test_what_the_page_says_about_audio_is_what_the_build_holds":
@@ -1557,3 +1561,267 @@ def test_the_demo_video_is_linked_when_there_is_one_to_link():
     hostile = video_link_markup('https://x/"><script>alert(1)</script>')
     assert "<script>" not in hostile, "the video URL is written into an attribute unescaped"
     assert "&quot;" in hostile or "&#x27;" in hostile
+def _node_suite_counts() -> tuple[int, int]:
+    """The two numbers every surface in this contribution states about the n8n recipe.
+
+    `test(` at the start of a line, the same method `judge_page._node_suite_size` uses and
+    the same one the README gate above uses, so nothing here can pass by counting
+    differently from the thing it checks.
+    """
+    examples = APP.parents[2] / "plugins" / "firstbell-absence-calls" / "examples"
+
+    def written(name: str) -> int:
+        body = (examples / name).read_text(encoding="utf-8")
+        return len([line for line in body.splitlines() if line.startswith("test(")])
+
+    return written("classify.test.mjs"), written("workflow-shape.test.mjs")
+
+
+def test_every_count_of_the_n8n_recipes_suite_is_the_number_it_runs():
+    """One suite, four surfaces, three different wrong numbers.
+
+    A district buyer ran the command the page prints for the n8n recipe and got 35 tests
+    where the page said 27. Twenty-seven is the classifier file on its own; the command names
+    the shape file too, which adds eight. Following that number to its other homes found the
+    plugin README and that plugin's `manifest.json` both saying "32 passing" for the same
+    pair, and the manifest saying "The 24 classifier tests" where there are twenty-seven.
+    Four surfaces, and the only one that was right was the app README, because it is the only
+    one a gate was reading.
+
+    So this reads all of them. Each is a count stated in prose next to a command nobody runs
+    while editing prose, which is the condition every stale number in this repository has
+    been found in.
+    """
+    classifier, shape = _node_suite_counts()
+    assert classifier > 10 and shape > 3, (
+        f"counted {classifier} and {shape} tests, so this is counting the wrong thing")
+    both = classifier + shape
+
+    plugin = APP.parents[2] / "plugins" / "firstbell-absence-calls"
+    readme = (plugin / "README.md").read_text(encoding="utf-8")
+    manifest = (plugin / "manifest.json").read_text(encoding="utf-8")
+
+    wrong = []
+
+    # The pair, in the fenced block the plugin README opens with and in the manifest field
+    # that names the same command.
+    for where, body in (("the plugin README", readme), ("manifest.json", manifest)):
+        for stated in re.findall(r"(\d+) passing", body):
+            if int(stated) != both:
+                wrong.append(f"{where} says {stated} passing; the pair runs {both}")
+
+    # The classifier alone, which is the number the manifest breaks out.
+    for stated in re.findall(r"The (\d+) classifier tests", manifest):
+        if int(stated) != classifier:
+            wrong.append(
+                f"manifest.json says {stated} classifier tests; there are {classifier}")
+
+    # The shape file alone, spelled in the plugin README's own section about it and given in
+    # digits in the manifest.
+    for stated in re.findall(r"The (\d+) shape tests", manifest):
+        if int(stated) != shape:
+            wrong.append(f"manifest.json says {stated} shape tests; there are {shape}")
+    spelled = re.search(r"The other ([\w-]+) tests read the generated workflow", readme)
+    assert spelled, "the plugin README no longer states the shape count where this looks"
+    in_words = {word: value for value, word in NUMBER_WORDS.items()}
+    said = spelled.group(1).lower()
+    counted = int(said) if said.isdigit() else in_words.get(said)
+    if counted != shape:
+        wrong.append(f"the plugin README says {said} shape tests; there are {shape}")
+
+    # And the sentence in the app README that sends a reader to the plugin, which has to
+    # agree about the eight it adds.
+    app_readme = (APP / "README.md").read_text(encoding="utf-8")
+    adds = re.search(r"The shape tests add ([\w-]+) more", app_readme)
+    assert adds, "the app README no longer says how many the shape tests add"
+    said = adds.group(1).lower()
+    counted = int(said) if said.isdigit() else in_words.get(said)
+    if counted != shape:
+        wrong.append(f"the app README says the shape tests add {said}; they add {shape}")
+
+    assert not wrong, "\n  ".join([""] + wrong)
+
+
+def test_the_take_away_card_prints_commands_that_can_be_run():
+    """The card offers two pieces of this entry to reuse, and neither command ran.
+
+    A buyer took both. `node --test examples/classify.test.mjs
+    examples/workflow-shape.test.mjs` runs nothing from the directory the page puts a reader
+    in, because the files are three levels up and across in `plugins/`. And the count beside
+    it was the count of one of the two files it names. The other row printed "44 tests" beside
+    `python tools/double_conformance.py --check`, which runs no tests at all and prints one
+    line, and 44 was the size of nothing in this tree.
+
+    Both commands now start with `cd`, so this resolves each one against a fresh clone: the
+    directory has to exist, every path argument in it has to exist inside that directory, and
+    the numbers beside them have to be the numbers the files hold. A command in a caption is
+    the last thing anyone runs, so it is checked here rather than trusted.
+    """
+    page = APP / "out" / "index.html"
+    if not page.is_file():
+        pytest.skip("no built page; run tools/judge_page.py with --receipts first")
+    markup = page.read_text(encoding="utf-8", errors="replace")
+
+    rows = re.findall(
+        r"<p class=take-run><code>(.*?)</code>\s*<span class=take-n>(.*?)</span>", markup)
+    assert len(rows) >= 2, (
+        f"found {len(rows)} take-away command(s) on the page; the card offers two")
+
+    root = APP.parents[2]
+    for raw, count in rows:
+        command = raw.replace("&amp;", "&").replace("&#8217;", "'")
+        head, _, rest = command.partition(" && ")
+        assert head.startswith("cd "), (
+            f"`{command}` names no directory, so it runs wherever the reader happens to be "
+            f"and the page never says where that is")
+        where = root / head[3:].strip()
+        assert where.is_dir(), f"`{head}` names a directory this repository does not have"
+        args = [word for word in rest.split()
+                if "/" in word and not word.startswith("-")]
+        assert args, f"`{rest}` names no file, so this gate is checking nothing"
+        for arg in args:
+            assert (where / arg).is_file(), (
+                f"`{command}` names {arg}, which does not exist under {head[3:].strip()}, "
+                f"so a reader who runs it gets nothing")
+
+    classifier, shape = _node_suite_counts()
+    node_row = [count for raw, count in rows if "node --test" in raw]
+    assert len(node_row) == 1, "the n8n row is not on the page under a node command"
+    assert node_row[0].startswith(f"{classifier + shape} tests"), (
+        f"the card says {node_row[0]!r} for a command that runs {classifier + shape}")
+
+    record = json.loads(
+        (APP / "evidence" / "api-shape.json").read_text(encoding="utf-8"))
+    paths, missing = len(record["api_paths"]), len(record["missing_in_double"])
+    double_row = [count for raw, count in rows if "double_conformance" in raw]
+    assert len(double_row) == 1, "the offline CALL-E row is not on the page"
+    assert double_row[0] == f"{paths} API paths, {missing} missing", (
+        f"the card says {double_row[0]!r}; the conformance record holds {paths} paths and "
+        f"{missing} missing")
+# The claim this repository made nine times, in the shape it made it: a subject, a verb of
+# being or holding, and the evidence page as where it is. A rule about prose is a weaker gate
+# than a rule about a file, and this one is here because the defect was in prose, with no
+# filename in seven of the nine.
+#
+# `SUBJECT` is sixty characters because the longest real subject was "the recordings and the
+# receipts of real calls". `BETWEEN` is where a negation has to sit to count as one: "is on
+# neither that page" is a denial, and "are not in this directory. They are on the evidence
+# page" is the sentence this whole gate exists for, so a negation anywhere in the window
+# would have skipped it.
+LOCATED_THERE = re.compile(
+    r"(?P<subject>[^.;:!?]{0,60})"
+    r"\b(?:are|is|were|was|live|lives|held|sit|sits|published)\b"
+    r"(?P<between>[^.;:!?]{0,40}?)"
+    r"\bon (?:the|that)\b[^.;:!?]{0,30}?\b(?:evidence|linked) page\b", re.I)
+A_DENIAL = re.compile(r"\b(?:not|never|neither|nor|outside)\b", re.I)
+A_PRONOUN = re.compile(r"^(?:\W*)(?:they|it|those|these|both)\b", re.I)
+# What counts as naming a receipt: the word, or one of the six files by name. The caption
+# under act 03 said "06-locale-matched-pairs.json, which is on the evidence page rather than
+# in the repository" and used neither the word nor a pronoun, so a rule that read only the
+# word walked straight past it.
+A_RECEIPT = re.compile(r"receipt|\b\d\d-[a-z0-9-]+\.json\b", re.I)
+HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
+
+
+def _as_a_reader_sees_it(text: str) -> str:
+    """Markup out, string-literal quotes out, whitespace collapsed.
+
+    The page writes `on the <a href=...>evidence page</a>` and the builder writes the same
+    sentence split across Python literals. Neither is a claim about a tag or a quote, and a
+    gate that reads the bytes rather than the sentence missed both.
+    """
+    return re.sub(r"\s+", " ", HTML_TAG.sub(" ", text).replace('"', "").replace("'", ""))
+
+
+def test_nothing_sends_a_reader_to_the_evidence_page_for_a_receipt():
+    """The receipts are on nobody's disk but the author's, and nine surfaces said otherwise.
+
+    `evidence/README.md` opened with "their receipts are not in this directory. They are on
+    the evidence page". `README.md` said it twice, once in the money paragraph and once in
+    the reading list. `docs/receipt-provenance.md` said it of the replay receipt, which is
+    the one carrying the claim that no telephone rang. The page said it twice: in the footer
+    under the escalation queue and in the caption under act 03, which is the page telling a
+    reader that a file is on the page. A comment over the generated response fixtures said
+    it, and so did the provenance line stamped inside each of those fixtures.
+
+    What that page publishes is the recording of each call, its transcript, its waveform and
+    a shortened id. No receipt file is on it, and none is in the tree. Nine of these were
+    written by hand and four of the nine were found by this gate after I had fixed five and
+    believed I was done.
+
+    The honest version was already sitting in one of them: the counts are committed in
+    `evidence/recorded-calls.json`, which names all six receipts and carries no conversation,
+    no telephone number and no call id.
+    """
+    surfaces = [(path.name, _as_a_reader_sees_it(
+                    path.read_text(encoding="utf-8", errors="replace")))
+                for path in _tracked_paths()
+                if path.suffix in {".md", ".py"} and "test_claims" not in path.name]
+
+    page = APP / "out" / "index.html"
+    if page.is_file():
+        surfaces.append(("out/index.html", _as_a_reader_sees_it(
+            page.read_text(encoding="utf-8", errors="replace"))))
+
+    claiming = []
+    for where, body in surfaces:
+        for found in LOCATED_THERE.finditer(body):
+            if A_DENIAL.search(found.group("between")):
+                continue
+            # Both halves of the claim, because the comment over the generated fixtures put
+            # the noun in the second one: "are published as receipts on the linked evidence
+            # page".
+            said = found.group("subject") + found.group("between")
+            if A_PRONOUN.search(said.strip()) or not said.strip():
+                # The subject is somewhere before the full stop, which is exactly how the
+                # sentence that started this was written.
+                said = body[max(0, found.start() - 260):found.start()]
+            if not A_RECEIPT.search(said):
+                continue
+            claiming.append(f"{where}: " + " ".join(found.group(0).split())[:170])
+
+    assert not claiming, (
+        "these say a receipt is on the evidence page, and that page publishes recordings, "
+        "transcripts, waveforms and shortened ids, and no receipt file:\n  "
+        + "\n  ".join(claiming)
+    )
+
+
+def test_the_queue_rows_are_the_number_the_committed_record_holds():
+    """A count no reader could check, made checkable by the one artifact that travels.
+
+    The footer under the escalation queue names the receipt those four rows come from and
+    says nothing there was arranged for the picture. Neither half could be checked, because
+    the receipt is published nowhere. What is committed is `evidence/recorded-calls.json`,
+    which records that receipt by name, the seven calls it placed and the four of them that
+    needed a human. Four is the number of rows.
+
+    The first version of this held each number against the record and then looked for the
+    digits in the footer, which "the 4 of them that needed a human" satisfied twice over: a
+    footer claiming five rows above four rows passed it. So it holds the sentence now.
+    """
+    page = APP / "out" / "index.html"
+    if not page.is_file():
+        pytest.skip("no built page; run tools/judge_page.py with --receipts first")
+    markup = page.read_text(encoding="utf-8", errors="replace")
+
+    record = json.loads(
+        (APP / "evidence" / "recorded-calls.json").read_text(encoding="utf-8"))
+    named = "06-locale-matched-pairs.json"
+    row = next((r for r in record["per_receipt"] if r["receipt"] == named), None)
+    assert row, f"{named} is in no row of evidence/recorded-calls.json"
+
+    drawn = len(re.findall(r'class="queue-row', markup))
+    assert drawn == row["escalated"], (
+        f"the queue draws {drawn} row(s) and the committed record says {row['escalated']} of "
+        f"that receipt's calls needed a human")
+
+    found = re.search(r"<p class=queue-foot>(.*?)</p>", markup, re.S)
+    assert found, "the queue footer is gone, and with it the only place these counts are said"
+    said = " ".join(found.group(1).split())
+    for phrase in (f"{row['calls']} calls",
+                   f"the {row['escalated']} of them",
+                   f"which is the {drawn} rows here"):
+        assert phrase in said, (
+            f"the footer does not say {phrase!r}, so a reader cannot check these rows "
+            f"against the one record that is committed")
