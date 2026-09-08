@@ -256,16 +256,20 @@ for (const r of sorted) {
   process.stdout.write(`${r.project.padEnd(width)}  ${String(r.payloads).padStart(2)}  ${cells}${note}\n`);
 }
 
-// A behaviour seen once and a behaviour seen twelve times print the same cross. The
-// legend is where that difference has to appear, or the table overstates what it knows.
+// A behaviour seen once and a behaviour seen twelve times print the same cross, so the
+// legend carries the difference. It says "observed", not a rate: fifteen responses from
+// one account is a record of what was seen and not a sample of anything, and one
+// observation establishes that a behaviour is real exactly as well as seven do. Printed
+// as a bare fraction it would be read as a frequency, which is a claim this cannot make.
 const corpusRow = sorted.find((r) => r.project.endsWith(OWNER));
 process.stdout.write(`\nlegend\n`);
+process.stdout.write(`  counts are observations in this corpus, which is a record and not a sample\n`);
 QUIRKS.forEach((q, i) => {
   const covered = sorted.filter((r) => r.quirks.has(q.id)).length;
   const seen = corpusRow?.counts.get(q.id) ?? 0;
   process.stdout.write(
     `  ${String(i + 1).padStart(2)}  ${q.id}\n` +
-      `      seen in ${seen} of ${corpusSize} corpus responses, covered by ${covered} of ${sorted.length} projects\n`,
+      `      observed in ${seen} of the ${corpusSize} corpus responses, covered by ${covered} of ${sorted.length} projects\n`,
   );
 });
 

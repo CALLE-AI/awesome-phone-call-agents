@@ -57,15 +57,19 @@ dialled. Node 22 runs the TypeScript directly, and the only dependency in
 `package.json` is needed by the optional probes, not by this.
 
 ```
-6 projects carrying call-shaped payloads, 8 quirks.
+corpus: 15 real responses, 8 behaviours declared as predicates.
+6 projects carry call-shaped payloads to score against them.
 A dot means the behaviour never appears in that project's payloads.
+That is a statement about recorded test data, not a verdict on a project's code: a
+project can handle a behaviour and ship no fixture for it, and a fixture is data
+rather than an assertion. Read a row as coverage against this corpus, nothing wider.
 
 project                            n    1  2  3  4  5  6  7  8
 ---------------------------------  --  -- -- -- -- -- -- -- --
 apps/python/casechaser              7   .  .  .  .  .  .  x  .
 apps/python/redline                 1   .  .  .  .  .  .  x  .
 apps/python/ringdown                2   .  .  .  .  x  .  x  .
-apps/typescript/calle-conformance  15   x  x  x  x  x  x  x  x
+apps/typescript/calle-conformance  15   x  x  x  x  x  x  x  x   <- the corpus itself, full by construction
 plugins/zapier-calle                3   .  .  .  .  .  .  x  .
 skills/verify-by-phone              1   .  .  .  .  .  .  .  .
 ```
@@ -177,10 +181,13 @@ is ruled out: nothing moved at local midnight or at UTC midnight.
 there. Two were accepted and the third met the limiter. Three refusals, three
 units, no phone rung.
 
-Reading the counter without placing a call is possible because payload validation
-runs before the rate limiter while destination screening runs after it, so a
-well-formed request to an unsupported region returns 422 with headroom and 429
-carrying `limit`, `window_hours` and `count` at the cap. Note the asymmetry: the
+Reading the counter without placing a call is possible because of an observed
+ordering of outcomes, stated as what was seen rather than as an internal
+architecture: a malformed payload returns 422 whether or not there is headroom; a
+well-formed request to an unsupported region returns 422 while there is headroom
+and 429 carrying `limit`, `window_hours` and `count` once there is none. Several
+implementations produce that table and this cannot tell them apart, so no claim is
+made here about which check runs where. Note the asymmetry: the
 probe is free **only** while at the cap. With headroom it reaches the planner and
 consumes, so the counter can be read for free only when there is nothing left to
 read.
@@ -279,9 +286,12 @@ correction.
 
 The second is worse, and it is in a project that screens job candidates.
 `apps/typescript/hirecall` guards against scoring somebody who was never reached
-by reading `end_reason` out of `structuredResult`, which is the field the platform
-populates on a call with no conversation at all. The check that decides whether
-the result can be trusted is derived from the result. Two fields it already
+by testing `end_reason`. That field does not appear in any of the fifteen
+responses here, so the app's own schema parser manufactures one, defaulting it to
+`"failed"` (`src/lib/call-result-schema.ts:111`). Because that default is truthy
+the fallback beside it never runs, and `"failed"` is not `"no_answer"`, so the
+guard misses on exactly the payloads it exists for. The value the check reads was
+invented by the app, from a field the platform did not send. Two fields it already
 receives, a non-null `failureCode` and an empty transcript, would settle it
 without guessing. It ships no tests, so nothing exercises the branch.
 

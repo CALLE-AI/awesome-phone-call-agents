@@ -116,24 +116,50 @@ never reached is at `src/lib/place-call.ts:265`:
 if (endReason === "no_answer" || candidate.callStatus === "no_answer") { ... }
 ```
 
-`endReason` is read from `response.result?.end_reason` two lines earlier, which is
-the structured result the platform populated on a call that did not connect. So
-the check that decides whether the result can be trusted is derived from the
-result itself. The second half of that condition cannot save it either:
-`mapCalleSnapshotToStatus` maps a failed call to `failed`, never to `no_answer`,
-so `candidate.callStatus` is `failed` on exactly the payloads at issue. The next
-guard, `if (!response.result)`, is false because a filled object was returned.
-What follows is a Gemini call that produces a score and a `decision` for a
-candidate whose phone never rang.
+**Correction, 8 September 2026.** An earlier version of this entry said the check
+is derived from the result it is checking, and described that circularity as the
+defect. That framing was wrong in the same way the entry above it was wrong: it
+asserted a runtime path without following it. Following it changes the finding and
+makes it sharper, so the wording is replaced rather than trimmed.
 
-**Scope of the claim, stated narrowly.** Whether this fires depends on which
-member of that app's `end_reason` enum the platform selects on a failed call. If
-it selects `no_answer`, the guard holds. This corpus cannot answer that, because
-it was captured against a different schema: on ours the platform chose `unknown`,
-the member that meant nobody answered. What the corpus does establish is that
-`structuredResult` is populated on a call with no conversation, so the app's
-safety rests entirely on a value it did not compute and does not check. Two
-fields it already receives would settle it without guessing:
+**What actually happens, line by line.** `end_reason` does not appear anywhere in
+the fifteen responses in this corpus. On the failed calls the platform sends
+`recipients[].structuredResult` as `{"heard_clearly": "unknown"}`, which is this
+task's own question, not an end reason.
+
+The app manufactures one anyway. `parseScreeningResult`
+(`src/lib/call-result-schema.ts:111`) coerces the missing field through
+`asEnum(row.end_reason, END_REASON, "failed")`, so `result.end_reason` comes back
+as `"failed"`. That value did not come from the platform. It is this app's own
+default wearing the shape of platform data.
+
+Then at `place-call.ts:257`:
+
+```ts
+const endReason =
+  response.result?.end_reason ||
+  (candidate.callStatus === "no_answer" || ... ? candidate.callStatus : "failed");
+```
+
+`"failed"` is truthy, so the fallback on the right never runs, and `endReason` is
+`"failed"`. The guard on line 265 asks whether it is `"no_answer"`. It is not. The
+second half cannot save it either: `mapCalleSnapshotToStatus` (`place-call.ts:90`)
+returns `"failed"` for a snapshot whose status is `failed`, never `"no_answer"`,
+which is exactly the payload at issue. The next guard, `if (!response.result)`, is
+false because `parseScreeningResult` returns a filled object for any object at
+all, including `{"heard_clearly": "unknown"}`. What follows is a Gemini call that
+produces a score and a `decision` for a candidate whose phone never rang.
+
+So the defect is not that the check reads what it is checking. It is that the
+value the check reads is invented by the app's own parser, from a field the API
+did not send, and the invented default is the one value that makes the guard miss.
+
+**Scope of the claim, stated narrowly.** Fifteen responses from one account cannot
+establish that the platform never sends `end_reason`; it may appear under
+conditions this corpus did not reach, and if it ever arrives as `no_answer` the
+guard holds. What the corpus does establish is that on every failed call it
+contains, the field is absent and `structuredResult` is populated anyway. Two
+fields the app already receives would settle it without guessing:
 `attempt.failureCode` is non-null and `transcriptTurns` is empty.
 
 **Why nothing catches it.** This project ships no tests and no fake server, so
