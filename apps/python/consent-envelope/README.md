@@ -1,6 +1,6 @@
 # CALL-E Consent Gate and Outcome Auditor
 
-**Prototype test build - not a compliance guarantee.** Fifteen local tests pass. The recorded live call used the CALL-E dashboard, not this app's SDK path; end-to-end SDK execution is unverified. Audits compare supplied transcript text and metadata, not independently verified audio or provider attempt history. Hashes identify content but do not authenticate consent. The included authorization is demo-only and cannot place calls.
+**Prototype test build - not a compliance guarantee.** Local tests cover the bundled synthetic examples; end-to-end SDK execution is unverified. Audits compare supplied transcript text and metadata, not independently verified audio or provider attempt history. Hashes identify content but do not authenticate consent. The included authorization is demo-only and cannot place calls.
 
 A two-sided safety wrapper for CALL-E phone tasks. The preflight validates recipient authorization before execution; the post-call auditor checks the actual transcript, attempt count, voicemail path, and hang-up against the approved plan. Both tools avoid printing phone numbers, and the auditor stores a transcript hash rather than echoing recipient speech.
 
@@ -12,7 +12,7 @@ python -m unittest discover -s tests -v
 
 Live execution additionally requires `--execute`, `--confirm-call`, and `CALLE_API_KEY`. Automated tests never execute a call.
 
-The redacted runtime fixture comes from a single consented CALL-E test. It intentionally fails the disclosure-budget check because the live agent added an unapproved audibility question and spoke part of its control instruction. This turns real runtime evidence into a deterministic regression test instead of claiming that successful connection alone means compliant execution.
+The bundled examples are synthetic and exercise disclosure-budget failures without claiming to reproduce a provider call.
 
 ## Compatibility
 
