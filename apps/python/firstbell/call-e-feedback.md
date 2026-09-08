@@ -37,8 +37,8 @@ termination control available, and it arrives too late by construction.
 and `max_turns` on the task as a backstop the agent cannot talk its way past. The backstop
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
-Anchor: `README.md:718-726` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:1074-1078` ("Platform-side call termination").
+Anchor: `README.md:729-737` ("The escape hatch is instructed, not enforced") and
+limitation 3 at `README.md:1085-1089` ("Platform-side call termination").
 
 ## 2. Webhook deliveries are unsigned, and your SDK is where we found out
 
