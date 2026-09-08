@@ -127,9 +127,15 @@ def test_asking_about_a_call_that_does_not_exist_is_a_404_not_a_crash(double, re
 
     `not_found` on an unknown id is the response the dispatcher's fatal-error table is
     built around: a call this run created coming back not_found means the platform lost
-    billable state, and it stops the run. Without the guard the double raises
-    `AttributeError` on None instead, which is not a response at all, so the branch that
-    handles the real failure could never be reached offline.
+    billable state. Without the guard the double raises `AttributeError` on None instead,
+    which is not a response at all, so the branch that handles the real failure could never
+    be reached offline.
+
+    What this test covers is the shape of the response, which is all it touches. That the
+    run then stops is asserted in `tests/test_dispatch.py`, by
+    `test_a_fatal_code_on_a_read_stops_the_run_rather_than_retrying_it`, and it did not
+    exist while this docstring claimed it: the dispatcher consulted `FATAL_ERRORS` only on
+    create, which is the one path that cannot return this code.
     """
     with pytest.raises(DoubleError) as caught:
         getattr(double, read)("call_nothing_here")

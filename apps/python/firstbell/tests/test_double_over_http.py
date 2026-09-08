@@ -260,8 +260,15 @@ def test_the_documented_server_command_binds_the_file_it_is_given():
             banner += line
         found = re.search(r"http://127\.0\.0\.1:(\d+)", banner)
         assert found, f"the server printed no address:\n{banner}"
-        assert "6 number(s) bound from examples/demo-outcomes.json" in banner, (
-            f"the server did not say it bound the file it was given:\n{banner}")
+        # Counted from the file rather than typed. This read 6 for as long as the scenario
+        # bound only the numbers in absences.csv, and binding the other two fixtures made
+        # it 10 and made this the one failure in the suite. A test edited every time the
+        # thing it measures changes is a second place to keep the number.
+        bound = len(json.loads((APP / "examples" / "demo-outcomes.json").read_text(
+            encoding="utf-8"))["numbers"])
+        assert f"{bound} number(s) bound from examples/demo-outcomes.json" in banner, (
+            f"the server did not say it bound the {bound} number(s) in the file it was "
+            f"given:\n{banner}")
         assert "no scenario bound" not in banner
 
         base = f"http://127.0.0.1:{found.group(1)}"

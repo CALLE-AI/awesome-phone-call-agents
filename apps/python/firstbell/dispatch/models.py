@@ -113,6 +113,44 @@ PERMANENT_ERRORS = frozenset({
     "idempotency_conflict",
 })
 
+# Failure codes that mean no telephone ever rang.
+#
+# A failed row has two completely different meanings and one of them is a claim about a
+# family. Either the network carried the call and nobody was reached, which is what an
+# office acts on by calling again, or CALL-E refused or could not carry it, which no
+# number of retries changes and which needs another channel or a person. Counting the
+# second as the first files a platform problem on a child's record, and that is the exact
+# move this package refuses on the call side.
+#
+# This is the set that can be proved from the code the platform returned. Every one of
+# these is raised before or instead of a dialling attempt. A code not in here is left in
+# the "nobody reached" bucket, unchanged: a code nobody has seen is not evidence of
+# anything, and guessing which side it fell on would be this same error mirrored.
+NEVER_CARRIED = frozenset({
+    "invalid_phone",
+    "invalid_recipient",
+    "no_recipients",
+    "unsupported_region",
+    "unsupported_language",
+    "recipient_blocked",
+    "policy_violation",
+    "invalid_request",
+    "goal_not_published",
+    "goal_not_executable",
+    "schema_override_not_allowed",
+    "variables_invalid",
+    "idempotency_conflict",
+    # Retryable, and still a refusal: these exhaust the retry policy and land as failed
+    # having never reached a telephone. A rate limit filed as "nobody reached on any
+    # number" is a district's morning turning into unreachable families because the
+    # platform asked us to slow down.
+    "rate_limit_exceeded",
+    "provider_unavailable",
+    "internal_error",
+    "call_not_ready",
+    "goal_not_ready",
+})
+
 # Anything here should stop the whole run rather than the item: continuing wastes money
 # or cannot possibly work.
 FATAL_ERRORS = frozenset({

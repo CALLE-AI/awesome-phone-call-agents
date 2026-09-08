@@ -57,6 +57,12 @@ class Dialect:
     def matches(self, headers: set[str]) -> bool:
         return all(column in headers for column in self.signature)
 
+    # How each target's sources are joined. `phones` is a list the fallback chain walks,
+    # so a comma is the separator that means "or". A name is one value spelled across two
+    # columns, and "Marcus,Ellery" is not a name: it is what the pupil would have been
+    # called down the telephone before this existed.
+    JOINS = {"student_name": " "}
+
     def rename(self, row: dict[str, str]) -> dict[str, str]:
         """The row under the names the rest of this program uses.
 
@@ -69,7 +75,7 @@ class Dialect:
             found = [(row.get(name) or "").strip() for name in sources]
             values = [value for value in found if value]
             if values:
-                out[target] = ",".join(values)
+                out[target] = self.JOINS.get(target, ",").join(values)
         return out
 
 
@@ -89,9 +95,11 @@ NATIVE = Dialect(
 ONEROSTER = Dialect(
     name="oneroster-1.2",
     signature=("sourcedId",),
-    mapping={"id": ("sourcedId",), "phones": ("phone", "sms")},
+    mapping={"id": ("sourcedId",), "phones": ("phone", "sms"),
+             "student_name": ("givenName", "familyName")},
     described_as="OneRoster v1.2 users.csv",
-    reference="1EdTech OneRoster v1.2 CSV binding, users.csv fields sourcedId, phone, sms",
+    reference=("1EdTech OneRoster v1.2 CSV binding, users.csv fields sourcedId, "
+               "givenName, familyName, phone, sms"),
 )
 
 # A Clever-shaped export, where the student identifier and the guardian's number are named
@@ -101,7 +109,8 @@ ONEROSTER = Dialect(
 CLEVER = Dialect(
     name="clever",
     signature=("student_id",),
-    mapping={"id": ("student_id",), "phones": ("guardian_phone", "phone")},
+    mapping={"id": ("student_id",), "phones": ("guardian_phone", "phone"),
+             "student_name": ("name", "student_name")},
     described_as="a Clever-shaped export keyed on student_id",
     reference="Clever SIS sync, student_id and guardian contact columns",
 )

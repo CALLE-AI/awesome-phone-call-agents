@@ -106,7 +106,7 @@ well as the entry README.
   `dispatch/scheduler.py:398`, inside `def _create_with_retries` at
   `dispatch/scheduler.py:389`.
 - `proof-classification.png`: `def _classify` at
-  `dispatch/scheduler.py:494` returns exactly seven times and the still labels every one of them,
+  `dispatch/scheduler.py:513` returns exactly seven times and the still labels every one of them,
   including `ItemResult(**base, resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:530` and `resolution=Resolution.RESOLVED, structured_result=result,` at
-  `dispatch/scheduler.py:566`.
+  `dispatch/scheduler.py:549` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:585`.

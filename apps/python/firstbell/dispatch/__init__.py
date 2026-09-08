@@ -6,6 +6,7 @@ once. This package is the layer that makes those facts survivable.
 
 from .models import (
     CANCELLED,
+    NEVER_CARRIED,
     NO_CONSENT,
     NO_VOICE_CHANNEL,
     DispatchReport,
@@ -26,6 +27,7 @@ __all__ = [
     "WorkItem", "ItemResult", "DispatchReport", "Resolution", "Escalation",
     "mask", "redact_free_text",
     "NO_CONSENT", "NO_VOICE_CHANNEL", "CANCELLED", "HOUSEHOLD_HELD",
+    "NEVER_CARRIED",
     "group_households", "calls_removed",
     "is_valid", "problems", "UnsupportedSchema",
     "WorkSource", "CsvSource", "DropSource", "MemorySource", "SourceError",

@@ -473,6 +473,25 @@ class WaveDispatcher:
             try:
                 call = self._client.calls.get(call_id)
             except Exception as exc:  # noqa: BLE001 - the call exists; do not lose it
+                # A fatal code stops the run here, not after three tries.
+                #
+                # `FATAL_ERRORS` was read in one place, `_create_with_retries`, and
+                # `not_found` is in it for a reason that only applies to a read: a call
+                # this run created, reported missing. This app passes no goal, so creation
+                # cannot return that code, and the path where it does arrive retried it and
+                # carried on dispatching. Retrying a code that means the platform has lost
+                # a call, or that this client is pointed at the wrong environment, spends
+                # the budget in front of a decision a person has to make, and the calls
+                # queued behind it are what it costs.
+                code = getattr(exc, "code", None)
+                if code in FATAL_ERRORS:
+                    with self._lock:
+                        self._fatal = code
+                    self._cancel.set()
+                    raise PollFailed(
+                        call_id,
+                        f"{code}: {redact(str(exc))}. This is a call this run placed, so "
+                        f"the run stops rather than dispatching more") from exc
                 consecutive_failures += 1
                 if (consecutive_failures >= self._retry.max_attempts
                         or time.monotonic() > deadline):

@@ -77,6 +77,15 @@ class ScenarioError(ValueError):
     """
 
 
+_LANGUAGE_NAMES = {
+    "ar": "Arabic", "bn": "Bengali", "de": "German", "en": "English", "es": "Spanish",
+    "fi": "Finnish", "fr": "French", "he": "Hebrew", "hi": "Hindi", "ja": "Japanese",
+    "ms": "Malay", "pl": "Polish", "pt": "Portuguese", "si": "Sinhala", "ta": "Tamil",
+    "th": "Thai", "tr": "Turkish", "uk": "Ukrainian", "ur": "Urdu", "vi": "Vietnamese",
+    "zh": "Chinese",
+}
+
+
 class DoubleError(Exception):
     """Raised for a request the real API would reject. Carries a real error code."""
 
@@ -551,8 +560,11 @@ class CalleDouble:
             if locale:
                 resolved = regions.resolve(phones[0])
                 language = locale.split("-")[0]
-                aliases = {"ta": "Tamil", "hi": "Hindi", "en": "English", "ar": "Arabic"}
-                named = aliases.get(language.lower(), language)
+                # Every language the region table offers, so the refusal names a language
+                # rather than a code. It held four, and the first fixture to ask for a
+                # fifth printed "es is not available for United States of America", which
+                # is the refusal a district reads on the path a district runs.
+                named = _LANGUAGE_NAMES.get(language.lower(), language)
                 if resolved and not regions.supports_language(resolved, named):
                     raise DoubleError(
                         "unsupported_language",

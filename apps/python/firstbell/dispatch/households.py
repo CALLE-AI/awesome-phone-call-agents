@@ -75,12 +75,22 @@ def group(items: list[WorkItem]) -> tuple[list[WorkItem], dict[str, list[str]]]:
         houses.setdefault(_key(item), []).append(item)
 
     held: dict[str, list[str]] = {}
+    held_names: dict[str, list[str]] = {}
     holds: dict[str, WorkItem] = {}
     for members in houses.values():
         if len(members) < 2:
             continue
         first, rest = members[0], members[1:]
         held[first.id] = [other.id for other in rest]
+        # The ids are what the receipt and the held rows are keyed on. What a parent is
+        # asked is a name, and this used to hand `also_absent` a list of ids, so the
+        # sentence in this module's own docstring would have read "S-3102, S-3103" down
+        # the telephone if anything had read it at all. A row with no name contributes
+        # nothing rather than a placeholder, because "the student" beside two real names
+        # is worse than two names.
+        held_names[first.id] = [
+            name for name in ((other.context.get("student_name") or "").strip()
+                              for other in rest) if name]
         for other in rest:
             holds[other.id] = first
 
@@ -94,6 +104,9 @@ def group(items: list[WorkItem]) -> tuple[list[WorkItem], dict[str, list[str]]]:
         if siblings:
             context = dict(item.context)
             context["also_absent"] = ", ".join(siblings)
+            names = held_names.get(item.id) or []
+            if names:
+                context["also_absent_names"] = ", ".join(names)
             out.append(replace(item, context=context))
         elif dialled is not None:
             out.append(replace(

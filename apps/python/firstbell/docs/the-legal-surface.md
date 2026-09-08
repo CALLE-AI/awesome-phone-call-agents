@@ -4,6 +4,14 @@ Seven questions a school district's counsel would ask before this software telep
 single parent. Some have an answer in this repository, some have a design position, and some
 are open. They are written down because silence about them reads as never having asked.
 
+Not among the seven: COPPA. It covers an operator of an online service directed to children
+collecting personal information from a child under 13, and this software does not do that. It
+telephones an adult, it asks nothing of a child, and if a child answers the instruction is to
+say only that the school will call back and end the call
+(`firstbell/domain.py`, `build_task`). Named here because a summary of this document listed
+it for a fortnight and the document never mentioned it, which is worse than either
+answering it or leaving it out.
+
 This is not legal advice and it is not a compliance sign-off. It is the list of questions a
 district's counsel would ask before this software phoned a single parent, written down so
 that a reader can see which ones have an answer here, which ones have a design position, and

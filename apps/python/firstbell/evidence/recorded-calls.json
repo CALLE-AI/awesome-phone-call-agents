@@ -15,5 +15,67 @@
     "escalated": 5,
     "attempts_removed_as_recorded": 6,
     "net_new_escalations_as_recorded": 1
-  }
+  },
+  "per_receipt": [
+    {
+      "receipt": "01-two-languages-one-command.json",
+      "calls": 2,
+      "placed_by_this_run": 2,
+      "attempts_billed": 2,
+      "attempts_removed": 2,
+      "answered": 2,
+      "net_new_escalations": 0,
+      "escalated": 0
+    },
+    {
+      "receipt": "02-idempotent-replay-no-calls.json",
+      "calls": 2,
+      "placed_by_this_run": 0,
+      "attempts_billed": 0,
+      "attempts_removed": 0,
+      "answered": 2,
+      "net_new_escalations": 0,
+      "escalated": 0
+    },
+    {
+      "receipt": "03-unanswered-call.json",
+      "calls": 1,
+      "placed_by_this_run": 1,
+      "attempts_billed": 1,
+      "attempts_removed": 0,
+      "answered": 0,
+      "net_new_escalations": 0,
+      "escalated": 0
+    },
+    {
+      "receipt": "04-defect-a-refusal-scored-resolved.json",
+      "calls": 1,
+      "placed_by_this_run": 1,
+      "attempts_billed": 1,
+      "attempts_removed": 0,
+      "answered": 1,
+      "net_new_escalations": 0,
+      "escalated": 1
+    },
+    {
+      "receipt": "05-locale-pilot.json",
+      "calls": 1,
+      "placed_by_this_run": 1,
+      "attempts_billed": 1,
+      "attempts_removed": 1,
+      "answered": 1,
+      "net_new_escalations": 0,
+      "escalated": 0
+    },
+    {
+      "receipt": "06-locale-matched-pairs.json",
+      "calls": 7,
+      "placed_by_this_run": 7,
+      "attempts_billed": 7,
+      "attempts_removed": 3,
+      "answered": 7,
+      "net_new_escalations": 0,
+      "escalated": 4
+    }
+  ]
 }

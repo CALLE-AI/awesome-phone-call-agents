@@ -96,6 +96,15 @@ on the row. Adding a language becomes a configuration change instead of a projec
 
 ## Where this evidence stops
 
+- **None of it applies to a United States number.** CALL-E offers English and no other
+  language in the US (`calle_double/regions.py`, mirroring the vendor's own region table),
+  so the effect measured here cannot be delivered where every figure in this entry is
+  priced. That is why this experiment was run to India in the first place, and it is the
+  limit a district decides on rather than a caveat about method. Reproduce it with no
+  account: `python -m firstbell --work-file examples/absences-oneroster.csv` prints
+  `unsupported_language: Spanish is not available for United States of America` on the
+  second row. This list named four things and did not name this one for a fortnight, while
+  naming the inverse below it, which is the more embarrassing half.
 - **One speaker, bilingual, who knew what was being tested.** The largest remaining
   confound, and not fixable here.
 - **The matched-pair control failed twice.** A bilingual person cannot reliably say the same

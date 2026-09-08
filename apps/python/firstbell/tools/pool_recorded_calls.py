@@ -61,6 +61,61 @@ def distinct_items(receipts_dir: Path) -> list[dict]:
     return list(seen.values())
 
 
+def per_receipt(receipts_dir: Path) -> list[dict]:
+    """The same counts, one block per receipt that reached the production API.
+
+    The pooled row is the honest headline and it is not what the page cites. Act 04 names
+    one receipt in particular, "a third run: 3 of 7 attempts removed", and offered
+    `tools/money_across_runs.py` as the way to check it while that tool printed three
+    offline runs and the pool. A reader who takes the invitation finds no such row.
+
+    De-duplication is per receipt here rather than across them, because the question each
+    row answers is what that run did. The pooled row is the one that must not count a call
+    twice, and it still does not.
+    """
+    from money_across_runs import _counts_from_items
+
+    out: list[dict] = []
+    for path in sorted(receipts_dir.glob("0*.json")):
+        run = json.loads(path.read_text(encoding="utf-8"))
+        if not run.get("reached_production_api"):
+            continue
+        seen: dict[str, dict] = {}
+        for item in run.get("items") or []:
+            key = item.get("id")
+            if key is not None and key not in seen:
+                seen[key] = item
+        items = list(seen.values())
+        if not items:
+            continue
+        billed, removed, answered, net_new, escalated = _counts_from_items(
+            items, refile=True)
+        # What this run was billed, which is not the same as what its rows carry.
+        #
+        # `_counts_from_items` sums `attempts` off every item and that is correct for the
+        # pooled block, because pooling de-duplicates by call id first and the replay's
+        # rows never reach it. A row per receipt does not de-duplicate, and
+        # `02-idempotent-replay-no-calls.json` holds two rows with `placed_by_this_run:
+        # false` and one attempt each. Reported as two billed attempts it would price a
+        # run whose whole argument is that an idempotency key placed no call and cost
+        # nothing. So the two attempt figures are recomputed over the rows this run
+        # actually placed, and a replay reads zero.
+        placed = [item for item in items if item.get("placed_by_this_run") is not False]
+        if len(placed) != len(items):
+            billed, removed, _, _, _ = _counts_from_items(placed, refile=True)
+        out.append({
+            "receipt": path.name,
+            "calls": len(items),
+            "placed_by_this_run": len(placed),
+            "attempts_billed": billed,
+            "attempts_removed": removed,
+            "answered": answered,
+            "net_new_escalations": net_new,
+            "escalated": escalated,
+        })
+    return out
+
+
 def counts(receipts_dir: Path) -> dict:
     """The counts under today's code, and the two the receipts recorded.
 
@@ -122,6 +177,9 @@ def document(receipts_dir: Path, read_at: str) -> dict:
         "read_at": read_at,
         "regenerate_with": "python tools/pool_recorded_calls.py --receipts DIR",
         "counts": counts(receipts_dir),
+        # One block per receipt, so the row act 04 cites is a row the tool prints. The
+        # pooled block above is still the only de-duplicated one.
+        "per_receipt": per_receipt(receipts_dir),
     }
 
 

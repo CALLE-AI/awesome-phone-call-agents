@@ -55,7 +55,7 @@ makes, and each one can be checked without an API key.
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and twenty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
-| 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The eight questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
+| 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
 | 8 | [`call-e-feedback.md`](call-e-feedback.md) | Thirteen findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
@@ -227,8 +227,8 @@ to. One command now prints all of them from one piece of arithmetic, which is al
 made the mismatched denominator findable:
 
 ```bash
-python tools/money_across_runs.py                    # the runs anybody can reproduce
-python tools/money_across_runs.py --receipts DIR     # and the live ones, if you have them
+python tools/money_across_runs.py                    # every run this entry cites
+python tools/money_across_runs.py --receipts DIR     # the same, recomputed from receipts
 ```
 
 ```
@@ -237,12 +237,18 @@ run                          calls billed removed   gross   added     net crosso
 -----------------------------------------------------------------------------------
 the demo                         6      8       4   $0.59   $0.23   $0.35     50.4%
 with consent records             3      3       2   $0.78   $0.62   $0.16     42.0%
-siblings on one number           1      1       0   $0.00   $0.00   $0.00      0.0%
+siblings on one number           2      2       1   $0.59   $0.00   $0.59     31.5%
 -----------------------------------------------------------------------------------
 all recorded calls              12     12       6   $0.59   $0.00   $0.59     34.3%
 ```
 
-Two kinds of row there, and the difference is worth more than any figure in the table.
+Four of the ten rows that command prints. The six left out are one recorded run each,
+named for the receipt that holds it, and one of them is the seven-attempt run this page's
+own receipt comes from: `locale matched pairs`, 3 of 7 attempts removed, a crossover of
+27.0 per 100. They are left out here because each is one to seven calls, so they are the
+narrowest samples and the widest figures, and the row worth arguing with is the last one.
+
+Three kinds of row, and the difference is worth more than any figure in the table.
 
 The first three run against a test double, and their outcome mix is written down in
 [`firstbell/scenario.py`](firstbell/scenario.py): three answered, one ambiguous, one
@@ -946,11 +952,11 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 606 tests collected
+python -m pytest tests/ -q          # 609 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**606 is the number collected, and two different pairs add up to it.** Some of these gates
+**609 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
@@ -959,8 +965,8 @@ A clean checkout of this commit into an empty directory reports **588 passed, 18
 The eighteen name what is missing rather than passing quietly: seven want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **604 passed, 2 skipped**. Both pairs are measured,
-both add up to 606, and the difference between them is what a reader has on their disk.
+run the gates and the same suite reports **607 passed, 2 skipped**. Both pairs are measured,
+both add up to 609, and the difference between them is what a reader has on their disk.
 
 A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
 this entry is about, and `-rs` prints each one so nothing hides behind a dot.

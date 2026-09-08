@@ -257,6 +257,17 @@ def rows(receipts_dir: Path | None) -> list[dict]:
             figures.update(run=path.stem, source=str(path.name),
                            live=bool(run.get("reached_production_api")))
             out.append(figures)
+    else:
+        # The same rows from the committed counts, for a reader with no receipts, which is
+        # every reader but this machine. Act 04 cites one of them by its numbers, "a third
+        # run: 3 of 7 attempts removed", and offers this command as the check, so without
+        # these the invitation pointed at a table the row was not in.
+        for label, block in recorded_receipt_rows():
+            figures = figures_for(block["attempts_billed"], block["attempts_removed"],
+                                  block["answered"], block["net_new_escalations"],
+                                  calls=block["calls"], escalated=block.get("escalated"))
+            figures.update(run=label, source="evidence/recorded-calls.json", live=True)
+            out.append(figures)
     pooled = pooled_live_row()
     if pooled is not None:
         out.append(pooled)
@@ -278,6 +289,31 @@ def recorded_counts() -> dict | None:
     if not RECORDED.exists():
         return None
     return json.loads(RECORDED.read_text(encoding="utf-8"))["counts"]
+
+
+def recorded_receipt_rows() -> list[tuple[str, dict]]:
+    """One row per recorded receipt, from the committed counts.
+
+    Reproducible with no receipts on disk, which is the point: the receipts are not in this
+    repository, and act 04 cites one of these rows by its numbers ("a third run: 3 of 7
+    attempts removed") while offering `tools/money_across_runs.py` as the way to check it.
+    A buyer took the invitation, found three offline rows and the pool, and no row with
+    seven attempts in it anywhere.
+
+    The label is the receipt filename with its leading number and its extension removed,
+    because that name is already published in `evidence/README.md` and a prettier one here
+    would be a second name for the same file.
+    """
+    facts = APP / "evidence" / "recorded-calls.json"
+    if not facts.exists():
+        return []
+    blocks = json.loads(facts.read_text(encoding="utf-8")).get("per_receipt") or []
+    rows = []
+    for block in blocks:
+        name = str(block.get("receipt") or "")
+        label = name.removesuffix(".json").split("-", 1)[-1].replace("-", " ")
+        rows.append((label[:28] or name, block))
+    return rows
 
 
 def pooled_live_row() -> dict | None:
@@ -347,7 +383,7 @@ def table(data: list[dict]) -> str:
         "             the only denominator on which one can be taken off the other",
         "crossover  = the net-new rate per 100 answered calls at which net reaches zero",
         "",
-        "Two kinds of row, and the difference matters more than any figure in the "
+        "Three kinds of row, and the difference matters more than any figure in the "
         "table.",
         "",
         "The offline rows run against a test double, and their outcome mix is written "
@@ -359,6 +395,19 @@ def table(data: list[dict]) -> str:
         "somebody chose their numerator. Read them as a worked example of the arithmetic, "
         "not",
         "as a measurement of how families behave.",
+        "",
+        "The middle rows are one recorded run each, named for the receipt that holds it.",
+        "Nobody can re-run them: they were telephone calls. Their counts are committed in",
+        "evidence/recorded-calls.json, which carries no conversation, no number, no call "
+        "id",
+        "and no field value, because the receipts themselves are not in the repository "
+        "and",
+        "evidence/README.md says why. They are here because the page cites one of them by",
+        "its numbers and offered this command as the way to check it. Each is one to "
+        "seven",
+        "calls, so the widest figures in this table come from its narrowest samples, "
+        "which",
+        "is what the last row is for.",
         "",
     ]
     if pooled is not None:

@@ -204,6 +204,117 @@ def test_every_cited_line_number_still_says_what_the_readme_claims():
         )
 
 
+def test_every_work_file_the_first_screen_names_closes_at_least_one_record():
+    """Runs the commands rather than checking that their files exist.
+
+    Unmarked on purpose. It is the slowest test in the suite, three subprocesses, and a
+    marker is how a check stops running: an earlier gate here was deselected by a `-m`
+    filter for a fortnight and nobody noticed it had gone quiet.
+
+    This is the gate that was missing. `test_the_three_minute_path_settles_what_it_says_it
+    _settles` asserted `(APP / rel).exists()` for each example file, and for a fortnight two
+    of the three closed nothing: every call in `absences-oneroster.csv` and
+    `absences-siblings.csv` fell through to the offline double's `{"ok": true}`, failed the
+    result schema, and the process exited 0. A reviewer with three minutes runs the command.
+    The README had already found this exact failure on the HTTP path and fixed it there,
+    which is what makes the file-listing gate worth replacing rather than defending.
+
+    "At least one" rather than "all": a fixture whose every row closes would be the demo
+    this project argues against, and `absences-oneroster.csv` deliberately carries a row
+    CALL-E refuses for language. What is not allowed is a run that closes nothing, because
+    that is a product that does not work.
+    """
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    start = readme.find("## If you have three minutes")
+    end = readme.find("## If you have twenty minutes", start)
+    assert end > start > 0, "the three-minute path moved"
+    named = sorted(set(re.findall(r"examples/[\w.-]+\.csv", readme[start:end])))
+    assert len(named) >= 3, "the three-minute path names fewer than three example files"
+
+    for rel in named:
+        run = subprocess.run(
+            [sys.executable, "-m", "firstbell", "--work-file", rel],
+            cwd=APP, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=180,
+        )
+        assert run.returncode == 0, (
+            f"`python -m firstbell --work-file {rel}` exited {run.returncode}:\n"
+            f"{(run.stderr or run.stdout)[-1200:]}"
+        )
+        found = re.search(r"^\s*resolved\s+(\d+)", run.stdout, re.M)
+        assert found, (
+            f"`python -m firstbell --work-file {rel}` printed no resolved count, so the "
+            f"first screen offers a command whose output cannot be read:\n"
+            f"{run.stdout[-1200:]}"
+        )
+        assert int(found.group(1)) >= 1, (
+            f"the first screen tells a reviewer to run {rel} and it closes "
+            f"{found.group(1)} record(s). Every call in it failed, and the process still "
+            f"exited 0, so a reviewer with three minutes sees a product that does not "
+            f"work:\n{run.stdout[-1600:]}"
+        )
+
+
+def test_every_document_summary_counts_and_names_what_its_document_holds():
+    """The card a reader clicks has to describe the page behind it.
+
+    `docs/the-legal-surface.md` has seven numbered questions and its own published summary
+    said eight, and named COPPA, which appears in no document in this repository. That
+    summary is the page's meta description and the text of the further-reading card, so it
+    is what a district's counsel reads before deciding whether to open the thing.
+
+    Both halves are derived. The count comes from the `## N.` headings, and the statutes come
+    out of the summary itself: any token of three or more upper-case letters that is not one
+    of this project's own words has to appear in the document. That way a document added to
+    `PUBLISHED` is covered without anybody editing this test, which is how the miscount
+    survived in the first place.
+    """
+    from tools import doc_pages
+
+    words = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+             8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
+    # Tokens that look like a statute and are not one. Kept short on purpose: every entry
+    # is a hole in the rule, so each one has to be a word this project itself uses.
+    not_a_statute = {"CALL", "CSV", "SDK", "API", "JSON", "HTML", "CSS", "URL", "AA",
+                     "WCAG", "SIS", "SIP", "AI", "ID", "IDS", "US", "UK", "IN", "PR",
+                     "README", "TTS", "LUFS", "E164", "ADA", "BLS"}
+
+    checked = 0
+    for slug, rel, _title, summary in doc_pages.PUBLISHED:
+        path = APP / rel
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        checked += 1
+
+        headings = re.findall(r"^## (\d+)\. ", text, re.M)
+        if headings:
+            found = len(headings)
+            expected = words.get(found)
+            claimed = re.match(r"^([A-Z][a-z]+) questions?\b", summary)
+            if claimed and expected:
+                assert claimed.group(1).lower() == expected, (
+                    f"the published summary of docs/{slug}.md says "
+                    f"{claimed.group(1).lower()} questions and the document has {found}. "
+                    f"That summary is the meta description and the further-reading card, "
+                    f"so it is what a reader sees before opening it"
+                )
+
+        for token in set(re.findall(r"\b[A-Z]{2,}\b", summary)):
+            if token in not_a_statute:
+                continue
+            assert token.lower() in text.lower(), (
+                f"the published summary of docs/{slug}.md names {token} and the document "
+                f"does not mention it anywhere. A summary naming a statute its own page "
+                f"never discusses sends a reader looking for something that is not there"
+            )
+
+    assert checked >= 5, (
+        f"this gate examined {checked} published document(s), which is too few to be "
+        "covering the reading list"
+    )
+
+
 def test_the_three_minute_path_settles_what_it_says_it_settles():
     """The first screen a reviewer reads, checked against the things it points at.
 

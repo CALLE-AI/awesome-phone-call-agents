@@ -1231,3 +1231,63 @@ def test_one_failed_read_does_not_condemn_a_call_that_answers_on_the_next(double
     assert report.results[0].resolution is Resolution.RESOLVED, report.results[0].reason
     assert report.not_recallable == [], "a call that completed is not unaccounted for"
 
+
+def test_a_fatal_code_on_a_read_stops_the_run_rather_than_retrying_it():
+    """A call this run placed, reported missing, stops the run on the first read.
+
+    `not_found` is in `FATAL_ERRORS` for a reason that only applies to a read: creation
+    returning it would be a goal problem and this app passes no goal. For a fortnight the
+    only consultation of that set was in `_create_with_retries`, so a 404 mid-poll went
+    through `except Exception`, spent the retry budget, raised `PollFailed`, and the run
+    dispatched the rest of the batch. A platform engineer served exactly that and got
+    `undetermined, not_recallable=['c9'], fatal=None`.
+
+    Three things are asserted, and the first is the one that matters: one read attempt, not
+    three. Retrying a code that means the platform has lost a call, or that this client is
+    pointed at the wrong environment, spends the budget in front of a decision a person has
+    to make, and the calls queued behind it are what it costs.
+    """
+    class Calls:
+        def __init__(self):
+            self.reads = 0
+
+        def create(self, **kwargs):
+            return {"id": "c9", "status": "queued", "created_at": "2026-09-08T00:00:00Z"}
+
+        def get(self, call_id):
+            self.reads += 1
+            err = Exception("Call not found.")
+            err.code = "not_found"
+            raise err
+
+    class Client:
+        def __init__(self):
+            self.calls = Calls()
+
+    client = Client()
+    items = [WorkItem(id=f"S-{n}", phones=("+15550100201",), consented=True)
+             for n in range(4)]
+    dispatcher = WaveDispatcher(
+        client, task_builder=lambda item: "task", result_schema={"type": "object"},
+        concurrency=1,
+        retry=RetryPolicy(max_attempts=3, base_delay_seconds=0.0, max_delay_seconds=0.0),
+        sleep=lambda seconds: None,
+    )
+    report = dispatcher.run(items)
+
+    assert client.calls.reads == 1, (
+        f"the read was attempted {client.calls.reads} time(s). A fatal code is not a "
+        "transient one, so the retry budget should not be spent on it"
+    )
+    assert report.fatal_error == "not_found", (
+        f"the run reports fatal_error={report.fatal_error!r} after a call it placed came "
+        "back not_found, so nothing tells a person to look"
+    )
+    assert [r.resolution.value for r in report.results][1:] == ["skipped"] * 3, (
+        "the run kept dispatching after the platform lost a call it had already placed: "
+        f"{[r.resolution.value for r in report.results]}"
+    )
+    assert "c9" in report.not_recallable, (
+        "the call that was placed and then lost is not named in not_recallable, so the "
+        "run cannot say what it left in flight"
+    )

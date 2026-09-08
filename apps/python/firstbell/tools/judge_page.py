@@ -344,6 +344,24 @@ def _spelled(n: int) -> str:
             8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}.get(n, str(n))
 
 
+def _stakes_sentence() -> str:
+    """The callback-window sentence, verbatim from the run act 08 ships.
+
+    Matched on the part that cannot move without the program changing, and returned whole
+    including the parenthetical that says whose thirty minutes it is. If the run stops
+    printing it, this raises rather than falling back to a sentence written here: a
+    fallback would be a second copy of the claim, which is the defect being fixed.
+    """
+    for line in offline_run().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("A school would have to answer these within"):
+            return stripped
+    raise SystemExit(
+        "act 01 quotes the run's callback-window sentence and the run no longer prints a "
+        "line starting 'A school would have to answer these within'. Fix the quote or the "
+        "program, but do not write the sentence here.")
+
+
 def _recorded_call_total() -> int:
     """How many calls this software has placed against the production API, from one file.
 
@@ -1883,7 +1901,13 @@ def build(has_audio: bool, repo_url: str | None = None,
         # own escalation queue, and it was sitting nine screens below here, in terminal
         # text, as the last thing a reader met. A reader called it the strongest
         # sentence in the entry and reached it after the point they had stopped reading.
-        '<p class=stakes>A school would have to answer these within 30 minutes.</p>',
+        #
+        # Lifted out of the run rather than retyped, because retyped is what it was: this
+        # said "within 30 minutes." under a line crediting the run, and the run says
+        # "within 30 minutes (this project's default, which no district has agreed to)".
+        # A page that quotes its own output and cuts the disclaimer out of the quote is
+        # doing the thing this entry is about, on the screen most readers never leave.
+        f'<p class=stakes>{esc(_stakes_sentence())}</p>',
         '<p class=stakes-src>Printed by the run itself, above the cases it refuses to '
         'close. The whole queue is in act 08.</p>',
         '</div><div class=artifact>',
@@ -2160,6 +2184,21 @@ def build(has_audio: bool, repo_url: str | None = None,
 
     # ---- Act 7: what is not true
     limits = [
+        # First, because it is the one a district decides on. It was in neither this list
+        # nor the locale document's own "Where this evidence stops" for a fortnight, while
+        # the first sentence of this page sold calling a family in their own language and
+        # every figure priced on it was American. A reader who finds this in
+        # `calle_double/regions.py` before finding it here stops trusting the other four.
+        ("CALL-E offers English and no other language in the United States. Every figure "
+         "priced on this page is American, and the language column cannot be delivered to "
+         "a United States number today. The twelve real calls went to Indian numbers, "
+         "where Tamil and Hindi are available.",
+         "Nothing in this app changes it. Run "
+         "<code>python -m firstbell --work-file examples/absences-oneroster.csv</code> and "
+         "the second row prints the refusal in the platform's own words. Until it changes, "
+         "the part of this that works in a United States district is the three outcomes, "
+         "the consent gate and the structured reason, over whichever dialler the district "
+         "already owns."),
         ("Calls to India arrived from a United States caller identity, shown as Oakland, "
          "California. A family will not answer an unknown foreign number about their child.",
          "Fixable by the operator with a local number on the account. Nothing in this app "
@@ -2177,13 +2216,14 @@ def build(has_audio: bool, repo_url: str | None = None,
     ]
     body = [marginalia("Read this one first",
                        '<p>A page that names its own limits is easier to check than one '
-                       'that does not. Two of these four belong to the platform and are '
-                       'reported without complaint.</p>'),
+                       'that does not. The first one is the one a district decides on, and '
+                       'three of these belong to the platform.</p>'),
             '<div class="split split-long"><div class=claim>',
             '<div class=act-num>07</div><h2 id=h-07>What is not true.</h2>',
-            '<p>Four limits, each with what would close it. Two of them are the '
-            'platform’s and are reported here without complaint, because a limit you '
-            'can read is worth more than a claim you cannot check.</p>',
+            f'<p>{_spelled(len(limits)).capitalize()} limits, each with what would '
+            'close it. Three of them are the platform’s and are reported here without '
+            'complaint, because a limit you can read is worth more than a claim you '
+            'cannot check.</p>',
             '</div><div class=artifact><ul class=limits>']
     for limit, closes in limits:
         body.append(f'<li><p class=limit>{esc(limit)}</p>'
