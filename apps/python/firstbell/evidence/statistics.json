@@ -148,6 +148,68 @@
       "published": "2026-08-27",
       "read_at_source": "2026-09-07",
       "note": "Added because a district buyer read the run and found the arithmetic priced the labour removed and not the labour added. A safeguarding callback goes to the designated safeguarding lead, a post a US district staffs with a counsellor or an administrator. Counsellors are the cheaper of the two, so this understates the added cost in the same direction the 2,080 hours understates the saved one. It is 1.59 times the desk wage, which is why the run's ceiling falls from $0.59 to $0.35 a call once the added work is paid for, per attempt billed on both halves of that subtraction."
+    },
+    {
+      "id": "ca-eligible-enrolment",
+      "value": "5,958,444",
+      "claim": "California students in the 2023-24 eligible cumulative enrolment, which the publisher defines as non-exempt students expected to attend more than 30 days. This is the denominator the absence-volume figure in docs/what-a-pilot-would-look-like.md is divided by",
+      "publisher": "California Department of Education",
+      "url": "https://dq.cde.ca.gov/dataquest/DQCensus/AttAbsByRsn.aspx?agglevel=State&cds=00&year=2023-24",
+      "quote": "Report Totals. Statewide 5,958,444 5,481,732 13.1 52.3% 41.4% 0.9% 5.4%",
+      "published": "2024-01-01",
+      "read_at_source": "2026-09-08",
+      "quote_is": "a row of the Report Totals table, under the headers Eligible Cumulative Enrollment, Count of Students with One or More Absences, Average Days Absent, Excused Absences, Unexcused Absences, Out-of-School Suspension Absences and Incomplete Independent Study Absences. The page renders those cells adjacent with no separator, so the spaces in the quote are added to make the row readable and no digit is changed. Read at the State report level on purpose: the page's own footnote says charter school data are removed by default from district-level reports “including the associated state and county Report Totals”, so a Statewide row read off a district-level page is a different population and gives 5,236,744.",
+      "quote_read_at": "2026-09-08",
+      "note": "The publisher gives no dated byline, so `published` is the academic year CDE attributes the collection to rather than a date the page states. The page names its own provenance: “Absenteeism and Cumulative Enrollment data were submitted and certified by LEAs and/or charter schools as part of the annual CALPADS EOY 3 submission.” Cumulative enrolment is larger than census-day enrolment, which makes it the conservative choice for a per-student rate."
+    },
+    {
+      "id": "ca-students-with-absences",
+      "value": "5,481,732",
+      "claim": "California students who missed one or more days of school between 1 July 2023 and 30 June 2024. The publisher calculates Total Days Absent from this count and not from enrolment, so the derivation has to as well",
+      "publisher": "California Department of Education",
+      "url": "https://dq.cde.ca.gov/dataquest/DQCensus/AttAbsByRsn.aspx?agglevel=State&cds=00&year=2023-24",
+      "quote": "Report Totals. Statewide 5,958,444 5,481,732 13.1 52.3% 41.4% 0.9% 5.4%",
+      "published": "2024-01-01",
+      "read_at_source": "2026-09-08",
+      "quote_is": "a row of the Report Totals table, under the headers Eligible Cumulative Enrollment, Count of Students with One or More Absences, Average Days Absent, Excused Absences, Unexcused Absences, Out-of-School Suspension Absences and Incomplete Independent Study Absences. The page renders those cells adjacent with no separator, so the spaces in the quote are added to make the row readable and no digit is changed. Read at the State report level on purpose: the page's own footnote says charter school data are removed by default from district-level reports “including the associated state and county Report Totals”, so a Statewide row read off a district-level page is a different population and gives 5,236,744.",
+      "quote_read_at": "2026-09-08"
+    },
+    {
+      "id": "ca-average-days-absent",
+      "value": "13.1",
+      "claim": "average days absent in California in 2023-24, which the publisher defines as Total Days Absent divided by the count of students with one or more absences",
+      "publisher": "California Department of Education",
+      "url": "https://dq.cde.ca.gov/dataquest/DQCensus/AttAbsByRsn.aspx?agglevel=State&cds=00&year=2023-24",
+      "quote": "Report Totals. Statewide 5,958,444 5,481,732 13.1 52.3% 41.4% 0.9% 5.4%",
+      "published": "2024-01-01",
+      "read_at_source": "2026-09-08",
+      "quote_is": "a row of the Report Totals table, under the headers Eligible Cumulative Enrollment, Count of Students with One or More Absences, Average Days Absent, Excused Absences, Unexcused Absences, Out-of-School Suspension Absences and Incomplete Independent Study Absences. The page renders those cells adjacent with no separator, so the spaces in the quote are added to make the row readable and no digit is changed. Read at the State report level on purpose: the page's own footnote says charter school data are removed by default from district-level reports “including the associated state and county Report Totals”, so a Statewide row read off a district-level page is a different population and gives 5,236,744.",
+      "quote_read_at": "2026-09-08",
+      "note": "Shown to one decimal, which is the only rounding in the derivation that moves the answer. Taking 13.05 and 13.15 as the bounds moves the derived rate from 27.6 to 27.9 per 1,000, so the published figure is given as about 28 and the range in the document is wider than the rounding."
+    },
+    {
+      "id": "ca-unexcused-absence-share",
+      "value": "41.4%",
+      "claim": "the share of all California absence days in 2023-24 that were unexcused, which the publisher defines as days a student was absent without a valid excuse, excluding out-of-school suspension",
+      "publisher": "California Department of Education",
+      "url": "https://dq.cde.ca.gov/dataquest/DQCensus/AttAbsByRsn.aspx?agglevel=State&cds=00&year=2023-24",
+      "quote": "Report Totals. Statewide 5,958,444 5,481,732 13.1 52.3% 41.4% 0.9% 5.4%",
+      "published": "2024-01-01",
+      "read_at_source": "2026-09-08",
+      "quote_is": "a row of the Report Totals table, under the headers Eligible Cumulative Enrollment, Count of Students with One or More Absences, Average Days Absent, Excused Absences, Unexcused Absences, Out-of-School Suspension Absences and Incomplete Independent Study Absences. The page renders those cells adjacent with no separator, so the spaces in the quote are added to make the row readable and no digit is changed. Read at the State report level on purpose: the page's own footnote says charter school data are removed by default from district-level reports “including the associated state and county Report Totals”, so a Statewide row read off a district-level page is a different population and gives 5,236,744.",
+      "quote_read_at": "2026-09-08",
+      "note": "The publisher's glossary is the reason this figure is an upper bound on what this software would call about: “Unexcused Absences are reported for the days a student was absent without a valid excuse and does not include students who are absent due to an out-of-school suspension or who attended in-school suspension.” Absent without a valid excuse is wider than absent with no reason given, because a parent who telephones to report a holiday or a missed bus has explained the absence and it is still unexcused."
+    },
+    {
+      "id": "ca-instructional-days",
+      "value": "180",
+      "claim": "days of instruction a California school district is penalised for offering less than, used as the length of the school year the per-day figure divides by",
+      "publisher": "California Legislature",
+      "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=46200.",
+      "quote": "and that offers less than 180 days of instruction or, in multitrack year-round schools, fewer than the number of days required in subdivision (a) of this section",
+      "published": "2013-09-26",
+      "read_at_source": "2026-09-08",
+      "note": "Education Code 46200, amended by Stats. 2013, Ch. 357. It is a statutory floor rather than a measured average: the Superintendent withholds funding from a district offering fewer days, so 180 is the shortest year a district will normally run. The document shows the figure at 175 and 185 days as well, because the year length is a larger lever on the answer than any rounding in the source data."
     }
   ]
 }

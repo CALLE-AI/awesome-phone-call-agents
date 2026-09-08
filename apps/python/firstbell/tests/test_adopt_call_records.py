@@ -1,0 +1,421 @@
+"""The decision layer runs over another dialler's records, and never reads a transcript.
+
+`tools/adopt_call_records.py` is the answer to the one recommendation this entry received and
+declined. A reader in the buyer's seat wanted the first screen to lead with the three
+outcomes, the consent gate and the structured reason, over whichever dialler a district
+already owns. That was declined at the time for a good reason: the sentence existed in act 07
+as a scoping statement, no integration was built, and promoting an unbuilt capability to the
+first screen would have been a claim this entry could not survive being asked about.
+
+So it was built instead. These gates hold the two things that make it worth having.
+
+**It cannot be a second implementation of the rule.** The value of the tool is that a district
+gets the same decision the live path makes, and the way that goes wrong is a copy of the rule
+drifting from the original. `decide` is checked against `file_today` and
+`safeguarding_escalation` directly, over every combination the schema allows, rather than
+against a table of expected answers written here. A table would be a third copy.
+
+**A transcript is not a decision.** This is the product, not a limitation, and it is the gate
+that would be easiest to lose to a well-meaning improvement. The defect this whole entry is
+built around is a schema-valid answer closing a record while saying nothing, and reading a
+guardian's confirmation out of free text is that defect with a better vocabulary. The test
+below hands the tool a transcript in which a parent says plainly that the child is at home
+with them, which is exactly the case a keyword reader would close, and requires the record to
+come back undetermined and land on a person's desk.
+"""
+from __future__ import annotations
+
+import itertools
+import json
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+APP = Path(__file__).resolve().parent.parent
+if str(APP / "tools") not in sys.path:
+    sys.path.insert(0, str(APP / "tools"))
+if str(APP) not in sys.path:
+    sys.path.insert(0, str(APP))
+
+RECORDS = APP / "examples" / "other-dialler-records.jsonl"
+CSV_RECORDS = APP / "examples" / "other-dialler-records.csv"
+REGISTER = APP / "examples" / "other-dialler-consent.json"
+TOOL = APP / "tools" / "adopt_call_records.py"
+
+# A transcript a keyword reader would close. Every reassuring phrase is in it.
+PLAIN_TRANSCRIPT = (
+    "Agent: Good morning, I am calling from the attendance office about Ravi. "
+    "Parent: Oh yes, he is at home with me today, I am his mother, he had a temperature "
+    "overnight so I kept him back. I am aware he is not in school. He should be in tomorrow."
+)
+
+
+def _run(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(TOOL), *args], capture_output=True,
+                          text=True, encoding="utf-8", errors="replace", cwd=str(APP))
+
+
+def test_the_example_pair_exists_and_the_tool_runs_on_it():
+    """A documented input path whose example does not run is documentation."""
+    assert RECORDS.is_file(), f"{RECORDS.name} is gone, and the README tells a reader to run it"
+    assert REGISTER.is_file(), f"{REGISTER.name} is gone, so the consent audit has nothing"
+    done = _run("--records", str(RECORDS), "--consent-register", str(REGISTER),
+                "--today", "2026-09-08")
+    assert done.returncode == 0, f"the documented command exited {done.returncode}: {done.stdout}"
+    assert "This dialled nothing." in done.stdout, (
+        "the tool no longer says it dialled nothing, which is the first thing a reviewer "
+        "running an unfamiliar telephony tool needs to know")
+
+
+def test_the_decision_is_the_live_rule_and_not_a_copy_of_it():
+    """Every result the schema allows, checked against the functions the live path calls.
+
+    Written this way on purpose. A table of expected outcomes here would be a third copy of
+    the rule, and the third copy is the one that goes stale. If `safeguarding_escalation`
+    changes, this test changes with it and the tool has to follow.
+    """
+    from adopt_call_records import decide
+    from dispatch.models import Escalation
+    from firstbell.domain import RESULT_SCHEMA, safeguarding_escalation
+    from replay_escalation import file_today
+
+    properties = RESULT_SCHEMA["properties"]
+    reasons = properties["reason_category"]["enum"]
+    returns = properties["expected_return"]["enum"]
+    confirmations = properties["parent_confirmed_aware"]["enum"]
+    spoke = properties["spoke_with"]["enum"]
+
+    checked = 0
+    for reason, back, confirmed, who in itertools.product(reasons, returns, confirmations,
+                                                          spoke):
+        result = {"reason_category": reason, "expected_return": back,
+                  "parent_confirmed_aware": confirmed, "spoke_with": who}
+        got = decide({"id": "S-1", "answered": True, "result": result, "_line": 1})
+        assert got["outcome"] == file_today(result, with_escalation=True), (
+            f"the tool files {result} as {got['outcome']} and the live rule files it as "
+            f"{file_today(result, with_escalation=True)}. A district adopting this over its "
+            "own dialler would get a different answer from the one this entry documents")
+        assert got["escalated"] == (
+            safeguarding_escalation(result) is not Escalation.NONE), (
+            f"the tool disagrees with safeguarding_escalation about {result}")
+        checked += 1
+    assert checked == len(reasons) * len(returns) * len(confirmations) * len(spoke)
+    assert checked > 100, f"only {checked} combinations checked, so the schema has shrunk"
+
+
+def test_a_transcript_is_never_read_to_close_a_record():
+    """The product claim, and the gate easiest to lose to a helpful improvement.
+
+    The transcript handed over here says the parent is the mother, that the child is at home
+    with her, and that she is aware. A keyword reader closes it. This has to not.
+    """
+    from adopt_call_records import decide
+
+    got = decide({"id": "S-9", "answered": True, "transcript": PLAIN_TRANSCRIPT, "_line": 1})
+    assert got["outcome"] == "undetermined", (
+        "a record carrying only a transcript was filed "
+        f"{got['outcome']!r}. Reading a guardian's confirmation out of prose is the defect "
+        "this software exists to catch, and a transcript is not a decision")
+    assert not got["escalated"], (
+        "a transcript-only record was marked as a safeguarding escalation, which claims the "
+        "tool read something in it")
+    assert "transcript is not a decision" in got["why"], (
+        "the row goes to a person without saying why, so the person cannot tell it from a "
+        "call that failed")
+
+    # And through the command line, because the assertion above is about a function and the
+    # thing a district runs is a process.
+    scratch = APP / "out" / "one-transcript.jsonl"
+    scratch.parent.mkdir(parents=True, exist_ok=True)
+    scratch.write_text(json.dumps({"id": "S-9", "answered": True,
+                                   "transcript": PLAIN_TRANSCRIPT}) + "\n",
+                       encoding="utf-8", newline="\n")
+    try:
+        done = _run("--records", str(scratch), "--json")
+        assert done.returncode == 0, done.stdout
+        filed = json.loads(done.stdout)["filed"]
+        assert [one["outcome"] for one in filed] == ["undetermined"], done.stdout
+        assert json.loads(done.stdout)["dialled"] == 0
+    finally:
+        scratch.unlink(missing_ok=True)
+
+
+def test_answered_has_three_states_and_absent_is_not_no():
+    """Added because a mutation survived, which is the only reason worth adding a test.
+
+    Changing `answered is False` to `answered is None` in the tool was noticed by nothing.
+    The example file has a row for every outcome and no row where `answered` is simply
+    absent, so the case that distinguishes the two spellings was never exercised.
+
+    It matters twice. A record whose export omits the field but carries a full answer would
+    be filed undetermined and told a person nobody picked up, which is a sentence about a
+    call that did not happen. And a record that really was not answered would be judged on
+    whatever result is attached to it, which is how a voicemail becomes a decision.
+
+    Three states, the same three `answered_by_the_guardian` has, and for the same reason:
+    absent is not no.
+    """
+    from adopt_call_records import decide
+
+    complete = {"reason_category": "illness", "expected_return": "tomorrow",
+                "parent_confirmed_aware": "yes", "spoke_with": "guardian"}
+
+    silent = decide({"id": "S-7", "result": dict(complete), "_line": 1})
+    assert silent["outcome"] == "closed", (
+        f"a record with no `answered` field and a complete answer was filed "
+        f"{silent['outcome']!r}. The field being absent is not the record saying nobody "
+        "picked up, and the answer attached to it is the evidence")
+    assert "nobody answered" not in silent["why"], (
+        "a record that does not say whether it was answered is being told it was not: "
+        f"{silent['why']!r}")
+
+    refused = decide({"id": "S-7", "answered": False, "result": dict(complete), "_line": 1})
+    assert refused["outcome"] == "undetermined", (
+        "a call the record says nobody answered was closed on the result attached to it, "
+        "which is how a voicemail becomes a guardian's confirmation")
+    assert "nobody answered" in refused["why"], (
+        f"the row goes to a person for the wrong stated reason: {refused['why']!r}")
+    assert not refused["escalated"], (
+        "a call nobody answered was marked as a safeguarding escalation")
+
+    reached = decide({"id": "S-7", "answered": True, "result": dict(complete), "_line": 1})
+    assert reached["outcome"] == "closed", (
+        "an answered call with a guardian's confirmation is no longer closed, so the three "
+        "states have collapsed into something else")
+
+
+def test_a_field_the_schema_does_not_define_is_refused_and_not_dropped():
+    """A district mapping its own export will get a field name wrong.
+
+    Dropping it silently would file the record undetermined for a reason the reader cannot
+    see, which reads exactly like a call that learned nothing. Naming the field is the
+    difference between a bug in their mapping and a bug in their families' records.
+    """
+    from adopt_call_records import RecordError, decide
+
+    try:
+        decide({"id": "S-8", "answered": True, "_line": 4,
+                "result": {"reason_category": "illness", "expected_return": "today",
+                           "parent_aware": "yes"}})
+    except RecordError as bad:
+        assert "parent_aware" in str(bad), (
+            f"the complaint does not name the field that caused it: {bad}")
+        assert "parent_confirmed_aware" in str(bad), (
+            "the complaint names the wrong field and not the right ones, so a reader cannot "
+            f"fix their mapping from it: {bad}")
+    else:
+        raise AssertionError(
+            "a result carrying `parent_aware` was accepted. A field this tool does not "
+            "understand is not a field it may quietly ignore, because the row would be "
+            "filed undetermined and read as a call that learned nothing")
+
+
+def test_the_tool_says_could_not_measure_rather_than_failing():
+    """The third outcome, the same one every other tool in this repository prints.
+
+    Exit 3 and a first line a reader can act on, distinct from exit 1, which is a finding,
+    and exit 2, which is argparse telling somebody who followed the documentation that they
+    used it wrong.
+    """
+    done = _run()
+    assert done.returncode == 3, (
+        f"with no --records the tool exited {done.returncode} rather than 3: {done.stdout}")
+    assert done.stdout.startswith("COULD-NOT-MEASURE"), done.stdout
+    assert "--records" in done.stdout and "examples/" in done.stdout, (
+        "the message does not name the flag or the example file, so it tells a reader that "
+        f"something is missing without telling them what to do: {done.stdout}")
+
+    missing = _run("--records", str(APP / "out" / "no-such-records.jsonl"))
+    assert missing.returncode == 3, missing.stdout
+    assert missing.stdout.startswith("COULD-NOT-MEASURE"), missing.stdout
+
+
+def test_the_spreadsheet_and_the_jsonl_reach_the_same_decisions():
+    """A district's dialler exports a CSV, so both forms exist and they have to agree.
+
+    Parity rather than a second table of expected answers. The two readers build the same
+    record shape from different files, and the only thing worth asserting is that they do:
+    a district that exports one format must not get a different answer about a family from a
+    district that exports the other.
+
+    Compared over the ids the two example files share. The CSV carries one row the JSONL does
+    not, which is the case a surviving mutation exposed, so the comparison is by id and not by
+    position.
+    """
+    from adopt_call_records import decide, read_records
+
+    lines = {one["id"]: decide(one) for one in read_records(RECORDS)}
+    cells = {one["id"]: decide(one) for one in read_records(CSV_RECORDS)}
+    shared = sorted(set(lines) & set(cells))
+    assert len(shared) >= 6, (
+        f"the two example files share {len(shared)} record(s), which is too few to be a "
+        "parity check")
+
+    for key in shared:
+        assert lines[key]["outcome"] == cells[key]["outcome"], (
+            f"{key} is filed {lines[key]['outcome']!r} from the JSONL and "
+            f"{cells[key]['outcome']!r} from the CSV. The same call cannot have two answers "
+            "because of the file it arrived in")
+        assert lines[key]["why"] == cells[key]["why"], (
+            f"{key} lands in the same place from both files and is given a different reason: "
+            f"{lines[key]['why']!r} against {cells[key]['why']!r}")
+
+
+def test_an_empty_answered_cell_is_not_read_as_no():
+    """The three states again, this time through the spreadsheet reader.
+
+    A CSV export routinely leaves a cell blank. Reading blank as "nobody picked up" would tell
+    an attendance officer that a call did not happen, on a row whose own answer says it did.
+    """
+    from adopt_call_records import decide, read_records
+
+    rows = {one["id"]: one for one in read_records(CSV_RECORDS)}
+    assert "S-2007" in rows, (
+        "the CSV example no longer carries a row with an empty `answered` cell, which is the "
+        "case this checks and the case a mutation survived on")
+    assert "answered" not in rows["S-2007"], (
+        "an empty cell became an `answered` value rather than staying absent")
+    assert decide(rows["S-2007"])["outcome"] == "closed", (
+        "a row with a complete answer and a blank answered cell was not decided on its "
+        "answer")
+
+    said = {one["id"]: one for one in read_records(CSV_RECORDS)}["S-2006"]
+    assert said.get("answered") is False, (
+        "the spreadsheet reader no longer reads a false answered cell as false, so a call "
+        "nobody picked up would be judged on the result attached to it")
+
+
+def test_a_column_the_tool_cannot_read_is_refused_and_the_value_is_not_guessed():
+    """Two refusals, both about a district getting its own mapping slightly wrong.
+
+    A column nobody reads and an answered value nobody can parse are the two ways a real
+    export goes wrong, and guessing at either would file records for reasons the output does
+    not name.
+    """
+    import csv as _csv
+
+    from adopt_call_records import RecordError, read_records
+
+    scratch = APP / "out" / "bad-columns.csv"
+    scratch.parent.mkdir(parents=True, exist_ok=True)
+
+    def _write(rows: list[list[str]]) -> None:
+        with scratch.open("w", encoding="utf-8", newline="") as handle:
+            _csv.writer(handle).writerows(rows)
+
+    try:
+        _write([["id", "answered", "was_parent_aware"], ["S-1", "true", "yes"]])
+        try:
+            read_records(scratch)
+        except RecordError as bad:
+            assert "was_parent_aware" in str(bad), f"the column is not named: {bad}"
+            assert "parent_confirmed_aware" in str(bad), (
+                f"the complaint does not say what the readable columns are: {bad}")
+        else:
+            raise AssertionError("a column this tool does not read was accepted")
+
+        _write([["id", "answered"], ["S-1", "probably"]])
+        try:
+            read_records(scratch)
+        except RecordError as bad:
+            assert "probably" in str(bad), f"the unparseable value is not quoted: {bad}"
+            assert "empty" in str(bad), (
+                "the complaint does not tell the reader what to do instead, which is to "
+                f"leave the cell empty: {bad}")
+        else:
+            raise AssertionError(
+                "answered='probably' was accepted. Guessing at it would decide whether a "
+                "call was answered on the basis of a word nobody defined")
+    finally:
+        scratch.unlink(missing_ok=True)
+
+
+def test_the_consent_audit_is_retrospective_and_finds_each_reason():
+    """These calls already happened, so the question is which of them the register covered.
+
+    Three findings on the example pair, each a different reason, because a register that only
+    ever fails one check does not show a district what the gate does.
+    """
+    done = _run("--records", str(RECORDS), "--consent-register", str(REGISTER),
+                "--today", "2026-09-08", "--json")
+    assert done.returncode == 0, done.stdout
+    findings = {one["id"]: one["why"] for one in json.loads(done.stdout)["consent_findings"]}
+
+    assert len(findings) == 3, (
+        f"the example pair produces {len(findings)} consent finding(s) rather than three: "
+        f"{sorted(findings)}")
+    assert "withdrawn" in findings.get("S-2004", ""), (
+        "the withdrawn record is no longer found, or is found for another reason")
+    assert "number" in findings.get("S-2006", ""), (
+        "the record covering a number the call did not use is no longer found. Consent "
+        "attaches to the number called")
+    assert "neither" in findings.get("S-2005", ""), (
+        "a call resting on no record at all is no longer found, which is the easiest of the "
+        "three to miss because there is no record to check")
+
+
+def test_a_boolean_is_counted_as_a_boolean_and_never_reported_as_a_record():
+    """The tool said a call rested on a record the register covers. It rested on a boolean.
+
+    This entry's whole position on consent is that a column saying yes is not a record, and
+    the live path holds that line: `ImpactSummary` counts `dialled_on_a_record` and
+    `dialled_on_a_boolean` apart and prints the second as "a column that says yes, which is
+    not a record" with the schema that replaces it. `firstbell/domain.py` does that at zero
+    as well, because an omitted line reads as an absence of information rather than a count.
+
+    This tool had no representation for the case at all: a bare `consented: true` produced no
+    finding and no count, and the summary sentence then inferred "rests on a record the
+    register covers" from an empty findings list. The absence of a refusal is not evidence of
+    a dated record, and a district's counsel is asking exactly which it was.
+
+    So provenance is counted for every row and reported, and the strong sentence is only
+    available when every row actually earned it.
+    """
+    from adopt_call_records import audit_consent, read_records, report
+
+    boolean_only = [{"id": "S-1", "numbers": ["+15550000101"], "consented": True,
+                     "_line": 1}]
+    findings, provenance = audit_consent(boolean_only, {}, date(2026, 9, 8))
+    assert provenance["boolean"] == 1, (
+        "a row carrying a bare `consented: true` is not counted as resting on a boolean, so "
+        "the one question a district's counsel asks has no answer in the output")
+    assert provenance["record"] == 0, (
+        "a bare boolean is being counted as a dated consent record, which is the claim this "
+        "entry exists to refuse")
+
+    filed = [{"id": "S-1", "outcome": "closed", "why": "x", "escalated": False,
+              "had_result": True}]
+    said = report(boolean_only, filed, findings, provenance)
+    assert "rests on a record the register covers" not in said, (
+        "the summary still claims a record for a call that rests on a boolean:\n" + said)
+    assert "not a record" in said, (
+        "the report counts the boolean and does not say what is wrong with it. The live path "
+        f"spells it out and this has to as well:\n{said}")
+
+    # And the good path still gets to say so, because a report that only ever finds fault is
+    # one nobody believes. Every row in the example pair that is not a finding rests on a
+    # dated record.
+    covered = [one for one in read_records(RECORDS)
+               if one.get("consent_record") in {"CR-2001", "CR-2002", "CR-2003"}]
+    assert len(covered) == 3, "the example pair no longer holds three covered rows"
+    from dispatch.consent import load_register
+
+    register = load_register(json.loads(REGISTER.read_text(encoding="utf-8")), str(REGISTER))
+    _, clean = audit_consent(covered, register, date(2026, 9, 8))
+    assert clean["record"] == 3 and clean["boolean"] == 0 and clean["nothing"] == 0, (
+        f"three rows resting on dated records are counted as {clean}")
+
+
+def test_a_consent_finding_is_output_and_not_an_error_unless_asked():
+    """A district running this on its own history wants the findings, not a failed command.
+
+    Opt-in, because the same tool belongs in a pipeline where an uncovered call should stop
+    something, and that is a decision for whoever runs it rather than for this file.
+    """
+    args = ["--records", str(RECORDS), "--consent-register", str(REGISTER),
+            "--today", "2026-09-08"]
+    assert _run(*args).returncode == 0, "findings changed the exit code without being asked to"
+    asked = _run(*args, "--fail-on-uncovered")
+    assert asked.returncode == 1, (
+        f"--fail-on-uncovered exited {asked.returncode} with three findings on the record")

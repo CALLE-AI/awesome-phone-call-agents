@@ -1253,15 +1253,27 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
     # reaches the sourced section, so a figure the program prints (both wage grades are
     # printed by `firstbell/domain.py` rather than written in prose) was registered and
     # then never compared against anything. Two of the thirteen were in that position.
+    # Widened from the README alone on 8 September 2026. The five absence-volume inputs are
+    # published in `docs/what-a-pilot-would-look-like.md`, which is where the derivation a
+    # finance director needs actually lives, and a README-only search called them unused
+    # when they are used. Left as it was, this gate would have argued for moving a figure
+    # into the README to satisfy a check rather than because a reader needed it there, which
+    # is the wrong way round. The rule it enforces is unchanged: a registered figure has to
+    # be published somewhere a reader reaches, with its source in the same file.
+    surfaces = {"README.md": readme}
+    for path in sorted((APP / "docs").glob("*.md")):
+        surfaces[f"docs/{path.name}"] = path.read_text(encoding="utf-8")
+
     for value, entry in figures.items():
-        assert value in readme, (
+        where = [name for name, body in surfaces.items() if value in body]
+        assert where, (
             f"{value} is registered in evidence/statistics.json and published nowhere in "
-            "the README. A register of sources for figures that are not used is a "
-            "register nobody has to keep true."
+            "the README or under docs/. A register of sources for figures that are not "
+            "used is a register nobody has to keep true."
         )
-        assert entry["url"] in readme, (
-            f"{value} is published in the README and {entry['url']} is not, so the figure "
-            "is in the file and its source is not"
+        assert any(entry["url"] in surfaces[name] for name in where), (
+            f"{value} is published in {', '.join(where)} and {entry['url']} is in none of "
+            "them, so the figure is in the entry and its source is not"
         )
 
 

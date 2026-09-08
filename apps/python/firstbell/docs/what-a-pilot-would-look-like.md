@@ -13,9 +13,68 @@ Nothing in this file is claimed to have happened. It is a proposal.
 |---|---|
 | Scale | Two schools in one district. One primary, one secondary, because the absence profile and the guardian relationship differ. |
 | Length | Six school weeks. Long enough to cross a holiday and an illness wave; short enough that a bad result is cheap. |
-| Volume | Only absences still unexplained at the district's existing cutoff. How many that is per school per morning is the first thing the baseline below has to measure, because no district has told us: this row read "in the districts this was modelled on that is a two-figure number" and there were no such districts. The pilot is sized on the number the school produces in its first fortnight, not on one written here. |
+| Volume | Only absences still unexplained at the district's existing cutoff. How many that is per school per morning is the first thing the baseline below has to measure, because no district has told us: this row read "in the districts this was modelled on that is a two-figure number" and there were no such districts. The pilot is sized on the number the school produces in its first fortnight, not on one written here. For the order of magnitude a board paper needs before that fortnight exists, the section below derives about 28 unexplained absences per 1,000 enrolled students a school day from California's certified figures, and says plainly what that number is a ceiling on rather than a measure of. |
 | Who is called | One guardian per student, on the numbers already on file, with the consent record the district already holds. No new consent is collected for a pilot. |
 | Who is not called | Any family flagged by the school for any reason, any student on a safeguarding plan, and any guardian without a recorded communication preference the tool can serve. The exclusion list is the school's and is never derived by software. |
+
+## The one number a finance director asks for
+
+Every figure in this entry is per call, because how many unexplained absences a district
+handles in a morning is a number a school office has and this project does not. That stays
+true of whichever district signs this pilot. It is not true of the country, and a board paper
+needs an order of magnitude before the first call is placed.
+
+California publishes enough to reconstruct one. Its Department of Education
+[reports](https://dq.cde.ca.gov/dataquest/DQCensus/AttAbsByRsn.aspx?agglevel=State&cds=00&year=2023-24)
+for 2023-24 an eligible cumulative enrolment of 5,958,444, of whom 5,481,732 missed at least
+one day, an average of 13.1 days absent each, and 41.4% of all absence days recorded as
+unexcused. The counts behind those percentages are not displayed, which the report says of
+itself, so the volume is derived rather than read:
+
+```
+13.1 days x 5,481,732 students        =  71,810,689 absence days
+71,810,689 x 41.4%                    =  29,729,625 unexcused days
+29,729,625 / 5,958,444 students       =  5.0 unexcused absences a student a year
+5.0 / 180 days x 1,000                =  27.7 per 1,000 enrolled students a school day
+```
+
+**About 28 unexplained absences per 1,000 enrolled students per school day.** The length of
+the school year is the biggest lever on that: 28.5 at 175 instructional days, 27.0 at 185.
+The 180 comes from [Education Code
+46200](https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=46200.),
+which withholds funding from a district offering fewer.
+
+Every input above is registered in [`evidence/statistics.json`](../evidence/statistics.json)
+with the sentence it came from and the date it was read at source, and
+`tests/test_absence_volume.py` recomputes the four lines rather than trusting the figures
+printed in them.
+
+For a district of 10,000 students that is roughly 277 calls on a school morning and 49,895 in
+a year. Against the $0.59 a call this software's own recorded calls support, about **$29,400
+a year**. Against the $0.19 a call the widest reading of those same calls produces, where
+every escalated call is priced as a callback, about **$9,500 spent** rather than saved. A
+board paper should carry both ends, because which end a district lands on is the thing the
+pilot measures.
+
+Three things that figure is not.
+
+**It is not a count of absences nobody explained.** California's test is absence without a
+valid excuse under Education Code 48205, so a parent who telephones to report a family
+holiday or a missed bus has explained the absence and it is still recorded unexcused. What
+this software would call about is smaller. Twenty-eight per 1,000 is a ceiling on it, not an
+estimate of it.
+
+**It is not the call volume.** This software dials only where the district's own notification
+has already gone unanswered, which is a subset of a subset. Both dollar figures above are
+upper bounds in both directions: a smaller volume shrinks the saving and the loss together.
+
+**It is not national.** One state, one year. The publisher holds 2019-20 data not valid and
+reliable and recommends caution when comparing absenteeism across academic years. Los Angeles
+Unified's own row in the same report works out higher, at 41 per 1,000 a school day, but that
+row reports 0.0% of absence days as out-of-school suspension and 0.0% as incomplete
+independent study where the state reports 0.9% and 5.4%. For a district of 396,000 students
+that is a coding difference rather than a fact about children, so the state figure is the one
+used here.
 
 ## The baseline, measured before anything is switched on
 

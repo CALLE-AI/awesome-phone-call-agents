@@ -2481,7 +2481,19 @@ def build(has_audio: bool, repo_url: str | None = None,
          "the second row prints the refusal in the platform's own words. Until it changes, "
          "the part of this that works in a United States district is the three outcomes, "
          "the consent gate and the structured reason, over whichever dialler the district "
-         "already owns."),
+         "already owns. That is a command and not a consolation: "
+         "<code>python tools/adopt_call_records.py --records "
+         "examples/other-dialler-records.jsonl --consent-register "
+         "examples/other-dialler-consent.json</code> files six calls this software never "
+         "placed, says why each landed where it did, and audits all six against the "
+         "district's own consent register. One of them carries a transcript in which a "
+         "parent says plainly that the child is at home with her, and it still goes to a "
+         "person, because reading a guardian&#8217;s confirmation out of prose is the "
+         "defect this entry was built to catch wearing better clothes. "
+         "It also narrows the ceiling above: it binds while CALL-E places the call, and a "
+         "district with Spanish-speaking families can keep the multilingual dialler it "
+         "already pays for and take this layer over what that dialler returns. Nothing in "
+         "that tool reads the language of a call, because it never reads the call."),
         ("Calls to India arrived from a United States caller identity, shown as Oakland, "
          "California. A family will not answer an unknown foreign number about their child.",
          "Fixable by the operator with a local number on the account. Nothing in this app "

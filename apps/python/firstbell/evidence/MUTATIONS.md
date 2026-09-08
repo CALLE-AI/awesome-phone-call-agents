@@ -131,6 +131,87 @@ a staged snapshot so no new test file was missing, and each was measured twice: 
 whole suite and once with `tests/test_every_rate_carries_its_bound.py` run alone, so no count
 here rests on an unrelated test failing. All six collected 645.
 
+**Rows 272 to 276 were added on 8 September 2026**, for the absence-volume gate, and a reader in the
+buyer's seat asked for the figure they protect: an annual total a finance director could put
+in a budget line, where this entry had only ever published a figure per call.
+
+The pilot document was candid about why it had none, which is that how many unexplained
+absences a district handles in a morning is a number a school office has and this project does
+not. Candour is not an answer to a board paper. California publishes enough to reconstruct one:
+`docs/what-a-pilot-would-look-like.md` now derives about 28 unexplained absences per 1,000
+enrolled students a school day from CDE's certified 2023-24 figures, and prices a
+10,000-student district's year at both ends of the same bound.
+
+It is the only externally sourced quantity in this entry that is derived rather than quoted,
+which is why the gate recomputes the arithmetic from the register instead of matching the
+strings. Four inputs and the statutory school year are in `evidence/statistics.json` with the
+sentence each came from; the arithmetic is in `tests/test_absence_volume.py`; the document is
+checked against the result. Change an input at source and the suite fails rather than
+publishing a rate that no longer follows from it. Rows 272 to 274 are that, planted three ways.
+
+Rows 275 and 276 are the two sentences that make the figure safe to publish, and both are
+easier to lose than the arithmetic. Row 275 removes the publisher's definition of unexcused,
+which is what makes 28 per 1,000 a ceiling rather than a measure: California counts a
+telephoned-in family holiday as unexcused, so the number of families this software would
+actually ring is smaller. Row 276 publishes the annual saving and drops the annual cost the
+widest reading of the same calls produces. That one is the vendor move this entry exists to
+argue against, and nothing in the suite had been able to catch it before.
+
+A figure in the source is deliberately unused and the document says so: Los Angeles Unified's
+own row works out at 41 per 1,000 a school day, and it reports 0.0% of absence days as
+out-of-school suspension where the state reports 0.9%. For a district of 396,000 students that
+is a coding difference rather than a fact about children.
+
+One research trap is worth recording next to this. The same `Statewide` row means two
+different populations depending on the report level it is read at: the page's own footnote says
+charter school data are removed by default from district-level reports “including the
+associated state and county Report Totals”, so a Statewide total read off a district-level
+page gives 5,236,744 rather than 5,958,444. Both land near 28 per 1,000, and only one of them
+is the state.
+
+All five rows were measured against a green baseline in worktrees built from a staged snapshot,
+each twice: once across the whole suite and once with the gate file alone. All five collected
+650.
+
+**Rows 277 to 282 were added on 8 September 2026**, for `tools/adopt_call_records.py`, and one of the
+six survived its first measurement.
+
+That tool is the recommendation this entry received and declined earlier the same day. A reader
+in the buyer's seat wanted the first screen to lead with the three outcomes, the consent gate
+and the structured reason, over whichever dialler a district already owns. It was declined
+because the sentence existed in act 07 as a scoping statement with nothing behind it, and
+promoting an unbuilt capability to the first screen is the kind of claim this entry cannot
+survive being asked about. So it was built: the tool reads call records another dialler
+produced, files them into the same three outcomes with the sentence that explains each one, and
+audits all of them against the district's consent register after the fact.
+
+Row 277 is the mutation that matters. It closes a record by finding a reassuring phrase in the
+transcript, which is the improvement somebody will eventually make to this tool in good faith
+and is the exact defect the rest of this entry exists to catch: a record closed while nothing
+was learned, wearing a better vocabulary. Row 278 decides the outcome inside the tool instead of
+calling the function the live path calls, which is the other way this goes wrong, because a
+copy of a rule agrees with the original only until one of them changes.
+
+**Row 282 was noticed by nothing.** It changed `answered is False` to `answered is None`, and the
+example file has a row for every outcome and no row where `answered` is simply absent, so the
+case that tells the two spellings apart was never exercised. It is not a cosmetic difference. A
+record whose export omits the field but carries a full answer would have been filed
+undetermined and told an attendance officer that nobody picked up, which is a sentence about a
+call that did not happen; and a record that really was not answered would have been judged on
+whatever result was attached to it, which is how a voicemail becomes a guardian's confirmation.
+`test_answered_has_three_states_and_absent_is_not_no` closes it, holding the same three states
+`answered_by_the_guardian` holds and for the same reason, and the row above is the count after
+that test existed.
+
+Two of these rows were measured twice for a duller reason, and it is the same trap as the note
+above about a green baseline. The first three came back uniformly at 3 noticed, which is the
+tell, and the cause was two standing failures in the clean tree: the example call records used
++1 415 555 01xx, where 415 is a real area code and only 555 as the area code is reserved for
+fiction, so `test_no_number_in_a_committed_fixture_could_ring_a_real_person` refused them. The
+main tree had not caught it because that gate walks the tracked tree and the new example files
+were still untracked there. Every count published in these six rows is from a baseline measured
+green at 630 passed and 28 skipped.
+
 **Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
 rows can be applied by a script. Twenty-nine came
 back exactly as published. Eight had moved, all upward: row 2 (five to eight), row 4 (one to
@@ -484,6 +565,17 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 269 | Put the escalation bound in the column headed net-new per 100 answered calls, which is the mistake this document records making once with 24 against 50.4: two right figures and a comparison that is not one | 1 |
 | 270 | Drift the cost the pessimistic reading prices out to by a cent in the money document, away from what the tool computes | 1 |
 | 271 | Compute the escalation rate's bound off the net-new count, so the two bounds are the same number and the card publishes the narrow reading twice while calling one of them the widest **Needs the built page.** | 3 |
+| 272 | Drift the derived absence rate by one per thousand in the line that shows the arithmetic, so the document publishes a rate its own registered inputs do not produce | 1 |
+| 273 | Round the headline volume up to a number the derivation does not reach, which is the figure a reader carries away and the only one most will remember | 1 |
+| 274 | State the wrong rate for a 175-day school year, hiding how much the largest lever on this figure actually moves it | 1 |
+| 275 | Remove the publisher's definition of unexcused, which is the sentence that makes the volume figure a ceiling on what this software would call about rather than a measure of it | 1 |
+| 276 | Publish the annual saving and drop the annual cost the widest reading of the same calls produces, which is the vendor move this entry was built to argue against | 1 |
+| 277 | Close a record by reading a reassuring phrase out of the transcript, which is the improvement somebody would plausibly make to this tool and is the exact defect the rest of this entry exists to catch | 1 |
+| 278 | Decide the outcome here instead of calling the function the live path calls, so a district adopting this over its own dialler gets a second rule that agrees with the first only until one of them changes | 1 |
+| 279 | Silently ignore a result field the schema does not define, so a district that mistypes one field in its mapping gets records filed undetermined for a reason nothing on the output names | 1 |
+| 280 | Abort instead of reporting could-not-measure when there is nothing to read, folding a third outcome back into a failure | 1 |
+| 281 | Audit another dialler's calls without passing the numbers they were placed to, so a consent record covering a different number than the one dialled passes. Consent attaches to the number called | 1 |
+| 282 | Judge a call nobody answered on the result attached to it, and treat a record that does not say whether it was answered as though nobody was there | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed
