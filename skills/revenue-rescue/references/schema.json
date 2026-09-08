@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RevenueRescueCallResult",
+  "description": "Strict structured result schema for the Revenue Rescue CALL-E workflow. Enforces fail-closed dispositions and explicit escalation flags.",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "payment_promised",
+        "disputed",
+        "no_answer",
+        "voicemail",
+        "callback_requested",
+        "failed"
+      ],
+      "description": "The final disposition of the call. 'failed' or 'no_answer' must trigger the retry cascade."
+    },
+    "promised_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date the customer promised to update their payment method (YYYY-MM-DD). Required if outcome is 'payment_promised'."
+    },
+    "dispute_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The specific reason for the dispute if the customer contested the charge. Null otherwise."
+    },
+    "escalation_required": {
+      "type": "boolean",
+      "description": "True if the call outcome requires human review (e.g., complex dispute, angry customer, or repeated failures). False if the automated workflow successfully resolved or scheduled the task."
+    },
+    "notes": {
+      "type": "string",
+      "description": "A brief, factual summary of the conversation, the customer's exact words regarding the payment, or the specific reason for a failed connection."
+    }
+  },
+  "required": [
+    "outcome",
+    "escalation_required",
+    "notes"
+  ],
+  "additionalProperties": false
+}
