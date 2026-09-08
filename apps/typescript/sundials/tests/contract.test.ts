@@ -54,7 +54,7 @@ import { resolveAllCalls, resolveAnalytics, resolveCallDetail, resolveLeadDetail
 import { readWorkspaceSettings, writeWorkspaceSettings } from "../lib/console/workspace-settings.ts";
 import { parseTheme } from "../lib/console/theme.ts";
 import { authenticateSdkRequest } from "../lib/sdk/auth.ts";
-import { DEFAULT_RETRY_DELAY_HOURS, defaultBrainConfig, defaultBrainGoals, enabledGoals, HARBOR_OPENING_SCRIPT, MAX_RETRY_DELAY_HOURS, MIN_RETRY_DELAY_HOURS, normalizeBrainConfig, normalizeRetryDelayHours, readBrainConfig, writeBrainConfig } from "../lib/brain/config.ts";
+import { DEFAULT_RETRY_DELAY_HOURS, defaultBrainConfig, defaultBrainGoals, enabledGoals, HARBOR_CLOSING_SCRIPT, HARBOR_OPENING_SCRIPT, MAX_RETRY_DELAY_HOURS, MIN_RETRY_DELAY_HOURS, normalizeBrainConfig, normalizeRetryDelayHours, readBrainConfig, writeBrainConfig } from "../lib/brain/config.ts";
 import { liveCreateInputForRecord, stopFollowUpsForVisitor } from "../lib/calle/retry.ts";
 import { ingestCalleWebhook } from "../lib/calle/webhook.ts";
 import { parseTrackingConsent, serializeTrackingConsent, TRACKING_CONSENT_TTL_MS } from "../lib/sdk/tracking-consent.ts";
@@ -582,7 +582,8 @@ test("live binding: maps E.164 country and builds a Harbor recipient task", () =
     productName: harbor.productName,
     agentIdentity: harbor.agentIdentity,
     tonePersona: harbor.tonePersona,
-    openingScript: harbor.openingScript
+    openingScript: harbor.openingScript,
+    closingScript: harbor.closingScript
   });
   assert.match(task, /^Call \+6555501911/);
   assert.match(task, /English \(en-SG\)/);
@@ -600,16 +601,20 @@ test("live binding: maps E.164 country and builds a Harbor recipient task", () =
   assert.match(task, /Hi there, thanks for picking up/i);
   assert.match(task, /recorded for quality/i);
   assert.match(task, /what can we help you with today/i);
+  assert.match(task, /customizing a Harbor plan/i);
+  assert.match(task, /Close with:/);
   assert.doesNotMatch(task, /thanks so much for picking up/i);
   assert.match(task, /EXTRACT \(silent/);
 });
 
 test("live binding: uses the provided openingScript", () => {
   const task = buildLiveCallTask("+15550192831", session(), "Alex", "alex@example.com", {
-    openingScript: "Hello from Northwind Voice. This call may be recorded. How can we help you today?"
+    openingScript: "Hello from Northwind Voice. This call may be recorded. How can we help you today?",
+    closingScript: "Thanks for the time. Northwind will take it from here."
   });
   assert.match(task, /Hello from Northwind Voice/);
   assert.match(task, /How can we help you today/);
+  assert.match(task, /Northwind will take it from here/);
   assert.doesNotMatch(task, /Harbor/);
 });
 
@@ -623,7 +628,9 @@ test("live binding: missing openingScript does not inject Harbor", () => {
     assert.match(task, /automated assistant/i);
     assert.match(task, /recorded for quality/i);
     assert.match(task, /What can we help you with today/i);
+    assert.match(task, /glad we could help/i);
     assert.doesNotMatch(task, /calling on behalf of Harbor/i);
+    assert.doesNotMatch(task, /customizing a Harbor plan/i);
   }
 });
 
@@ -1285,6 +1292,7 @@ test("brain: default Harbor config includes Harbor opening", () => {
   const config = defaultBrainConfig();
   assert.equal(config.accountId, "harbor");
   assert.equal(config.openingScript, HARBOR_OPENING_SCRIPT);
+  assert.equal(config.closingScript, HARBOR_CLOSING_SCRIPT);
   assert.equal(config.retryDelayHours, DEFAULT_RETRY_DELAY_HOURS);
   assert.match(config.openingScript, /automated assistant for Harbor Sales/);
   assert.match(config.openingScript, /recorded for quality/i);
@@ -1302,6 +1310,7 @@ test("brain: default goals and live task injection", () => {
     agentIdentity: config.agentIdentity,
     tonePersona: config.tonePersona,
     openingScript: config.openingScript,
+    closingScript: config.closingScript,
     activeGoals: enabledGoals(config)
   });
   assert.match(task, /How many reps are currently logging in every day/);
@@ -1421,9 +1430,12 @@ test("brain: config persists beside the database path", () => {
     });
     assert.equal(written.goals.find((goal) => goal.id === "timeline")?.enabled, false);
     assert.equal(written.openingScript, HARBOR_OPENING_SCRIPT);
+    assert.equal(written.closingScript, HARBOR_CLOSING_SCRIPT);
     assert.equal(readBrainConfig("harbor").goals.find((goal) => goal.id === "timeline")?.enabled, false);
     assert.equal(readBrainConfig("harbor").openingScript, HARBOR_OPENING_SCRIPT);
+    assert.equal(readBrainConfig("harbor").closingScript, HARBOR_CLOSING_SCRIPT);
     assert.equal(normalizeBrainConfig({ accountId: "harbor", productName: "Harbor CRM" }).openingScript, HARBOR_OPENING_SCRIPT);
+    assert.equal(normalizeBrainConfig({ accountId: "harbor", productName: "Harbor CRM" }).closingScript, HARBOR_CLOSING_SCRIPT);
     assert.equal(normalizeBrainConfig({ accountId: "harbor", productName: "Harbor CRM" }).retryDelayHours, DEFAULT_RETRY_DELAY_HOURS);
     const cleared = writeBrainConfig({ ...defaultBrainConfig(), openingScript: "   " });
     assert.equal(cleared.openingScript, "");

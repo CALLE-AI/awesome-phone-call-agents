@@ -249,6 +249,8 @@ export function BrainPanel({
             onRetry={(hours) => void persist({ ...config, retryDelayHours: hours })}
             onOpeningChange={(openingScript) => setConfig({ ...config, openingScript })}
             onOpeningCommit={(openingScript) => void persist({ ...config, openingScript })}
+            onClosingChange={(closingScript) => setConfig({ ...config, closingScript })}
+            onClosingCommit={(closingScript) => void persist({ ...config, closingScript })}
           />
         </div>
 
@@ -650,13 +652,17 @@ function CallPolicyCard({
   busy,
   onRetry,
   onOpeningChange,
-  onOpeningCommit
+  onOpeningCommit,
+  onClosingChange,
+  onClosingCommit
 }: {
   config: BrainConfig;
   busy: boolean;
   onRetry: (hours: number | null) => void;
   onOpeningChange: (script: string) => void;
   onOpeningCommit: (script: string) => void;
+  onClosingChange: (script: string) => void;
+  onClosingCommit: (script: string) => void;
 }) {
   const selected = retrySelectValue(config.retryDelayHours);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -757,6 +763,21 @@ function CallPolicyCard({
           />
           <p className="text-xs text-muted-foreground">
             First spoken lines. Disclose that this is an automated assistant and that the call may be recorded.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="closing-script">Closing script</Label>
+          <Textarea
+            id="closing-script"
+            rows={4}
+            disabled={busy}
+            value={config.closingScript}
+            className="text-base leading-relaxed md:text-base"
+            onChange={(event) => onClosingChange(event.target.value)}
+            onBlur={() => onClosingCommit(config.closingScript)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Last one or two sentences. Thank them and leave a warm impression. Do not promise a person will call back.
           </p>
         </div>
       </CardContent>

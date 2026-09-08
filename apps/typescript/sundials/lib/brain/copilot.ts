@@ -15,6 +15,7 @@ interface GeminiCopilotJson {
   companyAbout?: unknown;
   qualificationReport?: unknown;
   openingScript?: unknown;
+  closingScript?: unknown;
   retryDelayHours?: unknown;
   addGoal?: unknown;
   removeGoalLabel?: unknown;
@@ -99,8 +100,13 @@ export function applyCopilotHeuristics(config: BrainConfig, message: string): Co
   }
 
   const opening = text.match(/\bopening(?: script)?\s*[:-]\s*([\s\S]+)/i);
-  if (opening?.[1]) {
+  if (opening?.[1] && !/\bclos(?:e|ing)\b/i.test(text)) {
     return { reply: "Updated the opening script.", config: { ...config, openingScript: opening[1].trim() } };
+  }
+
+  const closing = text.match(/\bclos(?:e|ing)(?: script)?\s*[:-]\s*([\s\S]+)/i);
+  if (closing?.[1]) {
+    return { reply: "Updated the closing script.", config: { ...config, closingScript: closing[1].trim() } };
   }
 
   const company = text.match(/\b(?:company|product)\s+(?:is|name(?:\s+is)?|:)\s+(.+)/i);
@@ -177,6 +183,8 @@ function applyGeminiPatch(config: BrainConfig, parsed: GeminiCopilotJson): Brain
   if (qualificationReport) next.qualificationReport = qualificationReport;
   const openingScript = asString(parsed.openingScript);
   if (openingScript) next.openingScript = openingScript;
+  const closingScript = asString(parsed.closingScript);
+  if (closingScript) next.closingScript = closingScript;
   if ("retryDelayHours" in parsed) {
     next.retryDelayHours = parsed.retryDelayHours === null ? null : normalizeRetryDelayHours(parsed.retryDelayHours) ?? null;
   }
@@ -233,6 +241,7 @@ ${JSON.stringify(
     companyAbout: config.companyAbout,
     qualificationReport: config.qualificationReport,
     openingScript: config.openingScript,
+    closingScript: config.closingScript,
     retryDelayHours: config.retryDelayHours ?? null,
     goals: config.goals.map((goal) => ({ id: goal.id, label: goal.label, enabled: goal.enabled, targetField: goal.targetField })),
     suggestions: config.suggestions.map((item) => ({ title: item.title, type: item.type }))
@@ -244,7 +253,7 @@ ${JSON.stringify(
 User: ${message.trim()}
 
 Return JSON with a short "reply" and only the fields that should change:
-productName, companyAbout, qualificationReport, openingScript, retryDelayHours (number or null),
+productName, companyAbout, qualificationReport, openingScript, closingScript, retryDelayHours (number or null),
 addGoal (one sentence), removeGoalLabel, pauseGoalLabel, resumeGoalLabel, applySuggestionTitle.`,
     45_000
   );

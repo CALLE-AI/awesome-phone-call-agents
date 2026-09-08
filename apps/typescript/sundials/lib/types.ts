@@ -351,6 +351,8 @@ export interface BrainConfig {
   agentIdentity: string;
   tonePersona: string;
   openingScript: string;
+  /** Last spoken wrap-up. Keep to one or two sentences. */
+  closingScript: string;
   playbookNotes?: string;
   goals: BrainGoal[];
   suggestions: BrainSuggestion[];

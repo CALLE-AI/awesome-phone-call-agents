@@ -16,6 +16,7 @@ export interface LiveCallContext {
   tonePersona?: string;
   playbookNotes?: string;
   openingScript?: string;
+  closingScript?: string;
   activeGoals?: BrainGoal[];
 }
 
@@ -23,9 +24,17 @@ export interface LiveCallContext {
 export const GENERIC_OPENING_SCRIPT =
   "Hi there, thanks for picking up! This is an automated assistant calling you back because you requested a call. Before we get started, just a quick heads-up that this call may be recorded for quality. What can we help you with today?";
 
+export const GENERIC_CLOSING_SCRIPT =
+  "Thanks so much for your time today. We'll take what you shared and look at a plan that fits — glad we could help, and I hope this makes the work a bit easier from here.";
+
 export function resolveOpeningScript(openingScript?: string): string {
   const trimmed = openingScript?.trim();
   return trimmed || GENERIC_OPENING_SCRIPT;
+}
+
+export function resolveClosingScript(closingScript?: string): string {
+  const trimmed = closingScript?.trim();
+  return trimmed || GENERIC_CLOSING_SCRIPT;
 }
 
 export const OFFICIAL_CALLE_ORIGIN = "https://api.heycall-e.com";
@@ -66,6 +75,7 @@ export function buildLiveCallTask(
   const company = ctx.company || "their company";
   const product = ctx.productName?.trim();
   const opening = resolveOpeningScript(ctx.openingScript);
+  const closing = resolveClosingScript(ctx.closingScript);
   const role = ctx.agentIdentity ? `\nRole: ${ctx.agentIdentity}` : "";
   const tone = ctx.tonePersona ? `\nTone: ${ctx.tonePersona}` : "";
   const playbook = ctx.playbookNotes?.trim() ? `\nPlaybook: ${ctx.playbookNotes.trim()}` : "";
@@ -97,7 +107,7 @@ ${collectSection(ctx)}
 
 EXTRACT (silent, never say aloud): Fill the result schema from what they actually said. primary_pain should name the pain in their words, never a call-status summary.
 
-CLOSE: Thank them warmly and end the call. Do not ask if they want a human. Do not promise a follow-up unless they explicitly asked for a person — and even then, only that you will pass the note along.
+CLOSE: When you are done, speak this wrap-up and then end. Do not hang up on a bare bye. Do not ask if they want a human. Do not promise a person will call. Close with: "${closing}"
 `.trim();
 }
 

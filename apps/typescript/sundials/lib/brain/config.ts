@@ -18,6 +18,9 @@ export const MAX_RETRY_DELAY_HOURS = 48;
 export const HARBOR_OPENING_SCRIPT =
   "Hi there, thanks for picking up! This is the automated assistant for Harbor Sales, calling you back because you requested a call from our team. Before we get started, just a quick heads-up that this call may be recorded for quality. To get you to the right person, what can we help you with today?";
 
+export const HARBOR_CLOSING_SCRIPT =
+  "Thanks so much for your time today. We'll take what you shared and look at customizing a Harbor plan for your company — we're glad to keep helping, and I hope Harbor can make the business a bit easier from here. Goodbye and have a nice day!";
+
 function brainPath(): string {
   const dbPath = process.env.SUNDIALS_DB_PATH || join(process.cwd(), "data", "sundials.db");
   if (dbPath === ":memory:") return join(process.cwd(), "data", "sundials-brain.json");
@@ -135,6 +138,7 @@ export function defaultBrainConfig(accountId = HARBOR_ACCOUNT_ID): BrainConfig {
     tonePersona:
       "Warm, welcoming, unhurried host. Grateful they picked up. Curious, not interrogative. One question at a time. Never screening language.",
     openingScript: HARBOR_OPENING_SCRIPT,
+    closingScript: HARBOR_CLOSING_SCRIPT,
     playbookNotes: "",
     goals: defaultBrainGoals(),
     suggestions: defaultBrainSuggestions(),
@@ -227,6 +231,7 @@ export function normalizeBrainConfig(raw: Partial<BrainConfig> | null | undefine
         ? raw.tonePersona.trim()
         : fallback.tonePersona,
     openingScript: typeof raw.openingScript === "string" ? raw.openingScript.trim() : fallback.openingScript,
+    closingScript: typeof raw.closingScript === "string" ? raw.closingScript.trim() : fallback.closingScript,
     playbookNotes: typeof raw.playbookNotes === "string" ? raw.playbookNotes : "",
     goals: goals.length > 0 ? goals : fallback.goals,
     suggestions,
@@ -316,6 +321,7 @@ export function brainCallDirectives(config: BrainConfig) {
     tonePersona: config.tonePersona,
     playbookNotes: playbook,
     openingScript: config.openingScript,
+    closingScript: config.closingScript,
     activeGoals: enabledGoals(config)
   };
 }
