@@ -1137,7 +1137,16 @@ def money_markup(run: dict) -> str:
         f'the demo run: {f["demo"]["attempts_removed"]} of '
         f'{f["demo"]["attempts_billed"]} attempts came off a desk at '
         f'${f["desk"].hourly:,.2f} an hour at three minutes each, less the safeguarding '
-        f'callbacks at ${f["lead"].hourly:,.2f}. Not a saving: a ceiling.</p>'
+        f'callbacks at ${f["lead"].hourly:,.2f}. Not a saving: a ceiling. '
+        # The demo run is reproducible because its outcomes are written down, and that is
+        # the same sentence as "somebody chose this numerator". A reader who found
+        # firstbell/scenario.py after reading this figure would be entitled to think the
+        # page had hidden it.
+        'And not a measurement: that run answers against a test double whose outcome mix '
+        'is written down in <code>firstbell/scenario.py</code>, which is what lets anybody '
+        'reproduce it with one command and also means somebody chose it. The measured '
+        'figure is further down this paragraph, over every call this software has '
+        'placed.</p>'
 
         '</div>',
         '</div>',
