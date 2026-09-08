@@ -63,17 +63,17 @@ makes, and each one can be checked without an API key.
 Four lines do all of it, and the default offline run reaches three of them. Every anchor
 below is checked by a test, so a line number here cannot quietly rot.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:385`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:398`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:461`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:474`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:377`, rather than as a string match on a message.
+  `dispatch/scheduler.py:390`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
   `firstbell/cli.py:374`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:390`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:403`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 

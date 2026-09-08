@@ -72,6 +72,19 @@ class RetryPolicy:
                 f"all; one attempt is the minimum a policy can describe.")
 
     def delay_for(self, attempt: int) -> float:
+        """Doubling from the base delay, capped. Chosen with no information, on purpose.
+
+        A rate limit is the one error where the platform knows the right answer and the
+        caller does not, and `Retry-After` is how it says so. It cannot be honoured here:
+        `calle.errors.api_error_from_response` takes a status code and a decoded body, so
+        the response headers never enter the function that builds the exception, and
+        `CalleRateLimitError` has no field to carry a wait. `call-e-feedback.md` finding 13
+        is that, with the two-parameter fix.
+
+        So this backs off blind, which on a real 429 either returns before the window is
+        over or waits longer than the platform needed. If the SDK grows the field, read it
+        and prefer it over this.
+        """
         return min(self.base_delay_seconds * (2 ** (attempt - 1)), self.max_delay_seconds)
 
 

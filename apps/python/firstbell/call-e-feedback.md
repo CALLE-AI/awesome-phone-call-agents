@@ -286,6 +286,43 @@ can afford a wave of long calls. `evidence/observed-price.json` records what we 
 three things it cannot settle. Publishing the rate and the rounding rule would let anybody
 building on you write a number down instead of a range.
 
+## 13. A rate limit cannot say when to come back, because the SDK drops the header
+
+**Severity: small, cheap to fix, and it costs you load.** `calle/errors.py` has a dedicated
+`CalleRateLimitError`, raised for 429 and nothing else, so somebody meant a rate limit to be
+handled differently from other errors. Then:
+
+```python
+# calle/errors.py
+def api_error_from_response(status_code: int, payload: object) -> CalleAPIError:
+    ...
+    if status_code == 429:
+        return CalleRateLimitError(code=code, message=message,
+                                   status_code=status_code, details=details)
+```
+
+The function is handed a status code and a decoded body. The response headers are not a
+parameter, so nothing in that function can see a `Retry-After` even if you send one, and
+`CalleAPIError.__init__` has no field to hold it. Reproducing this needs no account and no
+key: it is the constructor signature in the installed package, and
+`generated/api/calls/create_call.py:87` shows the headers are on the response object one
+layer up and are dropped on the way here.
+
+So an integrator hitting a 429 has to invent a backoff. Ours doubles from one second and
+caps at thirty (`dispatch/scheduler.py`, `RetryPolicy.delay_for`), chosen with no
+information, which means on a real rate limit we either come back too early and take
+another 429 off you or wait longer than you needed us to. Both are your capacity.
+
+**What we would use:** `retry_after_seconds` on `CalleRateLimitError`, read from the header
+on the response you already have in hand, and `headers` passed into
+`api_error_from_response`. Two parameters. If the platform does not currently send
+`Retry-After` on a 429, the useful half of this is sending it; the SDK change is what makes
+it reachable.
+
+Anchor: `dispatch/scheduler.py` (`RetryPolicy` and the `RETRYABLE_ERRORS` branch, which
+treats `rate_limit_exceeded` with the same blind backoff as everything else because there is
+nothing better to use).
+
 ## What worked
 
 Not everything here is a complaint, and three of these decisions saved us real time.
