@@ -295,6 +295,42 @@ invented by the app, from a field the platform did not send. Two fields it alrea
 receives, a non-null `failureCode` and an empty transcript, would settle it
 without guessing. It ships no tests, so nothing exercises the branch.
 
+## What the re-read found
+
+Those two are about code. This one is about the platform, and it is the only
+question a corpus of dated responses can answer that a test suite structurally
+cannot: a suite can tell you your code still does what it did, never that the API
+underneath stopped doing what it did, because the suite's idea of the API is a
+fixture the suite wrote.
+
+```bash
+npm run drift
+```
+
+It re-reads the recorded calls rather than placing new ones. Each response belongs
+to a call that still exists, so `calls.get(id)` returns today's serialisation of
+the same event. It creates nothing and spends no allowance.
+
+On its first live run it found this. **Read a connected call twice and the attempt
+timestamps change.** The read that first observes the call completed answers
+`2026-09-08T08:19:29.064926Z`. Every read after answers `2026-09-08T04:19:29`: no
+zone designator, four hours earlier, microseconds dropped. Only the attempt moves;
+`call.createdAt` and `call.completedAt` keep their zone. The event stream for the
+same call still reports the correct instant, so both values are available through
+this API at once, from two endpoints, for one call. Four hours is not the caller's
+offset, which was UTC-5.
+
+It costs a caller because the attempt is where the duration and the start time
+live. A webhook handler and a reconciliation job reading the same call disagree by
+four hours, and the later reader has the worse copy: with no zone designator,
+`new Date("2026-09-08T04:19:29")` is local time by specification, so a third
+reader shifts it again by their own offset.
+
+No mechanism is claimed, and one exception has no explanation: two connected calls
+captured on 5 September still read tz-aware today while five captured on
+7 September do not. `docs/what-the-re-read-found.md` carries the reproduction, the
+limits, and the two errors the tool's own first run made before this was written.
+
 ## What this cannot see
 
 Every behaviour here is about the shape of a response. None of them is about who
