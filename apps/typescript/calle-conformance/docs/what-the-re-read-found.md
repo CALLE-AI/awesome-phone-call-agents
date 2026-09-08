@@ -5,91 +5,104 @@ first thing it answered about the platform, and it is a finding the corpus is
 the only artefact in this repository able to produce: the responses are dated,
 so they can be compared against the same calls read again.
 
-The finding is a single sentence. **Read a connected call twice through
-`calls.get` and the attempt timestamps change.** The first read that observes
-the call completed carries a UTC instant with a timezone designator. Every later
-read of the same call carries a naive local-time string, four hours earlier,
-with the microseconds dropped.
+**A connected call's attempt timestamp carries its timezone only for a window of
+under a minute after the call completes.** Before that window it is a placeholder
+that tracks the read clock. After it, and from then on, the field has no zone
+designator, no sub-second component, and reads four hours earlier.
 
 ---
 
 ## The reproduction
 
-One call was placed to the CALL-E English testing hotline on 8 September 2026
-and polled until it completed. The payload the polling loop received:
+`npm run settle` places one call to the CALL-E English testing hotline and reads
+it over plain `fetch` on a ten-second sleep plus request time, about thirteen to
+fourteen seconds in practice, from before it connects until four minutes past the
+first read that shows it completed. Run on 8 September 2026, call
+`call_WXko-BzSPlw5t3pCIPtLDg`, attempt `att_b18ffd198df93947`:
 
 ```
-attempt.startedAt     2026-09-08T08:19:29.064926Z
-attempt.completedAt   2026-09-08T08:19:49.348453Z
+wall clock (UTC)          status      zone  attempt.startedAt
+2026-09-08T08:32:24.663Z  queued      NO    2026-09-08T04:32:24
+2026-09-08T08:32:42.935Z  queued      NO    2026-09-08T04:32:29
+2026-09-08T08:32:56.305Z  queued      NO    2026-09-08T04:32:29
+2026-09-08T08:33:12.596Z  completed   yes   2026-09-08T08:32:40.611544Z
+2026-09-08T08:33:25.785Z  completed   yes   2026-09-08T08:32:40.611544Z
+2026-09-08T08:33:38.275Z  completed   NO    2026-09-08T04:32:40
+2026-09-08T08:33:51.070Z  completed   NO    2026-09-08T04:32:40
+   ... 15 further reads, all identical, through 08:37:16Z
 ```
 
-The same call, same endpoint, same key, read again seconds later, and three more
-times over the following two minutes. All four reads agree with each other and
-disagree with the first:
+The three `queued` rows are deliberately not part of the claim. Their values
+differ from one another and follow the read clock, so at that point the field
+holds a placeholder for a start time that has not happened rather than one
+instant in another representation. Reading them as a representation change would
+be the same mistake this tool made on a queued capture once already, recorded
+below.
 
-```
-attempt.startedAt     2026-09-08T04:19:29
-attempt.completedAt   2026-09-08T04:19:49
-```
+What is claimed is the transition after the start time settles at `:32:40`. Two
+reads carry `2026-09-08T08:32:40.611544Z`, and every read after carries
+`2026-09-08T04:32:40`. Bounded by the readings either side of it, the tz-aware
+run is at least 13 seconds wide and less than 42. Re-read at 08:41:14Z, the same
+call still answered `2026-09-08T04:32:40`.
 
-Saved as
-`probe-results/experiments/EVIDENCE-attempt-timestamp-rewritten-after-first-read.json`,
-git-ignored like every raw capture.
+Two things go, not one. The designator, and the `.611544`.
 
-That call is deliberately **not** in the published corpus, which stays at fifteen
-responses. It was placed to settle one question rather than to record a
+Every response carried `cache-control: no-store` and no `Age` header, so an HTTP
+cache serving a stale copy does not look like the explanation, at least not by
+policy.
+
+Saved as `probe-results/experiments/EVIDENCE-timestamp-settle-*.json`, git-ignored
+like every raw capture, alongside the earlier call that first showed it.
+
+Those two calls are deliberately **not** in the published corpus, which stays at
+fifteen responses. They were placed to settle a question rather than to record a
 behaviour, and a corpus that grows every time somebody runs an experiment stops
-being the fixed reference that the README, the report and the film all count. The
-masking preserves the presence or absence of a zone designator precisely because
-it is the finding, so nothing about this is hidden by leaving the call out; the
-reproduction above is the evidence, and it can be run again for the cost of one
-unit of the daily allowance.
-
-Three things narrow it.
-
-**Only the attempt is affected.** `call.createdAt` and `call.completedAt` carry
-their zone in every one of the sixteen calls held here, on both reads.
-
-**The platform still has the correct instant.** The event stream for the same
-call answers `call.started` at `2026-09-08T08:18:45.498626Z`, tz-aware and to
-the microsecond, while the attempt on the same call reads `04:19:29`. The right
-value and the wrong one are both available through this API at the same moment,
-from two endpoints, for one call.
-
-**Four hours is not the caller's offset.** These calls were placed from UTC-5.
-Four hours is US Eastern in September, which is a plausible server-side local
-time and is not a value any caller supplied.
+being the fixed reference that the README, the report and the film all count.
+Leaving them out hides nothing: the masking preserves the presence or absence of
+a zone designator precisely because it is the finding, and the reproduction above
+can be run again for one unit of the daily allowance.
 
 ## What it costs a caller
 
-The attempt is where a caller reads how long the call took and when it started,
-so this is the field a retry policy, a duration metric and a reconciliation job
-all consume.
+The attempt carries the start time, so a retry policy, a duration metric or a
+reconciliation job reading it gets a different answer depending on when it read.
 
-A handler that reads the call at completion and a job that reads the same call
-an hour later disagree by four hours about the same event, and neither is
-obviously wrong from the inside. Worse for the later reader: with no zone
-designator, `new Date("2026-09-08T04:19:29")` is parsed as local time by
-ECMAScript, so a reader in a third timezone shifts it again by their own offset.
-The error compounds rather than cancels.
+Two losses, not one. The designator goes and so does the sub-second component:
+`08:32:40.611544Z` becomes `04:32:40`, truncated to the whole second. A caller
+timing a short call from these fields loses precision it was handed earlier.
+
+The later form is also the easier one to misread. With no designator,
+ES2015-conformant engines parse `"2026-09-08T04:32:40"` as local time; ES5.1
+specified UTC for this form, so older engines differ, and the rule covers
+date-time strings rather than date-only ones, which are still UTC. So a
+JavaScript reader outside the server's zone shifts it again by their own offset.
+
+Four hours matches UTC-4, which is US Eastern in September. These calls were
+placed from UTC-5, so it is not the caller's offset, and it looks like a
+server-side local time rather than anything a caller supplied. UTC-4 is not
+uniquely US Eastern, so the zone itself is a guess.
 
 ## What is not established
 
-**The mechanism.** Something between the first read and the second serves a
-different representation. Whether that is a cache expiring, a write settling, or
-two code paths over one row cannot be seen from outside, and no cause is claimed
-here.
+**The mechanism.** Something serves a different representation inside that window
+than outside it. Whether that is a write settling, a cache expiring, or two code
+paths over one row cannot be seen from outside, and no cause is claimed here.
 
-**One exception has no explanation.** Two connected calls captured on
-5 September still read tz-aware today, three days later, while five connected
-calls captured on 7 September now read naive. If the rewrite applied to every
-connected call those two would have moved as well. They have not. Whatever the
-mechanism is, it did not always do this, and the corpus cannot say what changed.
+**One exception has no explanation.** Two connected calls captured on 5 September
+still read tz-aware when re-read on 8 September, while five captured on
+7 September do not. If every connected attempt settled into the naive form those
+two would have settled too. They have not, and it is the part of this finding
+worth attacking first.
 
-**Failed attempts are not part of this.** They carry the naive form on the first
-read and every read after, which is the behaviour the corpus already recorded as
-quirks 1 and 2. What is new is that connected attempts reach the same state, and
-that they do so after the caller has already been handed the correct value.
+**Whether failed attempts are the same bug.** All eight failed-call captures here
+were taken by a polling loop and none ever recorded a tz-aware attempt. That is
+consistent with the same short window existing and being missed between polls,
+and consistent with the failure path never producing one. This corpus cannot tell
+which, so quirks 1 and 2 stay scoped to what they observe.
+
+**What a webhook carries.** Every tz-aware attempt value seen here came from a
+read of `GET /v1/calls/{id}`. No webhook was received, so no claim is made about
+that delivery path.
 
 ## How it was found
 

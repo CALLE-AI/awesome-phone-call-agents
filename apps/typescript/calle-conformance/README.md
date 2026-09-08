@@ -311,25 +311,34 @@ It re-reads the recorded calls rather than placing new ones. Each response belon
 to a call that still exists, so `calls.get(id)` returns today's serialisation of
 the same event. It creates nothing and spends no allowance.
 
-On its first live run it found this. **Read a connected call twice and the attempt
-timestamps change.** The read that first observes the call completed answers
-`2026-09-08T08:19:29.064926Z`. Every read after answers `2026-09-08T04:19:29`: no
-zone designator, four hours earlier, microseconds dropped. Only the attempt moves;
-`call.createdAt` and `call.completedAt` keep their zone. The event stream for the
-same call still reports the correct instant, so both values are available through
-this API at once, from two endpoints, for one call. Four hours is not the caller's
-offset, which was UTC-5.
+On its first live run it flagged five of the fifteen. Following them with
+`npm run settle`, which places one call and reads it every few seconds from before
+it connects until minutes after it ends:
 
-It costs a caller because the attempt is where the duration and the start time
-live. A webhook handler and a reconciliation job reading the same call disagree by
-four hours, and the later reader has the worse copy: with no zone designator,
-`new Date("2026-09-08T04:19:29")` is local time by specification, so a third
-reader shifts it again by their own offset.
+```
+2026-09-08T08:33:12.596Z  completed   zone      2026-09-08T08:32:40.611544Z
+2026-09-08T08:33:25.785Z  completed   zone      2026-09-08T08:32:40.611544Z
+2026-09-08T08:33:38.275Z  completed   NO zone   2026-09-08T04:32:40
+   ... every read after, through 08:41:14Z, identical
+```
+
+**A connected call's attempt timestamp carries its timezone for a window of under
+a minute after the call completes, and not before or after.** The later form has
+lost the designator and the `.611544` both, and reads four hours earlier. Only the
+attempt moves; `call.createdAt` and `call.completedAt` keep their zone on every
+read. Four hours is not the caller's offset, which was UTC-5.
+
+It costs a caller because the attempt is where the start time lives, so two
+readers of one call get different answers depending on when they read, and the
+later one gets the form that is easier to misread: with no designator,
+ES2015-conformant engines parse `"2026-09-08T04:32:40"` as local time, so a
+JavaScript reader outside the server's zone shifts it again by their own offset.
 
 No mechanism is claimed, and one exception has no explanation: two connected calls
-captured on 5 September still read tz-aware today while five captured on
-7 September do not. `docs/what-the-re-read-found.md` carries the reproduction, the
-limits, and the two errors the tool's own first run made before this was written.
+captured on 5 September still read tz-aware three days later while five captured
+on 7 September do not. `docs/what-the-re-read-found.md` carries the reproduction,
+the limits, and the mistakes the tool's own first runs made before this was
+written.
 
 ## What this cannot see
 
