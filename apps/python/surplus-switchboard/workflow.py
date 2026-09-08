@@ -9,8 +9,9 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from calls import interpret,normalize_provider_result,provider_id,RESULT_FORMAT,strict_json,save_private_json,Ledger
-from optimizer import solve,validate,Invalid,integer
+from calls import (interpret,normalize_provider_result,provider_id,RESULT_FORMAT,strict_json,
+                   save_private_json,Ledger,context_test_mode,ROLE_PLAY_SCOPE)
+from optimizer import solve,validate,Invalid,integer,simulation_mode
 
 ROOT=Path(__file__).resolve().parent
 
@@ -19,9 +20,15 @@ def snapshot_hash(data:dict)->str:
 
 def reconcile(data:dict,partner_id:str,result:dict,offered:int,now:int,
               approval_sha:str,source_reference:str,*,confirmed_at:int,
-              evidence_approval_sha:str,acknowledge_review:bool,category=None)->dict:
+              evidence_approval_sha:str,acknowledge_review:bool,category=None,test_mode=False)->dict:
+    if type(test_mode) is not bool:raise Invalid('test_mode must be a boolean')
+    if simulation_mode(data)!=test_mode:
+        raise Invalid('Role-play allocation requires both test_mode=true evidence and simulation=true snapshot; no real capacity is established')
+    metadata=result.get('metadata',{}) if isinstance(result,dict) else {}
+    if isinstance(metadata,dict) and metadata.get('test_mode') is True and not test_mode:
+        raise Invalid('Role-play provider evidence cannot confirm real organization capacity')
     if approval_sha!=snapshot_hash(data):raise Invalid('Human approval is for a different planning snapshot')
-    expected=evidence_hash(result,partner_id,offered,confirmed_at,source_reference,category)
+    expected=evidence_hash(result,partner_id,offered,confirmed_at,source_reference,category,test_mode)
     if evidence_approval_sha!=expected or acknowledge_review is not True:
         raise Invalid('Exact evidence approval and explicit human verification are required')
     validate(data)
@@ -44,16 +51,30 @@ def reconcile(data:dict,partner_id:str,result:dict,offered:int,now:int,
             raise Invalid('Called category is not accepted in the approved snapshot')
         # A single-category inquiry must not silently enable unrelated food categories.
         partners[0]['accepts']=[category]
+    if test_mode:
+        provenance={'test_mode':True,'evidence_scope':ROLE_PLAY_SCOPE,'source_reference':source_reference,
+                    'real_organization_capacity_confirmed':False,'real_donation':False}
+        out['simulation_provenance']=copy.deepcopy(provenance)
+        partners[0]['capacity_scope']=ROLE_PLAY_SCOPE
+        partners[0]['confirmation_reference']='ROLE_PLAY:'+source_reference
     # Validate complete updated snapshot; do not persist partial/invalid updates.
     plan=solve(out)
-    return {'snapshot':out,'plan':plan,'approval':{'snapshot_sha':approval_sha,
+    output={'snapshot':out,'plan':plan,'approval':{'snapshot_sha':approval_sha,
             'evidence_sha':expected,'source_reference':source_reference,'confirmed_at':confirmed_at},
             'warning':'Proposal only. Human approval is an operator assertion, not independent verification.'}
+    if test_mode:
+        plan.update({'simulation':True,'evidence_scope':ROLE_PLAY_SCOPE,'real_donation':False})
+        output.update({'mode':'provider_role_play_simulation','provenance':provenance,
+                       'warning':'Fictional allocation demonstration only. The participant confirmed a role-play quantity, not real organization capacity. No real food or donation is involved.'})
+        output['approval']['test_mode']=True
+    return output
 
 
-def evidence_hash(result,partner_id,offered,confirmed_at,source_reference,category=None):
-    return snapshot_hash({'result':result,'partner_id':partner_id,'offered':offered,
-                          'confirmed_at':confirmed_at,'source_reference':source_reference,'category':category})
+def evidence_hash(result,partner_id,offered,confirmed_at,source_reference,category=None,test_mode=False):
+    evidence={'result':result,'partner_id':partner_id,'offered':offered,
+              'confirmed_at':confirmed_at,'source_reference':source_reference,'category':category}
+    if test_mode:evidence['test_mode']=True
+    return snapshot_hash(evidence)
 
 
 def review_result(data,envelope,confirmed_at,*,ledger,clock=time.time):
@@ -62,6 +83,7 @@ def review_result(data,envelope,confirmed_at,*,ledger,clock=time.time):
     """
     now=integer(int(clock()),'current_time',0,10**12)
     validate(data)
+    simulation=simulation_mode(data)
     if not isinstance(envelope,dict) or envelope.get('format')!=RESULT_FORMAT or envelope.get('source')!='call-e-rest-get':
         raise Invalid('Use a result envelope from calls.py read mode; raw fixtures cannot enter the live import path')
     ledger.verify_envelope(envelope)
@@ -71,6 +93,9 @@ def review_result(data,envelope,confirmed_at,*,ledger,clock=time.time):
         raise Invalid('Missing request approval reference')
     info=envelope.get('request')
     if not isinstance(info,dict):raise Invalid('Missing original request context')
+    test_mode=context_test_mode(info)
+    scope=ROLE_PLAY_SCOPE if test_mode else 'organization_capacity_inquiry'
+    if info.get('evidence_scope',scope)!=scope:raise Invalid('Conflicting request evidence scope')
     offered=integer(info.get('offered_portions'),'offered_portions',1,10000)
     requested=integer(info.get('requested_at'),'requested_at',0,10**12)
     fetched=integer(envelope.get('fetched_at'),'fetched_at',0,10**12)
@@ -85,12 +110,23 @@ def review_result(data,envelope,confirmed_at,*,ledger,clock=time.time):
     if info['category'] not in partners[0]['accepts']:raise Invalid('Called category is not accepted')
     result=normalize_provider_result(envelope.get('result'),cid)
     candidate=interpret(result,offered)
-    return {'mode':'private_review_no_allocation','candidate':candidate,'partner_id':info['partner_id'],
+    if test_mode:
+        candidate['evidence_scope']=ROLE_PLAY_SCOPE
+        if candidate['disposition']=='candidate_confirmation':
+            candidate['disposition']='candidate_role_play_confirmation'
+            candidate['fictional_capacity']=candidate.pop('capacity')
+        candidate['warning']='Role-play evidence only; does not establish real organization capacity.'
+    output={'mode':'private_role_play_review_no_allocation' if test_mode else 'private_review_no_allocation',
+            'candidate':candidate,'test_mode':test_mode,'evidence_scope':scope,
+            'simulation_snapshot':simulation,'partner_id':info['partner_id'],
             'batch_id':info['batch_id'],'category':info['category'],'offered':offered,
             'confirmed_at':confirmed_at,'planning_at':now,'provider_id':cid,
-            'input_sha':snapshot_hash(data),'evidence_sha':evidence_hash(result,info['partner_id'],offered,confirmed_at,cid,info['category']),
+            'input_sha':snapshot_hash(data),'evidence_sha':evidence_hash(result,info['partner_id'],offered,confirmed_at,cid,info['category'],test_mode),
             'review_sha':snapshot_hash({'snapshot':data,'envelope':envelope,'confirmed_at':confirmed_at}),
             'result':result,'required_review':'Verify recipient identity, actual affirmative capacity, exact quote and confirmation time in the provider dashboard. Then explicitly acknowledge. Only the called category will remain enabled.'}
+    if test_mode:
+        output['required_review']='Verify the consenting test participant, recorded AI role-play disclosure, exact fictional quantity and quote, and actual confirmation time in the provider evidence. Allocation requires a simulation=true fictional snapshot and exact human approval. No real organization capacity or donation may be claimed.'
+    return output
 
 
 def apply_review(data,envelope,confirmed_at,approved_review_sha,acknowledge_review,*,ledger,clock=time.time):
@@ -99,9 +135,13 @@ def apply_review(data,envelope,confirmed_at,approved_review_sha,acknowledge_revi
     if review['review_sha']!=approved_review_sha:raise Invalid('Approval does not match this exact evidence and snapshot review')
     output=reconcile(data,review['partner_id'],review['result'],review['offered'],now,
         review['input_sha'],review['provider_id'],confirmed_at=confirmed_at,
-        evidence_approval_sha=review['evidence_sha'],acknowledge_review=acknowledge_review,category=review['category'])
+        evidence_approval_sha=review['evidence_sha'],acknowledge_review=acknowledge_review,
+        category=review['category'],test_mode=review['test_mode'])
     output['approval'].update({'review_sha':approved_review_sha,'request_sha':envelope['request_sha'],
                                'fetched_at':envelope['fetched_at'],'planning_at':now})
+    if review['test_mode']:
+        output['provenance'].update({'source':envelope['source'],'request_sha':envelope['request_sha'],
+            'provider_id':envelope['provider_id'],'fetched_at':envelope['fetched_at']})
     return output
 
 def demo(approve_fixture:bool)->dict:

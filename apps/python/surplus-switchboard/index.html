@@ -113,8 +113,10 @@ function row(left,right){const e=element('div',undefined,'row');e.append(element
 function clearResult(){revision++;result=null;$('download').disabled=true;$('metrics').replaceChildren();$('detail').replaceChildren();$('visual').replaceChildren();$('raw').textContent='No result for the current inputs. Run the optimizer after correcting any errors.';}
 function render(r){result=r;$('download').disabled=false;$('metrics').replaceChildren();$('detail').replaceChildren();$('visual').replaceChildren();$('raw').textContent=JSON.stringify(r,null,2);
  if(KIND==='surplus'){
- metric('Proposed portions',String(r.portions));metric('Nearest-first baseline',String(r.nearest_first_baseline.portions));metric('Flow / cut check',r.max_flow_certificate.flow===r.max_flow_certificate.cut_capacity?'PASS':'FAIL');
- r.allocations.forEach(a=>row(a.batch+' → '+a.partner,a.portions+' portions'));
+ const simulated=r.simulation===true;
+ if(simulated)$('visual').append(element('div',r.evidence_scope==='fictional_role_play'?'Fictional role-play allocation. These quantities do not establish real organization capacity. No real food or donation is involved.':'Fictional allocation simulation. No real organization capacity or donation is established.','notice'));
+ metric(simulated?'Fictional portions':'Proposed portions',String(r.portions));metric(simulated?'Fictional nearest-first baseline':'Nearest-first baseline',String(r.nearest_first_baseline.portions));metric('Flow / cut check',r.max_flow_certificate.flow===r.max_flow_certificate.cut_capacity?'PASS':'FAIL');
+ r.allocations.forEach(a=>row(a.batch+' → '+a.partner,a.portions+(simulated?' fictional portions':' portions')));
  row('Secondary objective',r.portion_minutes+' portion-minutes');
  r.rejected_lanes.forEach(l=>row(l.batch+' → '+l.partner,l.reason));
  $('detail').append(element('p','This is an exact allocation for the stated model, not a van route. Capacity is shared across batches. Stale confirmations, expiry, incompatible categories and missing human clearance block lanes.','small'));

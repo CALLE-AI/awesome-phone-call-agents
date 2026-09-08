@@ -52,7 +52,7 @@ python calls.py --db calls.sqlite3 --read-request-sha <REQUEST_SHA> \
   --max-reads 6 --interval 5 --output provider-result.json
 ```
 
-Reads are bounded to 1–12 requests separated by 5–10 seconds; a read limit is not a call deadline or cancellation. Queued/in-progress null completion values remain pending. Completed, failed and canceled evidence is retained with its original retrieval time; failed/canceled outcomes stop polling and remain on hold. Unknown future statuses cannot confirm capacity.
+Reads are bounded to 1â€“12 requests separated by 5â€“10 seconds; a read limit is not a call deadline or cancellation. Queued/in-progress null completion values remain pending. Completed, failed and canceled evidence is retained with its original retrieval time; failed/canceled outcomes stop polling and remain on hold. Unknown future statuses cannot confirm capacity.
 
 ## Human review and planning
 
@@ -68,6 +68,14 @@ python workflow.py reconcile planning.json provider-result.json --db calls.sqlit
 ```
 
 The original call request, saved result, exact snapshot and actual confirmation time are bound to the review. Reconciliation checks current system time again, including after a review delay. A single-category inquiry only enables that category. Changed evidence, stale confirmations, unclear outcomes and multiple call attempts cannot silently authorize capacity. Unknown transcript speakers remain in the evidence but cannot supply the recipient's confirming quote. Extraction uses integer capacity with zero for unknown/refusal; local validation requires an affirmed positive quantity within the offered amount.
+
+## Recorded fictional role-play
+
+A consenting test participant can exercise the same create/read/review path with `test_mode: true` in a private context. The call identifies itself as AI, discloses recording/transcription and fictional quantities, checks continued willingness, and stops on refusal. A fictional allocation also requires `simulation: true` in its planning snapshot. The resulting review, plan, optimizer reruns, browser display and downloads retain fictional labels and source provenance; they cannot establish real organization capacity. Removing the simulation opt-in is rejected. [ROLE_PLAY_DEMO.md](ROLE_PLAY_DEMO.md) documents the exact procedure and approval boundaries.
+
+The request targets under60seconds and asks to finish by120seconds. These are advisory instructions: the inspected CALL-E contract has no automatic duration cap or hangup operation. Arrange an effective cutoff separately before a strictly time-limited call. No actual call is claimed by the local tests.
+
+132 Python3.12.14 tests and9 local browser checks pass. Tests include26role-play regressions,3added HTTP derivative checks, and500independently enumerated allocation cases across the existing suite. The [public verification](https://github.com/Bembaby/surplus-switchboard/tree/7ebee0274815e533f059520ece6cb775d62314d2/evidence/20260908_role_play_derivatives) uses fake providers and fictional quantities, not live-service evidence.
 
 ## Side effects, cancellation and boundaries
 

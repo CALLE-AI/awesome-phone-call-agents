@@ -75,6 +75,28 @@ let browser;
   assert.match(await page.locator('#status').getAttribute('class'),/error/);
   receipt.checks.push('Network failure leaves no stale result');
   await page.unroute('**/solve');
+
+  const roleplay=structuredClone(sample);roleplay.simulation=true;
+  roleplay.simulation_provenance={test_mode:true,evidence_scope:'fictional_role_play',source_reference:'fictional-browser-fixture',real_donation:false,real_organization_capacity_confirmed:false};
+  roleplay.partners[0].capacity_scope='fictional_role_play';
+  await input.fill(JSON.stringify(roleplay,null,2));await run.click();await complete();
+  assert.match(await page.locator('#visual').innerText(),/Fictional role-play allocation/);
+  assert.match(await page.locator('#visual').innerText(),/No real food or donation/);
+  assert.match(await page.locator('#metrics').innerText(),/Fictional portions/);
+  assert.match(await page.locator('#detail').innerText(),/fictional portions/);
+  const roleplayDownload=page.waitForEvent('download');await download.click();
+  await (await roleplayDownload).saveAs(path.join(output,'browser_role_play_result.json'));
+  const roleplayResult=JSON.parse(fs.readFileSync(path.join(output,'browser_role_play_result.json'),'utf8'));
+  assert.equal(roleplayResult.simulation,true);assert.equal(roleplayResult.evidence_scope,'fictional_role_play');
+  assert.equal(roleplayResult.real_donation,false);assert.deepEqual(roleplayResult.simulation_provenance,roleplay.simulation_provenance);
+  await page.screenshot({path:path.join(output,'browser_role_play.png'),fullPage:true});
+  receipt.checks.push('Role-play input retains visible fictional labels and provenance in actual JSON download');
+
+  delete roleplay.simulation;
+  await input.fill(JSON.stringify(roleplay));await run.click();await complete();await cleared();
+  assert.match(await page.locator('#status').innerText(),/cannot be relabeled/);
+  assert.equal(await page.locator('#visual').innerText(),'');
+  receipt.checks.push('Removing simulation opt-in rejects role-play recomputation and clears its old output');
   assert.deepEqual(receipt.page_errors,[]);receipt.passed=true;
  }catch(error){receipt.passed=false;receipt.error=String(error);process.exitCode=1;}
  finally{

@@ -21,6 +21,13 @@ SCHEMA={'type':'object','additionalProperties':False,
 
 RESULT_FORMAT='surplus-switchboard-call-e-result-v1'
 TERMINAL_STATUSES=frozenset(('completed','failed','canceled'))
+ROLE_PLAY_SCOPE='fictional_role_play'
+
+
+def context_test_mode(context):
+    value=context.get('test_mode',False)
+    if type(value) is not bool: raise Invalid('test_mode must be a boolean')
+    return value
 
 
 def monitoring_state(status):
@@ -51,6 +58,7 @@ def save_private_json(path,value):
 
 def build_request(context: dict, now: int) -> tuple[dict,str]:
     if not isinstance(context,dict): raise Invalid('Context must be an object')
+    test_mode=context_test_mode(context)
     integer(now,'now',0,10**12)
     if context.get('consented') is not True:
         raise Invalid('Explicit recipient permission is required')
@@ -72,11 +80,25 @@ def build_request(context: dict, now: int) -> tuple[dict,str]:
         if not isinstance(context.get(key),str) or not 1 <= len(context[key]) <= 100 or any(ord(c)<32 for c in context[key]):
             raise Invalid(f'Invalid {key}')
     quantity=integer(context.get('offered_portions'),'offered_portions',1,10000)
-    task=(f'You are an AI assistant calling with prior permission on behalf of {context["operator_name"]}. '
+    if test_mode:
+        introduction=(
+          f'You are an AI assistant calling a consenting test participant on behalf of {context["operator_name"]}. '
+          'At the beginning say clearly: "I am an AI assistant. This is a recorded and transcribed '
+          'role-play test using fictional quantities, not a real food or donation request." '
+          'Ask whether the participant is still willing to take part before asking the role-play question. '
+          f'If they agree, ask them to imagine accepting up to {quantity} fictional portions in category '
+          f'{context["category"]}, and state the fictional maximum they would accept in this scenario. '
+          'Do not assume they represent an organization or have any real receiving capacity. '
+          'Explain that no real food, donation, pickup, delivery, purchase or reservation is involved. '
+          'Keep the conversation brief, target under 60 seconds, and end the call by 120 seconds. '
+          'These are requested conversational timing instructions, not a provider-enforced duration limit. ')
+    else:
+        introduction=(f'You are an AI assistant calling with prior permission on behalf of {context["operator_name"]}. '
           f'At the beginning disclose that you are an AI assistant. Ask whether this organization is '
           f'willing and able to receive up to {quantity} portions in category {context["category"]}. '
           'Ask for the exact maximum number they can accept. Explain that this is a capacity inquiry '
-          'only: no donation, pickup, delivery, purchase, safety certification or reservation is being made. '
+          'only: no donation, pickup, delivery, purchase, safety certification or reservation is being made. ')
+    task=(introduction+
           'Do not make claims about ingredients, allergens, temperature, quality or suitability. '
           'Any food-safety, timing or logistical question goes to the human operator. '
           'Read back the number and request confirmation. If the person declines, asks you to stop, '
@@ -91,6 +113,9 @@ def build_request(context: dict, now: int) -> tuple[dict,str]:
              'result_schema':SCHEMA,'recipient_result_schema':SCHEMA,
              'metadata':{'workflow':'surplus-switchboard','partner_id':context['partner_id'],
                          'batch_id':context['batch_id']}}
+    if test_mode:
+        payload['metadata'].update({'test_mode':True,'evidence_scope':ROLE_PLAY_SCOPE,
+            'target_under_seconds':60,'requested_end_by_seconds':120,'duration_limit_enforced':False})
     # Consent and exact calling window are included in approval binding, but not sent to provider.
     digest=hashlib.sha256(json.dumps({'payload':payload,'consent':context['consent_reference'],
                          'window':[begin,end]},sort_keys=True).encode()).hexdigest()
@@ -159,6 +184,11 @@ class Ledger:
             db.execute('INSERT INTO calls VALUES (?, ?, NULL)',(digest,'submitting'))
             details={key:context[key] for key in ('partner_id','batch_id','category','offered_portions')}
             details['requested_at']=now
+            details['test_mode']=context_test_mode(context)
+            details['evidence_scope']=ROLE_PLAY_SCOPE if details['test_mode'] else 'organization_capacity_inquiry'
+            if details['test_mode']:
+                details.update({'target_under_seconds':60,'requested_end_by_seconds':120,
+                                'duration_limit_enforced':False})
             db.execute('INSERT INTO requests VALUES (?,?)',(digest,json.dumps(details,sort_keys=True)))
         # Durable state exists before side effects. A crash stays submitting and blocks replay.
         try:

@@ -3,12 +3,35 @@ No food-safety assessment, route optimization, transport or donation is performe
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import copy
 import hashlib
 import json
 from typing import Any
 
 class Invalid(ValueError):
     pass
+
+ROLE_PLAY_SCOPE='fictional_role_play'
+
+
+def simulation_mode(data):
+    if not isinstance(data,dict):raise Invalid('Input must be an object')
+    simulation=data.get('simulation',False)
+    if type(simulation) is not bool:raise Invalid('simulation must be a boolean')
+    partners=data.get('partners',[])
+    role_play=bool(data.get('simulation_provenance')) or (isinstance(partners,list) and any(
+        isinstance(p,dict) and p.get('capacity_scope')==ROLE_PLAY_SCOPE for p in partners))
+    if role_play and not simulation:
+        raise Invalid('Role-play provenance cannot be relabeled as a real planning snapshot')
+    if 'simulation_provenance' in data:
+        provenance=data['simulation_provenance']
+        if (not isinstance(provenance,dict) or provenance.get('test_mode') is not True
+            or provenance.get('evidence_scope')!=ROLE_PLAY_SCOPE
+            or provenance.get('real_organization_capacity_confirmed') is not False
+            or provenance.get('real_donation') is not False):
+            raise Invalid('Invalid or conflicting fictional role-play provenance')
+    return simulation
+
 
 def integer(x: Any, name: str, lo: int = 0, hi: int = 1_000_000) -> int:
     if type(x) is not int or not lo <= x <= hi:
@@ -18,6 +41,7 @@ def integer(x: Any, name: str, lo: int = 0, hi: int = 1_000_000) -> int:
 def validate(data: dict) -> tuple[list, list, list, list]:
     if not isinstance(data, dict):
         raise Invalid('Input must be an object')
+    simulation_mode(data)
     now = integer(data.get('now'), 'now', 0, 10**12)
     ttl = integer(data.get('confirmation_ttl', 3600), 'confirmation_ttl', 1, 86400)
     batches, partners, lanes = data.get('batches'), data.get('partners'), data.get('lanes')
@@ -143,7 +167,7 @@ def solve(data: dict) -> dict:
     cut = sum(e.original for u in reach for e in graph[u] if e.to not in reach)
     allocations = [{**lane,'portions':e.original-e.cap} for lane,e in refs if e.original>e.cap]
     canonical=json.dumps(data,sort_keys=True,separators=(',',':')).encode()
-    return {'status':'proposal_requires_human_approval','portions':total,
+    output={'status':'proposal_requires_human_approval','portions':total,
             'portion_minutes':cost,'allocations':allocations,'rejected_lanes':rejected,
             'input_sha256':hashlib.sha256(canonical).hexdigest(),
             'max_flow_certificate':{'flow':total,'cut_capacity':cut,'sink_reachable':sink in reach},
@@ -151,6 +175,14 @@ def solve(data: dict) -> dict:
                            'Portions are homogeneous integer units within each batch.',
                            'Capacity freshness and safety clearance are supplied by people.',
                            'No actual food, transport, cost, or environmental savings measured.']}
+    if data.get('simulation') is True:
+        role_play=bool(data.get('simulation_provenance')) or any(p.get('capacity_scope')==ROLE_PLAY_SCOPE for p in partners)
+        output.update({'simulation':True,'evidence_scope':ROLE_PLAY_SCOPE if role_play else 'fictional_simulation',
+            'real_donation':False,'real_organization_capacity_confirmed':False,
+            'warning':'Fictional allocation demonstration only. No real organization capacity or donation is established.'})
+        if 'simulation_provenance' in data:
+            output['simulation_provenance']=copy.deepcopy(data['simulation_provenance'])
+    return output
 
 def greedy(data: dict) -> tuple[int,int]:
     """Transparent nearest-lane baseline; may consume flexible capacity too early."""

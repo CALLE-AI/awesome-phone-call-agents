@@ -41,6 +41,25 @@ class HttpTests(unittest.TestCase):
     def test_interface_explicitly_labels_simulation(self):
         status,headers,body=self.request('/')
         self.assertEqual(status,200);self.assertIn(b'Simulation, not a live service.',body)
+    def test_optimizer_http_keeps_fictional_role_play_provenance(self):
+        data=case();data['simulation']=True
+        provenance={'test_mode':True,'evidence_scope':'fictional_role_play','source_reference':'fictional-call-test',
+                    'real_donation':False,'real_organization_capacity_confirmed':False}
+        data['simulation_provenance']=provenance
+        data['partners'][0]['capacity_scope']='fictional_role_play'
+        status,_,body=self.request('/solve',json.dumps(data),{'Content-Type':'application/json','X-Local-Demo':'1'})
+        self.assertEqual(status,200);result=json.loads(body)
+        self.assertEqual(result['portions'],12);self.assertTrue(result['simulation'])
+        self.assertEqual(result['evidence_scope'],'fictional_role_play');self.assertFalse(result['real_donation'])
+        self.assertEqual(result['simulation_provenance'],provenance)
+    def test_optimizer_http_rejects_role_play_with_simulation_disabled(self):
+        data=case();data['simulation']=False;data['partners'][0]['capacity_scope']='fictional_role_play'
+        status,_,body=self.request('/solve',json.dumps(data),{'Content-Type':'application/json','X-Local-Demo':'1'})
+        self.assertEqual(status,400);self.assertIn('cannot be relabeled',json.loads(body)['error'])
+    def test_optimizer_http_rejects_nonboolean_simulation(self):
+        data=case();data['simulation']='true'
+        status,_,body=self.request('/solve',json.dumps(data),{'Content-Type':'application/json','X-Local-Demo':'1'})
+        self.assertEqual(status,400);self.assertIn('simulation must be a boolean',json.loads(body)['error'])
 
 
 if __name__=='__main__':unittest.main()
