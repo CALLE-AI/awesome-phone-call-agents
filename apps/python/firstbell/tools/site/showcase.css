@@ -65,6 +65,18 @@
   padding: clamp(0.75rem, 2vw, 1.5rem);
   background: var(--cs-ground);
   color: var(--cs-ink);
+  /* A scroll container at every width, not only where it scrolls.
+   *
+   * Under 34rem the figure stops shrinking and this box pans instead, which needs to be
+   * reachable by Tab as well as by a thumb. `tabindex=0` is on the element, and the
+   * no-script gate exempts a focusable element only when its computed overflow says it is
+   * genuinely a scroll box, reading the property rather than a class name. Declaring the
+   * overflow at one width and the tabindex at all of them is how that exemption would be
+   * claimed and not earned. So the box is what it says it is everywhere, and above 34rem
+   * the figure fits and nothing moves. */
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Reserve the box before a byte of the figure is painted. The width and height
@@ -378,6 +390,26 @@
   .calle-showcase .cs-lane-label,
   .calle-showcase .cs-row-label { font-size: 24px; }
   .calle-showcase .cs-note { display: none; }
+}
+
+/* Under about 34rem the type stops being the problem and the scale is.
+ *
+ * The figure is 1,200 user units wide and renders at whatever the column gives it. On a
+ * 390px phone that column is about 330px, so the scale is 0.275 and a 24 unit label paints
+ * at under seven pixels. Growing the type further is not available: four labelled columns
+ * inside 1,200 units collide somewhere above 34 units, and a diagram whose labels overlap
+ * is worse than one a reader has to pan.
+ *
+ * So the figure stops shrinking and the box scrolls. 30rem of SVG at 30 unit type is about
+ * eleven pixels, which is small and is legible, and a reader who does not pan still has the
+ * caption underneath saying the same four things in words. */
+@media (max-width: 34rem) {
+  .calle-showcase { -webkit-overflow-scrolling: touch; }
+  .calle-showcase__svg { min-width: 30rem; }
+  .calle-showcase .cs-caption { font-size: 34px; }
+  .calle-showcase .cs-axis-label { font-size: 30px; }
+  .calle-showcase .cs-lane-label,
+  .calle-showcase .cs-row-label { font-size: 28px; }
 }
 
 /* ---- Forced colours ------------------------------------------------------ */

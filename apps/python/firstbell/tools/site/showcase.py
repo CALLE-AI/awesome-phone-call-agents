@@ -260,7 +260,14 @@ def showcase_markup() -> str:
     px, py, pw, ph = PANEL
 
     return (
-        '<figure class="calle-showcase">'
+        # Focusable and named, because under 34rem this box scrolls sideways rather than
+        # shrinking the figure to the point where a label paints at seven pixels. A region
+        # a pointer can pan and a keyboard cannot is a region half the readers cannot use,
+        # and one with no name is one a screen reader announces as nothing.
+        '<figure class="calle-showcase" tabindex="0" role="group" '
+        'aria-label="How one morning’s absence follow-up runs, in four stages. '
+        'Scrolls sideways on a narrow screen; the caption underneath says the same in '
+        'words.">'
         f'<svg class="calle-showcase__svg" viewBox="0 0 {VIEW_W} {VIEW_H}" '
         f'width="{VIEW_W}" height="{VIEW_H}" role="img" '
         'aria-labelledby="calle-showcase-title" '

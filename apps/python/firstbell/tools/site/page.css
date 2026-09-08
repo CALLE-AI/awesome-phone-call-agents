@@ -448,6 +448,21 @@ code { font-size: 0.88em; }
 }
 @media (min-width: 60rem) { .split { grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); } }
 
+/* On one column, the money goes above the artifact rather than under it.
+ *
+ * Act 04's artifact is twelve calls in a table, and in a container this narrow that table
+ * is twelve stacked blocks of six rows each. Somebody reading the page on a phone reported
+ * the money cards at roughly y 3,700, behind all of it, which means the act a buyer opens
+ * the page for is the part they never reach. Source order is claim, artifact, money,
+ * because that is the order the two-column layout wants; here the money is pulled up
+ * between them. Nothing moves at 60rem and above, where the artifact sits in its own
+ * column and the money spans underneath. */
+@media (max-width: 59.99rem) {
+  .split > .claim { order: 0; }
+  .split > .money { order: 1; }
+  .split > .artifact { order: 2; }
+}
+
 .act-2 { background: var(--paper-2); }
 .act-3 { background: var(--paper-3); }
 .act-deep { background: var(--paper-deep); }
