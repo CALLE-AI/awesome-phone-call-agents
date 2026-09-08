@@ -947,15 +947,20 @@ python -m pytest tests/ -q          # 605 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**600 is the number collected, not the number that will pass on your machine.** Some of
-these gates need something this repository cannot ship: the twelve call recordings, which
-are held outside the tree because the maintainer of this list requires that, a built copy
-of the page under `out/`, or a gate report from `node tools/gates/run.mjs`. Those skip with
-a reason that names what is missing. A checkout of this commit into an empty directory
-reported `581 passed, 17 skipped`, measured rather than estimated, and the two add up to
-the number above. A skip here is a
-could-not-measure rather than a pass, which is the distinction the rest of this entry is
-about, and `-rs` prints each one so nothing hides behind a dot.
+**605 is the number collected, and two different pairs add up to it.** Some of these gates
+need something this repository cannot ship: the twelve call recordings, which are held
+outside the tree because the maintainer of this list requires that, a built copy of the
+page under `out/`, or a gate report from `node tools/gates/run.mjs`.
+
+A clean checkout of this commit into an empty directory reports **587 passed, 18 skipped**.
+The eighteen name what is missing rather than passing quietly: seven want a built page,
+seven want a page and its policy, two want a gate report, one wants the gate screenshots,
+and one is a fixture that cannot exercise the branch it is written for. Build the page and
+run the gates and the same suite reports **603 passed, 2 skipped**. Both pairs are measured,
+both add up to 605, and the difference between them is what a reader has on their disk.
+
+A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
+this entry is about, and `-rs` prints each one so nothing hides behind a dot.
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
 classification and cancellation, consent, masking, and the live branch end to end against
