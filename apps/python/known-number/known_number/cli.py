@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--approver", help="name of the human approving this live call")
     p.add_argument("--timeout-seconds", type=float, default=900.0)
     p.add_argument("--poll-seconds", type=float, default=5.0)
+    p.add_argument("--attempt", type=int, default=1, help="bump to place a fresh call for the same ticket after a failed attempt")
 
     p = sub.add_parser("status", help="re-read a live ticket and reconcile if terminal")
     add_common(p)
@@ -144,7 +145,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         )
         return 0
 
-    if existing and existing.get("call_id"):
+    if existing and existing.get("call_id") and existing.get("status") not in {"failed", "canceled"}:
         print(json.dumps({"ok": True, "note": "ticket already has a call; resuming with status", "call_id": existing["call_id"]}, indent=2))
         return cmd_status(args)
 
@@ -155,7 +156,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         "recipient": {"phone": vendor.known_phone, "region": vendor.region, "locale": vendor.locale},
         "result_schema": RESULT_SCHEMA,
         "metadata": build_metadata(request, vendor),
-        "idempotency_key": idempotency_key(request, task),
+        "idempotency_key": idempotency_key(request, f"{task}|attempt={args.attempt}"),
     }
     created = client.calls.create(**payload)
     call_id = str(created["id"])
