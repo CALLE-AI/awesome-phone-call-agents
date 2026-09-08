@@ -1,22 +1,19 @@
 """Build the CALL-E task text and result schema for one callback.
 
-Design rule: the call carries no payment information. Not the new bank, not
-the old bank, not a single account digit. What the call verifies is that the
-person reachable on the number already on file (a) acknowledges that their
-organisation asked for a change, (b) can read back a one-time verification
-code that was delivered to the vendor's address already on file, and (c)
-confirms that the written change notice carrying that code describes what
-they asked for.
+Design rule: the call collects nothing sensitive. Not a bank name, not an
+account digit, not a code. It asks three yes/no questions of the person who
+answers the number already on file, and it *hands over* a callback reference
+that the vendor must quote back in writing through the address already on
+file. Two independent channels the vendor had before the request arrived
+must both close before anything changes.
 
-Reading the code proves control of two independent channels the vendor had
-before the request arrived. Confirming the notice catches a request that was
-tampered with in transit, because the notice restates the change in writing
-and the contact is the one who compares it, not the caller.
-
-This shape was forced by a real constraint: CALL-E's task planner refuses any
-call that asks a recipient to provide or confirm bank or payment details,
-even partially. That refusal is the right default for a phone platform, and
-it turns out a stronger protocol needs none of those details anyway.
+This shape was forced by real constraints met while building: CALL-E's task
+planner refuses any call that asks a recipient to provide or confirm bank or
+payment details, and it also refuses any call that asks a recipient to read
+out a verification code or OTP. Both refusals are the right default for a
+phone platform (those are the two classic scam scripts), and the protocol is
+stronger for obeying them: the phone leg can no longer leak or collect
+anything, and proof of channel control moves to the written leg.
 """
 
 from __future__ import annotations
@@ -31,8 +28,8 @@ RESULT_SCHEMA: dict[str, Any] = {
         "reached_authorized_contact",
         "contact_name_given",
         "requested_change",
-        "stated_verification_code",
         "notice_matches_request",
+        "reference_delivered",
         "request_channel_confirmed",
         "alternate_details_offered",
         "call_disposition",
@@ -51,14 +48,14 @@ RESULT_SCHEMA: dict[str, Any] = {
             "enum": ["yes", "no", "unknown"],
             "description": "Whether the contact confirms their organization recently asked to change its supplier profile.",
         },
-        "stated_verification_code": {
-            "type": "string",
-            "description": "The verification code the contact read out from the written change notice, letters and digits only, or an empty string if not stated.",
-        },
         "notice_matches_request": {
             "type": "string",
             "enum": ["yes", "no", "unknown"],
             "description": "Whether the contact confirms the written change notice describes the change their organization actually requested.",
+        },
+        "reference_delivered": {
+            "type": "boolean",
+            "description": "True if the callback reference was spoken to the authorized contact and they acknowledged it.",
         },
         "request_channel_confirmed": {
             "type": "string",
@@ -85,8 +82,9 @@ RESULT_SCHEMA: dict[str, Any] = {
 }
 
 
-def build_task(request: ChangeRequest, vendor: VendorRecord, *, company_name: str) -> str:
+def build_task(request: ChangeRequest, vendor: VendorRecord, *, company_name: str, reference: str) -> str:
     contacts = " or ".join(vendor.authorized_contacts)
+    spoken_ref = " ".join(reference)
     return (
         f"You are an automated assistant calling on behalf of the supplier administration team at {company_name}. "
         "Say that in your first sentence, say that you are not a person, and say that the call is being recorded "
@@ -97,15 +95,16 @@ def build_task(request: ChangeRequest, vendor: VendorRecord, *, company_name: st
         f"{request.received_on.strftime('%d %B %Y')} to change the supplier profile that {company_name} holds for "
         f"{vendor.legal_name}, that the request named {request.requested_by_name} as the sender, and that company policy "
         "requires a callback to the phone number already on file before any profile change is applied. Also mention that a "
-        "written change notice with a verification code was sent to the contact address already on file. Then ask, in order:\n"
+        "written change notice describing the request was sent to the contact address already on file. Then ask, in order:\n"
         "1. Did your organization ask us to change its supplier profile recently? (yes / no)\n"
-        "2. If yes: please read out the verification code printed on the written change notice. Do not say the code "
-        "yourself and do not confirm or deny whether what they read matches.\n"
-        "3. Does that written notice describe the change your organization actually requested? (yes / no)\n"
-        "4. Was the request sent by the person named above, through your normal channel? (yes / no)\n\n"
+        "2. Does the written change notice we sent describe the change your organization actually requested? (yes / no)\n"
+        "3. Was the request sent by the person named above, through your normal channel? (yes / no)\n\n"
+        f"Then give them the callback reference, spoken letter by letter: {spoken_ref}. Ask them to reply to the written "
+        "change notice from their usual address quoting that reference, and explain that the change is applied only once "
+        "that written reply arrives. Do not ask them to repeat the reference back and do not ask them to read anything out.\n\n"
         "Rules you must follow:\n"
-        "- Do not ask for, accept, repeat, or discuss any banking, account, or payment information of any kind. "
-        "You do not have any and you must not collect any. If the contact starts to give any such details, interrupt "
+        "- Do not ask for, accept, repeat, or discuss any banking, account, payment, password, or code information of any "
+        "kind. You do not have any and you must not collect any. If the contact starts to give any such details, interrupt "
         "politely, say that profile changes can only be made through the written process, note that details were "
         "offered, and move on.\n"
         "- If the contact says no change was requested, thank them, tell them the request will be treated as suspicious "

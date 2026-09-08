@@ -13,11 +13,11 @@
   "reached_authorized_contact": false,
   "contact_name_given": "",
   "requested_change": "unknown",
-  "stated_verification_code": "",
   "notice_matches_request": "unknown",
   "request_channel_confirmed": "unknown",
   "alternate_details_offered": false,
-  "call_disposition": "voicemail"
+  "call_disposition": "voicemail",
+  "reference_delivered": false
  },
  "recipients": [
   {

@@ -9,17 +9,17 @@
  },
  "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
  "evidence": [
-  "Contact said: \"The code is right, but I never sent that email; our portal was down that week.\""
+  "Contact said: \"The notice is right, but I never sent that email; our portal was down that week.\""
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_verification_code": "HE4NF5",
   "notice_matches_request": "yes",
   "request_channel_confirmed": "no",
   "alternate_details_offered": false,
-  "call_disposition": "spoke_with_contact"
+  "call_disposition": "spoke_with_contact",
+  "reference_delivered": true
  },
  "recipients": [
   {

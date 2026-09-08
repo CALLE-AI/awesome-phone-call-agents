@@ -12,12 +12,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import ChangeRequest, Reconciliation, VendorRecord, Verdict, normalize_code, verification_code
+from .models import ChangeRequest, Reconciliation, VendorRecord, Verdict, callback_reference, normalize_reference
 
 LOW_CONFIDENCE_LABELS = {"low", "very_low", "none"}
 
 
-def reconcile(request: ChangeRequest, vendor: VendorRecord, call: dict[str, Any], *, code_secret: str = "") -> Reconciliation:
+def reconcile(
+    request: ChangeRequest,
+    vendor: VendorRecord,
+    call: dict[str, Any],
+    *,
+    code_secret: str = "",
+    written_reply: str | None = None,
+) -> Reconciliation:
     reasons: list[str] = []
     evidence = _evidence(call)
 
@@ -73,23 +80,6 @@ def reconcile(request: ChangeRequest, vendor: VendorRecord, call: dict[str, Any]
             "Do not apply the change. Ask the vendor to confirm in writing through a second known channel.",
         )
 
-    expected_code = verification_code(request, code_secret)
-    stated_code = normalize_code(str(result.get("stated_verification_code", "")))
-    if not stated_code:
-        return Reconciliation(
-            Verdict.INCONCLUSIVE,
-            ["the contact confirmed a request but did not read back the verification code"],
-            evidence,
-            "Do not apply the change. Confirm the written notice reached the address on file, then repeat the callback.",
-        )
-    if stated_code != expected_code:
-        return Reconciliation(
-            Verdict.MISMATCH,
-            [f"verification code read back ({stated_code}) does not match the code issued for this ticket"],
-            evidence,
-            "Hold the change. Either the contact is reading a notice for a different request, or the notice never reached the address on file and somebody else supplied a code. A human must look before any payment moves.",
-        )
-
     notice = str(result.get("notice_matches_request", "unknown"))
     if notice == "no":
         return Reconciliation(
@@ -101,7 +91,7 @@ def reconcile(request: ChangeRequest, vendor: VendorRecord, call: dict[str, Any]
     if notice != "yes":
         return Reconciliation(
             Verdict.INCONCLUSIVE,
-            ["the contact read the correct code but did not confirm that the notice describes their request"],
+            ["the contact confirmed a request but did not confirm that the written notice describes it"],
             evidence,
             "Do not apply the change. Ask the contact to review the notice and confirm in writing.",
         )
@@ -110,9 +100,17 @@ def reconcile(request: ChangeRequest, vendor: VendorRecord, call: dict[str, Any]
     if channel == "no":
         return Reconciliation(
             Verdict.ESCALATE,
-            ["code and notice match, but the contact says the request did not come from the named sender through the normal channel"],
+            ["the notice is confirmed, but the contact says the request did not come from the named sender through the normal channel"],
             evidence,
             "Hold the change and ask the vendor to resubmit through its normal channel; the original request may have come from the vendor's own compromised mailbox.",
+        )
+
+    if not bool(result.get("reference_delivered")):
+        return Reconciliation(
+            Verdict.INCONCLUSIVE,
+            ["the callback reference was not delivered to the contact, so the written leg cannot close"],
+            evidence,
+            "Repeat the callback so the reference is delivered, or send it in a second written notice.",
         )
 
     completed = bool(call.get("task_completed", True))
@@ -132,15 +130,35 @@ def reconcile(request: ChangeRequest, vendor: VendorRecord, call: dict[str, Any]
             "Read the transcript before confirming; a verdict without quotable evidence is not audit-ready.",
         )
 
+    expected = callback_reference(request, code_secret)
+    if written_reply is None:
+        return Reconciliation(
+            Verdict.PENDING_WRITTEN_REPLY,
+            [
+                "phone leg complete: authorized contact reached on the number on file, change acknowledged, written notice confirmed, "
+                f"normal channel confirmed, callback reference {expected} delivered",
+                "written leg open: no reply quoting the reference has been recorded yet",
+            ],
+            evidence,
+            "Wait for the vendor's reply from the address on file quoting the reference, then run `close --written-reply <file>`. Do not apply the change before that.",
+        )
+    if expected not in normalize_reference(written_reply):
+        return Reconciliation(
+            Verdict.MISMATCH,
+            [f"the written reply does not quote callback reference {expected}"],
+            evidence,
+            "Hold the change. A reply that does not carry the reference did not come from the person who took the call, or the reply was altered. A human must look.",
+        )
+
     reasons.append(
-        "authorized contact reached on the number on file, change acknowledged, verification code from the address on file read back correctly, "
-        "written notice confirmed, normal channel confirmed"
+        "phone leg: authorized contact reached on the number on file, change acknowledged, written notice confirmed, normal channel confirmed; "
+        f"written leg: reply from the address on file quotes callback reference {expected}"
     )
     return Reconciliation(
         Verdict.CONFIRMED,
         reasons,
         evidence,
-        "Apply the change in the vendor master with this record attached. Keep the original request, the notice, and this audit record together.",
+        "Apply the change in the vendor master with this record attached. Keep the original request, the notice, the reply, and this audit record together.",
     )
 
 

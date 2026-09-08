@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .models import ChangeRequest, VendorRecord, load_request, load_vendors, mask_phone, verification_code
+from .models import ChangeRequest, VendorRecord, load_request, load_vendors, mask_phone, callback_reference
 from .policy import DEFAULT_MIN_KNOWN_PHONE_AGE_DAYS, evaluate
 from .reconcile import reconcile
 from .render import audit_record, memo
@@ -58,6 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     add_common(p)
     p.add_argument("--call-json", required=True, type=Path)
 
+    p = sub.add_parser("close", help="record the vendor's written reply and finish the ticket; no network")
+    add_common(p)
+    p.add_argument("--written-reply", required=True, type=Path, help="text file with the vendor's written reply")
+
     p = sub.add_parser("demo", help="run all fixtures; no network")
     p.add_argument("--fixtures", type=Path, default=Path(__file__).resolve().parent.parent / "fixtures")
     p.add_argument("--examples", type=Path, default=Path(__file__).resolve().parent.parent / "examples")
@@ -69,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             "verify": cmd_verify,
             "status": cmd_status,
             "reconcile": cmd_reconcile,
+            "close": cmd_close,
             "demo": cmd_demo,
         }[args.command](args)
     except KnownNumberError as exc:
@@ -96,18 +101,19 @@ def cmd_preview(args: argparse.Namespace) -> int:
     request, vendor, decision = _gate(args, live=False, approver=None)
     out: dict[str, Any] = {"ok": decision.allowed, "ticket_id": request.ticket_id, "policy": decision.to_dict()}
     if vendor is not None:
-        out["task"] = build_task(request, vendor, company_name=args.company)
+        reference = callback_reference(request, _code_secret())
+        out["task"] = build_task(request, vendor, company_name=args.company, reference=reference)
         out["result_schema"] = RESULT_SCHEMA
         out["recipient"] = {"phones": [mask_phone(vendor.known_phone)], "region": vendor.region, "locale": vendor.locale}
         out["metadata"] = build_metadata(request, vendor)
         out["idempotency_key"] = idempotency_key(request, out["task"])
-        out["verification_code_for_written_notice"] = verification_code(request, _code_secret())
+        out["callback_reference"] = reference
         task_l = out["task"].lower()
         out["payment_free_task"] = (
             request.new_account_last4 not in out["task"]
             and request.new_bank_name.lower() not in task_l
             and vendor.current_bank_name.lower() not in task_l
-            and "bank" not in task_l.replace("banking, account, or payment information", "")
+            and "bank" not in task_l.replace("banking, account, payment, password, or code information", "")
         )
     print(json.dumps(out, indent=2))
     return 0 if decision.allowed else 1
@@ -143,7 +149,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return cmd_status(args)
 
     client = _client()
-    task = build_task(request, vendor, company_name=args.company)
+    task = build_task(request, vendor, company_name=args.company, reference=callback_reference(request, _code_secret()))
     payload = {
         "task": task,
         "recipient": {"phone": vendor.known_phone, "region": vendor.region, "locale": vendor.locale},
@@ -186,13 +192,25 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     return _finish(args, request, vendor, call, store, approver=None, mode="offline")
 
 
+def cmd_close(args: argparse.Namespace) -> int:
+    request, vendor, _ = _gate(args, live=False, approver=None)
+    if vendor is None:
+        raise KnownNumberError("vendor not in master")
+    store = TicketStore(args.state_dir)
+    existing = store.load(request.ticket_id)
+    if not existing or not existing.get("call"):
+        raise KnownNumberError(f"no completed call recorded for ticket {request.ticket_id}; run verify or reconcile first")
+    reply = args.written_reply.read_text(encoding="utf-8")
+    return _finish(args, request, vendor, existing["call"], store, approver=existing.get("approver"), mode=existing.get("mode", "live"), written_reply=reply)
+
+
 def cmd_demo(args: argparse.Namespace) -> int:
     request = load_request(args.examples / "change_request.json")
     vendor = load_vendors(args.examples / "vendors.json")[request.vendor_id]
     rows = []
     for fixture in sorted(args.fixtures.glob("*.json")):
         call = json.loads(fixture.read_text(encoding="utf-8"))
-        rec = reconcile(request, vendor, call)
+        rec = reconcile(request, vendor, call, written_reply=("Ref HE4NF5 confirmed, thanks" if fixture.stem == "confirmed" else None))
         rows.append((fixture.stem, rec.verdict.value, rec.reasons[0] if rec.reasons else ""))
     width = max(len(r[0]) for r in rows)
     print(f"{'fixture'.ljust(width)}  {'verdict'.ljust(17)}  first reason")
@@ -201,10 +219,13 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return 0
 
 
-def _finish(args, request, vendor, call, store: TicketStore, *, approver, mode) -> int:
-    rec = reconcile(request, vendor, call, code_secret=_code_secret())
+def _finish(args, request, vendor, call, store: TicketStore, *, approver, mode, written_reply: str | None = None) -> int:
+    rec = reconcile(request, vendor, call, code_secret=_code_secret(), written_reply=written_reply)
     record = audit_record(request, vendor, rec, call=call, approver=approver, mode=mode, code_secret=_code_secret())
-    store.save(request.ticket_id, {**(store.load(request.ticket_id) or {}), "call_id": call.get("id"), "status": call.get("status"), "audit": record})
+    store.save(
+        request.ticket_id,
+        {**(store.load(request.ticket_id) or {}), "call_id": call.get("id"), "status": call.get("status"), "call": call, "approver": approver, "mode": mode, "audit": record},
+    )
     memo_path = store.root / f"{request.ticket_id}.memo.md"
     memo_path.write_text(memo(record, request, vendor), encoding="utf-8")
     print(json.dumps({"ok": True, "verdict": rec.verdict.value, "memo": str(memo_path), "audit": record}, indent=2))

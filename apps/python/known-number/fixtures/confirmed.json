@@ -9,17 +9,18 @@
  },
  "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
  "evidence": [
-  "Contact said: \"Yes, we asked for that. The code on the notice is H E 4 N F 5, and yes, the notice is what we asked for.\""
+  "Contact said: \"Yes, we asked for that. Yes, the notice is what we asked for. I sent it myself from our accounts mailbox.\"",
+  "Assistant gave the callback reference H E 4 N F 5 and the contact said they would reply to the notice quoting it."
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_verification_code": "HE4NF5",
   "notice_matches_request": "yes",
   "request_channel_confirmed": "yes",
   "alternate_details_offered": false,
-  "call_disposition": "spoke_with_contact"
+  "call_disposition": "spoke_with_contact",
+  "reference_delivered": true
  },
  "recipients": [
   {

@@ -9,17 +9,17 @@
  },
  "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
  "evidence": [
-  "Contact said something like H E 4 N F 5 but the line was breaking up."
+  "Contact seemed to say yes to all three but the line was breaking up."
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_verification_code": "HE4NF5",
   "notice_matches_request": "yes",
   "request_channel_confirmed": "yes",
   "alternate_details_offered": false,
-  "call_disposition": "spoke_with_contact"
+  "call_disposition": "spoke_with_contact",
+  "reference_delivered": true
  },
  "recipients": [
   {

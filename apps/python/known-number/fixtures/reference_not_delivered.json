@@ -1,5 +1,5 @@
 {
- "id": "call_fixture_no_code_readback",
+ "id": "call_fixture_wrong_code",
  "object": "call_task",
  "status": "completed",
  "task_completed": true,
@@ -7,19 +7,19 @@
   "score": 0.93,
   "label": "high"
  },
- "summary": "Contact confirmed the request, read back the verification code, and confirmed the notice.",
+ "summary": "Contact confirmed but hung up before the reference was given.",
  "evidence": [
-  "Contact said: \"Yes we requested it, I have not seen any notice yet.\""
+  "Contact said: \"Yes we asked for it, sorry I have to go, call back later.\""
  ],
  "structured_result": {
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_verification_code": "",
-  "notice_matches_request": "unknown",
+  "notice_matches_request": "yes",
   "request_channel_confirmed": "yes",
   "alternate_details_offered": false,
-  "call_disposition": "spoke_with_contact"
+  "call_disposition": "spoke_with_contact",
+  "reference_delivered": false
  },
  "recipients": [
   {

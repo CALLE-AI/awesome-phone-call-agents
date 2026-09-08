@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from . import __version__
-from .models import ChangeRequest, Reconciliation, VendorRecord, mask_phone, verification_code
+from .models import ChangeRequest, Reconciliation, VendorRecord, mask_phone, callback_reference
 
 
 def request_fingerprint(request: ChangeRequest) -> str:
@@ -53,7 +53,7 @@ def audit_record(
             "known_phone_since": vendor.known_phone_since.isoformat(),
         },
         "approver": approver,
-        "verification_code": verification_code(request, code_secret),
+        "callback_reference": callback_reference(request, code_secret),
         "call_id": (call or {}).get("id"),
         "call_status": (call or {}).get("status"),
         "reconciliation": reconciliation.to_dict(),
@@ -76,7 +76,7 @@ def memo(record: dict[str, Any], request: ChangeRequest, vendor: VendorRecord) -
         f"- Proposed: {request.new_bank_name}, account ending {request.new_account_last4}",
         f"- Currently on file: {vendor.current_bank_name}, account ending {vendor.current_account_last4}",
         f"- Request fingerprint: `{record['request_fingerprint']}`",
-        f"- Verification code issued for the written notice: `{record.get('verification_code', 'n/a')}`",
+        f"- Callback reference spoken on the call, to be quoted in the written reply: `{record.get('callback_reference', 'n/a')}`",
         "",
         "## What was dialed",
         "",

@@ -13,11 +13,11 @@
   "reached_authorized_contact": false,
   "contact_name_given": "Reception",
   "requested_change": "unknown",
-  "stated_verification_code": "",
   "notice_matches_request": "unknown",
   "request_channel_confirmed": "unknown",
   "alternate_details_offered": false,
-  "call_disposition": "wrong_person"
+  "call_disposition": "wrong_person",
+  "reference_delivered": false
  },
  "recipients": [
   {

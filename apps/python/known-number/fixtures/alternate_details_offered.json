@@ -15,11 +15,11 @@
   "reached_authorized_contact": true,
   "contact_name_given": "Priya Raman",
   "requested_change": "yes",
-  "stated_verification_code": "HE4NF5",
   "notice_matches_request": "yes",
   "request_channel_confirmed": "yes",
   "alternate_details_offered": true,
-  "call_disposition": "spoke_with_contact"
+  "call_disposition": "spoke_with_contact",
+  "reference_delivered": true
  },
  "recipients": [
   {

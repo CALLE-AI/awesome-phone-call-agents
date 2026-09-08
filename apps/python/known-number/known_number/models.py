@@ -21,6 +21,7 @@ class Verdict(str, Enum):
     MISMATCH = "MISMATCH"
     ESCALATE = "ESCALATE"
     INCONCLUSIVE = "INCONCLUSIVE"
+    PENDING_WRITTEN_REPLY = "PENDING_WRITTEN_REPLY"
 
     @property
     def releases_change(self) -> bool:
@@ -142,14 +143,14 @@ def load_request(path: Path) -> ChangeRequest:
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambiguity
 
 
-def verification_code(request: "ChangeRequest", secret: str = "") -> str:
-    """Six-character one-time code for this request.
+def callback_reference(request: "ChangeRequest", secret: str = "") -> str:
+    """Six-character callback reference for this request.
 
     Derived from the request as received plus an optional deployment secret,
     so the same ticket always yields the same code (idempotent re-runs) while
-    a tampered request yields a different one. The code goes in the written
-    change notice sent to the vendor's address on file; the vendor reads it
-    back on the call.
+    a tampered request yields a different one. The reference is spoken to the
+    vendor on the call and must come back quoted in a written reply from the
+    address on file.
     """
     import hashlib
 
@@ -168,7 +169,7 @@ def verification_code(request: "ChangeRequest", secret: str = "") -> str:
     return "".join(CODE_ALPHABET[b % len(CODE_ALPHABET)] for b in digest[:6])
 
 
-def normalize_code(text: str) -> str:
+def normalize_reference(text: str) -> str:
     """Upper-case and strip separators, spaces, and hyphens a caller may add."""
     return re.sub(r"[^A-Z0-9]", "", text.upper())
 
