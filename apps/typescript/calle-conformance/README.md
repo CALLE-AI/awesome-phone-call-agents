@@ -6,6 +6,46 @@ your code has never been tested against.
 Two and a half minute walkthrough, with the captured call it starts from:
 https://youtu.be/EIjuAj0jOxA
 
+## The call this started with
+
+One call, placed through the API to see what came back. The agent said its line,
+asked its question, and closed:
+
+```
+offset  role  text
+     0  bot   This is an automated call from an AI assistant.
+     2  user  Thanks for calling. How can I help you today?
+     3  bot   Can you hear me clearly?
+     6  user  I'm an                        <- cut off in the capture
+     7  bot   Thank you.
+     8  bot   Goodbye.
+     8  user  Yes.
+     9  user  I can hear you clearly.
+```
+
+Verbatim from `fixtures/calls/completed-no-failure-8turns-0f3ac1.json`, roles and
+offsets as the API returned them.
+
+The recipient answered after the agent had already said goodbye. Here is what the
+platform recorded for that call:
+
+```
+taskCompleted        true
+completionConfidence 0.95, high
+summary              "The call completed successfully. The recipient confirmed
+                      they could hear the automated call clearly, so the recorded
+                      result is yes."
+```
+
+Right about the words, wrong about the conversation, and confident. Nothing in the
+response says the confirmation arrived after the agent had gone; the two turns are
+in `transcriptTurns` with their offsets, and reading them is the caller's job.
+
+That is why this exists. The API emits things a caller would not predict from its
+documented shape, and the only way to find out is to have seen one. So this keeps
+them. The full transcript is in `fixtures/calls/`, and the walkthrough above opens
+on the audio.
+
 ## Run it first
 
 ```bash
@@ -32,9 +72,18 @@ skills/verify-by-phone              1   .  .  .  .  .  .  .  .
 
 Eight behaviours this API really emits, and the payloads six projects test
 against. A dot means that project has never seen that behaviour in a fixture.
-The bottom row is this corpus, which is where the behaviours come from. Any path
-works, so `node src/replay.ts ../some-app` scores a checkout that is not in this
-repository.
+The `calle-conformance` row is this corpus and is full by construction, because it
+is where the behaviours were derived from; the table marks it so, rather than
+letting it read as this tool topping its own scoreboard. Any path works, so
+`node src/replay.ts ../some-app` scores a checkout that is not in this repository.
+
+**Read a row as coverage against this corpus and nothing wider.** A dot is a
+statement about a project's recorded test data, not a verdict on its code: a
+project can handle a behaviour perfectly and ship no fixture for it, and a fixture
+is data rather than an assertion. The printed legend gives each behaviour's
+observation count, because eight behaviours drawn from fifteen responses on one
+account is a floor and a behaviour seen once should not carry the same weight as
+one seen seven times.
 
 Below the matrix it also lists the projects that call this API and ship no JSON
 payload at all. In this repository that is 53 of the 59 that consume it. A project
@@ -80,23 +129,39 @@ reading without a terminal.
 **On the free tier, every request that reaches the planner consumes one call from
 the 20-per-24-hour allowance, including the ones the planner refuses.** No number
 is dialled, no phone rings, no call object is created, and the allowance drops by
-one anyway. A refused request also burns its idempotency key, so the corrected
-retry is rejected as a conflict. One mistake costs twice.
+one anyway.
 
 Units return individually, each exactly 24 hours after it was spent. There is no
 daily reset.
 
-Nothing in the API exposes this. There is no usage endpoint: a merged project in
-this repository records that `/v1/account`, `/v1/balance`, `/v1/credits`,
-`/v1/usage` and `/v1/me` all return 404, and leaves open the question of whether a
-no-answer consumes a credit. The remaining allowance appears in exactly one place,
-the body of the 429 that tells you it is gone.
+Nothing surfaces this while it is happening. There is no usage endpoint: a merged
+project in this repository records that `/v1/account`, `/v1/balance`,
+`/v1/credits`, `/v1/usage` and `/v1/me` all return 404, and leaves open the
+question of whether a no-answer consumes a credit. The remaining allowance appears
+in exactly one place, the body of the 429 that tells you it is gone.
 
-The consequence is ordinary and it is happening now. A developer in an unsupported
-region, or one iterating on a task the planner declines, can exhaust a day of
-allowance without ever reaching a person, and has no way to see it coming. More
-than twenty projects in this repository maintain a local call budget that counts
-one unit per created call. Under the measured rule, all of them undercount.
+That is the gap, and it is a documentation and surfacing gap rather than a pricing
+one. The rule itself is defensible: a request the planner has to read has cost the
+planner something. What no caller can currently do is see the count move. A
+`remaining` field on a successful response, or one line in the quickstart saying
+refusals count, would close it, and would fix every project below at once without
+any change to the metering.
+
+The consequence is ordinary. A developer in an unsupported region, or one
+iterating on a task the planner declines, can exhaust a day of allowance without
+ever reaching a person, and has no way to see it coming. More than twenty projects
+in this repository maintain a local call budget that counts one unit per created
+call. Under the measured rule, all of them undercount, and none of their authors
+had any way to know.
+
+**Nothing is claimed here about idempotency.** An earlier draft of this file said
+a refused request burns its key, so the corrected retry is rejected as a conflict.
+The evidence does not support it. `probe-results/2026-09-05T07-52-53-494Z-tier2.json`
+does hold five `idempotency_conflict` responses, and they share one key across five
+requests with different region and locale pairs, which is the documented meaning of
+a conflict and is the probe harness reusing a key rather than a platform behaviour.
+Every one of those records also carries `"costedACall": "unknown"`, so the cost was
+never established either. The claim is withdrawn rather than softened.
 
 ### How it was measured, and how to falsify it
 
@@ -194,11 +259,23 @@ checked rather than believed.
 The first: `apps/typescript/call-on-behalf` maps a failed call to an outcome by
 looking for the words `voicemail`, `machine`, `answer`, `busy` or `unreachable`
 inside `attempt.failureCode`. The three codes in this corpus are `404`, `486` and
-`603`, so every one of them falls through to the default branch, and a caller who
-reaches an answering machine is told the call did not connect to a person. Its own
-test exercises that branch with `failureCode: "busy"`, which is the documented
+`603`, so every one of them falls through to the default branch. Its own test
+exercises that branch with `failureCode: "busy"`, which is the documented
 vocabulary and is not what an attempt carries. The test proves the branch works.
 It cannot show that the branch is reachable.
+
+An earlier version of this paragraph went further and said a caller who reaches an
+answering machine is therefore told the call did not connect to a person. **That
+part was wrong and is withdrawn.** `src/errand.ts:420` reads the transcript for a
+machine greeting before the failure code is consulted at line 425, so that message
+has a route the word branches are not on. A maintainer reproduced the workflow and
+said so in
+[issue #375](https://github.com/CALLE-AI/awesome-phone-call-agents/issues/375);
+checking it against the source, they are right. What survives is narrower: every
+failed call here carries `transcriptTurns: []`, and with no transcript the code is
+the only signal, so `404` (not routable), `486` (Busy Here) and `603` (Decline)
+collapse into one outcome. `docs/found-by-the-corpus.md` carries the full
+correction.
 
 The second is worse, and it is in a project that screens job candidates.
 `apps/typescript/hirecall` guards against scoring somebody who was never reached

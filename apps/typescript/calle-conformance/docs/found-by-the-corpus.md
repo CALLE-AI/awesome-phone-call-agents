@@ -47,13 +47,33 @@ call-level one, and the attempt-level code is the numeric one.
 the documented vocabulary and it is not a value this API produces on an attempt.
 The test proves the branch works; it cannot show that the branch is reachable.
 
-**The consequence, stated narrowly.** `not_reached` and `call_failed` render the
-same sentence to the user (`src/errand.ts:127`), so that half of the mapping costs
-nothing. The `voicemail` branch does not: it renders "The line went to a machine,
-so nothing was asked. Try again at a different time of day."
-(`src/errand.ts:123-125`). For the codes observed here, a caller who reaches an
-answering machine is told the call did not connect to a person, and loses the one
-piece of advice the app has for that case, which is to try at another time.
+**Correction, 8 September 2026.** An earlier version of this entry claimed that a
+caller who reaches an answering machine is told the call did not connect to a
+person. That is wrong, and this file said it would be removed if it turned out to
+be. A maintainer reproduced the workflow in
+[issue #375](https://github.com/CALLE-AI/awesome-phone-call-agents/issues/375) and
+did not reproduce the misclassification. Checking their reading against the source:
+`src/errand.ts:420` tests `reading.machineAnswered` **before** `failureOutcome` is
+called at line 425, so when the transcript carries a machine greeting the outcome
+is `voicemail` whatever the failure code says. The word branches are not the only
+route to that message, and the entry should never have said they were.
+
+**The consequence that survives, stated narrowly.** Two of the three outcomes cost
+nothing either: `not_reached` and `call_failed` render the same sentence
+(`src/errand.ts:127`). What is left is real but small. Every failed call in this
+corpus carries `transcriptTurns: []`, and with no transcript there is no
+`machineAnswered` evidence, so the failure code is the only signal the app has. For
+`404`, `486` and `603` it always resolves to `call_failed`, which means three
+distinguishable situations collapse into one: `404` is a destination that was not
+routable at all, `486` is Busy Here and `603` is Decline, and the last two mean the
+line was reached and refused. The app cannot tell them apart, and the codes are the
+only place that information exists.
+
+**What the corpus did establish.** That the five word branches cannot be reached by
+the values this API puts on an attempt. The maintainer's own reproduction table in
+#375 shows the same thing from the other direction: `404`, `486` and `603` with an
+empty transcript all produce `call_failed`. The absence was real; the harm was
+overstated, and the overstatement was mine.
 
 **Scope of the claim.** This corpus contains three failure codes from one account.
 It does not establish that the platform never emits a word-based code on an

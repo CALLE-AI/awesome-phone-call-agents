@@ -145,7 +145,13 @@ const roots = argv
   });
 if (roots.length === 0) throw new Error("Usage: npm run replay -- [label=]<directory> ...");
 
-type Row = { project: string; payloads: number; quirks: Set<string> };
+/**
+ * `counts` exists so the legend can say how many responses a behaviour was seen in,
+ * not merely that it was seen. Eight behaviours drawn from fifteen responses is a floor,
+ * and a behaviour observed once should not print with the same authority as one observed
+ * twelve times.
+ */
+type Row = { project: string; payloads: number; quirks: Set<string>; counts: Map<string, number> };
 const rows = new Map<string, Row>();
 
 /** Files that look like call data but carry no recipients[].attempts[]. */
@@ -163,9 +169,13 @@ for (const root of roots) {
     }
     const name = project(root.path, root.label, file);
     const key = `${root.path}:${name}`;
-    const row = rows.get(key) ?? { project: name, payloads: 0, quirks: new Set<string>() };
+    const row = rows.get(key) ?? { project: name, payloads: 0, quirks: new Set<string>(), counts: new Map<string, number>() };
     row.payloads += calls.length;
-    for (const call of calls) for (const q of quirksIn(call)) row.quirks.add(q);
+    for (const call of calls)
+      for (const q of quirksIn(call)) {
+        row.quirks.add(q);
+        row.counts.set(q, (row.counts.get(q) ?? 0) + 1);
+      }
     rows.set(key, row);
   }
 }
@@ -224,19 +234,39 @@ const corpusSize = (() => {
 
 process.stdout.write(`\ncorpus: ${corpusSize} real responses, ${QUIRKS.length} behaviours declared as predicates.\n`);
 process.stdout.write(`${sorted.length} projects carry call-shaped payloads to score against them.\n`);
-process.stdout.write(`A dot means the behaviour never appears in that project's payloads.\n\n`);
+process.stdout.write(`A dot means the behaviour never appears in that project's payloads.\n`);
+// The gap between what this measures and what a reader hears is the tool's own biggest
+// risk, so it is printed next to the table rather than left to a README nobody opens.
+// A dot is about recorded test data. Promoting it to "this project is broken" is the one
+// misreading that would make the matrix worse than nothing.
+process.stdout.write(
+  `That is a statement about recorded test data, not a verdict on a project's code: a\n` +
+    `project can handle a behaviour and ship no fixture for it, and a fixture is data\n` +
+    `rather than an assertion. Read a row as coverage against this corpus, nothing wider.\n\n`,
+);
 
 process.stdout.write(`${"project".padEnd(width)}  n   ${QUIRKS.map((_, i) => String(i + 1).padStart(2)).join(" ")}\n`);
 process.stdout.write(`${"-".repeat(width)}  --  ${QUIRKS.map(() => "--").join(" ")}\n`);
+// The corpus's own row scores full marks by construction: it is where the behaviours were
+// derived from. Unmarked, it reads as this tool's author topping this tool's own table.
+const OWNER = "calle-conformance";
 for (const r of sorted) {
   const cells = QUIRKS.map((q) => (r.quirks.has(q.id) ? " x" : " .")).join(" ");
-  process.stdout.write(`${r.project.padEnd(width)}  ${String(r.payloads).padStart(2)}  ${cells}\n`);
+  const note = r.project.endsWith(OWNER) ? "   <- the corpus itself, full by construction" : "";
+  process.stdout.write(`${r.project.padEnd(width)}  ${String(r.payloads).padStart(2)}  ${cells}${note}\n`);
 }
 
+// A behaviour seen once and a behaviour seen twelve times print the same cross. The
+// legend is where that difference has to appear, or the table overstates what it knows.
+const corpusRow = sorted.find((r) => r.project.endsWith(OWNER));
 process.stdout.write(`\nlegend\n`);
 QUIRKS.forEach((q, i) => {
   const covered = sorted.filter((r) => r.quirks.has(q.id)).length;
-  process.stdout.write(`  ${String(i + 1).padStart(2)}  ${q.id}\n      covered by ${covered} of ${sorted.length} projects\n`);
+  const seen = corpusRow?.counts.get(q.id) ?? 0;
+  process.stdout.write(
+    `  ${String(i + 1).padStart(2)}  ${q.id}\n` +
+      `      seen in ${seen} of ${corpusSize} corpus responses, covered by ${covered} of ${sorted.length} projects\n`,
+  );
 });
 
 if (unreadable.length > 0) {
