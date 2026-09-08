@@ -11,8 +11,28 @@
  *
  * The method is to re-read, not to re-call. Each response in the corpus belongs
  * to a call that still exists, so `calls.get(id)` returns today's serialisation
- * of the same event. The conversation is identical by construction. Anything
- * that differs is the platform, not the call.
+ * of the same event, and the conversation is identical by construction.
+ *
+ * That last step rests on an assumption this tool cannot settle from outside:
+ * that the platform renders a response from live code over stored data. If it
+ * instead persists the rendered JSON when a call completes, or serves a
+ * historical object from a cache, re-reading returns the bytes from capture day
+ * and this reports no drift forever, which is the same output as a platform
+ * that genuinely did not move. An alarm and a disconnected bell print the same
+ * thing, so the assumption is stated here rather than asserted in the report.
+ * What would settle it is a platform change known from outside, followed by a
+ * re-read of a call captured before it: a fingerprint that moves proves the
+ * read path is live. Comparing the earliest and latest captures in hand does
+ * not settle it, because their shapes are identical, which is consistent both
+ * with a live serialiser that did not change and with a store that cannot.
+ *
+ * A second limit follows from the same fact. A frozen conversation cannot
+ * produce a new outcome, so on re-reads the vocabulary and behaviour channels
+ * are close to inert: a status that reads `completed` will not become a member
+ * of an enum added next week, because that member arrives on new calls. What
+ * re-reading detects reliably is a removed path and a changed type. The other
+ * two channels earn their place when the baseline meets fresh payloads, which
+ * is what the offline comparison does.
  *
  *   npm run drift             re-read every recorded call and compare
  *   npm run drift -- --offline    compare the published corpus to the baseline,
@@ -147,13 +167,18 @@ if (has("--offline") || !process.env.CALLE_API_KEY) {
 
   out(`re-reading ${recorded.size} recorded calls. No call is created.\n\n`);
   const fresh: Fingerprint[] = [];
+  let unobservable = 0;
   for (const [id, then] of recorded) {
     let live: Record<string, unknown> | undefined;
     try {
       live = callNodesIn(normalise(await client.calls.get(id)))[0];
     } catch (error) {
       const e = error as Error & { status?: number; code?: string };
-      out(`  ${id}  unreadable: ${e.status ?? ""} ${e.code ?? e.message}\n`);
+      // A call the platform no longer serves is a baseline that cannot be
+      // observed. Reporting it as every path having been removed would turn a
+      // retention sweep into a spectacular false alarm.
+      unobservable += 1;
+      out(`  ${id}  baseline unobservable: ${e.status ?? ""} ${e.code ?? e.message}\n`);
       continue;
     }
     if (live === undefined) { out(`  ${id}  returned nothing call-shaped\n`); continue; }
@@ -165,7 +190,17 @@ if (has("--offline") || !process.env.CALLE_API_KEY) {
 
   out("\n");
   if (fresh.length === 0) { out("nothing could be re-read.\n"); process.exit(45); }
-  out(`${fresh.length} calls re-read, against the corpus baseline.\n\n`);
+  out(`${fresh.length} of ${recorded.size} calls re-read, against the corpus baseline.\n`);
+  if (unobservable > 0) {
+    out(
+      `${unobservable} could not be read, so they are absent from this comparison rather than\n` +
+        `counted as unchanged. A shrinking sample is not a quiet result.\n`,
+    );
+  }
+  out(
+    `re-reads detect a removed path and a changed type. A widened enum or a behaviour\n` +
+      `that stops holding arrives on new calls, not on frozen ones.\n\n`,
+  );
   const changes = diff(baseline, merge(fresh));
   findings.push({ scope: "the re-read calls", changes });
   code = report(changes, "the re-read calls");
