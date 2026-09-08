@@ -13,6 +13,11 @@ if (!live) {
   if (process.env.CALLE_LIVE_ENABLED !== "true" || process.env.CALLE_CONTACT_AUTHORIZED !== "true" || !process.env.CALLE_API_KEY) {
     throw new Error("Live mode requires explicit enablement, contact authorization, and server-side API credentials.");
   }
+  const testPhone = process.env.CALLE_TEST_PHONE ?? "";
+  const authorizedDestination = process.env.CALLE_AUTHORIZED_DESTINATION ?? "";
+  if (!/^\+[1-9][0-9]{7,14}$/.test(authorizedDestination) || authorizedDestination !== testPhone) {
+    throw new Error("Set CALLE_AUTHORIZED_DESTINATION to the exact ASCII E.164 test phone for this live run.");
+  }
   const demoId = process.env.CALLE_DEMO_ID;
   if (!/^[a-zA-Z0-9_-]{8,80}$/.test(demoId ?? "")) throw new Error("Provide a stable CALLE_DEMO_ID.");
   const directory = new URL("../.state/", import.meta.url);
@@ -23,7 +28,7 @@ if (!live) {
   catch (error) { if (error.code !== "ENOENT") throw error; }
   if (!state) {
     const appointment = appointmentFixture();
-    const input = createInput({ appointment, phone: process.env.CALLE_TEST_PHONE,
+    const input = createInput({ appointment, phone: testPhone,
       region: process.env.CALLE_TEST_REGION, locale: process.env.CALLE_TEST_LOCALE,
       demoId, webhookUrl: process.env.CALLE_WEBHOOK_URL || undefined });
     const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");

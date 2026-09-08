@@ -11,7 +11,7 @@ export function appointmentFixture(now = new Date()) {
 
 export function createInput({ appointment, phone, region = "MY", locale = "en-MY", demoId, webhookUrl }) {
   if (!/^[a-zA-Z0-9_-]{8,80}$/.test(demoId ?? "")) throw new Error("Provide a stable CALLE_DEMO_ID (8–80 letters, digits, underscores or hyphens).");
-  if (!/^\+[1-9]\d{7,14}$/.test(phone ?? "")) throw new Error("Provide an authorized E.164 number.");
+  if (!/^\+[1-9][0-9]{7,14}$/.test(phone ?? "")) throw new Error("Provide an authorized ASCII E.164 number.");
   if (webhookUrl && new URL(webhookUrl).protocol !== "https:") throw new Error("Webhook URL must use HTTPS.");
   return {
     task: [

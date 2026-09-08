@@ -77,13 +77,14 @@ Live calling is opt-in and may consume CALL-E credits. Use only your own number 
 ```sh
 npm install
 cp .env.example .env
-# Edit .env locally: API key, authorized number, region/locale,
+# Edit .env locally: API key, authorized number, region/locale, and
+# CALLE_AUTHORIZED_DESTINATION set to that exact authorized number,
 # CALLE_CONTACT_AUTHORIZED=true, CALLE_LIVE_ENABLED=true,
 # and a stable CALLE_DEMO_ID such as judge-rehearsal-001.
 node --env-file=.env src/cli.mjs --live
 ```
 
-No fixed number allowlist is used. Valid E.164 formatting is checked; the caller remains responsible for permission and provider-supported destinations. Credentials are server-side; never paste them into the browser or commit `.env`.
+Every live run requires `CALLE_AUTHORIZED_DESTINATION` to be the exact ASCII E.164 value in `CALLE_TEST_PHONE`; changing the recipient without renewing that authorization fails before the SDK is loaded. The caller remains responsible for permission and provider-supported destinations. Credentials are server-side; never paste them into the browser or commit `.env`.
 
 The task identifies the call as a synthetic demonstration, asks whether it is a good time, and discusses only the supplied fictional service appointment. It aims for three minutes, but **SDK 0.2.2 exposes no enforceable maximum duration or cancel/hang-up method**. This example therefore does not enforce a three-minute cap, a financial budget, or ten actual phone dials. Do not use it as an unrestricted shared judge calling service.
 
