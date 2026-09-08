@@ -128,6 +128,46 @@ prints either. A checker whose own crash reports success is worse than no checke
 report as a standalone file with no stylesheet, no script and no network, for
 reading without a terminal.
 
+## Do not take my word for any of it
+
+The raw captures are not published, because they carry a personal number and
+platform identifiers, and that is a real limit: you cannot audit my masking by
+reading this repository. So the findings are built to be re-derived rather than
+believed, with your own key and your own account.
+
+```bash
+npm run settle -- --i-understand-this-places-a-real-call
+```
+
+One call to the testing hotline CALL-E publishes, read on a fixed loop from
+before it connects until minutes after it ends. It prints every raw timestamp it
+saw and the runs they fall into. If the attempt timestamp keeps its timezone for
+a window after completion and loses it afterwards, you have reproduced the
+platform finding in about four minutes and one unit of the daily allowance. If it
+does not, the finding is wrong and I would like to know.
+
+```bash
+npm run meter
+npm run headroom
+```
+
+The metering claim, re-measured. `headroom` issues requests that reach the
+planner and are refused there, and watches the counter move anyway.
+
+```bash
+node src/replay.ts <path to a checkout of this repository>
+```
+
+The matrix, against any tree you point it at. No key, no network. The two defects
+it led to are named with file and line in `docs/found-by-the-corpus.md`, so they
+can be checked against somebody else's source rather than against my summary of
+it.
+
+What is not reproducible from here is the corpus itself: those fifteen responses
+came from one account in one region, and a different account may see different
+behaviour. That is stated again under "What this does not prove", and it is the
+reason the instruments above exist.
+
 ## The finding this exists to carry
 
 **On the free tier, every request that reaches the planner consumes one call from
