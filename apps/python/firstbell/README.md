@@ -55,7 +55,7 @@ makes, and each one can be checked without an API key.
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The eight questions a district's counsel asks first, including the three this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
-| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Twelve findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
+| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Thirteen findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
 
 ### Where CALL-E is called at runtime
@@ -944,11 +944,11 @@ the jurisdiction is data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 605 tests collected
+python -m pytest tests/ -q          # 606 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**605 is the number collected, and two different pairs add up to it.** Some of these gates
+**606 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
@@ -958,7 +958,7 @@ The eighteen name what is missing rather than passing quietly: seven want a buil
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
 run the gates and the same suite reports **603 passed, 2 skipped**. Both pairs are measured,
-both add up to 605, and the difference between them is what a reader has on their disk.
+both add up to 606, and the difference between them is what a reader has on their disk.
 
 A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
 this entry is about, and `-rs` prints each one so nothing hides behind a dot.

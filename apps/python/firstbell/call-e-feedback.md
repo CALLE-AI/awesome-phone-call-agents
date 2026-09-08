@@ -1,6 +1,6 @@
 # CALL-E feedback from building firstbell
 
-Twelve findings from building an absence-calling app on CALL-E and placing twelve real
+Thirteen findings from building an absence-calling app on CALL-E and placing twelve real
 calls with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026. The
 last two came from the days after: one off the billing surface, one from a household with
 two absent children.

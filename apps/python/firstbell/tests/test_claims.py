@@ -357,6 +357,48 @@ def _in_words(n: int) -> str:
 NUMBER_WORDS = {n: _in_words(n) for n in range(1000)}
 
 
+def test_every_surface_states_the_real_number_of_platform_findings():
+    """Counted from the headings, not from a number somebody remembered.
+
+    A thirteenth finding was added to `call-e-feedback.md` and two surfaces went on saying
+    twelve: its own opening line and the README's reading list. Both spell the number in
+    words, so a grep for the digit finds neither, which is why this reads the headings and
+    then looks for the wrong word as well as the right one.
+
+    The same shape as the mutation-count gate, and it exists for the same reason: the half
+    that checks the right number is worthless without the half that catches the old number
+    surviving somewhere else.
+    """
+    words = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+             8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+             13: "thirteen", 14: "fourteen", 15: "fifteen", 16: "sixteen"}
+    feedback = (APP / "call-e-feedback.md").read_text(encoding="utf-8")
+    numbered = re.findall(r"^## (\d+)\. ", feedback, re.M)
+    found = len(numbered)
+    assert found >= 2, "call-e-feedback.md has no numbered findings to count"
+    assert [int(n) for n in numbered] == list(range(1, found + 1)), (
+        f"the findings are numbered {numbered}, which is not 1 to {found}: a gap or a "
+        "repeat means one of them is unreachable from the list that cites it"
+    )
+    assert found in words, f"{found} findings is past what this gate can spell"
+    right = words[found]
+
+    surfaces = {
+        "call-e-feedback.md": feedback,
+        "README.md": (APP / "README.md").read_text(encoding="utf-8"),
+    }
+    for rel, text in surfaces.items():
+        assert re.search(rf"\b{right}\b findings", text, re.I), (
+            f"{rel} does not say '{right} findings' and the file holds {found}"
+        )
+        for other, word in words.items():
+            if other == found:
+                continue
+            assert not re.search(rf"\b{word}\b findings", text, re.I), (
+                f"{rel} still says '{word} findings' somewhere and the file holds {found}"
+            )
+
+
 def test_the_readme_states_the_real_number_of_mutations():
     """The third count in this README to go stale, and the first one caught from outside.
 
