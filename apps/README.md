@@ -49,6 +49,8 @@ Current apps:
 | [`python/casechaser`](python/casechaser/) | Python | Chases an open claim, refund, repair, or delivery case to closure: every company promise becomes a dated, quoted commitment, broken ones climb a fixed escalation ladder, offers and denials stop at the customer, and a masked evidence pack is ready for the written complaint. Fixture mode by default. |
 | [`python/agency-status-watch`](python/agency-status-watch/) | Python | Recurring status watch for phone-only government application files: CALL-E navigates the agency's published IVR, reads back the status of your own application by reference number, and returns it as structured JSON, re-checking on a decaying cadence until terminal, action-required, or budget spent. Fixture-first with a consent-gated live path. |
 
+- [OneReach service follow-up](typescript/onereach-service-followup/) - Standalone Node.js CALL-E appointment workflow with a no-call default, validated outcomes, and signed webhook handling.
+
 Suggested grouping:
 
 ```text
