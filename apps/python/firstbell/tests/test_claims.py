@@ -1033,6 +1033,15 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "reads out/index.html to check the counts the page spells out in a sentence against "
         "the data those sentences describe. The page is built from receipts that are "
         "deliberately not committed, so on a clean checkout there is nothing to read",
+    # Two reasons rather than one, and the second is the interesting half. The card is
+    # generated only where the pooled record carries the counts its rates are computed
+    # from, so a page can exist and legitimately have no card in it. A gate that failed in
+    # that case would be asserting that a rate must be published rather than that a
+    # published rate must carry its bound, which is a different and much weaker claim.
+    "_card":
+        "reads the money card out of out/index.html, which is built from receipts held "
+        "outside this repository, and skips again when a page has no money card because "
+        "the pooled record carries no rate for it to bound",
     "_contrast":
         "reads tools/gates/gate-report.json, which is a build artifact and not committed. "
         "It skips when the report is absent, and again when the report is older than "
@@ -1322,12 +1331,22 @@ def test_prose_that_names_a_mutation_row_agrees_with_that_row():
             rows[int(cells[0])] = int(cells[2])
     assert len(rows) > 50, f"only {len(rows)} rows parsed, so this gate is reading the wrong table"
 
-    words = {name: value for value, name in enumerate(
-        "zero one two three four five six seven eight nine ten eleven twelve thirteen "
-        "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+    # Generated rather than a longer literal, and it reaches past twenty on purpose. This
+    # map stopped at "twenty" and the pattern below matched `\w+`, which cannot match a
+    # hyphen, so the first count to reach twenty-one failed the gate with "the note has
+    # been reworded" when the note was fine. A gate that breaks on the next value of the
+    # thing it counts is a gate with a deadline in it.
+    ones = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+            "fourteen fifteen sixteen seventeen eighteen nineteen").split()
+    words = {name: value for value, name in enumerate(ones)}
+    for base, ten in ((20, "twenty"), (30, "thirty"), (40, "forty"), (50, "fifty"),
+                      (60, "sixty"), (70, "seventy"), (80, "eighty"), (90, "ninety")):
+        words[ten] = base
+        for unit in range(1, 10):
+            words[f"{ten}-{ones[unit]}"] = base + unit
 
     wrong = []
-    for match in re.finditer(r"\b(\d+) fails ([a-z]+|\d+) tests?\b", text):
+    for match in re.finditer(r"\b(\d+) fails ([a-z-]+|\d+) tests?\b", text):
         row = int(match.group(1))
         spoken = match.group(2)
         claimed = int(spoken) if spoken.isdigit() else words.get(spoken)
@@ -1344,7 +1363,7 @@ def test_prose_that_names_a_mutation_row_agrees_with_that_row():
     # clean checkout. Every other count in this project is computed, so this one is too.
     marked = [line for line in text.splitlines()
               if line.startswith("|") and "**Needs the built page.**" in line]
-    stated = re.search(r"except\s+the (\w+) marked \*\*needs the built page\*\*", text,
+    stated = re.search(r"except\s+the ([\w-]+) marked \*\*needs the built page\*\*", text,
                        re.S | re.I)
     assert stated, (
         "the note saying how many rows need a built page has been reworded, so nothing is "

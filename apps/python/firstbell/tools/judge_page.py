@@ -1263,7 +1263,11 @@ def money_facts(run: dict) -> dict:
 
 
 def _money_key_block(f: dict) -> str:
-    """The three figures a school board asks for, on the calls that rang.
+    """The figures a school board asks for, on the calls that rang.
+
+    Three of them, or four where the record holds an escalation count: the saving, the
+    crossover, the bound on the net-new rate, and the bound on the escalation rate that
+    the widest reading of these calls cannot rule out.
 
     A landing place rather than a summary: the same numbers as the paragraph under it, with
     nothing between them and the eye. Derived from the pooled row so it cannot drift from
@@ -1280,6 +1284,25 @@ def _money_key_block(f: dict) -> str:
     if (pooled.get("net_ceiling") is None or pooled.get("net_new_bound") is None
             or pooled.get("crossover_per_100") is None):
         return ""
+    # The escalation rate's own bound, as a fourth row rather than a wider guard. The
+    # three above it are still true without it, and blanking a card that can answer three
+    # of the four questions to punish a missing fourth is the shape of gate this entry
+    # spends its time arguing against. The count in the foot is derived for the same
+    # reason: a sentence saying "these three rates" over two rates is a small lie that
+    # nothing would have caught.
+    worse, widest, how_many = "", "", "two"
+    if pooled.get("escalated_bound") is not None and pooled.get("escalated"):
+        how_many = "three"
+        worse = (
+            '<div><dt>The same bound if every escalation is a callback</dt>'
+            f'<dd>{100 * pooled["escalated_bound"]:.0f} per 100</dd></div>')
+        widest = (
+            f'The widest of them prices all {pooled["escalated"]} escalated calls as '
+            'callbacks rather than only the ones this software says it created. That is '
+            f'{100 * pooled["escalated"] / pooled["answered"]:.0f} per 100 measured and '
+            f'{100 * pooled["escalated_bound"]:.0f} that this many calls cannot rule out, '
+            f'both above the {pooled["crossover_per_100"]:.1f} where the saving stops, so '
+            'on that assumption this is a cost and not a saving. ')
     return (
         '<dl class=money-key>'
         '<div><dt>What it can save, a call</dt>'
@@ -1290,12 +1313,20 @@ def _money_key_block(f: dict) -> str:
         # computed in money_across_runs.figures_for from `answered`, and one of the calls
         # reached nobody. This card said twelve for a figure over eleven, which is the same
         # defect an audit found in two other places on the same day.
+        #
+        # `net-new per 100` rather than `per 100`, because the label said what the sample
+        # was and not what the rate was of. A reader could take 24 as what eleven calls
+        # cannot rule out about escalations, and the escalation rate this run measured is
+        # already twice that. The row under it is that rate's own bound.
         f'<div><dt>What {pooled["answered"]} answered calls cannot rule out</dt>'
-        f'<dd>{100 * pooled["net_new_bound"]:.0f} per 100</dd></div>'
+        f'<dd>{100 * pooled["net_new_bound"]:.0f} net-new per 100</dd></div>'
+        + worse +
         '</dl>'
         '<p class=money-key-foot>The sample is every call this software has placed, which '
-        'is the one denominator on this page nobody chose, and these two rates are per '
-        'answered call, because one of those calls reached nobody. The paragraph below is '
+        f'is the one denominator on this page nobody chose, and these {how_many} rates '
+        'are per answered call, because one of those calls reached nobody. '
+        + widest +
+        'The paragraph below is '
         'the same '
         'figures with the objections they answer, and the demo run&#8217;s own numbers are '
         'in the two cards above.</p>')
@@ -1372,7 +1403,7 @@ def money_markup(run: dict) -> str:
         '</div>',
         '</div>',
 
-        # The three numbers a school board asks for, out of the paragraph below.
+        # The numbers a school board asks for, out of the paragraph below.
         #
         # Two readers with the buyer's job named that paragraph as the thing that
         # nearly stopped them reading: sixteen figures in one block, with the

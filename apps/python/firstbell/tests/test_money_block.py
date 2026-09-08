@@ -265,4 +265,4 @@ def test_the_cell_says_the_page_receipt_is_a_third_run():
     markup = judge_page.money_markup(_run())
     assert "receipt is a third run" in markup
     assert "money_across_runs.py" in markup, (
-        "the page states three figures and does not say where the rest are")
+        "the page states a handful of figures and does not say where the rest are")

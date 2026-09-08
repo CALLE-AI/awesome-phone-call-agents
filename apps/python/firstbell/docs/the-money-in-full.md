@@ -144,6 +144,29 @@ sample, or closing fewer records than this run closes, walks into the loss witho
 software saying a word. So the software says it. A run that removes fewer attempts absorbs
 a lower rate, and the figure moves down with it.
 
+The table above bounds one rate, and it is worth saying which. Twenty-four per 100 is what
+these calls cannot rule out about the *net-new* rate, meaning the escalations this software
+says its own safeguarding rule created. It is not a bound on escalations in general. The
+escalation rate this run measured is already about twice it.
+
+| | Escalations per 100 answered calls | Which run |
+|---|---|---|
+| Measured on the calls that rang | 45.5 | 11 answered calls |
+| What those calls cannot rule out | 72.9 | 11 answered calls |
+
+A second table with its own header, because 45.5 and 24 are rates of different things, and
+putting two of those in one column is the mistake this document already made once with 24
+and 50.4.
+
+Both rows sit above 34.3. Pricing every escalated call as a callback, rather than only the
+ones this software says it created, is the assumption behind $0.19, which the reviewer page
+publishes as the number to hold this entry to. Under that assumption the crossover is
+already passed and the saving is a cost of about nineteen cents a call. The narrower
+reading, where only the net-new escalations are work the rule created, is the 24 against
+34.3 in the table above. Which of the two a district is living in is a question a pilot
+answers in week one. Neither figure is buried here to make the other look better, and the
+wider one is the one a finance office should plan against until a pilot narrows it.
+
 A vendor would publish $0.35 and stop. The reason to publish 50.4 as well is that a school
 board is going to ask the question in the meeting, and the answer should already be in the
 run rather than improvised at the table.

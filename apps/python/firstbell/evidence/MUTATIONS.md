@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the twenty marked **needs the built page**. Those twenty are held by gates
+the twenty-four marked **needs the built page**. Those twenty-four are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -99,6 +99,37 @@ whole money card flattens into one run with no full stop in it, so the footnote 
 excused the label above it and row 265 survived too. Every check is now scoped to one sentence,
 one table cell, or one block element, which is the unit a reader actually reads. Both counts
 published here are from after that.
+
+**Rows 266 to 271 were added on 8 September 2026**, for the bound gate, and a reader in the
+buyer's seat asked for them by asking the obvious next question.
+
+This entry had argued since the start that a count of zero is not a rate of zero, and it
+published one bound to prove it: 24 net-new escalations per 100 answered calls, which is what
+eleven calls cannot rule out. What it never published was the same treatment of the other rate
+on the same eleven calls. The escalation rate those calls measured is 45 per 100. Its own
+one-sided upper limit is 73. Both sit above the 34.3 per 100 where the saving becomes a loss.
+
+The label was the part that misled. `What 11 answered calls cannot rule out: 24 per 100` names
+the sample and never names the quantity, so the one figure a reader could carry away was
+ambiguous in the direction that flattered this entry. It now reads `24 net-new per 100`, with
+the escalation rate's own bound on the row under it, and the money document publishes both in
+a second table under its own header.
+
+The second header is not decoration. `docs/the-money-in-full.md` already records making this
+mistake once, when it put a bound measured on real calls directly above a crossover derived
+from an authored outcome mix and concluded there was half the rate to spare. Both figures were
+right and the comparison between them was not one. Escalations per 100 and net-new per 100 are
+rates of different things, so row 269 is that defect planted again, in the other direction, and
+the gate walks each table separately rather than carrying one header down a document.
+
+Row 271 is the arithmetic rather than the wording: computing the escalation bound off the
+net-new count makes the two bounds the same number while the card goes on calling one of them
+the widest reading. Three tests noticed it and two of them were the gate written for it.
+
+Every count in these six rows was measured against a green baseline, in a worktree built from
+a staged snapshot so no new test file was missing, and each was measured twice: once across the
+whole suite and once with `tests/test_every_rate_carries_its_bound.py` run alone, so no count
+here rests on an unrelated test failing. All six collected 645.
 
 **Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
 rows can be applied by a script. Twenty-nine came
@@ -447,6 +478,12 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 263 | Offer the calls placed as the sample in all three rows of a table whose column is a rate per answered call | 1 |
 | 264 | Call the sample twelve calls in the sentence a district is told to take from that table, where the figures are over the eleven that answered | 1 |
 | 265 | Label the bound on the money card with the calls placed rather than the calls answered, eleven lines above a paragraph that reads it correctly out of the same record **Needs the built page.** | 1 |
+| 266 | Label the bound on the money card with the sample it was measured on and not the quantity it bounds, so 24 per 100 reads as what eleven calls cannot rule out about escalations, when the escalation rate they measured is about twice it **Needs the built page.** | 1 |
+| 267 | Drop the escalation rate's own bound from the money card while the sentence under it still counts three rates, leaving the wider of the two readings unpublished **Needs the built page.** | 2 |
+| 268 | State the wrong number of rates in the sentence generated beside them, so the card's own summary of itself is off by one **Needs the built page.** | 1 |
+| 269 | Put the escalation bound in the column headed net-new per 100 answered calls, which is the mistake this document records making once with 24 against 50.4: two right figures and a comparison that is not one | 1 |
+| 270 | Drift the cost the pessimistic reading prices out to by a cent in the money document, away from what the tool computes | 1 |
+| 271 | Compute the escalation rate's bound off the net-new count, so the two bounds are the same number and the card publishes the narrow reading twice while calling one of them the widest **Needs the built page.** | 3 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

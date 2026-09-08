@@ -113,6 +113,18 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
     # the worst number in this entry.
     all_escalations = None if (escalated is None or not placed) else (
         (escalated / placed) * (lead.hourly / 60.0) * MINUTES_AN_ATTEMPT)
+    # The bound on that worst number, which this entry published for a fortnight without
+    # one. `net_new_bound` above is a bound on the net-new rate, and a reader who saw only
+    # it could take 24 per 100 as what this sample cannot rule out about escalations
+    # generally. It is not: the observed escalation rate is already above it.
+    #
+    # Pricing every escalation as a callback is an assumption that the escalation rate and
+    # the net-new rate are the same quantity, so inside that assumption this bound is the
+    # one that belongs beside the crossover, and it is the wider of the two. Both are
+    # published, each labelled with what it is a rate of, because the last time this file
+    # printed two rates on unlike denominators a district finance office found it.
+    escalated_bound = (None if (escalated is None or not answered)
+                       else upper_bound(escalated, answered))
     return {
         "calls": calls,
         "attempts_billed": placed,
@@ -126,6 +138,7 @@ def figures_for(placed: int, removed: int, answered: int, net_new: int,
         "worst_case_ceiling": worst,
         "crossover_per_100": None if crossover is None else crossover * 100,
         "escalated": escalated,
+        "escalated_bound": escalated_bound,
         "added_if_every_escalation_is_new": all_escalations,
         "ceiling_if_every_escalation_is_new": (
             None if (gross is None or all_escalations is None)

@@ -1907,9 +1907,11 @@ button[data-copy][data-copied]::after {
  * so it reads as a destination rather than as another line of the footnote: the act ends
  * by saying a pilot settles which end of the bound a district is on, and two readers who
  * came to this entry as buyers could not find what a pilot would be. */
-/* The three numbers a board asks for, lifted out of the paragraph under them. Two
-   readers stopped at that paragraph, so this is a landing place rather than a summary:
-   the same figures, with nothing between them and the eye. */
+/* The numbers a board asks for, lifted out of the paragraph under them. Two readers
+   stopped at that paragraph, so this is a landing place rather than a summary: the same
+   figures, with nothing between them and the eye. Three rows, or four where the record
+   holds an escalation count and the escalation rate gets its own bound, so this is a
+   stack and not a three-column grid. */
 .money-key {
   display: grid;
   gap: 0.5rem 1.25rem;

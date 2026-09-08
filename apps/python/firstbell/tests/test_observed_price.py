@@ -316,6 +316,15 @@ def test_every_crossover_the_money_document_prints_is_one_the_tool_computes():
     pooled = next(r for r in money_across_runs.rows(None) if r.get("pooled"))
     computed.add(round(pooled["net_new_bound"] * 100, 1))
     computed.add(float(int(round(pooled["net_new_bound"] * 100))))
+    # The escalation rate and its own bound, which the document prints in a second table
+    # under its own header. They are rates of a different thing from the column above, so
+    # they get their own column, and this gate is the reason they cannot drift out of it.
+    if pooled.get("escalated_bound") is not None and pooled.get("escalated"):
+        computed.add(round(pooled["escalated_bound"] * 100, 1))
+        computed.add(float(int(round(pooled["escalated_bound"] * 100))))
+        measured = 100 * pooled["escalated"] / pooled["answered"]
+        computed.add(round(measured, 1))
+        computed.add(float(int(round(measured))))
     # The offline run's own measured rate, which the table's first row states.
     demo = next(r for r in money_across_runs.rows(None) if r["run"] == "the demo")
     if demo.get("net_new_per_100") is not None:
