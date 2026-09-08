@@ -1,0 +1,38 @@
+{
+  "status": "proposal_requires_human_approval",
+  "portions": 12,
+  "portion_minutes": 30,
+  "allocations": [
+    {
+      "batch": "flex",
+      "partner": "far",
+      "minutes": 2,
+      "arrival_at": 10120,
+      "portions": 6
+    },
+    {
+      "batch": "limited",
+      "partner": "near",
+      "minutes": 3,
+      "arrival_at": 10180,
+      "portions": 6
+    }
+  ],
+  "rejected_lanes": [],
+  "input_sha256": "eaadd31a0495384361b252eae09ba8633c6cfa9f6cfb7ec5701e6474fae3c3d1",
+  "max_flow_certificate": {
+    "flow": 12,
+    "cut_capacity": 12,
+    "sink_reachable": false
+  },
+  "assumptions": [
+    "All lanes independently available; not a vehicle-routing solution.",
+    "Portions are homogeneous integer units within each batch.",
+    "Capacity freshness and safety clearance are supplied by people.",
+    "No actual food, transport, cost, or environmental savings measured."
+  ],
+  "nearest_first_baseline": {
+    "portions": 6,
+    "portion_minutes": 6
+  }
+}

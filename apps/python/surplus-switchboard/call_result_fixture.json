@@ -1,0 +1,23 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipients": [
+    {
+      "structured_result": {
+        "willing": "yes",
+        "capacity_portions": 6,
+        "evidence_quote": "Yes, six portions."
+      },
+      "attempts": [
+        {
+          "transcript_turns": [
+            {
+              "speaker": "user",
+              "text": "Yes, six portions."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

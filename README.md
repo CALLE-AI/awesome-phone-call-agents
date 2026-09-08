@@ -164,6 +164,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/python/surplus-switchboard`](apps/python/surplus-switchboard/) | Python | Preview-first recipient-capacity inquiries with durable CALL-E attempt tracking, human evidence review and exact shared-capacity allocation; local tests and demo make no calls. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
 | [`apps/typescript/sparescout`](apps/typescript/sparescout/) | TypeScript | Approval-gated multi-supplier vehicle-part sourcing with strict fitment schemas, durable evidence history, interruption-safe CALL-E monitoring, global market localization, and a no-call fixture default. |

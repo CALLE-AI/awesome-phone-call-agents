@@ -1,0 +1,24 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipients": [
+    {
+      "structured_result": {
+        "willing": "unknown",
+        "capacity_portions": 0,
+        "evidence_quote": ""
+      },
+      "attempts": [
+        {
+          "transcript_turns": [
+            {
+              "offset_seconds": null,
+              "speaker": "unknown",
+              "text": "Fictional voicemail greeting; no recipient capacity answer."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

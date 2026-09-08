@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`python/surplus-switchboard`](python/surplus-switchboard/) | Python | Preview-first recipient-capacity inquiries with durable CALL-E attempt tracking, human evidence review and exact shared-capacity allocation; local tests and demo make no calls. |
 | [`python/audition-agent`](python/audition-agent/) | Python / React | Catalog and setup guide for producer-reviewed CALL-E role-disclosure callbacks, with upstream source and no-call verification. |
 | [`typescript/e-mploye-for-calle`](typescript/e-mploye-for-calle/) | TypeScript | Human-approved virtual employee for appointment, lead follow-up, and shift coordination workflows, with a fake-only public mode and opt-in CALL-E SDK integration. |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |

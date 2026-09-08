@@ -1,0 +1,63 @@
+{
+  "now": 10000,
+  "confirmation_ttl": 3600,
+  "batches": [
+    {
+      "id": "flex",
+      "portions": 6,
+      "category": "produce",
+      "ready_at": 9000,
+      "expires_at": 20000,
+      "operator_cleared": true
+    },
+    {
+      "id": "limited",
+      "portions": 6,
+      "category": "bread",
+      "ready_at": 9000,
+      "expires_at": 20000,
+      "operator_cleared": true
+    }
+  ],
+  "partners": [
+    {
+      "id": "near",
+      "capacity": 6,
+      "confirmed_at": 9990,
+      "receive_by": 20000,
+      "manager_verified": true,
+      "accepts": [
+        "produce",
+        "bread"
+      ]
+    },
+    {
+      "id": "far",
+      "capacity": 6,
+      "confirmed_at": 9990,
+      "receive_by": 20000,
+      "manager_verified": true,
+      "accepts": [
+        "produce"
+      ]
+    }
+  ],
+  "lanes": [
+    {
+      "batch": "flex",
+      "partner": "near",
+      "minutes": 1
+    },
+    {
+      "batch": "flex",
+      "partner": "far",
+      "minutes": 2
+    },
+    {
+      "batch": "limited",
+      "partner": "near",
+      "minutes": 3
+    }
+  ],
+  "description": "Constructed fictional case, not field data. Nearest-first uses the only partner able to receive bread for flexible produce."
+}
