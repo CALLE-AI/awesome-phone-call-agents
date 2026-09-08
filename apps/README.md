@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`python/aftercare`](python/aftercare/) | Python | Consent-aware post-discharge CALL-E follow-ups with protocol schemas, dry-run by default, risk scoring, and a clinic UI. |
 | [`python/audition-agent`](python/audition-agent/) | Python / React | Catalog and setup guide for producer-reviewed CALL-E role-disclosure callbacks, with upstream source and no-call verification. |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
 | [`web/fieldclose`](web/fieldclose/) | TypeScript / Next.js | Human-approved commercial HVAC closeout workflow with a fake-only public path, durable recipient suppression, one-attempt duplicate protection, structured CALL-E results, and explicit human disposition. |
