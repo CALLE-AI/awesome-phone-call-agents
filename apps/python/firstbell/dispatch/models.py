@@ -259,6 +259,16 @@ class ItemResult:
     # that filled that in from its own clock would be inventing the one number the rule
     # is measured against.
     completed_at: str | None = None
+    # The idempotency key of a request that went out, was never answered, and returned no
+    # call id. Three paths reach that state: a 200 carrying no id, a create that ran out of
+    # attempts unanswered, and a cancel landing during a create backoff. None of them can
+    # enter `not_recallable`, which is a list of call ids, and all three may be on a bill.
+    #
+    # It is a recovery handle and not a label. CALL-E honours idempotency keys, so sending
+    # the identical request again under this key replays the original and returns the call
+    # object with its id, without a second telephone ringing. The key is stable per item and
+    # per day, so the recovery is same-day.
+    possibly_placed_key: str | None = None
 
     @property
     def masked_numbers(self) -> tuple[str, ...]:
@@ -368,6 +378,18 @@ class DispatchReport:
             out[result.resolution.value] += 1
         return out
 
+    @property
+    def placed_without_id(self) -> list[ItemResult]:
+        """Requests that may have landed and returned no id, recoverable by their key.
+
+        Derived rather than accumulated, on purpose. A second list on the dispatcher would
+        be a second thing to keep in sync with the rows, and the rows are the record. Any
+        result that carries a `possibly_placed_key` is one of these, whatever path put it
+        there, so a fourth path added later appears here without anyone remembering to
+        register it.
+        """
+        return [r for r in self.results if r.possibly_placed_key]
+
     def summary(self) -> str:
         c = self.counts()
         parts = [
@@ -389,6 +411,23 @@ class DispatchReport:
             # without anyone asking for it.
             line += (f" | {len(self.not_recallable)} call(s) placed and not accounted "
                      f"for: {', '.join(self.not_recallable)}")
+        # Printed on its own terms, outside the branches above, because the branches
+        # are the reason this fact was invisible. The line was
+        # `if cancelled: ... elif not_recallable: ...`, and the comment in that `elif`
+        # records the last time a fact only reached the surface inside a branch somebody
+        # else's condition owned. On the cancel path this list exists for, `cancelled` is
+        # true and `not_recallable` is empty, so the reader was handed "0 already in flight
+        # and not recallable" about a run that may have placed a call.
+        #
+        # The wording keeps the two apart. `not_recallable` is calls with ids that cannot be
+        # accounted for; these are requests with no id at all, and the sentence says what to
+        # do about them rather than only that they exist.
+        if self.placed_without_id:
+            keys = ", ".join(f"{r.item.id} under {r.possibly_placed_key}"
+                             for r in self.placed_without_id)
+            line += (f" | {len(self.placed_without_id)} request(s) may have been placed "
+                     f"and returned no id: {keys}. Re-run the same command today to replay "
+                     f"them under those keys rather than call again")
         if self.fatal_error:
             line += f" | run stopped: {self.fatal_error}"
         return line

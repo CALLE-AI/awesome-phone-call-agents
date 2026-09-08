@@ -346,6 +346,7 @@ class WaveDispatcher:
             # no id anywhere in the report because none was ever assigned.
             return ItemResult(
                 item=item, resolution=Resolution.UNDETERMINED,
+                possibly_placed_key=self._idempotency_key(item),
                 reason="the call was created and the response carried no id, so its "
                        "outcome could not be read back",
             )
@@ -418,6 +419,7 @@ class WaveDispatcher:
                 if unanswered:
                     return ItemResult(
                         item=item, resolution=Resolution.UNDETERMINED,
+                        possibly_placed_key=key,
                         reason="the run was cancelled while a request that may already "
                                f"have been placed was waiting to be retried, under "
                                f"idempotency key {key!r}, so retrying it later cannot "
@@ -488,6 +490,7 @@ class WaveDispatcher:
                 if attempt == self._retry.max_attempts:
                     return ItemResult(
                         item=item, resolution=Resolution.UNDETERMINED,
+                        possibly_placed_key=key,
                         reason="the call may have been placed and the service did not "
                                "answer: " + last)
                 # The same key again, which is what makes this safe to repeat: if the

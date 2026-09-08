@@ -541,3 +541,61 @@ def test_a_cancel_during_a_create_backoff_does_not_say_nothing_was_dispatched():
     assert "S-8" in result.reason, (
         "the reason has to carry the idempotency key, because a request with no call id "
         "cannot enter not_recallable and the key is the only handle for reconciling it")
+def test_a_request_that_may_have_landed_without_an_id_reaches_the_summary_line():
+    """A zero next to "not recallable" on a run that may have placed a call.
+
+    `summary()` was `if cancelled: ... elif not_recallable: ...`, and the comment inside that
+    `elif` records the last time a fact reached the surface only inside a branch somebody
+    else's condition owned. On the cancel path, `cancelled` is true and `not_recallable` is
+    empty, because that list holds call ids and this request never returned one, so the
+    reader was handed "0 already in flight and not recallable" about a request that had gone
+    out unanswered.
+
+    A platform engineer picked the shape of the fix: the key rides on the row and the list is
+    derived from the rows, so a fourth path appears in it without anyone registering it, and
+    the line says what to do rather than only that something happened. Their reasoning for
+    the sentence: because CALL-E honours idempotency keys, the resolution is to send the
+    identical request again under the same key, which replays the original rather than
+    ringing a second telephone.
+    """
+    from calle import CalleTimeoutError
+
+    class calls:
+        @staticmethod
+        def create(**kwargs):
+            raise CalleTimeoutError("CALL-E API request timed out.")
+
+        @staticmethod
+        def get(call_id):
+            raise AssertionError("creation never succeeded; nothing to poll")
+
+    class Client:
+        pass
+
+    Client.calls = calls
+    holder = {}
+    run = dispatcher(client=Client(), retry=RetryPolicy(max_attempts=3),
+                     idempotency_key=lambda item: f"attendance:{item.id}:2026-09-08",
+                     sleep=lambda _s: holder["run"].cancel())
+    holder["run"] = run
+    report = run.run([WorkItem(id="S-9", phones=(IN_A,), consented=True)])
+    result = report.results[0]
+
+    assert result.possibly_placed_key == "attendance:S-9:2026-09-08", (
+        f"the row carries {result.possibly_placed_key!r}, and without the key there is "
+        f"nothing to replay the request under")
+    assert [r.item.id for r in report.placed_without_id] == ["S-9"], (
+        f"the derived list is {[r.item.id for r in report.placed_without_id]}")
+    assert report.not_recallable == [], (
+        "not_recallable holds call ids and this request returned none, which is the whole "
+        "reason the second list exists")
+
+    line = report.summary()
+    assert "may have been placed and returned no id" in line, line
+    assert "attendance:S-9:2026-09-08" in line, (
+        f"the summary names no key, so a reader has nothing to replay: {line}")
+    assert "S-9" in line, f"the summary names no item, so nobody can act on it: {line}"
+    assert "0 already in flight and not recallable" in line, (
+        "the cancelled clause is still expected to print its own zero, honestly, because "
+        "no call with an id was in flight. What must not happen is that being the only "
+        f"thing the line says: {line}")

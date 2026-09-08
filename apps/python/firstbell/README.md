@@ -66,17 +66,17 @@ makes, and each one can be checked without an API key.
 Four lines do all of it, and the default offline run reaches three of them. Every anchor
 below is checked by a test, so a line number here cannot quietly rot.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:427`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:429`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:516`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:519`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:399`, rather than as a string match on a message.
+  `dispatch/scheduler.py:400`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
   `firstbell/cli.py:374`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:432`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:434`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -766,6 +766,26 @@ python -m firstbell --work-file examples/absences.csv \
 `--live` without `--yes-i-mean-it` exits with an explanation instead of dialling. `--limit`
 exists so a first live run is one call.
 
+**A request that went out and was never answered is recoverable for the rest of the day.**
+Three states end that way: a create that returned 200 with no id, a create that ran out of
+attempts without an answer, and a cancel landing while an unanswered request was waiting to
+be retried. None of them has a call id, so none can enter the run's not-recallable list,
+which is a list of ids. Each of those rows carries its idempotency key instead, the summary
+line names them, and the recovery is to run the same command again today: CALL-E replays the
+original request under that key and returns the call it made, rather than telephoning the
+family a second time. The receipt named `02-idempotent-replay-no-calls.json` is that replay
+happening, two calls and neither of them placed by the run that read them, counted into
+[`evidence/recorded-calls.json`](evidence/recorded-calls.json) like every other. The receipts
+themselves are held outside this repository, for the reason
+[`evidence/README.md`](evidence/README.md) gives.
+
+Two conditions on it, both worth knowing before an office needs them. The key is
+`attendance:{student}:{day}`, so the recovery is same-day: tomorrow the key is different and
+the same command places a fresh call. And a replay needs the same request body, so a district
+that edits the spoken instruction between the run and the reconciliation gets
+`idempotency_conflict` instead of the call it was looking for, which is why that code is
+treated as permanent rather than retried.
+
 **A live run stops at fifty families and says so.** `--yes-i-mean-it` is given before the
 work file has been counted, so on its own it confirms an intention rather than an amount.
 The failure that needs stopping is not an attacker: it is a morning where the office exports
@@ -976,21 +996,21 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 618 tests collected
+python -m pytest tests/ -q          # 619 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**618 is the number collected, and two different pairs add up to it.** Some of these gates
+**619 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **598 passed, 20 skipped**.
+A clean checkout of this commit into an empty directory reports **599 passed, 20 skipped**.
 The twenty name what is missing rather than passing quietly: nine want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **616 passed, 2 skipped**. Both pairs are measured,
-both add up to 618, and the difference between them is what a reader has on their disk.
+run the gates and the same suite reports **617 passed, 2 skipped**. Both pairs are measured,
+both add up to 619, and the difference between them is what a reader has on their disk.
 
 Building the page is one command, and it takes the recordings separately because they are
 not in this repository:

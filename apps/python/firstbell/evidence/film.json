@@ -1,5 +1,5 @@
 {
-  "what_this_is": "Measured facts about the demo film, which is not in this repository. The file itself is uploaded to YouTube and the numbers here are what ffprobe and aprofile.py read off it, written by D:/calle-workshop/video/make-receipt.py at the same moment RECEIPT.md is.",
+  "what_this_is": "Measured facts about the demo film, which is not in this repository. The file is held outside it and no public link is published here until there is one to publish. The numbers are what ffprobe and aprofile.py read off it, written by D:/calle-workshop/video/make-receipt.py at the same moment RECEIPT.md is.",
   "why_it_is_here": "Three surfaces carried a running time typed by hand and a re-render moved the cut by five seconds, so all three were wrong at once.",
   "seconds": 178.0,
   "running_time": "2:58.0",
@@ -8,5 +8,5 @@
   "carrying_sound_percent": 37,
   "narration_recorded": false,
   "integrated_lufs": -14.0,
-  "sha256": "c3b12c173a0a8e65506824843ddbe08e5e5b2cd7e54d1d3f147c36c9fa373466"
+  "sha256": "74a6b926bd27dda92cc6e7784dca5e4e54684d846dcfd524e5b4a5b02858d2e9"
 }
