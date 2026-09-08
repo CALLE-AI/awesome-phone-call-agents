@@ -116,19 +116,28 @@ than it does.
 
 Put the three side by side, because this is the whole commercial question in one line.
 
-| | Net-new per 100 answered calls |
-|---|---|
-| Measured on the committed offline run | 20.0 |
-| Measured on eleven real calls | 0 |
-| What eleven real calls cannot rule out | 24 |
-| Where the saving becomes a loss | **50.4** |
+| | Net-new per 100 answered calls | Which run |
+|---|---|---|
+| Measured on the committed offline run | 20.0 | offline, authored mix |
+| Where the saving becomes a loss on that run | 50.4 | offline, authored mix |
+| Measured on the calls that rang | 0 | 12 real calls |
+| What those calls cannot rule out | 24 | 12 real calls |
+| Where the saving becomes a loss on them | **34.3** | 12 real calls |
 
-Twenty-four is under fifty, so on the evidence that exists the run sits on the right side
-of its own crossover with about half the rate to spare. The margin was published as seven
-and a half calls in a hundred while the crossover was computed on mismatched denominators,
-and calling it thin then was as wrong as calling it comfortable would be now: what a
-district should take from this table is that the sample is eleven calls, so the row that
-matters is the bound and not the count. A district running at a higher alert rate than the
+Read the last three rows together and ignore the first two for this purpose. Twenty-four
+against 34.3 leaves about ten per hundred to spare, which is what the README and
+`tools/money_across_runs.py` both print.
+
+The pairing is the point, and it took a reader to find it. This table used to put 24
+straight above 50.4 and call it half the rate to spare, which compares a bound measured on
+real calls against a crossover derived from an authored outcome mix. Both figures were
+right. The comparison between them was not one, and a district following the link from the
+page, where the same bound is set against a third crossover for a single receipt, was left
+with three conclusions and nothing saying which to staff against. It is the one on the calls
+that rang: 34.3, because that denominator is the only one nobody chose.
+
+What a district should take from the table is that the sample is twelve calls, so the row
+that matters is the bound and not the count. A district running at a higher alert rate than the
 sample, or closing fewer records than this run closes, walks into the loss without the
 software saying a word. So the software says it. A run that removes fewer attempts absorbs
 a lower rate, and the figure moves down with it.

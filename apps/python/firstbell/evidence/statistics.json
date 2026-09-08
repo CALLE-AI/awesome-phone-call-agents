@@ -1,5 +1,5 @@
 {
-  "_comment": "Every externally sourced figure this contribution publishes, with where it came from and when it was read at source. It exists because one of them was wrong. The README said England recorded 18.7% persistent absence in 2024/25; that number appears nowhere in the DfE release and the published rate is 17.63%. It was caught by reading the primary source rather than by any check, which is the kind of luck this file replaces. tests/test_claims.py fails if the README publishes a figure that is not here, or publishes one of these with a different value.",
+  "_comment": "Every externally sourced figure this contribution publishes, with where it came from and when it was read at source. It exists because one of them was wrong. The README said England recorded 18.7% persistent absence in 2024/25; that number appears nowhere in the DfE release and the published rate is 17.63%. It was caught by reading the primary source rather than by any check, which is the kind of luck this file replaces. tests/test_claims.py fails if the README publishes a figure that is not here, or publishes one of these with a different value. Every figure either appears inside its own quote or carries `quote_is`, saying why it cannot: a table cell with no sentence behind it, or a subtraction done here. Four of thirteen quotes did not contain their figure and nothing checked that, which is what `tests/test_claims.py::test_every_sourced_figure_is_in_its_own_quote_or_says_why_not` now does.",
   "figures": [
     {
       "id": "us-chronic-absenteeism",
@@ -60,7 +60,9 @@
       "url": "https://www.census.gov/newsroom/press-releases/2023/language-at-home-acs-5-year.html",
       "quote": "derived: 100% minus the 78.3% who spoke only English at home",
       "published": "2023-12-07",
-      "read_at_source": "2026-09-05"
+      "read_at_source": "2026-09-05",
+      "quote_is": "derived, and it says so in the quote: 100% minus the 78.3% the publisher states. The subtraction is here rather than in the source, which is why the figure is not in its own quote.",
+      "quote_read_at": "2026-09-07"
     },
     {
       "id": "us-public-schools",
@@ -71,7 +73,9 @@
       "quote": "Public Elementary/Secondary School Universe Survey, 2023-24 Final Version 1a",
       "published": "2025-01-01",
       "read_at_source": "2026-09-07",
-      "note": "The count of schools, not of districts. NCES publishes two district counts for the same year under two definitions: 13,303 regular school districts in Table 1 and 19,186 operating districts in Table 2, the wider one including charter agencies, supervisory unions and service agencies. The narrower one is used here because it is the count of bodies that run an attendance office."
+      "note": "The count of schools, not of districts. NCES publishes two district counts for the same year under two definitions: 13,303 regular school districts in Table 1 and 19,186 operating districts in Table 2, the wider one including charter agencies, supervisory unions and service agencies. The narrower one is used here because it is the count of bodies that run an attendance office.",
+      "quote_is": "a table cell, not a sentence. No prose in this source states the count: it is the total row of the school universe table, column \"Total\", row \"United States\". The quote below is the table's own title, which is what a reader needs to find the right table, and it is named as a title rather than offered as a sentence containing the figure.",
+      "quote_read_at": "2026-09-07"
     },
     {
       "id": "us-regular-districts",
@@ -82,7 +86,9 @@
       "quote": "Operational and student membership status of public elementary and secondary schools and agencies, by type",
       "published": "2025-01-01",
       "read_at_source": "2026-09-07",
-      "note": "See the note on 99,297. The wider NCES figure for the same year is 19,186 and is a different definition of district, not a correction to this one."
+      "note": "See the note on 99,297. The wider NCES figure for the same year is 19,186 and is a different definition of district, not a correction to this one.",
+      "quote_is": "a table cell, not a sentence, in the same way as us-public-schools: the \"Regular school districts\" row of the agency universe table, United States total. The quote below is the table's own title.",
+      "quote_read_at": "2026-09-07"
     },
     {
       "id": "chccs-sis-renewal",
@@ -90,10 +96,12 @@
       "claim": "Total purchase cost approved by one North Carolina school district for its annual PowerSchool contract renewal, 2024-25, paid from the capital outlay technology budget",
       "publisher": "Chapel Hill-Carrboro City Schools Board of Education, Agenda Abstract, 15 August 2024",
       "url": "https://chccs.granicus.com/MetaViewer.php?view_id=2&clip_id=646&meta_id=45974",
-      "quote": "the annual renewal of the PowerSchool, LLC Contract for 2024-25",
+      "quote": "The total purchase cost of $157,664 will be paid from funds allocated in the Article 46 Technology Budget contained in the FY 2024-25 Capital Outlay Fund.",
       "published": "2024-08-15",
       "read_at_source": "2026-09-07",
-      "note": "A bundle, not a bare student-information-system licence: it covers the core SIS plus Enrollment Registration with additional languages, Enrollment School Choice, PowerPack, Unified Talent Professional Learning, State Data Validation and Naviance. One district's price, on the record, rather than a market average. Divided by the district's enrolment it is about $13.89 a student a year, which is arithmetic and is labelled as such wherever it appears."
+      "note": "A bundle, not a bare student-information-system licence: it covers the core SIS plus Enrollment Registration with additional languages, Enrollment School Choice, PowerPack, Unified Talent Professional Learning, State Data Validation and Naviance. One district's price, on the record, rather than a market average. Divided by the district's enrolment it is about $13.89 a student a year, which is arithmetic and is labelled as such wherever it appears.",
+      "quote_read_at": "2026-09-08",
+      "quote_is": "a sentence, from the FINANCIAL IMPACT paragraph of the agenda abstract. The resolution on the same page repeats the figure: \"the Board of Education approves the PowerSchool contract for 2024-25 for the amount of $157,664\". The quote here used to be \"the annual renewal of the PowerSchool, LLC Contract for 2024-25\", which carries no amount, so the largest dollar figure in this entry was the one a reader could not check against its own quote."
     },
     {
       "id": "chccs-enrolment",
@@ -112,10 +120,12 @@
       "claim": "Texas Basic Allotment per student in average daily attendance, school year 2025-26",
       "publisher": "Texas Education Agency",
       "url": "https://tea.texas.gov/taa-letters/house-bill-2-hb-2-implementation-foundation-school-program-fsp-funding-formula-changes",
-      "quote": "House Bill 2 (HB 2) Implementation: Foundation School Program (FSP) Funding Formula Changes",
+      "quote": "the golden penny yield is calculated as the Basic Allotment (BA) of $6,215 multiplied by 0.02084, and the copper penny yield is determined by multiplying the Basic Allotment by 0.0008",
       "published": "2025-07-01",
       "read_at_source": "2026-09-07",
-      "note": "An annual figure per student in attendance, not a per-absence figure. Dividing it by an instructional-day count gives roughly $35.51 at 175 days or $34.53 at 180, which is arithmetic on a divisor that varies by district size and year, and is labelled arithmetic wherever it appears. Texas raised the allotment from $6,160 through HB2 of the 89th Legislature."
+      "note": "An annual figure per student in attendance, not a per-absence figure. Dividing it by an instructional-day count gives roughly $35.51 at 175 days or $34.53 at 180, which is arithmetic on a divisor that varies by district size and year, and is labelled arithmetic wherever it appears. Texas raised the allotment from $6,160 through HB2 of the 89th Legislature.",
+      "quote_read_at": "2026-09-08",
+      "quote_is": "a sentence, from the section on Tier Two yields. The letter states the allotment while deriving something else from it, which is why the quote reads as arithmetic. It replaces the letter's title, which was the previous quote and named no figure."
     },
     {
       "id": "us-school-office-wage",

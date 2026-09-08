@@ -1,15 +1,20 @@
 # CALL-E feedback from building firstbell
 
-Thirteen findings from building an absence-calling app on CALL-E and placing twelve real
-calls with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026. The
-last two came from the days after: one off the billing surface, one from a household with
-two absent children.
+Sixteen findings from building an absence-calling app on CALL-E and placing twelve real
+calls with it, to Indian mobile numbers, in English and Tamil, on 4 September 2026. Four
+came after that day: one off the billing surface, one from a household with two absent
+children, and three from auditing our own retry and error handling against your SDK, which
+is where the last three came from and why they are the most specific ones here.
 
 They are collected here because they were scattered. Until now they lived in a code comment,
 a `docs/` file and three README bullets, which is a bad place for the one thing in this
-contribution that is about your platform rather than about our app. Eight are reproducible
-from this repository with no account. Two need our call records, and we will hand those
-over.
+contribution that is about your platform rather than about our app.
+
+Most of them can be checked without an account, because they are statements about your
+published SDK, your reference and your own schema, and each one names the file and the line.
+The ones that rest on our call records say so in the finding, and we will hand those records
+over. This paragraph used to put a number on that split and the number was wrong twice, and the
+second time it was out by four, so there is no number on it now.
 
 Ordered by what we think they cost you, not by when we found them.
 
@@ -38,7 +43,7 @@ and `max_turns` on the task as a backstop the agent cannot talk its way past. Th
 matters more than the tool. A tool the agent forgets to call has the same failure mode we hit.
 
 Anchor: `README.md:739-747` ("The escape hatch is instructed, not enforced") and
-limitation 3 at `README.md:1106-1110` ("Platform-side call termination").
+limitation 3 at `README.md:1129-1133` ("Platform-side call termination").
 
 ## 2. Webhook deliveries are unsigned, and your SDK is where we found out
 
@@ -323,6 +328,88 @@ Anchor: `dispatch/scheduler.py` (`RetryPolicy` and the `RETRYABLE_ERRORS` branch
 treats `rate_limit_exceeded` with the same blind backoff as everything else because there is
 nothing better to use).
 
+## 14. `_request` decodes JSON before it knows there is any, so a proxy page raises the wrong error
+
+**Severity: small, two lines, and it turns your outage into our crash.** `calle/calls.py`:
+
+```python
+if response.status_code >= 400:
+    raise api_error_from_response(response.status_code, response.json())
+```
+
+`response.json()` runs on any status at or above 400, before anything has checked that the
+body is JSON. A 502 from a proxy in front of your API is an HTML page, and `.json()` on it
+raises `json.JSONDecodeError` out of the SDK: not `CalleAPIError`, not
+`CalleConnectionError`, not any class in `calle.errors`. An integrator catching your
+exception hierarchy does not catch it, and a 502 is the one class of failure a retry exists
+to absorb.
+
+We catch it at `dispatch/scheduler.py` in the same `except` as `CalleTimeoutError` and
+`CalleConnectionError`, with a comment explaining why a JSON decode error is in there, and
+it took a real bad-gateway response to find. Checkable with no account: point a client at
+any host that returns an HTML error page.
+
+**What we would use:** decode inside a `try`, and on failure raise `CalleConnectionError`
+with the status code and the first part of the body. The status code is the useful half and
+it is already in hand.
+
+## 15. A timeout waiting for a call and a timeout on the socket are the same exception class
+
+**Severity: small, and it decides whether an integrator dares retry.** Both of these are in
+`calle/calls.py`:
+
+```python
+except httpx.TimeoutException as exc:
+    raise CalleTimeoutError("CALL-E API request timed out.") from exc
+```
+
+```python
+raise CalleTimeoutError(f"Timed out waiting for CALL-E call {call_id}.")
+```
+
+The first means the request never got an answer, so nobody knows whether a call was placed.
+The second means the call is running and has not finished inside `timeout_seconds`, which is
+not an error about the request at all. They are the same class, so the only way to tell them
+apart is to match on the message text.
+
+The difference is the whole decision. On the first, retrying without an idempotency key can
+place a second telephone call to a family. On the second, retrying is wrong in a different
+way: the call is alive and the right move is to keep polling. We stopped using
+`wait_for_result` and wrote our own poll over `calls.get` (`dispatch/scheduler.py`,
+`_await_terminal`) partly for this.
+
+**What we would use:** a distinct class for the wait, `CalleResultTimeout` or similar,
+subclassing `CalleTimeoutError` so nobody's existing `except` breaks. One class, no
+signature change.
+
+## 16. `create_and_wait` raises `KeyError` on a response body without an id
+
+**Severity: smallest of these, and it is the one that loses a placed call.**
+`calle/calls.py`:
+
+```python
+call = self.create(**kwargs)
+return self.wait_for_result(
+    str(call["id"]),
+    ...
+```
+
+`call["id"]` on a 200 whose body carries no `id`. The subscript raises `KeyError`, which is
+not in `calle.errors` either, and by then the call may already be placed and billed: the
+create returned 200. The caller gets a `KeyError` and no identifier, so there is nothing to
+poll, nothing to reconcile against billing, and nothing to tell an office about a telephone
+that may be ringing.
+
+We hit the same shape on our own create path and defend against it at
+`dispatch/scheduler.py` with a comment that reads "This used to be `call["id"]`": we treat a
+missing id as a call that may have been placed and report it as not recallable, rather than
+as a call that failed.
+
+**What we would use:** raise `CalleConnectionError` naming the missing field, so the
+exception says the response was unusable rather than dying on a dictionary lookup. Or
+better, return the body and let the caller decide, since it is the caller who knows whether
+a possibly-placed call is a problem.
+
 ## What worked
 
 Not everything here is a complaint, and three of these decisions saved us real time.
@@ -340,7 +427,7 @@ Not everything here is a complaint, and three of these decisions saved us real t
 
 ## How to reproduce
 
-Eight of the ten need no account and no key:
+Most need no account and no key:
 
 ```bash
 cd apps/python/firstbell

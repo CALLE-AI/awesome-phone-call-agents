@@ -163,7 +163,7 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 54 | Compute the resolution rate from `resolved` rather than `closed`, so the headline improves when the app finds something serious | 3 |
 | 55 | Fail open when a caller's escalation rule raises, dropping the case the rule was written to catch on the one run where the rule was broken | 2 |
 | 56 | Drop `escalation=` from the schema-valid branch, so the flag is computed correctly and then not carried | 7 |
-| 57 | Plant an assignable Indian mobile in `plugins/firstbell-absence-calls/` with the privacy gate scoped to `apps/python/firstbell` as it was, which is the state this contribution shipped in | 0 |
+| 57 | Plant an assignable Indian mobile in `plugins/firstbell-absence-calls/` with the privacy gate scoped to `apps/python/firstbell`, which is the scope it had when this was found and not the scope that ships. Row 58 is the shipped state | 0 |
 | 58 | The same number with the gate scoped to every path this contribution adds | 1 |
 | 59 | Point `CONTRIBUTION_PATHS` at a directory that no longer exists, which is what a rename looks like from inside the gate. Reported as 10 errors rather than 10 failures, because the guard sits in the helper every one of them calls | 10 |
 | 60 | Have `mask_id` hand back the identifier it was given, so every call id on the page is whole again | 1 |

@@ -297,6 +297,60 @@ def test_no_number_in_a_committed_fixture_could_ring_a_real_person(tracked):
     )
 
 
+def test_a_row_closed_on_an_answer_that_said_nothing_is_marked_as_one():
+    """The row act 03 argues about cannot sit unmarked in act 04.
+
+    `call_L9Ms...MYgA` is `unknown / unknown / unknown` with the outcome `resolved`, because
+    that is what the committed receipt records and the receipt is committed uncorrected on
+    purpose. Act 03 explains it. For a fortnight the row itself carried nothing, so a reader
+    who reached act 04 first met a table contradicting the argument with no link to it, and
+    both readers who checked found the row before the paragraph.
+
+    The condition is asserted rather than the call id: every row whose outcome is `resolved`
+    and whose every shown field is empty or "unknown" has to carry the mark, and no other
+    row may. That way the same defect on a different call would be caught by this test
+    rather than needing to be added to it.
+    """
+    page = APP / "out" / "index.html"
+    if not page.exists():
+        pytest.skip("the page has not been built in this checkout")
+    page_markup = page.read_text(encoding="utf-8")
+
+    rows = re.findall(r"<tr role=row>(.*?)</tr>", page_markup, re.S)
+    table_rows = [r for r in rows if "data-label=outcome" in r]
+    assert len(table_rows) >= 4, (
+        f"the identifier table has {len(table_rows)} rows, which is too few to be the "
+        "committed calls"
+    )
+
+    should, marked = [], []
+    for row in table_rows:
+        cells = re.findall(r'<td role=cell data-field="([^"]+)"[^>]*>(.*?)</td>', row, re.S)
+        outcome = re.search(r'<span class="state state-[a-z]+">([a-z]+)</span>', row)
+        if not outcome or not cells:
+            continue
+        told = any(re.sub(r"<[^>]+>", "", value).strip().lower()
+                   not in ("", "unknown", "·", "&#183;")
+                   for _name, value in cells)
+        ident = re.search(r"call_[^<\s]+", row)
+        key = ident.group(0) if ident else row[:40]
+        if outcome.group(1) == "resolved" and not told:
+            should.append(key)
+        if "row-flag" in row:
+            marked.append(key)
+
+    assert should, (
+        "no row in the identifier table is a record closed on an answer that said nothing. "
+        "If the committed receipts changed, this test is the thing to reconsider, but the "
+        "S-3004 row is the reason act 03 exists"
+    )
+    assert sorted(marked) == sorted(should), (
+        f"rows meeting the condition: {should}. Rows carrying the mark: {marked}. Every "
+        "record this software closed while learning nothing has to say so where a reader "
+        "meets it, not only in the act that explains it"
+    )
+
+
 def test_no_number_in_the_source_could_ring_a_real_person(tracked):
     """The looser rule, and the reason it is looser is worth stating rather than hiding.
 

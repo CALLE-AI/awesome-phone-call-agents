@@ -291,3 +291,52 @@ def test_the_price_file_is_reachable_from_the_evidence_index():
     assert "observed-price.json" in index
     assert re.search(r"\$0\.05", index), (
         "the evidence index describes the file without saying what it records")
+
+
+def test_every_crossover_the_money_document_prints_is_one_the_tool_computes():
+    """Nothing checked that document, and it was the odd one out of three surfaces.
+
+    Its table put "What eleven real calls cannot rule out: 24" straight above "Where the
+    saving becomes a loss: 50.4" and concluded there was half the rate to spare. The bound
+    is measured on the calls that rang; 50.4 is derived from the committed offline run,
+    whose outcome mix is authored. Both figures were right and the comparison between them
+    was not one, and a district following the link from the page met a third crossover
+    again and had three conclusions with nothing saying which to staff against.
+
+    So every per-100 figure in the document has to be one the tool computes, to a tenth.
+    That is weaker than deriving the document, which is markdown a person writes, and it is
+    the strongest rule that does not require generating it.
+    """
+    import money_across_runs
+
+    doc = (APP / "docs" / "the-money-in-full.md").read_text(encoding="utf-8")
+    computed = {round(row["crossover_per_100"], 1)
+                for row in money_across_runs.rows(None)
+                if row.get("crossover_per_100") is not None}
+    pooled = next(r for r in money_across_runs.rows(None) if r.get("pooled"))
+    computed.add(round(pooled["net_new_bound"] * 100, 1))
+    computed.add(float(int(round(pooled["net_new_bound"] * 100))))
+    # The offline run's own measured rate, which the table's first row states.
+    demo = next(r for r in money_across_runs.rows(None) if r["run"] == "the demo")
+    if demo.get("net_new_per_100") is not None:
+        computed.add(round(demo["net_new_per_100"], 1))
+    allowed = {0.0, 20.0, 100.0} | computed
+
+    quoted = set()
+    for line in doc.splitlines():
+        if not line.startswith("|"):
+            continue
+        for cell in line.split("|"):
+            bare = cell.strip().strip("*")
+            try:
+                quoted.add(round(float(bare), 1))
+            except ValueError:
+                continue
+
+    unexplained = sorted(v for v in quoted if v not in allowed)
+    assert not unexplained, (
+        f"the money document's table prints {unexplained}, and the tool computes "
+        f"{sorted(computed)}. A per-100 figure in that table that the tool does not "
+        f"produce is either stale or belongs to a run the table does not name"
+    )
+

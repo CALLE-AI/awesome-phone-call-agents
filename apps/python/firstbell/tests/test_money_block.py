@@ -191,8 +191,20 @@ def test_a_run_that_answered_nothing_does_not_kill_the_page_build():
     assert markup, "the band went silent instead of saying what it could not measure"
     assert "and nobody answered, so it says nothing" in markup
     assert "that rate needs an answered call" in markup
-    assert "cannot rule out" not in markup, (
+    # Narrowed twice now, and both narrowings are the same shape: this run may not state
+    # its own bound, and a bound from another run is allowed if it says which run. It first
+    # asserted "per 100" appeared nowhere, which stopped being true when the band began
+    # naming the pooled figure; then it asserted "cannot rule out" appeared nowhere, which
+    # stopped being true when the three-figure block above the paragraph started saying
+    # "What 12 calls cannot rule out". The claim that matters is unchanged and now it is
+    # the claim being made: this run has no denominator, so no sentence may bound it.
+    assert f'{facts["answered"]} calls cannot rule out' not in markup, (
         "the band states a bound on a run with no answered call to bound"
+    )
+    assert "answered calls" in markup, (
+        "the band no longer names any rate at all. The pooled figures over every recorded "
+        "call are the one thing this run can still be compared against, so losing them "
+        "would make a zero-answer page emptier than it has to be"
     )
     # This used to assert that "per 100" appeared nowhere, which is a stronger claim than
     # the one that matters and it stopped being true when the band started naming the

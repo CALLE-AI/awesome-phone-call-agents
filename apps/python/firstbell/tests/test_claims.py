@@ -315,6 +315,44 @@ def test_every_document_summary_counts_and_names_what_its_document_holds():
     )
 
 
+def test_every_sourced_figure_is_in_its_own_quote_or_says_why_not():
+    """The register exists so a number can be checked against the words it came from.
+
+    Four of its thirteen quotes did not contain the figure beside them. The worst was the
+    largest dollar figure in the entry, a school district's system renewal, whose quote read
+    "the annual renewal of the PowerSchool, LLC Contract for 2024-25" and carried no amount
+    at all. A reader following the register to check $157,664 found a sentence that could
+    not confirm it.
+
+    Some figures genuinely cannot appear in a quote: a table cell has no sentence behind it,
+    and a figure derived by subtraction is not in the source at all. Those are allowed, and
+    they have to say so in `quote_is`, because a stated reason is checkable and a missing
+    number is not.
+    """
+    doc = json.loads((APP / "evidence" / "statistics.json").read_text(encoding="utf-8"))
+    figures = doc["figures"]
+    assert len(figures) >= 10, f"the register holds {len(figures)} figures, which is too few"
+
+    for figure in figures:
+        value = str(figure["value"])
+        quote = str(figure.get("quote") or "")
+        assert quote, f"{figure['id']} has no quote at all"
+        bare = value.replace(",", "").replace("%", "").replace("$", "")
+        in_quote = value in quote or bare in quote.replace(",", "")
+        if in_quote:
+            continue
+        why = str(figure.get("quote_is") or "")
+        assert why, (
+            f"{figure['id']} claims {value} and its quote does not contain it: "
+            f"{quote[:90]!r}. Either quote the words carrying the figure, or say in "
+            f"`quote_is` why no such words exist"
+        )
+        assert len(why) > 40, (
+            f"{figure['id']} explains a missing figure with {why!r}, which is too short "
+            "to be a reason a reader can check"
+        )
+
+
 def test_the_three_minute_path_settles_what_it_says_it_settles():
     """The first screen a reviewer reads, checked against the things it points at.
 
@@ -706,6 +744,14 @@ def test_the_creation_date_the_readme_publishes_is_the_one_git_records():
 # need an artifact that is deliberately not in the repository, so they cannot be made to run
 # on a clean checkout without committing the thing the privacy rules keep out.
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # The mark on any row this software closed while learning nothing, checked against the
+    # built page. It needs `out/index.html`, which is built from the receipts and so cannot
+    # exist in a clean clone. What is lost while this is quiet is the guarantee that the
+    # S-3004 row still links to the act explaining it; the condition it asserts is derived
+    # from the row rather than from a call id, so it also covers the same defect appearing
+    # on a call nobody has placed yet.
+    "test_a_row_closed_on_an_answer_that_said_nothing_is_marked_as_one":
+        "needs out/index.html, which is built from receipts held outside this repository",
     # The throughput figures the README publishes, against the tool run on the receipts
     # that produced them. The receipts are held outside this repository, so a clone cannot
     # run this one and should not be told its numbers are wrong. The ten beside it hold the

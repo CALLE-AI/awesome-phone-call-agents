@@ -13,7 +13,7 @@ Nothing in this file is claimed to have happened. It is a proposal.
 |---|---|
 | Scale | Two schools in one district. One primary, one secondary, because the absence profile and the guardian relationship differ. |
 | Length | Six school weeks. Long enough to cross a holiday and an illness wave; short enough that a bad result is cheap. |
-| Volume | Only absences still unexplained at the district's existing cutoff. In the districts this was modelled on that is a two-figure number per school per morning, not a four-figure one. |
+| Volume | Only absences still unexplained at the district's existing cutoff. How many that is per school per morning is the first thing the baseline below has to measure, because no district has told us: this row read "in the districts this was modelled on that is a two-figure number" and there were no such districts. The pilot is sized on the number the school produces in its first fortnight, not on one written here. |
 | Who is called | One guardian per student, on the numbers already on file, with the consent record the district already holds. No new consent is collected for a pilot. |
 | Who is not called | Any family flagged by the school for any reason, any student on a safeguarding plan, and any guardian without a recorded communication preference the tool can serve. The exclusion list is the school's and is never derived by software. |
 

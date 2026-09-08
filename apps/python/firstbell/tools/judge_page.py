@@ -344,6 +344,30 @@ def _spelled(n: int) -> str:
             8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}.get(n, str(n))
 
 
+def _closed_on_nothing_mark(resolution: str, fields: dict, order: list[str]) -> str:
+    """A mark on any row this software closed while learning nothing.
+
+    Derived, not listed. The condition is the defect itself: the outcome says the record was
+    closed and every field the table shows is empty or "unknown". One row in the committed
+    receipts meets it, S-3004, and act 03 is built around explaining it. Without this the
+    row sat in act 04 with no mark at all, and both readers who checked found the
+    contradiction before they found the paragraph about it.
+
+    Written as a condition rather than a call id so that the same defect on a different call
+    would be marked without anybody remembering to.
+    """
+    if resolution != "resolved":
+        return ""
+    told_us_something = any(
+        (fields.get(name) or "").strip().lower() not in ("", "unknown", "·")
+        for name in order)
+    if told_us_something:
+        return ""
+    return ('<a class=row-flag href="#act-03" '
+            'aria-label="This row was closed on an answer that said nothing. '
+            'Act 03 explains it.">closed on nothing</a>')
+
+
 def _stakes_sentence() -> str:
     """The callback-window sentence, verbatim from the run act 08 ships.
 
@@ -1118,6 +1142,39 @@ def money_facts(run: dict) -> dict:
     }
 
 
+def _money_key_block(f: dict) -> str:
+    """The three figures a school board asks for, on the calls that rang.
+
+    A landing place rather than a summary: the same numbers as the paragraph under it, with
+    nothing between them and the eye. Derived from the pooled row so it cannot drift from
+    the table it condenses, and empty when there is no pooled row to condense, because a
+    block of "n/a" beside a heading about money is worse than no block.
+
+    On the recorded calls rather than the demo run, because this is the block a district
+    would quote and the pooled row is the only numerator on this page nobody chose. The
+    demo run's own figures are in the two cards above it.
+    """
+    pooled = f.get("pooled")
+    if not pooled:
+        return ""
+    if (pooled.get("net_ceiling") is None or pooled.get("net_new_bound") is None
+            or pooled.get("crossover_per_100") is None):
+        return ""
+    return (
+        '<dl class=money-key>'
+        '<div><dt>What it can save, a call</dt>'
+        f'<dd>${pooled["net_ceiling"]:,.2f}</dd></div>'
+        '<div><dt>Where that becomes a loss</dt>'
+        f'<dd>{pooled["crossover_per_100"]:.1f} per 100 answered calls</dd></div>'
+        f'<div><dt>What {pooled["calls"]} calls cannot rule out</dt>'
+        f'<dd>{100 * pooled["net_new_bound"]:.0f} per 100</dd></div>'
+        '</dl>'
+        '<p class=money-key-foot>Measured over every call this software has placed, which '
+        'is the one denominator on this page nobody chose. The paragraph below is the same '
+        'figures with the objections they answer, and the demo run&#8217;s own numbers are '
+        'in the two cards above.</p>')
+
+
 def money_markup(run: dict) -> str:
     """Three numbers a district recognises, and the two nobody has."""
     f = money_facts(run)
@@ -1188,6 +1245,15 @@ def money_markup(run: dict) -> str:
 
         '</div>',
         '</div>',
+
+        # The three numbers a school board asks for, out of the paragraph below.
+        #
+        # Two readers with the buyer's job named that paragraph as the thing that
+        # nearly stopped them reading: sixteen figures in one block, with the
+        # ceiling and the crossover, the only two they came for, in the middle of
+        # it. Nothing was cut to pay for this. Every number in the paragraph answers
+        # a different objection, and a reader who needs three can now stop at three.
+        _money_key_block(f),
 
         # Three sentences of caveat, in the order a buyer would object in. The first
         # used to say nobody has a price, which stopped being true the day the account
@@ -2084,7 +2150,9 @@ def build(has_audio: bool, repo_url: str | None = None,
                     + f'<br>{pv}</span></td>'
                     f'{cells}'
                     f'<td role=cell data-label=outcome>'
-                    f'<span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
+                    f'<span class="state state-{cls}">{esc(resolution)}</span>'
+                    + _closed_on_nothing_mark(resolution, fields, data["fieldOrder"])
+                    + '</td></tr>')
     body.append('</tbody></table></div></div>')
     body.append(money_markup(run))
     body.append('</div>')

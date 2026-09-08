@@ -1901,6 +1901,60 @@ button[data-copy][data-copied]::after {
  * so it reads as a destination rather than as another line of the footnote: the act ends
  * by saying a pilot settles which end of the bound a district is on, and two readers who
  * came to this entry as buyers could not find what a pilot would be. */
+/* The three numbers a board asks for, lifted out of the paragraph under them. Two
+   readers stopped at that paragraph, so this is a landing place rather than a summary:
+   the same figures, with nothing between them and the eye. */
+.money-key {
+  display: grid;
+  gap: 0.5rem 1.25rem;
+  margin: 1.25rem 0 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--ink-2);
+  background: var(--card);
+}
+
+.money-key > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  justify-content: space-between;
+}
+
+.money-key dt {
+  font-size: 0.86rem;
+  color: var(--ink-2);
+}
+
+.money-key dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: var(--ink);
+}
+
+.money-key-foot {
+  margin-block: 0 1rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* The mark on a row this software closed while learning nothing. Small, and not red:
+   it is a link to the explanation, not an error badge, and the row really is what the
+   receipt recorded. */
+.row-flag {
+  display: block;
+  margin-block-start: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--ink-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .money-next {
   margin: 0; padding: 0.85rem 1.15rem; border-top: 1px solid var(--line-strong);
   background: var(--paper-deep); font-family: var(--ui); font-size: var(--size-2);

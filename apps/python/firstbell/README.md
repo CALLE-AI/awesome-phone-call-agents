@@ -57,7 +57,7 @@ makes, and each one can be checked without an API key.
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
-| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Thirteen findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
+| 8 | [`call-e-feedback.md`](call-e-feedback.md) | Sixteen findings about CALL-E itself, including the missing call termination control that is the blocker on this whole category, and that webhook deliveries are unsigned by their own SDK's admission | 2 min |
 | 9 | [`docs/district-ingest.md`](docs/district-ingest.md) | The file a district already exports, the column no system of record has, and why three siblings are one call and still three records | 2 min |
 
 ### Where CALL-E is called at runtime
@@ -948,25 +948,48 @@ None of the code knows any of this. `dispatch/` never reads a country, language 
 Moving this from a Chennai school to a California district changes two inputs and no logic:
 the jurisdiction is data, and only the data is jurisdictional.
 
+## What a district already has
+
+Every district this is priced for already owns a mass-notification system. SchoolMessenger,
+ParentSquare, Blackboard Connect and Remind are the names that come up, they sit beside or
+inside the student information system, and the automated absence message a parent gets in
+the morning is theirs. That message is the thing this software starts from, so it would be
+odd not to say so.
+
+What this adds is what happens to the message nobody answered. Those systems are built to
+send, to reach and to record delivery, and delivery is a fact about a network. Whether a
+family is accounted for is a fact about a conversation, and it has three values rather than
+two: a reason on the record, nobody reached, and a call that connected and produced nothing
+usable. The third is the one an office has to work and the one a two-bucket count cannot
+hold, and everything in this repository follows from refusing to fold it into either
+neighbour.
+
+Nothing here is a comparison of features, because the only software tested here is this
+software. It is a statement about where this belongs: after the notification and before the
+office, on the rows the notification did not settle, whichever product sent it. A district
+that reads the language limit in act 07 and decides the calling layer is not for them can
+take the three outcomes, the consent gate and the structured reason over the dialler they
+already pay for, and the receipt shape is documented for exactly that.
+
 ## Tests
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 609 tests collected
+python -m pytest tests/ -q          # 612 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**609 is the number collected, and two different pairs add up to it.** Some of these gates
+**612 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **588 passed, 18 skipped**.
-The eighteen name what is missing rather than passing quietly: seven want a built page,
+A clean checkout of this commit into an empty directory reports **593 passed, 19 skipped**.
+The nineteen name what is missing rather than passing quietly: eight want a built page,
 seven want a page and its policy, two want a gate report, one wants the gate screenshots,
 and one is a fixture that cannot exercise the branch it is written for. Build the page and
-run the gates and the same suite reports **607 passed, 2 skipped**. Both pairs are measured,
-both add up to 609, and the difference between them is what a reader has on their disk.
+run the gates and the same suite reports **610 passed, 2 skipped**. Both pairs are measured,
+both add up to 612, and the difference between them is what a reader has on their disk.
 
 A skip here is a could-not-measure rather than a pass, which is the distinction the rest of
 this entry is about, and `-rs` prints each one so nothing hides behind a dot.
