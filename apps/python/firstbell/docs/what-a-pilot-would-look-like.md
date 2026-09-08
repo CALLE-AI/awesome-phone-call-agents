@@ -31,7 +31,7 @@ afterwards is a description rather than a result. This is the part that is skipp
 
 ## What is measured during it
 
-The same four, plus four the software produces:
+The same four, plus five the software produces:
 
 5. Closed without a person: an explicit confirmation received and the record closed.
 6. Escalated: routed to a person because nothing confirmed the guardian already knew.
@@ -39,6 +39,10 @@ The same four, plus four the software produces:
    is not English.
 8. **Net-new escalations**: of those in 6, the ones the rest of the pipeline would have
    closed. Per hundred answered calls, with the count of answered calls beside it.
+9. **Held for channel**: the rows the accessibility gate refused to dial, because the export
+   said the guardian is not reachable by a voice call. Three numbers rather than one: how
+   many rows were held, how many of those the office served on another channel inside the
+   same window the safeguarding rota promises, and which named person served them.
 
 Note which direction each is expected to move. 1, 2 and 3 should fall. 5 should be well below
 the total, because a tool that closes most records is either being asked easy questions or is
@@ -49,7 +53,7 @@ against how much reach it buys.
 Measure 8 is the one this pilot exists to produce, and 6 on its own is not a substitute for
 it. Most of 6 is work the office was already doing: the call produced nothing usable, so it
 was going to a person whatever rule was in force. 8 is the part that is new, and it is the
-only one of the eight that decides whether the safeguarding lead's rota has to change. The
+only one of the nine that decides whether the safeguarding lead's rota has to change. The
 run prints it, and `tools/replay_escalation.py` computes it for calls already placed by
 filing each one twice under today's code, with the rule and without it.
 
@@ -59,6 +63,18 @@ per hundred. Read the bound rather than the count until the sample is large enou
 they agree, and staff against the bound. A stop rule below trips on a missed callback, so
 the cost of reading the count instead is a rota built for a queue that turns out to be four
 times longer.
+
+Measure 9 exists because the accessibility gate is the one part of this software that helps
+nobody by working. It does not contact the guardian it protects. It declines to dial and puts
+the row on a person's desk, which means that on its own it converts a family the telephone
+cannot reach into a record saying somebody was told. The sentence under the ownership table
+below, that an escalation into an unstaffed queue is worse than no call, was written about the
+safeguarding queue, and it applies to the `voice` gate by name: a held row nobody works is a
+guardian who was excluded twice and a district that now has a document saying otherwise. So
+the second of the three numbers is the one that matters, and its expected direction is up from
+whatever the first fortnight produces. Nine held and none served is a finding about the office
+rather than a gap in the data, and it is the finding that would decide whether precondition 3
+has actually been met or only written down.
 
 ## Who owns what
 

@@ -56,7 +56,7 @@ EVIDENCE = APP / "evidence"
 # gives, so this tool takes a directory the way it already takes --audio-dir.
 RECEIPTS: Path | None = None
 
-TROUBLE = """Nothing to build from.
+TROUBLE = """COULD-NOT-MEASURE  nothing to build from.
 
 This page is generated from the recordings of the calls this app placed, and those are
 held outside this repository: the maintainer of this list requires that committed
@@ -2066,15 +2066,24 @@ def build(has_audio: bool, repo_url: str | None = None,
     body = [
         '<div class=masthead>',
         '<p class=wordmark>firstbell</p>',
-        # The first sentence a buyer reads, and it used to promise language access.
-        # A director of student services put it plainly: taken to a board, "in the language
+        # The first sentence a buyer reads. It used to promise language access, and a
+        # director of student services put it plainly: taken to a board, "in the language
         # that family speaks" is a claim a trustee can disprove by reading one page of
-        # CALL-E's region table, and the meeting ends there. So the claim and its limit
-        # arrive together, in that order, on the first screen rather than in act 07.
-        '<p class=standfirst>Phones the families whose absence notification went '
-        'unanswered and brings back a structured reason a school office can act on. It '
-        'calls in whichever language CALL-E offers for that country, which in the United '
-        'States today means English.</p>',
+        # CALL-E's region table, and the meeting ends there. So the promise came off and
+        # the ceiling went on in its place, on the first screen.
+        #
+        # A district buyer then read the pair and named what the second sentence was
+        # spending: the escalation is the half of this product they would be buying, and
+        # the first screen gave that space to a platform limit with no demonstration
+        # beside it. The promise is gone either way, so there is nothing left up here to
+        # qualify, and the ceiling has moved to act 01, one screen down, where it can name
+        # the run that shows it. Both sentences now describe what the software does, and
+        # the second one is the one nothing else on the market does.
+        '<p class=standfirst>When a school’s absence notification goes unanswered, '
+        'this calls the family and brings back a reason the office can act on. When it '
+        'cannot get one, it says so and puts the call on a named person’s desk, '
+        'because a call that reached a parent and learned nothing is not a family '
+        'contacted.</p>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',
@@ -2122,6 +2131,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         f'<p class=stakes>{esc(_stakes_sentence())}</p>',
         '<p class=stakes-src>Printed by the run itself, above the cases it refuses to '
         'close. The whole queue is in act 08.</p>',
+        # The platform ceiling, moved off the masthead to sit one screen from the run that
+        # demonstrates it. On the first screen it was a limit on a promise the page had
+        # already stopped making; here it is a limit with its own receipt in the same
+        # sentence, and act 07 is a real call the platform refused in Spanish.
+        '<div class=note>Calls go out in whichever language CALL-E offers for the '
+        'country. In the United States today that is English, and '
+        '<a href="#act-07">act 07</a> holds the refusal, printed by a run a reader can '
+        'make on their own machine.</div>',
         '</div><div class=artifact>',
         '<div class=stat-grid>',
     ]

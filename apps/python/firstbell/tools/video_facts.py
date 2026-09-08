@@ -316,13 +316,18 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.receipts:
-        raise SystemExit(
-            "pass --receipts or set FIRSTBELL_RECEIPTS. The call panels read their "
-            "identifiers from the receipts, so there is no default worth guessing."
-        )
+        # Exit 3 and the same first word as the other four, rather than SystemExit's 1.
+        # A reviewer reading a 1 has no way to tell a check that failed from an input that
+        # was never going to be here.
+        print("COULD-NOT-MEASURE  pass --receipts or set FIRSTBELL_RECEIPTS. The call\n"
+              "                   panels read their identifiers from the receipts, so there\n"
+              "                   is no default worth guessing. The recordings are\n"
+              "                   deliberately not in this repository.")
+        return 3
     receipts_dir = Path(args.receipts).resolve()
     if not receipts_dir.is_dir():
-        raise SystemExit(f"--receipts {receipts_dir} is not a directory")
+        print(f"COULD-NOT-MEASURE  --receipts {receipts_dir} is not a directory")
+        return 3
 
     data = facts(receipts_dir)
     if args.json:

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 from pathlib import Path
@@ -86,7 +87,9 @@ def minutes(pupils: int, concurrency: int, seconds_per_call: float) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--receipts", type=Path, required=True,
+    # Optional, for the reason replay_escalation.py gives: a reviewer running the command
+    # the README prints has no receipts, and that is not a usage error.
+    ap.add_argument("--receipts", type=Path, default=os.environ.get("FIRSTBELL_RECEIPTS"),
                     help="A directory of run receipts. Their transcripts are the source.")
     ap.add_argument("--pupils", type=int, default=500,
                     help="Absences in one morning. 500 is a large secondary school.")
@@ -98,11 +101,21 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
+    if not args.receipts:
+        print("COULD-NOT-MEASURE  no receipts directory given. Every number this prints is\n"
+              "                   derived from how long real calls actually took, and there\n"
+              "                   is no default worth guessing. Pass --receipts DIR or set\n"
+              "                   FIRSTBELL_RECEIPTS. The recordings are deliberately not in\n"
+              "                   this repository; the table this computes is in README.md\n"
+              "                   under the throughput heading, measured.")
+        return 3
+
     lengths = call_lengths(args.receipts)
     if not lengths:
-        print(f"No timed transcript in any receipt under {args.receipts}. Nothing here "
-              "can be computed from an assumption, so nothing is printed.")
-        return 1
+        print(f"COULD-NOT-MEASURE  no timed transcript in any receipt under "
+              f"{args.receipts}. Nothing here\n"
+              "                   can be computed from an assumption, so nothing is printed.")
+        return 3
 
     mean = statistics.mean(lengths)
     per_call = mean + POLL_SECONDS

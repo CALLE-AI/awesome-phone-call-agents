@@ -194,3 +194,49 @@ def test_the_embedded_provenance_names_files_a_reader_can_open():
         assert "in the tree" in provenance["audio"], (
             "the provenance says the waveforms are the only representation of the audio "
             "that ships, on a build that ships the recordings and plays them")
+def test_the_language_ceiling_is_on_the_page_and_names_its_demonstration():
+    """The one limit a school board can check, and where it has to live.
+
+    It used to be the masthead's second sentence. A director of student services had asked
+    for it there, because the sentence before it promised to call "in the language that
+    family speaks", which a trustee disproves in one page of CALL-E's region table. Then a
+    district buyer pointed out what that arrangement cost: the first screen was spending its
+    second sentence on a platform limit while the escalation, which is the half of the
+    product they would be buying, was nine screens down.
+
+    The promise came off first, so there is nothing on the masthead left to qualify, and the
+    ceiling moved to act 01 where it can name the run that shows it. That leaves two ways for
+    the page to go wrong, and this holds both: the ceiling can be dropped in a reword, and
+    the masthead can reacquire the promise now that its qualifier has moved away.
+    """
+    markup = _page()
+
+    ceiling = re.search(
+        r"whichever language CALL-E offers[^<]{0,120}?"
+        r"United States today[^<]{0,40}?English[^<]{0,60}?"
+        r'<a href="#(act-\d\d)">',
+        markup)
+    assert ceiling, (
+        "the page no longer states the language ceiling and name the act that demonstrates "
+        "it. It is the one limit a school trustee can check in CALL-E's own region table, "
+        "and a page that drops it is making the promise the limit was written to answer.")
+
+    named = ceiling.group(1)
+    assert f'id="{named}"' in markup or f"id={named}" in markup, (
+        f"the language ceiling points a reader at {named}, which is not an act on this page")
+
+    # And the masthead, which no longer carries the limit, must not go back to promising a
+    # language. Anything of the "in the language they speak" shape is the claim the limit
+    # existed to qualify, and up there it would now sit unqualified.
+    masthead = re.search(r"<div class=masthead>(.*?)</div>", markup, re.S)
+    assert masthead, "the masthead is gone, and it is the first thing a reviewer reads"
+    promise = re.search(
+        r"in (?:the|whatever|whichever) language[^<]{0,60}?"
+        r"(?:they|family|families|parent|parents|guardian|guardians)\b",
+        masthead.group(1), re.I)
+    assert not promise, (
+        "the masthead promises to call in the family's own language: "
+        + " ".join(promise.group(0).split())
+        + ". CALL-E offers one language per country and English in the United States, so "
+        "that sentence is disproved by one page of its region table. The ceiling is in "
+        f"act 01; a promise up here needs it back beside it.")

@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the fifteen marked **needs the built page**. Those fifteen are held by gates
+the nineteen marked **needs the built page**. Those nineteen are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -39,6 +39,37 @@ needed the thing before the location. Nothing had shipped in that shape, so it w
 spot rather than a hole under a live defect, and the gate now reads the claim in both
 directions. The count published for that row is the re-measurement, because the zero was a
 fact about a gate that no longer exists.
+
+**9 rows were added later on 8 September 2026**, for three gates written after three
+changes, two of which a reviewer asked for.
+
+Rows 253 to 255 are the language ceiling. The sentence saying CALL-E offers one language per
+country, and English in the United States, came off the masthead and moved into act 01, one
+screen from the run that demonstrates it. That buys the first screen back for the escalation,
+which is the half of this product a school would be paying for, and it creates two ways to be
+wrong that the welded version did not have: the ceiling can be lost in a reword, and the
+masthead can reacquire the language promise the ceiling was written to answer.
+
+Rows 256 to 259 are one class. Five tools cannot do anything without the recordings, which
+are held outside this repository on purpose, so the ordinary experience of cloning this is a
+tool that cannot measure. Two of them answered that with an argparse usage error and exit code
+2, which is the code for using a tool wrongly, addressed to somebody who followed the
+documentation. A third raised `SystemExit` and exited 1, which reads as a check that failed.
+All five now print a line beginning COULD-NOT-MEASURE and exit 3.
+
+Rows 260 and 261 are the one worth reading. The caption moved into act 01 was written by the
+reviewer who asked for the move, word for word, and it said act 07 shows the platform refusing
+Spanish **on a real run**, which it does not. The refusal comes from `calle_double`, which raises
+`unsupported_language` out of a region table transcribed from CALL-E's own published list, so a
+reader reproduces it offline with no account, and no call has ever been placed in Spanish. That
+sentence was accepted, written into the page and the README, and only then checked, and nothing
+in this suite would have caught it. It is this entry's own failure mode arriving in the words of
+somebody grading the entry, which is the most persuasive form it takes. Both surfaces now say
+what the run does, and both rows put the overclaim back.
+
+Rows 253 to 255 were measured twice. The first pass ran while the README's own test count was
+one revision behind, so each came back a point high: the mutation's catch plus a failure with
+nothing to do with it. The counts published here are the second pass, against a green suite.
 
 **Every machine-applicable row was re-measured again on 6 September 2026.** Thirty-seven
 rows can be applied by a script. Twenty-nine came
@@ -374,6 +405,15 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 250 | Have the transcript provenance call the waveforms the only audio that ships, on a build that ships the recordings and plays them **Needs the built page.** | 2 |
 | 251 | State four runtime call sites above a list of five | 2 |
 | 252 | Drop the directory from act 08, so neither of the two commands it prints runs from the root of a fresh clone **Needs the built page.** | 2 |
+| 253 | Take the language ceiling off the page, which is what a reword of act 01 does to it now that it is no longer welded to the masthead **Needs the built page.** | 1 |
+| 254 | Point the language ceiling at an act this page does not have, so the one limit a school trustee can check names no demonstration **Needs the built page.** | 1 |
+| 255 | Put the language promise back in the masthead, now that the limit answering it has moved one screen down **Needs the built page.** | 1 |
+| 256 | Declare `--receipts` required again in `tools/throughput.py`, so a reviewer running the documented command is told they used the tool wrongly | 1 |
+| 257 | Report the missing recordings from `tools/video_facts.py` as a SystemExit, which exits 1 and reads as a check that failed | 1 |
+| 258 | Take the shared first word off the page builder's own answer, so four tools report the third outcome in one word and the fifth in its own | 1 |
+| 259 | Strip the flag, the environment variable and the committed file out of one COULD-NOT-MEASURE message, leaving a reviewer told what is missing and nowhere to go for it | 1 |
+| 260 | Say in the README that the OneRoster run prints the platform refusing Spanish on a real call, when no call has been placed in Spanish and the refusal is the double's | 1 |
+| 261 | Say the same in the caption under act 01, in the words the reviewer who asked for that caption wrote it in **Needs the built page.** | 1 |
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

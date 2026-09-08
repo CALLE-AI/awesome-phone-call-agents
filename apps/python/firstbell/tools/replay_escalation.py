@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import math
 import sys
 from pathlib import Path
@@ -113,20 +114,35 @@ def records(receipts: Path) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--receipts", required=True, type=Path,
-                    help="directory of published run receipts")
+    # Not required. A reviewer who clones this and runs the command the README prints has
+    # no receipts directory, because the recordings are held outside the repository on
+    # purpose, and argparse answered that with a usage error and exit 2: the code for using
+    # a tool wrongly, for somebody who used it exactly as documented. Missing input is the
+    # third outcome this entry already has a word and an exit code for.
+    ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"), type=Path,
+                    help="directory of published run receipts, held outside this repository")
     args = ap.parse_args(argv)
 
+    if not args.receipts:
+        print("COULD-NOT-MEASURE  no receipts directory given, so there are no calls to\n"
+              "                   re-file. Pass --receipts DIR or set FIRSTBELL_RECEIPTS.\n"
+              "                   The recordings are deliberately not in this repository,\n"
+              "                   so this is the expected result for anyone but the author.\n"
+              "                   The figure this tool computes is published in\n"
+              "                   evidence/recorded-calls.json and quoted in README.md.")
+        return 3
+
     if not args.receipts.is_dir():
-        print(f"no such directory: {args.receipts}", file=sys.stderr)
-        return 2
+        print(f"COULD-NOT-MEASURE  no such directory: {args.receipts}", file=sys.stderr)
+        return 3
 
     seen = records(args.receipts)
     if not seen:
         # The failure that looks exactly like success. A wrong path reads zero receipts,
         # every claim below is then trivially true of nothing, and the exit code is what
         # says so.
-        print(f"read 0 calls from {args.receipts}. Nothing was checked.", file=sys.stderr)
+        print(f"COULD-NOT-MEASURE  read 0 calls from {args.receipts}. Nothing was checked.",
+              file=sys.stderr)
         return 3
 
     moved = []
