@@ -26,6 +26,13 @@
  * not settle it, because their shapes are identical, which is consistent both
  * with a live serialiser that did not change and with a store that cannot.
  *
+ * One capture in the corpus was taken while its call was still queued. For that
+ * one the conversation is NOT identical by construction, because the call went
+ * on to happen: its differences are the call progressing rather than the
+ * platform moving, and they show up as the queued and pending states no longer
+ * being sent. Only a capture taken at a terminal state supports the argument
+ * this tool rests on.
+ *
  * A second limit follows from the same fact. A frozen conversation cannot
  * produce a new outcome, so on re-reads the vocabulary and behaviour channels
  * are close to inert: a status that reads `completed` will not become a member

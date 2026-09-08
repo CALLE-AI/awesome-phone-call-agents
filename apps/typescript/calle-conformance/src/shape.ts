@@ -60,8 +60,19 @@ const typeOf = (v: unknown): string => {
   return typeof v;
 };
 
+/**
+ * Paths whose children are defined by the caller's own result schema rather
+ * than by the platform. The field itself is part of the contract; what is
+ * inside it is whatever this particular task asked for, so descending into it
+ * reports one task's questions as another task's drift. The first live run made
+ * exactly that mistake and announced a new platform field that was one probe's
+ * own schema key.
+ */
+const CALLER_DEFINED: readonly string[] = ["structuredResult", "recipients[].structuredResult", "metadata"];
+
 function walk(node: unknown, path: string, shape: Set<string>, vocab: Map<string, Set<string>>): void {
   shape.add(`${path}:${typeOf(node)}`);
+  if (CALLER_DEFINED.includes(path)) return;
   if (VOCABULARY.includes(path) && node !== null && typeof node !== "object") {
     const bucket = vocab.get(path) ?? new Set<string>();
     bucket.add(String(node));
