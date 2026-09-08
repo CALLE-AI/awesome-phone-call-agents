@@ -221,6 +221,8 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
+- [Import Rescue](apps/python/import-rescue/) - One consented catalog-clarification callback returns quote-linked import settings and review rows, with a local no-call demo and no catalog writes.
+
 ### Plugins
 
 No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
