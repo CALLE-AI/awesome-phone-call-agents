@@ -8,6 +8,8 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { baseUrl, maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
 
 function withEnv<T>(value: string | undefined, fn: () => T): T {
@@ -62,4 +64,37 @@ describe("a destination printed to a terminal is not a dialable number", () => {
   test("two different numbers still read as different", () => {
     assert.notEqual(maskPhone("+14155550100"), maskPhone("+14155550142"));
   });
+});
+
+/**
+ * Masking a destination is only worth anything if every probe actually uses it.
+ * One of them printed the raw number for weeks, in a project whose own argument
+ * is that terminal output ends up pasted into issues. A reviewer found it, which
+ * is the wrong way round, so the rule is enforced here instead of remembered.
+ */
+describe("no probe prints a destination or a transcript by default", () => {
+  const scripts = readdirSync("scripts")
+    .filter((f) => f.endsWith(".ts"))
+    .map((f) => [f, readFileSync(join("scripts", f), "utf8")] as const);
+
+  test("there are probes to check", () => {
+    assert.ok(scripts.length > 0, "no scripts found to check");
+  });
+
+  for (const [name, source] of scripts) {
+    test(`${name} masks the destination it prints`, () => {
+      const printsRaw = /process\.stdout\.write\([^\n]*\$\{\s*phone\s*\}/.test(source);
+      assert.equal(printsRaw, false, `${name} prints the destination without maskPhone`);
+    });
+
+    test(`${name} does not print transcript text unasked`, () => {
+      // turn.text reaching stdout is only allowed behind an explicit opt-in.
+      const printsText = /process\.stdout\.write\([^\n]*\bturn\.text\b/.test(source);
+      if (!printsText) return;
+      assert.ok(
+        source.includes("--print-transcript"),
+        `${name} prints transcript text with no --print-transcript gate`,
+      );
+    });
+  }
 });

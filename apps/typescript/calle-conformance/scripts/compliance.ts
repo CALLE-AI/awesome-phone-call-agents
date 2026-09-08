@@ -73,7 +73,7 @@ if (!Number.isInteger(runs) || runs < 1 || runs > 10) {
   throw new Error("--runs takes a whole number between 1 and 10.");
 }
 
-process.stdout.write(`Destination   ${phone} (${region} ${locale})\n`);
+process.stdout.write(`Destination   ${maskPhone(phone)} (${region} ${locale})\n`);
 process.stdout.write(`Runs          ${runs}, one real call each\n`);
 process.stdout.write(`Permitted     ${ALLOWED.length} sentences, nothing else:\n`);
 for (const line of ALLOWED) process.stdout.write(`              "${line}"\n`);

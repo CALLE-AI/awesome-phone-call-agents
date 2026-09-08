@@ -13,6 +13,14 @@
  * It prints what it would send and stops. Passing --i-understand-this-places-a-real-call
  * is the only way to make it dial.
  *
+ * What it prints is the SHAPE of the call by default, not its content. Terminal
+ * output gets pasted into issues, so the transcript is summarised as speakers,
+ * offsets and lengths, and the structured result as its keys. Passing
+ * --print-transcript prints the words and the values, which is a decision the
+ * operator makes rather than a default they discover afterwards. The saved
+ * evidence file is unaffected: it is git-ignored, and masking for publication is
+ * src/mask.ts, not this.
+ *
  *   CALLE_TEST_PHONE   destination, E.164, in a supported region. Defaults to the
  *                      CALL-E English testing hotline, which a maintainer published
  *                      on 7 September 2026 for exactly this purpose.
@@ -121,7 +129,17 @@ process.stdout.write(`recipient.status       ${recipient?.status ?? "-"}\n`);
 process.stdout.write(`attempt.failureCode    ${JSON.stringify(attempt?.failureCode ?? null)}\n`);
 process.stdout.write(`taskCompleted          ${String(call.taskCompleted)}\n`);
 process.stdout.write(`completionConfidence   ${JSON.stringify(call.completionConfidence)}\n`);
-process.stdout.write(`structuredResult       ${JSON.stringify(recipient?.structuredResult ?? null)}\n`);
+const showContent = process.argv.includes("--print-transcript");
+const result = recipient?.structuredResult ?? null;
+process.stdout.write(
+  `structuredResult       ${
+    result === null
+      ? "null"
+      : showContent
+        ? JSON.stringify(result)
+        : `${Object.keys(result).length} keys: ${Object.keys(result).join(", ")}`
+  }\n`,
+);
 process.stdout.write(`transcript turns       ${turns.length}\n`);
 process.stdout.write(
   `turns with a timestamp ${turns.filter((t) => t.offset_seconds !== null).length}\n`,
@@ -130,9 +148,16 @@ process.stdout.write(
   `required line spoken   ${spokenByAgent.toLowerCase().includes(REQUIRED_LINE.toLowerCase()) ? "yes, verbatim" : "NOT found verbatim in the transcript"}\n`,
 );
 
-process.stdout.write(`\n--- transcript ---\n`);
+process.stdout.write(`\n--- transcript ${showContent ? "" : "shape "}---\n`);
 for (const [index, turn] of turns.entries()) {
-  process.stdout.write(`${index}  [${turn.offset_seconds ?? "no time"}]  ${turn.speaker}: ${turn.text}\n`);
+  const body = showContent ? turn.text : `${turn.text.length} characters`;
+  process.stdout.write(`${index}  [${turn.offset_seconds ?? "no time"}]  ${turn.speaker}: ${body}\n`);
+}
+if (!showContent) {
+  process.stdout.write(
+    `\nSpeakers, offsets and lengths only. The words are in the saved file, which is\n` +
+      `git-ignored. Pass --print-transcript to print them here as well.\n`,
+  );
 }
 
 process.stdout.write(`\nSaved to ${path}\n`);
