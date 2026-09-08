@@ -23,6 +23,7 @@ const rangeItemClass =
   "hover:bg-primary/10 hover:text-primary data-[state=on]:border-primary data-[state=on]:bg-primary/15 data-[state=on]:text-primary";
 
 export const cardHeadingClass = "text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase";
+export const insightHeadingClass = "text-lg font-semibold tracking-tight text-foreground";
 export const fieldLabelClass = "text-base font-semibold tracking-tight text-foreground";
 
 export function RangePicker({ value, onChange }: { value: Range; onChange: (next: Range) => void }) {
@@ -55,16 +56,19 @@ export function KpiCard({
   hint,
   value,
   detail,
-  bar
+  bar,
+  barCaption
 }: {
   label: string;
   hint?: string;
   value: ReactNode;
-  detail: ReactNode;
+  detail?: ReactNode;
   bar?: number;
+  barCaption?: string;
 }) {
+  const showBar = typeof bar === "number" && barCaption;
   return (
-    <Card className="[--card-spacing:1.5rem]">
+    <Card className="flex h-full flex-col [--card-spacing:1.5rem]">
       <CardHeader className="gap-3 border-b">
         <CardTitle className={cardHeadingClass}>
           {hint ? (
@@ -87,22 +91,42 @@ export function KpiCard({
         </CardTitle>
         <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight">{value}</div>
       </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-        {typeof bar === "number" ? <Progress value={bar} className="mt-4 h-1.5" /> : null}
+      <CardContent className="flex flex-1 items-center">
+        {showBar ? (
+          <div className="flex w-full items-center gap-3">
+            <Progress
+              value={bar}
+              className="h-2 flex-1"
+              aria-label={`${label}: ${barCaption}`}
+            />
+            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{barCaption}</span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{detail}</p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-export function InsightBars({ title, items }: { title: string; items: { label: string; count: number }[] }) {
+export function InsightBars({
+  title,
+  items,
+  titleClassName,
+  tickFontSize
+}: {
+  title: string;
+  items: { label: string; count: number }[];
+  titleClassName?: string;
+  tickFontSize?: number;
+}) {
   return (
     <Card className="overflow-visible [--card-spacing:1.5rem]">
       <CardHeader className="border-b">
-        <CardTitle className={cardHeadingClass}>{title}</CardTitle>
+        <CardTitle className={titleClassName || cardHeadingClass}>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <InsightChart items={items} />
+        <InsightChart items={items} tickFontSize={tickFontSize} />
       </CardContent>
     </Card>
   );

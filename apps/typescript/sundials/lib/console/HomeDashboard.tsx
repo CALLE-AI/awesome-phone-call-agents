@@ -10,12 +10,11 @@ import {
   parseRange,
   SPEED_TO_RING_SLA_SEC,
   SQD_HINT,
-  speedToRingSlaMet,
   type Range,
   withRange
 } from "./format";
 import { AnimatedNumber } from "./AnimatedNumber";
-import { InsightBars, KpiCard, RangePicker, cardHeadingClass } from "./ui";
+import { InsightBars, KpiCard, RangePicker, cardHeadingClass, insightHeadingClass } from "./ui";
 import { useConsoleData } from "./useConsoleData";
 import type { AnalyticsSnapshot, DataSource, LeadQueueItem, SundialCallRecord } from "@/lib/types";
 
@@ -41,7 +40,6 @@ export function HomeDashboard({
   const pickupRate = pct(analytics.kpis.callsCompleted, analytics.kpis.callsRequested);
   const sqdRate = pct(analytics.kpis.salesQualifiedLeads, analytics.kpis.callsCompleted);
   const sla = analytics.kpis.avgResponseTimeSec;
-  const slaMet = speedToRingSlaMet(sla);
 
   return (
     <>
@@ -57,14 +55,9 @@ export function HomeDashboard({
         <KpiCard
           label="Avg Speed-to-Ring"
           value={sla ? formatDuration(sla) : "—"}
-          detail={
-            slaMet
-              ? `Inside ${formatDuration(SPEED_TO_RING_SLA_SEC)} SLA`
-              : sla
-                ? `Above ${formatDuration(SPEED_TO_RING_SLA_SEC)} SLA`
-                : "No completed calls yet"
-          }
-          bar={sla ? Math.min(100, (sla / SPEED_TO_RING_SLA_SEC) * 100) : 0}
+          bar={sla ? Math.min(100, (sla / SPEED_TO_RING_SLA_SEC) * 100) : undefined}
+          barCaption={sla ? `${formatDuration(SPEED_TO_RING_SLA_SEC)} SLA` : undefined}
+          detail={sla ? undefined : "No completed calls yet"}
         />
         <KpiCard
           label="High-Intent Inbound"
@@ -118,10 +111,15 @@ export function HomeDashboard({
       </section>
 
       <section className="grid gap-5 md:grid-cols-3">
-        <InsightBars title="Top inbound pain points" items={analytics.intelligence.topPainPoints} />
+        <InsightBars
+          title="Top inbound pain points"
+          titleClassName={insightHeadingClass}
+          tickFontSize={14}
+          items={analytics.intelligence.topPainPoints}
+        />
         <Card className="overflow-visible [--card-spacing:1.5rem]">
           <CardHeader className="border-b">
-            <CardTitle className={cardHeadingClass}>
+            <CardTitle className={insightHeadingClass}>
               Company size
             </CardTitle>
           </CardHeader>
@@ -129,7 +127,12 @@ export function HomeDashboard({
             <DonutChart items={analytics.intelligence.companySizeDistribution} title="Company size" />
           </CardContent>
         </Card>
-        <InsightBars title="Purchase horizon" items={analytics.intelligence.timelines} />
+        <InsightBars
+          title="Purchase horizon"
+          titleClassName={insightHeadingClass}
+          tickFontSize={14}
+          items={analytics.intelligence.timelines}
+        />
       </section>
 
       <section className="grid gap-5 md:grid-cols-2">

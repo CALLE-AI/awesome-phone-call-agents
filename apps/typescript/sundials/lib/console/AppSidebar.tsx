@@ -18,7 +18,9 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const NAV = [
   {
@@ -134,6 +136,19 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <div className="mx-1 rounded-md border border-sidebar-border bg-sidebar px-3 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <Avatar className="size-8" aria-label="Harbor">
+              <AvatarFallback className="bg-teal-800 text-sm font-semibold text-white">H</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Harbor</p>
+                <Badge variant="secondary">Mock</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

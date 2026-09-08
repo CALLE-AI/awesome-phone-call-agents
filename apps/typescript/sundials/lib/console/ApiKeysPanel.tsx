@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ const REACT_SNIPPET = `import { Sundials } from "@sundials/sdk";
   accountId="${HARBOR_ACCOUNT_ID}"
 />`;
 
-export function ApiKeysPanel({ geminiConfigured }: { geminiConfigured: boolean }) {
+export function ApiKeysPanel({ geminiConfigured: _geminiConfigured }: { geminiConfigured: boolean }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,31 +39,36 @@ export function ApiKeysPanel({ geminiConfigured }: { geminiConfigured: boolean }
   return (
     <div className="max-w-3xl space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">API keys</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">API keys</h1>
+          <Badge variant="secondary">Mock</Badge>
+        </div>
         <p className="text-sm text-muted-foreground">
-          Authenticate client-side events and connect inbound calls to Harbor. Discovery goals on the Brain tab apply
+          Authenticate client-side events and connect inbound calls. Discovery goals on the Brain tab apply
           to every call dispatched with this key.
         </p>
       </div>
 
       <Card className="[--card-spacing:1.5rem]">
-        <CardHeader className="gap-2">
-          <CardTitle>Public SDK key</CardTitle>
-          <CardDescription>Used to authenticate website visitors and associate calls with this workspace.</CardDescription>
-        </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
+            <div className="text-sm font-medium">Public SDK key</div>
             <div className="flex gap-2">
-              <Input readOnly value={HARBOR_PUBLIC_SDK_KEY} className="font-mono" />
+              <Input readOnly value={HARBOR_PUBLIC_SDK_KEY} className="font-mono" aria-label="Public SDK key" />
               <Button type="button" variant="outline" onClick={() => void copy(HARBOR_PUBLIC_SDK_KEY, "key")}>
                 {copied === "key" ? "Copied" : "Copy"}
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Account ID: <code className="font-mono">{HARBOR_ACCOUNT_ID}</code>
-              {" · "}
-              Status: Active demo key
-            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Account ID</div>
+            <div className="flex gap-2">
+              <Input readOnly value={HARBOR_ACCOUNT_ID} className="font-mono" aria-label="Account ID" />
+              <Button type="button" variant="outline" onClick={() => void copy(HARBOR_ACCOUNT_ID, "account")}>
+                {copied === "account" ? "Copied" : "Copy"}
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -94,14 +100,6 @@ export function ApiKeysPanel({ geminiConfigured }: { geminiConfigured: boolean }
           </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-          <p className="text-sm text-muted-foreground">
-            Gemini Flash is server-side only via <code className="font-mono">GEMINI_API_KEY</code> in{" "}
-            <code className="font-mono">.env</code>
-            {geminiConfigured ? " — configured." : " — not configured yet."} After a completed transcript it writes a
-            sales briefing (what the call was about, what the lead wants, and next steps) and can suggest Brain goals
-            every five completed calls. It is never sent to the browser.
-          </p>
         </CardContent>
       </Card>
     </div>

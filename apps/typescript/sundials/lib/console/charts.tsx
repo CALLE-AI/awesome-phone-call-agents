@@ -94,15 +94,18 @@ export function LineChart({ series }: { series: DailyPoint[] }) {
 
 function HorizontalBars({
   items,
-  empty
+  empty,
+  tickFontSize = 12
 }: {
   items: { label: string; count: number }[];
   empty: string;
+  tickFontSize?: number;
 }) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">{empty}</p>;
   }
-  const height = Math.max(200, items.length * 44);
+  const height = Math.max(200, items.length * 48);
+  const axisWidth = tickFontSize > 12 ? 148 : 118;
   return (
     <ChartContainer
       config={barConfig}
@@ -117,12 +120,12 @@ function HorizontalBars({
           type="category"
           tickLine={false}
           axisLine={false}
-          width={118}
-          tick={{ fontSize: 12 }}
+          width={axisWidth}
+          tick={{ fontSize: tickFontSize }}
         />
         <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
         <Bar dataKey="count" fill="var(--color-count)" radius={4} animationDuration={800}>
-          <LabelList dataKey="count" position="right" className="fill-muted-foreground" fontSize={11} />
+          <LabelList dataKey="count" position="right" className="fill-muted-foreground" fontSize={tickFontSize > 12 ? 13 : 11} />
         </Bar>
       </BarChart>
     </ChartContainer>
@@ -180,8 +183,8 @@ export function FunnelBars({ analytics }: { analytics: AnalyticsSnapshot }) {
   );
 }
 
-export function InsightChart({ items }: { items: CountBucket[] }) {
-  return <HorizontalBars items={items} empty="No call intelligence yet." />;
+export function InsightChart({ items, tickFontSize }: { items: CountBucket[]; tickFontSize?: number }) {
+  return <HorizontalBars items={items} empty="No call intelligence yet." tickFontSize={tickFontSize} />;
 }
 
 export function DonutChart({ items, title }: { items: CountBucket[]; title: string }) {
@@ -197,34 +200,49 @@ export function DonutChart({ items, title }: { items: CountBucket[]; title: stri
       ])
     )
   } satisfies ChartConfig;
-  const pieData = items.map((item, i) => ({
-    label: item.label,
-    count: item.count,
-    fill: `var(--color-slice${i})`
-  }));
+  const pieData = items.map((item, i) => {
+    const color = `var(--chart-${(i % 5) + 1})`;
+    return {
+      key: `slice${i}`,
+      label: item.label,
+      count: item.count,
+      fill: color
+    };
+  });
   return (
-    <ChartContainer
-      config={pieConfig}
-      className="mx-auto h-[280px] w-full"
-      initialDimension={{ width: 280, height: 280 }}
-    >
-      <PieChart>
-        <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
-        <Pie
-          data={pieData}
-          dataKey="count"
-          nameKey="label"
-          innerRadius={52}
-          outerRadius={78}
-          strokeWidth={2}
-          animationDuration={800}
-        >
-          {pieData.map((entry) => (
-            <Cell key={entry.label} fill={entry.fill} />
-          ))}
-        </Pie>
-        <ChartLegend content={<ChartLegendContent nameKey="label" />} />
-      </PieChart>
-    </ChartContainer>
+    <div className="flex flex-col items-center gap-4">
+      <ChartContainer
+        config={pieConfig}
+        className="mx-auto aspect-square h-[220px] w-[220px]"
+        initialDimension={{ width: 220, height: 220 }}
+      >
+        <PieChart>
+          <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
+          <Pie
+            data={pieData}
+            dataKey="count"
+            nameKey="label"
+            cx="50%"
+            cy="50%"
+            innerRadius={58}
+            outerRadius={88}
+            strokeWidth={2}
+            animationDuration={800}
+          >
+            {pieData.map((entry) => (
+              <Cell key={entry.key} fill={entry.fill} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+      <ul className="flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
+        {pieData.map((entry) => (
+          <li key={entry.key} className="flex items-center gap-1.5 text-sm text-foreground">
+            <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.fill }} aria-hidden />
+            <span>{entry.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
