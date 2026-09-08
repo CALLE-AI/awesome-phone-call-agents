@@ -40,7 +40,7 @@ and nothing here is a screenshot.
 | A call costs $0.05 and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call**, thirteen events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv` prints four endings for four rows: a reason on record, the platform refusing Spanish, nobody answered, and a guardian the telephone cannot reach. Then `examples/absences-siblings.csv`, which places two calls for four rows |
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 288 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 310 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The recordings are on
 the [evidence page](https://firstbell-evidence.vercel.app), with each call's transcript
@@ -59,7 +59,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Two hundred and eighty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and ten gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
@@ -72,17 +72,17 @@ Five lines do all of it, and the default offline run reaches three of them. Ever
 below is checked by a test, so a line number here cannot quietly rot, and the count in this
 sentence is checked against the list under it.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:429`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:448`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:519`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:538`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:400`, rather than as a string match on a message.
+  `dispatch/scheduler.py:419`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
-  `firstbell/cli.py:374`.
+  `firstbell/cli.py:375`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:434`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:453`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -226,6 +226,29 @@ So the honest position is narrower than "this does not work for a Title VI distr
 the call in Spanish is a platform limit this app cannot lift. Deciding what a Spanish call
 means, refusing to close it on anything less than a guardian's confirmation, and putting it on
 a named person's desk is not, and that is the part a district is short of.
+
+And it is narrower than that paragraph on its own reads, in a way worth stating before a
+district finds it out in the first hour. `tools/adopt_call_records.py` needs a record
+carrying `reason_category`, `expected_return`, `parent_confirmed_aware` and `spoke_with`.
+Those are answers from a conversation. The four products a district is most likely to
+already own, SchoolMessenger, ParentSquare, Blackboard Connect and Remind, are broadcast
+systems: they send, and they record delivery, which is a fact about a network and not about
+a family. They hold no conversation, so they cannot produce those four fields, and every
+record they export would land `undetermined` here. That is the correct filing and it is not
+worth paying for.
+
+So the adoption path serves a district that already owns a **conversational** dialler, one
+that holds a short exchange and returns structured fields, and hands its decisions to
+software that closes on any schema-valid answer. That is a smaller set of districts than the
+one the paragraph above could be read as describing, and the honest way to put it is that
+this narrows the language ceiling for whoever has already solved the harder half of the
+problem. A district that has not solved it is waiting on CALL-E to offer Spanish for a United
+States number, and nothing in this repository changes that.
+
+The shape it reads is documented at the top of the file rather than being any named vendor's
+export, so even the district that does have a conversational dialler writes a mapping first.
+`examples/other-dialler-records.csv` is a runnable one, and a reader can see how small the
+mapping is by looking at how few columns it has.
 
 An outbound call that adapts, holds a short conversation and returns a schema-valid answer
 is a different tool from a broadcast. That is the gap this app sits in.
@@ -1066,24 +1089,24 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 668 tests collected
+python -m pytest tests/ -q          # 693 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**668 is the number collected, and two different pairs add up to it.** Some of these gates
+**693 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **636 passed, 32
+A clean checkout of this commit into an empty directory reports **661 passed, 32
 skipped**. The thirty-two name what is missing rather than passing quietly: twenty-three want a
 built page, four want the page and its Content-Security-Policy, three want a gate report,
 one wants the gate screenshots, and one is a run whose rows are all of one kind, so the
 ordering it would check proves nothing. Build the page and run the gates and the same suite
-reports **666 passed, 2 skipped**. Both pairs are measured, both add up to 668, and the
+reports **691 passed, 2 skipped**. Both pairs are measured, both add up to 693, and the
 difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 635 and 33.
+The very first run in a fresh clone reports one more skip and one fewer pass, 660 and 33.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on
@@ -1264,9 +1287,15 @@ to take the sentence above on trust.
 
 ### The history was rewritten, and here is how much
 
-Eighty-three of the one hundred and sixty-three commits in this directory carry a committer
-date later than their author date, the largest gap being thirty-eight hours. Branches were
-squashed, messages corrected, one range reordered.
+About two in every five commits in this directory carry a committer date later than their
+author date, and the largest gap is thirty-eight hours. Branches were squashed, messages
+corrected, one range reordered.
+
+That used to be stated as an exact pair, eighty-three of one hundred and sixty-three, and
+by the time a reviewer counted it the tree held 86 of 198. It is a proportion now because
+every commit changes both halves of that pair and nothing was recomputing them, which made
+this the one honesty disclosure in the entry that was not itself checked.
+`test_the_commit_provenance_disclosure_is_still_true` recounts it from git on every run.
 
 One of those rewrites removed things a reviewer would expect to find. The maintainer of the
 list this contributes to has required, on several pull requests, that a contributor take

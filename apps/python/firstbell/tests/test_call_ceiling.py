@@ -115,9 +115,17 @@ def test_the_ceiling_counts_calls_not_rows(tmp_path, monkeypatch, double_over_ht
     anything. A ceiling counted on rows would refuse a run that was going to spend nothing,
     and worse, the refusal would name a number of families nobody was going to phone.
 
-    This is also the drift gate on that arithmetic. The condition lives in two places, here
-    and in `WaveDispatcher.run`, and if the dispatcher ever grows a third reason to skip a
-    row then the count in the refusal goes stale and this fails.
+    This is also the drift gate on that arithmetic, and it was not one. Its own docstring
+    said that if the dispatcher grew a third reason to skip a row then this would fail, and
+    the dispatcher had four reasons the whole time: a row held because another absence on
+    the same telephone number is already being called, and a dated consent record that does
+    not cover this call. Neither appears in the file below, so the gate passed over a
+    refusal that named twice the families it was going to phone. A test whose fixture only
+    contains the cases the code already handles cannot notice the ones it does not.
+
+    The count now comes from `dial_refusal`, which is the dispatcher's own gate chain and
+    not a copy of two of its four branches. `test_the_ceiling_and_the_dispatcher_cannot_
+    disagree` below is the gate that this stays true.
     """
     work = tmp_path / "mixed.csv"
     work.write_text(
@@ -154,4 +162,44 @@ def test_the_offline_run_is_not_capped(monkeypatch):
 
     assert main(["--work-file", WORK]) == 0, (
         "the offline run was stopped by something, and it phones nobody"
+    )
+
+
+def test_the_ceiling_and_the_dispatcher_cannot_disagree(tmp_path, monkeypatch,
+                                                        double_over_http):
+    """The refusal's number, against the number of calls the same file really places.
+
+    Measured rather than reasoned about: the file goes through a live run against the double
+    with the ceiling raised, and the calls the transport saw are compared with the count the
+    refusal printed when the ceiling was low. A shared predicate is what makes them agree;
+    this is what proves they do.
+
+    The four rows here are the four reasons the dispatcher skips one, plus two it dials. The
+    siblings share a telephone number, so the second of them is held rather than dialled,
+    and that is the case the old gate had no row for.
+    """
+    work = tmp_path / "every-reason.csv"
+    work.write_text(
+        "id,phones,locale,region,consent,voice,student_name\n"
+        "S-9001,+915559100001,en-IN,IN,yes,yes,One\n"
+        "S-9002,+915559100002,en-IN,IN,no,yes,Two\n"          # never consented
+        "S-9003,+915559100003,en-IN,IN,yes,no,Three\n"        # no voice channel
+        "S-9004,+915559100004,en-IN,IN,yes,yes,Four\n"
+        "S-9005,+915559100004,en-IN,IN,yes,yes,Five\n",       # same number as S-9004
+        encoding="utf-8", newline="\n",
+    )
+
+    monkeypatch.setattr(cli, "DEFAULT_CALL_CEILING", 1)
+    with pytest.raises(SystemExit) as caught:
+        main(["--work-file", str(work), "--live", "--yes-i-mean-it"])
+    refused = str(caught.value.code)
+
+    assert "2 families" in refused, (
+        "five rows: one without consent, one with no voice channel, and one held because a "
+        "sibling on the same number is already being called. Two calls, so the refusal has "
+        f"to say two: {refused!r}"
+    )
+    assert "--max-calls 2" in refused, (
+        "the number the refusal tells an operator to pass has to be the number of calls, or "
+        "following the instruction raises the ceiling to the wrong place"
     )

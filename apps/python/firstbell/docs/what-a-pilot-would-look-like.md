@@ -51,10 +51,17 @@ printed in them.
 
 For a district of 10,000 students that is roughly 277 calls on a school morning and 49,895 in
 a year. Against the $0.59 a call this software's own recorded calls support, about **$29,400
-a year**. Against the $0.19 a call the widest reading of those same calls produces, where
-every escalated call is priced as a callback, about **$9,500 spent** rather than saved. A
-board paper should carry both ends, because which end a district lands on is the thing the
-pilot measures.
+a year of desk time removed**, and the calls themselves cost $0.05 each on the one month of
+billing this account has, so about **$26,900** once they are paid for. Against the $0.19 a
+call the widest reading of those same calls produces, where every escalated call is priced
+as a callback, about **$9,500 spent** rather than saved, and that figure already has the
+call cost inside it. A board paper should carry both ends, because which end a district
+lands on is the thing the pilot measures.
+
+The $0.05 is subtracted here because the loss at the other end is stated net, and the two
+were not comparable: the saving was gross and the cost was not, which ran in this entry's
+favour on the one page a board reads. On the reproducible demo run the same arithmetic is
+$0.35 a call before the call cost and $0.30 after it.
 
 Three things that figure is not.
 
@@ -75,6 +82,47 @@ row reports 0.0% of absence days as out-of-school suspension and 0.0% as incompl
 independent study where the state reports 0.9% and 5.4%. For a district of 396,000 students
 that is a coding difference rather than a fact about children, so the state figure is the one
 used here.
+
+## What that volume does to a rota
+
+The two figures above have never been in the same sentence, and a district buyer who read
+this entry said putting them there was worth more than any number currently published. So:
+
+    277 calls on a morning, in a district of 10,000
+    x 11 of 12 answered, the rate this software's own recorded calls came back at
+    = about 254 answered calls
+    x 5 of 11 marked by the safeguarding rule, the rate those same calls came back at
+    = about 115 escalations on a morning
+    x 30 minutes, the callback window this software prints beside every one of them
+    = about 58 staff-hours, every school morning
+
+**That is a department, not a rota.** Eight people doing nothing else, at a 7.5-hour day.
+Over a 180-day year it is about 20,800 escalations. A pilot sized on the calls and not on
+the callbacks will produce a queue no school can work, and the software will be blamed for
+the queue.
+
+Three things about that arithmetic, because it is the most load-bearing projection in this
+entry and it is the least measured.
+
+**It is a projection and not a result.** The volume is California's, at a state level, from
+a source with a URL. The two rates are this software's, from twelve calls. Twelve calls
+cannot support a rate to two significant figures, and the entry publishes the bound that
+says so: 73 escalations per 100 answered calls is what those eleven answered calls cannot
+rule out, which at this volume is 185 a morning rather than 115. A district's own first week
+is the only thing that narrows it.
+
+**The 30 minutes is this project's default and nobody has agreed to it.** It is in
+`firstbell/domain.py` as `SAFEGUARDING_CALLBACK_MINUTES` and `--safeguarding-minutes`
+changes it, and the run says which of the two it used. A district that has agreed 15 minutes
+with its safeguarding lead halves this. One that has agreed an hour doubles it.
+
+**It is the argument for the escalation rate mattering, not against it.** Every one of those
+115 was going to a person anyway: on the twelve real calls, every call the rule marked had
+already connected and given nothing usable, so a person was ringing that family back
+whichever system placed the call. What the rule adds is the grade, and what the grade buys is
+knowing which of the 254 to work first. At 115 a morning that ordering is the difference
+between a queue and a triage list. It is also why the money section prices those escalations
+both ways and holds this entry to the pessimistic one.
 
 ## The baseline, measured before anything is switched on
 

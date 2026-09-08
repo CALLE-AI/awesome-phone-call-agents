@@ -74,7 +74,7 @@ for _path in (APP, HERE):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from dispatch.consent import load_register, refusal  # noqa: E402
+from dispatch.consent import RegisterError, load_register, refusal  # noqa: E402
 from dispatch.models import Escalation  # noqa: E402
 from firstbell.domain import RESULT_SCHEMA, safeguarding_escalation  # noqa: E402
 from replay_escalation import file_today  # noqa: E402
@@ -105,6 +105,85 @@ TRUE_WORDS = {"true", "yes", "y", "1", "answered"}
 FALSE_WORDS = {"false", "no", "n", "0", "unanswered", "noanswer", "no answer"}
 
 
+def parse_answered(value: object, where: str) -> bool | None:
+    """Whether somebody picked up, out of whatever the export wrote there.
+
+    The CSV path had this vocabulary and the JSONL path had `is False`, so a record whose
+    `answered` was the string `"false"`, or `"no"`, or the number `0`, was read as somebody
+    having picked up, and a call nobody answered was filed closed on whatever result sat
+    beside it. A dialler exporting JSON out of a spreadsheet writes strings, and this is a
+    tool for reading other people's exports.
+
+    Absent stays absent. `answered` has three states and a record that does not say is not a
+    record saying no, which is why this returns `None` rather than defaulting either way.
+
+    Anything else refuses. A value this cannot read is a mapping mistake in the district's
+    export, and guessing at it decides whether a family gets telephoned again.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value in (0, 1):
+            return bool(value)
+        raise RecordError(
+            f"{where} says answered is {value!r}, and the only numbers that mean anything "
+            "here are 0 and 1")
+    if isinstance(value, str):
+        word = value.strip().lower()
+        if not word:
+            return None
+        if word in TRUE_WORDS:
+            return True
+        if word in FALSE_WORDS:
+            return False
+        raise RecordError(
+            f"{where} says answered is {value!r}. This reads "
+            f"{', '.join(sorted(TRUE_WORDS))} as yes and {', '.join(sorted(FALSE_WORDS))} "
+            "as no, and an empty value as the export not saying")
+    raise RecordError(
+        f"{where} says answered is a {type(value).__name__}, which cannot say whether "
+        "somebody picked up the telephone")
+
+
+def parse_numbers(value: object, where: str) -> tuple[str, ...]:
+    """The telephone numbers this call was placed to.
+
+    A bare string is one number, not a sequence of characters. `tuple(str(n) for n in ...)`
+    over `"+15550000101"` produced twelve numbers, one per character, and the consent audit
+    then told an attendance officer that the record "covers 1 number(s) and this row carries
+    12 the record does not name". That sentence is what somebody acts on.
+
+    A scalar is one number too, because an export that writes the number as a JSON integer
+    is wrong about the type and right about the fact. A mapping is neither and refuses.
+    """
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value.strip(),) if value.strip() else ()
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return (str(value),)
+    if isinstance(value, dict):
+        raise RecordError(
+            f"{where} gives numbers as an object. This reads a list of numbers, or one "
+            "number as a string")
+    if isinstance(value, (list, tuple)):
+        out = []
+        for one in value:
+            if isinstance(one, (dict, list, tuple)):
+                raise RecordError(
+                    f"{where} has a {type(one).__name__} inside numbers, and a telephone "
+                    "number is a string")
+            text = str(one).strip()
+            if text:
+                out.append(text)
+        return tuple(out)
+    raise RecordError(
+        f"{where} gives numbers as a {type(value).__name__}, which this cannot read as "
+        "telephone numbers")
+
+
 def read_csv_records(path: Path) -> list[dict]:
     """The same records as a spreadsheet, because that is what a dialler exports.
 
@@ -125,7 +204,21 @@ def read_csv_records(path: Path) -> list[dict]:
         reader = csv.DictReader(handle)
         if not reader.fieldnames:
             raise RecordError(f"{path.name} has no header row, so no column can be named")
-        headers = {name.strip() for name in reader.fieldnames if name}
+        named = [name.strip() for name in reader.fieldnames if name]
+        # A duplicated column, before anything else. `csv.DictReader` keeps the last value
+        # for a repeated header and says nothing, and putting the names in a set hid the
+        # repeat from the check below as well, so a file with `parent_confirmed_aware`
+        # twice carrying `no` and then `yes` was filed closed, and the same file with the
+        # values the other way round was escalated. Two answers to one question is not a
+        # record this tool may pick from.
+        seen: set[str] = set()
+        twice = sorted({name for name in named if name in seen or seen.add(name)})
+        if twice:
+            raise RecordError(
+                f"{path.name} names the column(s) {', '.join(twice)} more than once. Each "
+                "one would silently keep its last value, so a row answering the same "
+                "question two ways would be filed on whichever came last.")
+        headers = set(named)
         unknown = sorted(headers - set(CSV_COLUMNS))
         if unknown:
             raise RecordError(
@@ -146,17 +239,14 @@ def read_csv_records(path: Path) -> list[dict]:
             if cells.get("numbers"):
                 item["numbers"] = [one.strip() for one in cells["numbers"].split(";")
                                    if one.strip()]
-            said = cells.get("answered", "").lower()
-            if said in TRUE_WORDS:
-                item["answered"] = True
-            elif said in FALSE_WORDS:
-                item["answered"] = False
-            elif said:
-                raise RecordError(
-                    f"line {number} of {path.name} says answered={cells['answered']!r}, "
-                    "which this tool will not guess at. Leave the cell empty if the export "
-                    "does not know, because a record that does not say is not a record "
-                    "saying nobody picked up.")
+            # Through the same reader the JSONL path uses. This block used to be the only
+            # place that knew a spreadsheet writes "no" rather than `false`, and the JSONL
+            # path tested `is False`, so the two formats disagreed about the one field that
+            # decides whether a call is closed on a result nobody gave.
+            said = parse_answered(cells.get("answered"),
+                                  f"line {number} of {path.name}")
+            if said is not None:
+                item["answered"] = said
             if cells.get("consent_record"):
                 item["consent_record"] = cells["consent_record"]
             consented = cells.get("consented", "").lower()
@@ -197,6 +287,13 @@ def read_records(path: Path) -> list[dict]:
         if not str(item.get("id") or "").strip():
             raise RecordError(f"line {number} has no id, so its outcome could not be filed "
                               "against a pupil")
+        # Normalised here rather than where they are read, so the two formats cannot
+        # disagree and nothing downstream has to know what a spreadsheet writes.
+        item["answered"] = parse_answered(item.get("answered"), f"line {number}")
+        if item["answered"] is None:
+            del item["answered"]
+        if "numbers" in item:
+            item["numbers"] = list(parse_numbers(item.get("numbers"), f"line {number}"))
         item["_line"] = number
         found.append(item)
     return found
@@ -287,7 +384,8 @@ def audit_consent(items: list[dict], register: dict,
     provenance = {"record": 0, "boolean": 0, "nothing": 0, "refused": 0}
     for item in items:
         reference = str(item.get("consent_record") or "").strip()
-        numbers = tuple(str(n) for n in (item.get("numbers") or ()) if str(n).strip())
+        numbers = parse_numbers(item.get("numbers"),
+                                f"record {item.get('id') or '?'}")
         if reference:
             said = refusal(register.get(reference), str(item["id"]), reference, today,
                            numbers)
@@ -337,12 +435,31 @@ def report(items: list[dict], filed: list[dict], findings: list[dict],
                    "inferring a guardian's confirmation from prose is the defect this "
                    "software exists to catch, wearing better clothes.")
         out.append("")
-    out.append("The queue, escalations first:")
+    # Two lists, because it was one and the closed rows were in it. Every row under a heading
+    # reading "The queue, escalations first" is a row a clerk reads as work, and two of the
+    # six carried the sentence "nothing here needs a person" while sitting in the queue. The
+    # queue is what somebody has to do; the rest is what this filed and is printed after it,
+    # under its own heading, because it is still the answer to what happened to that pupil.
     order = {"escalated": 0, "undetermined": 1, "closed": 2}
-    for one in sorted(filed, key=lambda f: (order[f["outcome"]], str(f["id"]))):
+    rows = sorted(filed, key=lambda f: (order[f["outcome"]], str(f["id"])))
+    queue = [one for one in rows if one["outcome"] != "closed"]
+    closed = [one for one in rows if one["outcome"] == "closed"]
+
+    def line(one: dict) -> str:
         mark = "!!" if one["outcome"] == "escalated" else "  "
-        out.append(f"  {mark} {one['id']:<12} [{one['outcome']}] {one['why']}")
+        return f"  {mark} {one['id']:<12} [{one['outcome']}] {one['why']}"
+
+    if queue:
+        out.append(f"The queue, escalations first. {len(queue)} of {len(filed)} record(s) "
+                   "need a person:")
+        out.extend(line(one) for one in queue)
+    else:
+        out.append(f"Nothing in these {len(filed)} record(s) needs a person.")
     out.append("")
+    if closed:
+        out.append(f"Closed, and needing nobody. {len(closed)} of {len(filed)}:")
+        out.extend(line(one) for one in closed)
+        out.append("")
     # What every row rested on, printed before the refusals and printed at zero, because an
     # omitted line reads as an absence of information about the good path rather than as a
     # count of nothing on it. `firstbell/domain.py` prints its own consent block the same way
@@ -406,6 +523,14 @@ def main(argv=None) -> int:
     except RecordError as bad:
         print(f"COULD-NOT-MEASURE  {bad}")
         return 3
+    except (UnicodeDecodeError, UnicodeError) as bad:
+        # A file that is not UTF-8 raised out of `read_text` and exited 1, which this
+        # tool's own contract reserves for a consent finding under --fail-on-uncovered. A
+        # district exporting from a system with a Windows codepage hits this on the first
+        # accented surname, and the third outcome is exactly what it is for.
+        print(f"COULD-NOT-MEASURE  {args.records} is not UTF-8 text: {bad}. Re-export it "
+              "as UTF-8, or as UTF-8 with a byte order mark, which this also reads.")
+        return 3
     if not items:
         print(f"COULD-NOT-MEASURE  {args.records} holds no call records, only blank or "
               "commented lines.")
@@ -423,9 +548,24 @@ def main(argv=None) -> int:
         if not args.consent_register.is_file():
             print(f"COULD-NOT-MEASURE  no consent register at {args.consent_register}.")
             return 3
-        register = load_register(
-            json.loads(args.consent_register.read_text(encoding="utf-8")),
-            str(args.consent_register))
+        # Both failures, and neither may exit 1. `RegisterError` and `JSONDecodeError`
+        # escaped as tracebacks and took the exit code this tool reserves for a consent
+        # finding, so a script checking the code could not tell "one of these calls rests
+        # on nothing" from "your register file has a typo in it".
+        try:
+            register = load_register(
+                json.loads(args.consent_register.read_text(encoding="utf-8")),
+                str(args.consent_register))
+        except json.JSONDecodeError as bad:
+            print(f"COULD-NOT-MEASURE  {args.consent_register} is not JSON: {bad.msg} at "
+                  f"line {bad.lineno}.")
+            return 3
+        except RegisterError as bad:
+            print(f"COULD-NOT-MEASURE  {bad}")
+            return 3
+        except (UnicodeDecodeError, UnicodeError) as bad:
+            print(f"COULD-NOT-MEASURE  {args.consent_register} is not UTF-8 text: {bad}.")
+            return 3
 
     try:
         filed = [decide(item) for item in items]
@@ -446,7 +586,14 @@ def main(argv=None) -> int:
     else:
         print(report(items, filed, findings, provenance))
 
-    return 1 if (findings and args.fail_on_uncovered) else 0
+    # Every call that does not rest on a dated record, not only the ones that produced a
+    # refusal. The flag's own help says "exit 1 when a call rests on no consent record",
+    # and a bare `consented: true` column is not a record: this report says so itself, on
+    # the line reading "on a boolean". It counted such a row, printed it, withheld the
+    # strong sentence about it, and then exited 0, so the one machine-readable answer
+    # disagreed with everything above it.
+    uncovered = len(findings) + provenance["boolean"] + provenance["nothing"]
+    return 1 if (uncovered and args.fail_on_uncovered) else 0
 
 
 if __name__ == "__main__":

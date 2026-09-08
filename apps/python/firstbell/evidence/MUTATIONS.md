@@ -582,6 +582,28 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 286 | Promote bold and stop, so the one row drawing a distinction between any required field and all of them shows the emphasis as punctuation instead **Needs the built page.** | 1 |
 | 287 | Label the ceiling on the money card as what a call can save, eighty lines from a README that calls the same figure a ceiling and not a saving **Needs the built page.** | 1 |
 | 288 | Drop the sentence naming which of the four money figures to quote and which to plan against, leaving a reader to pick **Needs the built page.** | 1 |
+| 289 | Mark a drop directory's export as one calls have been placed from at the moment it is read, which is before the confirmation flag, before the key check, before the credential origin, before the call ceiling, and on every offline run | 2 |
+| 290 | Mark the export whatever the run did, so a rehearsal against the bundled double, which rings no house, burns the file the morning's real calls come from | 2 |
+| 291 | Mark the export on a wave that dialled nobody, where every row was held for a person on consent, a shared household number or a language this cannot speak, and those rows are tomorrow's work out of the same file | 1 |
+| 292 | Record that the run stopped without setting the flag every worker reads before it dials again, so an operator's Ctrl-C is written on the receipt and the wave carries on out of the queue and out of the backoffs | 3 |
+| 293 | Exit zero from a run that was stopped part way, which is what a cron job wrapping this reads as a morning where every family was called | 1 |
+| 294 | Count the spend ceiling on consent and reachability alone, which is two of the four things that stop a row being dialled, so a file placing two calls is refused as four families and the refusal names the wrong number to raise it to | 1 |
+| 295 | Read a record's `answered` as yes on any word, so a call nobody picked up is closed on the result sitting beside it, which is this entry's founding defect arriving through the adoption path | 3 |
+| 296 | Iterate a single telephone number written as a string, so a consent refusal tells an attendance officer the record covers one number and the row carries twelve | 1 |
+| 297 | Accept a CSV naming one column twice, where the reader keeps the last value silently, so column order decides whether a child's absence is closed | 1 |
+| 298 | Crash on a records file that is not UTF-8, taking the exit code this tool reserves for a consent finding, which a district exporting from a Windows codepage hits on the first accented surname | 1 |
+| 299 | Crash on a consent register that does not validate, so a script cannot tell one of these calls resting on nothing from a typo in the register file | 1 |
+| 300 | Exit zero from `--fail-on-uncovered` on a call resting on a bare boolean, while the line above the exit reads on a boolean and the flag's help says exit one when a call rests on no consent record | 1 |
+| 301 | Print the closed rows inside the queue, under a heading about what needs a person, each carrying the sentence that nothing here needs one | 1 |
+| 302 | Publish the absence volume and the escalation rate and never multiply them, which is what a district buyer said was worth more than any figure already on the page | 1 |
+| 303 | Understate the escalations a morning's volume produces, so a pilot is sized on the calls rather than on the callbacks and the queue it creates is blamed on the software | 1 |
+| 304 | State the commit-provenance disclosure as an exact pair, which both halves of change on every push and which nothing recounts, making the entry's one honesty disclosure the one claim it does not check | 1 |
+| 305 | Read the pair on the page's first screen out of a sentence in the README instead of the measurement sitting beside it, so a stale sentence and a stale card agree with each other and disagree with the suite | 1 |
+| 306 | Name records in a fixture's own comment that the fixture does not contain, so a reader following the comment finds neither | 1 |
+| 307 | Print `the other N` where N is all of them, so a sentence says the rule marked five calls and the other five gave nothing usable | 1 |
+| 308 | Annualise the ceiling without subtracting what the calls cost, against a loss on the same line that is already stated net, which runs in this entry's favour on the one page a board reads | 1 |
+| 309 | Read the cancel flag before the first attempt only, so an item whose first attempt timed out waits out its backoff and telephones the family after the operator has pressed Ctrl-C, holding a request that may already have started that same telephone ringing | 2 |
+| 310 | Take the pair on the page's first screen off the recorded pass count rather than the tests the tree can run, which is a number the gate holding the file against the page lowers by failing, so a stale card has no value it can correct itself to | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
@@ -600,6 +622,38 @@ a pair of asterisks, and removing the bold pass while the italic pass stayed pro
 stray asterisk either side of a real emphasis tag, which is neither of the two shapes it
 looked for. A correct page carries no asterisk in its prose at all, so that is what the
 gate asks now.
+
+Rows 289 to 310 answer three reports read on 9 September 2026: a bug hunt over the calling
+path, a second over the tool that reads another dialler's records, and a district buyer's
+blind review of the whole entry. Every one was reproduced with a command before it was
+fixed and every fix went in with its gate written first. Three of them are worth reading
+on their own.
+
+Row 289 is the worst thing found in this repository. A drop directory keeps a ledger of
+exports calls have gone out from, so no family is telephoned twice about one absence, and
+the digest was written at the moment the file was read. Reading places no calls. Every
+refusal in the program happens after the read, so a district that typed --live without the
+confirmation, or ran the file once to look at it, was told on the next attempt that every
+family in it had already been telephoned. The day's work was unreachable and the message
+explaining why was false.
+
+Row 294 is a gate that was checking its own assumption. The spend ceiling counted rows on
+consent and reachability, the dispatcher refuses rows on four things, and the test written
+to catch exactly that drift said in its own docstring that it would fail if the dispatcher
+grew a third reason. It had four the whole time, and the test's fixture only contained
+rows for the two the ceiling knew about. Both now read one function.
+
+Eight of these twenty killed nothing on the first attempt and not one of them was written
+down on that count. One was the harness: an interrupt escaping the wave makes pytest
+abandon the session and print no failure line at all, so a counter reading failure lines
+saw zero on a mutation that had stopped the suite dead. Two were mutations that did not do
+what they said, renaming a heading while leaving the numbers under it, and changing one
+line of a derivation while three paragraphs went on stating the old figure. One could not
+run yet. The other four were holes: nothing checked the queue against the rows in it,
+nothing checked a fixture's comment against the fixture, nothing checked a remainder
+against the subtraction above it, and nothing recomputed the annual figure after the calls
+were paid for. Four gates were written and one was widened, and every row below is a count
+observed after that.
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

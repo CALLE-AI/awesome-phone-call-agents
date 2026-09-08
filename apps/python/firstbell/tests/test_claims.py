@@ -917,6 +917,18 @@ def test_the_page_says_where_its_source_is_and_whether_a_film_exists():
         "and Demo. A reader cannot tell an unlinked film from no film")
 
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # Counts the history rather than the tree, so a checkout without git, or an export of
+    # this directory on its own, cannot answer it. What is lost while it is quiet is the
+    # claim that the provenance paragraph still describes the commits it is about, which
+    # was untrue for thirty-three commits before this gate existed.
+    "test_the_commit_provenance_disclosure_is_still_true":
+        "needs git history for this directory, which an export of the tree does not carry",
+    # Reads evidence/suite-pair.json, which tools/suite_pair.py writes and which is not
+    # written by running the suite, because a gate cannot require what it produces. What is
+    # lost while it is quiet is the claim that the pass count on the page's first screen is
+    # the measured one; the card falls back to the README sentence in exactly that case.
+    "test_the_recorded_suite_pair_is_the_one_the_readme_publishes":
+        "needs evidence/suite-pair.json, written by python tools/suite_pair.py",
     "test_the_queue_rows_are_the_number_the_committed_record_holds":
         "needs a page built by tools/judge_page.py, which needs the call receipts",
     "test_the_take_away_card_prints_commands_that_can_be_run":
@@ -1917,3 +1929,133 @@ def test_the_queue_rows_are_the_number_the_committed_record_holds():
         assert phrase in said, (
             f"the footer does not say {phrase!r}, so a reader cannot check these rows "
             f"against the one record that is committed")
+
+
+def test_the_commit_provenance_disclosure_is_still_true():
+    """The one honesty disclosure in this entry that nothing was checking.
+
+    It read "Eighty-three of the one hundred and sixty-three commits in this directory carry
+    a committer date later than their author date". A reviewer counted 86 of 198. Both halves
+    of that pair move on every commit, so an exact pair was a claim with a shelf life of one
+    push, and `grep -rn "163|committer" tests/*.py` returned nothing.
+
+    So it is a proportion now, and this recounts it. Skips rather than passes where git is
+    not available, because a checkout without history cannot measure this and a quiet pass
+    would be the third outcome folded into the wrong one.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "log", "--format=%at %ct", "--", "apps/python/firstbell"],
+            capture_output=True, text=True, cwd=APP.parent.parent.parent, timeout=60)
+    except (OSError, subprocess.SubprocessError) as bad:   # pragma: no cover
+        pytest.skip(f"git is not usable here, so the history cannot be counted: {bad}")
+    if out.returncode != 0 or not out.stdout.strip():
+        pytest.skip("no git history for this directory, so there is nothing to count")
+
+    rows = [tuple(int(x) for x in line.split())
+            for line in out.stdout.splitlines() if line.strip()]
+    gaps = [committed - authored for authored, committed in rows if committed > authored]
+    assert rows, "the history came back empty, so this gate is measuring nothing"
+
+    share = len(gaps) / len(rows)
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+
+    assert "two in every five commits" in readme, (
+        "the disclosure has been reworded, so nothing is checking the number in it")
+    assert 0.3 <= share <= 0.5, (
+        f"{len(gaps)} of {len(rows)} commits carry a later committer date, which is "
+        f"{share:.0%} and no longer about two in five. Reword the paragraph in README.md "
+        "rather than leaving a reader a figure the tree contradicts")
+
+    hours = max(gaps) / 3600 if gaps else 0
+    assert "largest gap is thirty-eight hours" in readme, (
+        "the largest gap is no longer stated in words, and it is the part of this "
+        "disclosure a reader can be most surprised by")
+    assert 37.5 <= hours < 38.5, (
+        f"the largest gap between an author date and a committer date is now {hours:.1f} "
+        "hours, and the README still says thirty-eight")
+
+
+def test_every_pair_the_readme_publishes_adds_up_to_the_number_collected():
+    """The count above them was checked. What they add up to was not.
+
+    `README.md` states the number of tests collected, and then explains it with two pairs:
+    what a clean checkout reports, and what the same suite reports once the page is built
+    and the gates have run. Both pairs describe the same suite, so both have to sum to the
+    same number, and that number is the one directly above them.
+
+    They did not. The tree grew by eighteen tests in one night, the collected count moved
+    because a gate made it move, and both pairs went on adding up to the figure from the
+    commit before. A reader checking the arithmetic in that paragraph would have found it
+    consistent with itself and inconsistent with the line above it, which is the worst
+    shape a published number can take: it looks checked because its neighbour is.
+
+    Three more figures in the same paragraph are checked here for the same reason. The
+    first run in a fresh clone reports one more skip and one fewer pass, because the figure
+    on the first screen is generated and `tools/make_figure.py --check` has nothing to
+    compare against until it has run once; that pair is derived from the clean pair rather
+    than read. The breakdown of the skips by reason is spelled in words, so a grep for a
+    digit finds none of it, and it has to add up to the skip count two sentences above it.
+    """
+    collected = _collected_test_count()
+    readme = re.sub(r"\s+", " ", (APP / "README.md").read_text(encoding="utf-8"))
+
+    pairs = [(int(passed), int(skipped)) for passed, skipped
+             in re.findall(r"\*\*(\d+) passed, (\d+) skipped\*\*", readme)]
+    assert len(pairs) >= 2, (
+        f"the README publishes {len(pairs)} measured pair(s) and the paragraph explaining "
+        "the collected count needs two: what a clean checkout reports and what a built one "
+        "reports")
+
+    for passed, skipped in pairs:
+        assert passed + skipped == collected, (
+            f"the README publishes {passed} passed and {skipped} skipped, which is "
+            f"{passed + skipped}, and the suite collects {collected}. Both pairs describe "
+            "this suite, so a pair that does not add up to the count above it was measured "
+            "on a tree that no longer exists")
+
+    stated = re.search(r"both add up to (\d+)", readme)
+    assert stated, (
+        "the README no longer says what the two pairs add up to, and that sentence is the "
+        "one a reader checks the arithmetic against")
+    assert int(stated.group(1)) == collected, (
+        f"the README says both pairs add up to {stated.group(1)} and the suite collects "
+        f"{collected}")
+
+    # The clean pair is the one with more skips, because the skips are what a clean
+    # checkout has instead of a built page.
+    clean = max(pairs, key=lambda pair: pair[1])
+    first = re.search(r"one more skip and one fewer pass, (\d+) and (\d+)", readme)
+    assert first, (
+        "the README no longer states the first-run pair, and two runs of the same suite on "
+        "the same commit giving two answers is worth saying rather than leaving a reader to "
+        "wonder which of us miscounted")
+    assert (int(first.group(1)), int(first.group(2))) == (clean[0] - 1, clean[1] + 1), (
+        f"the first-run pair reads {first.group(1)} and {first.group(2)}, and one fewer "
+        f"pass and one more skip than {clean[0]} and {clean[1]} is {clean[0] - 1} and "
+        f"{clean[1] + 1}")
+
+    opens = readme.find("passing quietly:")
+    assert opens != -1, (
+        "the README no longer breaks the skips down by reason. A skip here is a "
+        "could-not-measure rather than a pass, so a reader is owed the reason for each one")
+    span = readme[opens:]
+    shuts = span.find("Build the page and run the gates")
+    assert shuts != -1, "the breakdown no longer ends where this gate reads it to"
+    span = span[:shuts]
+
+    backwards = {word: value for value, word in NUMBER_WORDS.items()}
+    # No leading comma or "and" required. The first clause of the sentence follows a
+    # colon, so a pattern wanting one of those in front of the number word read four of
+    # the five clauses and would have passed a breakdown missing the largest of them.
+    named = re.findall(r"\b([a-z-]+) (?:wants|want|is)\b", span)
+    counted = [backwards[word] for word in named if word in backwards]
+    assert len(counted) >= 3, (
+        f"the breakdown names {len(counted)} reasons and the skips come from more than "
+        f"that. Clauses read: {named}")
+    assert sum(counted) == clean[1], (
+        f"the breakdown accounts for {sum(counted)} skips {named} and a clean checkout "
+        f"reports {clean[1]}")
+    assert NUMBER_WORDS[clean[1]] in readme.lower(), (
+        f"the README does not spell the skip count in words beside the breakdown, and "
+        f"{clean[1]} is '{NUMBER_WORDS[clean[1]]}'")

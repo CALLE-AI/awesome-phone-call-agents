@@ -36,6 +36,7 @@ from dispatch import (
     SourceError,
     WaveDispatcher,
     default_idempotency_key,
+    dial_refusal,
     redact_free_text,
 )
 
@@ -539,6 +540,31 @@ def _key_label(raw: str) -> str:
     return "-".join(raw.strip().lower().split())
 
 
+def records_as_called_from(*, reached_production: bool, calls_placed: int) -> bool:
+    """Whether this run may mark its export as one that families were telephoned from.
+
+    A drop directory keeps a ledger of exports calls have gone out from, and refuses to
+    read the same content twice so that no family is telephoned about the same absence
+    again. The source used to write that ledger at the moment it read the file. Reading a
+    file telephones nobody, and every refusal in this program happens after the read: the
+    confirmation flag, the missing key, the credential origin, the call ceiling. Each one
+    left the day's export permanently refused under a message saying the calls had already
+    been placed, and an ordinary offline run did the same.
+
+    Both conditions have to hold.
+
+    `reached_production` because nothing else reaches a telephone. A run against the bundled
+    double answers on 127.0.0.1 and rings no house, and a district rehearsing on it would
+    otherwise burn the export it is about to work from.
+
+    `calls_placed` because a wave can complete having dialled nobody. Every row held for a
+    person on consent, on a shared household number, or on a language this cannot speak is
+    a row that still needs calling once somebody has dealt with it, and that is tomorrow's
+    work out of the same file.
+    """
+    return bool(reached_production) and calls_placed > 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     bad_number = _check_numbers(args)
@@ -607,16 +633,19 @@ def main(argv: list[str] | None = None) -> int:
     #
     # The offline default is exempt. It phones nobody and dials nothing, so a ceiling there
     # would cap a demonstration rather than any spend, and it is the run a reviewer executes.
-    # Rows are not calls. A family that never consented is never dialled, and neither is one
-    # the telephone cannot reach; both are gates inside the dispatcher and both come back as
-    # SKIPPED with no call placed. Counting rows would refuse runs that were never going to
-    # spend anything, and would print a number of families nobody was going to phone. The
-    # two conditions are the dispatcher's own, and `test_the_ceiling_counts_calls_not_rows`
-    # fails if they ever stop agreeing.
+    # Rows are not calls, and counting them refuses runs that were never going to spend
+    # anything while printing a number of families nobody was going to phone.
+    #
+    # `dial_refusal` is the dispatcher's own gate chain, not a copy of it. This line used to
+    # read `i.consented and i.reachable_by_voice`, which is two of the four things that stop
+    # a row being dialled, so a file of five rows placing two calls was refused as four and
+    # the refusal told the operator to raise the ceiling to four. The two it missed were a
+    # sibling held because the same number is already being called, and a dated consent
+    # record that does not cover this call.
     #
     # A ceiling of zero or less refuses every live run. That is nonsense to ask for and it
     # fails closed, so it is left to mean what it says rather than guarded again.
-    would_dial = [i for i in items if i.consented and i.reachable_by_voice]
+    would_dial = [i for i in items if dial_refusal(i) is None]
     ceiling = DEFAULT_CALL_CEILING if args.max_calls is None else args.max_calls
     if mode.live and len(would_dial) > ceiling:
         raise SystemExit(
@@ -654,6 +683,21 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarise(report.results, live=mode.reached_production, rate=rate,
                         staff=_staff_from(args),
                         escalation_staff=_escalation_staff_from(args))
+
+    # Now, and only now, the drop directory learns its export has been called from. The
+    # source used to record that at the moment it read the file, which is before the
+    # confirmation flag, before the key check, before the credential-origin refusal and
+    # before the call ceiling, so any one of those stranded the day's work under a message
+    # saying every family in it had already been telephoned. An offline run stranded it too.
+    #
+    # The rule is in `records_as_called_from` rather than inline, because the branch it
+    # guards is only ever true against the real telephone network and a rule nothing can
+    # exercise is a rule nobody has checked.
+    if records_as_called_from(reached_production=mode.reached_production,
+                             calls_placed=summary.calls_placed):
+        recorder = getattr(source, "placed_calls_from", None)
+        if recorder is not None:
+            recorder()
 
     if args.json:
         print(json.dumps({
@@ -751,6 +795,11 @@ def main(argv: list[str] | None = None) -> int:
                        api_responded=dispatcher.api_responded)
         print(f"\nReceipt written to {args.receipt}")
 
+    # An interrupted wave is not a completed wave, and a cron job reading the exit code has
+    # no other way to learn that. It was exit 0 with a summary that read like a finished
+    # run, over however many rows the operator got through before pressing Ctrl-C.
+    if report.cancelled:
+        return 4
     return 1 if report.fatal_error else 0
 
 
@@ -786,6 +835,17 @@ def _print_human(report: DispatchReport, summary, safeguarding_minutes: int) -> 
     # attempt lists that were read back, and these calls have none, so they contribute
     # zero to `calls placed` and zero to `attempts billed` while the vendor may still
     # bill them. A reader has to see that before the totals, not after.
+    # An interrupted run, said in words, above the totals for the same reason as the block
+    # below: every number under this line is counted over the rows that ran and not over
+    # the rows that were in the file. `report.cancelled` reached `--json` and `--receipt`
+    # and no human-readable line, so somebody who pressed Ctrl-C read a normal summary.
+    if report.cancelled:
+        print()
+        print(f"This run was stopped after {report.cancelled_after} of "
+              f"{len(report.results)} row(s). Every figure below counts only those, and "
+              "the rows marked cancelled were never dialled, so they are still owed a "
+              "call.")
+
     if report.not_recallable:
         by_call = {r.call_id: r for r in report.results if r.call_id}
         print()

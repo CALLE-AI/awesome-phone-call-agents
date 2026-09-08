@@ -39,6 +39,8 @@ import re
 import sys
 from pathlib import Path
 
+from firstbell.domain import SAFEGUARDING_CALLBACK_MINUTES
+
 APP = Path(__file__).resolve().parent.parent
 if str(APP / "tools") not in sys.path:
     sys.path.insert(0, str(APP / "tools"))
@@ -107,6 +109,25 @@ def _doc() -> str:
     document that said exactly what it had been asked to say.
     """
     return re.sub(r"\s+", " ", DOC.read_text(encoding="utf-8"))
+
+
+def _rota_block() -> str:
+    """The rota section on its own, with its line breaks kept.
+
+    Kept raw because the derivation is a block of indented lines and each assertion below
+    is about one of those lines, not about the document holding the number somewhere. And
+    extracted by heading so that a document with the section removed fails here rather
+    than passing on the copies of the same figures in the paragraphs around it.
+    """
+    raw = DOC.read_text(encoding="utf-8")
+    heading = "## What that volume does to a rota"
+    start = raw.find(heading)
+    assert start != -1, (
+        f"{DOC.name} no longer has a section headed \"{heading}\", so the entry publishes "
+        "the absence volume and the escalation rate and never multiplies them, which is "
+        "what a district buyer said was worth more than any figure already on the page")
+    rest = raw.find("\n## ", start + len(heading))
+    return raw[start:] if rest == -1 else raw[start:rest]
 
 
 def test_every_line_of_the_derivation_is_one_the_register_produces():
@@ -212,3 +233,108 @@ def test_the_document_says_the_figure_is_a_ceiling_and_why():
     assert re.search(r"subset|upper bound", doc), (
         "the document does not say the call volume is smaller than the absence volume, so "
         "a reader multiplies the per-call money by too many calls")
+
+
+def test_the_rota_projection_is_the_product_of_the_two_figures_it_names():
+    """The most load-bearing projection in this entry, recomputed rather than read.
+
+    A district buyer said the entry published the absence volume and the escalation rate and
+    never multiplied them, and that doing so was worth more than any figure already on the
+    page. It is now multiplied, which means five numbers in one paragraph are all derived
+    from two sources, and a change to either source silently invalidates all five. So each
+    one is recomputed here from `evidence/statistics.json` and `evidence/recorded-calls.json`
+    rather than matched as a string.
+
+    The escalation bound is checked too. A projection stated to two significant figures off
+    eleven answered calls has to carry what those calls cannot rule out, and this entry
+    spends four gates on that rule elsewhere; the paragraph would be the one place it did
+    not apply.
+
+    The first version of this gate asked whether each figure appeared anywhere in the
+    document. A mutation that understated the escalations on the derivation line alone was
+    measured at zero failures, because 115 also appears in three of the paragraphs
+    underneath and one of those satisfied the assertion. So each line is now matched as the
+    line it is, inside a section found by its heading, and both defects fail: changing a
+    figure, and removing the section.
+    """
+    doc = _rota_block()
+    counts = json.loads((APP / "evidence" / "recorded-calls.json")
+                        .read_text(encoding="utf-8"))["counts"]
+
+    per_thousand = 27.7          # from the derivation this file already checks, above
+    enrolled = 10_000
+    morning = per_thousand * enrolled / 1000
+    answered = morning * counts["answered"] / counts["calls"]
+    escalations = answered * counts["escalated"] / counts["answered"]
+    hours = escalations * SAFEGUARDING_CALLBACK_MINUTES / 60
+
+    for line, what in ((f"{round(morning)} calls on a morning", "the volume it starts from"),
+                       (f"= about {round(answered)} answered calls", "the answered line"),
+                       (f"= about {round(escalations)} escalations on a morning",
+                        "the escalation line"),
+                       (f"= about {round(hours)} staff-hours", "the staff-hours line")):
+        assert line in doc, (
+            f"{what} of the derivation does not read \"{line}\". That is what "
+            f"{counts['answered']} of {counts['calls']} answered and "
+            f"{counts['escalated']} of {counts['answered']} escalated give at this volume, "
+            "and a pilot sized on the calls rather than on the callbacks blames the queue "
+            "it creates on the software")
+
+    prose = re.sub(r"\s+", " ", doc)
+
+    assert f"{SAFEGUARDING_CALLBACK_MINUTES} minutes" in doc, (
+        "the callback window in the arithmetic has to be the one the code uses, because a "
+        "district changing it with --safeguarding-minutes changes this answer")
+
+    # To the nearest hundred, which is how the document states it, because a projection
+    # off twelve calls printed as 20,775 claims a precision it does not have. The rounding
+    # is computed rather than trusted, so the figure still moves if either source does.
+    annual = round(escalations * 180 / 100) * 100
+    assert f"{annual:,}" in prose, (
+        f"the annual figure is not {annual:,}, and a per-morning number is the one a "
+        "district under-plans from")
+
+    # And the wide reading, at the same volume.
+    from replay_escalation import upper_bound
+    wide = round(answered * upper_bound(counts["escalated"], counts["answered"]))
+    assert str(wide) in prose, (
+        f"the projection does not say that the escalation bound puts this at {wide} a "
+        "morning rather than the measured figure. Eleven answered calls cannot support a "
+        "rate to two significant figures and every other surface in this entry says so")
+    assert "projection and not a result" in prose, (
+        "the paragraph no longer says it is a projection, and it multiplies a state-level "
+        "volume by two rates measured on twelve calls")
+
+
+def test_the_annual_saving_is_stated_after_the_calls_are_paid_for():
+    """The gross figure and the net one are two thousand dollars apart, and one is fair.
+
+    The loss at the other end of the band already has the call cost inside it. Stating the
+    saving gross put a net loss beside a gross saving on the one page a board reads, and
+    the difference ran in this entry's favour. Both ends are now net, and the net figure is
+    recomputed here from the billed price rather than read out of the sentence, so a price
+    change moves it instead of quietly making the page wrong.
+    """
+    from money_across_runs import demo_row, observed, pooled_live_row
+
+    pooled = pooled_live_row()
+    assert pooled, "there is no pooled row, so there is no per-call figure to annualise"
+    price = observed()["observed"]["per_call_usd"]
+    got = _derived()
+    doc = _doc()
+
+    a_year = got["a_student_a_year"] * EXAMPLE_DISTRICT
+    net = round(a_year * (pooled["net_ceiling"] - price), -2)
+    assert f"${net:,.0f}" in doc.replace("**", ""), (
+        f"the document annualises the saving without paying for the calls. At ${price:,.2f} "
+        f"a call and {a_year:,.0f} calls a year the figure is ${net:,.0f}")
+    assert (f"The ${price:,.2f} is subtracted here because the loss at the other end is "
+            "stated net") in doc, (
+        "the document nets out the call cost without saying why it does, and the reason is "
+        "the only thing that makes the two ends of the band comparable")
+
+    demo = demo_row()["net_ceiling"]
+    assert (f"${demo:,.2f} a call before the call cost and ${demo - price:,.2f} after it"
+            in doc), (
+        "the demo run's before-and-after pair is not the one the tool computes, and it is "
+        "the pair a reviewer can reproduce without an account")

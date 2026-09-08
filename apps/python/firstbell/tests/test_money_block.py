@@ -266,3 +266,52 @@ def test_the_cell_says_the_page_receipt_is_a_third_run():
     assert "receipt is a third run" in markup
     assert "money_across_runs.py" in markup, (
         "the page states a handful of figures and does not say where the rest are")
+
+
+def test_the_remainder_sentence_is_a_distinction_and_not_a_subtraction():
+    """"The rule marked 5 and the other 5 gave nothing usable" is one sentence too clever.
+
+    The line above states how many of the marked calls became new work, and the line under
+    it prices the rest. With none of them new the rest is all of them, so "the other 5"
+    printed a subtraction as though it were a distinction, and a reader who trusted it
+    thinks ten calls were marked. The remainder is checked against the two figures above
+    it here, in both directions, because the sentence has to change shape when the count
+    does and nothing else notices when it does not.
+    """
+    import re
+
+    from money_across_runs import pooled_live_row, rows, table
+
+    pooled = pooled_live_row()
+    assert pooled, "there is no pooled row, so the paragraph this checks is not printed"
+    text = table(rows(None))
+
+    said = re.search(r"safeguarding rule marked (\d+) of those (\d+) answered calls, and "
+                     r"(none|\d+) of them counts as new work", text)
+    assert said, (
+        "the table no longer states how many marked calls became new work, which is the "
+        "figure the whole band rests on")
+    marked, answered, new = said.group(1), said.group(2), said.group(3)
+    marked, answered = int(marked), int(answered)
+    new = 0 if new == "none" else int(new)
+    assert (marked, answered, new) == (pooled["escalated"], pooled["answered"],
+                                       pooled["net_new"]), (
+        f"the sentence says {marked} of {answered} marked and {new} new, and the figures "
+        f"are {pooled['escalated']}, {pooled['answered']} and {pooled['net_new']}")
+
+    other = re.search(r"the other (\d+) connected and gave nothing usable", text)
+    if new:
+        assert other, (
+            f"{new} of the {marked} marked calls became new work and the table does not "
+            "say what the rest of them did")
+        assert int(other.group(1)) == marked - new, (
+            f"the table says the other {other.group(1)} gave nothing usable, and "
+            f"{marked} marked less {new} new is {marked - new}")
+    else:
+        assert other is None, (
+            f"none of the {marked} marked calls became new work, so the remainder is all "
+            f"{marked} of them and \"the other {other.group(1)}\" reads as a second group "
+            "of calls that does not exist")
+        assert "every one of them connected and gave nothing usable" in text, (
+            "with no call counted as new work the table has to say so in words, because "
+            "the number on its own is the one that got printed as a distinction")

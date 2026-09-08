@@ -429,17 +429,46 @@ def _suite_pair() -> tuple[int, int]:
 
     The page cannot measure the pair for itself. Collecting is cheap and `test_count` does
     it, but a pass-and-skip pair needs the suite to run, and the suite reads the page this
-    function is building. So it comes from the README, which states the measurement, whose
-    collected count is held against a live collection by
-    `test_the_readme_states_the_real_number_of_tests`, and whose pair is held against the
-    card by a gate in `tests/test_page_prose_counts.py`.
+    function is building.
+
+    So it is measured separately and written down. `tools/suite_pair.py` runs the suite and
+    records what happened in `evidence/suite-pair.json`, the same way
+    `evidence/recorded-calls.json` holds counts for calls whose receipts are outside this
+    tree. This reads that file.
+
+    It used to read the sentence in the README instead, and a reviewer in the buyer's seat
+    was right to call that out: in an entry arguing that a claim ships with the thing that
+    checks it, the largest count on the front screen was the one figure a person had typed.
+    The README falls back only when the file is absent, which is a clean checkout that has
+    not run the tool, and `test_the_recorded_suite_pair_is_the_one_the_readme_publishes`
+    holds the two together whenever both exist.
     """
+    recorded = APP / "evidence" / "suite-pair.json"
+    if recorded.is_file():
+        try:
+            held = json.loads(recorded.read_text(encoding="utf-8"))
+            # Collected less skipped, not the pass count. "Run here" means the tests this
+            # tree can exercise at all, as against the ones wanting the recordings, a built
+            # page or a gate report, and that is what the card claims. Reading `passed`
+            # made the number depend on whether the suite was green, and the gate holding
+            # this file against the README's sentence is one of the tests in it: a stale
+            # file failed that gate, which lowered the pass count, which was recorded as
+            # the new pair and was still stale. There was no value the pair could settle
+            # on. A skip is a could-not-measure whatever else the run did, so these two are
+            # the quantities a failing gate does not move.
+            return int(held["collected"]) - int(held["skipped"]), int(held["skipped"])
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as bad:
+            raise SystemExit(
+                f"{recorded.name} does not hold a measured pair ({bad}). Run "
+                "`python tools/suite_pair.py` to write it.") from bad
+
     readme = (APP / "README.md").read_text(encoding="utf-8")
     found = re.search(r"the same suite\s+reports \*\*(\d+) passed, (\d+) skipped\*\*", readme)
     if not found:
         raise SystemExit(
-            "the README no longer states the built-tree pair where the page reads it, so "
-            "the stat card cannot say how many of the collected tests run")
+            "the README no longer states the built-tree pair where the page reads it, and "
+            "evidence/suite-pair.json is absent, so the stat card cannot say how many of "
+            "the collected tests run. Run `python tools/suite_pair.py`.")
     return int(found.group(1)), int(found.group(2))
 
 
@@ -1308,13 +1337,24 @@ def _money_key_block(f: dict) -> str:
     # codes either one is the defect this page spends four thousand words on.
     demo = (f.get("demo") or {}).get("net_ceiling")
     every = pooled.get("ceiling_if_every_escalation_is_new")
+    price = (f.get("price") or {}).get("per_call_usd")
     quote = ""
     if demo is not None and every is not None and every < 0:
+        # Three figures in one order, because a district met four across three surfaces and
+        # said it could not tell which one this entry stood behind. Smallest reproducible
+        # saving, then the cost the widest reading prices out to, then what was actually
+        # billed. All three derived.
+        billed = ("" if price is None else
+                  f'The calls themselves were billed at ${price:,.2f} each on the one '
+                  'month of usage this account has. ')
         quote = (
             f'Quote the demo run&#8217;s ${demo:,.2f} rather than the ceiling above: it is '
             'the smaller of the two and one command reproduces it. Plan against the '
             f'${abs(every):,.2f} a call this becomes if every escalated call is priced as '
-            'a callback, which is the reading this entry holds itself to. ')
+            'a callback, which is the reading this entry holds itself to. '
+            + billed +
+            'Which of those two a district is living in is what the first week of a pilot '
+            'measures, and nothing before that week can settle it. ')
 
     worse, widest, how_many = "", "", "two"
     if pooled.get("escalated_bound") is not None and pooled.get("escalated"):

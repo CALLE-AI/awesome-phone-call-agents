@@ -29,6 +29,7 @@ from dispatch import (
     mask,
     problems,
 )
+from dispatch.models import CANCELLED
 from dispatch.validation import UnsupportedSchema
 from tests.fixtures import IN_A, IN_FALLBACK
 
@@ -1292,3 +1293,202 @@ def test_a_fatal_code_on_a_read_stops_the_run_rather_than_retrying_it():
         "the call that was placed and then lost is not named in not_recallable, so the "
         "run cannot say what it left in flight"
     )
+
+
+def test_an_interrupt_stops_dialling_and_keeps_what_happened():
+    """Ctrl-C during a wave used to telephone everybody anyway, then lose the receipt.
+
+    Every future was submitted up front, so the `with ThreadPoolExecutor` block's own exit
+    ran `shutdown(wait=True)` with no `cancel_futures`, and the queue drained to the end.
+    A probe interrupting after 2 of 8 creates watched all 8 reach the transport and then got
+    no report at all, because the exception left `run` before it could return one. The
+    dispatcher already had `cancel()`, `report.cancelled` and `report.cancelled_after`, and
+    nothing in the shipped path reached any of them.
+
+    An operator pressing Ctrl-C means stop telephoning these families. It does not mean
+    forget which ones you already telephoned, so the report comes back with a row for every
+    item and the caller can still write its receipt.
+    """
+    calls = []
+
+    class Calls:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            time.sleep(0.05)
+            if len(calls) == 3:
+                raise KeyboardInterrupt
+            return {"id": f"c{len(calls)}", "status": "completed",
+                    "created_at": "2026-09-08T00:00:00Z",
+                    "result": dict(GOOD), "transcript": list(TALK)}
+
+        def get(self, call_id):
+            return {"id": call_id, "status": "completed", "result": dict(GOOD),
+                    "transcript": list(TALK)}
+
+    class Client:
+        def __init__(self):
+            self.calls = Calls()
+
+    items = [WorkItem(id=f"S-{n}", phones=("+15550000201",), consented=True)
+             for n in range(8)]
+    dispatcher = WaveDispatcher(
+        Client(), task_builder=lambda item: "task", result_schema=SCHEMA,
+        concurrency=1, poll_interval_seconds=0, sleep=lambda seconds: None)
+
+    report = dispatcher.run(items)
+
+    assert report.cancelled is True, (
+        "the interrupt was swallowed without saying so, and a receipt that does not record "
+        "having been interrupted reads as a complete run")
+    assert len(calls) < len(items), (
+        f"{len(calls)} of {len(items)} calls were placed after an interrupt, so pressing "
+        "Ctrl-C telephoned the families it was pressed to stop calling")
+    assert len(report.results) == len(items), (
+        "some rows have no result at all, so the receipt cannot say what happened to them")
+    assert report.cancelled_after == len([r for r in report.results
+                                          if r.reason != CANCELLED]), (
+        "cancelled_after has to be the number of rows this run actually got through")
+    assert [r.item.id for r in report.results] == [i.id for i in items], (
+        "the report reordered the rows, so a clerk reading it top down is not reading the "
+        "order the work came in")
+
+
+def test_an_interrupt_stops_a_handler_that_is_between_attempts():
+    """The other half of stopping, and the half the test above cannot see.
+
+    The interrupt handler stops the wave twice over. `cancel()` sets a flag every worker
+    reads before it dials again, and `shutdown(cancel_futures=True)` drops whatever the
+    pool has not started. At a concurrency of one no worker is ever between attempts, so
+    taking the flag out changes nothing the test above can observe, and a mutation that
+    took it out killed nothing. Two stops and one of them unpinned.
+
+    The case where only the flag helps is an item whose first attempt timed out. A timeout
+    is not an answer, so that item is sitting in a backoff holding a request that may
+    already have started a telephone ringing, and the next thing it will do is dial again.
+    An operator pressing Ctrl-C during that backoff means do not dial again. With the flag
+    the item comes back undetermined and carrying its idempotency key, which is a row a
+    person picks up and can safely retry tomorrow. Without it the item waits the backoff
+    out and telephones the family after the operator has stopped the run.
+
+    The two items go in with the interrupting one first, because results are collected in
+    submission order and the collecting loop blocks on each in turn. Behind the second one
+    the interrupt would not be seen until the backoff it is supposed to cut short had
+    already finished.
+    """
+    from calle import CalleTimeoutError
+
+    attempts: dict[str, int] = {}
+    running: list[WaveDispatcher] = []
+    in_backoff = threading.Event()
+
+    class Calls:
+        def create(self, **kwargs):
+            who = kwargs["metadata"]["work_item"]
+            attempts[who] = attempts.get(who, 0) + 1
+            if who == "S-interrupt":
+                # Not before the other item has dialled once and timed out. An interrupt
+                # landing earlier than that is the case the test above holds, and it comes
+                # back cancelled before dialling, which proves nothing about the backoff.
+                if not in_backoff.wait(5):
+                    raise RuntimeError("the other item never reached its backoff")
+                raise KeyboardInterrupt
+            if attempts[who] == 1:
+                in_backoff.set()
+                raise CalleTimeoutError("read timed out")
+            return {"id": f"c-{who}", "status": "completed",
+                    "created_at": "2026-09-08T00:00:00Z",
+                    "result": dict(GOOD), "transcript": list(TALK)}
+
+        def get(self, call_id):
+            return {"id": call_id, "status": "completed", "result": dict(GOOD),
+                    "transcript": list(TALK)}
+
+    class Client:
+        def __init__(self):
+            self.calls = Calls()
+
+    def sleep(seconds):
+        """The backoff, returning the moment the operator's interrupt lands.
+
+        Bounded rather than open. A mutation that never sets the flag has to end this test
+        with a failure and not hang it, so the wait gives up after two seconds and the
+        assertions below then see the second attempt it allowed.
+        """
+        for _ in range(200):
+            if running and running[0].cancelled:
+                return
+            time.sleep(0.01)
+
+    items = [WorkItem(id="S-interrupt", phones=("+15550000301",), consented=True),
+             WorkItem(id="S-slow", phones=("+15550000302",), consented=True)]
+    dispatcher = WaveDispatcher(
+        Client(), task_builder=lambda item: "task", result_schema=SCHEMA,
+        concurrency=2, poll_interval_seconds=0, sleep=sleep)
+    running.append(dispatcher)
+
+    report = dispatcher.run(items)
+
+    assert report.cancelled is True, "the interrupt was swallowed without saying so"
+    assert attempts.get("S-slow") == 1, (
+        f"the item in a backoff dialled {attempts.get('S-slow')} times. One is the whole "
+        "point: the first attempt timed out, and anything after it went out after the "
+        "operator had pressed Ctrl-C to stop telephoning these families. None would mean "
+        "it never dialled at all, which is a different case and not this one")
+
+    slow = [one for one in report.results if one.item.id == "S-slow"]
+    assert len(slow) == 1, f"S-slow has {len(slow)} rows in the report and needs one"
+    assert slow[0].resolution is Resolution.UNDETERMINED, (
+        "an item whose attempt timed out and was then cancelled came back as "
+        f"{slow[0].resolution}, and a timeout is not an answer: {slow[0].reason}")
+    assert "waiting to be retried" in (slow[0].reason or ""), (
+        "the row does not say it was cancelled between attempts, so a clerk reading it "
+        f"cannot tell it from a call nobody answered: {slow[0].reason}")
+    assert slow[0].possibly_placed_key, (
+        "the row carries no idempotency key, so a person picking it up tomorrow cannot "
+        "retry it without risking a second call to the same house")
+
+
+def test_a_stopped_run_says_so_in_words_and_in_the_exit_code(tmp_path, monkeypatch, capsys):
+    """The two surfaces an operator actually reads.
+
+    `report.cancelled` reached `--json` and `--receipt` and no printed line, so somebody who
+    pressed Ctrl-C read a summary that looked like a finished morning, and the exit code was
+    0, which is what a cron job wrapping this checks. Exit 4 because 1 is a fatal error and
+    2 is a refusal before anything was dialled: an interrupted wave is neither, and the
+    difference matters to whoever has to work out what still needs calling.
+    """
+    import socket
+
+    from calle_double.server import serve
+    from firstbell.cli import main
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    real = WaveDispatcher.run
+
+    def stopped(self, items):
+        report = real(self, items)
+        report.cancelled = True
+        report.cancelled_after = 1
+        return report
+
+    monkeypatch.setattr(WaveDispatcher, "run", stopped)
+    server = serve(port=port)
+    try:
+        monkeypatch.setenv("CALLE_API_KEY", "iams_test_anything")
+        monkeypatch.setenv("CALLE_BASE_URL", f"http://127.0.0.1:{port}")
+        code = main(["--work-file", "examples/absences.csv", "--live", "--yes-i-mean-it",
+                     "--limit", "2"])
+    finally:
+        server.shutdown()
+
+    printed = capsys.readouterr().out
+    assert code == 4, f"a stopped run exited {code}, which a cron job reads as a good morning"
+    assert "was stopped after" in printed, (
+        "nothing on the human-readable output says the run did not finish, and every total "
+        "printed under it counts only the rows that ran")
+    assert "still owed a call" in printed, (
+        "the output has to say the untouched rows are still work, because that is the only "
+        "thing the operator has to do next")

@@ -471,8 +471,15 @@ def table(data: list[dict]) -> str:
                 "",
                 f"The safeguarding rule marked {pooled['escalated']} of those "
                 f"{pooled['answered']} answered calls, and {counted}:",
-                f"the other {pooled['escalated'] - pooled['net_new']} connected and gave "
-                "nothing usable, so a person was ringing those",
+                # "the other N" only when some of them were new work. With none new,
+                # the remainder is all of them, and the sentence read "marked 5 ...
+                # the other 5", which is a subtraction printed as a distinction. The
+                # README says the same thing correctly and this now matches it.
+                (f"the other {pooled['escalated'] - pooled['net_new']} connected and "
+                 "gave nothing usable, so a person was ringing those"
+                 if pooled["net_new"] else
+                 "every one of them connected and gave nothing usable, so a person "
+                 "was ringing those"),
                 "families back whatever placed the call and the rule added the grade "
                 "rather than the",
                 f"callback. That reading is ours. Price all {pooled['escalated']} as "

@@ -3,6 +3,21 @@
 Three derivations, in the order a district asks for them: why the headline figure is a
 ceiling and not a saving, what the safeguarding rule costs at the grade it lands on, and
 where the saving turns into a loss.
+## The one line, if you only read one
+
+**Quote $0.35 a call.** It is the smallest of the figures here, it is the one a reader
+reproduces with one command, and it is the demo run's. **Plan against $0.19 a call as a
+cost**, which is what the same arithmetic gives when every escalated call is priced as a
+callback rather than only the ones this software says it created. **The calls were billed at
+$0.05 each**, on the one month of usage one account has. Which of the first two a district is
+living in is what the first week of a pilot measures, and nothing published before that week
+can settle it.
+
+That line is here because a district buyer read this entry and counted four per-call figures
+across three surfaces without being told which one it stands behind. Every one of them is
+defined and sourced below. Being defined is not the same as being usable, and a reader who
+has to assemble the ranking themselves will pick the largest number or none of them.
+
 
 This was three sections of the README. Two readers who came to the entry as district buyers
 said they stopped reading in exactly this stretch, which is fair: it sits after the table

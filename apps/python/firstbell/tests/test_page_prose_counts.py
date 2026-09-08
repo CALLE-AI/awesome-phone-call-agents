@@ -240,3 +240,108 @@ def test_the_language_ceiling_is_on_the_page_and_names_its_demonstration():
         + ". CALL-E offers one language per country and English in the United States, so "
         "that sentence is disproved by one page of its region table. The ceiling is in "
         f"act 01; a promise up here needs it back beside it.")
+
+
+def test_the_recorded_suite_pair_is_the_one_the_readme_publishes():
+    """The largest count on the front screen used to be the one nothing checked.
+
+    `tools/judge_page.py` printed "N tests, M of them run here" and read M out of a sentence
+    in the README, which its own docstring admitted: "The page cannot measure the pair for
+    itself." The collected count was held against a live collection. The pair beside it was
+    held against the prose it was copied from, so a stale sentence made the card stale and
+    both agreed with each other while disagreeing with the suite.
+
+    `tools/suite_pair.py` measures it and writes `evidence/suite-pair.json`. That tool is not
+    part of this suite, because a test that ran it would be measuring a run containing
+    itself. This holds the recorded file and the published sentence together, and checks the
+    file is internally consistent, which is the part that would catch a hand edit.
+    """
+    recorded = APP / "evidence" / "suite-pair.json"
+    if not recorded.is_file():
+        pytest.skip("no evidence/suite-pair.json; run python tools/suite_pair.py first")
+
+    held = json.loads(recorded.read_text(encoding="utf-8"))
+    for field in ("collected", "passed", "skipped", "failed", "tree"):
+        assert field in held, f"{recorded.name} has no {field}, so it records no measurement"
+
+    assert held["passed"] + held["skipped"] + held["failed"] == held["collected"], (
+        f"{recorded.name} says {held['passed']} passed, {held['skipped']} skipped and "
+        f"{held['failed']} failed of {held['collected']} collected, which do not add up. "
+        "A hand edit is the only way to get here")
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    published = re.search(r"the same suite\s+reports \*\*(\d+) passed, (\d+) skipped\*\*",
+                          readme)
+    assert published, (
+        "the README no longer publishes the built-tree pair, and it is the sentence a "
+        "reader compares the card against")
+
+    if held["tree"] != "built":
+        pytest.skip(
+            f"the recorded pair was measured on a {held['tree']}, and the README sentence "
+            "this compares against is the built-tree one. Two true numbers about two "
+            "different trees are not a disagreement")
+
+    # Collected less skipped, for the reason the builder gives where it reads the same
+    # two fields: the pass count moves when a gate that reads this file is itself failing,
+    # and this is one of those gates, so a pair taken off it could never settle anywhere.
+    runs = held["collected"] - held["skipped"]
+    assert (int(published.group(1)), int(published.group(2))) == (runs,
+                                                                  held["skipped"]), (
+        f"the README publishes {published.group(1)} passed and {published.group(2)} "
+        f"skipped; {recorded.name} records {held['collected']} collected and "
+        f"{held['skipped']} skipped, so {runs} of them run on a tree like this one. The "
+        "card reads the file, so the sentence is the stale one")
+
+    # Whether the recorded run was green is checked by `tools/suite_pair.py --check` and
+    # not here. It was here, and it is one of the tests whose result the file records: a
+    # file written by a red run failed it, which kept the run red, which was what got
+    # recorded on the next write. There is no state in which the suite could satisfy it.
+
+
+def test_the_card_reads_the_measurement_and_not_the_sentence(tmp_path, monkeypatch):
+    """Which source the card believes, proven by giving it two that disagree.
+
+    The gate above compares the recorded pair to the published sentence, and it cannot tell
+    where the card got its number: while the file and the prose agree, a builder reading
+    either one passes. So this builds a tree whose file and prose disagree on purpose. The
+    card has to come back with the measurement, because the whole argument of this entry is
+    that a claim ships with the thing that checks it and the largest count on the front
+    screen was the one figure a person had typed.
+
+    Then it takes the file away, and the sentence has to be the fallback. A clean checkout
+    that has not run `tools/suite_pair.py` still has to be able to build a page, and the
+    prose is the only pair on disk at that point.
+    """
+    import sys
+
+    sys.path.insert(0, str(APP / "tools"))
+    import judge_page
+
+    root = tmp_path / "app"
+    (root / "evidence").mkdir(parents=True)
+    # Two failures on purpose, so the pass count and the number of tests this tree can run
+    # are different numbers: 700 collected less 10 skipped is 690 that run here, and 688
+    # of those passed. A fixture where the two agreed could not tell a card reading the
+    # pass count from one reading the pair, and the pass count is the reading that cannot
+    # settle: the gate holding this file against the README is one of the tests it counts,
+    # so a stale file lowers the very number that is supposed to correct it.
+    (root / "evidence" / "suite-pair.json").write_text(json.dumps({
+        "collected": 700, "passed": 688, "skipped": 10, "failed": 2,
+        "tree": "built"}), encoding="utf-8")
+    (root / "README.md").write_text(
+        "Build the page and run the gates and the same suite\n"
+        "reports **11 passed, 22 skipped**. Both pairs are measured.\n", encoding="utf-8")
+
+    monkeypatch.setattr(judge_page, "APP", root)
+
+    assert judge_page._suite_pair() == (690, 10), (
+        "the card came back with the pair out of the README while a measurement sat on "
+        "disk beside it, so the largest count on the front screen is a typed sentence "
+        "again and a stale sentence makes a stale card")
+
+    (root / "evidence" / "suite-pair.json").unlink()
+    assert judge_page._suite_pair() == (11, 22), (
+        "with no measurement on disk the builder has to fall back to the published "
+        "sentence rather than refusing, because a reviewer who has just cloned this and "
+        "wants to look at the page has not run the tool that writes the file")

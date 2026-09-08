@@ -414,6 +414,8 @@ class DropSource:
         # age instead of sleeping, and so the age quoted in a refusal is the age this
         # actually decided on.
         self._now = now
+        # The export this source read, held until a caller says calls went out from it.
+        self._read: tuple[str, str] | None = None
 
     @property
     def ledger_path(self) -> Path:
@@ -478,12 +480,40 @@ class DropSource:
                 "a second time. If that is genuinely what you want, remove the line."
             )
 
-        # Read to a list before recording. A file that fails validation halfway through has
-        # placed no calls, and marking it processed would strand it: the operator fixes the
-        # export and this refuses the fixed copy for having been seen.
+        # Read, and record nothing. The ledger's own header says these are the exports this
+        # has placed calls from, and reading a file places none. Recording here strands the
+        # day's work on every refusal that comes after ingest, which is all of them: the
+        # `--yes-i-mean-it` confirmation, the missing key, the credential origin, the call
+        # ceiling, and every offline run. The caller says when calls were placed.
+        #
+        # An earlier fix moved this line below the parse, for the same reason one step
+        # smaller: a file that fails validation places no calls either. Its comment said the
+        # ledger is written once there is something to place calls from, which is not the
+        # same thing as once calls have been placed.
         items = list(CsvSource(chosen, encoding=self.encoding).items())
-        self._record(digest, chosen.name)
+        self._read = (digest, chosen.name)
         return iter(items)
+
+    def placed_calls_from(self) -> None:
+        """Record the export this source read, now that a run has telephoned from it.
+
+        Separate from `items()` because only the caller knows whether the account was
+        billed. It is not enough that a dispatcher ran: a wave whose every row was held for
+        a person dialled nobody, and recording that would refuse the export tomorrow when
+        the held rows are ready to go.
+
+        Refuses rather than guessing when nothing has been read. The digest belongs to the
+        file this source chose, and choosing again could pick up an export that landed in
+        the meantime, which is the wrong file to mark.
+        """
+        if self._read is None:
+            raise SourceError(
+                f"{self.directory} has not read an export in this run, so there is nothing "
+                "to record as called from. Reading the drop directory again could choose a "
+                "different file than the one the calls went out from."
+            )
+        digest, name = self._read
+        self._record(digest, name)
 
 
 class MemorySource:

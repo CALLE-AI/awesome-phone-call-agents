@@ -102,12 +102,20 @@ figures below are the current answers, and they are checked by
 `test_every_cited_line_number_still_says_what_the_readme_claims`, which reads this file as
 well as the entry README.
 
+The line numbers printed inside the three stills are the ones the file had when each was
+captured, and they are lower than the anchors above because the code has moved down since:
+`proof-call-site.png` shows `calls.create` at 320 and it is at 448 today. A gate cannot read
+a picture, so nothing in this repository could have noticed that on its own, and saying it
+here is cheaper than a still that has to be recaptured every time a method above it grows.
+What each still shows is the thing being proved. Where it sits in the file is the anchor
+above, which is checked on every run.
+
 - `proof-call-site.png`: the only occurrence of `calls.create` in this codebase is
   `self._client.calls.create(` at
-  `dispatch/scheduler.py:429`, inside `def _create_with_retries` at
-  `dispatch/scheduler.py:399`.
+  `dispatch/scheduler.py:448`, inside `def _create_with_retries` at
+  `dispatch/scheduler.py:418`.
 - `proof-classification.png`: `def _classify` at
-  `dispatch/scheduler.py:558` returns exactly seven times and the still labels every one of them,
+  `dispatch/scheduler.py:577` returns exactly seven times and the still labels every one of them,
   including `ItemResult(**base, resolution=Resolution.FAILED` at
-  `dispatch/scheduler.py:594` and `resolution=Resolution.RESOLVED, structured_result=result,` at
-  `dispatch/scheduler.py:630`.
+  `dispatch/scheduler.py:613` and `resolution=Resolution.RESOLVED, structured_result=result,` at
+  `dispatch/scheduler.py:649`.

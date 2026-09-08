@@ -39,6 +39,7 @@ from .models import (
     FATAL_ERRORS,
     NO_CONSENT,
     NO_VOICE_CHANNEL,
+    dial_refusal,
     PERMANENT_ERRORS,
     RETRYABLE_ERRORS,
     DispatchReport,
@@ -240,44 +241,26 @@ class WaveDispatcher:
 
         callable_items: list[WorkItem] = []
         for item in items:
-            if item.held_reason:
-                # Another absence on this telephone number is being called this run. First
-                # in the chain because it is the only one of these that says nothing about
-                # the family: they consented, the phone reaches them, and the reason this
-                # row is not a call is that the same call is already being placed. Filing
-                # it under consent or reachability would report a fact about a household
-                # that is not true of it.
-                report.results.append(ItemResult(
-                    item=item, resolution=Resolution.SKIPPED, reason=item.held_reason,
-                ))
-            elif item.consent_refusal:
-                # A dated record that does not cover this call. Checked before the boolean
-                # because it is the more specific statement: a row carrying a record that
-                # was withdrawn last week has a `consent` column that still says yes, and
-                # reading the weaker of two answers is how a family that asked not to be
-                # called gets called. The reason is the register's own sentence, so the
-                # queue says which record and why rather than "no consent".
-                report.results.append(ItemResult(
-                    item=item, resolution=Resolution.SKIPPED,
-                    reason=f"{NO_CONSENT}: {item.consent_refusal}",
-                ))
-            elif not item.consented:
-                # A person who has not consented is never dialled. This is a gate, not a
-                # filter: it comes before dispatch and it cannot be configured off.
-                report.results.append(ItemResult(
-                    item=item, resolution=Resolution.SKIPPED, reason=NO_CONSENT,
-                ))
-            elif not item.reachable_by_voice:
-                # Consent is asked first because a family that never agreed to be called
-                # is not owed a call on another channel either. This gate is second and
-                # it is the one that leaves work behind: the row is not dialled, is not
-                # a failure, and goes to a person.
-                report.results.append(ItemResult(
-                    item=item, resolution=Resolution.SKIPPED, reason=NO_VOICE_CHANNEL,
-                    needs_another_channel=True,
-                ))
-            else:
+            # One reading of the four gates, from `dial_refusal`, which the call ceiling in
+            # `firstbell/cli.py` also counts with. This loop used to spell the chain out and
+            # the ceiling reimplemented two of its four branches, so a file of five rows
+            # that places two calls was refused as "this run would phone 4 families" and
+            # told the operator to pass `--max-calls 4`, which is twice the spend the flag
+            # exists to cap. Each branch's reasoning is in `dial_refusal`, next to the
+            # order it depends on.
+            #
+            # `needs_another_channel` is the one thing the reason string does not carry. It
+            # marks the row that is not dialled, is not a failure, and is still owed contact
+            # some other way, which is the voice-channel case and only that one: a family
+            # who never agreed to be called is not owed a message on another channel either.
+            refusal = dial_refusal(item)
+            if refusal is None:
                 callable_items.append(item)
+                continue
+            report.results.append(ItemResult(
+                item=item, resolution=Resolution.SKIPPED, reason=refusal,
+                needs_another_channel=refusal == NO_VOICE_CHANNEL,
+            ))
 
         if not callable_items:
             return report
@@ -288,30 +271,66 @@ class WaveDispatcher:
 
         with ThreadPoolExecutor(max_workers=self._concurrency) as pool:
             futures = {pool.submit(self._handle, item): item for item in callable_items}
-            for future, item in futures.items():
-                try:
-                    report.results.append(future.result())
-                except Cancelled:
+            collected: set[str] = set()
+            try:
+                for future, item in futures.items():
+                    try:
+                        report.results.append(future.result())
+                    except Cancelled:
+                        report.results.append(ItemResult(
+                            item=item, resolution=Resolution.SKIPPED, reason=CANCELLED,
+                        ))
+                    except PollFailed as failure:
+                        # Reachable only if a poll failure escapes _handle, which it should
+                        # not. Kept because the alternative is the generic catch below
+                        # turning a placed call into "the call did not happen".
+                        report.results.append(ItemResult(
+                            item=item, resolution=Resolution.UNDETERMINED,
+                            call_id=failure.call_id,
+                            reason=f"the call was placed and its outcome could not be read "
+                                   f"back: {redact(failure.why)}",
+                        ))
+                    except Exception as exc:  # noqa: BLE001 - one item must not kill the run
+                        log.exception("item %s raised", item.id)
+                        report.results.append(ItemResult(
+                            item=item, resolution=Resolution.FAILED,
+                            reason=f"dispatcher error: {type(exc).__name__}: "
+                                   f"{redact(str(exc))}",
+                        ))
+                    collected.add(item.id)
+            except KeyboardInterrupt:
+                # An operator pressing Ctrl-C means stop telephoning these families.
+                #
+                # Every future is submitted before the first result is collected, so leaving
+                # this block normally runs the executor's own `shutdown(wait=True)`, which
+                # has no `cancel_futures` and drains the queue to the end. A probe that
+                # interrupted after 2 of 8 creates watched all 8 reach the transport, took
+                # two seconds to get control back, and then had no report at all, because
+                # the exception left this method before it could return one. So the whole
+                # wave went out and nothing recorded that it had.
+                #
+                # `cancel()` first, so a handler already inside a poll stops rather than
+                # waiting out its retry budget. Then cancel what is queued and wait for what
+                # is running: a call already accepted by CALL-E cannot be recalled, and its
+                # id belongs on the receipt whatever the operator has decided.
+                self.cancel()
+                report.cancelled = True
+                report.cancelled_after = len(collected)
+                pool.shutdown(wait=True, cancel_futures=True)
+                for pending, waiting in futures.items():
+                    if waiting.id in collected:
+                        continue
+                    if pending.done() and not pending.cancelled():
+                        try:
+                            report.results.append(pending.result())
+                            collected.add(waiting.id)
+                            continue
+                        except BaseException:  # noqa: BLE001 - reported as cancelled below
+                            pass
                     report.results.append(ItemResult(
-                        item=item, resolution=Resolution.SKIPPED, reason=CANCELLED,
+                        item=waiting, resolution=Resolution.SKIPPED, reason=CANCELLED,
                     ))
-                except PollFailed as failure:
-                    # Reachable only if a poll failure escapes _handle, which it should
-                    # not. Kept because the alternative is the generic catch below
-                    # turning a placed call into "the call did not happen".
-                    report.results.append(ItemResult(
-                        item=item, resolution=Resolution.UNDETERMINED,
-                        call_id=failure.call_id,
-                        reason=f"the call was placed and its outcome could not be read "
-                               f"back: {redact(failure.why)}",
-                    ))
-                except Exception as exc:  # noqa: BLE001 - one item must not kill the run
-                    log.exception("item %s raised", item.id)
-                    report.results.append(ItemResult(
-                        item=item, resolution=Resolution.FAILED,
-                        reason=f"dispatcher error: {type(exc).__name__}: "
-                               f"{redact(str(exc))}",
-                    ))
+                    collected.add(waiting.id)
 
         # Built once, not once per result: the old `[i.id for i in items].index(...)`
         # rebuilt and linear-scanned the whole id list for every single result, which

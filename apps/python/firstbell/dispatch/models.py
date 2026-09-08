@@ -289,6 +289,38 @@ class ItemResult:
                 or self.needs_another_channel)
 
 
+def dial_refusal(item: WorkItem) -> str | None:
+    """Why this row will not be dialled, in the words the queue prints, or None if it will.
+
+    One definition, because there were two. `WaveDispatcher.run` gates on four things in a
+    deliberate order, and the call ceiling in `firstbell/cli.py` counted rows on two of them,
+    so a run of five rows that would place two calls was refused with "this run would phone 4
+    families" and told the operator to pass `--max-calls 4`. Following that instruction sets
+    the ceiling to twice the spend it is there to cap.
+
+    The gate that was supposed to catch this said in its own docstring that it would fail if
+    the dispatcher grew a third reason to skip a row. The dispatcher had four from the start
+    and the gate's fixture only contained rows for two of them, so it passed. A copy of two
+    branches of a four-branch rule is not a check on that rule.
+
+    The order is the dispatcher's and it is not arbitrary. `held_reason` first because it is
+    the only one of the four that says nothing about the family: they consented, the
+    telephone reaches them, and the reason this row is not a call is that the same call is
+    already going out. The dated record before the boolean column, because a record
+    withdrawn last week sits beside a `consent` column that still says yes, and reading the
+    weaker of two answers is how somebody who asked not to be called gets called.
+    """
+    if item.held_reason:
+        return item.held_reason
+    if item.consent_refusal:
+        return f"{NO_CONSENT}: {item.consent_refusal}"
+    if not item.consented:
+        return NO_CONSENT
+    if not item.reachable_by_voice:
+        return NO_VOICE_CHANNEL
+    return None
+
+
 def mask(phone: str) -> str:
     if len(phone) <= 5:
         return "*" * len(phone)

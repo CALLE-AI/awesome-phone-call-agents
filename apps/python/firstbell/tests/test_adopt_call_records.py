@@ -29,6 +29,8 @@ import itertools
 import json
 import subprocess
 import sys
+
+import pytest
 from datetime import date
 from pathlib import Path
 
@@ -419,3 +421,220 @@ def test_a_consent_finding_is_output_and_not_an_error_unless_asked():
     asked = _run(*args, "--fail-on-uncovered")
     assert asked.returncode == 1, (
         f"--fail-on-uncovered exited {asked.returncode} with three findings on the record")
+
+
+# ---- what another district's export actually looks like -----------------------------------
+#
+# Six defects a bug hunt reproduced on this file, all of the same shape: a value the tool was
+# never given in an example, arriving from a system nobody here controls. The first three are
+# the dangerous ones, because each produced a confident wrong answer rather than a refusal.
+
+
+def test_answered_is_read_the_same_way_in_both_formats(tmp_path):
+    """`"false"`, `"no"` and `0` are not somebody picking up the telephone.
+
+    The CSV reader knew that a spreadsheet writes `no` and the JSONL reader tested
+    `answered is False`, so a record exported as JSON out of a spreadsheet, which is what a
+    dialler produces, was read as answered on every one of those values. It was then filed
+    closed on whatever result sat beside it: a call nobody took, closed, on an answer nobody
+    gave. That is the defect this entire entry is about, arriving through the other door.
+    """
+    from tools.adopt_call_records import decide, read_records
+
+    for spelling in ('"false"', '"no"', '"NO"', '"unanswered"', '0'):
+        path = tmp_path / "one.jsonl"
+        path.write_text(
+            '{"id":"A","answered":' + spelling + ',"consent_record":"C","result":'
+            '{"reason_category":"illness","expected_return":"today",'
+            '"parent_confirmed_aware":"yes","spoke_with":"guardian"}}\n',
+            encoding="utf-8", newline="\n")
+        filed = decide(read_records(path)[0])
+        assert filed["outcome"] == "undetermined", (
+            f"answered={spelling} was read as somebody having picked up, so a call nobody "
+            f"took was filed {filed['outcome']} on a result nobody gave")
+
+
+def test_a_value_answered_cannot_mean_is_refused_rather_than_guessed(tmp_path):
+    """And the other half: a word this does not know is a mapping mistake, not a default."""
+    from tools.adopt_call_records import RecordError, read_records
+
+    path = tmp_path / "odd.jsonl"
+    path.write_text('{"id":"A","answered":"maybe"}\n', encoding="utf-8", newline="\n")
+    with pytest.raises(RecordError) as refused:
+        read_records(path)
+    assert "maybe" in str(refused.value)
+
+
+def test_one_number_written_as_a_string_is_one_number(tmp_path):
+    """`tuple(str(n) for n in "+15550000101")` is twelve numbers, one per character.
+
+    The consent audit then told an attendance officer that the record "covers 1 number(s)
+    and this row carries 12 the record does not name", which is a sentence somebody acts on
+    about a family, built out of a type confusion.
+    """
+    from tools.adopt_call_records import read_records
+
+    path = tmp_path / "scalar.jsonl"
+    path.write_text('{"id":"A","numbers":"+15550000101"}\n'
+                    '{"id":"B","numbers":15550000102}\n',
+                    encoding="utf-8", newline="\n")
+    got = read_records(path)
+    assert got[0]["numbers"] == ["+15550000101"], got[0]["numbers"]
+    assert got[1]["numbers"] == ["15550000102"], got[1]["numbers"]
+
+
+def test_a_column_named_twice_is_refused_rather_than_resolved_by_position(tmp_path):
+    """`csv.DictReader` keeps the last value for a repeated header and says nothing.
+
+    The unknown-column gate could not see it either, because the header names went into a
+    set. So a file carrying `parent_confirmed_aware` twice with `no` and then `yes` was
+    filed closed, and the same file with the values swapped was escalated. Column order
+    decided whether a child's absence was closed.
+    """
+    from tools.adopt_call_records import RecordError, read_records
+
+    path = tmp_path / "twice.csv"
+    path.write_text(
+        "id,parent_confirmed_aware,parent_confirmed_aware,reason_category,expected_return\n"
+        "D1,no,yes,illness,today\n",
+        encoding="utf-8", newline="\n")
+    with pytest.raises(RecordError) as refused:
+        read_records(path)
+    assert "more than once" in str(refused.value)
+
+
+def test_a_file_that_is_not_utf8_is_a_third_outcome_and_not_an_error(tmp_path, capsys):
+    """A district exporting from a Windows codepage hits this on the first accented name.
+
+    It raised `UnicodeDecodeError` out of `read_text` and exited 1, which this tool's own
+    contract reserves for a consent finding under `--fail-on-uncovered`. A script could not
+    tell "one of these calls rests on nothing" from "your file is in the wrong encoding".
+    """
+    from tools.adopt_call_records import main
+
+    path = tmp_path / "cp1252.jsonl"
+    path.write_bytes(b'{"id":"A","transcript":"caf\xe9"}\n')
+    assert main(["--records", str(path)]) == 3
+    assert "COULD-NOT-MEASURE" in capsys.readouterr().out
+
+
+def test_an_unusable_consent_register_is_a_third_outcome_too(tmp_path, capsys):
+    """Same rule, the other input. Both failures escaped as tracebacks."""
+    from tools.adopt_call_records import main
+
+    records = tmp_path / "r.jsonl"
+    records.write_text('{"id":"A"}\n', encoding="utf-8", newline="\n")
+
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text('{"records": [{"id":"X"}]}', encoding="utf-8", newline="\n")
+    assert main(["--records", str(records), "--consent-register", str(invalid)]) == 3
+    assert "COULD-NOT-MEASURE" in capsys.readouterr().out
+
+    truncated = tmp_path / "truncated.json"
+    truncated.write_text('{"records": [', encoding="utf-8", newline="\n")
+    assert main(["--records", str(records), "--consent-register", str(truncated)]) == 3
+    assert "is not JSON" in capsys.readouterr().out
+
+
+def test_fail_on_uncovered_counts_a_boolean_as_uncovered(tmp_path, capsys):
+    """Because a column that says yes is not a consent record, which this report says itself.
+
+    The flag's help reads "exit 1 when a call rests on no consent record". A row carrying a
+    bare `consented: true` produces no refusal, so there was no finding, so it exited 0
+    while the line above the exit read `on a boolean 1`. The only machine-readable answer
+    disagreed with the report printed over it.
+    """
+    from tools.adopt_call_records import main
+
+    path = tmp_path / "boolean.jsonl"
+    path.write_text(
+        '{"id":"A","answered":true,"consented":true,"result":{"reason_category":"illness",'
+        '"expected_return":"today","parent_confirmed_aware":"yes",'
+        '"spoke_with":"guardian"}}\n',
+        encoding="utf-8", newline="\n")
+
+    assert main(["--records", str(path)]) == 0, (
+        "a boolean is output and not an error, so it must not change the exit code on its "
+        "own")
+    printed = capsys.readouterr().out
+    assert "on a boolean" in printed
+
+    assert main(["--records", str(path), "--fail-on-uncovered"]) == 1, (
+        "the flag exited 0 on a call resting on a column, which is what it exists to catch")
+
+    nothing = tmp_path / "nothing.jsonl"
+    nothing.write_text('{"id":"B"}\n', encoding="utf-8", newline="\n")
+    assert main(["--records", str(nothing), "--fail-on-uncovered"]) == 1
+
+
+def test_the_queue_holds_only_rows_that_need_a_person():
+    """A row printed under the queue heading is a row a clerk works.
+
+    Two of the six records came back closed, each carrying the sentence that nothing there
+    needs a person, and both were printed inside a list headed "The queue, escalations
+    first". A clerk reading the queue as the morning's work reads two records that were
+    already settled. The lists are split now, and this checks the split rather than the
+    wording, so the headings can be reworded and the rule still holds.
+    """
+    done = _run("--records", str(RECORDS), "--consent-register", str(REGISTER),
+                "--today", "2026-09-08")
+    assert done.returncode == 0, f"the documented command exited {done.returncode}"
+    lines = done.stdout.splitlines()
+
+    opens = [i for i, one in enumerate(lines) if one.startswith("The queue,")]
+    shuts = [i for i, one in enumerate(lines)
+             if one.startswith("Closed, and needing nobody")]
+    assert len(opens) == 1, f"the queue heading is printed {len(opens)} times, not once"
+    assert len(shuts) == 1, (
+        "the closed records are not printed under a heading of their own, so they are "
+        "either missing from the output or back inside the queue")
+    assert shuts[0] > opens[0], "the closed list is printed above the queue it is not part of"
+
+    queue = lines[opens[0] + 1:shuts[0]]
+    assert queue, "the queue heading is printed with nothing under it"
+    settled = [one for one in queue if "nothing here needs a person" in one]
+    assert not settled, (
+        "the queue holds record(s) whose own line says nothing there needs a person: "
+        + " | ".join(one.strip() for one in settled))
+
+    after = [one for one in lines[shuts[0] + 1:] if "nothing here needs a person" in one]
+    assert after, (
+        "no record under the closed heading says nothing there needs a person, so the "
+        "sentence this gate looks for has moved and the gate is measuring nothing")
+
+
+def test_a_fixture_comment_names_only_records_the_pair_contains():
+    """A comment pointing at ids that do not exist is worse than no comment.
+
+    The register's comment named CR-2026-2004 and CR-2026-2006 while the records in it are
+    CR-2004 and CR-2006, so a reviewer following the comment to see why a call comes back
+    as a finding found neither id anywhere in the file. That comment is the reading path
+    into the fixture, so its ids are checked against the fixture rather than proofread.
+    """
+    import re
+
+    register = json.loads(REGISTER.read_text(encoding="utf-8"))
+    comment = register["_comment"]
+    held = {one["id"] for one in register["records"]}
+
+    called = set()
+    for line in RECORDS.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        called.add(json.loads(line)["id"])
+
+    named = set(re.findall(r"\bCR-[0-9-]+\b", comment))
+    assert named, (
+        "the register's comment names no record at all, so it cannot explain which call "
+        "comes back as which finding")
+    missing = sorted(named - held)
+    assert not missing, (
+        f"the register's comment names {', '.join(missing)}, which the register does not "
+        f"contain. It holds {', '.join(sorted(held))}")
+
+    students = set(re.findall(r"\bS-[0-9-]+\b", comment))
+    stray = sorted(students - called)
+    assert not stray, (
+        f"the register's comment names {', '.join(stray)} as a call, and {RECORDS.name} "
+        "has no such row, so the pair the comment describes is not the pair on disk")

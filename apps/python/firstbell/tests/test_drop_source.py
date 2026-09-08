@@ -96,6 +96,10 @@ def test_an_export_already_called_from_is_refused(tmp_path):
     drop(tmp_path)
     source = DropSource(tmp_path, now=time.time())
     assert len(list(source.items())) == 2
+    # Said explicitly, because reading is no longer what records. The rule this
+    # test is about is unchanged: once calls have gone out, that content is
+    # refused.
+    source.placed_calls_from()
 
     again = DropSource(tmp_path, now=time.time())
     with pytest.raises(SourceError) as refused:
@@ -110,7 +114,9 @@ def test_it_is_the_content_that_was_called_from_and_not_the_name(tmp_path):
     thing for a job to do wrong, and the filename would let it through.
     """
     drop(tmp_path, "monday.csv")
-    assert len(list(DropSource(tmp_path, now=time.time()).items())) == 2
+    first = DropSource(tmp_path, now=time.time())
+    assert len(list(first.items())) == 2
+    first.placed_calls_from()
 
     drop(tmp_path, "tuesday.csv")          # same bytes, new name
     with pytest.raises(SourceError):
@@ -120,7 +126,9 @@ def test_it_is_the_content_that_was_called_from_and_not_the_name(tmp_path):
 def test_a_genuinely_new_export_is_read_after_an_old_one(tmp_path):
     """The ledger must not become a wall. Different rows are different work."""
     drop(tmp_path, "monday.csv")
-    assert len(list(DropSource(tmp_path, now=time.time()).items())) == 2
+    monday = DropSource(tmp_path, now=time.time())
+    assert len(list(monday.items())) == 2
+    monday.placed_calls_from()
 
     drop(tmp_path, "tuesday.csv", HEAD + "B-1,+15551230003,en-US,yes,Sam\n")
     assert [i.id for i in DropSource(tmp_path, now=time.time()).items()] == ["B-1"]
@@ -154,7 +162,9 @@ def test_an_empty_drop_is_reported_rather_than_read_as_a_quiet_day(tmp_path):
 def test_the_ledger_is_not_mistaken_for_an_export(tmp_path):
     """It lives in the directory it guards, so the glob has to skip it."""
     drop(tmp_path)
-    list(DropSource(tmp_path, now=time.time()).items())
+    read = DropSource(tmp_path, now=time.time())
+    list(read.items())
+    read.placed_calls_from()
     ledger = tmp_path / DropSource.LEDGER
     assert ledger.exists()
 
@@ -165,7 +175,9 @@ def test_the_ledger_is_not_mistaken_for_an_export(tmp_path):
 def test_the_ledger_says_what_deleting_a_line_does(tmp_path):
     """It is a file a person will edit under pressure, so it explains itself."""
     drop(tmp_path)
-    list(DropSource(tmp_path, now=time.time()).items())
+    read = DropSource(tmp_path, now=time.time())
+    list(read.items())
+    read.placed_calls_from()
     text = (tmp_path / DropSource.LEDGER).read_text(encoding="utf-8")
     assert text.startswith("#")
     assert "telephoned again" in text, (
@@ -181,3 +193,112 @@ def test_pointing_it_at_a_file_rather_than_a_drop_says_so(tmp_path):
     with pytest.raises(SourceError) as refused:
         DropSource(f, now=time.time()).items()
     assert "not a directory" in str(refused.value)
+
+
+def test_reading_an_export_is_not_placing_calls_from_it(tmp_path):
+    """The ledger says calls were placed. Reading a file places none.
+
+    `items()` recorded the digest, and `items()` runs long before anything is dialled: ahead
+    of the `--yes-i-mean-it` confirmation, ahead of the missing-key refusal, ahead of the
+    credential-origin refusal, ahead of the call ceiling, and on every offline run. So a
+    district that typed `--live` without the confirmation, or that ran the file once to look
+    at it, was told on the next attempt that every family in it had already been telephoned.
+
+    The sibling test above fixed half of this and its own docstring names the other half:
+    the ledger is written "only once there is something to place calls from", which is not
+    the same as once calls have been placed. Recording is now something the caller does
+    after the run, and the caller only does it when the account was billed for a call.
+    """
+    drop(tmp_path, "nightly.csv")
+    source = DropSource(tmp_path, now=time.time())
+    assert len(list(source.items())) == 2
+    assert not (tmp_path / DropSource.LEDGER).exists(), (
+        "reading the export wrote the ledger, so any refusal after this point strands the "
+        "day's work under a message asserting the families were called")
+
+    # And a second read of the same file still works, because nothing has been dialled.
+    assert len(list(DropSource(tmp_path, now=time.time()).items())) == 2
+
+
+def test_the_ledger_is_written_when_the_caller_says_calls_were_placed(tmp_path):
+    """The other half of the rule. Recording has to still happen, or the guard is gone."""
+    drop(tmp_path, "nightly.csv")
+    source = DropSource(tmp_path, now=time.time())
+    items = list(source.items())
+    assert items
+    source.placed_calls_from()
+
+    ledger = tmp_path / DropSource.LEDGER
+    assert ledger.is_file(), "nothing recorded the export a run has just telephoned"
+    assert "nightly.csv" in ledger.read_text(encoding="utf-8")
+    with pytest.raises(SourceError) as refused:
+        DropSource(tmp_path, now=time.time()).items()
+    assert "already been called from" in str(refused.value)
+
+
+def test_recording_without_reading_first_is_refused(tmp_path):
+    """A guard against the fix going wrong in the other direction.
+
+    `placed_calls_from()` writes the digest of the file this source chose. If it is called
+    before `items()` there is no chosen file, and the honest answer is to say so rather than
+    to pick the newest export again and record whatever is there now, which on a drop
+    directory that has received the next export in the meantime is the wrong file.
+    """
+    drop(tmp_path, "nightly.csv")
+    source = DropSource(tmp_path, now=time.time())
+    with pytest.raises(SourceError) as refused:
+        source.placed_calls_from()
+    assert "has not read an export" in str(refused.value)
+    assert not (tmp_path / DropSource.LEDGER).exists()
+
+
+# ---- the caller's half of the rule --------------------------------------------------------
+
+
+def test_only_a_run_that_reached_the_network_and_placed_a_call_records_the_export():
+    """The table, because the branch it guards cannot be reached without a real telephone.
+
+    Recording used to happen inside `items()`, so this decision did not exist. Now that it
+    does, it is the whole of the fix and it lives where it can be checked rather than in a
+    condition that only a production run walks through.
+    """
+    from firstbell.cli import records_as_called_from as rule
+
+    assert rule(reached_production=True, calls_placed=1) is True
+    assert rule(reached_production=True, calls_placed=0) is False, (
+        "a wave that held every row for a person telephoned nobody, and its export is the "
+        "work those held rows still need")
+    assert rule(reached_production=False, calls_placed=8) is False, (
+        "a run against the bundled double answers on 127.0.0.1 and rings no house, so a "
+        "district rehearsing on it would burn the export it is about to work from")
+    assert rule(reached_production=False, calls_placed=0) is False
+
+
+def test_a_live_run_against_the_double_does_not_burn_the_export(tmp_path, monkeypatch):
+    """The rehearsal case, end to end through the CLI.
+
+    `--live --yes-i-mean-it` against the bundled double is the run the README tells a
+    district to do before the real one. It places calls, it writes a receipt, and it must
+    leave the drop directory ready for the morning.
+    """
+    import socket
+
+    from calle_double.server import serve
+    from firstbell.cli import main
+
+    drop(tmp_path, "nightly.csv")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    server = serve(port=port)
+    try:
+        monkeypatch.setenv("CALLE_API_KEY", "iams_test_anything")
+        monkeypatch.setenv("CALLE_BASE_URL", f"http://127.0.0.1:{port}")
+        assert main(["--work-drop", str(tmp_path), "--live", "--yes-i-mean-it"]) == 0
+    finally:
+        server.shutdown()
+
+    assert not (tmp_path / DropSource.LEDGER).exists(), (
+        "a rehearsal against the double recorded the export as telephoned, so the real run "
+        "in the morning would be refused")
