@@ -1,48 +1,35 @@
 import { NextResponse } from "next/server";
-import type { Call } from "@call-e/calle";
+import { z } from "zod";
+import { requireWebhook } from "@/lib/auth";
+import { calleClient } from "@/lib/calle";
 import { normalizeCall } from "@/lib/call-record";
-import { findSessionByCallId, recordCall } from "@/lib/session";
+import { verifyCall } from "@/lib/live-call";
+import { findSessionByCallId, getSession, recordCall, withSessionLock } from "@/lib/session";
 
 export const runtime = "nodejs";
-
-/**
- * Terminal-result push. This is the bonus path: the demo depends on polling,
- * which needs no public URL. Current CALL-E deliveries are unsigned, so the
- * event is trusted only far enough to trigger a state write for a call this
- * process already started — an unknown call id is ignored.
- */
-const seenEvents = new Set<string>();
+// CALL-E currently sends unsigned events. Enable this only behind a trusted relay
+// that supplies the separate bearer credential. Polling needs no webhook setup.
+const EventSchema = z.object({ data: z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) }) });
 
 export async function POST(request: Request) {
-  let event: { id?: string; type?: string; data?: Call };
+  const denied = requireWebhook(request);
+  if (denied) return denied;
+  const parsed = EventSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid event." }, { status: 400 });
   try {
-    event = await request.json();
+    const callId = parsed.data.data.id;
+    const session = await findSessionByCallId(callId);
+    if (!session || session.replay) return NextResponse.json({ ok: true, ignored: true });
+    await withSessionLock(session.id, async () => {
+      const current = (await getSession(session.id))!;
+      const verified = await calleClient().calls.get(callId);
+      verifyCall(verified, current, callId);
+      await recordCall(session.id, normalizeCall(verified));
+    });
+    // Re-delivery is safe: refresh the same provider record. No caller-controlled
+    // event-ID cache can suppress a later valid delivery or poison retry handling.
+    return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    return NextResponse.json({ error: "Could not verify the call. Retry this event." }, { status: 502 });
   }
-
-  const headerId = request.headers.get("CALL-E-Event-Id");
-  if (headerId && event.id && headerId !== event.id) {
-    return NextResponse.json({ error: "Event id header does not match body." }, { status: 400 });
-  }
-
-  const call = event.data;
-  if (!call?.id) {
-    return NextResponse.json({ error: "Event carried no call." }, { status: 400 });
-  }
-
-  // Deduplicate side effects by event id, as CALL-E's webhook guide requires.
-  if (event.id) {
-    if (seenEvents.has(event.id)) return NextResponse.json({ ok: true, duplicate: true });
-    seenEvents.add(event.id);
-  }
-
-  const session = await findSessionByCallId(call.id);
-  if (!session) {
-    // Not a call this deployment placed. Acknowledge so CALL-E stops retrying.
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
-  await recordCall(session.id, normalizeCall(call));
-  return NextResponse.json({ ok: true });
 }

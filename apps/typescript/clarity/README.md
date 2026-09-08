@@ -24,10 +24,12 @@ Use Node.js 22.9 or later (`.nvmrc` selects Node 22).
 cd apps/typescript/clarity
 npm ci
 cp .env.example .env
+openssl rand -hex 32  # paste the result into CLARITY_AUTH_TOKEN in .env
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000), select **Load example**, then
+Open [localhost:3000](http://localhost:3000). Sign in with username `clarity` and
+your `CLARITY_AUTH_TOKEN` as the password. Select **Load example**, then
 **Find what to clarify** → **Clarify by phone**.
 
 The app defaults to `DEMO_MODE=replay`, even without an environment file. It runs the included synthetic
@@ -44,22 +46,37 @@ Set `DEMO_MODE=live` in `.env`, add your API keys, and restart the server.
 | `GEMINI_API_KEY` | Required for live application analysis. |
 | `GEMINI_MODEL` | Optional analyzer model override. Defaults to `gemini-3.5-flash-lite`. |
 | `CALLE_API_KEY` | Required to place and retrieve live calls. |
-| `CALLE_BASE_URL` | Optional API endpoint override. Defaults to `https://api.heycall-e.com`. |
+| `CLARITY_ORIGIN` | Exact browser origin for mutation checks; defaults to `http://localhost:3000`. Set your HTTPS deployment origin (or alternate local host/port). |
+| `CLARITY_AUTH_TOKEN` | Required 32+ random character operator password in every mode. Never reuse a provider key. |
+| `CALLE_BASE_URL` | Optional compatibility setting; only `https://api.heycall-e.com` (with optional trailing slash) is accepted. Redirects are refused. |
 | `DEMO_PHONE_E164` | Recipient for the `call:capture` CLI tool only, in E.164 format. The app does not use this setting. |
-| `CALLE_WEBHOOK_URL` | Optional public HTTPS URL for `/api/calle/webhook`. Polling works without it. |
+| `CLARITY_WEBHOOK_SECRET` | Optional separate 32+ character bearer credential for a trusted webhook relay. Unset disables the webhook. |
 
-Live calls use the phone number found in the submitted résumé or written
-answers. The interface shows that number before a call can be placed. The
-fictional example has no number: add your test recipient's number to its résumé
-before using it in live mode. There is no environment fallback. For
-international numbers, include an explicit country code; bare ten-digit numbers
-are interpreted as North American numbers.
+After analysis, enter the agreed destination in **Candidate destination**. It must
+be an exact ASCII E.164 number (`+` followed by country code and digits); spaces,
+Unicode digits, extensions, trailing newlines and national-only numbers are
+rejected. The app never selects a number from a résumé or written answers.
+
+Confirm that you verified the exact number and have the recipient's consent and
+authority for an English AI follow-up, then select **Confirm destination consent**.
+The server stores the exact number, derived country, English language, operator,
+and a 10-minute expiry on that application session. Only then can **Clarify by
+phone** create a call. The call request cannot override the destination. Editing
+and reanalyzing the application creates a new session requiring new consent.
+
+International numbers are validated with libphonenumber-js. Routing uses the
+number's country (for example, `GB` for a UK number), with locale `en` because the
+brief is English. Region and language availability still depend on CALL-E; this
+app does not claim every country or language is supported. Non-geographic numbers
+and numbers whose country cannot be identified are rejected. Destination entry is
+hidden by default with an explicit **Show** control; confirmation and result
+summaries show only the last four digits.
 
 Live analysis sends application text to Gemini and uses Gemini tokens. A live
 call sends the recipient number, candidate/role context, selected claim, and
 questions to CALL-E and uses CALL-E credits. Only use an authorized recipient
 who has agreed to this application follow-up; for verification, use your own
-phone and fictional candidate details. Inspect the displayed recipient and
+phone and fictional candidate details. Verify the destination in the consent step and inspect the
 question before selecting **Clarify by phone**. A number appearing in an
 application does not itself establish permission to call.
 
@@ -67,9 +84,27 @@ application does not itself establish permission to call.
 
 Before dialing, go back or leave the page without selecting **Clarify by phone**.
 Each application session uses a stable CALL-E idempotency key and reuses an
-existing call ID on repeat requests. Creating a new session is a new call intent;
-do not re-analyze and redial to recover a delayed result. Retrieve the existing
-call with `npm run call:inspect -- <call-id>` instead.
+existing call ID on repeat requests. A private disk reservation is written before
+calling; concurrent clicks cannot issue two creates. If creation times out, returns
+an invalid response, or cannot be durably recorded, the session is halted. The
+reservation also blocks a new session or CLI capture to that exact destination.
+No create request is automatically retried, even with the same idempotency key.
+
+Use **Reconcile existing call** with the call ID from CALL-E's dashboard. Match the
+call's `metadata.session_id` to the session shown on the halted screen. The server
+only GETs that call and verifies its ID, application metadata, exact destination,
+and region before linking the result and releasing the reservation. Unrelated
+calls are rejected. If the provider cannot establish what happened, leave the
+reservation in place and contact provider support; do not reanalyze and redial.
+Reconciliation also works through authenticated `POST /api/call/reconcile` with
+`{ "sessionId": "<session-uuid>", "callId": "<existing-call-id>" }` or
+`npm run call:reconcile -- <session-uuid> <existing-call-id>`.
+
+A process crash may leave `data/locks/<session-uuid>`. Stop all app/capture
+processes before an administrator removes that session's stale lock, then restart
+and reconcile. Preserve the session JSON and `data/destinations/` reservations;
+removing them defeats duplicate-call protection. Use one deployment with a
+persistent local disk, not ephemeral or independently scaled instances.
 
 Clarity creates no recurring schedules or automatic application-level retries.
 Once CALL-E accepts a live call, closing the tab or stopping the local server
@@ -80,8 +115,11 @@ rolled back. To disable live mode for subsequent analyses, set `DEMO_MODE=replay
 restart the server, and start a fresh session.
 
 The separate `call:capture` command is an explicit live action regardless of
-`DEMO_MODE`; each invocation uses a new idempotency key and can place a new call.
-Run `call:preview` first and do not restart a capture to recover its result.
+`DEMO_MODE`; pass `--consent` only after verifying the exact `DEMO_PHONE_E164`
+and recipient agreement. It uses the same durable consent and destination
+reservation as the app, and prints its session ID before any create. A successful
+new invocation can place a new call. Run `call:preview` first and reconcile an
+interrupted capture instead of restarting it.
 Stopping its polling process does not cancel an accepted call.
 
 ## How it works
@@ -124,7 +162,8 @@ app:
 ```bash
 npm run call:preview                   # print the brief and schema; no network
 npm run analyze                        # analyze the example; uses Gemini tokens
-npm run call:capture                   # place one real call to DEMO_PHONE_E164
+npm run call:capture -- --consent       # authorized real call to DEMO_PHONE_E164
+npm run call:reconcile -- <session-id> <call-id> # retrieve and link; never dials
 npm run call:inspect -- <call-id>       # fetch an existing call; never redials
 npm run call:inspect -- data/captures/<timestamp>.json
 npm run replay:promote -- data/captures/<timestamp>.json
@@ -154,10 +193,12 @@ lib/
   call-record.ts    Response normalization and transcript evidence helpers
   call-status.ts    Call progress and failure descriptions
   guardrails.ts     Claim anchoring and sensitive-attribute filters
-  phone.ts          Phone-number parsing
+  auth.ts           Operator authentication and separate webhook authentication
+  live-call.ts      Consent, durable create protection, and reconciliation
+  phone.ts          Strict E.164 validation, country routing, and masking
   replay.ts         Fixture loading and replay timing
   result.ts         Result presentation and conversation trail
-  session.ts        In-memory sessions mirrored to local JSON files
+  session.ts        Atomic private JSON storage and durable reservations
   types.ts          Shared domain types
 fixtures/           Fictional application, clarifications, and synthetic call
 scripts/            Analysis, capture, inspection, and local replay tools
@@ -166,10 +207,30 @@ tests/              Offline regression tests
 
 ## Data and deployment
 
-This is a local demo with no authentication, rate limits, database, or shared
-session store. Add access controls before exposing a live instance: its API can
-spend provider credits and retrieve application and transcript data. File-backed
-sessions need a writable filesystem and are intended for a single server process.
+All app pages and data routes require HTTP Basic authentication in every mode;
+there is no localhost, forwarded-header, replay, or debug bypass. The account is
+`clarity`; configure a unique random password in `CLARITY_AUTH_TOKEN`. Use HTTPS
+for remote hosting (for example through your TLS reverse proxy), keep the backend
+port private, and never expose plaintext HTTP credentials over a network. Browser
+mutations reject cross-origin requests against the configured `CLARITY_ORIGIN`,
+independent of forwarded or internal server host headers. Responses are not cached. Session reads
+also require the owning operator credential; rotating it invalidates access to
+old sessions. This is a single-operator demo, not a multi-user identity system.
+
+There are no application rate limits, database or distributed session store.
+File-backed sessions and call reservations require persistent writable storage;
+storage failures fail closed before dialing. Session files use private permissions
+and atomic replacement. Do not deploy multiple replicas on independent disks.
+
+The optional webhook is disabled unless `CLARITY_WEBHOOK_SECRET` is configured.
+CALL-E's current unsigned deliveries cannot authenticate directly: use a trusted
+relay that supplies `Authorization: Bearer <CLARITY_WEBHOOK_SECRET>`, or just use
+polling. The former `CALLE_WEBHOOK_URL` setting is no longer used. A delivery is
+only a hint to GET a known call from the pinned CALL-E API; supplied transcripts,
+results, summaries and status are discarded. Provider responses must match the
+stored call and authorized destination before they can update evidence. Duplicate
+events refresh the same record; failed verification returns a retryable error and
+does not consume an event ID. Do not expose the relay credential in callback URLs.
 
 `.env`, `data/`, local captured fixtures, dependencies, and build output are
 excluded by `.gitignore`. Share the source files through Git rather than uploading
@@ -179,8 +240,8 @@ Only fictional examples belong in shared fixtures.
 Keep API keys server-side in the ignored `.env` file. Local application sessions,
 transcripts, capture output, and inspection output can contain personal data;
 review and redact them before sharing. Mask recipient numbers in shared summaries
-(for example, `***0100`). The UI shows the full destination for the operator's
-pre-call check; capture startup logs mask it. This app does not implement an
+(for example, `***0100`). The operator can explicitly reveal the destination during
+entry; confirmation, API result views, and capture startup logs mask it. This app does not implement an
 automated retention or deletion policy. All committed candidate details and
 transcripts are fictional; test numbers are reserved examples and must not be
 used as live destinations.

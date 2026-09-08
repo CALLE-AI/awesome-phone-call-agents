@@ -1,3 +1,4 @@
+import { requireOperator } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { loadDemoApplication, loadDemoRun } from "@/lib/replay";
@@ -25,6 +26,8 @@ export const dynamic = "force-dynamic";
  *   &outcome=failed    the same stage, but as a call that never connected
  */
 export async function GET(request: Request) {
+  const denied = requireOperator(request);
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const stage = searchParams.get("stage") ?? "complete";
   const sessionId = searchParams.get("sessionId");

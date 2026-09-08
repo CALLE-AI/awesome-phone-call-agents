@@ -1,5 +1,7 @@
 "use client";
 
+import { DestinationConsent } from "./DestinationConsent";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CallScreen } from "./CallScreen";
@@ -30,6 +32,10 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [clarifications, setClarifications] = useState<Clarification[]>([]);
   const [view, setView] = useState<ResultView | null>(null);
+
+  const [authorizedDestination, setAuthorizedDestination] = useState<string | null>(null);
+  const [halted, setHalted] = useState(false);
+  const [reconcileId, setReconcileId] = useState("");
 
   const poller = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,6 +79,9 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
   );
 
   async function runAnalysis() {
+    setAuthorizedDestination(null);
+    setHalted(false);
+    setReconcileId("");
     setBusy("analyzing");
     setError(null);
     try {
@@ -84,10 +93,7 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
         const data = await postJson("/api/analyze", application);
         setSessionId(data.sessionId);
         setClarifications(data.clarifications);
-        // Who the call would reach, read out of the text that was just
-        // submitted. Assigned even when null, so a number found in a previous
-        // application can never be carried onto this one.
-        setApplication((p) => ({ ...p, candidatePhone: data.candidatePhone ?? undefined }));
+
       }
       setStage("clarify");
     } catch (cause) {
@@ -102,6 +108,8 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
     try {
       const response = await fetch(`/api/call/${id}`, { cache: "no-store" });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not read the call.");
+      if (data.ambiguous) { setHalted(true); setError(data.error); setStage("clarify"); return; }
       if (data.view) setView(data.view as ResultView);
       if (data.terminal) {
         setStage("result");
@@ -114,7 +122,7 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
   }, []);
 
   async function startCall() {
-    if (busy !== null) return;
+    if (busy !== null || halted) return;
     setBusy("dialing");
     setError(null);
     setView(null);
@@ -135,11 +143,38 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
       await postJson("/api/call", { sessionId });
       void poll(sessionId);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not place the call.");
+      const unknown = !(cause instanceof RequestFailure) || cause.ambiguous;
+      setHalted(unknown);
+      if (!unknown) setAuthorizedDestination(null);
+      setError(unknown ? "Call acceptance is unknown. Calling is halted. Find the existing call in CALL-E and reconcile its call ID below; do not redial." : (cause as Error).message);
       setStage("clarify");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function authorize(phone: string) {
+    setBusy("dialing");
+    setError(null);
+    try {
+      const data = await postJson("/api/call/authorize", { sessionId, phone, consent: true });
+      setAuthorizedDestination(`${data.destination} · ${data.region}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not record consent.");
+    } finally { setBusy(null); }
+  }
+
+  async function reconcile() {
+    setBusy("dialing");
+    setError(null);
+    try {
+      await postJson("/api/call/reconcile", { sessionId, callId: reconcileId });
+      setHalted(false);
+      setStage("calling");
+      void poll(sessionId!);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not reconcile the call.");
+    } finally { setBusy(null); }
   }
 
   /** Debug-only: hands the completed mock call to the normal result pipeline. */
@@ -161,6 +196,9 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
   function reset() {
     stopPolling();
     setApplication(EMPTY);
+    setAuthorizedDestination(null);
+    setHalted(false);
+    setReconcileId("");
     setSource("jobDescription");
     setStage("compose");
     setSessionId(null);
@@ -180,8 +218,7 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
     "the candidate";
   const roleTitle =
     application.roleTitle?.trim() || view?.session.application.roleTitle?.trim() || null;
-  const candidatePhone =
-    application.candidatePhone?.trim() || view?.session.application.candidatePhone?.trim() || null;
+
 
 
   return (
@@ -222,12 +259,23 @@ export function ClarityApp({ demoMode }: { demoMode: string }) {
           secondary={clarifications.slice(1)}
           candidateName={candidateName}
           roleTitle={roleTitle}
-          candidatePhone={candidatePhone}
+          candidatePhone={authorizedDestination}
+          halted={halted}
+          consentForm={!isDebug && demoMode === "live" && !halted ? <DestinationConsent key={sessionId} busy={busy !== null} authorized={authorizedDestination} onAuthorize={authorize} /> : null}
           requiresPhone={!isDebug && demoMode !== "replay"}
           busy={busy !== null}
           onStartCall={startCall}
           onEditApplication={() => setStage("compose")}
         />
+      )}
+
+      {halted && (
+        <div className="my-4 space-y-3 rounded-xl border border-amber/40 p-4">
+          <p className="text-sm text-fog">Session: {sessionId}. Reconciliation only retrieves a call; it never dials.</p>
+          <label htmlFor="reconcile-id" className="block text-sm text-chalk">Existing CALL-E call ID</label>
+          <input id="reconcile-id" value={reconcileId} onChange={(event) => setReconcileId(event.target.value)} className="w-full rounded-lg border border-line bg-ink px-3 py-2 text-sm" />
+          <button type="button" disabled={busy !== null || !reconcileId} onClick={reconcile} className="rounded-lg border border-amber px-3 py-2 text-sm text-amber disabled:opacity-35">Reconcile existing call</button>
+        </div>
       )}
 
       {stage === "calling" && (
@@ -264,6 +312,10 @@ function firstName(name: string): string {
   return first && /^\p{Lu}/u.test(first) ? first : name;
 }
 
+class RequestFailure extends Error {
+  constructor(message: string, public ambiguous: boolean) { super(message); }
+}
+
 async function postJson(url: string, body: unknown) {
   const response = await fetch(url, {
     method: "POST",
@@ -271,6 +323,6 @@ async function postJson(url: string, body: unknown) {
     body: JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Request failed.");
+  if (!response.ok) throw new RequestFailure(data.error ?? "Request failed.", data.ambiguous === true || response.status >= 500);
   return data;
 }

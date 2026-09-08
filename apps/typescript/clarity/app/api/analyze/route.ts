@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyze } from "@/lib/analyze";
-import { findPhone } from "@/lib/phone";
+import { operatorId, requireOperator } from "@/lib/auth";
 import { isReplayMode, loadReplayRun } from "@/lib/replay";
 import { createSession } from "@/lib/session";
 import type { ApplicationInput } from "@/lib/types";
@@ -18,6 +18,8 @@ const ApplicationSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const denied = requireOperator(request);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await request.json();
@@ -38,27 +40,22 @@ export async function POST(request: Request) {
     );
   }
 
-  // Resolved here rather than at dial time so the questions screen can say who
-  // is about to be called — or that nobody can be — before the button is live.
-  // Never read from `body`: the number must belong to the text it came with.
-  application.candidatePhone = findPhone(application.resume, application.answers) ?? undefined;
-
   // Replay rehearses the UI without spending anything. The fixture carries the
   // clarifications that produced its call, so the result cards stay keyed to the
   // run they came from rather than to a fresh, unrelated analysis.
   if (isReplayMode()) {
     try {
       const { clarifications, synthetic } = await loadReplayRun();
-      const session = await createSession({ application, clarifications, replay: true, synthetic });
+      const session = await createSession({ ownerId: operatorId(), application, clarifications, replay: true, synthetic });
       return NextResponse.json({
         sessionId: session.id,
         clarifications,
         rejected: [],
         replay: true,
-        candidatePhone: application.candidatePhone ?? null,
+        candidatePhone: null,
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Replay failed.";
+    } catch {
+      const message = "Replay failed.";
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
@@ -84,16 +81,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = await createSession({ application, clarifications: result.clarifications });
+    const session = await createSession({ ownerId: operatorId(), application, clarifications: result.clarifications });
 
     return NextResponse.json({
       sessionId: session.id,
       clarifications: result.clarifications,
       rejected: result.rejected,
-      candidatePhone: application.candidatePhone ?? null,
+      candidatePhone: null,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Analysis failed.";
+  } catch {
+    const message = "Analysis failed. Check the server configuration and try again.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

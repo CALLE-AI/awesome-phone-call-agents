@@ -158,6 +158,16 @@ export type CallRecord = {
 
 export type Session = {
   id: string;
+  ownerId?: string;
+  authorization?: {
+    phone: string;
+    region: string;
+    locale: string;
+    consentAt: string;
+    expiresAt: string;
+    ownerId: string;
+  };
+  createState?: "creating" | "ambiguous" | "accepted";
   createdAt: string;
   /** True when this session is rendered from a fixture, not a live call. */
   replay: boolean;

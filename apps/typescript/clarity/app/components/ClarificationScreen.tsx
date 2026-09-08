@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { factNeed, factTopic } from "@/lib/result";
 import type { Clarification } from "@/lib/types";
 
@@ -9,6 +10,8 @@ type Props = {
   candidatePhone: string | null;
   requiresPhone: boolean;
   busy: boolean;
+  consentForm?: ReactNode;
+  halted?: boolean;
   onStartCall: () => void;
   onEditApplication: () => void;
 };
@@ -21,6 +24,8 @@ export function ClarificationScreen({
   candidatePhone,
   requiresPhone,
   busy,
+  consentForm,
+  halted,
   onStartCall,
   onEditApplication,
 }: Props) {
@@ -44,13 +49,15 @@ export function ClarificationScreen({
         </div>
       </div>
 
+      {consentForm}
+
       {/* Synthetic runs do not need a dialable recipient. */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={onStartCall}
-            disabled={busy || (!candidatePhone && requiresPhone)}
+            disabled={busy || halted || (!candidatePhone && requiresPhone)}
             className="cursor-pointer rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
           >
             Clarify by phone
@@ -65,12 +72,11 @@ export function ClarificationScreen({
           </button>
         </div>
         {candidatePhone ? (
-          <p className="rail text-fog/60">Number to call: {candidatePhone}</p>
+          <p className="rail text-fog/60">Authorized destination: {candidatePhone}</p>
         ) : (
           requiresPhone && (
             <p className="max-w-prose text-[13px] leading-relaxed text-amber">
-              No phone number was found in this application, so there is nobody to call. Add the
-              candidate’s number to the résumé and find what to clarify again.
+              Confirm the agreed destination and recipient consent before placing this call.
             </p>
           )
         )}

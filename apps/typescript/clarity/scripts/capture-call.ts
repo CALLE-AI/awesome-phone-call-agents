@@ -1,7 +1,7 @@
 /**
  * Capture one real CALL-E call using the same brief and schema as the app.
  *
- *   npm run call:capture  # calls DEMO_PHONE_E164
+ *   npm run call:capture -- --consent  # calls the agreed DEMO_PHONE_E164
  *   npm run call:preview  # prints the brief and schema without dialing
  *
  * The raw response goes to data/captures/<timestamp>.json (gitignored). That file
@@ -10,13 +10,15 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import demo from "../fixtures/demo-application.json" with { type: "json" };
 import clarifications from "../fixtures/demo-clarifications.json" with { type: "json" };
 import { buildResultSchema, buildTask, calleClient } from "../lib/calle";
 import { formatOffset, matchEvidence, normalizeCall, readAnswer } from "../lib/call-record";
 import type { Clarification } from "../lib/types";
-import { isE164 } from "../lib/phone";
+import { destination, maskPhone } from "../lib/phone";
+import { operatorId } from "../lib/auth";
+import { authorizeDestination, CallProblem, callError, startLiveCall } from "../lib/live-call";
+import { createSession } from "../lib/session";
 
 /** The ambiguities in the seeded application, ranked. Shared with the replay
  *  fixtures so a promoted run stays keyed to the same questions. Only the first
@@ -26,7 +28,7 @@ const PRIMARY = CLARIFICATIONS[0]!;
 
 async function main() {
   const dryRun = process.argv.includes("--dry");
-  const phone = process.env.DEMO_PHONE_E164?.trim();
+  const phone = process.env.DEMO_PHONE_E164 ?? "";
 
   const task = buildTask(PRIMARY, { candidateName: demo.candidateName, roleTitle: demo.roleTitle });
   const resultSchema = buildResultSchema(PRIMARY);
@@ -39,21 +41,18 @@ async function main() {
     return;
   }
 
-  if (!isE164(phone)) throw new Error("Set DEMO_PHONE_E164 to a valid E.164 number.");
-
+  try { destination(phone); }
+  catch (error) { throw new CallProblem((error as Error).message, 400); }
+  if (!process.argv.includes("--consent")) throw new CallProblem("Pass --consent only after verifying this exact destination and the recipient's agreement to the English AI call.", 400);
   const client = calleClient();
   const started = Date.now();
-
-  console.log(`Placing call to ***${phone.slice(-4)} …`);
-  const created = await client.calls.create(
-    {
-      task,
-      recipients: [{ phones: [phone], region: "US", locale: "en-US" }],
-      resultSchema,
-      metadata: { app: "clarity", source: "capture-script" },
-    },
-    { idempotencyKey: `clarity-capture:${randomUUID()}` },
-  );
+  const owner = operatorId();
+  const session = await createSession({ application: demo, clarifications: CLARIFICATIONS, ownerId: owner });
+  await authorizeDestination(session.id, owner, phone);
+  console.log(`Session: ${session.id}. Placing call to ${maskPhone(phone)} …`);
+  console.log("If acceptance is unknown, stop and reconcile this session; do not rerun capture.");
+  const accepted = await startLiveCall(session.id, owner);
+  const created = await client.calls.get(accepted.callId);
 
   console.log(`call_id=${created.id}  status=${created.status}`);
   console.log("Answer the phone and role-play the candidate. Polling …\n");
@@ -145,6 +144,6 @@ function stamp(): string {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(callError(error).error);
   process.exit(1);
 });

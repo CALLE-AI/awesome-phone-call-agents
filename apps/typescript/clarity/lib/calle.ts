@@ -13,11 +13,23 @@ export const OPENING_LINE =
   "follow-up questions about your application. Is now a good time for a brief call?";
 
 export function calleClient(): CalleClient {
+  const origin = "https://api.heycall-e.com";
+  const configured = process.env.CALLE_BASE_URL || origin;
+  if (configured !== origin && configured !== `${origin}/`) {
+    throw new Error("CALL-E credentials require https://api.heycall-e.com.");
+  }
   const apiKey = process.env.CALLE_API_KEY;
   if (!apiKey) throw new Error("CALLE_API_KEY is not set");
   return new CalleClient({
     apiKey,
-    baseUrl: process.env.CALLE_BASE_URL?.trim() || "https://api.heycall-e.com",
+    baseUrl: origin,
+    fetch: async (request) => {
+      const url = new URL(request.url);
+      if (url.origin !== origin || url.username || url.password) {
+        throw new Error("Unapproved CALL-E origin.");
+      }
+      return fetch(new Request(request, { redirect: "error", signal: AbortSignal.timeout(30_000) }));
+    },
   });
 }
 
