@@ -10,7 +10,7 @@ The skill expects a structured JSON payload, typically delivered via a webhook f
 ```json
 {
   "customer_id": "cus_fixture_123456",
-  "customer_phone": "+14045639785",
+  "customer_phone": "+1-555-0100",
   "trigger_id": "evt_stripe_failed_fixture_987",
   "amount": 249.00,
   "failure_reason": "expired_card",
