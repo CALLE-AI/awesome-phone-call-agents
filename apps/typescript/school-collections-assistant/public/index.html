@@ -98,8 +98,32 @@
               />
             </div>
 
+            <div class="field">
+              <label>Operator API token</label>
+              <input
+                id="apiToken"
+                type="password"
+                autocomplete="off"
+                placeholder="SCHOOL_COLLECTIONS_API_TOKEN"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Stable intent id (optional)</label>
+              <input
+                id="intentId"
+                type="text"
+                placeholder="e.g. fee-2026-09-mary-banda"
+              />
+            </div>
+
           </div>
 
+          <label class="confirm-live">
+            <input id="confirmLiveCall" type="checkbox" />
+            Confirm a real live call (ignored unless the server has CALLE_LIVE_ENABLED=true)
+          </label>
 
           <button type="submit" id="callButton">
             <span></span>

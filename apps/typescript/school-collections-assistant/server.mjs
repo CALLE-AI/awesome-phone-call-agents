@@ -1,89 +1,213 @@
 import "dotenv/config";
 import express from "express";
 import { CalleClient } from "@call-e/calle";
+import {
+  bearerToken,
+  buildReminderTask,
+  fakeReminderResult,
+  isAmbiguousProviderError,
+  isE164,
+  maskPhone,
+  reminderIntentKey,
+  RESULT_SCHEMA,
+  safeEqual,
+} from "./safety.mjs";
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
-const client = new CalleClient({
-  apiKey: process.env.CALLE_LIVE_API_KEY,
-});
-
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(express.json({ limit: "32kb", strict: true }));
 app.use(express.static("public"));
 
-app.post("/api/reminder", async (req, res) => {
-  try {
-    const {
-      parentName,
-      studentName,
-      phoneNumber,
-      amount,
-      dueDate,
-      schoolName,
-    } = req.body;
+function config() {
+  return {
+    liveEnabled: process.env.CALLE_LIVE_ENABLED === "true",
+    apiToken: String(process.env.SCHOOL_COLLECTIONS_API_TOKEN || "").trim(),
+    calleApiKey: String(process.env.CALLE_API_KEY || "").trim(),
+    authorizedDestination: String(
+      process.env.CALLE_AUTHORIZED_DESTINATION || ""
+    ).trim(),
+  };
+}
 
-    if (!parentName || !studentName || !phoneNumber || !amount || !dueDate) {
-      return res.status(400).json({
-        error: "Please provide all required fields.",
+function requireApiAuth(req, res, next) {
+  const { apiToken } = config();
+  if (!apiToken) {
+    return res.status(503).json({
+      success: false,
+      error:
+        "Authentication is not configured. Set SCHOOL_COLLECTIONS_API_TOKEN on the server.",
+    });
+  }
+
+  const provided = bearerToken(req.get("authorization"));
+  if (!safeEqual(provided, apiToken)) {
+    res.set("WWW-Authenticate", "Bearer");
+    return res.status(401).json({
+      success: false,
+      error: "Authentication required.",
+    });
+  }
+
+  return next();
+}
+
+function validateReminderBody(body) {
+  const fields = {
+    parentName: String(body?.parentName || "").trim(),
+    studentName: String(body?.studentName || "").trim(),
+    phoneNumber: String(body?.phoneNumber || "").trim(),
+    amount: String(body?.amount || "").trim(),
+    dueDate: String(body?.dueDate || "").trim(),
+    schoolName: String(body?.schoolName || "").trim(),
+    intentId: String(body?.intentId || "").trim(),
+    confirmLiveCall: body?.confirmLiveCall === true,
+  };
+
+  if (
+    !fields.parentName ||
+    !fields.studentName ||
+    !fields.phoneNumber ||
+    !fields.amount ||
+    !fields.dueDate
+  ) {
+    return { error: "Please provide all required fields.", status: 400 };
+  }
+
+  if (!isE164(fields.phoneNumber)) {
+    return {
+      error:
+        "Phone number must be strict ASCII E.164 (for example +12025550100).",
+      status: 400,
+    };
+  }
+
+  return { fields };
+}
+
+async function placeAuthorizedCall(fields, intentKey, calleApiKey) {
+  const client = new CalleClient({ apiKey: calleApiKey });
+  const input = {
+    task: buildReminderTask(fields),
+    recipient: { phone: fields.phoneNumber },
+    resultSchema: RESULT_SCHEMA,
+    metadata: {
+      intent_key: intentKey,
+      workflow: "school-collections-reminder",
+    },
+  };
+  const options = { idempotencyKey: intentKey };
+
+  try {
+    return await client.calls.createAndWait(input, options);
+  } catch (error) {
+    if (!isAmbiguousProviderError(error)) throw error;
+
+    // Ambiguous create: the call may already exist. Reconcile under the same
+    // stable intent key and never mint a replacement key or place a second dial.
+    try {
+      return await client.calls.createAndWait(input, options);
+    } catch (reconcileError) {
+      const err = new Error(
+        `Call outcome is ambiguous for ${maskPhone(fields.phoneNumber)}. Halted for reconciliation under intent key ${intentKey}. Do not retry with a new key.`
+      );
+      err.status = 409;
+      err.code = "needs_human_reconciliation";
+      err.intentKey = intentKey;
+      err.cause = reconcileError;
+      throw err;
+    }
+  }
+}
+
+app.get("/api/health", (_req, res) => {
+  const cfg = config();
+  res.json({
+    ok: true,
+    service: "school-collections-assistant",
+    mode: cfg.liveEnabled ? "live" : "fake",
+    liveEnabled: cfg.liveEnabled,
+    authConfigured: Boolean(cfg.apiToken),
+  });
+});
+
+app.post("/api/reminder", requireApiAuth, async (req, res) => {
+  try {
+    const checked = validateReminderBody(req.body);
+    if (checked.error) {
+      return res.status(checked.status).json({
+        success: false,
+        error: checked.error,
       });
     }
 
-    const call = await client.calls.createAndWait({
-      task: `
-You are a polite school payment reminder assistant calling on behalf of ${
-        schoolName || "the school"
-      }.
+    const { fields } = checked;
+    const intentKey = reminderIntentKey(fields);
+    const cfg = config();
 
-You are speaking with ${parentName}, the parent or guardian of ${studentName}.
+    // Default path: fake / no-call. Live requires explicit env gates + exact destination auth.
+    if (!cfg.liveEnabled) {
+      console.info(
+        JSON.stringify({
+          event: "reminder_fake",
+          intentKey,
+          phoneMasked: maskPhone(fields.phoneNumber),
+        })
+      );
+      return res.json(fakeReminderResult(fields, intentKey));
+    }
 
-The student's outstanding school payment is ${amount}.
-The payment is due on ${dueDate}.
+    if (!cfg.calleApiKey) {
+      return res.status(503).json({
+        success: false,
+        error: "CALLE_API_KEY is required when CALLE_LIVE_ENABLED=true.",
+      });
+    }
 
-Your task is to:
-1. Politely introduce yourself as calling on behalf of the school.
-2. Inform the parent about the outstanding payment.
-3. Ask whether they are aware of the outstanding balance.
-4. Ask when they expect to make the payment.
-5. Be polite and understanding.
-6. Do not pressure, threaten, or embarrass the parent.
-7. Thank them for their time.
+    if (!isE164(cfg.authorizedDestination)) {
+      return res.status(503).json({
+        success: false,
+        error:
+          "Set CALLE_AUTHORIZED_DESTINATION to the exact ASCII E.164 destination authorized for this live run.",
+      });
+    }
 
-If the parent cannot commit to a date, record that appropriately.
+    if (fields.phoneNumber !== cfg.authorizedDestination) {
+      return res.status(403).json({
+        success: false,
+        error:
+          "Destination is not authorized for this live run. The phone number must exactly match CALLE_AUTHORIZED_DESTINATION.",
+        phoneMasked: maskPhone(fields.phoneNumber),
+        intentKey,
+      });
+    }
 
-Do not make up information that was not provided.
-      `,
-      recipient: {
-        phone: phoneNumber,
-      },
-      resultSchema: {
-        type: "object",
-        required: [
-          "payment_awareness",
-          "will_pay",
-          "payment_date",
-        ],
-        properties: {
-          payment_awareness: {
-            type: "string",
-            enum: ["yes", "no", "unknown"],
-          },
-          will_pay: {
-            type: "string",
-            enum: ["yes", "no", "uncertain"],
-          },
-          payment_date: {
-            type: "string",
-          },
-          parent_response: {
-            type: "string",
-          },
-        },
-      },
-    });
+    if (!fields.confirmLiveCall) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Live calls require confirmLiveCall: true so the operator explicitly authorizes this exact run.",
+        intentKey,
+      });
+    }
 
-    res.json({
+    console.info(
+      JSON.stringify({
+        event: "reminder_live_start",
+        intentKey,
+        phoneMasked: maskPhone(fields.phoneNumber),
+      })
+    );
+
+    const call = await placeAuthorizedCall(fields, intentKey, cfg.calleApiKey);
+
+    return res.json({
       success: true,
+      mode: "live",
+      realCallPlaced: true,
+      intentKey,
+      phoneMasked: maskPhone(fields.phoneNumber),
       status: call.status,
       taskCompleted: call.taskCompleted,
       completionConfidence: call.completionConfidence,
@@ -91,21 +215,36 @@ Do not make up information that was not provided.
       evidence: call.evidence,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      JSON.stringify({
+        event: "reminder_error",
+        code: error.code || "error",
+        message: error.message,
+        intentKey: error.intentKey,
+      })
+    );
 
-    res.status(error.status || 500).json({
+    return res.status(error.status || 500).json({
       success: false,
       error: error.message || "Something went wrong.",
+      code: error.code,
+      intentKey: error.intentKey,
     });
   }
 });
 
-export { app };
+export { app, config };
 
 if (process.env.NODE_ENV !== "test") {
+  const cfg = config();
+  if (!cfg.apiToken) {
+    console.warn(
+      "SCHOOL_COLLECTIONS_API_TOKEN is not set. /api/reminder will return 503 until it is configured."
+    );
+  }
   app.listen(PORT, () => {
     console.log(
-      `School Payment Assistant running at http://localhost:${PORT}`
+      `School Collections Assistant running at http://localhost:${PORT} (mode=${cfg.liveEnabled ? "live" : "fake"})`
     );
   });
 }
