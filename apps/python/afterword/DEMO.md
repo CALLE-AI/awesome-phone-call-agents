@@ -1,5 +1,7 @@
 # Afterword demo
 
+**Hosted:** https://afterword-95953931159.us-central1.run.app
+
 One estate, six fictional institutions, all five grades. No credentials, no
 calls.
 

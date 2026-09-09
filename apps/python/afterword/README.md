@@ -12,6 +12,9 @@ queue and asks them to say it again.
 Afterword makes those calls and returns one consolidated pack of what each
 institution actually requires -- quoted, dated, and marked non-binding.
 
+**Hosted console:** https://afterword-95953931159.us-central1.run.app
+(fictional estate and institutions, places no calls)
+
 **No call is placed unless you ask for one.** Every command defaults to a
 preview or a scripted demo, and the whole test suite runs with no credentials.
 
