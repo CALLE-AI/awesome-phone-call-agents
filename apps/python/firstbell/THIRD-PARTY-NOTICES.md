@@ -29,12 +29,17 @@ to install, declares no licence:
 - `info.license` on PyPI is null, as is `info.license_expression`
 - there are no licence classifiers
 - the installed distribution contains no `LICENSE` file
-- the package's declared Home-page, `https://github.com/CALLE-AI/server-sdk-python`,
-  returns 404 and does not appear in the CALL-E organisation's public repository list
+The package's declared Home-page, `https://github.com/CALLE-AI/server-sdk-python`, is a
+separate matter and it has since been settled. This file used to say it returned 404 and was
+absent from the CALL-E organisation's public repository list, which was true when it was
+written on 2026-09-04. Re-checked on 2026-09-09 it answers **200**, it is public, and it
+carries an MIT licence reading `Copyright (c) 2026 CALL-E, Inc.`, pushed 2026-09-08. That
+half of the report is withdrawn.
 
-The TypeScript SDK from the same organisation, at the same version, is published under
-MIT with a public repository. The asymmetry suggests an oversight rather than a deliberate
-restriction.
+What has not changed is the PyPI metadata above: the published distribution still declares no
+licence and ships no `LICENSE` file, so a developer who follows the quickstart and installs
+from PyPI, which is what the quickstart tells them to do, still receives an unlicensed
+artifact. The repository being MIT does not license the package that was already published.
 
 Our position, stated plainly rather than assumed: this project uses `calle-ai` exactly as
 the platform's own installation guide and quickstart direct, inside a hackathon run by the
@@ -42,8 +47,10 @@ package's publisher, for the purpose that publisher invited. We hold no licence 
 implied invitation, and we redistribute no part of the SDK. It is declared as an ordinary
 PyPI dependency and installed from PyPI by the end user.
 
-This has been reported to CALL-E through the hackathon's feedback channel, with the
-suggested fix of adding the MIT licence to match the TypeScript SDK.
+This was reported to CALL-E through the hackathon's feedback channel, with the suggested fix
+of adding the MIT licence to match the TypeScript SDK. Part of it has been acted on already:
+the repository is public and MIT as of 2026-09-08. The remaining ask is the smaller one, that
+the same licence reach the PyPI metadata and the built distribution.
 
 ## Reference data
 

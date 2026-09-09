@@ -610,6 +610,18 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 314 | Set the count in the sentence under the money card next to the row that makes it true, so the two cannot disagree, and the gate written to catch them disagreeing cannot fail | 1 |
 | 315 | State twenty-eight unexplained absences per 1,000 as the figure to use rather than a ceiling on it, which is the sentence that stops a reader multiplying the per-call money by every absence a district records | 1 |
 | 316 | Call a string method on the path argparse hands back, so a records file with nothing in it raises rather than printing could-not-measure, which turns the one outcome this tool reserves for what it cannot judge into a traceback | 1 |
+| 317 | Blank the English on one Tamil turn in the gloss file, so a line a reader is promised a translation of gets an empty one, which renders as the Tamil alone with a gap under it | 1 |
+| 318 | Leave a Tamil word inside an English gloss, so the translation a reader was given to read is partly the thing they could not read | 1 |
+| 319 | Add a gloss row for a line that holds no Tamil, so the file that exists to say which lines were translated starts claiming a line nobody needed translated | 1 |
+| 320 | Empty the gloss file's statement of what wrote the English, so a reader deciding how much to trust a translation has nothing to decide from | 1 |
+| 321 | Stop the builder refusing a Tamil line the gloss file has no English for, so the page publishes one untranslated line in the middle of a scroller and nothing says so | 2 |
+| 322 | Stop the builder refusing a call in another language that the gloss file does not name, so a call added later reaches the page with none of its turns translated | 1 |
+| 323 | Look each gloss up by its position in the list rather than by what the line says, so a transcript the transcriber split differently puts every English sentence under the wrong Tamil one, with a gloss present on every line | 1 |
+| 324 | Decide which turns need English from the call's locale rather than from each line's own text, so a call labelled `ta-IN` that opens with an English announcement demands a translation of English, and the authored fixture the suite builds a page from stops building at all | 1 |
+| 325 | Drop the English span from a rendered turn while leaving it in the published data, so the transcript a reader with no JavaScript meets is the one version of it with no translation | 2 |
+| 326 | Drop the note under a translated transcript saying the English was written afterwards, so a page presenting a translation stops saying it is one, which is a claim about what was on the recording | 1 |
+| 327 | Retype one consonant of the Tamil quoted in `docs/the-legal-surface.md`, which is the defect that was actually in the tree: the fourth word of the opening announcement carried the wrong one of two similar letters, inside the paragraph whose whole argument is that the disclosure a parent hears is the disclosure on the recording | 1 |
+| 328 | Remove the English under a Tamil line in a document, so one file in the submitted tree prints two sentences of Tamil with no translation anywhere near them, which is where this started | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
@@ -1241,6 +1253,8 @@ rang, which is true of one row in the shipped example and false of another. Cons
 attaches to the number called, so a log that says which record authorised a call and not
 whether that record named the telephone answers half of the only question it exists to
 answer. Counted over the 43 tests in `tests/test_consent_record.py`.
+
+One change this session was caught by the builder and by no test, and it is left out of the table rather than entered as a zero, because a zero here means a gate that was not guarding what it claimed and this is not that. Retyping one character of a `ta` line inside `tools/glosses.json` makes `tools/judge_page.py` exit 1 and refuse to write the page, saying the transcript changed under the gloss. No test fails, and the reason is worth knowing: the line in question is the opening announcement, `S-4108` opens with the same sentence, so the quotation in `docs/the-legal-surface.md` is still exactly a line of a committed transcript. Two gates were watching and the cheaper one had nothing to say.
 
 Mutation testing shows a test notices a change. It does not show the test is testing the
 right thing, and it says nothing about the rules nobody thought to write. The two defects

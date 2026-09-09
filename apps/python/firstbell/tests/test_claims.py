@@ -945,6 +945,19 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     # on a call nobody has placed yet.
     "test_a_row_closed_on_an_answer_that_said_nothing_is_marked_as_one":
         "needs out/index.html, which is built from receipts held outside this repository",
+    # The three gates on the English under every Tamil line. Two of them read the built page
+    # and one reads the JSON island inside it, so a clone with no receipts cannot run them.
+    # What is lost while they are quiet is the guarantee that the page a reviewer opens
+    # carries a translation of every line it prints in Tamil, which is a rule of entry and
+    # not a nicety. The gloss file itself is committed, so the two gates that read it
+    # directly run everywhere and hold the harder half: that the English is written in
+    # English and that the file says who wrote it.
+    "test_the_island_carries_english_for_every_turn_it_carries":
+        "needs out/index.html, which is built from receipts held outside this repository",
+    "test_the_rendered_transcript_puts_the_english_under_the_tamil":
+        "needs out/index.html, which is built from receipts held outside this repository",
+    "test_the_page_says_who_wrote_the_english":
+        "needs out/index.html, which is built from receipts held outside this repository",
     # The throughput figures the README publishes, against the tool run on the receipts
     # that produced them. The receipts are held outside this repository, so a clone cannot
     # run this one and should not be told its numbers are wrong. The ten beside it hold the
