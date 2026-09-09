@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "low-confidence",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 0.72,
+    "summary": "The sanitized evidence satisfies every assertion, but evaluation confidence sits below the 0.8 floor, so this must be reviewed rather than trusted.",
+    "evidence": {
+      "mentions": ["attendance confirmed for thursday", "a cancellation fee applies if you cancel within 24 hours"]
+    }
+  }
+}
