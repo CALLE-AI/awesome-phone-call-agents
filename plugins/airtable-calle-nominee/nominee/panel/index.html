@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nominee</title>
+<style>
+  :root {
+    --ground: #ecefe9; --panel: #f7f8f4; --sunk: #e0e4da;
+    --ink: #171b13; --soft: #5b6252; --faint: #868d79;
+    --rule: #cdd2c2; --edge: #a9b099;
+    --brass: #7d6413; --brass-lit: #9a7c1c;
+    --ok: #1c6742; --warn: #94520e; --stop: #97291f; --idle: #6d7460;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101208; --panel: #191c12; --sunk: #22261a;
+      --ink: #e9ebdd; --soft: #9ba28a; --faint: #767d66;
+      --rule: #2e3324; --edge: #454b37;
+      --brass: #d3af56; --brass-lit: #e6c873;
+      --ok: #56b584; --warn: #d08c3e; --stop: #d4655a; --idle: #8a9179;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 22px 80px; }
+
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
+  h1 { font-size: 17px; letter-spacing: -.01em; margin: 0; font-weight: 700; }
+  h1 small { font-weight: 400; color: var(--soft); margin-left: 10px; font-size: 13px; }
+  .mode {
+    float: right; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; padding: 4px 9px; border: 1px solid var(--edge);
+    color: var(--soft);
+  }
+  .mode.live { color: var(--stop); border-color: var(--stop); font-weight: 600; }
+
+  .bar {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    border-bottom: 1px solid var(--edge); margin-bottom: 26px;
+  }
+  .bar div { padding: 12px 14px 13px; border-left: 1px solid var(--rule); }
+  .bar div:first-child { border-left: 0; padding-left: 0; }
+  .bar dt {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 3px;
+  }
+  .bar dd {
+    margin: 0; font-family: var(--mono); font-size: 20px; font-weight: 600;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .bar dd.alert { color: var(--warn); }
+
+  .sect { font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+          text-transform: uppercase; color: var(--faint); margin: 0 0 10px; }
+
+  .item { border-top: 1px solid var(--rule); padding: 14px 0; }
+  .item:last-of-type { border-bottom: 1px solid var(--rule); }
+  .item.skip { opacity: .82; }
+  .head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .rid { font-family: var(--mono); font-weight: 600; font-size: 12.5px; }
+  .emp { font-weight: 600; }
+  .num { font-family: var(--mono); font-size: 12px; color: var(--soft);
+         font-variant-numeric: tabular-nums; }
+  .src { font-family: var(--mono); font-size: 10px; letter-spacing: .09em;
+         text-transform: uppercase; color: var(--faint); }
+  .why { color: var(--soft); font-size: 13px; margin: 5px 0 0; }
+
+  details { margin-top: 9px; }
+  summary {
+    cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--brass);
+    letter-spacing: .04em;
+  }
+  summary::marker { color: var(--edge); }
+  pre {
+    background: var(--sunk); border-left: 2px solid var(--edge); margin: 9px 0 0;
+    padding: 12px 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.62;
+    white-space: pre-wrap; overflow-x: auto; color: var(--ink);
+  }
+
+  .pill {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; padding: 3px 8px; border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.verified { color: var(--ok); }
+  .pill.partial, .pill.needs_review { color: var(--warn); }
+  .pill.not_verified, .pill.employer_unreachable, .pill.skipped { color: var(--stop); }
+  .pill.declined, .pill.pending, .pill.queued { color: var(--idle); }
+
+  .act {
+    margin-top: 26px; padding-top: 18px; border-top: 2px solid var(--ink);
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  }
+  button {
+    font: inherit; font-weight: 600; padding: 9px 18px; border: 1px solid var(--edge);
+    background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  button:hover { border-color: var(--soft); }
+  button.go { background: var(--brass); border-color: var(--brass); color: #fbfaf4; }
+  button.go:hover { background: var(--brass-lit); border-color: var(--brass-lit); }
+  button[disabled] { opacity: .45; cursor: not-allowed; }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .note { color: var(--soft); font-size: 12.5px; }
+
+  .chain { font-family: var(--mono); font-size: 11.5px; color: var(--soft); margin-top: 22px;
+           padding-top: 12px; border-top: 1px solid var(--rule); }
+  .chain.bad { color: var(--stop); font-weight: 600; }
+  .err { color: var(--stop); font-size: 13px; margin-top: 12px; }
+  .ev { font-size: 12.5px; color: var(--soft); margin: 6px 0 0; padding-left: 12px;
+        border-left: 2px solid var(--rule); font-style: italic; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="mode" id="mode">…</span>
+    <h1>Nominee <small>verification of employment</small></h1>
+  </header>
+
+  <dl class="bar" id="bar">
+    <div><dt>View</dt><dd id="m-view" style="font-size:13px">—</dd></div>
+    <div><dt>Will call</dt><dd id="m-call">—</dd></div>
+    <div><dt>Skipped</dt><dd id="m-skip">—</dd></div>
+    <div><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
+    <div><dt>Estimated</dt><dd id="m-cost">—</dd></div>
+  </dl>
+
+  <section id="s-plan">
+    <p class="sect">What will be said</p>
+    <div id="planned"></div>
+  </section>
+
+  <section id="s-skip" hidden>
+    <p class="sect" style="margin-top:26px">Will not be called</p>
+    <div id="skipped"></div>
+  </section>
+
+  <div class="act">
+    <button id="refresh">Preview again</button>
+    <button id="run" class="go">Run</button>
+    <span class="note" id="hint"></span>
+  </div>
+  <p class="err" id="err" hidden></p>
+
+  <section id="s-res" hidden>
+    <p class="sect" style="margin-top:30px">Results</p>
+    <div id="results"></div>
+  </section>
+
+  <p class="chain" id="chain">audit: …</p>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let VIEW = "", LIVE = false, polling = null;
+
+const api = async (path, opts) => {
+  const r = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN), opts);
+  const j = await r.json().catch(() => ({ error: "bad response" }));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+
+function showError(msg) {
+  const el = $("err");
+  el.hidden = !msg;
+  el.textContent = msg || "";
+}
+
+function renderPlan(p) {
+  VIEW = p.view;
+  $("m-view").textContent = p.view;
+  $("m-call").textContent = p.call_count;
+  $("m-skip").textContent = p.skipped.length;
+  const hid = $("m-hidden");
+  hid.textContent = p.hidden;
+  hid.classList.toggle("alert", p.hidden > 0);
+  $("m-cost").textContent = "$" + p.estimated_cost_usd.toFixed(2);
+
+  $("planned").innerHTML = p.planned.map(x => `
+    <div class="item">
+      <div class="head">
+        <span class="rid">${esc(x.request_id)}</span>
+        <span class="emp">${esc(x.employer)}</span>
+        <span class="num">${esc(x.masked_number)}</span>
+        <span class="src">${esc(x.source.replace(/_/g, " "))}</span>
+      </div>
+      <details><summary>what will be said</summary><pre>${esc(x.task)}</pre></details>
+    </div>`).join("") || `<p class="note">Nothing in this view is ready to call.</p>`;
+
+  $("s-skip").hidden = p.skipped.length === 0;
+  $("skipped").innerHTML = p.skipped.map(x => `
+    <div class="item skip">
+      <div class="head">
+        <span class="rid">${esc(x.request_id)}</span>
+        <span class="emp">${esc(x.employer)}</span>
+        <span class="pill skipped">not called</span>
+      </div>
+      <p class="why">${esc(x.reason)}</p>
+    </div>`).join("");
+
+  $("run").disabled = p.call_count === 0;
+  $("hint").textContent = p.call_count
+    ? `${p.call_count} real call${p.call_count > 1 ? "s" : ""}. This cannot be undone.`
+    : "";
+}
+
+function renderRun(s) {
+  $("s-res").hidden = false;
+  const order = ["verified","partial","needs_review","declined","not_verified","employer_unreachable","pending","skipped"];
+  const rows = [...s.rows].sort((a,b) => order.indexOf(a.disposition) - order.indexOf(b.disposition));
+  $("results").innerHTML = rows.map(r => `
+    <div class="item">
+      <div class="head">
+        <span class="rid">${esc(r.request_id)}</span>
+        <span class="pill ${esc(r.disposition)}">${esc(r.disposition.replace(/_/g, " "))}</span>
+        ${r.confidence != null ? `<span class="num">confidence ${r.confidence.toFixed(2)}</span>` : ""}
+      </div>
+      <p class="why">${esc(r.reason)}</p>
+      ${(r.evidence || []).map(e => `<p class="ev">${esc(e)}</p>`).join("")}
+    </div>`).join("");
+  if (s.error) showError(s.error);
+  if (s.finished && !s.running) {
+    const parts = Object.entries(s.counts).map(([k, v]) => `${v} ${k.replace(/_/g," ")}`);
+    $("hint").textContent = parts.length ? `${parts.join(", ")} in ${s.elapsed}s` : "";
+    $("run").disabled = false;
+    $("refresh").disabled = false;
+    clearInterval(polling); polling = null;
+    loadAudit();
+  }
+}
+
+async function loadPlan() {
+  try { renderPlan(await api("/api/plan?view=" + encodeURIComponent(VIEW))); showError(""); }
+  catch (e) { showError(e.message); }
+}
+
+async function loadAudit() {
+  try {
+    const a = await api("/api/audit");
+    const el = $("chain");
+    el.classList.toggle("bad", !a.ok);
+    el.textContent = a.ok
+      ? `audit: chain intact — ${a.records} records, head ${a.head}`
+      : `audit: CHAIN BROKEN at seq ${a.broken_at} — ${a.reason}`;
+  } catch (e) { /* panel still usable without it */ }
+}
+
+$("refresh").addEventListener("click", loadPlan);
+
+$("run").addEventListener("click", async () => {
+  const n = $("m-call").textContent;
+  if (!confirm(`Place ${n} real phone call${n === "1" ? "" : "s"} to real employers.\n\nThis cannot be undone.`)) return;
+  $("run").disabled = true; $("refresh").disabled = true;
+  showError("");
+  try {
+    await api("/api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ view: VIEW, confirm: true }),
+    });
+    $("hint").textContent = "dialling…";
+    polling = setInterval(async () => {
+      try { renderRun(await api("/api/status")); }
+      catch (e) { showError(e.message); clearInterval(polling); polling = null; }
+    }, 1000);
+  } catch (e) {
+    showError(e.message);
+    $("run").disabled = false; $("refresh").disabled = false;
+  }
+});
+
+(async () => {
+  try {
+    const cfg = await api("/api/config");
+    VIEW = cfg.view; LIVE = cfg.live;
+    const m = $("mode");
+    m.textContent = LIVE ? "live — can place calls" : "fixtures — no calls";
+    m.classList.toggle("live", LIVE);
+    await loadPlan();
+    await loadAudit();
+  } catch (e) {
+    showError(e.message + " — open the URL printed by `nominee serve`, which carries the token.");
+  }
+})();
+</script>
+</body>
+</html>

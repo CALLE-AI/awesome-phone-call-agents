@@ -23,6 +23,7 @@ from typing import Any
 
 from .airtable import FieldMap, FixtureAirtable, LiveAirtable
 from .audit import AuditLog
+from .panel.server import serve
 from .runner import Plan, RunError, execute, plan
 from .transport import FixtureTransport, LiveTransport
 
@@ -178,6 +179,34 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    """Open the operator's control panel on loopback."""
+    import secrets
+
+    if args.fixtures:
+        client, transport = _fixture_clients(args)
+        live = False
+    else:
+        client, transport = _live_clients(args)
+        live = transport is not None
+    serve(
+        {
+            "client": client,
+            "transport": transport,
+            "audit": AuditLog(args.audit),
+            "table": args.table,
+            "requester_name": args.requester,
+            "default_view": args.view,
+            "max_calls": args.max_calls,
+            "token": secrets.token_urlsafe(24),
+            "live": live,
+        },
+        host=args.host,
+        port=args.port,
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nominee",
@@ -214,6 +243,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="required; confirms the preview was checked",
     )
     run.set_defaults(func=cmd_run)
+
+    panel = sub.add_parser("serve", help="open the control panel on loopback")
+    common(panel)
+    panel.add_argument("--host", default="127.0.0.1")
+    panel.add_argument("--port", type=int, default=8787)
+    panel.add_argument(
+        "--fixtures", action="store_true",
+        help="drive the panel from bundled fixtures; places no calls",
+    )
+    panel.add_argument("--base")
+    panel.add_argument("--scenario")
+    panel.set_defaults(func=cmd_serve)
     return parser
 
 
