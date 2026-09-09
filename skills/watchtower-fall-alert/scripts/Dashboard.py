@@ -1,25 +1,3 @@
-"""
-dashboard.py
-
-Streamlit dashboard for Watchtower.
-
-This is a pure display layer - it does NOT run the CV pipeline itself.
-It reads from the FastAPI backend (fall_detector.py) which must already
-be running:
-
-    - GET /detect  -> live annotated MJPEG video stream
-    - GET /status  -> JSON status: current state, last event, decision
-
-Run (in a separate terminal from fall_detector.py):
-
-    pip install streamlit requests --break-system-packages
-    streamlit run dashboard.py
-
-Then make sure fall_detector.py is running at the same time, e.g.:
-
-    python fall_detector.py
-"""
-
 import time
 
 import requests

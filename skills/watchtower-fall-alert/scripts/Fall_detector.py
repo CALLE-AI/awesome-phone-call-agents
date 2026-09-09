@@ -20,11 +20,8 @@ box_annotator = sv.BoxAnnotator(thickness=2)
 
 # --- Database logging ----------------------------------------------------
 # Lightweight SQLite logging, kept inline here rather than a separate
-# module. Records every fall event and the eventual caregiver decision
-# to watchtower.db (created automatically in the working directory).
 
 DB_PATH = "watchtower.db"
-
 
 @contextmanager
 def _db_connect() -> Iterator[sqlite3.Connection]:
@@ -147,12 +144,6 @@ STATUS_COOL_DOWN_SECONDS = 10
 _consecutive_fall_frames = 0
 _last_event_time = 0.0
 
-
-# --- Shared status state for the dashboard -------------------------------
-# Polled by the "/status" endpoint. Kept as a plain dict for simplicity -
-# fine for a single-camera hackathon demo; a real multi-room deployment
-# would want a proper state store instead of a module-level global.
-
 status_state = {
     "status": "monitoring",       # monitoring | fall_detected | calling | resolved
     "last_event": None,             # last fall_detected event dict, or None
@@ -269,11 +260,6 @@ def generate_frame():
         else:
             annotated_frame = frame
 
-        # Reset the displayed status back to "monitoring" once we're
-        # well past the last event's cooldown window. Without this, the
-        # dashboard stays stuck on "resolved" (or "calling", if the call
-        # itself failed) forever, even though the CV pipeline is still
-        # actively watching for the next fall in the background.
         if status_state["status"] != "monitoring" and _last_event_time:
             if time.time() - _last_event_time >= STATUS_COOL_DOWN_SECONDS:
                 _update_status(status="monitoring")

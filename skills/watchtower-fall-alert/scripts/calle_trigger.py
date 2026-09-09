@@ -35,8 +35,8 @@ from typing import Literal, Optional
 from calle import CalleClient
 
 # Placeholder / fictional numbers only - see CONTRIBUTING.md safety rules.
-CAREGIVER_PHONE = os.environ.get("CAREGIVER_PHONE", "+2349068072169")
-SECONDARY_CONTACT_PHONE = os.environ.get("SECONDARY_CONTACT_PHONE", "+2349068072169")
+CAREGIVER_PHONE = os.environ.get("CAREGIVER_PHONE", "")
+SECONDARY_CONTACT_PHONE = os.environ.get("SECONDARY_CONTACT_PHONE", "")
 
 Decision = Literal["dismiss", "escalate", "unknown"]
 
