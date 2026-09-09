@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { CallConsent, CallStatus, DispatchCallResponse, LeadContext, SundialCallRecord } from "@/lib/types";
 import { sundials } from "./concierge";
-import { HARBOR_PUBLIC_SDK_KEY, SUNDIALS_API_KEY_HEADER } from "./public-key";
+import { SUNDIALS_API_KEY_HEADER } from "./public-key";
 
 export interface UseSundialOptions {
   apiEndpoint?: string;
@@ -97,7 +97,7 @@ export function useSundial(options: UseSundialOptions = {}) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            [SUNDIALS_API_KEY_HEADER]: sundials.getApiKey() || HARBOR_PUBLIC_SDK_KEY
+            [SUNDIALS_API_KEY_HEADER]: sundials.getApiKey()
           },
           body: JSON.stringify({
             phoneNumber: params.phoneNumber,

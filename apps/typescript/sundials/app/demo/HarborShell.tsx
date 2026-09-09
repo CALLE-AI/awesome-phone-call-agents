@@ -42,7 +42,15 @@ function HarborMark() {
   );
 }
 
-export function HarborShell({ children }: { children: ReactNode }) {
+export function HarborShell({
+  children,
+  apiKey,
+  accountId = "harbor"
+}: {
+  children: ReactNode;
+  apiKey?: string;
+  accountId?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const onLearnMore = useCallback(() => {
@@ -52,8 +60,8 @@ export function HarborShell({ children }: { children: ReactNode }) {
   return (
     <div className="harbor min-h-screen w-full max-w-none bg-background text-foreground">
       <Sundials
-        accountId="harbor"
-        apiKey="hardcoded-sdk-key"
+        accountId={accountId}
+        apiKey={apiKey || ""}
         brandName="Harbor"
         title="Want a walkthrough of Harbor?"
         description="Tell us about your revenue team. We will show you the workspace, not a slide deck."

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HARBOR_ACCOUNT_ID } from "@/lib/sdk/public-key";
 import { geminiConfigured } from "@/lib/brain/gemini";
 import { readBrainConfig, writeBrainConfig } from "@/lib/brain/config";
 import { applyIngestDraft, draftFromText, enrichDraftWithGemini, MAX_INGEST_FILE_BYTES, resolveIngestText } from "@/lib/brain/ingest";
+import { requireConsoleSession } from "@/lib/console/session-http";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const auth = requireConsoleSession(req);
+  if (!auth.ok) return auth.response;
   const body = (await req.json().catch(() => null)) as {
     kind?: string;
     url?: string;
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
       fileName: typeof body?.fileName === "string" ? body.fileName : undefined,
       text: typeof body?.text === "string" ? body.text : undefined
     });
-    const current = readBrainConfig(HARBOR_ACCOUNT_ID);
+    const current = readBrainConfig(auth.session.accountId);
     const heuristic = draftFromText(current, text);
     const draft = await enrichDraftWithGemini(current, text, heuristic);
     const config = writeBrainConfig(applyIngestDraft(current, source, draft));

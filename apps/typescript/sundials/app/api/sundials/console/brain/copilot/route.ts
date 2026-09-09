@@ -1,27 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HARBOR_ACCOUNT_ID } from "@/lib/sdk/public-key";
 import { geminiConfigured } from "@/lib/brain/gemini";
 import { readBrainConfig, writeBrainConfig } from "@/lib/brain/config";
 import { applySuggestionToConfig, runBrainCopilot } from "@/lib/brain/copilot";
+import { requireConsoleSession } from "@/lib/console/session-http";
 import type { BrainConfig } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const auth = requireConsoleSession(req);
+  if (!auth.ok) return auth.response;
   const body = (await req.json().catch(() => null)) as {
     message?: string;
     suggestionId?: string;
     config?: Partial<BrainConfig>;
   } | null;
 
-  const current = readBrainConfig(HARBOR_ACCOUNT_ID);
+  const current = readBrainConfig(auth.session.accountId);
   const base = writeBrainConfig({
     ...current,
     ...(body?.config && typeof body.config === "object" ? body.config : {}),
     tonePersona: current.tonePersona,
     agentIdentity: current.agentIdentity,
     painCategories: current.painCategories,
-    accountId: HARBOR_ACCOUNT_ID
+    accountId: auth.session.accountId
   });
 
   if (typeof body?.suggestionId === "string" && body.suggestionId.trim()) {
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
     tonePersona: current.tonePersona,
     agentIdentity: current.agentIdentity,
     painCategories: current.painCategories,
-    accountId: HARBOR_ACCOUNT_ID
+    accountId: auth.session.accountId
   });
   return NextResponse.json({
     success: true,

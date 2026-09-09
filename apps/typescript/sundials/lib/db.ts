@@ -1,11 +1,22 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import {
+  formatSdkKey,
+  harborSeedPassword,
+  hashPassword,
+  HARBOR_USERNAME,
+  MIN_PASSWORD_LENGTH,
+  normalizeUsername,
+  slugFromCompany,
+  type SundialAccount
+} from "./accounts.ts";
 import { createFixtureCallRecord } from "./calle/fixture.ts";
 import { fetchLiveCalleCall } from "./calle/live-binding.ts";
 import { handleCallSavedForRetry, processDueRetries } from "./calle/retry.ts";
 import { applyCalleSnapshot, isInFlightStatus } from "./calle/sync-live.ts";
 import { maskEmail, maskPhoneNumber } from "./calle/security.ts";
+import { HARBOR_ACCOUNT_ID } from "./sdk/public-key.ts";
 import { buildAnalytics, buildLeadQueue } from "./intent/analytics.ts";
 import { behaviorFromEvents, declaredInterestFromEvents } from "./intent/profile.ts";
 import { scoreEvents } from "./intent/score.ts";
@@ -32,30 +43,42 @@ function inAnalyticsRange(iso: string | undefined, range: "today" | "7d" | "30d"
   return Date.now() - t <= windowMs;
 }
 
+function forAccountId<T extends { accountId?: string }>(rows: T[], accountId?: string): T[] {
+  if (!accountId) return rows;
+  return rows.filter((row) => row.accountId === accountId);
+}
+
+function callsForAccount(calls: SundialCallRecord[], accountId?: string): SundialCallRecord[] {
+  if (!accountId) return calls;
+  return calls.filter((call) => (call.session?.accountId || HARBOR_ACCOUNT_ID) === accountId);
+}
+
 function analyticsFromStore(
   store: SundialsDatabase,
-  range?: "today" | "7d" | "30d"
+  range?: "today" | "7d" | "30d",
+  accountId?: string
 ): AnalyticsSnapshot {
-  const visitors = range
-    ? store.getAllVisitors().filter((visitor) => inAnalyticsRange(visitor.lastSeenAt, range))
-    : store.getAllVisitors();
-  const events = range
-    ? store.getAllEvents().filter((event) => inAnalyticsRange(event.timestamp, range))
-    : store.getAllEvents();
-  const calls = range
-    ? store.getAllCalls().filter((call) => inAnalyticsRange(call.requestedAt, range))
-    : store.getAllCalls();
+  const visitors = forAccountId(store.getAllVisitors(), accountId).filter((visitor) =>
+    range ? inAnalyticsRange(visitor.lastSeenAt, range) : true
+  );
+  const events = forAccountId(store.getAllEvents(), accountId).filter((event) =>
+    range ? inAnalyticsRange(event.timestamp, range) : true
+  );
+  const calls = callsForAccount(store.getAllCalls(), accountId).filter((call) =>
+    range ? inAnalyticsRange(call.requestedAt, range) : true
+  );
   return buildAnalytics(visitors, events, calls);
 }
 
-function leadQueueFromStore(store: SundialsDatabase): LeadQueueItem[] {
+function leadQueueFromStore(store: SundialsDatabase, accountId?: string): LeadQueueItem[] {
+  const visitors = forAccountId(store.getAllVisitors(), accountId);
   const eventsByVisitor = new Map<string, SundialEvent[]>();
-  for (const event of store.getAllEvents()) {
+  for (const event of forAccountId(store.getAllEvents(), accountId)) {
     const list = eventsByVisitor.get(event.visitorId) || [];
     list.push(event);
     eventsByVisitor.set(event.visitorId, list);
   }
-  return buildLeadQueue(store.getAllVisitors(), eventsByVisitor, store.getAllCalls());
+  return buildLeadQueue(visitors, eventsByVisitor, callsForAccount(store.getAllCalls(), accountId));
 }
 
 export function defaultDbPath(): string {
@@ -104,7 +127,176 @@ export class SundialsDatabase {
       CREATE INDEX IF NOT EXISTS idx_events_visitor ON events (visitor_id, timestamp);
       CREATE INDEX IF NOT EXISTS idx_events_session ON events (session_id, timestamp);
       CREATE INDEX IF NOT EXISTS idx_events_account ON events (account_id, timestamp);
+      CREATE TABLE IF NOT EXISTS accounts (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        company_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        sdk_key TEXT UNIQUE,
+        created_at TEXT NOT NULL
+      );
     `);
+    this.seedHarborAccount();
+  }
+
+  private parseAccount(row: {
+    id: string;
+    username: string;
+    company_name: string;
+    password_hash: string;
+    sdk_key: string | null;
+    created_at: string;
+  }): SundialAccount {
+    return {
+      id: row.id,
+      username: row.username,
+      companyName: row.company_name,
+      passwordHash: row.password_hash,
+      sdkKey: row.sdk_key,
+      createdAt: row.created_at
+    };
+  }
+
+  private seedHarborAccount(): void {
+    if (this.getAccount(HARBOR_ACCOUNT_ID)) return;
+    this.sqlite
+      .prepare(
+        `INSERT INTO accounts (id, username, company_name, password_hash, sdk_key, created_at)
+         VALUES (?, ?, ?, ?, NULL, ?)`
+      )
+      .run(
+        HARBOR_ACCOUNT_ID,
+        HARBOR_USERNAME,
+        "Harbor",
+        hashPassword(harborSeedPassword()),
+        new Date().toISOString()
+      );
+  }
+
+  public getAccount(id: string): SundialAccount | undefined {
+    const row = this.sqlite
+      .prepare(
+        `SELECT id, username, company_name, password_hash, sdk_key, created_at FROM accounts WHERE id = ?`
+      )
+      .get(id) as
+      | {
+          id: string;
+          username: string;
+          company_name: string;
+          password_hash: string;
+          sdk_key: string | null;
+          created_at: string;
+        }
+      | undefined;
+    return row ? this.parseAccount(row) : undefined;
+  }
+
+  public getAccountByUsername(username: string): SundialAccount | undefined {
+    const row = this.sqlite
+      .prepare(
+        `SELECT id, username, company_name, password_hash, sdk_key, created_at
+         FROM accounts WHERE lower(username) = ?`
+      )
+      .get(normalizeUsername(username)) as
+      | {
+          id: string;
+          username: string;
+          company_name: string;
+          password_hash: string;
+          sdk_key: string | null;
+          created_at: string;
+        }
+      | undefined;
+    return row ? this.parseAccount(row) : undefined;
+  }
+
+  public getAccountBySdkKey(sdkKey: string): SundialAccount | undefined {
+    const key = sdkKey.trim();
+    if (!key) return undefined;
+    const row = this.sqlite
+      .prepare(
+        `SELECT id, username, company_name, password_hash, sdk_key, created_at
+         FROM accounts WHERE sdk_key = ?`
+      )
+      .get(key) as
+      | {
+          id: string;
+          username: string;
+          company_name: string;
+          password_hash: string;
+          sdk_key: string | null;
+          created_at: string;
+        }
+      | undefined;
+    return row ? this.parseAccount(row) : undefined;
+  }
+
+  private allocateAccountId(companyName: string): string {
+    const base = slugFromCompany(companyName);
+    if (base === HARBOR_ACCOUNT_ID) {
+      /* Harbor id is reserved for the seed; signups get a suffix. */
+    }
+    let candidate = base === HARBOR_ACCOUNT_ID ? `${base}-2` : base;
+    let n = 2;
+    while (this.getAccount(candidate)) {
+      n += 1;
+      candidate = `${base}-${n}`;
+    }
+    return candidate;
+  }
+
+  public createAccount(input: {
+    username: string;
+    password: string;
+    companyName: string;
+  }): { ok: true; account: SundialAccount } | { ok: false; message: string } {
+    const username = normalizeUsername(input.username);
+    const companyName = input.companyName.trim();
+    if (!username || username.length < 3) {
+      return { ok: false, message: "Username must be at least 3 characters." };
+    }
+    if (!/^[a-z0-9._-]+$/.test(username)) {
+      return { ok: false, message: "Username may only include letters, numbers, dots, underscores, and hyphens." };
+    }
+    if (input.password.length < MIN_PASSWORD_LENGTH) {
+      return { ok: false, message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
+    }
+    if (!companyName) {
+      return { ok: false, message: "Company name is required." };
+    }
+    if (this.getAccountByUsername(username)) {
+      return { ok: false, message: "That username is already taken." };
+    }
+    const id = this.allocateAccountId(companyName);
+    const account: SundialAccount = {
+      id,
+      username,
+      companyName,
+      passwordHash: hashPassword(input.password),
+      sdkKey: null,
+      createdAt: new Date().toISOString()
+    };
+    this.sqlite
+      .prepare(
+        `INSERT INTO accounts (id, username, company_name, password_hash, sdk_key, created_at)
+         VALUES (?, ?, ?, ?, NULL, ?)`
+      )
+      .run(account.id, account.username, account.companyName, account.passwordHash, account.createdAt);
+    return { ok: true, account };
+  }
+
+  public generateSdkKey(accountId: string): string {
+    const account = this.getAccount(accountId);
+    if (!account) throw new Error("Account not found.");
+    let key = formatSdkKey(account.companyName);
+    let attempts = 0;
+    while (this.getAccountBySdkKey(key)) {
+      attempts += 1;
+      if (attempts > 5) throw new Error("Could not allocate an SDK key.");
+      key = formatSdkKey(account.companyName);
+    }
+    this.sqlite.prepare("UPDATE accounts SET sdk_key = ? WHERE id = ?").run(key, accountId);
+    return key;
   }
 
   private parseCall(payload: string): SundialCallRecord {
@@ -197,14 +389,14 @@ export class SundialsDatabase {
     return row ? (JSON.parse(row.payload) as WebSessionContext) : undefined;
   }
 
-  public saveCall(call: SundialCallRecord): void {
+  public saveCall(call: SundialCallRecord, options?: { skipRetryHooks?: boolean }): void {
     this.sqlite
       .prepare(
         `INSERT INTO calls (id, requested_at, payload) VALUES (?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET requested_at = excluded.requested_at, payload = excluded.payload`
       )
       .run(call.id, call.requestedAt, JSON.stringify(call));
-    handleCallSavedForRetry(this, call);
+    if (!options?.skipRetryHooks) handleCallSavedForRetry(this, call);
     if (this.persistent && process.env.GEMINI_API_KEY?.trim()) {
       void import("./brain/pipeline.ts").then((mod) => {
         if (mod.needsGeminiProfile(call)) mod.scheduleBrainAfterCall(this, call.id);
@@ -376,8 +568,8 @@ export class SundialsDatabase {
     };
   }
 
-  public getMetrics(): SpeedToLeadMetrics {
-    const all = this.getAllCalls();
+  public getMetrics(accountId?: string): SpeedToLeadMetrics {
+    const all = callsForAccount(this.getAllCalls(), accountId);
     const completed = all.filter((c) => c.status === "completed" && c.speedToDialSec);
     const inFlight = all.filter((c) => isInFlightStatus(c.status));
     const avgSpeed =
@@ -399,16 +591,16 @@ export class SundialsDatabase {
     };
   }
 
-  public getAnalytics(range?: "today" | "7d" | "30d"): AnalyticsSnapshot {
-    return analyticsFromStore(this, range);
+  public getAnalytics(range?: "today" | "7d" | "30d", accountId?: string): AnalyticsSnapshot {
+    return analyticsFromStore(this, range, accountId);
   }
 
-  public getLeadQueue(): LeadQueueItem[] {
-    return leadQueueFromStore(this);
+  public getLeadQueue(accountId?: string): LeadQueueItem[] {
+    return leadQueueFromStore(this, accountId);
   }
 
-  public getLeadById(leadId: string): LeadQueueItem | undefined {
-    return this.getLeadQueue().find((lead) => lead.visitorId === leadId);
+  public getLeadById(leadId: string, accountId?: string): LeadQueueItem | undefined {
+    return this.getLeadQueue(accountId).find((lead) => lead.visitorId === leadId);
   }
 
   public getCallsForVisitor(visitorId: string): SundialCallRecord[] {
@@ -430,23 +622,24 @@ export function getSundialsDb(): SundialsDatabase {
 export const db = {
   saveSession: (session: WebSessionContext) => getSundialsDb().saveSession(session),
   getSession: (id: string) => getSundialsDb().getSession(id),
-  saveCall: (call: SundialCallRecord) => getSundialsDb().saveCall(call),
+  saveCall: (call: SundialCallRecord, options?: { skipRetryHooks?: boolean }) =>
+    getSundialsDb().saveCall(call, options),
   getCall: (id: string) => getSundialsDb().getCall(id),
   peekCalls: () => getSundialsDb().peekCalls(),
   getAllCalls: () => getSundialsDb().getAllCalls(),
   refreshLiveCalls: (taskId?: string) => getSundialsDb().refreshLiveCalls(taskId),
-  getMetrics: () => getSundialsDb().getMetrics(),
+  getMetrics: (accountId?: string) => getSundialsDb().getMetrics(accountId),
   ingestEventBatch: (input: Parameters<SundialsDatabase["ingestEventBatch"]>[0]) =>
     getSundialsDb().ingestEventBatch(input),
   touchVisitor: (partial: Parameters<SundialsDatabase["touchVisitor"]>[0]) =>
     getSundialsDb().touchVisitor(partial),
   snapshotForVisitor: (visitorId: string, sessionId?: string) =>
     getSundialsDb().snapshotForVisitor(visitorId, sessionId),
-  getAnalytics: (range?: Parameters<SundialsDatabase["getAnalytics"]>[0]) =>
-    analyticsFromStore(getSundialsDb(), range),
-  getLeadQueue: () => leadQueueFromStore(getSundialsDb()),
-  getLeadById: (leadId: string) =>
-    leadQueueFromStore(getSundialsDb()).find((lead) => lead.visitorId === leadId),
+  getAnalytics: (range?: Parameters<SundialsDatabase["getAnalytics"]>[0], accountId?: string) =>
+    analyticsFromStore(getSundialsDb(), range, accountId),
+  getLeadQueue: (accountId?: string) => leadQueueFromStore(getSundialsDb(), accountId),
+  getLeadById: (leadId: string, accountId?: string) =>
+    leadQueueFromStore(getSundialsDb(), accountId).find((lead) => lead.visitorId === leadId),
   getCallsForVisitor: (visitorId: string) =>
     getSundialsDb()
       .getAllCalls()

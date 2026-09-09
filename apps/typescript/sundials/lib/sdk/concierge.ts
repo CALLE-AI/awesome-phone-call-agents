@@ -3,7 +3,7 @@
 import type { ConciergeCta, IdentifiedLead, WebSessionContext } from "@/lib/types";
 import { newEntityId } from "@/lib/ids";
 import { compactE164 } from "@/lib/calle/security";
-import { HARBOR_PUBLIC_SDK_KEY, SUNDIALS_API_KEY_HEADER } from "./public-key";
+import { SUNDIALS_API_KEY_HEADER } from "./public-key";
 import { ctaOpensWidget, scDatasetProperties } from "./cta-dataset";
 import {
   parseTrackingConsent,
@@ -83,7 +83,7 @@ class SundialsClient {
       apiEndpoint: "/api/sundials",
       requireConsent: true,
       ...config,
-      apiKey: config.apiKey || HARBOR_PUBLIC_SDK_KEY
+      apiKey: config.apiKey?.trim() || ""
     };
     this.startedAt = Date.now();
     this.bindCtaClicks();
@@ -99,7 +99,7 @@ class SundialsClient {
   }
 
   public getApiKey(): string {
-    return this.config.apiKey || HARBOR_PUBLIC_SDK_KEY;
+    return this.config.apiKey || "";
   }
 
   public subscribeConsent(listener: () => void): () => void {

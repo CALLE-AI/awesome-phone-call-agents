@@ -15,34 +15,40 @@ export type ConsolePayload = {
   source: DataSource;
 };
 
-export async function loadConsole(range?: Range): Promise<ConsolePayload> {
+export async function loadConsole(range?: Range, accountId?: string): Promise<ConsolePayload> {
   const source = readDataSource();
   if (source !== "mock") {
     await db.refreshLiveCalls();
-    syncPainCatalogFromCalls(getSundialsDb());
+    if (accountId) syncPainCatalogFromCalls(getSundialsDb(), accountId);
   }
-  const { analytics } = resolveAnalytics(range);
-  const { calls } = resolveAllCalls();
-  const { leads } = resolveLeadQueue();
+  const { analytics } = resolveAnalytics(range, accountId);
+  const { calls } = resolveAllCalls(accountId);
+  const { leads } = resolveLeadQueue(accountId);
   return { calls, leads, analytics, source };
 }
 
-export async function loadLead(leadId: string): Promise<{
+export async function loadLead(
+  leadId: string,
+  accountId?: string
+): Promise<{
   lead: LeadQueueItem | null;
   calls: SundialCallRecord[];
 }> {
   if (readDataSource() !== "mock") await db.refreshLiveCalls();
-  const { lead, calls } = resolveLeadDetail(leadId);
+  const { lead, calls } = resolveLeadDetail(leadId, accountId);
   scheduleMissingBriefings(getSundialsDb(), calls);
   return { lead, calls };
 }
 
-export async function loadCall(callId: string): Promise<{
+export async function loadCall(
+  callId: string,
+  accountId?: string
+): Promise<{
   call: SundialCallRecord | null;
   lead: LeadQueueItem | null;
 }> {
   if (readDataSource() !== "mock") await db.refreshLiveCalls(callId);
-  const { call, lead } = resolveCallDetail(callId);
+  const { call, lead } = resolveCallDetail(callId, accountId);
   maybeProfile(call);
   return { call, lead };
 }
