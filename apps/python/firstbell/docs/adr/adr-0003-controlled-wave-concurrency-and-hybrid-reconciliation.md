@@ -32,8 +32,8 @@ In the CALL-E telephony engine, outbound calls cannot be recalled or cancelled o
 Currently, [`dispatch.scheduler.WaveDispatcher`](../../dispatch/scheduler.py) schedules work through a Python `ThreadPoolExecutor` bounded by `concurrency` (default 3, up to 4). Each worker thread blocks on `_await_terminal(call_id)`, executing a loop that polls `calls.get(call_id)` every 2.0 seconds (`time.sleep`) up to a 600-second deadline.
 In district deployments handling 500 absentees, thread-pool sleep polling presents technical liabilities:
 1. Thread starvation: OS threads remain blocked in sleep states rather than multiplexing network requests.
-2. Polling overhead: Each call lasting 40 seconds generates 20 GET requests. A 500-call run generates 10,000 HTTP requests, risking API rate limiting (`rate_limit_exceeded`).
-3. Window elongation: At concurrency 4, sequentially dialling 500 families takes over 80 minutes, exceeding the school morning attendance window (typically 08:30 to 09:15).
+2. Polling overhead: eleven real calls measured a mean of 51.0 seconds (`tools/throughput.py`, printed at `README.md`), so at the 2.0-second poll interval declared in `dispatch/scheduler.py` each call generates about 26 GET requests. A 500-call run generates about 13,000 HTTP requests, risking API rate limiting (`rate_limit_exceeded`).
+3. Window elongation: at concurrency 4, dialling 500 families takes 110.4 minutes, measured by `tools/throughput.py` from real call lengths and printed at `README.md`, which overruns the school morning attendance window (typically 08:30 to 09:15).
 
 ### Constraints
 - Outbound calls cannot be aborted mid-flight by an API endpoint.

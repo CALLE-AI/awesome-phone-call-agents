@@ -42,9 +42,9 @@ and nothing here is a screenshot.
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 334 rows, each with the change made and the number of tests that noticed |
 
-Twelve of these calls were real, to real telephones, on 2026-09-04. The recordings are on
-the [evidence page](https://firstbell-evidence.vercel.app), with each call's transcript
-and its shortened id. The receipt files are on neither that page nor in this tree, for the
+Twelve of these calls were real, to real telephones, on 2026-09-04. Eight were recorded, and those recordings are on the
+[evidence page](https://firstbell-evidence.vercel.app), with their transcripts, beside a
+shortened id for all twelve. The receipt files are on neither that page nor in this tree, for the
 reason [`evidence/README.md`](evidence/README.md) gives, so what travels with the code is the
 arithmetic they produced: [`evidence/recorded-calls.json`](evidence/recorded-calls.json) names
 all six and holds the counts behind every money figure here.
@@ -884,7 +884,10 @@ the wrong view from its student system and gets every enrolled pupil instead of 
 absentees. The idempotency key is `attendance:{student}:{day}`, which makes the second run
 of a day free and can do nothing about the first, because every row is a different child.
 
-The refusal names the number it found and how to proceed on purpose:
+The refusal names the number it found and how to proceed on purpose. The block below is the
+message template in `firstbell/cli.py` filled in by hand rather than a captured run: no file
+in `examples/` comes near the fifty-call ceiling, so nothing committed here produces this
+refusal. The wording is the program's. The count and the file name are stand-ins.
 
 ```
 This run would phone 412 families, more than the 50-call ceiling.

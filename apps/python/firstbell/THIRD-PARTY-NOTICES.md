@@ -115,10 +115,12 @@ package's publisher, for the purpose that publisher invited. We hold no licence 
 implied invitation, and we redistribute no part of the SDK. It is declared as an ordinary
 PyPI dependency and installed from PyPI by the end user.
 
-This was reported to CALL-E through the hackathon's feedback channel, with the suggested fix
-of adding the MIT licence to match the TypeScript SDK. Part of it has been acted on already:
-the repository is public and MIT as of 2026-09-08. The remaining ask is the smaller one, that
-the same licence reach the PyPI metadata and the built distribution.
+This goes to CALL-E through the hackathon's feedback survey, with the suggested fix of
+adding the MIT licence to match the TypeScript SDK. That survey is filed outside this
+repository, so it is the one line in this file a reader cannot open and check. Part of it
+has been acted on already: the repository is public and MIT as of 2026-09-08. The remaining
+ask is the smaller one, that the same licence reach the PyPI metadata and the built
+distribution.
 
 ## What the published page loads
 

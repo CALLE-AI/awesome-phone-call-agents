@@ -2650,7 +2650,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'recovered afterwards with a <code>GET</code>, which places no call.</p>',
         '<table class=compliance><tbody>'
         '<tr><td>transcripts, waveforms, the audio, and the unshortened identifiers</td>'
-        '<td class=dim>not in the repository, and not published whole</td></tr>'
+        '<td class=dim>not in the repository. On this page'
+        + (' in full' if has_audio else ' without the audio')
+        + ', apart from the identifiers, which are shortened</td></tr>'
         '<tr><td>the rules those calls produced, and the tests that hold them</td>'
         '<td class=ok>in the repository</td></tr>'
         '</tbody></table>',
