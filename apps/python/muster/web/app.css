@@ -42,6 +42,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -100,6 +102,7 @@ button { font: inherit; color: inherit; }
   background: var(--ink);
   color: #e7efec;
   border-bottom: 1px solid #000;
+  overflow-x: hidden;
 }
 
 .brand {
@@ -387,7 +390,38 @@ select {
 
 main { padding: var(--pad); }
 
-.view { display: grid; gap: var(--pad); }
+.view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--pad);
+}
+
+/* Grid and flex children default to min-width:auto, which lets a wide table
+   push the whole page sideways. Every wide thing scrolls in its own box. */
+.card,
+.card-head,
+.card-head-row > *,
+.card-body,
+.kpi,
+.stage > *,
+.rung > *,
+.factlist div,
+.factlist dd,
+.kv-item,
+.turn,
+.turn-text,
+.chart-row,
+.track { min-width: 0; }
+
+.table-scroll,
+.chart-scroll { max-width: 100%; }
+
+.turn-text,
+.kv-value,
+.quote,
+.taskbox,
+.chain-hashes span,
+.factlist dd { overflow-wrap: anywhere; }
 
 .card {
   background: var(--card);
@@ -840,7 +874,7 @@ tr.not-caught td:first-child { box-shadow: inset 3px 0 0 var(--g-third); }
   right: 0;
   bottom: 0;
   z-index: 46;
-  width: min(46rem, 100vw);
+  width: min(46rem, 100%);
   background: var(--card);
   border-left: 1px solid var(--rule-2);
   box-shadow: -14px 0 34px rgba(15, 28, 29, 0.14);
@@ -1034,4 +1068,12 @@ tr.not-caught td:first-child { box-shadow: inset 3px 0 0 var(--g-third); }
   .user-name { display: none; }
   .kpi { border-left: 0; border-top: 1px solid var(--rule); }
   .kpi:first-child { border-top: 0; }
+}
+
+/* The cadence is still stated in the KPI strip and the cadence table, so the
+   pill is the first thing to go when the bar runs out of room. */
+@media (max-width: 40rem) {
+  .pill { display: none; }
+  /* The status counts wrap to three lines down here, so reserve the room. */
+  body { padding-bottom: 5.5rem; }
 }

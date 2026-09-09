@@ -73,8 +73,11 @@ Muster.chartMarkup = function (exposure) {
   }).join('');
 
   var axis = '<div class="axis">' + ticks.map(function (t) {
-    return '<span class="axis-tick" style="left:' + Muster.logPct(t).toFixed(2) + '%">' +
-      Muster.commas(t) + '</span>';
+    var pct = Muster.logPct(t);
+    var style = pct < 1
+      ? 'left:0;transform:none'
+      : 'left:' + pct.toFixed(2) + '%';
+    return '<span class="axis-tick" style="' + style + '">' + Muster.commas(t) + '</span>';
   }).join('') + '</div>';
 
   var rows = exposure.cases.map(function (c) {
@@ -348,7 +351,7 @@ Muster.renderProtocol = function () {
         var days = ladder.intervals[grade];
         return '<tr><td>' + Muster.gradeChip(grade) + '</td>' +
           '<td class="mono nowrap">' + (days === null || days === undefined
-            ? 'no schedule' : days + ' days') + '</td>' +
+            ? 'no schedule' : days + (days === 1 ? ' day' : ' days')) + '</td>' +
           '<td>' + Muster.escape(Muster.GRADE_MEANING[grade] || '') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<p class="axis-note">An interval is never a deadline for the subject. Nothing expires, ' +

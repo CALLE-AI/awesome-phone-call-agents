@@ -5,6 +5,10 @@ disclosure of who is calling and why, disclosure of what the call causes, and
 an explicit statement that the call cannot take anything away. A person who
 believes their pension is about to be cut will say whatever they think is
 needed, which is exactly the pressure that produces bad evidence.
+
+The recipient's number never appears in the script. It is carried in the
+request's `recipients` field instead, so a plan preview, a log line or the
+console can show the whole spoken text without disclosing the line.
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ def build_task(
         else ""
     )
     return (
-        f"Call {subject.phone_e164} and speak {subject.language}. "
+        f"Speak {subject.language}. "
         f"Say that you are an automated call on behalf of {scheme_name}, "
         f"that you are calling {subject.display_name} about reference "
         f"{subject.reference}, and that this is the periodic check confirming "
