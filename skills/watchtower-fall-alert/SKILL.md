@@ -77,6 +77,18 @@ export WATCHTOWER_CAREGIVER_PHONE="+1..."      # primary contact, E.164 format
 export WATCHTOWER_SECONDARY_PHONE="+1..."      # escalation contact, E.164 format
 ```
 
+To try Watchtower without placing any real phone calls (useful for review,
+testing, or CI), set a dry-run flag instead:
+
+```bash
+export WATCHTOWER_DRY_RUN=1
+```
+
+With this set, `calle_trigger.py` logs exactly what call it would have
+placed (recipient, task, result schema) and returns a simulated decision
+instead of contacting the CALL-E API at all. No CALLE_API_KEY or real
+phone numbers are required in this mode.
+
 Place your trained model at `scripts/best.pt`. Confirm its class names match
 `FALL_CLASS_NAME` in `fall_detector.py` (defaults to `"fall"`, matching a
 model with `{0: 'non-fall', 1: 'fall'}`).
@@ -94,6 +106,25 @@ Streamlit version in a second terminal:
 ```bash
 streamlit run dashboard.py
 ```
+
+## Stopping it (cancellation behavior)
+
+Watchtower is not a scheduled or recurring job — it's a long-running
+process that watches the camera feed continuously while active. There is
+no background task, cron entry, or persistent job to cancel.
+
+To stop monitoring, stop the running process directly:
+
+```bash
+# in the terminal running fall_detector.py:
+Ctrl+C
+```
+
+This immediately releases the camera and stops the FastAPI server. If a
+CALL-E call is in progress when you stop the process, the call itself
+continues on CALL-E's side until it naturally completes (CALL-E calls are
+not cancelled by stopping the local script) — only the detection loop and
+video stream are affected locally.
 
 ## Consent and disclosure
 
