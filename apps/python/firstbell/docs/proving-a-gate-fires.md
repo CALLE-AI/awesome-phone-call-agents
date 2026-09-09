@@ -68,14 +68,14 @@ protected, and that is knowable before a call goes out rather than after.
 
 ## Worked example
 
-Three hundred and thirty-four gates broken on purpose, each one reverted, with the number of tests that
+Three hundred and thirty-six gates broken on purpose, each one reverted, with the number of tests that
 caught it, are in [`../evidence/MUTATIONS.md`](../evidence/MUTATIONS.md). Two rows show
 the shape:
 
 | The change | Tests that failed |
 |---|---|
 | `max_workers=self._concurrency` becomes `max_workers=None`, removing the only brake | 4 |
-| Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 1 |
+| Match the production host by substring instead of hostname, so `api.heycall-e.com.example.net` passes | 2 |
 
 Reproduce either by making the change and running:
 

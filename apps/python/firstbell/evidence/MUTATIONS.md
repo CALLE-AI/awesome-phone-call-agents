@@ -631,6 +631,8 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 332 | Say the browser-gate lock file resolves forty packages when it resolves eighty-three, so a count nobody could check sits next to a claim that all of them are permissive | 1 |
 | 333 | Let one browser-gate dependency arrive under GPL while the file still says none is copyleft, which is how a licence claim goes stale: not by being written wrongly, but by a lock file moving under it | 1 |
 | 334 | Remove the note explaining the AGPL dependency while `requirements-dev.txt` still pins it, so a reviewer of an MIT repository meets an AGPL import with nothing written about it anywhere | 1 |
+| 335 | Put a kill count of 1 back beside the substring row in `docs/proving-a-gate-fires.md`, which is the defect that was actually in the tree: the document a reader is told to reproduce the mutations from copied a row whole and disagreed with the table it copied from, and the gate that checks these counts read only the README | 1 |
+| 336 | State a kill count in the README that the table does not measure for the substring row. The sentence used to name a test instead of a number, which is why nothing checked it while its three neighbours were checked | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
@@ -1240,7 +1242,7 @@ that can reach any of it.
 destroys the middle, and for a body of four characters the two ends are the whole body: it
 published the identifier entire, and for a body of three it printed `ab…bc`, repeating a
 character to fill the mask. Nothing in this repository reaches it, because a CALL-E call id
-is 26 characters and a provider id is 32. The number masker in `firstbell/redaction.py` has
+is 26 characters and a provider id is 32. The number masker in `dispatch/models.py` has
 always refused this, showing nothing of a value below the length at which the ends hide
 something, and the identifier masker refuses it now for the same reason. Counted over the
 15 tests in `tests/test_privacy.py`.

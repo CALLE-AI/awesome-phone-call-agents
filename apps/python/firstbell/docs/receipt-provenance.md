@@ -28,8 +28,8 @@ def reached_production(self) -> bool:
 **Compare hostnames, never substrings.** A substring test passes
 `api.heycall-e.com.example.net`, which is a domain an attacker or a misconfigured proxy can
 own. It also passes every honest test you would think to write, because honest tests use
-the real hostname. Mutation 4 replaces the comparison with a substring test; one test
-catches it, and that test exists only because the mutation was tried.
+the real hostname. Mutation 4 replaces the comparison with a substring test; two tests
+catch it, and both exist only because the mutation was tried.
 
 The third state matters too. A run that was live but reached somewhere else is neither
 `offline` nor `live`; it is `live-nonproduction`, and collapsing it into either one is the

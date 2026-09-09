@@ -1322,6 +1322,8 @@ def test_the_mutation_counts_the_readme_quotes_match_the_table_it_points_at():
         ("removing the concurrency cap fails", "concurrency cap"),
         ("disabling the consent check fails", "disabling the consent gate"),
         ("real error code from the double fails", "API_ERROR_CODES"),
+        ("host by substring\ninstead of hostname lets a look-alike domain through and fails",
+         "Match the production host by substring"),
     ]
 
     wrong = []
@@ -1340,8 +1342,30 @@ def test_the_mutation_counts_the_readme_quotes_match_the_table_it_points_at():
         if claimed != measured:
             wrong.append(f"the README says {claimed} for {phrase!r}, the table says {measured}")
 
+    # And the same rule for a row copied whole into another document.
+    # `docs/proving-a-gate-fires.md` reproduces two rows verbatim so a reader can run them,
+    # and one of the two carried a 1 where the table measures 2, for as long as it took
+    # somebody to read the two files side by side. This gate used to read the README alone,
+    # which is exactly why that survived.
+    changes = {}
+    for line in rows.splitlines():
+        if line.startswith("| ") and line.count("|") == 4:
+            _, number, change, count, _ = line.split("|")
+            if number.strip().isdigit():
+                changes[change.strip()] = count.strip()
+
+    for rel in ("docs/proving-a-gate-fires.md",):
+        for line in (APP / rel).read_text(encoding="utf-8").splitlines():
+            if not line.startswith("| ") or line.count("|") != 3:
+                continue
+            _, change, count, _ = line.split("|")
+            measured = changes.get(change.strip())
+            if measured is not None and measured != count.strip():
+                wrong.append(f"{rel} says {count.strip()} for a row the table measures at "
+                             f"{measured}: {change.strip()[:60]}")
+
     assert not wrong, (
-        "the README quotes kill counts the mutation table disagrees with:\n  "
+        "a document quotes kill counts the mutation table disagrees with:\n  "
         + "\n  ".join(wrong)
     )
 
