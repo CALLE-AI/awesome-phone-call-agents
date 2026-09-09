@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import subprocess
 import sys
 
@@ -104,6 +105,17 @@ def test_the_decision_is_the_live_rule_and_not_a_copy_of_it():
         checked += 1
     assert checked == len(reasons) * len(returns) * len(confirmations) * len(spoke)
     assert checked > 100, f"only {checked} combinations checked, so the schema has shrunk"
+
+    # And the README has to say the same number. It said 315 for as long as the schema had
+    # three values for `spoke_with`, and kept saying it after a fourth and a fifth were
+    # added, because the only gate on the figure was the `> 100` above. A count in prose
+    # that nothing compares against is a count that describes an older repository.
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    stated = re.search(r"agree across every one of the ([\d,]+) results", readme)
+    assert stated, "the README no longer states the size of this sweep where this looks"
+    assert int(stated.group(1).replace(",", "")) == checked, (
+        f"the README says this checks {stated.group(1)} results and it checks {checked}. "
+        "The schema grew and the sentence did not")
 
 
 def test_a_transcript_is_never_read_to_close_a_record():

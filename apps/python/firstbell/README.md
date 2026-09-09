@@ -40,7 +40,7 @@ and nothing here is a screenshot.
 | A call costs $0.05 and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call**, thirteen events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv` prints four endings for four rows: a reason on record, the platform refusing Spanish, nobody answered, and a guardian the telephone cannot reach. Then `examples/absences-siblings.csv`, which places two calls for four rows |
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 328 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 334 rows, each with the change made and the number of tests that noticed |
 
 Twelve of these calls were real, to real telephones, on 2026-09-04. The recordings are on
 the [evidence page](https://firstbell-evidence.vercel.app), with each call's transcript
@@ -59,7 +59,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and twenty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and thirty-four gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
@@ -167,7 +167,7 @@ answers: the same call cannot come out differently because of the file it arrive
 
 The decision is not reimplemented there. `tools/adopt_call_records.py` imports `file_today`
 and `safeguarding_escalation` from the modules the live path calls, and
-`tests/test_adopt_call_records.py` checks the two agree across every one of the 315 results
+`tests/test_adopt_call_records.py` checks the two agree across every one of the 525 results
 the schema allows, because a copy of a rule is the thing that goes stale.
 
 One row in that file carries a transcript in which a parent says plainly that the child is at
@@ -1089,24 +1089,24 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 784 tests collected
+python -m pytest tests/ -q          # 788 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**784 is the number collected, and two different pairs add up to it.** Some of these gates
+**788 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **750 passed, 34
+A clean checkout of this commit into an empty directory reports **754 passed, 34
 skipped**. The thirty-four name what is missing rather than passing quietly: thirty want a
 built page, four of those thirty also wanting its Content-Security-Policy, three want a gate
 report, and one is a run whose rows are all of one kind, so the ordering it would check
 proves nothing. Build the page and run the gates and
-the same suite reports **782 passed, 2 skipped**. Both pairs are measured, both add up to
-784, and the difference between them is what a reader has on their disk.
+the same suite reports **786 passed, 2 skipped**. Both pairs are measured, both add up to
+788, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 749 and 35.
+The very first run in a fresh clone reports one more skip and one fewer pass, 753 and 35.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on
@@ -1207,9 +1207,11 @@ TCPA, which puts a call like this one inside the statute rather than beside it.
 - **The Title VI reading is an extension.** The 2015 Dear Colleague Letter names
   English-learner identification and programme notices. Applying it to attendance contact
   follows from the same duty, but the letter does not say the word attendance.
-- **Schools are not uniformly alarmed about this.** A Brookings and USC survey found only
-  15% of school leaders described themselves as extremely worried about attendance. The
-  duty of care is a legal floor rather than a felt crisis everywhere.
+- **Schools are not uniformly alarmed about this.** The duty of care is a legal floor
+  rather than a felt crisis everywhere, and an office that does not feel the problem is a
+  harder sale than the numbers above suggest. A survey figure stood here and it is gone:
+  it named a publisher and carried no link, and every other number in this entry resolves
+  to a source a reader can open.
 - **The work file is a CSV.** No school hand-uploads one every morning at scale. The
   source is a `Protocol` in `dispatch/sources.py` and a system-of-record adapter is a
   drop-in, but what ships is file-backed, because a demo must not need credentials to
@@ -1315,9 +1317,14 @@ rewriting chooses, so trust the committer column.
 ## Attribution
 
 The supported region, calling code and language table in `calle_double/regions.py` is
-transcribed from `CALLE-AI/call-e-integrations`, which is MIT licensed. Dependency
-licences and one unresolved licensing question about the `calle-ai` package are recorded
-in `THIRD-PARTY-NOTICES.md`.
+transcribed from `CALLE-AI/call-e-integrations`, which is MIT licensed.
+`THIRD-PARTY-NOTICES.md` records every dependency this project installs, at runtime and
+in development and in the browser gates, with the version and the licence read from the
+installed metadata rather than from memory. Two rows there are awkward and both are
+written up rather than left for a reviewer to find: the `calle-ai` package publishes no
+licence at all, and the figure builder imports an AGPL library into an MIT repository.
+`tests/test_third_party_notices.py` fails when that file stops matching what is
+installed.
 
 Every phone number in this repository is fictional and unassignable, and
 `tests/test_privacy.py` fails if one is not. The calls described above went to a real

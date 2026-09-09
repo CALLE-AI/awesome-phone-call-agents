@@ -7,19 +7,87 @@ because a reader should be able to check that claim rather than take it.
 
 ## Runtime dependencies
 
-| Package | Version | Licence | Where the licence was checked |
-|---|---|---|---|
-| `calle-ai` | 0.7.0 | **None declared** | See the note below. This is not an omission on our part. |
-| `httpx` | transitive, via `calle-ai` | BSD-3-Clause | PyPI metadata |
+`requirements.txt` names two packages. Installing those two pulls in six more, and this
+table is the whole closure rather than the part that was typed by hand. Every version and
+every licence below was read from the installed distribution's own metadata on 2026-09-09,
+not from memory and not from a package page.
 
-Nothing else is required at runtime. The test double and the dispatcher use only the
-Python standard library plus `httpx`, which arrives with the SDK.
+| Package | Version | Required by | Licence | Read from |
+|---|---|---|---|---|
+| `calle-ai` | 0.7.0 | `requirements.txt` | **None declared** | See the note below. This is not an omission on our part. |
+| `attrs` | 26.1.0 | `calle-ai` | MIT | `License-Expression` in the installed metadata |
+| `httpx` | 0.28.1 | `requirements.txt`, and `calle-ai` | BSD-3-Clause | `License` in the installed metadata |
+| `anyio` | 4.14.1 | `httpx` | MIT | `License-Expression` |
+| `certifi` | 2026.1.4 | `httpx`, `httpcore` | MPL-2.0 | `License` plus an OSI classifier |
+| `httpcore` | 1.0.9 | `httpx` | BSD-3-Clause | `License-Expression` plus an OSI classifier |
+| `h11` | 0.16.0 | `httpcore` | MIT | `License` plus an OSI classifier |
+| `idna` | 3.11 | `httpx`, `anyio` | BSD-3-Clause | `License-Expression` |
+
+Two more arrive on older interpreters, because `anyio` asks for them by marker. This
+project supports Python 3.10 and up, so both are reachable and both are listed rather than
+left out for not being installed on the machine that wrote this file. Their licences were
+read from the published wheels on 2026-09-09: `typing_extensions` 4.16.0 (PSF-2.0) on
+Python below 3.13, and `exceptiongroup` 1.3.1 (MIT) on Python below 3.11.
+
+`certifi` is the one that is not permissive. MPL-2.0 is file-level copyleft: it asks that
+modifications to certifi's own files be published under the same licence, and it says
+nothing about the software that imports it. Nothing here modifies it, and it is installed
+from PyPI by the end user rather than redistributed, so the obligation is not engaged. It
+is named because a reader auditing a dependency tree should find the awkward row already
+written down instead of finding it themselves.
+
+Nothing outside this table is needed to run the dispatcher. The test double and the
+dispatcher use the Python standard library plus what the table lists.
 
 ## Development dependencies
 
-| Package | Licence |
-|---|---|
-| `pytest` | MIT |
+None of these ship to anybody. They build the page, run the suite and drive the browser
+gates, and a reader running the software needs none of them.
+
+| Package | Version | Licence |
+|---|---|---|
+| `pytest` | 9.1.1 | MIT |
+| `iniconfig` | 2.3.0 | MIT |
+| `packaging` | 26.0 | Apache-2.0 OR BSD-2-Clause |
+| `pluggy` | 1.6.0 | MIT |
+| `pygments` | 2.19.2 | BSD-2-Clause |
+| `colorama` | 0.4.6 | BSD-3-Clause |
+| `markdown-it-py` | 4.2.0 | MIT |
+| `mdurl` | 0.1.2 | MIT |
+| `lottie` | 0.7.2 | **AGPL-3.0-or-later**. See the note below |
+
+The browser gates run on Node. `tools/gates/package.json` pins one package,
+`puppeteer-core` 23.11.1 (Apache-2.0), and `package-lock.json` resolves 83 more. All 84
+were read out of the installed tree on 2026-09-09 and every one is permissive: MIT,
+Apache-2.0, ISC, BSD-2-Clause, BSD-3-Clause or 0BSD. None is copyleft. `node_modules/` is
+not tracked, so what this repository carries is the lock file that names them.
+
+## The `lottie` licence situation
+
+`tools/make_figure.py` draws the three-endings figure by importing the Python `lottie`
+package, which is published under AGPL-3.0-or-later. That is the only copyleft licence
+anywhere in this project, and this repository is MIT, so the pairing is worth stating
+plainly rather than leaving for a reviewer to find.
+
+What is and is not happening, as precisely as we can put it:
+
+- `lottie` is a development dependency. It is installed from PyPI by whoever rebuilds the
+  page, and no part of it is copied into this repository or served to a reader.
+- The figure the page plays is drawn by our own code and written out in the Lottie
+  interchange format, which is a published format rather than a piece of the library. The
+  shipped artifact carries no `lottie` source.
+- The player in the browser is a different project with a different licence: `lottie-web`
+  5.13.0, MIT, vendored with its digest in `tools/site/vendor/VENDOR.json`.
+- AGPL section 13 is about users interacting with the program over a network. Nothing here
+  runs `lottie` on a server. It runs once on a laptop during a build.
+
+The part we do not claim to have settled is whether a source file that imports an AGPL
+library is itself reached by that licence when it sits in an MIT repository. Opinions
+differ on Python imports, and this project is not the right place to decide it. The
+practical position: `make_figure.py` is published in full alongside the library it calls,
+which is what the AGPL exists to guarantee, and if the maintainer would rather this
+contribution carried no AGPL import at all, the figure can be emitted as Lottie JSON
+directly with no dependency. Say so on the pull request and it comes out.
 
 ## The `calle-ai` licence situation
 
@@ -51,6 +119,26 @@ This was reported to CALL-E through the hackathon's feedback channel, with the s
 of adding the MIT licence to match the TypeScript SDK. Part of it has been acted on already:
 the repository is public and MIT as of 2026-09-08. The remaining ask is the smaller one, that
 the same licence reach the PyPI metadata and the built distribution.
+
+## What the published page loads
+
+The evidence page is a static file. Three things on it come from somebody else, and the
+build pins all three.
+
+| Asset | Version | Served from | Licence |
+|---|---|---|---|
+| `lottie-web`, light build | 5.13.0 | this origin, vendored | MIT |
+| `lenis` | 1.1.18 | `cdn.jsdelivr.net` | MIT |
+| Adobe Fonts kit `qdx4jvs` | n/a | `use.typekit.net` | Adobe Fonts terms, tied to the account that made the kit |
+
+`lottie-web` is copied into the output directory from `tools/site/vendor/`, where
+`VENDOR.json` records the package, the version, the exact URL it was fetched from and the
+sha256 of the bytes, so a file that changed without a version change fails the suite
+instead of reaching a browser. `lenis` is loaded from a CDN with a subresource integrity
+hash recomputed from what that URL actually serves, and the page falls back to native
+scrolling if the bytes ever differ. The Adobe Fonts kit is a hosted service rather than a
+file this project redistributes: the fonts are not in this repository and are not copied
+anywhere by the build.
 
 ## Reference data
 

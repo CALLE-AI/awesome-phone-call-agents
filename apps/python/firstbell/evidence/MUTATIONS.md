@@ -17,8 +17,11 @@ Three of the gates watch what the program prints rather than any one rule:
 `test_the_demo_run_shows_all_three_outcomes`. Any change that alters the demonstration's
 output fails those as well as the test belonging to the rule, so a count here can be larger
 than the number of tests written about the rule itself. That is the honest number and it is
-what this column reports: row 2 says five because disabling consent breaks two consent
-tests and all three of those.
+what this column reports. Row 2 says eight. A sentence used to stand here breaking that
+eight down as two consent tests plus the three output gates, which is five, and the
+arithmetic stopped reaching the row when the suite grew. The row is the measured number and
+the breakdown was not, so the breakdown is gone rather than corrected: a total nobody re-ran
+is the same defect a second time.
 
 A count also grows as the suite does. Row 2 read three until it was re-measured, having
 been written when fewer of the output gates existed, which is the same drift that put stale
@@ -622,6 +625,12 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 326 | Drop the note under a translated transcript saying the English was written afterwards, so a page presenting a translation stops saying it is one, which is a claim about what was on the recording | 1 |
 | 327 | Retype one consonant of the Tamil quoted in `docs/the-legal-surface.md`, which is the defect that was actually in the tree: the fourth word of the opening announcement carried the wrong one of two similar letters, inside the paragraph whose whole argument is that the disclosure a parent hears is the disclosure on the recording | 1 |
 | 328 | Remove the English under a Tamil line in a document, so one file in the submitted tree prints two sentences of Tamil with no translation anywhere near them, which is where this started | 1 |
+| 329 | Delete the `attrs` row from the runtime table, which is the defect that was actually in the tree: a direct requirement of the CALL-E SDK with no licence recorded, under a sentence saying nothing else was needed at runtime | 1 |
+| 330 | State a version for `httpx` that is not the version installed, so the file describes a dependency tree that a reader checking it would not find | 1 |
+| 331 | Call `certifi` MIT. It is MPL-2.0, and it is the only weak-copyleft row in the runtime table, so this is the mistake an author makes by assuming a licence rather than reading one | 1 |
+| 332 | Say the browser-gate lock file resolves forty packages when it resolves eighty-three, so a count nobody could check sits next to a claim that all of them are permissive | 1 |
+| 333 | Let one browser-gate dependency arrive under GPL while the file still says none is copyleft, which is how a licence claim goes stale: not by being written wrongly, but by a lock file moving under it | 1 |
+| 334 | Remove the note explaining the AGPL dependency while `requirements-dev.txt` still pins it, so a reviewer of an MIT repository meets an AGPL import with nothing written about it anywhere | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
