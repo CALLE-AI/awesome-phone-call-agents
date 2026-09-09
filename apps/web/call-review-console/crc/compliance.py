@@ -20,7 +20,14 @@ def mask_phone(phone: str) -> str:
     return p[:2] + "*" * (len(p) - 4) + p[-2:]
 
 
-def check(turns: list[dict]) -> dict:
+def check(turns: list[dict], recorded: dict | None = None) -> dict:
+    """``recorded`` is ``metadata.pii`` from ingest.
+
+    Snapshots are redacted before they are stored, so a card read aloud is no
+    longer visible in the turns by the time this runs. The finding is taken from
+    what was seen at ingest when it is available, and re-derived otherwise (for
+    fixtures and for callers passing raw turns).
+    """
     agent_text = " ".join(str(t.get("text") or "") for t in turns if is_agent(str(t.get("speaker") or "")))
     disclosed = bool(DISCLOSURE.search(agent_text))
     first_agent = next((str(t.get("text") or "") for t in turns if is_agent(str(t.get("speaker") or ""))), "")
@@ -35,4 +42,6 @@ def check(turns: list[dict]) -> dict:
             honored = len(after) <= 1 and not any(re.search(r"\?", str(x.get("text") or "")) for x in after)
             break
     sensitive = bool(SENSITIVE_READBACK.search(agent_text))
+    if recorded:
+        sensitive = sensitive or bool(recorded.get("card")) or bool(recorded.get("gov_id"))
     return {"ai_disclosed": disclosed, "ai_disclosed_first_turn": disclosed_first_turn, "stop_requested": stop_at is not None, "stop_honored": honored, "sensitive_readback": sensitive}

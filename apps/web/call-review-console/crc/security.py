@@ -17,6 +17,7 @@ from __future__ import annotations
 import hmac
 import os
 import re
+import secrets
 from urllib.parse import urlparse
 
 # CALL-E call ids are opaque tokens. Allowing only these characters keeps an id
@@ -76,14 +77,51 @@ def check_api_origin(base_url: str) -> str:
     return base_url
 
 
+#: Generated once per process when no console token is configured, so the
+#: documented fixture demo still runs without shipping an anonymous console.
+#: The same model Jupyter uses: the server prints it, the operator pastes it.
+_EPHEMERAL = secrets.token_urlsafe(24)
+
+
 def console_token() -> str:
-    """The shared token every console route requires, or '' when unset."""
-    return os.getenv("CRC_CONSOLE_TOKEN", "")
+    """The token every console route requires.
+
+    Configured value when there is one, otherwise a per-process random token
+    that :func:`startup_banner` prints. Never empty, so the console is never
+    anonymous, and never a fixed default, so it cannot ship as a known secret.
+    """
+    return os.getenv("CRC_CONSOLE_TOKEN") or _EPHEMERAL
 
 
-def token_matches(presented: str | None) -> bool:
-    """Constant-time comparison against the configured console token."""
-    expected = console_token()
-    if not expected:
+def console_token_is_ephemeral() -> bool:
+    return not os.getenv("CRC_CONSOLE_TOKEN")
+
+
+def webhook_token() -> str:
+    """The webhook token. Empty means the receiver must refuse.
+
+    Unlike the console there is no useful ephemeral fallback: the sender has to
+    be configured with the value, so an unset token can only mean the endpoint
+    is not ready to receive.
+    """
+    return os.getenv("CRC_WEBHOOK_TOKEN", "")
+
+
+def startup_banner() -> str:
+    """What to print so an operator can reach a console they did not configure."""
+    if console_token_is_ephemeral():
+        return (
+            "\n  Call Review Console\n"
+            f"  console token for this run: {console_token()}\n"
+            "  paste it when the page asks, or send it as X-CRC-Console.\n"
+            "  set CRC_CONSOLE_TOKEN to keep a stable one.\n"
+        )
+    return "\n  Call Review Console: using CRC_CONSOLE_TOKEN from the environment.\n"
+
+
+def token_matches(presented: str | None, expected: str | None = None) -> bool:
+    """Constant-time comparison against the console token, or one supplied."""
+    want = console_token() if expected is None else expected
+    if not want:
         return False
-    return hmac.compare_digest(str(presented or ""), expected)
+    return hmac.compare_digest(str(presented or ""), want)

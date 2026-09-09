@@ -48,20 +48,21 @@ def test_verdicts_on_fixtures():
 
 def test_webhook_ingest_and_api(tmp_path, monkeypatch):
     monkeypatch.setenv("CRC_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CRC_CONSOLE_TOKEN", "t0ken")  # console routes now require it
+    monkeypatch.setenv("CRC_CONSOLE_TOKEN", "t0ken")   # console routes require it
+    monkeypatch.setenv("CRC_WEBHOOK_TOKEN", "s3cret")  # the receiver fails closed without one
     from crc import store
     monkeypatch.setattr(store, "DATA", tmp_path)
     client = TestClient(app)
     hdr = {"X-CRC-Console": "t0ken"}
+    whdr = {"X-CRC-Token": "s3cret"}
     t = load("call_fx_001.json"); t["id"] = "call_wh_001"; t["metadata"] = {}
-    r = client.post("/calle/webhook", json={"id": "evt_1", "type": "call.completed", "created_at": "2026-09-04T15:03:06Z", "data": t})
+    r = client.post("/calle/webhook", headers=whdr, json={"id": "evt_1", "type": "call.completed", "created_at": "2026-09-04T15:03:06Z", "data": t})
     assert r.status_code == 200 and r.json()["stored"] == "call_wh_001"
     calls = client.get("/api/calls", headers=hdr).json()
     assert any(c["id"] == "call_wh_001" and c["source"] == "ingested" for c in calls)
     d = client.get("/api/calls/call_wh_001", headers=hdr).json()
     assert d["task"]["recipients"][0]["phones"][0].startswith("+1**")  # masked
-    assert client.post("/calle/webhook", json={"type": "nope"}).status_code == 400
-    monkeypatch.setenv("CRC_WEBHOOK_TOKEN", "s3cret")
+    assert client.post("/calle/webhook", headers=whdr, json={"type": "nope"}).status_code == 400
     assert client.post("/calle/webhook", json={"type": "call.completed", "data": t}).status_code == 401
     assert client.post("/calle/webhook", json={"type": "call.completed", "data": t}, headers={"X-CRC-Token": "s3cret"}).status_code == 200
     assert client.get("/api/benchmark", headers=hdr).json()["aggregate"]["calls"] >= 6

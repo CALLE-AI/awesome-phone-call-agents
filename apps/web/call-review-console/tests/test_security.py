@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from crc import security, store
+from crc import review, sanitize, security, store
 from crc.app import app
 from crc.security import UnsafeCallId, UnsafeOrigin, safe_call_id
 
@@ -48,9 +48,11 @@ def test_ordinary_call_ids_still_pass():
 
 
 def test_webhook_traversal_id_is_rejected_and_writes_nothing(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("CRC_WEBHOOK_TOKEN", "hook")
     monkeypatch.setattr(store, "DATA", tmp_path / "data")
     r = client.post(
         "/calle/webhook",
+        headers={"X-CRC-Token": "hook"},
         json={"type": "call.completed",
               "data": {"object": "call_task", "id": "../../pwned", "status": "completed"}},
     )
@@ -86,9 +88,86 @@ def test_routes_answer_with_the_token(client):
     assert client.get("/api/calls", headers=auth()).status_code == 200
 
 
-def test_console_refuses_rather_than_defaulting_open(client, monkeypatch):
+def test_console_is_never_anonymous_even_unconfigured(client, monkeypatch):
+    """With no token configured the console still refuses anonymous callers.
+
+    It generates one per process and prints it, rather than either serving
+    openly or returning 503 and breaking the documented fixture demo.
+    """
     monkeypatch.delenv("CRC_CONSOLE_TOKEN", raising=False)
-    assert client.get("/api/calls").status_code == 503
+    assert client.get("/api/calls").status_code == 401
+    generated = security.console_token()
+    assert generated and security.console_token_is_ephemeral()
+    assert client.get("/api/calls", headers={"X-CRC-Console": generated}).status_code == 200
+
+
+def test_startup_banner_shows_the_generated_token(monkeypatch):
+    monkeypatch.delenv("CRC_CONSOLE_TOKEN", raising=False)
+    assert security.console_token() in security.startup_banner()
+    monkeypatch.setenv("CRC_CONSOLE_TOKEN", "configured")
+    assert "configured" not in security.startup_banner()  # never echo a real secret
+
+
+# --- superseding review: webhook must fail closed ---------------------------
+
+def test_webhook_refuses_when_no_token_is_configured(client, monkeypatch, tmp_path):
+    monkeypatch.delenv("CRC_WEBHOOK_TOKEN", raising=False)
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    body = {"type": "call.completed",
+            "data": {"object": "call_task", "id": "call_x1", "status": "completed"}}
+    r = client.post("/calle/webhook", json=body)
+    assert r.status_code == 503
+    assert not list(tmp_path.rglob("call_x1*"))
+
+
+def test_webhook_requires_the_token_when_configured(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("CRC_WEBHOOK_TOKEN", "hook-secret")
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    body = {"type": "call.completed",
+            "data": {"object": "call_task", "id": "call_x2", "status": "completed"}}
+    assert client.post("/calle/webhook", json=body).status_code == 401
+    assert client.post("/calle/webhook", json=body,
+                       headers={"X-CRC-Token": "hook-secret"}).status_code == 200
+
+
+# --- superseding review: redaction happens before persistence ---------------
+
+def test_snapshot_on_disk_carries_no_pii(tmp_path, monkeypatch):
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    task = {
+        "object": "call_task", "id": "call_pii", "task": "call +15550100123",
+        "result": {"callback": "+15550100999", "card": "4111 1111 1111 1111"},
+        "recipients": [{"phones": ["+15550100123"], "attempts": [{"phone": "+15550100123",
+            "transcript_turns": [
+                {"speaker": "agent", "text": "reading back 4111 1111 1111 1111"},
+                {"speaker": "callee", "text": "my ssn is 123-45-6789"}]}]}],
+    }
+    path = store.save(task)
+    raw = path.read_text()
+    for secret in ("+15550100123", "+15550100999", "4111 1111 1111 1111", "123-45-6789"):
+        assert secret not in raw, f"{secret} was written to disk"
+    assert "[redacted-card]" in raw and "[redacted-gov-id]" in raw
+
+
+def test_redaction_keeps_the_compliance_finding(tmp_path, monkeypatch):
+    """The digits go, the verdict stays: a card read aloud is still reported."""
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    task = {
+        "object": "call_task", "id": "call_rb",
+        "recipients": [{"attempts": [{"transcript_turns": [
+            {"speaker": "agent", "text": "confirming 4111 1111 1111 1111"}]}]}],
+    }
+    store.save(task)
+    stored = store.load_all()["call_rb"]
+    assert stored["metadata"]["pii"]["card"] is True
+    assert review.review(stored)["compliance"]["sensitive_readback"] is True
+
+
+def test_redaction_is_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    task = {"object": "call_task", "id": "call_idem", "task": "call +15550100123"}
+    once = sanitize.redact(task)
+    assert sanitize.redact(once) == once
 
 
 def test_ping_stays_open_but_leaks_nothing(client):

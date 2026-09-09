@@ -40,3 +40,28 @@ single-quoted JS strings inside `onclick` attributes, so an id such as
 `x',alert(1),'` executed. Ids now travel in `data-` attributes read by one
 delegated listener, no handler is built by string interpolation, and the
 escaper covers `& < > " ' \``.
+
+
+## Second review pass (head 5f7e2ed)
+
+**The webhook fails closed.** `CRC_WEBHOOK_TOKEN` is now required rather than
+optional: with none configured the receiver answers 503 and stores nothing,
+instead of accepting caller payloads from anyone who finds the URL. CALL-E
+deliveries are unsigned, so the token is the only thing separating a real
+delivery from a stranger.
+
+**Redaction happens before persistence, not at render.** `store.save()` runs
+every snapshot through `crc.sanitize` first, so phone numbers, card-shaped runs
+and government-id-shaped runs never reach the disk, the structured result, or
+anything the evidence pass derives from them. The compliance signal survives the
+redaction: findings are computed *before* the digits are removed and recorded on
+`metadata.pii`, so "the agent read a card number back" is still reported without
+keeping the number. Redaction is idempotent, and a second pass merges rather
+than overwrites those findings.
+
+**The offline demo still works.** Making console auth mandatory would have left
+the documented fixture quickstart returning 503, which the review rightly
+flagged. When `CRC_CONSOLE_TOKEN` is unset the server now generates one per
+process and prints it at startup — the model Jupyter uses. The console is never
+anonymous and never ships a fixed default, and `uvicorn crc.app:app` still works
+with no configuration at all.

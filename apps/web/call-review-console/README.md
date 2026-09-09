@@ -31,6 +31,8 @@ Roadmap item: `apps/web/call-review-console` ("Review call results, summaries, r
 cd apps/web/call-review-console
 uv venv && uv pip install -e ".[dev]"      # or: pip install -e ".[dev]"
 uvicorn crc.app:app --port 8080            # http://localhost:8080 — fixtures only, no key needed
+# The server prints a console token for the run. Paste it when the page asks.
+# Set CRC_CONSOLE_TOKEN to keep a stable one; the console is never anonymous.
 pytest -q                                  # 7 tests: timing, compliance, evidence, verdicts, webhook ingest, SDK-backed fetch
 ```
 
@@ -38,7 +40,8 @@ Opt-in live review of your own calls:
 
 ```bash
 export CALLE_API_KEY=iams_...              # read-only use
-curl -X POST localhost:8080/api/fetch -H 'content-type: application/json' -d '{"call_id":"call_..."}'
+curl -X POST localhost:8080/api/fetch -H "X-CRC-Console: $CRC_CONSOLE_TOKEN" \
+     -H 'content-type: application/json' -d '{"call_id":"call_..."}'
 ```
 
 Optional model-assisted evidence check (cites turns per field): `pip install -e ".[llm]"`, set `GOOGLE_API_KEY` (or Vertex: `GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=...`) and open a call with `?llm=true` or set `CRC_USE_LLM=true`.

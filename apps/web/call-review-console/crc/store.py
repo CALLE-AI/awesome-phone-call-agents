@@ -6,7 +6,7 @@ import os
 import re
 from pathlib import Path
 
-from . import compliance
+from . import compliance, sanitize
 from .security import UnsafeCallId, safe_call_id
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,9 +57,14 @@ def save(task: dict) -> Path:
     write outside the data directory.
     """
     cid = safe_call_id(task.get("id"))
+    # Redact before the snapshot touches disk. Rendering-time masking left raw
+    # numbers in the file, in the structured result, and in anything the
+    # evidence pass derived from them.
+    clean = sanitize.redact(task)
+    clean["id"] = cid
     DATA.mkdir(parents=True, exist_ok=True)
     p = _within(DATA, f"{cid}.json")
-    p.write_text(json.dumps(task, indent=1))
+    p.write_text(json.dumps(clean, indent=1))
     return p
 
 

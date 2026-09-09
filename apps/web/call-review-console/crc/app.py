@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -18,17 +19,11 @@ def require_console(request: Request) -> None:
 
     Transcripts, results and review notes are caller data, and ``/api/fetch``
     spends the CALL-E API key, so none of it may be reachable unauthenticated.
-    Set ``CRC_CONSOLE_TOKEN`` and send it as ``X-CRC-Console`` (or
-    ``Authorization: Bearer``); with no token set the app refuses rather than
-    defaulting open, so a deployment cannot leak by omission.
+    Send ``CRC_CONSOLE_TOKEN`` as ``X-CRC-Console`` or a bearer token. When it
+    is not configured the server generates one per process and prints it at
+    startup, so the fixture demo runs out of the box without ever serving an
+    anonymous console.
     """
-    if not security.console_token():
-        raise HTTPException(
-            503,
-            "CRC_CONSOLE_TOKEN unset: set CRC_CONSOLE_TOKEN to serve this console. "
-            "It is refused rather than served openly because these routes expose "
-            "call transcripts and spend the CALL-E API key.",
-        )
     presented = request.headers.get("x-crc-console") or ""
     if not presented:
         auth = request.headers.get("authorization") or ""
@@ -38,7 +33,13 @@ def require_console(request: Request) -> None:
         raise HTTPException(401, "missing or wrong X-CRC-Console token")
 
 
-app = FastAPI(title="Call Review Console")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    print(security.startup_banner(), flush=True)
+    yield
+
+
+app = FastAPI(title="Call Review Console", lifespan=_lifespan)
 STATIC = Path(__file__).resolve().parents[1] / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 USE_LLM = os.getenv("CRC_USE_LLM", "false").lower() == "true"
@@ -104,10 +105,20 @@ def note(call_id: str, body: Note):
 @app.post("/calle/webhook")
 async def webhook(request: Request):
     """Terminal-event receiver (call.completed / call.failed / call.result_validation_failed). Stores the snapshot.
-    CALL-E deliveries are unsigned (SDK 0.7), so when CRC_WEBHOOK_TOKEN is set the request must carry it in the
-    X-CRC-Token header; otherwise put the endpoint behind your proxy's own check."""
-    token = os.getenv("CRC_WEBHOOK_TOKEN")
-    if token and request.headers.get("x-crc-token") != token:
+    CALL-E deliveries are unsigned (SDK 0.7), so CRC_WEBHOOK_TOKEN is required and must be sent in the
+    X-CRC-Token header. With no token configured the endpoint refuses every delivery rather than storing
+    payloads from whoever finds the URL."""
+    token = security.webhook_token()
+    if not token:
+        # Fail closed: an unconfigured receiver must not accept and store
+        # caller payloads from anyone who finds the URL.
+        raise HTTPException(
+            503,
+            "CRC_WEBHOOK_TOKEN is not set; this receiver refuses deliveries until it is. "
+            "CALL-E deliveries are unsigned, so the token is the only thing "
+            "distinguishing a real delivery from anyone who knows the URL.",
+        )
+    if not security.token_matches(request.headers.get("x-crc-token"), token):
         raise HTTPException(401, "missing or wrong X-CRC-Token")
     body = await request.json()
     data = body.get("data") if isinstance(body, dict) else None

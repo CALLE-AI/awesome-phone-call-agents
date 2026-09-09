@@ -28,8 +28,9 @@ def schema_check(result: Any, schema: dict | None) -> dict:
 
 def review(task: dict, schema: dict | None = None, use_llm: bool = False) -> dict:
     turns = _turns(task)
+    recorded_pii = (task.get("metadata") or {}).get("pii")
     t = timing.analyze_turns(turns)
-    comp = compliance.check(turns)
+    comp = compliance.check(turns, recorded_pii)
     result = task.get("structured_result")
     ev = evidence.deterministic(result, turns)
     llm_rows = evidence.llm(result, turns, task.get("task", "")) if use_llm else None
