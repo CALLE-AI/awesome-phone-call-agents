@@ -23,7 +23,8 @@ from typing import Any
 
 from .airtable import FieldMap, FixtureAirtable, LiveAirtable
 from .audit import AuditLog
-from .panel.server import serve
+from .config import load as load_config
+from .panel.server import Panel, serve
 from .runner import Plan, RunError, execute, plan
 from .transport import FixtureTransport, LiveTransport
 
@@ -180,30 +181,22 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
-    """Open the operator's control panel on loopback."""
+    """Open the operator's control panel on loopback.
+
+    Starts with no configuration at all: with no credentials it runs on sample
+    data, and the operator enters keys in the panel rather than in a shell.
+    """
     import secrets
 
-    if args.fixtures:
-        client, transport = _fixture_clients(args)
-        live = False
-    else:
-        client, transport = _live_clients(args)
-        live = transport is not None
-    serve(
-        {
-            "client": client,
-            "transport": transport,
-            "audit": AuditLog(args.audit),
-            "table": args.table,
-            "requester_name": args.requester,
-            "default_view": args.view,
-            "max_calls": args.max_calls,
-            "token": secrets.token_urlsafe(24),
-            "live": live,
-        },
-        host=args.host,
-        port=args.port,
+    panel = Panel(
+        AuditLog(args.audit),
+        table=args.table,
+        default_view=args.view,
+        max_calls=args.max_calls,
+        token=secrets.token_urlsafe(24),
+        force_fixtures=args.fixtures,
     )
+    serve(panel, host=args.host, port=args.port, open_browser=args.open)
     return 0
 
 
@@ -250,7 +243,10 @@ def build_parser() -> argparse.ArgumentParser:
     panel.add_argument("--port", type=int, default=8787)
     panel.add_argument(
         "--fixtures", action="store_true",
-        help="drive the panel from bundled fixtures; places no calls",
+        help="force sample data even when credentials exist; places no calls",
+    )
+    panel.add_argument(
+        "--open", action="store_true", help="open the panel in a browser"
     )
     panel.add_argument("--base")
     panel.add_argument("--scenario")

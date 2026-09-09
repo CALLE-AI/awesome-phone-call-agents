@@ -5,10 +5,13 @@
 A workflow plugin for Airtable, built on the CALL-E Developer API. Submitted to the **Workflow Plugins** contribution area for *CALL-E: Your Code Is Calling*, targeting **Most Practical Use Case**.
 
 ```bash
-python3 -m nominee replay          # full pipeline, no credentials, no calls
-python3 -m nominee serve --fixtures # the operator's panel, driven by fixtures
-python3 -m unittest discover -s tests -t .
+./run.sh
 ```
+
+That is the whole setup. It opens the panel in your browser on **sample data**,
+so the first thing you see is the product working — no account, no API key, no
+environment variables, no install. Connect your own Airtable from the Setup
+screen when you are ready; you never return to a terminal.
 
 Python 3.11+, **standard library only**. No install, no build step, no lockfile.
 
@@ -134,51 +137,63 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 
 ## Setup
 
-### Try it with nothing
+### 1. Start it
 
 ```bash
-python3 -m nominee replay
+./run.sh
 ```
 
-Runs the whole pipeline against `examples/fixtures/`. Four outcomes in one run: verified, a title contradiction routed to review, an employer never reached, and a request skipped for having no independently sourced number. No Airtable account, no CALL-E key, no network, no calls.
+Opens on **sample data**: three employers called, one contradiction routed to
+review, one employer never reached, one request skipped for having no
+independently sourced number. Everything is real except the phone calls.
 
-### Real use
+### 2. Connect your own base
 
-1. Import `examples/base-template.json` into a new Airtable base.
-2. Create an Airtable Personal Access Token with `schema.bases:read` plus record read/write on that base.
-3. Get a CALL-E API key from the [dashboard](https://dashboard.heycall-e.com/account/api-keys).
-4. Copy `.env.example` and fill it in.
+Import `examples/base-template.json` into a new Airtable base, then open
+**Setup** in the panel and paste:
 
-```bash
-python3 -m nominee preview --view "Ready to verify"    # writes nothing, dials nothing
-python3 -m nominee run --view "Ready to verify" --confirm-consent
-python3 -m nominee verify                              # check the audit chain
-```
+| | |
+|---|---|
+| Airtable token | needs `schema.bases:read` plus record read/write — [create one](https://airtable.com/create/tokens) |
+| Airtable base ID | the `app…` segment of your base URL |
+| CALL-E API key | only to place calls — [dashboard](https://dashboard.heycall-e.com/account/api-keys) |
+| Your organisation | spoken on every call; an unnamed caller asking about an employee is pretexting |
 
-`preview` is the default posture. `run` requires `--confirm-consent` said explicitly.
+Saved to a local `.env` created **mode 0600**, never written to your base,
+never logged, and never returned by any endpoint. The panel only ever shows
+the last four characters, so you can tell one key from another without either
+being readable. Environment variables still win if you would rather inject
+them, and the panel warns if the file's permissions are loose.
 
-### The control panel
+With an Airtable token but no CALL-E key it runs **preview only** — reading
+your real table, unable to dial.
 
-```bash
-python3 -m nominee serve --fixtures   # safe: fixtures, places no calls
-python3 -m nominee serve              # live, if CALLE_API_KEY is set
-```
+### 3. Work
 
-Prints a URL carrying a one-off token. One page: the rows in scope, the rows
-being skipped and why, how many the view's filter is hiding, the estimated
-spend, and **the verbatim script that will be spoken** behind a disclosure on
-each row. Then Run, with a confirmation naming the count.
+The panel shows the rows in scope, the rows being skipped and why, how many
+the view's filter is hiding, the estimated spend, and **the verbatim script
+that will be spoken**. Then Run, with a confirmation naming the count. Results
+land back in your Airtable base, which updates live as they arrive.
 
 Three properties are worth stating, because two PRs in this repository were
 blocked for the opposite:
 
 - It binds **loopback only** and refuses any other address.
-- Every API request needs the token; the page itself carries no secret.
+- Every API request needs a one-off token; the page itself carries no secret.
 - **The run endpoint accepts no destination.** It takes a view name and a
   confirmation, and rejects any other field. Numbers come from consented rows
   the server reads itself, so there is no request shape that can introduce a
   phone number. `tests/test_panel.py` asserts that for `phone`, `phones`,
   `to`, `recipients`, `number` and `e164`.
+
+### For scripting and CI
+
+```bash
+python3 -m nominee replay      # whole pipeline on fixtures, no credentials
+python3 -m nominee preview     # your table; writes nothing, dials nothing
+python3 -m nominee run --confirm-consent
+python3 -m nominee verify      # walk the audit chain
+```
 
 ---
 
@@ -187,15 +202,15 @@ blocked for the opposite:
 | | |
 |---|---|
 | **Platform** | Airtable (Web API v0). Works on the free plan. |
-| **Trigger** | An operator running `preview` then `run` against a named view. No automatic or scheduled trigger; nothing dials without a person. |
+| **Trigger** | An operator pressing Run in the panel (or the `run` command) against a named view. No automatic or scheduled trigger; nothing dials without a person. |
 | **Required inputs** | Request ID, applicant name and reference, employer, an independently sourced E.164 number with its source, a consent receipt (id, disclosure version, signed-at) and its derived token |
 | **Outputs** | A disposition and reason per row, the call id, and one answer column per derived schema field |
-| **Credentials** | `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID`, `CALLE_API_KEY` from the environment. Never written to the table, never logged. Each is restricted to a single origin: `api.airtable.com` and `api.heycall-e.com`. |
+| **Credentials** | Entered in the panel's Setup or supplied as environment variables, stored in a local `.env` created mode 0600. Never written to the table, never logged, never returned by an endpoint. Each is restricted to a single origin: `api.airtable.com` and `api.heycall-e.com`. |
 | **Side effects** | `run` places real outbound phone calls to real employers, billed by CALL-E, and writes results back into the base. `preview` and `replay` place none. |
 | **Cancellation** | Tick `Cancelled` on a request; nothing further is dispatched for it. In-flight calls cannot be stopped — see Limits. |
 | **Rollback** | Dispositions are overwritten by a later run; the audit log is append-only by design and is not rolled back. |
 | **Recurrence** | None. This plugin has no scheduler and creates no recurring job. |
-| **Tests** | `python3 -m unittest discover -s tests -t .` — 162 tests, no credentials, no outbound network, no call placed. The panel tests bind a loopback socket. |
+| **Tests** | `python3 -m unittest discover -s tests -t .` — 184 tests, no credentials, no outbound network, no call placed. The panel tests bind a loopback socket. |
 
 ---
 

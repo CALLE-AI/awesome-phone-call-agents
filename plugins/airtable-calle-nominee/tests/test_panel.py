@@ -14,13 +14,17 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from nominee.airtable import FixtureAirtable
 from nominee.audit import AuditLog
-from nominee.panel.server import LOOPBACK, Panel, PanelError, make_handler, serve
-from nominee.transport import FixtureTransport
+from nominee.panel.server import (
+    FIXTURES_MODE,
+    LOOPBACK,
+    Panel,
+    PanelError,
+    make_handler,
+    serve,
+)
 
-from tests.test_airtable import SCHEMA
-from tests.test_runner import VIEW, consented, scenario
+from tests.test_runner import VIEW
 
 
 class BindBoundary(unittest.TestCase):
@@ -36,16 +40,15 @@ class BindBoundary(unittest.TestCase):
 class PanelServer(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
+        self.env = Path(self._tmp.name) / ".env"
         self.panel = Panel(
-            FixtureAirtable(SCHEMA, [consented()]),
-            FixtureTransport(scenario()),
             AuditLog(Path(self._tmp.name) / "audit.jsonl", fsync=False),
             table="Verification Requests",
-            requester_name="Meridian Lending",
             default_view=VIEW,
             max_calls=5,
             token="test-token",
-            live=False,
+            env_path=self.env,
+            force_fixtures=True,
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.panel))
         self.port = self.server.server_address[1]
@@ -98,7 +101,7 @@ class PanelServer(unittest.TestCase):
     def test_plan_with_the_token_works(self):
         status, body = self.get("/api/plan?token=test-token")
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body)["call_count"], 1)
+        self.assertEqual(json.loads(body)["call_count"], 3)
 
     # -- no destination can be introduced ------------------------------
 
@@ -144,6 +147,70 @@ class PanelServer(unittest.TestCase):
         self.panel.transport = None
         with self.assertRaises(PanelError):
             self.panel.start_run(VIEW)
+
+    # -- zero-configuration start --------------------------------------
+
+    def test_panel_starts_useful_with_no_credentials(self):
+        """First run shows the product working rather than a config error."""
+        self.assertEqual(self.panel.mode, FIXTURES_MODE)
+        self.assertEqual(json.loads(self.get("/api/plan?token=test-token")[1])["call_count"], 3)
+
+    def test_config_never_returns_a_secret(self):
+        from nominee import config as cfg
+
+        cfg.save(
+            cfg.Config(
+                airtable_token="pat_super_secret_value",
+                airtable_base_id="appABC",
+                calle_api_key="iams_live_secret_value",
+                requester_name="Example Lending",
+            ),
+            self.env,
+        )
+        self.panel.reconfigure()
+        body = self.get("/api/config?token=test-token")[1]
+        self.assertNotIn("pat_super_secret_value", body)
+        self.assertNotIn("iams_live_secret_value", body)
+        self.assertIn("alue", body)  # last four only
+
+    # -- setup ---------------------------------------------------------
+
+    def test_setup_rejects_unknown_fields(self):
+        body = self.expect_error(
+            400, self.post, "/api/setup", {"airtable_token": "pat_x", "sneaky": "1"}
+        )
+        self.assertIn("unknown fields", body)
+
+    def test_setup_without_a_base_is_refused_with_what_is_missing(self):
+        body = self.expect_error(400, self.post, "/api/setup", {"airtable_token": "pat_x"})
+        self.assertIn("AIRTABLE_BASE_ID", body)
+
+    def test_setup_writes_an_owner_only_file(self):
+        import stat as stat_mod
+
+        self.post(
+            "/api/setup",
+            {
+                "airtable_token": "pat_written",
+                "airtable_base_id": "appWritten",
+                "requester_name": "Example Lending",
+            },
+        )
+        self.assertTrue(self.env.exists())
+        mode = stat_mod.S_IMODE(self.env.stat().st_mode)
+        self.assertEqual(mode, 0o600, f"credentials file is mode {mode:04o}")
+
+    def test_setup_response_carries_no_secret(self):
+        _, body = self.post(
+            "/api/setup",
+            {
+                "airtable_token": "pat_response_secret",
+                "airtable_base_id": "appR",
+                "requester_name": "Example Lending",
+            },
+        )
+        self.assertNotIn("pat_response_secret", json.dumps(body))
+        self.assertTrue(body["airtable_token"].startswith("set ("))
 
 
 if __name__ == "__main__":

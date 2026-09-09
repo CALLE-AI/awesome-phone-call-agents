@@ -108,6 +108,30 @@
   button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
   .note { color: var(--soft); font-size: 12.5px; }
 
+  .banner {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--edge);
+    border-left: 3px solid var(--brass); padding: 13px 16px; margin: 0 0 22px;
+  }
+  .banner p { margin: 0; font-size: 13px; color: var(--soft); flex: 1 1 300px; }
+  .banner strong { color: var(--ink); }
+
+  .setup { border: 1px solid var(--edge); background: var(--panel); padding: 20px 22px; margin-bottom: 26px; }
+  .setup h2 { font-size: 14px; margin: 0 0 4px; }
+  .setup > p { margin: 0 0 16px; color: var(--soft); font-size: 13px; }
+  .fields { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
+  label span { font-weight: 400; color: var(--faint); font-family: var(--mono); font-size: 10.5px; }
+  input {
+    width: 100%; font: 13px var(--mono); padding: 8px 10px;
+    border: 1px solid var(--edge); background: var(--ground); color: var(--ink);
+  }
+  input:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+  .help { font-size: 11.5px; color: var(--faint); margin: 5px 0 0; }
+  .help a { color: var(--brass); }
+  .setup .act { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .warn { color: var(--warn); font-size: 12.5px; margin: 14px 0 0; font-family: var(--mono); }
+
   .chain { font-family: var(--mono); font-size: 11.5px; color: var(--soft); margin-top: 22px;
            padding-top: 12px; border-top: 1px solid var(--rule); }
   .chain.bad { color: var(--stop); font-weight: 600; }
@@ -123,6 +147,44 @@
     <span class="mode" id="mode">…</span>
     <h1>Nominee <small>verification of employment</small></h1>
   </header>
+
+  <div class="banner" id="banner" hidden>
+    <p id="banner-text"></p>
+    <button id="banner-cta">Connect my Airtable</button>
+  </div>
+
+  <section class="setup" id="setup" hidden>
+    <h2>Connect your data</h2>
+    <p>Stored in a local <code>.env</code> readable only by you. Never written to your base, never logged, never shown again.</p>
+    <div class="fields">
+      <div>
+        <label for="f-token">Airtable token <span id="s-token"></span></label>
+        <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
+        <p class="help">Needs <code>schema.bases:read</code> plus record read/write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create one</a></p>
+      </div>
+      <div>
+        <label for="f-base">Airtable base ID</label>
+        <input id="f-base" autocomplete="off" placeholder="app…">
+        <p class="help">The <code>app…</code> segment in your base URL.</p>
+      </div>
+      <div>
+        <label for="f-key">CALL-E API key <span id="s-key"></span></label>
+        <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
+        <p class="help">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Dashboard</a></p>
+      </div>
+      <div>
+        <label for="f-req">Your organisation</label>
+        <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
+        <p class="help">Spoken on every call. An unnamed caller asking about an employee is pretexting.</p>
+      </div>
+    </div>
+    <p class="warn" id="perm" hidden></p>
+    <div class="act">
+      <button class="go" id="save">Save and connect</button>
+      <button id="close-setup">Cancel</button>
+      <span class="note" id="setup-msg"></span>
+    </div>
+  </section>
 
   <dl class="bar" id="bar">
     <div><dt>View</dt><dd id="m-view" style="font-size:13px">—</dd></div>
@@ -144,6 +206,7 @@
 
   <div class="act">
     <button id="refresh">Preview again</button>
+    <button id="open-setup">Setup</button>
     <button id="run" class="go">Run</button>
     <span class="note" id="hint"></span>
   </div>
@@ -161,7 +224,7 @@
 const TOKEN = new URLSearchParams(location.search).get("token") || "";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let VIEW = "", LIVE = false, polling = null;
+let VIEW = "", MODE = "fixtures", polling = null;
 
 const api = async (path, opts) => {
   const r = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN), opts);
@@ -279,17 +342,85 @@ $("run").addEventListener("click", async () => {
   }
 });
 
+const MODE_LABEL = {
+  fixtures: "sample data — no calls",
+  preview: "your table — preview only",
+  live: "live — can place calls",
+};
+
+function renderConfig(c) {
+  VIEW = c.view; MODE = c.mode;
+  const m = $("mode");
+  m.textContent = MODE_LABEL[MODE] || MODE;
+  m.classList.toggle("live", MODE === "live");
+
+  $("s-token").textContent = c.airtable_token || "";
+  $("s-key").textContent = c.calle_api_key || "";
+  $("f-base").value = c.airtable_base_id || "";
+  $("f-req").value = c.requester_name || "";
+
+  const perm = $("perm");
+  perm.hidden = !c.permission_warning;
+  perm.textContent = c.permission_warning || "";
+
+  const banner = $("banner"), text = $("banner-text"), cta = $("banner-cta");
+  if (MODE === "fixtures" && !c.forced_fixtures) {
+    banner.hidden = false;
+    text.innerHTML = "<strong>You're on sample data.</strong> Everything here is real except the phone calls. Connect your Airtable base to run your own verification queue.";
+    cta.textContent = "Connect my Airtable";
+  } else if (MODE === "preview") {
+    banner.hidden = false;
+    text.innerHTML = "<strong>Preview only.</strong> Reading your table, but no CALL-E key yet, so nothing can be dialled.";
+    cta.textContent = "Add CALL-E key";
+  } else {
+    banner.hidden = true;
+  }
+}
+
+function toggleSetup(show) {
+  $("setup").hidden = !show;
+  if (show) $("setup").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("open-setup").addEventListener("click", () => toggleSetup($("setup").hidden));
+$("banner-cta").addEventListener("click", () => toggleSetup(true));
+$("close-setup").addEventListener("click", () => toggleSetup(false));
+
+$("save").addEventListener("click", async () => {
+  const body = {};
+  const token = $("f-token").value.trim(); if (token) body.airtable_token = token;
+  const key = $("f-key").value.trim();     if (key)   body.calle_api_key = key;
+  const base = $("f-base").value.trim();   if (base)  body.airtable_base_id = base;
+  const req = $("f-req").value.trim();     if (req)   body.requester_name = req;
+
+  $("save").disabled = true;
+  $("setup-msg").textContent = "saving…";
+  try {
+    const c = await api("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    $("f-token").value = ""; $("f-key").value = "";
+    renderConfig(c);
+    $("setup-msg").textContent = "connected.";
+    toggleSetup(false);
+    await loadPlan();
+  } catch (e) {
+    $("setup-msg").textContent = "";
+    showError(e.message);
+  } finally {
+    $("save").disabled = false;
+  }
+});
+
 (async () => {
   try {
-    const cfg = await api("/api/config");
-    VIEW = cfg.view; LIVE = cfg.live;
-    const m = $("mode");
-    m.textContent = LIVE ? "live — can place calls" : "fixtures — no calls";
-    m.classList.toggle("live", LIVE);
+    renderConfig(await api("/api/config"));
     await loadPlan();
     await loadAudit();
   } catch (e) {
-    showError(e.message + " — open the URL printed by `nominee serve`, which carries the token.");
+    showError(e.message + " — open the URL printed by ./run.sh, which carries the token.");
   }
 })();
 </script>

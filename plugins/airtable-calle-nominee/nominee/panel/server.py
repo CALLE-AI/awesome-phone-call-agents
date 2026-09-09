@@ -13,6 +13,12 @@ destinations. So this server is built the other way round:
 The last point is a security property expressed as an absence: you cannot ask
 this server to call someone. You can only ask it to run a view that a person
 already consented to.
+
+The panel also starts *useful with no configuration at all*. With no
+credentials it runs on bundled fixtures, so the first thing anyone sees is the
+product working. Credentials are entered in the panel and the clients are
+rebuilt in place -- an operator on a verification desk never has to export an
+environment variable.
 """
 
 from __future__ import annotations
@@ -26,17 +32,25 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from ..airtable import AirtableClient
+from .. import config as cfg
+from ..airtable import AirtableError, FixtureAirtable, LiveAirtable
 from ..audit import AuditLog
 from ..runner import RunError, execute, plan
-from ..transport import Transport
+from ..transport import FixtureTransport, LiveTransport, TransportError
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
-INDEX = Path(__file__).resolve().parent / "index.html"
+PANEL_DIR = Path(__file__).resolve().parent
+INDEX = PANEL_DIR / "index.html"
+FIXTURES = PANEL_DIR.parent.parent / "examples" / "fixtures"
+
+# Modes, in order of how much they can do to the world.
+FIXTURES_MODE = "fixtures"
+PREVIEW_MODE = "preview"
+LIVE_MODE = "live"
 
 
 class PanelError(Exception):
-    """The panel cannot be started safely."""
+    """The panel cannot be started or reconfigured safely."""
 
 
 @dataclass
@@ -45,7 +59,6 @@ class RunState:
 
     running: bool = False
     view: str = ""
-    started: bool = False
     finished: bool = False
     error: str = ""
     rows: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -95,32 +108,95 @@ def _plan_json(current) -> dict[str, Any]:
     }
 
 
+def _fixture_clients():
+    base = json.loads((FIXTURES / "base.json").read_text(encoding="utf-8"))
+    scenario = json.loads((FIXTURES / "happy-path.json").read_text(encoding="utf-8"))
+    return (
+        FixtureAirtable(base["schema"], base["records"], view_records=base.get("view_records")),
+        FixtureTransport(scenario),
+    )
+
+
 class Panel:
-    """Holds the clients and the current run state."""
+    """Holds the clients, the config, and the current run state."""
 
     def __init__(
         self,
-        client: AirtableClient,
-        transport: Transport | None,
         audit: AuditLog,
         *,
         table: str,
-        requester_name: str,
         default_view: str,
         max_calls: int,
         token: str,
-        live: bool,
+        env_path: Path | str = cfg.DEFAULT_ENV_PATH,
+        force_fixtures: bool = False,
     ) -> None:
-        self.client = client
-        self.transport = transport
         self.audit = audit
         self.table = table
-        self.requester_name = requester_name
         self.default_view = default_view
         self.max_calls = max_calls
         self.token = token
-        self.live = live
+        self.env_path = Path(env_path)
+        self.force_fixtures = force_fixtures
         self.state = RunState()
+        self.reconfigure()
+
+    # -- configuration -------------------------------------------------
+
+    def reconfigure(self) -> None:
+        """(Re)build clients from the current config. Never raises upward."""
+        self.config = cfg.load(self.env_path)
+        if self.force_fixtures or not self.config.can_read_table:
+            self.client, self.transport = _fixture_clients()
+            self.mode = FIXTURES_MODE
+            return
+        try:
+            self.client = LiveAirtable(
+                self.config.airtable_token, self.config.airtable_base_id
+            )
+            self.transport = (
+                LiveTransport(self.config.calle_api_key)
+                if self.config.can_place_calls
+                else None
+            )
+        except (AirtableError, TransportError) as exc:
+            self.client, self.transport = _fixture_clients()
+            self.mode = FIXTURES_MODE
+            raise PanelError(str(exc)) from exc
+        self.mode = LIVE_MODE if self.transport else PREVIEW_MODE
+
+    def apply_setup(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Save credentials and rebuild. Returns the redacted config only."""
+        current = self.config
+        merged = cfg.Config(
+            airtable_token=str(values.get("airtable_token") or current.airtable_token).strip(),
+            airtable_base_id=str(values.get("airtable_base_id") or current.airtable_base_id).strip(),
+            calle_api_key=str(values.get("calle_api_key") or current.calle_api_key).strip(),
+            requester_name=str(values.get("requester_name") or current.requester_name).strip(),
+        )
+        if not merged.can_read_table:
+            raise PanelError(
+                "an Airtable token and base id are needed before the panel can "
+                f"read your table; still missing: {', '.join(merged.missing())}"
+            )
+        cfg.save(merged, self.env_path)
+        self.reconfigure()
+        return self.config_json()
+
+    def config_json(self) -> dict[str, Any]:
+        payload = self.config.redacted()
+        payload.update(
+            {
+                "mode": self.mode,
+                "view": self.default_view,
+                "table": self.table,
+                "forced_fixtures": self.force_fixtures,
+                "permission_warning": cfg.permission_warning(self.env_path),
+            }
+        )
+        return payload
+
+    # -- work ----------------------------------------------------------
 
     def plan(self, view: str) -> dict[str, Any]:
         return _plan_json(
@@ -128,20 +204,22 @@ class Panel:
                 self.client,
                 table=self.table,
                 view=view,
-                requester_name=self.requester_name,
+                requester_name=self.config.requester_name or "Example Lending",
             )
         )
 
     def start_run(self, view: str) -> dict[str, Any]:
         if self.transport is None:
             raise PanelError(
-                "no CALL-E transport configured; this panel is preview-only"
+                "this panel is preview-only: add a CALL-E API key in Setup "
+                "before it can place calls"
             )
         with self.state.lock:
             if self.state.running:
                 raise PanelError("a run is already in flight")
             self.state = RunState(running=True, view=view)
         state = self.state
+        simulated = self.mode == FIXTURES_MODE
 
         def work() -> None:
             try:
@@ -151,10 +229,13 @@ class Panel:
                     self.audit,
                     table=self.table,
                     view=view,
-                    requester_name=self.requester_name,
+                    requester_name=self.config.requester_name or "Example Lending",
                     max_calls=self.max_calls,
-                    **({} if self.live else {"first_delay": 0, "interval": 0,
-                                             "sleep": lambda _: None}),
+                    **(
+                        {"first_delay": 0, "interval": 0, "sleep": lambda _: None}
+                        if simulated
+                        else {}
+                    ),
                 )
                 with state.lock:
                     for outcome in report.outcomes:
@@ -229,7 +310,9 @@ def make_handler(panel: Panel):
             parts = urlsplit(self.path)
             query = parse_qs(parts.query)
             if parts.path == "/":
-                return self._send(200, INDEX.read_text(encoding="utf-8"), "text/html; charset=utf-8")
+                return self._send(
+                    200, INDEX.read_text(encoding="utf-8"), "text/html; charset=utf-8"
+                )
             if not self._authorized(query):
                 return self._send(401, {"error": "token required"})
             view = (query.get("view") or [panel.default_view])[0]
@@ -241,7 +324,7 @@ def make_handler(panel: Panel):
                 if parts.path == "/api/audit":
                     return self._send(200, panel.audit_status())
                 if parts.path == "/api/config":
-                    return self._send(200, {"view": panel.default_view, "live": panel.live})
+                    return self._send(200, panel.config_json())
             except Exception as exc:  # noqa: BLE001 - reported to the operator
                 return self._send(400, {"error": str(exc)})
             return self._send(404, {"error": "not found"})
@@ -251,14 +334,34 @@ def make_handler(panel: Panel):
             query = parse_qs(parts.query)
             if not self._authorized(query):
                 return self._send(401, {"error": "token required"})
-            if parts.path != "/api/run":
-                return self._send(404, {"error": "not found"})
 
             length = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
             except json.JSONDecodeError:
                 return self._send(400, {"error": "body must be JSON"})
+            if not isinstance(body, dict):
+                return self._send(400, {"error": "body must be a JSON object"})
+
+            if parts.path == "/api/setup":
+                allowed = {
+                    "airtable_token",
+                    "airtable_base_id",
+                    "calle_api_key",
+                    "requester_name",
+                }
+                unexpected = set(body) - allowed
+                if unexpected:
+                    return self._send(
+                        400, {"error": f"unknown fields: {sorted(unexpected)}"}
+                    )
+                try:
+                    return self._send(200, panel.apply_setup(body))
+                except PanelError as exc:
+                    return self._send(400, {"error": str(exc)})
+
+            if parts.path != "/api/run":
+                return self._send(404, {"error": "not found"})
 
             # A destination cannot be introduced through this endpoint. Only a
             # view name is accepted; numbers come from consented rows.
@@ -287,10 +390,12 @@ def make_handler(panel: Panel):
 
 
 def serve(
-    panel_kwargs: dict[str, Any],
+    panel: Panel | None = None,
     *,
     host: str = "127.0.0.1",
     port: int = 8787,
+    open_browser: bool = False,
+    **panel_kwargs: Any,
 ) -> None:
     """Start the panel. Refuses any bind address that is not loopback."""
     if host not in LOOPBACK:
@@ -299,17 +404,33 @@ def serve(
             "and is loopback-only by design; put it behind your own "
             "authenticated proxy if it must be reachable."
         )
-    panel = Panel(**panel_kwargs)
+    if panel is None:
+        panel = Panel(**panel_kwargs)
+
     server = ThreadingHTTPServer((host, port), make_handler(panel))
+    url = f"http://{host}:{port}/?token={panel.token}"
+    mode_line = {
+        FIXTURES_MODE: "sample data — places no calls",
+        PREVIEW_MODE: "your table, preview only — no CALL-E key yet",
+        LIVE_MODE: "LIVE — this can place real calls",
+    }[panel.mode]
     # flush: the operator cannot reach the panel without this line, and stdout
     # is block-buffered whenever it is redirected or piped.
-    print(f"  nominee panel  http://{host}:{port}/?token={panel.token}", flush=True)
-    print(
-        "  mode: "
-        + ("LIVE — this can place real calls" if panel.live else "fixtures — no calls"),
-        flush=True,
-    )
+    print(f"\n  Nominee is running.\n\n  {url}\n", flush=True)
+    print(f"  mode: {mode_line}\n", flush=True)
+    warning = cfg.permission_warning(panel.env_path)
+    if warning:
+        print(f"  warning: {warning}\n", flush=True)
+
+    if open_browser:
+        import webbrowser
+
+        threading.Thread(target=lambda: webbrowser.open(url), daemon=True).start()
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        print("  stopped.", flush=True)
+    finally:
         server.shutdown()
+        server.server_close()
