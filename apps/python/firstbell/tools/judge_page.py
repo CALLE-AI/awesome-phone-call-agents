@@ -3106,9 +3106,12 @@ def main() -> int:
     markup = build(has_audio, args.repo_url, args.video_url)
     page.write_text(markup, encoding="utf-8", newline="\n")
 
-    # The five committed documents, rendered rather than retyped, in the page's own inks.
-    # They are what a reader who will not clone a repository can still read: the pilot
-    # shape, the legal surface, and the three that say how the evidence itself was made.
+    # Every document in `doc_pages.PUBLISHED`, rendered rather than retyped, in the page's
+    # own inks. They are what a reader who will not clone a repository can still read:
+    # the pilot shape, the file a district already exports, the legal surface, the
+    # consent record, and the four that say how the evidence itself was made. The count
+    # used to be written here and was wrong twice, which is what a number kept beside a
+    # list rather than read from it does.
     docs = doc_pages.write_all(out, css_for_serving(page_css()),
                                args.repo_url, args.repo_ref)
 

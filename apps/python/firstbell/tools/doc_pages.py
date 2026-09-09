@@ -36,8 +36,9 @@ if REPO / APP_IN_REPO != APP:  # pragma: no cover - a moved application, caught 
         "the constant has to move with the directory.")
 
 # slug, the title a reader sees in the list, and why they would open it. The order is the
-# order a reader meets the questions in: what it costs to try, what the lawyer asks, then
-# the three that answer how the evidence itself was made.
+# order a reader meets the questions in: what it costs to try, what it costs to feed,
+# what counsel asks and the record that answers counsel, then the four that say how the
+# evidence itself was made.
 # Four fields: the slug the page is served under, the file it is rendered from relative
 # to the app root, the title, and the one line saying why a reader should open it. The
 # path is spelled out rather than derived from the slug, because the most reusable piece
@@ -55,11 +56,23 @@ PUBLISHED: list[tuple[str, str, str, str]] = [
      "Why the headline figure is a ceiling and not a saving, what the safeguarding rule "
      "costs at the grade it lands on, and the rate above which this software costs a "
      "district money."),
+    ("district-ingest",
+     "docs/district-ingest.md",
+     "The file your district already exports",
+     "OneRoster, Clever or a header nobody here has seen, read without editing it. The "
+     "two columns no export carries, what filling them costs, and why three children in "
+     "one house are one telephone call."),
     ("the-legal-surface",
      "docs/the-legal-surface.md",
      "The legal surface",
      "Seven questions a district's counsel asks before this software telephones a "
      "parent. FERPA, the TCPA, retention, and which four of them are still open."),
+    ("consent-record",
+     "docs/consent-record.md",
+     "The consent record",
+     "A column that says yes is not a record of permission. The shape of one, the eight "
+     "checks a call passes before a telephone rings, and the three decisions that stay "
+     "with the district."),
     ("locale-is-not-only-a-hint",
      "docs/locale-is-not-only-a-hint.md",
      "Locale is not only a hint",
@@ -83,10 +96,23 @@ PUBLISHED: list[tuple[str, str, str, str]] = [
      "about it that are not true."),
 ]
 
-# Only what the documents actually contain. markdown-it-py emits nothing else from these
-# five files, and a page that grew a tag not on this list is a page nobody reviewed.
+# A document under `docs/` that is deliberately not on the site, and the reason. The list
+# above is a list rather than a glob on purpose, and the price of that is silence: two
+# documents a district reviewer needs, the export format and the consent record, sat
+# unpublished for as long as they existed while the legal surface cited both by name, and
+# nothing anywhere recorded whether that was a decision or an oversight. It was an
+# oversight. Empty is the right state today, and an entry here is a decision somebody
+# wrote down rather than a file nobody noticed.
+WITHHELD: dict[str, str] = {}
+
+
+# Only what the documents actually contain, and a page that grew a tag not on this list
+# is a page nobody reviewed. The set sat here for as long as this file existed with
+# nothing reading it: a comment describing a check reads exactly like a check, and the
+# renderer would have published any tag markdown-it cared to emit. `_render_markdown`
+# now refuses one.
 ALLOWED = {"a", "blockquote", "code", "em", "h1", "h2", "h3", "li", "ol", "p", "pre",
-           "strong", "ul"}
+           "strong", "table", "tbody", "td", "th", "thead", "tr", "ul"}
 
 # One block, small on purpose. Everything else a document is set in comes from page.css,
 # byte for byte the same stylesheet the main page carries, so the two are one publication
@@ -104,6 +130,51 @@ DOC_CSS = """
 .doc blockquote { margin: 0 0 1.1rem; padding-left: var(--space-3);
                   border-left: 2px solid var(--line); color: var(--ink-2); }
 .doc-back { display: block; margin-bottom: var(--space-4); }
+/* Tables come from page.css and are set exactly as the ones on the main page. What is
+ * true only here is that they sit in a prose column, so they take the paragraph's bottom
+ * margin: without it the sentence underneath starts on the last rule. A table whose first
+ * column is a term rather than a value sets that column in the label face, because the
+ * header that would have said so is the one this build takes off. */
+.doc table { margin: 0 0 1.1rem; }
+.doc td[data-term] {
+  font-family: var(--ui); font-size: var(--size-2); font-weight: 600;
+  /* A floor rather than a width. The auto layout gives this column whatever the prose
+   * column does not want, which was 86px in the pilot document: `Who is not called` came
+   * out on three lines beside a paragraph on three, and the longest one-line term in
+   * these documents needs 112px. A fixed 9rem then held the money table to three lines a
+   * row where its two number columns had 300px they were not using. A floor fixes the
+   * first case and lets the second have the room. */
+  min-width: 9rem;
+}
+
+/* Under 38rem there is no table. A four-column table in a prose column has 85px a
+ * column at 390px, which is narrower than `guardian_phone`, and the two ways out of that
+ * are both worse than stacking: breaking inside the words prints `FORMA / T` and
+ * `firstb / ell`, and a scroll container hides half the columns behind a gesture with
+ * nothing on the page to say so. So each row becomes a block and each cell prints the
+ * name of its column in front of itself, which is what the main page does with call
+ * identifiers under the same pressure. The label is `data-label`, written into the
+ * markup at build time, because these pages carry no script and a stylesheet cannot read
+ * a header cell.
+ *
+ * The names are not lost to a screen reader: `content` on a pseudo-element is announced,
+ * and it is the same string the header carried. */
+@media (max-width: 38rem) {
+  .doc thead { display: none; }
+  .doc table, .doc tbody, .doc tr, .doc td { display: block; }
+  .doc tr { border-top: 1px solid var(--line-strong); padding: 0.5rem 0; }
+  .doc tbody tr:first-child { border-top: 0; }
+  .doc td { padding: 0.2rem 0; border-bottom: 0; }
+  .doc td[data-label]::before {
+    content: attr(data-label); display: block;
+    font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  /* A term has no column name to print, because it is the name of the row. Stacked, it
+   * is the heading of the block rather than a cell beside one, and the width that kept it
+   * on one line beside a paragraph has no paragraph to sit beside. */
+  .doc td[data-term] { width: auto; margin-bottom: 0.15rem; }
+}
 .doc-why { color: var(--ink-2); margin-bottom: var(--space-4); }
 """.strip()
 
@@ -194,10 +265,89 @@ def _render_markdown(text: str) -> str:
             "  pip install -r requirements-dev.txt\n"
             "It is a dev dependency: running firstbell itself does not need it."
         )
-    # `commonmark` and nothing else. No raw HTML passthrough, no tables, no footnotes: the
-    # documents use none of it, and a renderer that accepts more is a renderer that will
+    # `commonmark` and tables, and nothing else. No raw HTML passthrough, no footnotes:
+    # the documents use neither, and a renderer that accepts more is a renderer that will
     # put something on a public page that nobody read.
-    return MarkdownIt("commonmark").render(text)
+    #
+    # Tables are on because six of these documents contain them and the renderer did not.
+    # The pipes went out as prose: the pilot document opened its Shape section with a
+    # paragraph reading "| | | |---|---| | Scale | Two schools in one district." and on for
+    # eleven rows, on the page the money card sends a reader to. It answered 200, its
+    # contrast passed, its links resolved, and every check in this repository agreed,
+    # because not one of them had ever compared the shape of a document against the shape
+    # of the page made from it.
+    body = MarkdownIt("commonmark").enable("table").render(text)
+    body = _shape_tables(body)
+    unknown = sorted(set(re.findall("<([a-z0-9]+)[ >]", body)) - ALLOWED)
+    if unknown:
+        raise SystemExit(
+            f"a published document rendered to {', '.join(unknown)}, which is not in "
+            "doc_pages.ALLOWED.\n"
+            "Either the document grew a construction nobody reviewed, or a renderer rule "
+            "was turned on without deciding how the tag is set.\n"
+            "Add it to ALLOWED with a style for it, or take it out of the document."
+        )
+    return body
+
+
+def _shape_tables(body: str) -> str:
+    """Every table given what it needs to survive a telephone screen.
+
+    Two jobs, both of which happen before the markup is written, because these pages carry
+    no script and a stylesheet cannot read a header cell.
+
+    A header whose cells are all empty comes off. There is no way to write a table with no
+    header row, so a document that wants a column of terms and a column of meanings writes
+    `| | |` and gets two empty cells, which print as a rule and a band of nothing above the
+    first term.
+
+    And every body cell is told the name of its column. At 390px a four-column table has
+    85px a column, which is narrower than `guardian_phone`. Breaking inside the word fits
+    the viewport and prints `FORMA / T` and `firstb / ell`, which is not a table anybody
+    can read. The stacked form the main page already uses for call identifiers needs each
+    cell to carry its own label, and it is written here rather than in the document, so the
+    markdown stays a table a person can edit.
+
+    A column with no name in the header is the row's own term, not a value: `the-money-in-
+    full` names its second and third columns and leaves the first blank, because the first
+    is what the row is about. That cell is marked rather than labelled, and the marker is
+    what the stylesheet sets in the label face and stacks first.
+    """
+    def label_cells(table: str, heads: list[str]) -> str:
+        def row(match: re.Match[str]) -> str:
+            column = iter(range(len(heads)))
+
+            def cell(inner: re.Match[str]) -> str:
+                index = next(column, None)
+                if index is None:
+                    return inner.group(0)
+                name = heads[index]
+                if name:
+                    return f'<td data-label="{name}">{inner.group(1)}</td>'
+                if index == 0:
+                    return f"<td data-term>{inner.group(1)}</td>"
+                return inner.group(0)
+
+            return re.sub("<td>(.*?)</td>", cell, match.group(0), flags=re.S)
+
+        return re.sub("<tr>(.*?)</tr>", row, table, flags=re.S)
+
+    def one(match: re.Match[str]) -> str:
+        table = match.group(0)
+        # Inside the header row rather than across the table, because <th[^>]*> matches
+        # <thead> as well and the first cell of an empty header then comes back as the
+        # markup between them rather than as nothing.
+        head = re.search("<thead>(.*?)</thead>", table, re.S)
+        cells = re.findall("<th[^>]*>(.*?)</th>", head.group(1), re.S) if head else []
+        if not cells:
+            return table
+        heads = [html.escape(html.unescape(re.sub("<[^>]+>", "", cell)).strip(), quote=True)
+                 for cell in cells]
+        if not any(heads):
+            table = re.sub("<thead>(.*?)</thead>", "", table, flags=re.S)
+        return label_cells(table, heads)
+
+    return re.sub("<table>(.*?)</table>", one, body, flags=re.S)
 
 
 def render(slug: str, path: str, title: str, why: str, css: str,

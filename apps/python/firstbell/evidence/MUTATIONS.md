@@ -645,6 +645,13 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 346 | Count a turn only when it carries both `text` and `speaker`, so the Tamil and English pairs the gloss file is made of stop reading as dialogue | 1 |
 | 347 | Empty the declared exception list while the file it names is still tracked, so real conversation sits in the tree with nothing recording that anybody decided it could | 2 |
 | 348 | Stop the gate walking into nested objects, so a conversation one level below the root of a committed document passes | 1 |
+| 349 | Render the documents with commonmark alone, which has no tables, so six documents publish their table rows as paragraphs of pipe characters. This is the defect that was in the tree: `what-a-pilot-would-look-like` opened its Shape section with eleven rows of `| Scale | Two schools in one district. |` set as running prose, on the page the money card sends a reader to | 3 |
+| 350 | Skip the table pass entirely, so no cell carries the name of its column and an empty header row stays on the page as a rule above a band of nothing | 2 |
+| 351 | Treat a column with no name in the header as an ordinary value rather than the term the row is about, so the money document's first column loses the mark that stacks it first and sets it in the label face | 2 |
+| 352 | Take the header row off every table rather than only off one whose cells are all empty, so a table that names its columns loses the names | 2 |
+| 353 | Return to what this module did for as long as it existed: keep the set of allowed tags as a comment and check nothing against it, so any tag the renderer emits reaches a public page with no style written for it | 1 |
+| 354 | Take one document off the published list while it is still cited by name from another page, which is how `docs/district-ingest.md` and `docs/consent-record.md` came to be unreachable | 1 |
+| 355 | Accept a name in the withheld register with no reason written beside it, so a document can be kept off the site by an empty string | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
