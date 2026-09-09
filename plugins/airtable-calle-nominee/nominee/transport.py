@@ -138,30 +138,59 @@ class FixtureTransport:
 
     `poll` is consumed in order and the last entry repeats, so a scenario can
     show a call moving from in_progress to a terminal state.
+
+    A fixture may instead key scenarios by request id, so one replay can show
+    several different outcomes side by side:
+
+        { "calls": { "VR-1041": { "create": ..., "poll": [...] }, ... } }
+
+    The request id is read from the payload's `metadata.request_id`, which is
+    the same correlation key a real deployment uses on the webhook.
     """
 
     def __init__(self, scenario: dict[str, Any]) -> None:
         self.scenario = scenario
         self.created: list[tuple[dict[str, Any], str]] = []
         self._poll_index = 0
+        self._by_call: dict[str, dict[str, Any]] = {}
+        self._poll_index_by_call: dict[str, int] = {}
 
     @classmethod
     def from_file(cls, path: str | Path) -> "FixtureTransport":
         text = Path(path).read_text(encoding="utf-8")
         return cls(json.loads(text))
 
+    def _scenario_for(self, payload: dict[str, Any]) -> dict[str, Any]:
+        keyed = self.scenario.get("calls")
+        if not keyed:
+            return self.scenario
+        request_id = ((payload.get("metadata") or {}).get("request_id")) or ""
+        if request_id not in keyed:
+            raise TransportError(
+                f"fixture has no scenario for request {request_id!r}; "
+                f"known: {sorted(keyed)}"
+            )
+        return keyed[request_id]
+
     def create_call(self, payload: dict[str, Any], *, idempotency_key: str) -> dict[str, Any]:
+        scenario = self._scenario_for(payload)
+        created = dict(scenario.get("create", {}))
         # Replaying the same idempotency key returns the same result, as the
         # real API is required to, so tests can assert re-runs do not re-dial.
-        for seen_payload, seen_key in self.created:
+        for _seen_payload, seen_key in self.created:
             if seen_key == idempotency_key:
-                return dict(self.scenario.get("create", {}), replayed=True)
+                return dict(created, replayed=True)
         self.created.append((payload, idempotency_key))
-        return dict(self.scenario.get("create", {}))
+        call_id = str(created.get("id") or "")
+        if call_id:
+            self._by_call[call_id] = scenario
+        return created
 
     def get_call(self, call_id: str) -> dict[str, Any]:
-        polls = self.scenario.get("poll") or [self.scenario.get("create", {})]
-        index = min(self._poll_index, len(polls) - 1)
+        scenario = self._by_call.get(call_id, self.scenario)
+        polls = scenario.get("poll") or [scenario.get("create", {})]
+        index = min(self._poll_index_by_call.get(call_id, 0), len(polls) - 1)
+        self._poll_index_by_call[call_id] = index + 1
         self._poll_index += 1
         return polls[index]
 

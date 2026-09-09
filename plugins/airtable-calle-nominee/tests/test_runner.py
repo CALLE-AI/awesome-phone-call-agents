@@ -83,7 +83,7 @@ def scenario(**answers):
 class Base(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
-        self.audit = AuditLog(Path(self._tmp.name) / "audit.jsonl")
+        self.audit = AuditLog(Path(self._tmp.name) / "audit.jsonl", fsync=False)
         self.transport = FixtureTransport(scenario())
 
     def tearDown(self):

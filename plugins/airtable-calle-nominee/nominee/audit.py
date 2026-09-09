@@ -25,6 +25,10 @@ tamper-proofing that overreaches is worse than none:
   * An attacker with write access and the code can rebuild the whole file.
     The chain makes tampering evident to someone who kept an earlier head, not
     impossible.
+  * Concurrent writers in *separate processes*. Appends are serialised by an
+    in-process lock, which is what the runner's thread pool needs. Two
+    processes appending to one log would interleave and break the chain, so a
+    log has one writing process.
 
 Numbers are masked before they reach the log, and consent tokens are stored as
 a short prefix only: enough to correlate, not enough to replay.
@@ -35,6 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,9 +96,20 @@ class AuditLog:
     record of the authority for it.
     """
 
-    def __init__(self, path: str | os.PathLike[str]) -> None:
+    def __init__(self, path: str | os.PathLike[str], *, fsync: bool = True) -> None:
+        """`fsync` defaults to on, because a record must be durable before the
+        call it authorises is allowed to ring. Turning it off is for tests that
+        are not exercising durability; a deployment should leave it alone."""
         self.path = Path(path)
+        self.fsync = fsync
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Dispatch is concurrent, so deriving the next seq and prev_hash must be
+        # atomic with the write that consumes them. Without this, two threads
+        # read the same head and both claim the same sequence number, which
+        # breaks the chain the log exists to guarantee.
+        self._lock = threading.Lock()
+        self._head: str | None = None
+        self._seq: int | None = None
 
     # -- reading -------------------------------------------------------
 
@@ -147,8 +163,33 @@ class AuditLog:
                 "pass types.mask(...) output"
             )
 
-        prev = self.head()
-        seq = self.count()
+        with self._lock:
+            if self._head is None or self._seq is None:
+                self._seq = 0
+                self._head = GENESIS
+                for existing in self.records():
+                    self._head = existing.get("hash", self._head)
+                    self._seq += 1
+            prev = self._head
+            seq = self._seq
+            record = self._write(event, prev, seq, request_id, masked_number,
+                                 number_source, call_id, consent_token, detail)
+            self._head = record["hash"]
+            self._seq = seq + 1
+        return record
+
+    def _write(
+        self,
+        event: str,
+        prev: str,
+        seq: int,
+        request_id: str,
+        masked_number: str,
+        number_source: str,
+        call_id: str,
+        consent_token: str,
+        detail: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         record: dict[str, Any] = {
             "seq": seq,
             "ts": _now(),
@@ -167,7 +208,8 @@ class AuditLog:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(line)
             handle.flush()
-            os.fsync(handle.fileno())
+            if self.fsync:
+                os.fsync(handle.fileno())
         return record
 
     # -- verification --------------------------------------------------

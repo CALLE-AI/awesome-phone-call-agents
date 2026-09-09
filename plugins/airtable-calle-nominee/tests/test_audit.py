@@ -7,6 +7,7 @@ broke.
 
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -20,7 +21,7 @@ class ChainBase(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self.path = Path(self._tmp.name) / "audit.jsonl"
-        self.log = AuditLog(self.path)
+        self.log = AuditLog(self.path, fsync=False)
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -142,6 +143,57 @@ class Tampering(ChainBase):
         self.assertNotEqual(
             status.head, anchored_head, "an anchored head is what catches this"
         )
+
+
+class Durability(ChainBase):
+    def test_fsync_is_on_by_default(self):
+        """A record must be durable before the call it authorises can ring."""
+        self.assertTrue(AuditLog(self.path).fsync)
+
+
+class Concurrency(ChainBase):
+    """Dispatch is concurrent, so the chain must survive parallel appends.
+
+    Without serialising the read of head/seq with the write that consumes
+    them, two threads claim the same sequence number and the chain breaks.
+    """
+
+    def test_parallel_appends_keep_the_chain_intact(self):
+        threads = [
+            threading.Thread(
+                target=self.log.append,
+                args=("call.authorized",),
+                kwargs={"request_id": f"VR-{i:04d}", "consent_token": "c" * 64},
+            )
+            for i in range(24)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        status = self.log.verify_chain()
+        self.assertTrue(status.ok, str(status))
+        self.assertEqual(status.records, 24)
+
+    def test_sequence_numbers_are_unique_under_load(self):
+        threads = [
+            threading.Thread(target=self.log.append, args=("call.dispatched",))
+            for _ in range(16)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        seqs = [r["seq"] for r in self.log.records()]
+        self.assertEqual(sorted(seqs), list(range(16)))
+
+    def test_a_reopened_log_continues_the_existing_chain(self):
+        self.seed(3)
+        reopened = AuditLog(self.path, fsync=False)
+        reopened.append("call.reconciled", request_id="VR-9999")
+        self.assertTrue(reopened.verify_chain().ok)
+        self.assertEqual(reopened.verify_chain().records, 4)
 
 
 class PrivacyInTheLog(ChainBase):
