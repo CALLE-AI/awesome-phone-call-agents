@@ -6,6 +6,9 @@ A phone call cannot prove that somebody is alive. It proves that a human
 answered a line. Muster grades what one call did and did not establish, names
 the reason, and says `UNPROVEN` far more often than it says alive.
 
+**Hosted console:** https://muster-95953931159.us-central1.run.app
+(scripted demo data, places no calls)
+
 **No call is placed unless you ask for one.** Every command in this app
 defaults to a preview or a scripted demo. The whole test suite runs with no
 credentials.

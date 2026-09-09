@@ -1,6 +1,9 @@
 # Muster demo
 
-Five enrolled subjects, five outcomes, one pass. No credentials, no calls.
+**Hosted:** https://muster-95953931159.us-central1.run.app
+
+Six enrolled subjects. Only one closes without a person. No credentials, no
+calls.
 
 ```bash
 cd apps/python/muster
@@ -14,9 +17,11 @@ python3 -m muster.cli demo
 | Marguerite Baptiste | `voicemail` | `UNPROVEN` | An answering machine greets the caller in her own voice. A recording cannot answer a challenge minted seconds ago. |
 | Henry Achterberg | `clean` | `NEEDS_HUMAN` | He answers correctly and passes every challenge, and is still routed to a person, because he is enrolled as hearing-impaired. A machine never fails him. |
 | Sofia Kallas | `coached` | `NEEDS_HUMAN` | Every answer is right. An unattributed voice supplies them eight seconds before she repeats them. Right answers, wrong provenance. |
+| Beatrice Nkrumah | `clean` | `CONFIRMED_LIVE`, `REGISTER_CONTRADICTED` | The death register records her death. She just repeated three words minted ninety seconds ago. The correction case is opened against the register, not against her, and her payment does not stop. |
 
-Two of those are the point of the whole system: **Henry passes and is still not
-closed**, and **Sofia gives perfect answers and is still not closed**.
+Three of those are the point of the whole system. **Henry passes and is still
+not closed.** **Sofia gives perfect answers and is still not closed.** And
+**Beatrice is recorded as dead by the register and is demonstrably not.**
 
 ## Try a different outcome for the same person
 
