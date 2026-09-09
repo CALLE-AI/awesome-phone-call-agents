@@ -638,3 +638,157 @@ def test_a_fixture_comment_names_only_records_the_pair_contains():
     assert not stray, (
         f"the register's comment names {', '.join(stray)} as a call, and {RECORDS.name} "
         "has no such row, so the pair the comment describes is not the pair on disk")
+
+
+def test_one_pupil_with_two_contradicting_records_is_not_filed_closed(tmp_path):
+    """Two records, one pupil, opposite answers, and the closed pile took one of them.
+
+    An export with the same id on two lines is two calls about one child, which is
+    legitimate: a first attempt nobody answered and a second that got through. What is not
+    legitimate is filing one of them closed while the other says a person has to ring back.
+    A clerk reads the closed pile as settled, and `tools/replay_escalation.py` de-duplicates
+    by call id for exactly this reason.
+
+    So the row that needs a person is the one that counts. Both records still print, because
+    hiding one of two real calls is the other way to be wrong, and the collision is named
+    rather than resolved silently.
+    """
+    # The shape the reader takes, copied from examples/other-dialler-records.jsonl. The
+    # field that decides the outcome is `spoke_with`: a guardian closes the record and a
+    # child cannot, because a child has no authority to give the answer.
+    records = tmp_path / "twice.jsonl"
+    settled = {"id": "S-1", "numbers": ["+15550000501"], "answered": True,
+               "result": {"reason_category": "illness", "expected_return": "tomorrow",
+                          "parent_confirmed_aware": "yes", "spoke_with": "guardian"}}
+    unsettled = {"id": "S-1", "numbers": ["+15550000501"], "answered": True,
+                 "result": {"reason_category": "illness", "expected_return": "today",
+                            "parent_confirmed_aware": "yes", "spoke_with": "child"}}
+    records.write_text(json.dumps(settled) + "\n" + json.dumps(unsettled) + "\n",
+                       encoding="utf-8")
+
+    done = _run("--records", str(records), "--today", "2026-09-08")
+    assert done.returncode == 0, f"the tool exited {done.returncode}: {done.stdout}"
+
+    lines = done.stdout.splitlines()
+    shuts = [i for i, one in enumerate(lines)
+             if one.startswith("Closed, and needing nobody")]
+    if shuts:
+        closed = lines[shuts[0] + 1:]
+        assert not [one for one in closed if "S-1" in one], (
+            "S-1 has a record saying a person has to ring back and a record filed closed, "
+            "and the closed pile is where a clerk stops reading:\n  "
+            + "\n  ".join(one.strip() for one in closed if one.strip()))
+
+    assert "more than once" in done.stdout, (
+        "the tool files two contradicting records for one pupil without saying that is "
+        f"what it did:\n{done.stdout}")
+
+
+def test_a_file_with_a_header_and_no_rows_says_that_and_not_something_else(tmp_path):
+    """A spreadsheet has neither blank lines nor comments, so it cannot be told it has only those.
+
+    The message was written for the JSONL path and reached the CSV path unchanged, so a
+    district whose export produced a header and nothing under it was told its file held
+    "only blank or commented lines". It is the right exit code and the wrong sentence, and
+    the sentence is the whole of what the district has to work from.
+    """
+    records = tmp_path / "header-only.csv"
+    # Columns this tool reads. The first version of this fixture named a column the
+    # tool refuses, so the file was rejected for its header rather than for holding no
+    # rows, and this gate passed on a message about something else. It measured zero
+    # against its own mutation, which is the only reason that was found.
+    records.write_text("id,answered,numbers,reason_category\n", encoding="utf-8")
+
+    done = _run("--records", str(records), "--today", "2026-09-08")
+    assert done.returncode == 3, (
+        f"a file with nothing to audit exited {done.returncode} rather than the "
+        f"could-not-measure code: {done.stdout}")
+    assert "COULD-NOT-MEASURE" in done.stdout
+    assert "blank or commented" not in done.stdout, (
+        f"a spreadsheet is told it holds only blank or commented lines:\n{done.stdout}")
+    assert "header" in done.stdout.lower(), (
+        "the message does not say the file is a header with nothing under it, and that "
+        f"sentence is the whole of what the district has to work from:\n{done.stdout}")
+
+
+def test_a_boolean_saying_no_is_read_even_when_a_dated_record_says_yes():
+    """The audit tool must not certify a call the live path refuses.
+
+    `dial_refusal` reads the dated record and then the boolean, and refuses if either says
+    no. Its docstring gives the reason: "a record withdrawn last week sits beside a consent
+    column that still says yes, and reading the weaker of two answers is how somebody who
+    asked not to be called gets called." `audit_consent` returned as soon as the record
+    cleared, so the column was never read. On this row the tool answered "every call rests
+    on a dated record" while firstbell's own gate answered "no recorded consent".
+
+    This is the third copy of a gate found with fewer branches than the gate it copies.
+    """
+    from dispatch.consent import load_register
+    from dispatch.models import WorkItem, dial_refusal
+    from adopt_call_records import audit_consent
+
+    register = load_register({"records": [{
+        "id": "CR-1", "student_id": "S-1", "channel": "voice", "purpose": "attendance",
+        "given_at": "2026-08-01", "phones": ["+15550100301"],
+    }]}, "register.json")
+
+    row = {"id": "S-1", "consent_record": "CR-1", "consented": False,
+           "numbers": ["+15550100301"]}
+
+    live = dial_refusal(WorkItem(id="S-1", phones=("+15550100301",), consented=False,
+                                 consent_record="CR-1"))
+    assert live is not None, "the fixture must be a row the live path actually refuses"
+
+    findings, provenance = audit_consent([row], register, date(2026, 9, 9))
+    assert findings, (
+        "the tool certified a call the dispatcher refuses. Its whole job is telling a "
+        "district which of its placed calls its own paperwork authorised")
+    assert provenance["record"] == 0, "this row does not rest on a record alone"
+
+
+def test_uncovered_counts_each_unauthorised_row_once():
+    """`len(findings) + boolean + nothing` counted every "rests on nothing" row twice.
+
+    The `else` branch appends a finding and increments `nothing`, so the sum was
+    `refused + boolean + 2 x nothing`: three uncovered calls out of two records.
+    """
+    from adopt_call_records import audit_consent, uncovered_count
+
+    rows = [
+        {"id": "S-1", "consented": True, "numbers": ["+15550100301"]},   # a bare boolean
+        {"id": "S-2", "numbers": ["+15550100302"]},                      # nothing at all
+    ]
+    findings, provenance = audit_consent(rows, {}, date(2026, 9, 9))
+    assert uncovered_count(findings, provenance) == 2, (
+        "two rows rest on no dated record, and the count must not exceed the rows")
+
+
+def test_a_row_that_is_uninformative_and_alarming_is_marked_and_named():
+    """`decide` returns the outcome and the escalation separately; `report` read one.
+
+    A result whose every required field came back unknown, from a call a child answered,
+    files as `undetermined` and is also escalated. The headline counted only the outcome, so
+    it printed "escalated 0" while the same run's `--json` marked the row escalated, and the
+    `!!` the legend defines as "a person has to see it" was withheld from it.
+    """
+    from adopt_call_records import decide, report
+
+    child = {"id": "S-CHILD", "result": {
+        "reason_category": "unknown", "expected_return": "unknown", "spoke_with": "child"}}
+    ordinary = {"id": "S-PLAIN", "result": {
+        "reason_category": "illness", "expected_return": "tomorrow",
+        "parent_confirmed_aware": "yes"}}
+
+    filed = [decide(child), decide(ordinary)]
+    marked = next(one for one in filed if one["id"] == "S-CHILD")
+    assert marked["outcome"] == "undetermined" and marked["escalated"] is True, (
+        "fixture must be the both-at-once row this is about")
+
+    text = report([child, ordinary], filed, [], {"record": 0, "boolean": 0,
+                                                 "nothing": 0, "refused": 0})
+    assert "safeguarding signal" in text, (
+        "the headline reported no escalation for a row its own --json escalates")
+    child_line = next(line for line in text.splitlines() if "S-CHILD" in line)
+    assert "!!" in child_line, "the marker the legend defines was withheld"
+    plain_line = next(line for line in text.splitlines() if "S-PLAIN" in line)
+    assert "!!" not in plain_line, "and it must still mean something"

@@ -1492,3 +1492,50 @@ def test_a_stopped_run_says_so_in_words_and_in_the_exit_code(tmp_path, monkeypat
     assert "still owed a call" in printed, (
         "the output has to say the untouched rows are still work, because that is the only "
         "thing the operator has to do next")
+
+
+def test_a_final_body_without_an_id_still_carries_the_one_this_run_placed():
+    """The row said no call was placed, beside a receipt naming the call that was.
+
+    `_classify` read the call id out of the poll response. `_handle` has had the id the
+    create returned in scope the whole time, and hands it to the not-recallable list on
+    every other undetermined path. A proxy or an off-spec body that answers a poll without
+    `id` produced a queue row carrying no id at all, next to a receipt naming the call. A
+    clerk reading that row does not ring the family back, and the id on the receipt is the
+    only trace that somebody's telephone rang.
+
+    Every response recorded in `evidence/api-shape.json` carries `.id` as a string, so this
+    needs a mangled body to fire. It is filed anyway because the whole design of `_handle`
+    is that an id, once a call has been placed, does not get lost, and this was the one
+    path that could lose it.
+    """
+    shape = _task_result_shape()
+    assert shape.get("id"), "the fixture no longer carries an id, so nothing is removed here"
+    without = {key: value for key, value in shape.items() if key != "id"}
+
+    placed = []
+
+    class Calls:
+        def create(self, **kwargs):
+            placed.append(kwargs)
+            return {"id": "call_9", "status": "queued",
+                    "created_at": "2026-09-08T00:00:00Z"}
+
+        def get(self, call_id):
+            return dict(without)
+
+    class Client:
+        def __init__(self):
+            self.calls = Calls()
+
+    dispatcher = WaveDispatcher(
+        Client(), task_builder=lambda item: "task", result_schema=LIVE_SCHEMA,
+        concurrency=1, poll_interval_seconds=0, sleep=lambda seconds: None)
+    report = dispatcher.run([LIVE_ITEM])
+
+    assert len(report.results) == 1, "one row in, one row out"
+    assert report.results[0].call_id == "call_9", (
+        "the row carries "
+        f"{report.results[0].call_id!r} for a call this run placed as call_9. The id came "
+        "from the poll body rather than from the create that returned it, so a body "
+        "answering without one loses the only handle a person has on a call that rang")

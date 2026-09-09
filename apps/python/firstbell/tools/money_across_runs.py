@@ -190,8 +190,24 @@ def _counts_from_items(items: list[dict], *,
         return file_today(result, with_escalation=False) == "closed"
 
     def answered_row(item: dict) -> bool:
-        """Whether somebody picked up, which no re-filing can change."""
-        return item.get("resolution") in ("resolved", "undetermined")
+        """Whether somebody picked up, which no re-filing can change.
+
+        `undetermined` alone cannot answer this. Three of its producers mean a person
+        answered and the answer was unusable, and five mean nothing is known about
+        whether a telephone was picked up. The receipt now records `spoke_to_someone`
+        per row, so this reads the fact instead of inferring it from the word.
+
+        A receipt written before that field existed has no key to read. Those fall back
+        to the old rule, which is the rule that receipt was measured under, and the
+        recorded set contains no undetermined row at all, so the fallback changes no
+        published figure. It is here so an old receipt keeps reporting what it reported.
+        """
+        if item.get("resolution") == "resolved":
+            return True
+        if item.get("resolution") != "undetermined":
+            return False
+        spoke = item.get("spoke_to_someone")
+        return True if spoke is None else bool(spoke)
 
     billed = sum(item.get("attempts", item.get("attempts_made", 0)) for item in items)
     removed = sum(item.get("attempts", item.get("attempts_made", 0)) for item in items

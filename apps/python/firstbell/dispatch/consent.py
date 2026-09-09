@@ -25,7 +25,7 @@ them.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 # What a record must carry, and what it may. `id` is what a work file points at;
@@ -93,10 +93,14 @@ class ConsentRecord:
     withdrawn_at: date | None = None
     evidence: str = ""
     recorded_by: str = ""
-    guardian_name: str = ""
+    # Both kept out of the repr for the reason given on `WorkItem.phones`: a consent
+    # record names a guardian and the numbers the permission covers, so its default
+    # repr carries the same two things a receipt is forbidden to carry. The record id
+    # and the student id stay visible, which is what a register bug is debugged from.
+    guardian_name: str = field(default="", repr=False)
     # The numbers this permission covers, compared on digits. Empty means the record
     # names a student and no number.
-    phones: tuple[str, ...] = ()
+    phones: tuple[str, ...] = field(default=(), repr=False)
 
     def covers_number(self, number: str) -> bool:
         """Whether this record names the number about to be dialled.

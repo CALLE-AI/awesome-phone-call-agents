@@ -338,3 +338,42 @@ def test_the_annual_saving_is_stated_after_the_calls_are_paid_for():
             in doc), (
         "the demo run's before-and-after pair is not the one the tool computes, and it is "
         "the pair a reviewer can reproduce without an account")
+
+
+def test_the_sentence_that_states_the_figure_is_the_one_that_hedges_it():
+    """The hedge has to be beside the number, not somewhere in the same document.
+
+    The gate above asked whether the word "ceiling" appeared anywhere in the file. It does,
+    in an exit criterion about the staff-time ceiling a run prints, which is a different
+    number entirely. So both sentences calling the absence volume a ceiling could be
+    rewritten into plain claims and the gate went on passing on the strength of an
+    unrelated line. A reader who takes 28 per 1,000 for the number of families this
+    software would ring has been over-sold, and that is the whole reason the hedge exists.
+
+    Checked sentence by sentence: whichever sentences state the per-1,000 figure, at least
+    one of them has to call it a ceiling.
+    """
+    # The section, not the document. Two sentences state the figure and both are hedged,
+    # so a gate asking whether any hedged sentence exists survived the removal of either
+    # one. This reads the section that exists to say what the figure is not, which is where
+    # a reader who has just been given the number arrives next.
+    raw = DOC.read_text(encoding="utf-8")
+    opens = raw.find("Three things that figure is not.")
+    assert opens != -1, (
+        "the document no longer has the section that says what the volume figure is not, "
+        "and a reader who takes 28 per 1,000 for the number of families this software "
+        "would ring has been over-sold by us")
+    rest = raw.find("\n## ", opens)
+    section = re.sub(r"\s+", " ", raw[opens:] if rest == -1 else raw[opens:rest])
+
+    naming = [one for one in re.split(r"(?<=\.)\s+", section) if "per 1,000" in one]
+    assert naming, (
+        "the section that says what the figure is not never states the figure, so nothing "
+        "in it is attached to the number a reader just read")
+    hedged = [one for one in naming if "ceiling" in one]
+    assert hedged, (
+        "no sentence in that section states the per-1,000 figure and calls it a ceiling. "
+        "The word appears elsewhere in the document, about the staff-time ceiling a run "
+        "prints, which is a different number, and that occurrence is what used to satisfy "
+        "this. Sentences in the section naming the figure:\n  "
+        + "\n  ".join(one.strip()[:160] for one in naming))

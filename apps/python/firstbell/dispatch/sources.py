@@ -51,20 +51,61 @@ class SourceError(Exception):
     pass
 
 
+# The same seven-digit floor `models.redact` uses, and for the same reason: shorter than
+# any diallable number, longer than an extension, a footnote marker or a SIP code. A floor
+# existed on the path that decides what is masked and nowhere on the path that decides what
+# is dialled.
+_DIALLABLE_FLOOR = 7
+
+
+def _ascii_digits(text: str) -> str:
+    """Digits a telephone network can carry.
+
+    `str.isdigit()` is true for superscripts and for Eastern Arabic numerals, so a cell of
+    `٩٨٧٦٥٤٣٢١٠` was accepted as a number and dialled, and `unknown²` counted as carrying a
+    digit. E.164 is ASCII.
+    """
+    return "".join(ch for ch in text if "0" <= ch <= "9")
+
+
 def _split_phones(raw: str) -> tuple[str, ...]:
     """A person's numbers, in the order they should be tried.
 
     CALL-E models `phones` as a list per recipient, so the fallback chain is a first-class
     part of the request rather than something we have to orchestrate ourselves.
 
-    An entry with no digits in it is dropped. `unknown`, `n/a` and `none` all arrive in
-    the phone column of a real district export, and each one used to become an attempt:
-    the dialler tried it, the platform refused it, and the row spent a place in the
-    fallback chain on a word. Dropping it here rather than at the dialler keeps the count
-    of numbers on the row equal to the count of numbers somebody could answer.
+    An entry that is not a diallable number is dropped. `unknown`, `n/a` and `none` all
+    arrive in the phone column of a real district export, and each one used to become an
+    attempt: the dialler tried it, the platform refused it, and the row spent a place in the
+    fallback chain on a word. Dropping it here rather than at the dialler keeps the count of
+    numbers on the row equal to the count of numbers somebody could answer.
+
+    Three things used to break that invariant. The filter was "contains a digit", so
+    `ext. 4`, `unknown²` and `see note ⁵` all survived it. The split ran on commas as well as
+    semicolons with no floor, so a single comma-grouped number, which `models.redact`'s own
+    comment records as a format real vendors write, became four numbers: the row was then
+    refused as `invalid_phone`, which is in `NEVER_CARRIED`, so the run reported that the
+    platform refused the call when the cause was the district's formatting, and
+    `households._key` reads the digits of `phones[0]`, which is `"1"` for every such row, so
+    unrelated children were filed as one family and held behind a call about another child.
+    And a number written twice on one row stayed twice, which rings one house twice inside a
+    single call: the harm `dispatch/households.py` exists to prevent, reached from inside a
+    row rather than across rows, while inflating `attempts_made` and so `calls_placed`.
     """
     parts = [p.strip() for p in raw.replace(";", ",").split(",")]
-    return tuple(p for p in parts if p and any(ch.isdigit() for ch in p))
+    numbers = [p for p in parts if len(_ascii_digits(p)) >= _DIALLABLE_FLOOR]
+    if not numbers:
+        # No part is diallable on its own. Either the cell holds one number grouped with
+        # the same character this splits on, or it holds nothing worth dialling. Asking the
+        # whole cell tells the two apart without guessing at a vendor's grouping style.
+        whole = raw.strip()
+        return (whole,) if len(_ascii_digits(whole)) >= _DIALLABLE_FLOOR else ()
+    # Compared on digits, so the same telephone written two ways is one telephone, and the
+    # first spelling wins because that is the order the district wrote them in.
+    seen: dict[str, str] = {}
+    for one in numbers:
+        seen.setdefault(_ascii_digits(one), one)
+    return tuple(seen.values())
 
 
 _YES = {"1", "true", "yes", "y", "granted"}
@@ -237,7 +278,12 @@ class CsvSource:
 
             seen: set[str] = set()
             try:
-                rows = list(enumerate(reader, start=2))
+                # `reader.line_num` and not a counter. A quoted cell containing a newline is
+                # one CSV record spread over several physical lines, so a counter and the
+                # file diverge from that row onward and every refusal below sends an
+                # operator to the wrong place: "line 3" landing in the middle of record 2.
+                # The reader already carries the physical position; it was not being read.
+                rows = [(reader.line_num, row) for row in reader]
             except csv.Error as bad:
                 # The stdlib default field limit is 131,072 characters. A cell past it is a
                 # corrupt file, not a long name, and `_csv.Error` reaching an operator says
@@ -405,11 +451,22 @@ class DropSource:
 
     def __init__(self, directory: str | Path, *, pattern: str = "*.csv",
                  max_age_hours: float = 18.0, encoding: str = "utf-8-sig",
-                 now: float | None = None) -> None:
+                 now: float | None = None, consent_register: dict | None = None,
+                 today: date | None = None,
+                 column_map: dict[str, tuple[str, ...]] | None = None) -> None:
         self.directory = Path(directory)
         self.pattern = pattern
         self.max_age_hours = max_age_hours
         self.encoding = encoding
+        # Passed straight through to the `CsvSource` this builds per export. Without them
+        # the unattended path could not use a dated consent register even once the caller
+        # had loaded one, and it then refused every row that named a record with the words
+        # "Pass --consent-records", which is the thing the operator had already done. Same
+        # for a district's own column mapping: the drop is the path a district automates,
+        # so it is the path most likely to be reading a vendor's own export shape.
+        self.consent_register = consent_register
+        self.today = today
+        self.column_map = column_map
         # Injected rather than read where it is used, so a test can place a file at a known
         # age instead of sleeping, and so the age quoted in a refusal is the age this
         # actually decided on.
@@ -490,7 +547,23 @@ class DropSource:
         # smaller: a file that fails validation places no calls either. Its comment said the
         # ledger is written once there is something to place calls from, which is not the
         # same thing as once calls have been placed.
-        items = list(CsvSource(chosen, encoding=self.encoding).items())
+        items = list(CsvSource(chosen, encoding=self.encoding,
+                               consent_register=self.consent_register,
+                               today=self.today, column_map=self.column_map).items())
+        if not items:
+            # The third failure mode, and the only one that looks like good news. A stale
+            # export and a re-used one are both refused above. An overnight job that wrote
+            # the header row and then died parsed to zero rows and returned cleanly, so the
+            # school day passed with nobody telephoned and cron saw exit 0. The docstring on
+            # this class already commits to this distinction for an empty directory; a
+            # truncated file is the same claim about the same day.
+            raise SourceError(
+                f"{chosen.name} has a header row and nothing under it. An export with no "
+                "rows is reported rather than treated as a day with no absences, because "
+                "the two look identical from here and only one of them is good news. If "
+                "the overnight job genuinely found no absences, there is nothing to call "
+                "from and nothing to record."
+            )
         self._read = (digest, chosen.name)
         return iter(items)
 

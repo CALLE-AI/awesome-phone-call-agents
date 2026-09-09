@@ -105,7 +105,11 @@ def records(receipts: Path) -> dict:
             continue
         for item in payload.get("items") or []:
             result = item.get("structured_result")
-            call_id = item.get("id")
+            # `call_id`, not `id`. The docstring above says "Keyed on the call id alone"
+            # and this read the pupil id, so one child telephoned twice was one record and
+            # the second call's answer was never re-filed. A row carrying a result always
+            # rang, so there is no keyless case to fall back for here.
+            call_id = item.get("call_id")
             if not isinstance(result, dict) or not call_id:
                 continue
             seen.setdefault(call_id, (result, path.name))

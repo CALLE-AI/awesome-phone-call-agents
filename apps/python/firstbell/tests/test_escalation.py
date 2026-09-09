@@ -149,3 +149,50 @@ def test_the_default_escalates_nothing():
     )
     assert dispatcher._escalation_for(_result(parent_confirmed_aware="no")) is (
         Escalation.NONE)
+
+
+# ---------------------------------------------------------------------------
+# A status is not an answer. Both of the branches below return before the
+# escalation rule is consulted, so a call that connected, talked and then
+# dropped was filed on its status alone and the thing the parent said went
+# nowhere: no count, no clock, no receipt, and sorted below an ordinary
+# callback in the queue a clerk works top-down.
+# ---------------------------------------------------------------------------
+
+def _dispatcher():
+    from dispatch.scheduler import WaveDispatcher
+    from firstbell.domain import RESULT_SCHEMA, safeguarding_escalation
+
+    return WaveDispatcher(
+        client=object(), task_builder=lambda item: "task",
+        result_schema=RESULT_SCHEMA, escalate=safeguarding_escalation,
+    )
+
+
+ALARMING = {"reason_category": "unknown", "expected_return": "unknown",
+            "spoke_with": "child", "parent_confirmed_aware": "no"}
+
+
+@pytest.mark.parametrize("call,why", [
+    ({"id": "call-1", "status": "failed", "failure_code": "call_failed",
+      "structured_result": ALARMING},
+     "a call that connected, said the serious thing and then dropped"),
+    ({"id": "call-2", "status": "canceled", "structured_result": ALARMING},
+     "a cancelled call whose recipient had already answered"),
+    ({"id": "call-3", "status": "in_progress", "_timed_out": True,
+      "structured_result": ALARMING},
+     "a call whose result arrived but whose status never went terminal"),
+])
+def test_a_result_that_says_the_serious_thing_escalates_whatever_the_status(call, why):
+    out = _dispatcher()._classify(ITEM, call, placed_id=call["id"])
+    assert out.escalation is Escalation.SAFEGUARDING, (
+        f"{why} was filed on its status and the rule was never asked")
+
+
+@pytest.mark.parametrize("status", ["failed", "canceled"])
+def test_a_non_completed_call_keeps_the_result_it_carried(status):
+    """Without this the only surviving trace is the transcript, which is off by default."""
+    out = _dispatcher()._classify(
+        ITEM, {"id": "c", "status": status, "structured_result": ALARMING}, placed_id="c")
+    assert out.structured_result == ALARMING, (
+        "the receipt recorded null and what the child said was lost")

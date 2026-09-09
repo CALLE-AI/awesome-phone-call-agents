@@ -16,6 +16,7 @@ from .models import (
     Resolution,
     WorkItem,
     mask,
+    redact,
     redact_free_text,
 )
 from .households import HOUSEHOLD_HELD, calls_removed, group as group_households
@@ -26,7 +27,7 @@ from .validation import UnsupportedSchema, is_valid, problems
 __all__ = [
     "WaveDispatcher", "RetryPolicy", "Cancelled", "default_idempotency_key",
     "WorkItem", "ItemResult", "DispatchReport", "Resolution", "Escalation",
-    "mask", "redact_free_text",
+    "mask", "redact", "redact_free_text",
     "NO_CONSENT", "NO_VOICE_CHANNEL", "CANCELLED", "HOUSEHOLD_HELD",
     "dial_refusal",
     "NEVER_CARRIED",

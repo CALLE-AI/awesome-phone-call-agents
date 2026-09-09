@@ -1248,15 +1248,28 @@ def money_facts(run: dict) -> dict:
     }
     closed = [item for item in items
               if item.get("resolution") == "resolved" and item.get("id") not in escalating]
+    # Third copy of one definition, and the one the page's escalation prose divides by.
+    # `undetermined` covers both a person who answered and gave nothing usable and a call
+    # nobody is known to have answered, so it reads the per-row fact the receipt now
+    # records. A receipt older than that field falls back to the rule it was measured
+    # under; the recorded set has no undetermined row, so nothing published moves.
     answered = [item for item in items
-                if item.get("resolution") in ("resolved", "undetermined")]
+                if item.get("resolution") == "resolved"
+                or (item.get("resolution") == "undetermined"
+                    and item.get("spoke_to_someone", True))]
     net_new = [item for item in items
                if item.get("resolution") == "resolved" and item.get("id") in escalating]
     # Every escalating row, not only the net-new ones. The page said "0 of 7 answered
     # calls became new work" a short scroll below a queue showing four rows marked
     # safeguarding, and reconciling the two meant reading this file.
     escalated_rows = [item for item in items if item.get("id") in escalating]
-    removed = sum(item.get("attempts", 0) for item in closed)
+    # Restricted to attempts this run placed, because the `placed` figure beside it comes
+    # from the receipt's `calls_placed`, which excludes replays on purpose: an attempt an
+    # idempotency key replayed was not billed. Summing every attempt here and dividing by a
+    # billed-only denominator put replays in one half of the ratio and not the other, and
+    # on a partly replayed run that overstates the ceiling threefold.
+    removed = sum(item.get("attempts", 0) for item in closed
+                  if item.get("placed_by_this_run") is True)
 
     # Every figure on this band, from the module that owns the arithmetic. This function
     # used to do its own division for its own receipt, which is how the mismatched
@@ -1356,9 +1369,8 @@ def _money_key_block(f: dict) -> str:
             'Which of those two a district is living in is what the first week of a pilot '
             'measures, and nothing before that week can settle it. ')
 
-    worse, widest, how_many = "", "", "two"
+    worse, widest = "", ""
     if pooled.get("escalated_bound") is not None and pooled.get("escalated"):
-        how_many = "three"
         worse = (
             '<div><dt>The same bound if every escalation is a callback</dt>'
             f'<dd>{100 * pooled["escalated_bound"]:.0f} per 100</dd></div>')
@@ -1369,17 +1381,16 @@ def _money_key_block(f: dict) -> str:
             f'{100 * pooled["escalated_bound"]:.0f} that this many calls cannot rule out, '
             f'both above the {pooled["crossover_per_100"]:.1f} where the saving stops, so '
             'on that assumption this is a cost and not a saving. ')
-    return (
-        '<dl class=money-key>'
+    rows = [
         # "The most", not "what it can save". The README calls this figure a ceiling and
         # not a saving, eighty lines from where the card's largest label promised one, and
         # a reviewer read the label rather than the qualification. A ceiling is the honest
         # word for a number computed by pricing every removed attempt at a desk rate
         # nobody has audited, so the label says it.
         '<div><dt>The most one call can save</dt>'
-        f'<dd>${pooled["net_ceiling"]:,.2f}</dd></div>'
+        f'<dd>${pooled["net_ceiling"]:,.2f}</dd></div>',
         '<div><dt>Where that becomes a loss</dt>'
-        f'<dd>{pooled["crossover_per_100"]:.1f} per 100 answered calls</dd></div>'
+        f'<dd>{pooled["crossover_per_100"]:.1f} per 100 answered calls</dd></div>',
         # The answered count, not the placed one. The bound is a rate per answered call,
         # computed in money_across_runs.figures_for from `answered`, and one of the calls
         # reached nobody. This card said twelve for a figure over eleven, which is the same
@@ -1390,9 +1401,24 @@ def _money_key_block(f: dict) -> str:
         # cannot rule out about escalations, and the escalation rate this run measured is
         # already twice that. The row under it is that rate's own bound.
         f'<div><dt>What {pooled["answered"]} answered calls cannot rule out</dt>'
-        f'<dd>{100 * pooled["net_new_bound"]:.0f} net-new per 100</dd></div>'
-        + worse +
-        '</dl>'
+        f'<dd>{100 * pooled["net_new_bound"]:.0f} net-new per 100</dd></div>',
+    ]
+    if worse:
+        rows.append(worse)
+
+    # Counted off the rows rather than set beside the branch that adds one. The literal
+    # and the fourth row were assigned inside the same `if`, so the foot and the card
+    # could not disagree, and the gate written to catch a disagreement could not fail:
+    # its own docstring claimed it would read "these three rates" over two rows, and
+    # only editing this file's literals could produce that. A count taken off the rows
+    # can be wrong, which is what makes checking it worth anything.
+    how_many = ("no", "one", "two", "three", "four", "five", "six")[
+        sum(1 for row in rows if "per 100" in row)]
+
+    return (
+        '<dl class=money-key>'
+        + "".join(rows)
+        + '</dl>'
         '<p class=money-key-foot>The sample is every call this software has placed, which '
         f'is the one denominator on this page nobody chose, and these {how_many} rates '
         'are per answered call, because one of those calls reached nobody. '

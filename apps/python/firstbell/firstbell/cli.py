@@ -37,6 +37,7 @@ from dispatch import (
     WaveDispatcher,
     default_idempotency_key,
     dial_refusal,
+    redact,
     redact_free_text,
 )
 
@@ -263,6 +264,15 @@ def build_parser() -> argparse.ArgumentParser:
                              "row names one in a consent_record column: a row that "
                              "points at a record and is checked against nothing looks "
                              "better documented than a boolean row and is not.")
+    parser.add_argument("--column-map", default=None, metavar="JSON",
+                        help="The district's own column names, as one JSON object of "
+                             '{target: [source, ...]}, for example \'{"id": '
+                             '["pupil_ref"], "phones": ["guardian_number"]}\'. Use it when '
+                             "an export is not one of the built-in formats. Three refusals "
+                             "have always told operators to pass this and it was never "
+                             "registered as a flag, so following the advice printed by the "
+                             "tool produced an argparse error and there was no second "
+                             "route short of renaming a vendor's columns by hand.")
     parser.add_argument("--escalation-annual", type=float, default=None,
                         help="Annual cost of the post that answers a safeguarding "
                              "callback. Defaults to a sourced US school counsellor "
@@ -468,11 +478,22 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 # True placed, False replayed by an idempotency key, null undetermined.
                 # A receipt that counted a replay as a call would overstate the cost.
                 "placed_by_this_run": r.placed_by_this_run,
+                # Whether a conversation happened, which the resolution cannot say:
+                # "undetermined" covers both a person who picked up and gave an
+                # unusable answer and a call nobody is known to have answered. Anything
+                # reading this receipt to divide by "answered" needs the first group.
+                "spoke_to_someone": r.spoke_to_someone,
                 # The flag below governs the transcript. It never governed this, and
                 # a result field holds what a person said, so it can hold a number.
                 "structured_result": redact_free_text(r.structured_result),
                 "failure_code": r.failure_code,
-                "reason": r.reason,
+                # Redacted at the sink as well as where each one is built. Three separate
+                # `reason` strings have now had to be fixed for quoting a number back, and
+                # the third was found beside this line, one below a field redacted for the
+                # same reason. Every construction that reaches here is somebody remembering;
+                # this is the one that does not have to be remembered. `redact` leaves an
+                # already-masked string alone, so the two layers do not fight.
+                "reason": redact(r.reason),
                 # Redacted the same way the structured result is. The rule for that field
                 # is written as "a structured result is CALL-E's account of what a person
                 # said, so any field of it can carry a number the caller read out", and a
@@ -577,31 +598,54 @@ def main(argv: list[str] | None = None) -> int:
     # `args.work_file`, which is None on the drop path, so a receipt would have recorded
     # `"work_file": "None"` and the ceiling refusal would have told an operator to go and
     # check a file called None.
+    # Both of these are loaded before either source is built, and not inside one branch of
+    # the choice below. They used to sit in the `--work-file` arm, so the unattended path
+    # parsed `--consent-records` and threw it away, then refused every row that named a
+    # record with the words "Pass --consent-records". The operator had done that. A district
+    # automating this is the one most likely to have both a register and a vendor's own
+    # column names, so the drop is the last path that should be missing them.
+    register = None
+    if args.consent_records is not None:
+        # A failure here stops the run. A register this cannot parse is a document somebody
+        # has to look at, and dialling the rows it happened to understand would be calling
+        # families on the strength of a file nobody trusts.
+        if not args.consent_records.is_file():
+            print(f"no consent register at {args.consent_records}", file=sys.stderr)
+            return 2
+        try:
+            register = load_register(
+                json.loads(args.consent_records.read_text(encoding="utf-8")),
+                args.consent_records.name)
+        except (json.JSONDecodeError, RegisterError) as bad:
+            print(f"the consent register is unusable: {bad}", file=sys.stderr)
+            return 2
+
+    column_map = None
+    if args.column_map is not None:
+        try:
+            raw = json.loads(args.column_map)
+        except json.JSONDecodeError as bad:
+            print(f"--column-map is not valid JSON: {bad}", file=sys.stderr)
+            return 2
+        if not isinstance(raw, dict) or not all(
+                isinstance(v, (list, tuple)) for v in raw.values()):
+            print("--column-map is one JSON object of {target: [source, ...]}, for example "
+                  '\'{"id": ["pupil_ref"], "phones": ["guardian_number"]}\'',
+                  file=sys.stderr)
+            return 2
+        column_map = {str(k): tuple(str(one) for one in v) for k, v in raw.items()}
+
     if args.work_drop is not None:
-        source = DropSource(args.work_drop, max_age_hours=args.drop_max_age_hours)
+        source = DropSource(args.work_drop, max_age_hours=args.drop_max_age_hours,
+                            consent_register=register, column_map=column_map)
         try:
             came_from = str(source.newest())
         except SourceError as err:
             print(f"Could not read the work file: {err}", file=sys.stderr)
             return 2
     else:
-        register = None
-        if args.consent_records is not None:
-            # Loaded before the work file, and a failure here stops the run. A register
-            # this cannot parse is a document somebody has to look at, and dialling the
-            # rows it happened to understand would be calling families on the strength
-            # of a file nobody trusts.
-            if not args.consent_records.is_file():
-                print(f"no consent register at {args.consent_records}", file=sys.stderr)
-                return 2
-            try:
-                register = load_register(
-                    json.loads(args.consent_records.read_text(encoding="utf-8")),
-                    args.consent_records.name)
-            except (json.JSONDecodeError, RegisterError) as bad:
-                print(f"the consent register is unusable: {bad}", file=sys.stderr)
-                return 2
-        source = CsvSource(args.work_file, consent_register=register)
+        source = CsvSource(args.work_file, consent_register=register,
+                           column_map=column_map)
         came_from = str(args.work_file)
     try:
         items = list(source.items())
@@ -717,6 +761,12 @@ def main(argv: list[str] | None = None) -> int:
             # which is the reading a district buyer caught.
             "net_new_escalations": summary.net_new_escalations,
             "answered_calls": summary.answered,
+            # Every escalating call, not only the net-new ones. `tools/money_across_runs.py`
+            # has always read `escalated_calls` off this payload and nothing has ever
+            # written it, so on the `--json` branch the worst-case column was silently
+            # blank for every offline row while the receipt branch computed it correctly:
+            # one table, two rules, and the blank one gave no sign it was blank.
+            "escalated_calls": summary.escalated,
             "escalation_cost_per_call_lead_minute":
                 summary.escalation_cost_per_call_lead_minute,
             # Which paperwork each dialled row rested on. The human summary has said this
@@ -767,6 +817,11 @@ def main(argv: list[str] | None = None) -> int:
                         "attempts": r.attempts_made,
                         "call_id": r.call_id,
                         "placed_by_this_run": r.placed_by_this_run,
+                # Whether a conversation happened, which the resolution cannot say:
+                # "undetermined" covers both a person who picked up and gave an
+                # unusable answer and a call nobody is known to have answered. Anything
+                # reading this receipt to divide by "answered" needs the first group.
+                "spoke_to_someone": r.spoke_to_someone,
                     }
                     for r in report.results
                     if r.resolution is not Resolution.SKIPPED and r.attempts_made
@@ -820,7 +875,7 @@ def _print_human(report: DispatchReport, summary, safeguarding_minutes: int) -> 
             marker = "HUMAN"
         if result.escalation is not Escalation.NONE:
             marker = result.escalation.value.upper()[:5]
-        print(f"  [{marker:5s}] {result.item.id:12s} {result.reason}")
+        print(f"  [{marker:5s}] {result.item.id:12s} {redact(result.reason)}")
 
     # Calls this run placed and cannot account for.
     #
@@ -900,7 +955,7 @@ def _print_human(report: DispatchReport, summary, safeguarding_minutes: int) -> 
                   f"{safeguarding_minutes} minutes ({whose}).")
         for result in queue:
             flag = "!! " if result.escalation is not Escalation.NONE else "   "
-            print(f"  {flag}{result.item.id:12s} {result.reason}")
+            print(f"  {flag}{result.item.id:12s} {redact(result.reason)}")
 
 
 if __name__ == "__main__":

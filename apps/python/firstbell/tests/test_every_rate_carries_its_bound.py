@@ -314,3 +314,38 @@ def test_the_card_foot_counts_the_rates_it_actually_prints():
     assert claimed == len(rates), (
         f"the foot claims {claimed} rates and the card prints {len(rates)}: "
         + "; ".join(re.sub(r"<[^>]+>", "", v).strip() for v in rates))
+
+
+def test_the_foot_counts_the_rates_on_a_card_that_prints_one_fewer():
+    """The count is only worth checking on a card whose row count can change.
+
+    The gate above reads the built page, and on this record the escalation bound always
+    prints, so the foot always says three over three rows and the comparison can only ever
+    agree. The count used to be assigned inside the same branch that added the fourth row,
+    so the two could not disagree and that gate's own docstring described a failure nothing
+    could reach.
+
+    A card built from a record with no escalations prints one rate fewer. That is the state
+    where a literal shows, so both states are checked here and the number is read off the
+    rows in each.
+    """
+    import judge_page
+
+    for escalated, expected in ((_pooled().get("escalated"), None), (0, None)):
+        pooled = dict(_pooled())
+        pooled["escalated"] = escalated
+        card = judge_page._money_key_block({"pooled": pooled})
+
+        values = re.findall(r"<dd>(.*?)</dd>", card, re.S)
+        rates = [one for one in values if "per 100" in one]
+        foot = re.search(r"these\s+(\w+)\s+rates", html.unescape(card))
+        assert foot, (
+            f"a card built with escalated={escalated} prints no count of its rates, and "
+            "that sentence is the one a reader checks the rows against")
+        claimed = SPELLED.get(foot.group(1).lower())
+        assert claimed is not None, (
+            f"the foot says {foot.group(1)!r} rates, which is not a number this can check")
+        assert claimed == len(rates), (
+            f"with escalated={escalated} the foot claims {claimed} rates and the card "
+            f"prints {len(rates)}: "
+            + "; ".join(re.sub(r"<[^>]+>", "", one).strip() for one in rates))

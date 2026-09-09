@@ -382,7 +382,7 @@ def audit_consent(items: list[dict], register: dict,
     """
     findings: list[dict] = []
     provenance = {"record": 0, "boolean": 0, "nothing": 0, "refused": 0}
-    for item in items:
+    for item in items:  # noqa: PLR1702 - one branch per thing a row can rest on
         reference = str(item.get("consent_record") or "").strip()
         numbers = parse_numbers(item.get("numbers"),
                                 f"record {item.get('id') or '?'}")
@@ -392,8 +392,27 @@ def audit_consent(items: list[dict], register: dict,
             if said:
                 findings.append({"id": item["id"], "on": f"record {reference}", "why": said})
                 provenance["refused"] += 1
-            else:
-                provenance["record"] += 1
+                continue
+            # The record stands, and the column beside it still has to be read. This used to
+            # `continue` here, which made the rule an OR where the live path is an AND:
+            # `dial_refusal` reads the dated record and then the boolean and refuses if
+            # either says no, for the reason written in its own docstring, that "a record
+            # withdrawn last week sits beside a consent column that still says yes, and
+            # reading the weaker of two answers is how somebody who asked not to be called
+            # gets called." On a row with a valid record and `consented: false` this tool
+            # answered "every call rests on a dated record" and exited 0 while firstbell
+            # answered "no recorded consent to be called". A second copy of a gate with
+            # fewer branches than the gate is the shape this project has now fixed three
+            # times.
+            if item.get("consented") is False:
+                findings.append({
+                    "id": item["id"], "on": f"record {reference} and a boolean",
+                    "why": "the dated record covers this call and the consent column says "
+                           "consent was not given. The live path refuses when either says "
+                           "no, so this call would not have been placed today."})
+                provenance["refused"] += 1
+                continue
+            provenance["record"] += 1
             continue
         if item.get("consented") is False:
             findings.append({"id": item["id"], "on": "a boolean",
@@ -413,11 +432,36 @@ def audit_consent(items: list[dict], register: dict,
     return findings, provenance
 
 
+def uncovered_count(findings: list[dict], provenance: dict[str, int]) -> int:
+    """How many calls rest on no dated consent record the register covers.
+
+    This was `len(findings) + boolean + nothing`, and the `else` branch above appends a
+    finding *and* increments `nothing`, so every row resting on nothing was counted twice:
+    two records could report three uncovered calls. It changed no exit code, because the
+    number was only ever tested for truthiness and never printed, which is exactly why it
+    survived. A count that cannot be read is a count nobody can check.
+
+    `findings` already contains one entry per refused row and one per row resting on
+    nothing. The only uncovered rows it does not contain are those resting on a bare
+    boolean, which are not refusals and get no finding.
+    """
+    return len(findings) + provenance["boolean"]
+
+
 def report(items: list[dict], filed: list[dict], findings: list[dict],
            provenance: dict[str, int]) -> str:
     counted = {"closed": 0, "escalated": 0, "undetermined": 0}
     for one in filed:
         counted[one["outcome"]] += 1
+    # The three outcomes above partition the rows and must keep summing to the total, so
+    # this is reported beside them rather than folded into one of them. A row whose every
+    # required field came back unknown files as `undetermined`, and if a child answered it
+    # is also escalated. The headline said "escalated 0" for a run whose own `--json`
+    # marked the row escalated, and the `why` sentence blamed the schema without mentioning
+    # who was on the line. This is the state of the committed receipt
+    # `04-defect-a-refusal-scored-resolved.json`, so it is not a hypothetical input.
+    alarming_but_not_filed_so = [one for one in filed
+                                 if one["escalated"] and one["outcome"] != "escalated"]
     no_result = [one for one in filed if not one["had_result"]]
     transcript_only = [one for one in no_result if one.get("had_transcript")]
 
@@ -427,6 +471,10 @@ def report(items: list[dict], filed: list[dict], findings: list[dict],
         f"  closed        {counted['closed']:>3}  a guardian confirmed they were aware",
         f"  escalated     {counted['escalated']:>3}  answered, and a person has to see it",
         f"  undetermined  {counted['undetermined']:>3}  nothing here closes the record",
+        *([f"  of those undetermined rows, {len(alarming_but_not_filed_so)} also carr"
+           f"{'ies' if len(alarming_but_not_filed_so) == 1 else 'y'} a safeguarding "
+           "signal and are marked !! in the queue below"]
+          if alarming_but_not_filed_so else []),
         "",
     ]
     if transcript_only:
@@ -440,14 +488,46 @@ def report(items: list[dict], filed: list[dict], findings: list[dict],
     # six carried the sentence "nothing here needs a person" while sitting in the queue. The
     # queue is what somebody has to do; the rest is what this filed and is printed after it,
     # under its own heading, because it is still the answer to what happened to that pupil.
+    # One pupil, two records, opposite answers. An export with the same id twice is two
+    # calls about one child, which is legitimate: a first attempt nobody answered and a
+    # second that got through. Filing one of them closed is not, because the closed pile is
+    # where a clerk stops reading, and `tools/replay_escalation.py` de-duplicates by call
+    # id for this exact reason. So both records still print, the row needing a person is
+    # the one that decides where the pupil sits, and the collision is named rather than
+    # resolved out of sight.
+    outcomes: dict[str, set[str]] = {}
+    for one in filed:
+        outcomes.setdefault(str(one["id"]), set()).add(one["outcome"])
+    split = sorted(who for who, seen in outcomes.items() if len(seen) > 1)
+
+    # Sorted on whether a person has to see it, not on the outcome word. A row can
+    # be uninformative and alarming at once: every required field came back unknown
+    # *and* a child answered. `decide` returns those two facts separately and this
+    # read only the outcome, so such a row sorted below every ordinary undetermined
+    # one, in a queue a clerk works top-down.
     order = {"escalated": 0, "undetermined": 1, "closed": 2}
-    rows = sorted(filed, key=lambda f: (order[f["outcome"]], str(f["id"])))
-    queue = [one for one in rows if one["outcome"] != "closed"]
-    closed = [one for one in rows if one["outcome"] == "closed"]
+    rows = sorted(filed, key=lambda f: (0 if f["escalated"] else 1,
+                                        order[f["outcome"]], str(f["id"])))
+    queue = [one for one in rows if one["outcome"] != "closed"
+             or str(one["id"]) in split]
+    closed = [one for one in rows if one["outcome"] == "closed"
+              and str(one["id"]) not in split]
 
     def line(one: dict) -> str:
-        mark = "!!" if one["outcome"] == "escalated" else "  "
+        # The legend defines `!!` as "a person has to see it", so it follows the
+        # escalation flag and not the outcome word. It was withheld from exactly
+        # the row that most needed it: undetermined, and a child on the line.
+        mark = "!!" if (one["escalated"] or one["outcome"] == "escalated") else "  "
         return f"  {mark} {one['id']:<12} [{one['outcome']}] {one['why']}"
+
+    if split:
+        out.append("")
+        out.append(
+            f"{len(split)} id(s) appear more than once with different outcomes: "
+            f"{', '.join(split)}. Two records for one pupil is two calls about one "
+            "child, which an export may legitimately hold. Two different answers about "
+            "one child is not something this can settle, so every record for those ids "
+            "is in the queue below and none of them is in the closed pile.")
 
     if queue:
         out.append(f"The queue, escalations first. {len(queue)} of {len(filed)} record(s) "
@@ -532,8 +612,20 @@ def main(argv=None) -> int:
               "as UTF-8, or as UTF-8 with a byte order mark, which this also reads.")
         return 3
     if not items:
-        print(f"COULD-NOT-MEASURE  {args.records} holds no call records, only blank or "
-              "commented lines.")
+        # Two messages, because one of them was wrong about half its inputs. A spreadsheet
+        # has neither blank records nor comment lines, so a district whose export produced
+        # a header and nothing under it was told its file held only those. The exit code
+        # was right and the sentence is the whole of what the district has to work from.
+        # str() first. argparse hands this back as a Path, so the first version of this
+        # branch raised AttributeError on every empty input file and turned a
+        # could-not-measure into a crash. Its own gate caught it on the first run.
+        if str(args.records).lower().endswith(".csv"):
+            print(f"COULD-NOT-MEASURE  {args.records} has a header row and nothing under "
+                  "it, so there are no calls to audit. Export the rows as well as the "
+                  "column names.")
+        else:
+            print(f"COULD-NOT-MEASURE  {args.records} holds no call records, only blank or "
+                  "commented lines.")
         return 3
 
     today = date.today()
@@ -592,7 +684,7 @@ def main(argv=None) -> int:
     # the line reading "on a boolean". It counted such a row, printed it, withheld the
     # strong sentence about it, and then exited 0, so the one machine-readable answer
     # disagreed with everything above it.
-    uncovered = len(findings) + provenance["boolean"] + provenance["nothing"]
+    uncovered = uncovered_count(findings, provenance)
     return 1 if (uncovered and args.fail_on_uncovered) else 0
 
 

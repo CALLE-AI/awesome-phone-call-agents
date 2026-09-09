@@ -172,7 +172,12 @@ class WorkItem:
     """One unit of phone work: one person to reach, however many numbers they have."""
 
     id: str
-    phones: tuple[str, ...]
+    # Kept out of the repr, here and on ItemResult below. `masked_numbers` is the only view
+    # anything serialises, so no production path formats one of these today. A repr is the
+    # sink nobody chooses: one print, one error reporter that captures locals, one pytest
+    # assertion message on a live run. The field still compares and still hashes; only the
+    # printed form loses it, and the id beside it is what makes a repr worth reading.
+    phones: tuple[str, ...] = field(repr=False)
     locale: str | None = None
     region: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
@@ -237,12 +242,22 @@ class ItemResult:
     failure_code: str | None = None
     reason: str = ""
     attempts_made: int = 0
-    numbers_tried: tuple[str, ...] = ()
-    transcript: tuple[dict[str, Any], ...] = ()
+    numbers_tried: tuple[str, ...] = field(default=(), repr=False)
+    transcript: tuple[dict[str, Any], ...] = field(default=(), repr=False)
     # True: this run placed the call. False: an idempotency key replayed an earlier one,
     # so no call was made and nothing was billed. None: the response carried no usable
     # created_at, so we do not know, and saying "placed" would be a guess.
     placed_by_this_run: bool | None = None
+    # Whether the call reached a terminal completion and a conversation therefore happened,
+    # whatever came back from it. Recorded because `UNDETERMINED` has two very different
+    # populations under one word and no field distinguished them: three of its producers
+    # mean somebody picked up and the answer was unusable, and five mean nothing is known
+    # about whether a telephone was answered at all, or no call was placed. Anything that
+    # divides by "answered" needs the first population and was being handed both.
+    #
+    # `NEVER_CARRIED` exists so "the platform refused it" is not filed as "nobody was
+    # reached". This is the same distinction on the other side of the same word.
+    spoke_to_someone: bool = False
     # Set by the caller's own rule, because what counts as unsafe to close is a property
     # of the domain and not of telephony. This package supplies the channel and the
     # default, which is that nothing escalates unless something says so.
@@ -333,7 +348,15 @@ def mask(phone: str) -> str:
 # (04) 1234-5678 or +1, 800, 555, 0199 is still caught. The comma matters: CALL-E
 # quotes the number it rejected and a vendor that groups it with commas was breaking
 # the run into pieces shorter than the floor, so none of them were masked.
-_LONG_DIGIT_RUN = re.compile(r"\+?\d[\d\s(),.\-]{5,}\d")
+#
+# The class is every non-alphanumeric character rather than a list of the ones seen so far.
+# An ASCII list was the same bug one layer up: Word and Excel autocorrect a typed hyphen to
+# an en dash between digits in several locales, a pasted number carries a zero-width space,
+# and a vendor export groups with a slash. Each of those split the run below the floor and
+# nothing was masked. Widening cannot over-mask, because `hide` below returns any run of
+# fewer than seven digits unchanged, so the floor and not the class is what protects a SIP
+# code. It stops at letters, which is what keeps "E.164" and "attempt 2 of 3" whole.
+_LONG_DIGIT_RUN = re.compile(r"\+?\d[\d\W_]{5,}\d")
 
 
 def redact(text: str) -> str:

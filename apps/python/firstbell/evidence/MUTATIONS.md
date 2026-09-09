@@ -604,6 +604,12 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 308 | Annualise the ceiling without subtracting what the calls cost, against a loss on the same line that is already stated net, which runs in this entry's favour on the one page a board reads | 1 |
 | 309 | Read the cancel flag before the first attempt only, so an item whose first attempt timed out waits out its backoff and telephones the family after the operator has pressed Ctrl-C, holding a request that may already have started that same telephone ringing | 2 |
 | 310 | Take the pair on the page's first screen off the recorded pass count rather than the tests the tree can run, which is a number the gate holding the file against the page lowers by failing, so a stale card has no value it can correct itself to | 1 |
+| 311 | Read a placed call's id out of the poll response rather than out of the create that returned it, so a body answering a poll without one produces a queue row carrying no id beside a receipt naming the call, and the row a clerk reads says nobody was telephoned | 1 |
+| 312 | Put one of two records for the same pupil in the closed pile while the other says a person has to ring back, so the pile a clerk stops reading at holds a child whose absence nobody has explained | 1 |
+| 313 | Answer a spreadsheet that exported its header and no rows with a sentence about blank and commented lines, which a spreadsheet has neither of, leaving the district the right exit code and no idea what to fix | 1 |
+| 314 | Set the count in the sentence under the money card next to the row that makes it true, so the two cannot disagree, and the gate written to catch them disagreeing cannot fail | 1 |
+| 315 | State twenty-eight unexplained absences per 1,000 as the figure to use rather than a ceiling on it, which is the sentence that stops a reader multiplying the per-call money by every absence a district records | 1 |
+| 316 | Call a string method on the path argparse hands back, so a records file with nothing in it raises rather than printing could-not-measure, which turns the one outcome this tool reserves for what it cannot judge into a traceback | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures
@@ -654,6 +660,14 @@ nothing checked a fixture's comment against the fixture, nothing checked a remai
 against the subtraction above it, and nothing recomputed the annual figure after the calls
 were paid for. Four gates were written and one was widened, and every row below is a count
 observed after that.
+
+Rows 311 to 315 came from two bug hunts whose reports arrived in halves. Two of the five
+are gates rather than code: 314 is a count spelled beside the row that made it true, so
+the sentence and the card could not disagree and the gate written to catch a disagreement
+had no reachable failure, and 315 is a hedge the gate looked for anywhere in a document
+rather than in the sentence that states the number. Both had passed every run since they
+were written. A gate with no reachable failure is worse than no gate, because the row it
+occupies in this table says something was checked.
 
 Rows 148 to 159 are the only ones in this table that were not found by reading. A probe
 fed the input path twenty-four hostile files and recorded what each one did: two crashed

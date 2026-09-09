@@ -291,7 +291,15 @@ class WaveDispatcher:
                                    f"back: {redact(failure.why)}",
                         ))
                     except Exception as exc:  # noqa: BLE001 - one item must not kill the run
-                        log.exception("item %s raised", item.id)
+                        # `log.exception` would attach the traceback, and the exception text
+                        # in it is the same string redacted four lines below before it is
+                        # allowed into the receipt. A log is not a lesser sink: this package
+                        # calls no basicConfig, so a caller that configures logging at all
+                        # gets it, and the last-chance handler is where the vendor error
+                        # quoting a rejected number arrives. Type and redacted text, no
+                        # traceback, and the item id says where to look.
+                        log.error("item %s raised %s: %s", item.id,
+                                  type(exc).__name__, redact(str(exc)))
                         report.results.append(ItemResult(
                             item=item, resolution=Resolution.FAILED,
                             reason=f"dispatcher error: {type(exc).__name__}: "
@@ -315,7 +323,12 @@ class WaveDispatcher:
                 # id belongs on the receipt whatever the operator has decided.
                 self.cancel()
                 report.cancelled = True
-                report.cancelled_after = len(collected)
+                # `cancelled_after` is not set here. It was, as `len(collected)`, and the
+                # unconditional assignment below the `with` block overwrote it on every
+                # path, so this line had no effect and described a behaviour the code did
+                # not have. `_dispatched` is the number the sentence wants anyway: an
+                # operator who interrupts wants to know how many calls went out, not how
+                # many results had been gathered when the key was pressed.
                 pool.shutdown(wait=True, cancel_futures=True)
                 for pending, waiting in futures.items():
                     if waiting.id in collected:
@@ -400,7 +413,7 @@ class WaveDispatcher:
                 self._in_flight.discard(call_id)
 
         try:
-            return self._classify(item, final)
+            return self._classify(item, final, placed_id=call_id)
         except Exception as exc:  # noqa: BLE001 - an unexpected shape, not a crash
             # A response shape _classify does not model (recipients as an object or a
             # bare string, attempts as a list of strings, and so on) used to raise out of
@@ -574,7 +587,18 @@ class WaveDispatcher:
 
     # -- the only place a meaning is assigned ----------------------------
 
-    def _classify(self, item: WorkItem, call: dict[str, Any]) -> ItemResult:
+    def _classify(self, item: WorkItem, call: dict[str, Any],
+                  placed_id: str | None = None) -> ItemResult:
+        """Read a meaning off a terminal response.
+
+        `placed_id` is the id the create returned, which the caller has and this body may
+        not. It used to be taken from the response alone, so a proxy or an off-spec body
+        answering a poll without `id` gave a queue row carrying no id, next to a receipt
+        naming the call that had been placed. A clerk reading that row does not ring the
+        family back. Every response in `evidence/api-shape.json` carries `.id` as a string,
+        so it takes a mangled body to reach; the point is that once a call is placed the id
+        does not get lost, and this was the only path that could lose it.
+        """
         self._api_responded = True
         recipients = call.get("recipients") or [{}]
         recipient = recipients[0]
@@ -582,7 +606,13 @@ class WaveDispatcher:
         tried = tuple(a.get("phone", "") for a in attempts)
         transcript = tuple(attempts[-1].get("transcript_turns", []) if attempts else ())
         base = dict(
-            item=item, call_id=call.get("id"),
+            # `placed_id` first. The previous fix reached only the case where the body
+            # carries no id; a body carrying a *different* id still won, so the receipt was
+            # written under an id this run never placed while the in-flight bookkeeping at
+            # `_poll` used the placed one, and the two never disagreed out loud. A clerk
+            # ringing that family back reads the receipt. It takes a proxy or an off-spec
+            # body to reach, which is the same reachability the docstring already claims.
+            item=item, call_id=placed_id or call.get("id"),
             provider_call_id=attempts[-1].get("provider_call_id") if attempts else None,
             attempts_made=len(attempts),
             numbers_tried=tried, transcript=transcript,
@@ -595,8 +625,28 @@ class WaveDispatcher:
         )
 
         status = call.get("status")
+
+        # Read the answer and ask the rule about it before any branch on status, not after.
+        # A status says whether the platform finished the call. It does not say what the
+        # person on the line said, and the two arrive in the same body: a call that
+        # connects, talks, and then drops carries a failure status beside a populated
+        # result. Filing that on the status alone was silent four times over. It reached
+        # neither `escalated` nor `escalated_unresolved`, so it was in no count and in no
+        # `--json`; it got no completed_at-derived thirty-minute clock; the receipt recorded
+        # `structured_result: null`, leaving the transcript, which is off by default, as the
+        # only trace of what the child said; and `needs_human` sorts escalations first, so
+        # it sat below every ordinary callback in a queue a clerk works top-down.
+        #
+        # This is the same argument `_escalation_for` is already commented with one branch
+        # further down: a malformed result that still says the serious thing is not less
+        # serious for being malformed. A failed one is not either.
+        result = self._result_for(call, recipient, len(recipients))
+        escalation = (self._escalation_for(result) if result is not None
+                      else Escalation.NONE)
+
         if call.get("_timed_out"):
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
+                              structured_result=result, escalation=escalation,
                               reason="the call did not reach a terminal status in time")
 
         if status in ("failed", "canceled"):
@@ -611,29 +661,39 @@ class WaveDispatcher:
             )
             code = call.get("failure_code") or attempt_code
             return ItemResult(**base, resolution=Resolution.FAILED, failure_code=code,
+                              structured_result=result, escalation=escalation,
                               reason=self._describe_failure(code, tried, attempt_code))
 
-        result = self._result_for(call, recipient, len(recipients))
+        # Past the status branches, the call completed. Everything below is a conversation
+        # that happened, however unusable its answer, which is what `spoke_to_someone`
+        # records and what anything dividing by "answered" actually needs. The escalation
+        # rule was asked once, above, so that every path holding a structured result gets
+        # the same answer: a malformed result that still says the serious thing is not less
+        # serious for being malformed, and it was the well-formed one that was being closed.
         if result is None:
             # Answered, talked, and still no usable answer. This is the outcome that
             # naive code loses, and it is exactly the one a person has to pick up.
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
+                              spoke_to_someone=True,
                               reason="the call completed but returned no structured result")
-
-        # Asked once, here, so that every path holding a structured result gets the same
-        # answer. A malformed result that still says the serious thing is not less serious
-        # for being malformed, and it was the well-formed one that was being closed.
-        escalation = self._escalation_for(result)
 
         found = problems(result, self._schema)
         if found:
+            # Redacted because `problems()` quotes the value it is complaining about, and
+            # these fields are filled from what a person said. A guardian reading out a
+            # callback number puts that number in an off-enum value, and this string is
+            # written to a receipt and printed. Same rule as `structured_result` beside it,
+            # applied to the sentence about it rather than only to it.
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
                               structured_result=result, escalation=escalation,
-                              reason="result did not satisfy the schema: " + "; ".join(found))
+                              spoke_to_someone=True,
+                              reason=redact("result did not satisfy the schema: "
+                                            + "; ".join(found)))
 
         if self._learned_nothing(result):
             return ItemResult(**base, resolution=Resolution.UNDETERMINED,
                               structured_result=result, escalation=escalation,
+                              spoke_to_someone=True,
                               reason="the call completed but every required field came "
                                      "back unknown")
 
@@ -643,10 +703,12 @@ class WaveDispatcher:
             # still has to see it.
             return ItemResult(**base, resolution=Resolution.RESOLVED,
                               structured_result=result, escalation=escalation,
+                              spoke_to_someone=True,
                               reason=f"schema-valid answer received, escalated as "
                                      f"{escalation.value} and not closed automatically")
 
         return ItemResult(**base, resolution=Resolution.RESOLVED, structured_result=result,
+                          spoke_to_someone=True,
                           reason="schema-valid answer received")
 
     def _escalation_for(self, result: dict[str, Any]) -> Escalation:

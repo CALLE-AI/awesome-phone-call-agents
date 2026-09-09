@@ -9,6 +9,7 @@ structured answer" problem unchanged.
 from __future__ import annotations
 
 import textwrap
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -271,6 +272,12 @@ class StaffCost:
 FIELD_CEILING = 80
 
 
+# Unicode general categories that cannot be part of a person's name and can change what an
+# instruction means: control, format, surrogate and private use, plus the two separators that
+# are line breaks by another name.
+_NOT_A_NAME = frozenset({"Cc", "Cf", "Co", "Cs", "Zl", "Zp"})
+
+
 def as_data(value: object, fallback: str) -> str:
     """One field from the work file, made safe to sit inside an instruction.
 
@@ -289,7 +296,18 @@ def as_data(value: object, fallback: str) -> str:
     the field is data.
     """
     text = str(value if value is not None else "").strip()
-    text = "".join(" " if ch.isspace() or ord(ch) < 0x20 else ch for ch in text)
+    # Every control and format character, taken from the Unicode category rather than from a
+    # range. This was `ch.isspace() or ord(ch) < 0x20`, which is the C0 block and nothing
+    # else, so DEL and the whole C1 block went through as control characters that the range
+    # simply sat below. The two that matter most here are not controls at all: `str.isspace`
+    # is false for U+200B, so a zero-width space could split a word into two the reading
+    # agent treats separately, and U+202E reverses the visual order of everything after it,
+    # so the string a roster maintainer sees and the string the model receives are different.
+    # Cs and Co are in the set for completeness: a lone surrogate or a private-use character
+    # is not a name either, and neither renders the same way twice.
+    text = "".join(
+        " " if (ch.isspace() or unicodedata.category(ch) in _NOT_A_NAME) else ch
+        for ch in text)
     text = " ".join(text.split())
     if not text:
         return fallback
@@ -409,6 +427,14 @@ class ImpactSummary:
     rate: FundingRate | None = None
     staff: StaffCost | None = None
     attempts_resolved: int = 0
+    # The same sum restricted to attempts this run actually placed. `calls_placed`
+    # counts billed attempts only, on purpose: an attempt an idempotency key replayed
+    # was not placed by this run and was not billed. `attempts_resolved` counts every
+    # attempt behind a closed record including replayed ones, which is the right number
+    # for the sentence about work removed and the wrong one to divide by billed
+    # attempts. A partly replayed run put replays in the numerator and not the
+    # denominator and reported a ceiling three times the real one.
+    attempts_resolved_billed: int = 0
     attempts_open: int = 0
     # Cases that came back schema-valid and are still not closed. Counted separately
     # because the alternative is counting them twice: once as an answer received, and
@@ -447,6 +473,11 @@ class ImpactSummary:
     # different grades: one is the desk this run clears and the other is the post this
     # run adds work to.
     escalation_staff: StaffCost | None = None
+    # The subset of `undetermined` where somebody demonstrably picked up. Added at the end
+    # of the field list, with a default, so no positional construction anywhere moves. The
+    # dispatcher sets the per-row flag this counts, and `answered` below says at length why
+    # the two halves of `undetermined` cannot share a denominator.
+    undetermined_after_a_conversation: int = 0
 
     @property
     def closed(self) -> int:
@@ -471,8 +502,22 @@ class ImpactSummary:
 
         The denominator for anything about what the escalation rule does, because a call
         nobody answered could not have confirmed or failed to confirm anything.
+
+        This used to return `resolved + undetermined`, which reads as if it says that, and
+        does not. `UNDETERMINED` has eight producers and only three of them mean somebody
+        picked up: no structured result, a result that fails the schema, and a result whose
+        every required field came back unknown. The other five are a call that never reached
+        a terminal status, a poll that could not be read back, a create whose 200 carried no
+        id, a create that ran out of attempts unanswered, and a response the classifier could
+        not read. Four of those know nothing about whether a telephone was answered and one
+        of them placed no call at all.
+
+        Counting them here understated every rate built on this, and understating the
+        safeguarding load is the direction that under-staffs a rota. It also narrowed the
+        honest-uncertainty machinery, because `upper_bound(events, trials)` with an inflated
+        `trials` returns a tighter interval than the sample earns.
         """
-        return self.resolved + self.undetermined
+        return self.resolved + self.undetermined_after_a_conversation
 
     @property
     def net_new_escalations(self) -> int:
@@ -558,7 +603,8 @@ class ImpactSummary:
         if (self.staff is None or self.escalation_staff is None
                 or not self.calls_placed or not self.answered):
             return None
-        gross = (self.attempts_resolved / self.calls_placed) * (self.staff.hourly / 60.0)
+        gross = ((self.attempts_resolved_billed / self.calls_placed)
+                 * (self.staff.hourly / 60.0))
         added = (self.escalations_total / self.calls_placed) * (
             self.escalation_staff.hourly / 60.0)
         return gross - added
@@ -623,7 +669,8 @@ class ImpactSummary:
         """
         if self.staff is None or not self.calls_placed:
             return None
-        return (self.attempts_resolved / self.calls_placed) * (self.staff.hourly / 60.0)
+        return ((self.attempts_resolved_billed / self.calls_placed)
+                * (self.staff.hourly / 60.0))
 
     @property
     def funding_recovered(self) -> float | None:
@@ -907,6 +954,11 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         contacted=counts[Resolution.RESOLVED] + counts[Resolution.UNDETERMINED],
         resolved=counts[Resolution.RESOLVED],
         undetermined=counts[Resolution.UNDETERMINED],
+        # Counted off the flag the dispatcher set, not off the resolution, because the
+        # resolution is exactly the word that cannot tell these two populations apart.
+        undetermined_after_a_conversation=sum(
+            1 for r in results
+            if r.resolution is Resolution.UNDETERMINED and r.spoke_to_someone),
         failed=counts[Resolution.FAILED],
         # Read off the code the platform returned rather than off the reason text. The
         # consent bucket next to this one has a comment about why `startswith` and not
@@ -966,6 +1018,14 @@ def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
         attempts_resolved=sum(r.attempts_made for r in results
                               if r.resolution is Resolution.RESOLVED
                               and not r.needs_a_human),
+        # `is True`, exactly as `calls_placed` buckets it above. Not `is not False`:
+        # None means the response carried no usable created_at, and the denominator
+        # already declines to count those, so counting them here would reintroduce the
+        # same mismatch one row narrower.
+        attempts_resolved_billed=sum(r.attempts_made for r in results
+                                     if r.resolution is Resolution.RESOLVED
+                                     and not r.needs_a_human
+                                     and r.placed_by_this_run is True),
         attempts_open=sum(r.attempts_made for r in results
                           if r.needs_a_human),
         resolved_by_language=resolved_by_language,

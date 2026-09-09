@@ -23,9 +23,17 @@ IN_A = "+915550000001"
 IN_B = "+915550000002"
 
 
-def _row(name: str, resolution: Resolution, escalation: Escalation) -> ItemResult:
+def _row(name: str, resolution: Resolution, escalation: Escalation,
+         spoke: bool = True) -> ItemResult:
+    """`spoke` is whether somebody picked up, which the resolution cannot say on its own.
+
+    `UNDETERMINED` covers both a person who answered and gave nothing usable and a call
+    nobody is known to have answered, so the fixture states which one each row is rather
+    than letting the denominator guess.
+    """
     return ItemResult(item=WorkItem(id=name, phones=(IN_A,)), resolution=resolution,
-                      escalation=escalation, attempts_made=1, placed_by_this_run=True)
+                      escalation=escalation, attempts_made=1, placed_by_this_run=True,
+                      spoke_to_someone=spoke)
 
 
 def _wave() -> list[ItemResult]:
@@ -35,8 +43,9 @@ def _wave() -> list[ItemResult]:
         _row("closed-1", Resolution.RESOLVED, Escalation.NONE),
         _row("closed-2", Resolution.RESOLVED, Escalation.NONE),
         _row("net-new", Resolution.RESOLVED, Escalation.SAFEGUARDING),
+        # Answered: the call connected and every required field came back unknown.
         _row("already-open", Resolution.UNDETERMINED, Escalation.SAFEGUARDING),
-        _row("nobody-home", Resolution.FAILED, Escalation.NONE),
+        _row("nobody-home", Resolution.FAILED, Escalation.NONE, spoke=False),
     ]
 
 

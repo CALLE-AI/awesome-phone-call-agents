@@ -47,15 +47,38 @@ if str(APP / "tools") not in sys.path:
 TARGET = APP / "evidence" / "recorded-calls.json"
 
 
+def dedup_key(item: dict) -> tuple[str, str] | None:
+    """What makes two receipt rows the same call.
+
+    The receipt writes two identifiers per row: `id` is the pupil, `call_id` is CALL-E's id
+    for the call. Every de-duplicator here read `id` into a variable named `call_id`, while
+    `evidence/recorded-calls.json` published `de_duplicated_by: "call id"` and the block
+    below justified its arithmetic with the same sentence. On the recorded set the two keys
+    agree, because the only rows that repeat are an idempotency replay sharing both. They
+    part company as soon as one child is telephoned twice, which `--again LABEL` exists to
+    do and which a second day's export does by itself, and then two separately billed calls
+    become one and leave `calls`, `answered`, `attempts_billed` and every derived rate.
+
+    A row that was refused before dialling has no call id and never rang. It is keyed on the
+    pupil instead, under a tag that cannot collide with a call id, so it still de-duplicates
+    against itself and never merges with a call that did ring.
+    """
+    call_id = item.get("call_id")
+    if call_id:
+        return ("call", str(call_id))
+    pupil = item.get("id")
+    return ("no-call", str(pupil)) if pupil is not None else None
+
+
 def distinct_items(receipts_dir: Path) -> list[dict]:
     """Every call that rang, once each, in the order the first receipt recorded it."""
-    seen: dict[str, dict] = {}
+    seen: dict[tuple[str, str], dict] = {}
     for path in sorted(receipts_dir.glob("0*.json")):
         run = json.loads(path.read_text(encoding="utf-8"))
         if not run.get("reached_production_api"):
             continue
         for item in run.get("items") or []:
-            key = item.get("id")
+            key = dedup_key(item)
             if key is not None and key not in seen:
                 seen[key] = item
     return list(seen.values())
@@ -80,9 +103,9 @@ def per_receipt(receipts_dir: Path) -> list[dict]:
         run = json.loads(path.read_text(encoding="utf-8"))
         if not run.get("reached_production_api"):
             continue
-        seen: dict[str, dict] = {}
+        seen: dict[tuple[str, str], dict] = {}
         for item in run.get("items") or []:
-            key = item.get("id")
+            key = dedup_key(item)
             if key is not None and key not in seen:
                 seen[key] = item
         items = list(seen.values())

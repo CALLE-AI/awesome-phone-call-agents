@@ -282,3 +282,89 @@ def test_the_error_message_that_actually_leaked_is_covered():
     assert _subscriber_part(number) not in _digits(out)
     assert "invalid_phone" in out, "the code beside the number is the useful half"
     assert "E.164" in out, "a fixed vocabulary must survive"
+
+
+# The separators a spreadsheet introduces on its own. Word and Excel autocorrect a typed
+# hyphen to an en dash between digits in several locales, a pasted number arrives carrying a
+# zero-width space, and a vendor export writes a slash. None of these are in the ASCII class
+# the implementation started with, so each one broke a number into runs under the floor and
+# nothing was masked. Held apart from SEPARATORS because that tuple is the promise the
+# docstring makes and this one is the promise it should have made.
+WIDER_SEPARATORS = ("–", "—", "−", "/", "_", "​", "·", "|")
+
+
+@pytest.mark.parametrize("sep", WIDER_SEPARATORS)
+def test_a_separator_a_spreadsheet_writes_does_not_defeat_the_mask(sep):
+    """A number grouped by a non-ASCII separator must still be masked.
+
+    The floor is what makes widening safe: `hide` refuses to mask any run carrying fewer
+    than seven digits and returns it unchanged, so admitting more separator characters can
+    only ever catch more numbers and can never mask a SIP code or an HTTP status.
+    """
+    number = india(2_390_144)
+    grouped = sep.join((number[:3], number[3:7], number[7:]))
+    message = f"invalid_phone: '{grouped}' is not a valid E.164 number"
+    out = redact(message)
+    assert _subscriber_part(number) not in _digits(out), (
+        f"a number separated by {sep!r} passed through unmasked")
+    assert "invalid_phone" in out
+
+
+def test_widening_the_class_still_refuses_to_mask_a_short_code():
+    """The guard that makes the wider class safe, asserted directly."""
+    for short in ("E.164", "SIP 486", "HTTP 503", "attempt 2 of 3"):
+        assert redact(short) == short
+
+
+def test_no_model_prints_a_raw_number_or_a_transcript_through_its_repr():
+    """A default dataclass repr is a sink nobody chose and every debugger reaches.
+
+    `masked_numbers` is the only serialised view, so no production path formats one of
+    these today. That is what makes it worth closing now rather than after: one `print`,
+    one error reporter that captures locals, or one assertion message on a live run turns
+    a latent field into a leak, and the transcript rides out with it.
+    """
+    from dispatch.models import ItemResult, Resolution, WorkItem
+
+    number = india(2_390_144)
+    item = WorkItem(id="S-1", phones=(number,))
+    said = "my mother's number is " + india(2_390_145)
+    result = ItemResult(
+        item=item, resolution=Resolution.RESOLVED,
+        numbers_tried=(number,),
+        transcript=({"speaker": "guardian", "text": said},),
+    )
+
+    for shown in (repr(item), repr(result), f"{item}", f"{result}"):
+        assert _subscriber_part(number) not in _digits(shown), (
+            "a raw telephone number reached a repr")
+        assert "mother's number" not in shown, "a transcript reached a repr"
+
+    assert "S-1" in repr(item), "the id has to survive or the repr is useless for debugging"
+
+
+def test_a_schema_complaint_does_not_carry_the_value_it_is_complaining_about():
+    """The third instance of one bug, found after two fixes of the same shape.
+
+    `problems()` names the off-enum value so an operator can see what arrived. CALL-E fills
+    these fields from what a person said, and a guardian reading out a callback number is
+    the obvious way a number lands in one. That complaint became `reason`, and `reason` was
+    written into the receipt raw, one line below `structured_result`, which is redacted for
+    exactly this reason.
+    """
+    from dispatch.scheduler import WaveDispatcher
+    from firstbell.domain import RESULT_SCHEMA
+    from dispatch.models import WorkItem
+
+    number = india(2_390_144)
+    dispatcher = WaveDispatcher(client=object(), task_builder=lambda item: "task",
+                                result_schema=RESULT_SCHEMA)
+    out = dispatcher._classify(
+        WorkItem(id="S-1", phones=("+915550000001",)),
+        {"id": "c", "status": "completed", "structured_result": {
+            "reason_category": f"ring back on {number}", "expected_return": "tomorrow"}},
+        placed_id="c")
+
+    assert _subscriber_part(number) not in _digits(out.reason), (
+        "the number the parent read out reached `reason`, which the receipt writes raw")
+    assert "reason_category" in out.reason, "the useful half of the complaint must survive"
