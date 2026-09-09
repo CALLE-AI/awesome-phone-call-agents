@@ -56,9 +56,10 @@ describe("a destination printed to a terminal is not a dialable number", () => {
   });
 
   test("any other number loses everything but its country code and last two digits", () => {
-    const masked = maskPhone("+51917919061");
-    assert.equal(masked, "+51*******61");
-    assert.ok(!masked.includes("9179190"), "the subscriber number survived masking");
+    // +44 7700 900xxx is Ofcom's drama range, reserved so it can never be dialled.
+    const masked = maskPhone("+447700900142");
+    assert.equal(masked, "+447*******42");
+    assert.ok(!masked.includes("7009001"), "the subscriber number survived masking");
   });
 
   test("two different numbers still read as different", () => {
