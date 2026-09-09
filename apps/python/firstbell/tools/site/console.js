@@ -166,3 +166,63 @@ export function mountConsoles(scope = document) {
  *
  * A module executes after the document is parsed, so the elements are there. */
 mountConsoles();
+
+/* Mark every code block that is actually cut off, so the stylesheet can show the cut.
+ *
+ * `pre { overflow-x: auto }` was the whole of the overflow handling, and on a 390px screen
+ * act 08 sliced roughly ninety console lines mid-word with nothing to say so: `OFFLINE. No
+ * telephone call will be plac`. It is not only a phone problem. At 1440px two of the cited
+ * Bureau of Labor Statistics URLs were cut in the same silent way.
+ *
+ * The attribute is set rather than the fade being unconditional, because a block that fits
+ * must not be faded: a gradient over the last two characters of a line that ends where it
+ * meant to reads as a rendering fault. With no JavaScript nothing is marked and nothing
+ * fades, which is the same content, still scrollable by touch, without a hint it does not
+ * need to be wrong about.
+ *
+ * Re-run on resize because the answer changes with the viewport, and a page rotated from
+ * landscape to portrait is exactly when the cut appears. */
+function markOverflowingBlocks() {
+  for (const block of document.querySelectorAll('pre')) {
+    const cut = block.scrollWidth > block.clientWidth + 1;
+    if (cut) block.setAttribute('data-overflowing', '');
+    else block.removeAttribute('data-overflowing');
+  }
+}
+
+markOverflowingBlocks();
+
+let overflowPass;
+addEventListener('resize', () => {
+  clearTimeout(overflowPass);
+  overflowPass = setTimeout(markOverflowingBlocks, 150);
+}, { passive: true });
+
+/* The transcript scrollers, marked the same way and for the same reason.
+ *
+ * `.turns` has a fixed `max-height` and rows of variable height, so the cut lands wherever
+ * a row happens to fall. Both columns of the duet were ending on the top third of a line
+ * of type. `data-scrollable` says the list is taller than its box; `data-at-end` says the
+ * reader has reached the bottom, and takes the fade off so the final turn is never dimmed.
+ *
+ * This lives here rather than in `player.js` because it is about the box, not the playback:
+ * a transcript nobody has pressed play on scrolls too. */
+function markScroller(list) {
+  const scrollable = list.scrollHeight > list.clientHeight + 1;
+  list.toggleAttribute('data-scrollable', scrollable);
+  const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+  list.toggleAttribute('data-at-end', atEnd);
+}
+
+for (const list of document.querySelectorAll('.turns')) {
+  markScroller(list);
+  list.addEventListener('scroll', () => markScroller(list), { passive: true });
+}
+
+addEventListener('resize', () => {
+  clearTimeout(overflowPass);
+  overflowPass = setTimeout(() => {
+    markOverflowingBlocks();
+    document.querySelectorAll('.turns').forEach(markScroller);
+  }, 150);
+}, { passive: true });

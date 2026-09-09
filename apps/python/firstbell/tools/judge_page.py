@@ -822,7 +822,13 @@ def scene_call(call: dict, has_audio: bool) -> str:
                f'{scene:.0f} seconds, because the wait between one turn and the next is '
                f'capped at {SCENE_GAP_MAX} seconds however it was spent; the timestamps are '
                'CALL-E’s own. Each field is marked at the answer it came from. CALL-E '
-               'returned all three together when the call ended.</p>')
+               'returned all three together when the call ended. The two apostrophe shapes '
+               'in the turns below are CALL-E’s too, not a typesetting fault: the agent’s '
+               'lines come back with a curly one because they are synthesised from a '
+               "script, and the guardian's come back straight because they are transcribed "
+               'from speech. Normalising them would make this transcript tidier than what '
+               'the platform returned, and every other line on this page is what it '
+               'returned.</p>')
     out.append('</div>')
     return "".join(out)
 
@@ -2922,7 +2928,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         # The directory, because neither line runs from the root of a fresh clone and
         # the page said nothing about where to be. The same defect the take-away card had,
         # on the command this act is named after.
-        '<pre>cd apps/python/firstbell\n'
+        # Focusable and named, the same way the run console below it is. A block that
+        # scrolls sideways and cannot take focus is unreachable by keyboard, and this one
+        # holds the command the act is asking a reader to run. `page.css` already lists
+        # `pre:focus-visible` in the shared focus ring, so the ring was written expecting
+        # this element to be focusable, and this was the only `<pre>` on the page that was
+        # not.
+        '<pre tabindex=0 role=region aria-label="The commands, verbatim. Scrolls sideways '
+        'on a narrow screen.">cd apps/python/firstbell\n'
         'pip install -r requirements-dev.txt\n'
         'python -m firstbell --work-file examples/absences.csv</pre>',
         # The instruction used to name a button that no longer exists, and before that it

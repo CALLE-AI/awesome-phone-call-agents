@@ -578,6 +578,20 @@ canvas[data-waveform] {
   max-width: var(--measure-ui-tight);
   scrollbar-width: thin;
 }
+/* The bottom of the scroller, drawn rather than left as a slice.
+ *
+ * `max-height` cuts at 352px, and rows are not a fixed height: a one-line English turn and
+ * a three-line Tamil one are different sizes, so no max-height can land on a row boundary.
+ * Both columns of the duet were ending on the top third of a line of type, side by side, in
+ * the one act that exists for a reader to compare them.
+ *
+ * The fade says the box has more in it. It comes off at the bottom of the scroll, so the
+ * last line of a transcript is never the dim one, and it is not applied at all to a list
+ * short enough to fit. `console.js` marks both. A mask is not motion, so reduced-motion
+ * changes nothing here. */
+.turns[data-scrollable]:not([data-at-end]) {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+}
 .turns li {
   display: grid;
   grid-template-columns: 3rem 4.5rem minmax(0, 1fr);
@@ -666,6 +680,23 @@ pre {
   font-size: var(--size-2); line-height: 1.6; overflow-x: auto;
   background: var(--paper-deep); border: 1px solid var(--line);
   padding: 1rem 1.1rem; margin: 1rem 0; max-width: 100%;
+  scrollbar-width: thin;
+}
+/* The cut, made visible on the blocks that are actually cut.
+ *
+ * The page already learned this once and only fixed it in one place: the comment at the
+ * identifier table says it "overflowed a box the reader had no way of knowing was
+ * scrollable, and the outcome column was cut mid-word at the edge". The console blocks in
+ * act 08 had the same defect and act 08 is the one titled "Run it yourself", so on a phone
+ * both of its central artifacts, the command and its output, ended mid-word with nothing
+ * saying there was more.
+ *
+ * The console is fixed-width mono and cannot reflow, so this marks the edge rather than
+ * trying to remove it. `console.js` sets the attribute only where the content really is
+ * wider than its box, which is why the rule is not on `pre` itself: a fade over a block
+ * that fits reads as a rendering fault rather than as an affordance. */
+pre[data-overflowing] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
 }
 
 /* ---- the run block ------------------------------------------------------------------- */
@@ -1378,6 +1409,27 @@ footer .source-link { margin-top: var(--space-3); }
 /* Pressed is 0.97, not 0.95. This control is 28px tall, and a scale a reader can measure
  * on a small target reads as the button breaking rather than as the button answering. */
 .replay:active { transform: scale(0.97); }
+/* The disabled state, which did not exist.
+ *
+ * `app.js` sets `disabled` on these the moment a scene stops running, and this stylesheet
+ * had no `:disabled` selector anywhere in it. `.replay` sets colour, border and
+ * `cursor: pointer` unconditionally, which overrides the browser's own greying, so "PAUSE
+ * THE TRANSCRIPT" rendered pixel for pixel like "RUN THE TRANSCRIPT AGAIN" beside it. Worse,
+ * a hover rule fires on a disabled element, so the border darkened under the pointer and
+ * promised a response that could not come. That pair is the first control a reader reaches
+ * on the first screen, and it was the first thing on the page that was not true.
+ *
+ * The ink is `--ink-3` and not the quieter `--ink-4`. WCAG exempts an inactive control from
+ * the 4.5 floor, so `--ink-4` would have been defensible, and the contrast gate measured it
+ * at 3.13 and failed the build. Carving an exemption into a gate that works, to win a
+ * slightly greyer button, is the trade this project spends its time arguing against. The
+ * state is legible without it: lighter ink, a lighter border, no hover response and no
+ * press. */
+.replay:disabled {
+  color: var(--ink-3); border-color: var(--line); cursor: default;
+}
+.replay:disabled:hover { color: var(--ink-3); border-color: var(--line); }
+.replay:disabled:active { transform: none; }
 
 /* Act 1 rides over the pinned hero, so it needs its own ground and an edge. */
 .act-01 { position: relative; z-index: 2; background: var(--paper); border-top: 1px solid var(--line); }

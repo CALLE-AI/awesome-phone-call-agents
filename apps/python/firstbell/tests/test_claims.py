@@ -1788,7 +1788,11 @@ def test_the_take_away_card_prints_commands_that_can_be_run():
 
     # Act 08 is called "Run it yourself" and printed two commands with no directory, so
     # neither ran from the root of a fresh clone. Same claim, same gate.
-    block = re.search(r"<pre>(cd [^<]*)</pre>", markup)
+    # Any attributes on the element, not a bare `<pre>`. The block gained `tabindex`,
+    # `role` and an `aria-label` when it turned out to be the one scrollable region on
+    # the page that keyboard could not reach, and this gate went blind rather than red:
+    # it stopped finding the block at all and reported that no directory was named.
+    block = re.search(r"<pre[^>]*>(cd [^<]*)</pre>", markup)
     assert block, (
         "the command block in act 08 names no directory, so a reader who clones the "
         "repository and follows it is in the wrong place for both lines")
