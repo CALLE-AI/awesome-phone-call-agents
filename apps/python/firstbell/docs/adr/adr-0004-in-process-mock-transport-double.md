@@ -29,10 +29,10 @@ Firstbell requires a high-fidelity local double that executes the official CALL-
 
 ## Decision
 
-Firstbell implements [`calle_double`](file:///D:/calle/submit/apps/python/firstbell/calle_double/) as an in-process mock transport engine and loopback HTTP server.
+Firstbell implements [`calle_double`](../../calle_double) as an in-process mock transport engine and loopback HTTP server.
 1. In-process execution: `calle_double.build_client(double)` constructs a real `calle.CalleClient` wired to `httpx.Client(transport=build_transport(double))`. No HTTP sockets or loopback listeners are opened during standard unit testing.
 2. Endpoint coverage: The double handles `POST /v1/calls`, `GET /v1/calls/{id}`, `GET /v1/calls`, `GET /v1/calls/{id}/events`, and `GET /v1/goals`. It implements regional phone validation, idempotency caching, attempt tracking, and structured result extraction.
-3. Conformance verification: [`evidence/api-shape.json`](file:///D:/calle/submit/apps/python/firstbell/evidence/api-shape.json) records every key path and JSON type observed across 11 production API responses. [`tools/double_conformance.py --check`](file:///D:/calle/submit/apps/python/firstbell/tools/double_conformance.py) executes as an automated gate, confirming that the double emits every property returned by production.
+3. Conformance verification: [`evidence/api-shape.json`](../../evidence/api-shape.json) records every key path and JSON type observed across 11 production API responses. [`tools/double_conformance.py --check`](../../tools/double_conformance.py) executes as an automated gate, confirming that the double emits every property returned by production.
 4. Packaging roadmap: Extract `calle_double` into a standalone asset with `pyproject.toml` configuration to enable direct installation across the CALL-E community.
 
 ### Architecture Diagram
@@ -72,7 +72,7 @@ def build_client(double: CalleDouble) -> calle.CalleClient: ...
 - **Description**: Replace `calls.create` and `calls.get` with mock return values.
 - **Pros**: Minimal lines of test code; quick setup.
 - **Cons**: The official SDK code is bypassed; parameter serialization is never tested; response shape mismatches pass silently.
-- **Rejection Reason**: Fails [`tests/test_sdk_is_really_running.py`](file:///D:/calle/submit/apps/python/firstbell/tests/test_sdk_is_really_running.py). Proves nothing about real integration.
+- **Rejection Reason**: Fails [`tests/test_sdk_is_really_running.py`](../../tests/test_sdk_is_really_running.py). Proves nothing about real integration.
 
 ### Alternative 2: Generic Mock Servers (Prism / WireMock)
 - **Description**: Run an external containerized mock server loaded with OpenAPI schemas.
@@ -89,7 +89,8 @@ def build_client(double: CalleDouble) -> calle.CalleClient: ...
 ## Consequences
 
 ### Positive
-- Allows full end-to-end testing of [`firstbell`](file:///D:/calle/submit/apps/python/firstbell/README.md) in 30 seconds with zero network dependency.
+- Allows full end-to-end testing of [`firstbell`](../../README.md) with no network dependency at all. The wall time is whatever the suite takes and is not
+  claimed here.
 - Verifies that `CalleClient` constructs valid requests and successfully parses vendor responses.
 - Enables reproducible edge-case simulation (such as replayed calls, timeouts, and uninformative enum values).
 - Provides a valuable testing utility for any developer building on CALL-E.
@@ -103,12 +104,12 @@ def build_client(double: CalleDouble) -> calle.CalleClient: ...
 
 ## Performance Implications
 - **CPU**: Extremely fast in-memory dictionary dispatch.
-- **Memory**: Less than 5 MB of heap memory.
+- **Memory**: The double holds the canned responses in memory, not measured.
 - **Load Time**: Sub-millisecond initialization.
 - **Network**: Zero bytes sent across the network interface during in-process tests.
 
 ## Migration Plan
-The double is already functional in [`calle_double/`](file:///D:/calle/submit/apps/python/firstbell/calle_double/). The next step is publishing it as a standalone package with dedicated distribution metadata.
+The double is already functional in [`calle_double/`](../../calle_double). The next step is publishing it as a standalone package with dedicated distribution metadata.
 
 ## Validation Criteria
 - `python tools/double_conformance.py --check` exits with status 0, proving zero missing response paths.
@@ -116,5 +117,5 @@ The double is already functional in [`calle_double/`](file:///D:/calle/submit/ap
 - `tests/test_double_guards.py` validates that all internal security and validation guards remain active.
 
 ## Related Decisions
-- [ADR-0001](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
-- [ADR-0003](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0003-controlled-wave-concurrency-and-hybrid-reconciliation.md): Controlled Wave Concurrency
+- [ADR-0001](adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
+- [ADR-0003](adr-0003-controlled-wave-concurrency-and-hybrid-reconciliation.md): Controlled Wave Concurrency

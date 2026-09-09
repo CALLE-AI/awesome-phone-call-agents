@@ -26,7 +26,7 @@ Furthermore, when a guardian answers and reports a valid reason (such as illness
 
 ## Decision
 
-Firstbell implements a tri-state resolution lifecycle in [`dispatch.models.Resolution`](file:///D:/calle/submit/apps/python/firstbell/dispatch/models.py) decoupled from an orthogonal [`dispatch.models.Escalation`](file:///D:/calle/submit/apps/python/firstbell/dispatch/models.py) axis.
+Firstbell implements a tri-state resolution lifecycle in [`dispatch.models.Resolution`](../../dispatch/models.py) decoupled from an orthogonal [`dispatch.models.Escalation`](../../dispatch/models.py) axis.
 1. `Resolution.RESOLVED`: A schema-valid structured result was returned with informative data.
 2. `Resolution.FAILED`: Telephony failed or the provider permanently rejected the request.
 3. `Resolution.UNDETERMINED`: The call connected but yielded no structured result, failed JSON schema validation, timed out, or returned only uninformative placeholders.
@@ -137,12 +137,12 @@ class ItemResult:
 
 ## Performance Implications
 - **CPU**: Negligible in-memory string checks and enum evaluations.
-- **Memory**: Less than 1 KB per `ItemResult` instance.
+- **Memory**: One small dataclass per result, not measured.
 - **Load Time**: Zero additional dependencies.
 - **Network**: Zero external requests required for resolution and escalation classification.
 
 ## Migration Plan
-The tri-state resolution engine is fully implemented in [`dispatch/models.py`](file:///D:/calle/submit/apps/python/firstbell/dispatch/models.py) and verified by [`dispatch/scheduler.py`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py). All output queues and receipts reflect the three-bucket division.
+The tri-state resolution engine is fully implemented in [`dispatch/models.py`](../../dispatch/models.py) and verified by [`dispatch/scheduler.py`](../../dispatch/scheduler.py). All output queues and receipts reflect the three-bucket division.
 
 ## Validation Criteria
 - Schema-valid results with all required fields set to "unknown" evaluate to `Resolution.UNDETERMINED`.
@@ -150,5 +150,5 @@ The tri-state resolution engine is fully implemented in [`dispatch/models.py`](f
 - Only records with `Resolution.RESOLVED` and `Escalation.NONE` decrement the manual triage backlog.
 
 ## Related Decisions
-- [ADR-0001](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
-- [ADR-0003](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0003-controlled-wave-concurrency-and-hybrid-reconciliation.md): Controlled Wave Concurrency
+- [ADR-0001](adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
+- [ADR-0003](adr-0003-controlled-wave-concurrency-and-hybrid-reconciliation.md): Controlled Wave Concurrency

@@ -29,7 +29,7 @@ cheaper than shipping a half-converted one.
 
 ### Problem Statement
 In the CALL-E telephony engine, outbound calls cannot be recalled or cancelled once `POST /v1/calls` is accepted. The platform documentation confirms that calls in flight run to completion regardless of whether the requesting application needs the outcome. Consequently, concurrency caps serve as the sole operational safety brake on dialling.
-Currently, [`dispatch.scheduler.WaveDispatcher`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py) schedules work through a Python `ThreadPoolExecutor` bounded by `concurrency` (default 3, up to 4). Each worker thread blocks on `_await_terminal(call_id)`, executing a loop that polls `calls.get(call_id)` every 2.0 seconds (`time.sleep`) up to a 600-second deadline.
+Currently, [`dispatch.scheduler.WaveDispatcher`](../../dispatch/scheduler.py) schedules work through a Python `ThreadPoolExecutor` bounded by `concurrency` (default 3, up to 4). Each worker thread blocks on `_await_terminal(call_id)`, executing a loop that polls `calls.get(call_id)` every 2.0 seconds (`time.sleep`) up to a 600-second deadline.
 In district deployments handling 500 absentees, thread-pool sleep polling presents technical liabilities:
 1. Thread starvation: OS threads remain blocked in sleep states rather than multiplexing network requests.
 2. Polling overhead: Each call lasting 40 seconds generates 20 GET requests. A 500-call run generates 10,000 HTTP requests, risking API rate limiting (`rate_limit_exceeded`).
@@ -49,7 +49,7 @@ In district deployments handling 500 absentees, thread-pool sleep polling presen
 ## Decision
 
 Firstbell adopts a Controlled Wave Concurrency model backed by a Hybrid Webhook-Polling Reconciliation Architecture.
-1. Concurrency control: The system maintains strict worker caps via [`WaveDispatcher`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py). The cap is enforced per callee rather than per request.
+1. Concurrency control: The system maintains strict worker caps via [`WaveDispatcher`](../../dispatch/scheduler.py). The cap is enforced per callee rather than per request.
 2. Webhook notification path: When `--webhook-url` is configured, CALL-E posts `call.completed` and `call.failed` events to the receiver. Receipt of an event instantly wakes the awaiting task.
 3. Authenticated re-fetch verification: Because CALL-E webhooks are unsigned, Firstbell treats the incoming webhook as a hint. Upon receiving an event, Firstbell issues a single authenticated `calls.get(call_id)` request to retrieve the canonical response directly from the platform origin.
 4. Fallback polling reconciliation: For deployments where webhooks are disabled, or when an in-flight call exceeds expected duration without an event, Firstbell runs an asynchronous reconciliation loop at extended intervals (10 to 15 seconds) as a safety backstop.
@@ -177,7 +177,7 @@ here is what you are agreeing to when you set it.
   GET, which is a load reduction on CALL-E rather than a speed-up here.
 
 ## Migration Plan
-Retain the existing `_await_terminal` polling mechanism as the standard fallback. Expose the `--webhook-url` parameter in [`firstbell/cli.py`](file:///D:/calle/submit/apps/python/firstbell/firstbell/cli.py) and wire the event receiver to wake waiting workers immediately upon webhook receipt.
+Retain the existing `_await_terminal` polling mechanism as the standard fallback. Expose the `--webhook-url` parameter in [`firstbell/cli.py`](../../firstbell/cli.py) and wire the event receiver to wake waiting workers immediately upon webhook receipt.
 
 ## Validation Criteria
 - Offline suite passes without running network listeners.
@@ -185,5 +185,5 @@ Retain the existing `_await_terminal` polling mechanism as the standard fallback
 - If webhooks fail to arrive, the reconciliation loop resolves terminal calls before timeout.
 
 ## Related Decisions
-- [ADR-0001](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
-- [ADR-0002](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0002-tri-state-call-resolution-lifecycle.md): Tri-State Call Resolution Lifecycle
+- [ADR-0001](adr-0001-native-calle-sdk-integration.md): Native CALL-E Server SDK Integration
+- [ADR-0002](adr-0002-tri-state-call-resolution-lifecycle.md): Tri-State Call Resolution Lifecycle

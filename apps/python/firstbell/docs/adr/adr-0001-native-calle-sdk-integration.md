@@ -26,9 +26,9 @@ A common shape in prototypes against a new telephony API is to shell out to an e
 
 ## Decision
 
-Firstbell integrates exclusively with the native `calle-ai` Python SDK via [`dispatch.scheduler.WaveDispatcher`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py) and [`firstbell.cli`](file:///D:/calle/submit/apps/python/firstbell/firstbell/cli.py).
+Firstbell integrates exclusively with the native `calle-ai` Python SDK via [`dispatch.scheduler.WaveDispatcher`](../../dispatch/scheduler.py) and [`firstbell.cli`](../../firstbell/cli.py).
 Firstbell rejects subprocess shelling, wrapper scripts, and CLI piping.
-The CLI establishes an explicit execution gate verifying whether the target origin matches `https://api.heycall-e.com` before permitting live API keys. When running offline, Firstbell constructs a genuine `calle.CalleClient` wired to an in-process mock transport ([`calle_double.CalleDouble`](file:///D:/calle/submit/apps/python/firstbell/calle_double/)), ensuring that request construction, payload validation, response deserialization, and error handling run CALL-E's actual library code.
+The CLI establishes an explicit execution gate verifying whether the target origin matches `https://api.heycall-e.com` before permitting live API keys. When running offline, Firstbell constructs a genuine `calle.CalleClient` wired to an in-process mock transport ([`calle_double.CalleDouble`](../../calle_double)), ensuring that request construction, payload validation, response deserialization, and error handling run CALL-E's actual library code.
 
 ### Architecture Diagram
 
@@ -85,7 +85,7 @@ class CallsResource(Protocol):
 - **Description**: Mock `calle.CalleClient` methods using `unittest.mock.MagicMock` for tests.
 - **Pros**: Easy test setup without implementing an HTTP transport double.
 - **Cons**: Fails to test whether the SDK actually parses real API response shapes; conceals syntax errors in SDK call sites; allows fake method signatures to pass CI silently.
-- **Rejection Reason**: Fails [`tests/test_sdk_is_really_running.py`](file:///D:/calle/submit/apps/python/firstbell/tests/test_sdk_is_really_running.py). Only transport-level mocking proves the SDK runtime path functions.
+- **Rejection Reason**: Fails [`tests/test_sdk_is_really_running.py`](../../tests/test_sdk_is_really_running.py). Only transport-level mocking proves the SDK runtime path functions.
 
 ## Consequences
 
@@ -103,19 +103,20 @@ class CallsResource(Protocol):
 - Upstream SDK updates could alter `CalleClient.__init__` arguments or internal httpx configuration. Mitigation: Pin dependency to exact version `calle-ai==0.7.0` in `requirements.txt`.
 
 ## Performance Implications
-- **CPU**: Minimal. Eliminates 50ms to 150ms subprocess invocation overhead per call attempt.
+- **CPU**: Calling the SDK in process removes the per attempt cost of starting a
+  subprocess. The size of that saving was never measured here, so no figure is given.
 - **Memory**: One SDK client instance per run. Shared connection pool avoids socket churn.
-- **Load Time**: Standard Python module import time (under 100ms).
+- **Load Time**: One Python module import at start up, not measured.
 - **Network**: HTTP/1.1 or HTTP/2 keep-alive connections reuse TLS sessions across requests.
 
 ## Migration Plan
-The codebase already implements native SDK usage across [`dispatch/scheduler.py`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py) and [`firstbell/cli.py`](file:///D:/calle/submit/apps/python/firstbell/firstbell/cli.py). Tests in [`tests/test_sdk_is_really_running.py`](file:///D:/calle/submit/apps/python/firstbell/tests/test_sdk_is_really_running.py) guard against regression.
+The codebase already implements native SDK usage across [`dispatch/scheduler.py`](../../dispatch/scheduler.py) and [`firstbell/cli.py`](../../firstbell/cli.py). Tests in [`tests/test_sdk_is_really_running.py`](../../tests/test_sdk_is_really_running.py) guard against regression.
 
 ## Validation Criteria
-- [`tests/test_sdk_is_really_running.py`](file:///D:/calle/submit/apps/python/firstbell/tests/test_sdk_is_really_running.py) passes, verifying `isinstance(client, calle.CalleClient)` and `type(client).__module__.startswith("calle.")`.
-- [`dispatch/scheduler.py`](file:///D:/calle/submit/apps/python/firstbell/dispatch/scheduler.py) explicitly handles `CalleAPIError`, `CalleTimeoutError`, and `CalleConnectionError`.
+- [`tests/test_sdk_is_really_running.py`](../../tests/test_sdk_is_really_running.py) passes, verifying `isinstance(client, calle.CalleClient)` and `type(client).__module__.startswith("calle.")`.
+- [`dispatch/scheduler.py`](../../dispatch/scheduler.py) explicitly handles `CalleAPIError`, `CalleTimeoutError`, and `CalleConnectionError`.
 - No `subprocess` or `os.system` calls exist in the telephony dispatch pipeline.
 
 ## Related Decisions
-- [ADR-0002](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0002-tri-state-call-resolution-lifecycle.md): Tri-State Call Resolution Lifecycle
-- [ADR-0004](file:///D:/calle/submit/apps/python/firstbell/docs/adr/adr-0004-in-process-mock-transport-double.md): In-Process Mock Transport Double
+- [ADR-0002](adr-0002-tri-state-call-resolution-lifecycle.md): Tri-State Call Resolution Lifecycle
+- [ADR-0004](adr-0004-in-process-mock-transport-double.md): In-Process Mock Transport Double
