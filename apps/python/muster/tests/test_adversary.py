@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import pytest
 
-from muster.adversary import ATTACKS, Attack, Outcome, run, run_all
+from muster.adversary import ATTACKS, FIXED_NONCE, Attack, Outcome, run, run_all
 from muster.models import Grade
+from muster.nonce import check, check_reversed
 
 #: The two the README lists as not caught, by key.
 DOCUMENTED_MISSES: frozenset[str] = frozenset({"impersonator", "synthesised"})
@@ -153,6 +154,28 @@ def test_a_documented_miss_still_confirms_life(key: str) -> None:
     assert outcome.caught is False
     assert outcome.grade is Grade.CONFIRMED_LIVE
     assert outcome.as_expected is True
+
+
+def test_the_documented_misses_answer_the_reverse_leg_as_well() -> None:
+    """Why the reverse challenge does not close either of these.
+
+    It proves attention, not identity. A relative who has understood the
+    instruction can say three words backwards as easily as the subject can, and
+    a synthesised voice is driven by whoever is reading the transcript. Both
+    attacks therefore satisfy both legs, and both still pass. Asserting it here
+    keeps the reverse leg from being read as a defence it is not."""
+    for key in sorted(DOCUMENTED_MISSES):
+        attack = next(a for a in ATTACKS if a.key == key)
+        assert check(FIXED_NONCE, attack.observations) is True
+        assert check_reversed(FIXED_NONCE, attack.observations) is True
+
+
+def test_the_recording_answers_neither_leg() -> None:
+    """The contrast that makes the point: a greeting has no way to produce
+    either recital, which is what the two legs exist to detect."""
+    attack = next(a for a in ATTACKS if a.key == "recording")
+    assert check(FIXED_NONCE, attack.observations) is False
+    assert check_reversed(FIXED_NONCE, attack.observations) is False
 
 
 def test_the_synthesised_voice_attack_says_why_it_cannot_be_caught() -> None:

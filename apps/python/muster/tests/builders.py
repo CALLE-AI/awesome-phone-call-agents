@@ -71,6 +71,7 @@ def make_observations(
         "answered_by": Endpoint.SUBJECT,
         "claimed_to_be_subject": Ternary.YES,
         "nonce_words_heard": NONCE.words,
+        "nonce_words_reversed_heard": NONCE.reversed_words,
         "weekday_heard": NONCE.weekday,
         "prompt_answers": correct_answers(prompts),
         "another_person_present": Ternary.NO,
@@ -82,6 +83,22 @@ def make_observations(
     }
     fields.update(overrides)
     return Observations(**fields)  # type: ignore[arg-type]
+
+
+def forward_only_observations(
+    prompts: tuple[KnowledgePrompt, ...] = PROMPTS,
+    **overrides: object,
+) -> Observations:
+    """A call that echoes the three words forwards and never says them back.
+
+    That is the shape a recording, or a person parroting without listening,
+    can still produce, so it is the exact call the reverse leg exists to
+    separate from a full pass. Named here rather than spelled out at each use,
+    because several suites need to build it.
+    """
+    fields: dict[str, object] = {"nonce_words_reversed_heard": ()}
+    fields.update(overrides)
+    return make_observations(prompts, **fields)
 
 
 def coached_turns() -> tuple[TranscriptTurn, ...]:

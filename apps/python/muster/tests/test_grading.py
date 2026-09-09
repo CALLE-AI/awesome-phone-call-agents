@@ -5,6 +5,10 @@ disabled subject is never failed by a machine, silence is never read as proof,
 and a relative's word is never a pass. A test that only checked grades would
 miss that, so each case asserts the named reason too — the reason is what a
 caseworker reads.
+
+The reverse leg sits between the freshness check and the knowledge checks, and
+it is what carries a confirmation now that the platform refuses to ask security
+questions at all. Its position in the order is asserted here, not assumed.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from tests.builders import (
     STREET,
     coached_turns,
     correct_answers,
+    forward_only_observations,
     make_observations,
     make_subject,
 )
@@ -332,13 +337,67 @@ def test_a_missing_self_identification_beats_a_failed_nonce() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_no_enrolled_prompts_can_only_be_weak() -> None:
-    """Nothing was asked that a stranger could not have answered."""
-    subject = make_subject(prompts=())
-    result = grade_call(make_observations(prompt_answers={}), subject=subject, asked=())
+def test_a_forward_echo_without_the_reverse_is_only_weak() -> None:
+    """The leg that separates listening from parroting.
+
+    Repeating three words forwards is within reach of a recording spliced into
+    the line, or of somebody echoing sounds without following the instruction.
+    Saying them back in reverse is not, so a call that stops after the forward
+    echo is reached and answered but one leg short."""
+    result = grade_call(forward_only_observations())
     assert result.grade is Grade.PRESUMED_LIVE_WEAK
-    assert result.reasons == ("no_knowledge_prompts_enrolled",)
-    assert result.challenges_asked == 0
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
+    assert result.nonce_ok is True
+
+
+def test_the_words_in_forward_order_do_not_satisfy_the_reverse_leg() -> None:
+    """Saying the same three words a second time is the parrot's answer, and it
+    is exactly what the reverse leg is asked to reject."""
+    result = grade_call(make_observations(nonce_words_reversed_heard=NONCE.words))
+    assert result.grade is Grade.PRESUMED_LIVE_WEAK
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
+
+
+def test_a_shuffled_reverse_reply_is_not_a_reverse_reply() -> None:
+    """Order is the whole content of the challenge; the right three words in
+    the wrong order carry none of it."""
+    result = grade_call(
+        make_observations(nonce_words_reversed_heard=("table", "yellow", "river"))
+    )
+    assert result.grade is Grade.PRESUMED_LIVE_WEAK
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
+
+
+def test_a_failed_forward_echo_beats_a_failed_reverse() -> None:
+    """Precedence: the freshness check runs first, so a call that satisfied
+    neither leg is reported as the freshness failure it is, rather than as the
+    weaker finding that somebody was reached and answered."""
+    result = grade_call(
+        make_observations(nonce_words_heard=(), nonce_words_reversed_heard=())
+    )
+    assert result.grade is Grade.UNPROVEN
+    assert result.reasons == ("freshness_challenge_failed",)
+
+
+def test_a_failed_reverse_beats_the_knowledge_challenge() -> None:
+    """Precedence the other way: the reverse leg is decided before any enrolled
+    question is scored, so a caseworker reads the leg that failed first."""
+    result = grade_call(
+        forward_only_observations(prompt_answers={"pet": PET.expected})
+    )
+    assert result.grade is Grade.PRESUMED_LIVE_WEAK
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
+    assert (result.challenges_passed, result.challenges_asked) == (1, 2)
+
+
+def test_the_reverse_leg_survives_asr_noise_and_filler() -> None:
+    """A living person saying "yellow, table, river, I think" has answered."""
+    result = grade_call(
+        make_observations(
+            nonce_words_reversed_heard=("er", "Yéllow,", "TABLE.", "river!", "I", "think")
+        )
+    )
+    assert result.grade is Grade.CONFIRMED_LIVE
 
 
 def test_a_partial_knowledge_challenge_is_weak_and_says_n_of_m() -> None:
@@ -380,10 +439,42 @@ def test_a_full_pass_is_confirmed_live() -> None:
     assert result.reasons == (
         "self_identified",
         "freshness_challenge_passed",
+        "reverse_challenge_passed",
         "knowledge_challenge_passed_2_of_2",
     )
     assert result.auto_closes is True
     assert result.stops_payment is False
+
+
+def test_both_nonce_legs_confirm_life_with_no_prompts_enrolled() -> None:
+    """The configuration the demo roster actually ships.
+
+    CALL-E's policy layer refuses to place a call that collects security-question
+    answers, so a subject may legitimately have no enrolled prompts at all. The
+    reverse leg is what carries the confirmation in that case: it proves the
+    instruction was understood, and it collects nothing personal."""
+    subject = make_subject(prompts=())
+    result = grade_call(make_observations(prompt_answers={}), subject=subject, asked=())
+    assert result.grade is Grade.CONFIRMED_LIVE
+    assert result.reasons == (
+        "self_identified",
+        "freshness_challenge_passed",
+        "reverse_challenge_passed",
+    )
+    assert result.challenges_asked == 0
+    assert result.auto_closes is True
+
+
+def test_no_enrolled_prompts_cannot_rescue_a_missing_reverse_reply() -> None:
+    """Dropping the knowledge challenge must not have made the protocol easier:
+    with nothing enrolled, the reverse leg is the only thing between a forward
+    echo and an automatic close."""
+    subject = make_subject(prompts=())
+    result = grade_call(
+        forward_only_observations(prompt_answers={}), subject=subject, asked=()
+    )
+    assert result.grade is Grade.PRESUMED_LIVE_WEAK
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
 
 
 def test_confirmed_live_survives_asr_noise_in_every_answer() -> None:
@@ -391,6 +482,7 @@ def test_confirmed_live_survives_asr_noise_in_every_answer() -> None:
     result = grade_call(
         make_observations(
             nonce_words_heard=("um", "Rivér,", "TABLE.", "yellow!", "I", "think"),
+            nonce_words_reversed_heard=("Yéllow.", "table", "RIVER!"),
             weekday_heard="Tuesday.",
             prompt_answers={"pet": " biscuit ", "street": "marlborough road"},
         )
@@ -429,6 +521,22 @@ def test_grading_does_not_touch_the_observations_it_was_given() -> None:
     grade_call(observed)
     assert observed.prompt_answers == before
     assert observed == make_observations()
+
+
+def test_a_failed_reverse_leg_is_recorded_only_in_its_reason() -> None:
+    """Characterisation of a rough edge, not an endorsement.
+
+    `Attestation` carries a `nonce_ok` field for the forward leg and no field
+    at all for the reverse one, so a call that echoed forwards and then stopped
+    is filed with `nonce_ok=True` beside a grade of PRESUMED_LIVE_WEAK. Nothing
+    is wrong with the grade and the reason string says exactly what happened,
+    but a caseworker skimming the structured fields sees only a passed nonce.
+    If the reverse leg ever gets a field of its own, this is the test that
+    should change."""
+    result = grade_call(forward_only_observations())
+    assert result.grade is Grade.PRESUMED_LIVE_WEAK
+    assert result.nonce_ok is True
+    assert result.reasons == ("reverse_challenge_not_satisfied",)
 
 
 def test_an_unreached_call_records_no_freshness_verdict() -> None:

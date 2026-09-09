@@ -63,6 +63,7 @@ def observations(call: dict[str, Any], prompts: tuple[KnowledgePrompt, ...]) -> 
         answered_by=_endpoint(result.get("answered_by")),
         claimed_to_be_subject=_ternary(result.get("claimed_to_be_subject")),
         nonce_words_heard=_strings(result.get("nonce_words_heard")),
+        nonce_words_reversed_heard=_strings(result.get("nonce_words_reversed_heard")),
         weekday_heard=str(result.get("weekday_heard", "") or ""),
         prompt_answers=answers,
         another_person_present=_ternary(result.get("another_person_present")),

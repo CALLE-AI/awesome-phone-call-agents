@@ -81,6 +81,7 @@ def grade(
         and observed.claimed_to_be_subject is Ternary.YES
     )
     nonce_ok = nonce_mod.check(issued_nonce, observed) if challenge_reached else None
+    reverse_ok = nonce_mod.check_reversed(issued_nonce, observed) if challenge_reached else None
     coached, coaching_signals = coaching.suspected(observed)
     passed, total, safe_passed = score_prompts(asked_prompts, observed)
 
@@ -93,6 +94,7 @@ def grade(
             reasons=tuple(reasons),
             evidence_quotes=observed.evidence_quotes,
             nonce_ok=nonce_ok,
+            reverse_ok=reverse_ok,
             challenges_passed=passed,
             challenges_asked=total,
             coaching_suspected=coached,
@@ -132,8 +134,18 @@ def grade(
     if nonce_ok is not True:
         return result(Grade.UNPROVEN, "freshness_challenge_failed")
 
+    # Echoing forwards is within reach of a recording. Saying the words back
+    # in reverse is not, so this is the leg that carries a confirmation.
+    if reverse_ok is not True:
+        return result(Grade.PRESUMED_LIVE_WEAK, "reverse_challenge_not_satisfied")
+
     if total == 0:
-        return result(Grade.PRESUMED_LIVE_WEAK, "no_knowledge_prompts_enrolled")
+        return result(
+            Grade.CONFIRMED_LIVE,
+            "self_identified",
+            "freshness_challenge_passed",
+            "reverse_challenge_passed",
+        )
 
     if passed < total:
         return result(
@@ -152,5 +164,6 @@ def grade(
         Grade.CONFIRMED_LIVE,
         "self_identified",
         "freshness_challenge_passed",
+        "reverse_challenge_passed",
         f"knowledge_challenge_passed_{passed}_of_{total}",
     )

@@ -61,7 +61,19 @@ def _words_match(expected: tuple[str, ...], heard: tuple[str, ...]) -> bool:
 
 
 def check(nonce: Nonce, observed: Observations) -> bool:
-    """True only when both legs of the freshness challenge were satisfied."""
+    """True only when the echo and the weekday were both satisfied."""
     if not _words_match(nonce.words, observed.nonce_words_heard):
         return False
     return normalise(observed.weekday_heard) == normalise(nonce.weekday)
+
+
+def check_reversed(nonce: Nonce, observed: Observations) -> bool:
+    """True when the three words came back in reverse order.
+
+    Echoing forwards is something a recording or an inattentive parrot can do.
+    Reversing requires having understood the instruction, so this is the
+    stronger of the two legs -- and unlike a knowledge challenge it collects no
+    personal information at all, which is what allows it to be asked on a
+    platform that refuses security questions.
+    """
+    return _words_match(nonce.reversed_words, observed.nonce_words_reversed_heard)

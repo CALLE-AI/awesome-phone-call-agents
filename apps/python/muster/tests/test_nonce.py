@@ -4,6 +4,11 @@ The nonce is the only defence against a voicemail greeting recorded in the
 subject's own voice, so these tests care about two opposite things: it must be
 strict about order, and forgiving about everything a telephone line and an ASR
 engine can mangle.
+
+It has two legs. The forward echo is the freshness proof. The reverse echo is
+the one that shows the instruction was understood rather than parroted, and it
+does that while collecting nothing about the person at all, which is why it can
+be asked on a platform that refuses security questions.
 """
 
 from __future__ import annotations
@@ -14,7 +19,7 @@ from datetime import date
 import pytest
 
 from muster.models import Nonce, Observations
-from muster.nonce import WEEKDAYS, WORD_POOL, check, mint, normalise
+from muster.nonce import WEEKDAYS, WORD_POOL, check, check_reversed, mint, normalise
 
 
 # --------------------------------------------------------------------------
@@ -69,6 +74,23 @@ def test_spoken_instruction_names_every_word_in_order() -> None:
     said = minted.spoken_instruction()
     assert "river, table, yellow" in said
     assert said.index("river") < said.index("table") < said.index("yellow")
+
+
+def test_spoken_instruction_asks_for_the_reverse_as_well() -> None:
+    """The reverse leg is only fair if the person was asked for it, and this
+    string is the only place the asking happens."""
+    minted = Nonce(words=("river", "table", "yellow"), weekday="tuesday")
+    said = minted.spoken_instruction()
+    assert "reverse order" in said
+    assert said.index("day of the week") < said.index("reverse order")
+
+
+def test_reversed_words_is_the_word_list_backwards() -> None:
+    """Stated once here so the graders and the spoken script cannot disagree
+    about which end the person is meant to start from."""
+    minted = Nonce(words=("river", "table", "yellow"), weekday="tuesday")
+    assert minted.reversed_words == ("yellow", "table", "river")
+    assert tuple(reversed(minted.reversed_words)) == minted.words
 
 
 # --------------------------------------------------------------------------
@@ -176,3 +198,99 @@ def test_check_ignores_empty_transcription_slots() -> None:
     """An ASR engine emits stray blank elements; they are not evidence either way."""
     reply = observed(("", "river", "  ", "table", "yellow"), "tuesday")
     assert check(NONCE, reply) is True
+
+
+# --------------------------------------------------------------------------
+# Checking the reverse leg
+# --------------------------------------------------------------------------
+
+
+def reversed_observed(words: tuple[str, ...]) -> Observations:
+    """Only the reverse slot is filled, so nothing here can pass by accident on
+    the strength of the forward echo."""
+    return Observations(nonce_words_reversed_heard=words)
+
+
+def test_check_reversed_passes_when_the_words_come_back_backwards() -> None:
+    assert check_reversed(NONCE, reversed_observed(("yellow", "table", "river"))) is True
+
+
+def test_check_reversed_fails_on_the_forward_order() -> None:
+    """The point of the leg. Repeating the same three words a second time is
+    what a recording or an inattentive parrot does; it is not an answer to the
+    question that was asked."""
+    assert check_reversed(NONCE, reversed_observed(("river", "table", "yellow"))) is False
+
+
+def test_check_reversed_fails_on_any_other_order() -> None:
+    assert check_reversed(NONCE, reversed_observed(("table", "yellow", "river"))) is False
+    assert check_reversed(NONCE, reversed_observed(("yellow", "river", "table"))) is False
+
+
+def test_check_reversed_tolerates_filler_around_the_sequence() -> None:
+    """Somebody working it out aloud says "er, yellow, table, river, I think"."""
+    reply = reversed_observed(("er", "yellow", "table", "river", "I", "think"))
+    assert check_reversed(NONCE, reply) is True
+
+
+def test_check_reversed_does_not_tolerate_filler_inside_the_sequence() -> None:
+    """Same rule as the forward leg: the sequence has to be contiguous, or
+    three words scattered through a long call would count as an ordered reply."""
+    assert check_reversed(NONCE, reversed_observed(("yellow", "um", "table", "river"))) is False
+
+
+def test_check_reversed_tolerates_asr_spelling_and_punctuation() -> None:
+    """An ASR quirk must never fail a living person on this leg either."""
+    assert check_reversed(NONCE, reversed_observed(("Yéllow,", "TABLE.", "river!"))) is True
+
+
+def test_check_reversed_fails_on_a_short_reply() -> None:
+    assert check_reversed(NONCE, reversed_observed(("yellow", "table"))) is False
+
+
+def test_check_reversed_fails_on_the_wrong_words() -> None:
+    assert check_reversed(NONCE, reversed_observed(("yellow", "table", "silver"))) is False
+
+
+def test_check_reversed_fails_on_empty_input() -> None:
+    """Silence is not a pass, and saying nothing when asked to reverse the words
+    is the commonest way this leg goes unanswered."""
+    assert check_reversed(NONCE, Observations()) is False
+    assert check_reversed(NONCE, reversed_observed(())) is False
+    assert check_reversed(NONCE, reversed_observed(("", "", ""))) is False
+
+
+def test_check_reversed_ignores_empty_transcription_slots() -> None:
+    reply = reversed_observed(("", "yellow", "  ", "table", "river"))
+    assert check_reversed(NONCE, reply) is True
+
+
+def test_check_reversed_reads_only_the_reverse_slot() -> None:
+    """The two legs are transcribed into separate fields. If the reverse check
+    could be satisfied by the forward field, a person who only ever echoed once
+    would pass both."""
+    spoken = Observations(nonce_words_heard=NONCE.reversed_words)
+    assert check_reversed(NONCE, spoken) is False
+
+
+def test_the_two_legs_are_independent() -> None:
+    """Each leg answers its own question, so neither can carry the other."""
+    forward_only = Observations(
+        nonce_words_heard=NONCE.words, weekday_heard=NONCE.weekday
+    )
+    assert check(NONCE, forward_only) is True
+    assert check_reversed(NONCE, forward_only) is False
+
+    reverse_only = Observations(nonce_words_reversed_heard=NONCE.reversed_words)
+    assert check(NONCE, reverse_only) is False
+    assert check_reversed(NONCE, reverse_only) is True
+
+
+def test_check_reversed_does_not_consult_the_weekday() -> None:
+    """Characterisation, not an oversight: the weekday is the freshness half of
+    the challenge and `check` already requires it. Asking for it twice would
+    fail a person twice for one mishearing."""
+    reply = Observations(
+        nonce_words_reversed_heard=NONCE.reversed_words, weekday_heard="friday"
+    )
+    assert check_reversed(NONCE, reply) is True

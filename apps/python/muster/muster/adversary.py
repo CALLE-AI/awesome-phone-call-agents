@@ -43,6 +43,7 @@ def _passing_fields(**overrides) -> dict:
         answered_by=Endpoint.SUBJECT,
         claimed_to_be_subject=Ternary.YES,
         nonce_words_heard=FIXED_NONCE.words,
+        nonce_words_reversed_heard=FIXED_NONCE.reversed_words,
         weekday_heard="Tuesday",
         prompt_answers={"first_employer": "Ashanti Goldfields"},
         another_person_present=Ternary.NO,
@@ -67,7 +68,9 @@ ATTACKS: tuple[Attack, ...] = (
         "An answering machine greets the caller by name.",
         True,
         Observations(**_passing_fields(answered_by=Endpoint.VOICEMAIL,
-                                       nonce_words_heard=(), weekday_heard="")),
+                                       nonce_words_heard=(),
+                                       nonce_words_reversed_heard=(),
+                                       weekday_heard="")),
     ),
     Attack(
         "coached", "Somebody in the room supplies the answers",

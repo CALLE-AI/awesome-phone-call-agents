@@ -116,8 +116,13 @@ class Nonce:
         listed = ", ".join(self.words)
         return (
             f"say these three words back in this order: {listed}; "
-            "then say what day of the week it is today"
+            "then say what day of the week it is today; "
+            "then say those same three words again in reverse order"
         )
+
+    @property
+    def reversed_words(self) -> tuple[str, ...]:
+        return tuple(reversed(self.words))
 
 
 @dataclass(frozen=True)
@@ -140,6 +145,7 @@ class Observations:
     answered_by: Endpoint = Endpoint.UNKNOWN
     claimed_to_be_subject: Ternary = Ternary.UNKNOWN
     nonce_words_heard: tuple[str, ...] = ()
+    nonce_words_reversed_heard: tuple[str, ...] = ()
     weekday_heard: str = ""
     prompt_answers: dict[str, str] = field(default_factory=dict)
     another_person_present: Ternary = Ternary.UNKNOWN
@@ -161,6 +167,7 @@ class Attestation:
     reasons: tuple[str, ...]
     evidence_quotes: tuple[str, ...] = ()
     nonce_ok: bool | None = None
+    reverse_ok: bool | None = None
     challenges_passed: int = 0
     challenges_asked: int = 0
     coaching_suspected: bool = False

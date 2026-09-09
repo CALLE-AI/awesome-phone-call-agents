@@ -47,6 +47,16 @@ def result_schema(prompts: tuple[KnowledgePrompt, ...]) -> dict:
                 "it is wrong or incomplete. Empty array if they said nothing back."
             ),
         },
+        "nonce_words_reversed_heard": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "The words the person said when asked to repeat them in reverse "
+                "order, in the order they said them, one per array element. "
+                "Transcribe what was actually said even if it is wrong or "
+                "incomplete. Empty array if they said nothing back."
+            ),
+        },
         "weekday_heard": {
             "type": "string",
             "description": (
@@ -113,6 +123,7 @@ def result_schema(prompts: tuple[KnowledgePrompt, ...]) -> dict:
             "answered_by",
             "claimed_to_be_subject",
             "nonce_words_heard",
+            "nonce_words_reversed_heard",
             "weekday_heard",
             "subject_reported_dead",
             "evidence_quotes",

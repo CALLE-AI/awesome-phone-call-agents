@@ -4,8 +4,8 @@ Every number here comes from a range reserved for fiction -- Ofcom's
 +44 7700 900xxx drama block and the North American 555-01xx block -- so nothing
 in this repository can dial a real person. Names are invented.
 
-The five subjects exist to exercise the five interesting outcomes, not to
-flatter the system: only one of them ends in CONFIRMED_LIVE.
+The six subjects exist to exercise the interesting outcomes, not to flatter
+the system: most of them do not close without a person.
 """
 
 from __future__ import annotations
@@ -24,20 +24,7 @@ ROSTER: tuple[Subject, ...] = (
         language="English",
         reference="PEN-1041",
         date_of_birth=date(1938, 4, 11),
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="first_employer",
-                question="What was the name of the first place you worked?",
-                expected="Ashanti Goldfields",
-                co_resident_safe=True,
-            ),
-            KnowledgePrompt(
-                prompt_id="birth_month",
-                question="Which month were you born in?",
-                expected="April",
-                co_resident_safe=False,
-            ),
-        ),
+        prompts=(),
     ),
     Subject(
         subject_id="s-1042",
@@ -46,14 +33,7 @@ ROSTER: tuple[Subject, ...] = (
         country_code="GB",
         language="English",
         reference="PEN-1042",
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="street_of_first_school",
-                question="What street was your first school on?",
-                expected="Kingsway",
-                co_resident_safe=True,
-            ),
-        ),
+        prompts=(),
     ),
     Subject(
         subject_id="s-1043",
@@ -62,14 +42,7 @@ ROSTER: tuple[Subject, ...] = (
         country_code="US",
         language="English",
         reference="PEN-1043",
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="first_pet",
-                question="What was the name of your first pet?",
-                expected="Bijou",
-                co_resident_safe=True,
-            ),
-        ),
+        prompts=(),
     ),
     Subject(
         subject_id="s-1044",
@@ -80,14 +53,7 @@ ROSTER: tuple[Subject, ...] = (
         reference="PEN-1044",
         # Enrolled as needing a person. Muster must never fail him by machine.
         accessibility=Accessibility(hearing_impaired=True),
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="first_pet",
-                question="What was the name of your first pet?",
-                expected="Rufus",
-                co_resident_safe=True,
-            ),
-        ),
+        prompts=(),
     ),
     Subject(
         subject_id="s-1046",
@@ -98,14 +64,7 @@ ROSTER: tuple[Subject, ...] = (
         reference="PEN-1046",
         # The register has recorded her death. She has not died. Under the
         # paper process she has no channel to say so.
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="first_employer",
-                question="What was the name of the first place you worked?",
-                expected="Tema Harbour Authority",
-                co_resident_safe=True,
-            ),
-        ),
+        prompts=(),
     ),
     Subject(
         subject_id="s-1045",
@@ -114,14 +73,7 @@ ROSTER: tuple[Subject, ...] = (
         country_code="GB",
         language="English",
         reference="PEN-1045",
-        prompts=(
-            KnowledgePrompt(
-                prompt_id="first_employer",
-                question="What was the name of the first place you worked?",
-                expected="Baltic Line",
-                co_resident_safe=True,
-            ),
-        ),
+        prompts=(),
     ),
 )
 

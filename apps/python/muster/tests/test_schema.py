@@ -104,9 +104,49 @@ def test_required_covers_the_fields_grading_cannot_do_without(
         "answered_by",
         "claimed_to_be_subject",
         "nonce_words_heard",
+        "nonce_words_reversed_heard",
         "weekday_heard",
         "subject_reported_dead",
     } <= set(schema["required"])
+
+
+def test_the_reverse_leg_is_transcribed_into_its_own_required_array(
+    schema: dict[str, Any],
+) -> None:
+    """The reverse echo is what carries a confirmation now that the platform
+    refuses to ask security questions, so it cannot be optional and it cannot
+    share a field with the forward echo: one slot for both would let a single
+    recital satisfy both legs."""
+    spec = schema["properties"]["nonce_words_reversed_heard"]
+    assert spec["type"] == "array"
+    assert spec["items"] == {"type": "string"}
+    assert "nonce_words_reversed_heard" in schema["required"]
+    assert "nonce_words_reversed_heard" != "nonce_words_heard"
+    assert schema["properties"]["nonce_words_heard"] != spec
+
+
+def test_the_reverse_field_asks_for_a_transcription_and_not_a_verdict(
+    schema: dict[str, Any],
+) -> None:
+    """`check_reversed` decides whether the order was right. The model is only
+    ever asked what it heard, in the order it heard it."""
+    described = schema["properties"]["nonce_words_reversed_heard"]["description"]
+    assert "reverse" in described.lower()
+    assert "in the order they said them" in described
+    assert "Transcribe what was actually said" in described
+
+
+def test_the_schema_asks_no_security_question_of_its_own(
+    schema: dict[str, Any],
+) -> None:
+    """Enrolled prompts arrive as `answer_<id>` fields and nothing else. A
+    standing security question baked into the schema would make every call
+    unplaceable, because the platform refuses to collect that at all."""
+    fixed = {
+        name for name in schema["properties"] if not name.startswith("answer_")
+    }
+    assert not any("password" in name or "security" in name for name in fixed)
+    assert not any("account" in name or "verification" in name for name in fixed)
 
 
 def test_every_property_carries_a_description(schema: dict[str, Any]) -> None:

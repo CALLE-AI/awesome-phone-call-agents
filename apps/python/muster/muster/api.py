@@ -84,6 +84,7 @@ def attest_payload(subject_id: str, scenario: str | None) -> dict:
         "grade": attestation.grade.value,
         "reasons": list(attestation.reasons),
         "nonce_ok": attestation.nonce_ok,
+        "reverse_ok": attestation.reverse_ok,
         "challenges_passed": attestation.challenges_passed,
         "challenges_asked": attestation.challenges_asked,
         "coaching_suspected": attestation.coaching_suspected,

@@ -7,6 +7,7 @@ are the safety claims from the design note, written as code:
   * Muster can confirm life; it can never confirm death.
   * Only a pass closes automatically, and nothing here stops a payment.
   * Every grade names its reason.
+  * Nothing closes on a forward echo alone; the reverse leg has to be answered.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from muster.models import (
     Subject,
     Ternary,
 )
+from muster.nonce import check_reversed
 from tests.builders import (
     NONCE,
     PROMPTS,
@@ -40,11 +42,15 @@ FATAL_VOCABULARY = ("dead", "death", "deceased", "died", "fatal", "expired")
 
 ACCESSIBILITIES = (Accessibility(), Accessibility(cognitive_impairment=True))
 
-#: A nonce reply that passes, one that is out of order, and silence.
+#: A nonce reply that passes both legs, one that echoes forwards and then
+#: stops, one that is out of order, and silence. The forward-only reply is the
+#: shape a recording can still produce, so the sweep has to contain it or the
+#: reverse invariant below would be proved against calls that never occur.
 NONCE_REPLIES = (
-    (NONCE.words, NONCE.weekday),
-    (("yellow", "river", "table"), NONCE.weekday),
-    ((), ""),
+    (NONCE.words, NONCE.weekday, NONCE.reversed_words),
+    (NONCE.words, NONCE.weekday, ()),
+    (("yellow", "river", "table"), NONCE.weekday, NONCE.reversed_words),
+    ((), "", ()),
 )
 
 PROMPT_ANSWERS = (
@@ -67,8 +73,8 @@ class GradedCall(NamedTuple):
 def every_call() -> Iterator[GradedCall]:
     """Grade the cross-product of everything a call can report.
 
-    Around two thousand calls. Cheap, deterministic, and it means an invariant
-    is checked against combinations nobody thought to write down.
+    Some tens of thousands of calls. Cheap, deterministic, and it means an
+    invariant is checked against combinations nobody thought to write down.
     """
     combinations = itertools.product(
         Endpoint,
@@ -82,7 +88,7 @@ def every_call() -> Iterator[GradedCall]:
         ACCESSIBILITIES,
     )
     for endpoint, claim, dead, wrong, distress, reply, answers, turns, access in combinations:
-        words, weekday = reply
+        words, weekday, reversed_words = reply
         subject = make_subject(accessibility=access)
         observed = make_observations(
             answered_by=endpoint,
@@ -91,6 +97,7 @@ def every_call() -> Iterator[GradedCall]:
             wrong_number=wrong,
             distress_or_confusion=distress,
             nonce_words_heard=words,
+            nonce_words_reversed_heard=reversed_words,
             weekday_heard=weekday,
             prompt_answers=answers,
             turns=turns,
@@ -147,6 +154,31 @@ def test_confirmed_live_is_impossible_when_the_freshness_challenge_failed() -> N
     for call in every_call():
         if call.attestation.nonce_ok is False:
             assert call.attestation.grade is not Grade.CONFIRMED_LIVE
+
+
+def test_confirmed_live_is_impossible_when_the_reverse_leg_was_not_satisfied() -> None:
+    """The leg that carries the confirmation.
+
+    Echoing three words forwards is within reach of a recording spliced into
+    the line. Saying them back in reverse is not, so no combination of anything
+    else a call can report may close an attestation without it -- and because it
+    collects nothing personal, it is the only challenge of that strength the
+    platform will let Muster ask."""
+    for call in every_call():
+        if not check_reversed(NONCE, call.observed):
+            assert call.attestation.grade is not Grade.CONFIRMED_LIVE
+
+
+def test_a_forward_echo_alone_never_closes_an_attestation() -> None:
+    """Stated from the other side, over the calls that actually pass the
+    freshness leg and then stop: those are exactly the recordings, and they end
+    weak rather than confirmed."""
+    seen_forward_only = 0
+    for call in every_call():
+        if call.attestation.nonce_ok is True and not check_reversed(NONCE, call.observed):
+            seen_forward_only += 1
+            assert call.attestation.grade is not Grade.CONFIRMED_LIVE
+    assert seen_forward_only > 0, "the sweep no longer contains a forward-only reply"
 
 
 def test_confirmed_live_is_impossible_without_self_identification() -> None:
