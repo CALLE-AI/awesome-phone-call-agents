@@ -28,9 +28,16 @@ def test_private_inputs_are_rejected_by_basename() -> None:
 
 def test_public_examples_and_normal_files_are_allowed() -> None:
     scanner = load_scanner()
-    assert scanner.private_staged_paths(
-        ["apps/python/redline/.env.example", "redline.scope.example.yaml", "redline.yaml"]
-    ) == []
+    assert (
+        scanner.private_staged_paths(
+            [
+                "apps/python/redline/.env.example",
+                "redline.scope.example.yaml",
+                "redline.yaml",
+            ]
+        )
+        == []
+    )
 
 
 def test_the_hook_and_scanner_ship_together() -> None:
@@ -45,9 +52,7 @@ def test_a_force_added_scope_file_is_refused_from_the_real_index(
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     (tmp_path / ".gitignore").write_text("redline.scope.yaml\n", encoding="utf-8")
     (tmp_path / "redline.scope.yaml").write_text("private\n", encoding="utf-8")
-    subprocess.run(
-        ["git", "add", "-f", "redline.scope.yaml"], cwd=tmp_path, check=True
-    )
+    subprocess.run(["git", "add", "-f", "redline.scope.yaml"], cwd=tmp_path, check=True)
 
     result = subprocess.run(
         [sys.executable, str(SCRIPT)],

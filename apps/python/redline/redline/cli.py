@@ -92,7 +92,7 @@ OnlyOption = Annotated[
 
 
 def _fail(message: str) -> None:
-    error_console.print(Text(message, style="bold red"))
+    error_console.print(Text(message, style="bold red"), soft_wrap=True)
     raise typer.Exit(code=2)
 
 
@@ -755,8 +755,11 @@ def verify(
         ),
     ] = None,
 ) -> None:
-    """Generate the fix, replay every attack against it, and report the diff."""
+    """Check the generated patch against the static contract and benign suite."""
     loaded = _load(config)
+    console.print(
+        Text("\n  evidence: static (declared policy model); no real calls", style="dim")
+    )
     scenarios = _load_scenarios(loaded, only)
     transport = MockTransport()
 
@@ -855,7 +858,10 @@ def verify(
         )
     elif verification.fully_closed:
         console.print(
-            Text("  Every attack in this run is now closed.", style="bold green")
+            Text(
+                "  All modelled findings are closed in this static run.",
+                style="bold green",
+            )
         )
     console.print()
 

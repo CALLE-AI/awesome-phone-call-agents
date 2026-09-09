@@ -1,0 +1,16 @@
+[project]
+name = "calle-python-reality-resolver"
+version = "0.0.0"
+description = "Evidence-driven decision engine for CALL-E: only escalates to a compliance-gated outbound call when a decision is genuinely uncertain."
+requires-python = ">=3.10"
+dependencies = [
+  # zoneinfo (used by compliance/time_utils.py for calling-window checks)
+  # has no bundled tz database on Windows; this supplies it. Harmless no-op
+  # on platforms that already ship system tzdata (Linux, macOS).
+  "tzdata; platform_system == 'Windows'",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
