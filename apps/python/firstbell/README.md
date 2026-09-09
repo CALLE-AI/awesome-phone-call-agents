@@ -1274,7 +1274,7 @@ is a thing you can describe well enough to be refused.
 
 ## When this was built
 
-Newly created. The first commit in this directory is `565f0d9`, 2026-09-04, and every
+Newly created. The first commit in this directory is `b668ac0`, 2026-09-04, and every
 line below it was written after that. No pre-existing project was renamed, forked or
 resubmitted, and nothing here was carried in from earlier work of mine.
 
