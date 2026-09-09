@@ -148,6 +148,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`incident-escalation-call`](skills/incident-escalation-call/) - Walks an on-call escalation ladder one phone call at a time and records an acknowledgement only when an owner and an ETA are both quoted by words the recipient spoke, then re-reads the call over a second transport before the incident is reported as owned.
 - [`partline-part-sourcing`](skills/partline-part-sourcing/) - Preview-first industrial replacement-part sourcing that calls approved suppliers for exact part identity, quantity and shipping cutoffs, then ranks evidence-backed matches and leaves purchase and alternate approval to a human.
 - [`concord-policy-audit`](skills/concord-policy-audit/) - Calls the branches an operator owns, judges each spoken answer against a written policy rubric compiled into the CALL-E result schema, and returns a branch-level gap register that carries no field capable of identifying the person who answered.
+- [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured information for RDN review and referral follow-up. See [`docs/rdn-intake-referral.md`](docs/rdn-intake-referral.md) for documentation and synthetic validation examples.
 
 ### Apps
 
