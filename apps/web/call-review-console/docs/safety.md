@@ -65,3 +65,26 @@ flagged. When `CRC_CONSOLE_TOKEN` is unset the server now generates one per
 process and prints it at startup — the model Jupyter uses. The console is never
 anonymous and never ships a fixed default, and `uvicorn crc.app:app` still works
 with no configuration at all.
+
+
+## Third pass (head 26e75cb): contact details in every written form
+
+The first sanitizer matched `\+\d{7,15}`, which is E.164 and nothing else. A
+transcript says `+1 555 010 0123`, `(555) 010-0123` or `555.010.0777`, and an
+email is a contact identifier too; none of those were caught.
+
+Candidates are now found loosely -- any run of digits and separators -- and
+classified by counting the digits in them: 7-15 is a phone and is masked,
+13-19 is card-shaped and becomes `[redacted-card]`, `nnn-nn-nnnn` becomes
+`[redacted-gov-id]`, and addresses become `[redacted-email]`.
+
+The trap in doing that is that `2026-09-04T15:03:06Z` is also eight digits with
+separators, and these snapshots are full of timestamps. Redacting them would
+corrupt every `created_at` and break the timing analysis that the whole review
+depends on. Datetimes, dates, clock times and decimals are therefore protected
+before redaction runs and restored afterwards. A dotted phone number is not
+mistaken for a decimal: a decimal may not touch another dot or digit on either
+side, so `12.5` survives and `555.010.0123` does not.
+
+`tests/test_security.py` covers seven written phone forms, emails, cards and
+government ids, and asserts that six timestamp and time forms survive.

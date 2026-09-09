@@ -211,3 +211,71 @@ def test_phone_numbers_are_masked_in_transcripts_and_results():
     for raw in ("+15550100123", "+15550100456", "+15550100999", "+15550100777"):
         assert raw not in blob, f"{raw} survived masking"
     assert "+1********23" in blob
+
+
+# --- third pass: formatted contact details, and what must survive -----------
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "+15550100123",            # E.164
+        "+1 555 010 0123",         # spaced international
+        "+1-555-010-0123",         # hyphenated international
+        "(555) 010-0123",          # national with parens
+        "555.010.0123",            # dotted
+        "555 010 0123",            # spaced national
+        "0555 010123",             # leading zero, local
+    ],
+)
+def test_every_written_phone_form_is_redacted(raw):
+    out = sanitize._redact_text(f"reach me on {raw} tomorrow")
+    assert raw not in out, f"{raw!r} survived as {out!r}"
+    assert "*" in out
+
+
+def test_emails_and_ids_are_redacted():
+    out = sanitize._redact_text("mail bob.smith+tag@mail.example.org or ssn 123-45-6789 card 4111 1111 1111 1111")
+    assert "bob.smith+tag@mail.example.org" not in out
+    assert "123-45-6789" not in out
+    assert "4111 1111 1111 1111" not in out
+    assert "[redacted-email]" in out and "[redacted-gov-id]" in out and "[redacted-card]" in out
+
+
+@pytest.mark.parametrize(
+    "keep",
+    [
+        "2026-09-04T15:03:06Z",    # the created_at on every snapshot
+        "2026-09-04T15:03:06+05:30",
+        "2026-09-04",
+        "15:03",
+        "9:30 am",
+        "12.5",
+    ],
+)
+def test_timestamps_and_times_survive_redaction(keep):
+    """A loose digit matcher would eat these; the timing analysis depends on them."""
+    assert keep in sanitize._redact_text(f"at {keep} the call ended")
+
+
+def test_findings_see_formatted_forms_too():
+    f = sanitize.findings({"t": "call (555) 010-0123 or mail a@example.net"})
+    assert f["phone"] and f["email"]
+
+
+def test_no_contact_detail_of_any_form_reaches_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr(store, "DATA", tmp_path / "data")
+    task = {
+        "object": "call_task", "id": "call_forms",
+        "created_at": "2026-09-04T15:03:06Z",
+        "task": "call (555) 010-0123 and confirm",
+        "result": {"callback": "+1 555 010 0999", "email": "ops@example.com"},
+        "recipients": [{"attempts": [{"transcript_turns": [
+            {"offset_seconds": 0, "speaker": "callee", "text": "try 555.010.0777 after 9:30 am"},
+            {"speaker": "agent", "text": "card is 4111-1111-1111-1111"}]}]}],
+    }
+    raw = store.save(task).read_text()
+    for secret in ("555) 010-0123", "555 010 0999", "ops@example.com",
+                   "555.010.0777", "4111-1111-1111-1111"):
+        assert secret not in raw, f"{secret} was written to disk"
+    assert "2026-09-04T15:03:06Z" in raw  # timestamp intact
+    assert "9:30 am" in raw               # spoken time intact
