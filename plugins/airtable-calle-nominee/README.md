@@ -4,9 +4,9 @@
 
 A workflow plugin for Airtable, built on the CALL-E Developer API. Submitted to the **Workflow Plugins** contribution area for *CALL-E: Your Code Is Calling*, targeting **Most Practical Use Case**.
 
-```bash
-./run.sh
-```
+**macOS** — double-click `Nominee.command`
+**Windows** — double-click `run.bat`
+**Anywhere** — `./run.sh`
 
 That is the whole setup. It opens the panel in your browser on **sample data**,
 so the first thing you see is the product working — no account, no API key, no
@@ -139,9 +139,9 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 
 ### 1. Start it
 
-```bash
-./run.sh
-```
+Double-click `Nominee.command` on macOS or `run.bat` on Windows. From a shell,
+`./run.sh`. All three do the same thing: find a suitable Python, start the
+panel, open your browser.
 
 Opens on **sample data**: three employers called, one contradiction routed to
 review, one employer never reached, one request skipped for having no

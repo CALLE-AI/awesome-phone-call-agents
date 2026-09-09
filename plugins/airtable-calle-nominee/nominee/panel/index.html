@@ -5,219 +5,328 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nominee</title>
 <style>
+  /* ───────────────────────────────────────────────────────────────────
+     Monochrome. No hue anywhere. Status is carried by weight, inversion
+     and rule — which also means it survives a compressed screen recording
+     and reads identically to anyone with a colour vision deficiency.
+     ─────────────────────────────────────────────────────────────────── */
   :root {
-    --ground: #ecefe9; --panel: #f7f8f4; --sunk: #e0e4da;
-    --ink: #171b13; --soft: #5b6252; --faint: #868d79;
-    --rule: #cdd2c2; --edge: #a9b099;
-    --brass: #7d6413; --brass-lit: #9a7c1c;
-    --ok: #1c6742; --warn: #94520e; --stop: #97291f; --idle: #6d7460;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --paper:  #ffffff;
+    --sunk:   #f4f4f4;
+    --ink:    #000000;
+    --g80:    #1c1c1c;
+    --g55:    #6b6b6b;
+    --g40:    #969696;
+    --g25:    #c4c4c4;
+    --rule:   #e2e2e2;
+    --edge:   #111111;
+
+    --sans: "Helvetica Neue", Helvetica, Inter, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --u: 8px;                 /* the whole layout is a multiple of this */
+    --gutter: 24px;
+  }
+  :root[data-theme="dark"], html:not([data-theme="light"]) {
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --ground: #101208; --panel: #191c12; --sunk: #22261a;
-      --ink: #e9ebdd; --soft: #9ba28a; --faint: #767d66;
-      --rule: #2e3324; --edge: #454b37;
-      --brass: #d3af56; --brass-lit: #e6c873;
-      --ok: #56b584; --warn: #d08c3e; --stop: #d4655a; --idle: #8a9179;
+    html:not([data-theme="light"]) {
+      --paper:  #000000;
+      --sunk:   #0d0d0d;
+      --ink:    #ffffff;
+      --g80:    #e8e8e8;
+      --g55:    #9a9a9a;
+      --g40:    #6e6e6e;
+      --g25:    #3d3d3d;
+      --rule:   #232323;
+      --edge:   #ededed;
+      color-scheme: dark;
     }
   }
+  html[data-theme="dark"] {
+    --paper:  #000000;
+    --sunk:   #0d0d0d;
+    --ink:    #ffffff;
+    --g80:    #e8e8e8;
+    --g55:    #9a9a9a;
+    --g40:    #6e6e6e;
+    --g25:    #3d3d3d;
+    --rule:   #232323;
+    --edge:   #ededed;
+    color-scheme: dark;
+  }
+
   * { box-sizing: border-box; }
+  html, body { background: var(--paper); }
   body {
-    margin: 0; background: var(--ground); color: var(--ink);
-    font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased;
+    margin: 0; color: var(--ink);
+    font: 400 13px/1.5 var(--sans);
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
   }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 22px 80px; }
+  .sheet { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter) 96px; }
 
-  header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
-  h1 { font-size: 17px; letter-spacing: -.01em; margin: 0; font-weight: 700; }
-  h1 small { font-weight: 400; color: var(--soft); margin-left: 10px; font-size: 13px; }
+  /* ── masthead ───────────────────────────────────────────────────── */
+  .masthead {
+    display: grid; grid-template-columns: 1fr auto; align-items: end;
+    gap: var(--gutter); padding: 40px 0 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .wordmark { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  .wordmark span {
+    display: block; font-weight: 400; font-size: 11px; color: var(--g55);
+    letter-spacing: 0.16em; text-transform: uppercase; margin-top: 5px;
+  }
+  .controls { display: flex; align-items: center; gap: 12px; }
   .mode {
-    float: right; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
-    text-transform: uppercase; padding: 4px 9px; border: 1px solid var(--edge);
-    color: var(--soft);
-  }
-  .mode.live { color: var(--stop); border-color: var(--stop); font-weight: 600; }
-
-  .bar {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    border-bottom: 1px solid var(--edge); margin-bottom: 26px;
-  }
-  .bar div { padding: 12px 14px 13px; border-left: 1px solid var(--rule); }
-  .bar div:first-child { border-left: 0; padding-left: 0; }
-  .bar dt {
-    font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
-    text-transform: uppercase; color: var(--faint); margin: 0 0 3px;
-  }
-  .bar dd {
-    margin: 0; font-family: var(--mono); font-size: 20px; font-weight: 600;
-    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
-  }
-  .bar dd.alert { color: var(--warn); }
-
-  .sect { font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
-          text-transform: uppercase; color: var(--faint); margin: 0 0 10px; }
-
-  .item { border-top: 1px solid var(--rule); padding: 14px 0; }
-  .item:last-of-type { border-bottom: 1px solid var(--rule); }
-  .item.skip { opacity: .82; }
-  .head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
-  .rid { font-family: var(--mono); font-weight: 600; font-size: 12.5px; }
-  .emp { font-weight: 600; }
-  .num { font-family: var(--mono); font-size: 12px; color: var(--soft);
-         font-variant-numeric: tabular-nums; }
-  .src { font-family: var(--mono); font-size: 10px; letter-spacing: .09em;
-         text-transform: uppercase; color: var(--faint); }
-  .why { color: var(--soft); font-size: 13px; margin: 5px 0 0; }
-
-  details { margin-top: 9px; }
-  summary {
-    cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--brass);
-    letter-spacing: .04em;
-  }
-  summary::marker { color: var(--edge); }
-  pre {
-    background: var(--sunk); border-left: 2px solid var(--edge); margin: 9px 0 0;
-    padding: 12px 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.62;
-    white-space: pre-wrap; overflow-x: auto; color: var(--ink);
-  }
-
-  .pill {
-    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
-    text-transform: uppercase; padding: 3px 8px; border: 1px solid currentColor;
+    font: 500 10px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
+    padding: 6px 9px; border: 1px solid var(--g25); color: var(--g55);
     white-space: nowrap;
   }
-  .pill.verified { color: var(--ok); }
-  .pill.partial, .pill.needs_review { color: var(--warn); }
-  .pill.not_verified, .pill.employer_unreachable, .pill.skipped { color: var(--stop); }
-  .pill.declined, .pill.pending, .pill.queued { color: var(--idle); }
-
-  .act {
-    margin-top: 26px; padding-top: 18px; border-top: 2px solid var(--ink);
-    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  .mode[data-live="true"] {
+    background: var(--ink); border-color: var(--ink);
+    color: var(--paper); font-weight: 700;
   }
-  button {
-    font: inherit; font-weight: 600; padding: 9px 18px; border: 1px solid var(--edge);
-    background: var(--panel); color: var(--ink); cursor: pointer;
+  .theme {
+    font: 500 10px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
+    padding: 6px 9px; border: 1px solid var(--g25); background: none;
+    color: var(--g55); cursor: pointer;
   }
-  button:hover { border-color: var(--soft); }
-  button.go { background: var(--brass); border-color: var(--brass); color: #fbfaf4; }
-  button.go:hover { background: var(--brass-lit); border-color: var(--brass-lit); }
-  button[disabled] { opacity: .45; cursor: not-allowed; }
-  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
-  .note { color: var(--soft); font-size: 12.5px; }
+  .theme:hover { border-color: var(--ink); color: var(--ink); }
 
-  .banner {
-    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
-    background: var(--panel); border: 1px solid var(--edge);
-    border-left: 3px solid var(--brass); padding: 13px 16px; margin: 0 0 22px;
+  /* ── metric band: hairline-divided, no cards ────────────────────── */
+  .band {
+    display: grid; grid-template-columns: 2fr repeat(4, 1fr);
+    border-bottom: 1px solid var(--ink); margin: 0 0 40px;
   }
-  .banner p { margin: 0; font-size: 13px; color: var(--soft); flex: 1 1 300px; }
-  .banner strong { color: var(--ink); }
+  .band > div {
+    padding: 18px 16px 20px; border-left: 1px solid var(--rule); min-width: 0;
+  }
+  .band > div:first-child { border-left: 0; padding-left: 0; }
+  .band dt {
+    font: 500 9.5px/1 var(--mono); letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--g40); margin: 0 0 10px;
+  }
+  .band dd {
+    margin: 0; font: 500 26px/1 var(--sans); letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+  .band dd.txt { font-size: 15px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .band dd small { font: 400 11px/1 var(--sans); color: var(--g55); letter-spacing: 0; }
+  .band dd.flag { text-decoration: underline; text-decoration-thickness: 2px;
+                  text-underline-offset: 5px; }
 
-  .setup { border: 1px solid var(--edge); background: var(--panel); padding: 20px 22px; margin-bottom: 26px; }
-  .setup h2 { font-size: 14px; margin: 0 0 4px; }
-  .setup > p { margin: 0 0 16px; color: var(--soft); font-size: 13px; }
-  .fields { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-  label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
-  label span { font-weight: 400; color: var(--faint); font-family: var(--mono); font-size: 10.5px; }
+  /* ── section rule ───────────────────────────────────────────────── */
+  .rubric {
+    display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px;
+    font: 500 10px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--g40); margin: 0 0 4px;
+  }
+  .rubric::after { content: ""; height: 1px; background: var(--rule); }
+  section + section { margin-top: 44px; }
+
+  /* ── record rows ────────────────────────────────────────────────── */
+  .row {
+    display: grid; grid-template-columns: 92px 1fr auto;
+    gap: 0 var(--gutter); align-items: start;
+    padding: 18px 0; border-bottom: 1px solid var(--rule);
+  }
+  .row:first-of-type { border-top: 1px solid var(--g25); }
+  .rid { font: 500 11.5px/1.6 var(--mono); letter-spacing: 0.02em; }
+  .who { min-width: 0; }
+  .org { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+  .meta {
+    font: 400 11px/1.7 var(--mono); color: var(--g55); margin-top: 3px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .meta .prov { text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; color: var(--g40); }
+  .say { color: var(--g55); font-size: 12.5px; margin: 8px 0 0; max-width: 62ch; }
+
+  /* status: monochrome, distinguished by fill and weight */
+  .tag {
+    font: 500 9.5px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
+    padding: 6px 9px; border: 1px solid var(--g25); color: var(--g55);
+    white-space: nowrap; align-self: start;
+  }
+  .tag[data-w="attention"] { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
+  .tag[data-w="clear"]     { border-color: var(--ink); color: var(--ink); }
+  .tag[data-w="muted"]     { border-style: dashed; }
+
+  details { margin-top: 10px; }
+  summary {
+    cursor: pointer; font: 500 10.5px/1 var(--mono); letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--g40); padding: 2px 0;
+    list-style: none; display: inline-flex; gap: 8px; align-items: center;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+"; font-size: 12px; }
+  details[open] summary::before { content: "\2212"; }
+  summary:hover { color: var(--ink); }
+  .script {
+    margin: 12px 0 0; padding: 16px 18px; background: var(--sunk);
+    border-left: 2px solid var(--ink);
+    font: 400 11.5px/1.72 var(--mono); white-space: pre-wrap;
+    overflow-x: auto; color: var(--g80);
+  }
+  .quote {
+    margin: 8px 0 0; padding-left: 14px; border-left: 1px solid var(--g25);
+    font-size: 12.5px; color: var(--g55);
+  }
+
+  /* ── notices ────────────────────────────────────────────────────── */
+  .notice {
+    display: grid; grid-template-columns: 1fr auto; gap: var(--gutter);
+    align-items: center; border: 1px solid var(--ink);
+    padding: 16px 18px; margin: 0 0 32px;
+  }
+  .notice p { margin: 0; font-size: 13px; color: var(--g55); }
+  .notice b { color: var(--ink); font-weight: 600; }
+
+  /* ── setup ──────────────────────────────────────────────────────── */
+  .setup { border: 1px solid var(--ink); padding: 26px 28px 24px; margin: 0 0 40px; }
+  .setup h2 { font-size: 14px; font-weight: 700; margin: 0 0 5px; letter-spacing: -0.01em; }
+  .setup > .lede { margin: 0 0 26px; color: var(--g55); font-size: 12.5px; max-width: 66ch; }
+  .grid {
+    display: grid; gap: 22px var(--gutter);
+    grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  }
+  label {
+    display: block; font: 500 10px/1 var(--mono); letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--g40); margin-bottom: 9px;
+  }
+  label b { color: var(--ink); font-weight: 500; }
   input {
-    width: 100%; font: 13px var(--mono); padding: 8px 10px;
-    border: 1px solid var(--edge); background: var(--ground); color: var(--ink);
+    width: 100%; font: 400 13px/1.4 var(--mono); padding: 10px 0;
+    border: 0; border-bottom: 1px solid var(--g25); background: none; color: var(--ink);
+    border-radius: 0;
   }
-  input:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
-  .help { font-size: 11.5px; color: var(--faint); margin: 5px 0 0; }
-  .help a { color: var(--brass); }
-  .setup .act { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
-  .warn { color: var(--warn); font-size: 12.5px; margin: 14px 0 0; font-family: var(--mono); }
+  input::placeholder { color: var(--g40); }
+  input:focus { outline: none; border-bottom-color: var(--ink); border-bottom-width: 2px; padding-bottom: 9px; }
+  .hint { font-size: 11px; color: var(--g40); margin: 8px 0 0; line-height: 1.5; }
+  .hint a { color: var(--ink); text-underline-offset: 2px; }
 
-  .chain { font-family: var(--mono); font-size: 11.5px; color: var(--soft); margin-top: 22px;
-           padding-top: 12px; border-top: 1px solid var(--rule); }
-  .chain.bad { color: var(--stop); font-weight: 600; }
-  .err { color: var(--stop); font-size: 13px; margin-top: 12px; }
-  .ev { font-size: 12.5px; color: var(--soft); margin: 6px 0 0; padding-left: 12px;
-        border-left: 2px solid var(--rule); font-style: italic; }
+  /* ── actions ────────────────────────────────────────────────────── */
+  .actions {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 36px; padding-top: 20px; border-top: 2px solid var(--ink);
+  }
+  .setup .actions { margin-top: 28px; padding-top: 20px; border-top-width: 1px; border-top-color: var(--rule); }
+  button {
+    font: 500 11px/1 var(--mono); letter-spacing: 0.11em; text-transform: uppercase;
+    padding: 12px 20px; border: 1px solid var(--ink); background: var(--paper);
+    color: var(--ink); cursor: pointer; border-radius: 0;
+  }
+  button:hover { background: var(--sunk); }
+  button.primary { background: var(--ink); color: var(--paper); }
+  button.primary:hover { background: var(--g80); }
+  button[disabled] { opacity: .3; cursor: not-allowed; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .say-more { font-size: 12px; color: var(--g55); }
+  .say-more.bad { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 56px; padding-top: 14px; border-top: 1px solid var(--rule);
+    font: 400 11px/1.7 var(--mono); color: var(--g40);
+    display: flex; justify-content: space-between; gap: var(--gutter); flex-wrap: wrap;
+  }
+  footer .bad { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 720px) {
+    .band { grid-template-columns: 1fr 1fr; }
+    .band > div { border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); }
+    .band > div:first-child { padding-left: 16px; }
+    .row { grid-template-columns: 1fr; gap: 10px; }
+    .notice { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <span class="mode" id="mode">…</span>
-    <h1>Nominee <small>verification of employment</small></h1>
+<div class="sheet">
+
+  <header class="masthead">
+    <h1 class="wordmark">Nominee<span>Verification of employment</span></h1>
+    <div class="controls">
+      <span class="mode" id="mode">—</span>
+      <button class="theme" id="theme" title="Light, dark, or follow the system">Auto</button>
+    </div>
   </header>
 
-  <div class="banner" id="banner" hidden>
-    <p id="banner-text"></p>
-    <button id="banner-cta">Connect my Airtable</button>
-  </div>
-
-  <section class="setup" id="setup" hidden>
-    <h2>Connect your data</h2>
-    <p>Stored in a local <code>.env</code> readable only by you. Never written to your base, never logged, never shown again.</p>
-    <div class="fields">
-      <div>
-        <label for="f-token">Airtable token <span id="s-token"></span></label>
-        <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
-        <p class="help">Needs <code>schema.bases:read</code> plus record read/write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create one</a></p>
-      </div>
-      <div>
-        <label for="f-base">Airtable base ID</label>
-        <input id="f-base" autocomplete="off" placeholder="app…">
-        <p class="help">The <code>app…</code> segment in your base URL.</p>
-      </div>
-      <div>
-        <label for="f-key">CALL-E API key <span id="s-key"></span></label>
-        <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
-        <p class="help">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Dashboard</a></p>
-      </div>
-      <div>
-        <label for="f-req">Your organisation</label>
-        <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
-        <p class="help">Spoken on every call. An unnamed caller asking about an employee is pretexting.</p>
-      </div>
-    </div>
-    <p class="warn" id="perm" hidden></p>
-    <div class="act">
-      <button class="go" id="save">Save and connect</button>
-      <button id="close-setup">Cancel</button>
-      <span class="note" id="setup-msg"></span>
-    </div>
-  </section>
-
-  <dl class="bar" id="bar">
-    <div><dt>View</dt><dd id="m-view" style="font-size:13px">—</dd></div>
+  <dl class="band" id="band">
+    <div><dt>View</dt><dd class="txt" id="m-view">—</dd></div>
     <div><dt>Will call</dt><dd id="m-call">—</dd></div>
     <div><dt>Skipped</dt><dd id="m-skip">—</dd></div>
     <div><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
     <div><dt>Estimated</dt><dd id="m-cost">—</dd></div>
   </dl>
 
+  <div class="notice" id="notice" hidden>
+    <p id="notice-text"></p>
+    <button id="notice-cta">Connect</button>
+  </div>
+
+  <section class="setup" id="setup" hidden>
+    <h2>Connect your data</h2>
+    <p class="lede">Stored in a local <code>.env</code> created readable only by you. Never written to your base, never logged, and never returned by this panel — only the last four characters are ever shown again.</p>
+    <div class="grid">
+      <div>
+        <label for="f-token">Airtable token <b id="s-token"></b></label>
+        <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
+        <p class="hint">Scope <code>schema.bases:read</code> plus record read/write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create one</a></p>
+      </div>
+      <div>
+        <label for="f-base">Airtable base</label>
+        <input id="f-base" autocomplete="off" placeholder="app…">
+        <p class="hint">The <code>app…</code> segment of your base URL.</p>
+      </div>
+      <div>
+        <label for="f-key">CALL-E key <b id="s-key"></b></label>
+        <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
+        <p class="hint">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Dashboard</a></p>
+      </div>
+      <div>
+        <label for="f-req">Your organisation</label>
+        <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
+        <p class="hint">Spoken on every call. An unnamed caller asking about an employee is pretexting.</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="save">Save and connect</button>
+      <button id="close-setup">Cancel</button>
+      <span class="say-more" id="setup-msg"></span>
+    </div>
+  </section>
+
   <section id="s-plan">
-    <p class="sect">What will be said</p>
+    <p class="rubric"><span>Will be called</span></p>
     <div id="planned"></div>
   </section>
 
   <section id="s-skip" hidden>
-    <p class="sect" style="margin-top:26px">Will not be called</p>
+    <p class="rubric"><span>Will not be called</span></p>
     <div id="skipped"></div>
   </section>
 
-  <div class="act">
+  <div class="actions">
     <button id="refresh">Preview again</button>
     <button id="open-setup">Setup</button>
-    <button id="run" class="go">Run</button>
-    <span class="note" id="hint"></span>
+    <button class="primary" id="run">Run</button>
+    <span class="say-more" id="hint"></span>
   </div>
-  <p class="err" id="err" hidden></p>
+  <p class="say-more bad" id="err" hidden></p>
 
   <section id="s-res" hidden>
-    <p class="sect" style="margin-top:30px">Results</p>
+    <p class="rubric"><span>Results</span></p>
     <div id="results"></div>
   </section>
 
-  <p class="chain" id="chain">audit: …</p>
+  <footer>
+    <span id="chain">audit —</span>
+    <span id="perm"></span>
+  </footer>
 </div>
 
 <script>
@@ -226,6 +335,15 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let VIEW = "", MODE = "fixtures", polling = null;
 
+/* Status weight, not colour. Inversion is reserved for what needs a human. */
+const WEIGHT = {
+  needs_review: "attention", partial: "attention",
+  verified: "clear",
+  not_verified: "muted", employer_unreachable: "muted",
+  declined: "muted", skipped: "muted", pending: "muted",
+};
+const ORDER = ["needs_review","partial","verified","declined","not_verified","employer_unreachable","pending","skipped"];
+
 const api = async (path, opts) => {
   const r = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN), opts);
   const j = await r.json().catch(() => ({ error: "bad response" }));
@@ -233,12 +351,27 @@ const api = async (path, opts) => {
   return j;
 };
 
-function showError(msg) {
-  const el = $("err");
-  el.hidden = !msg;
-  el.textContent = msg || "";
-}
+const showError = (msg) => { $("err").hidden = !msg; $("err").textContent = msg || ""; };
 
+/* ── theme: light / dark / follow the system ───────────────────────── */
+const THEMES = ["auto", "light", "dark"];
+function applyTheme(next) {
+  if (next === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", next);
+  $("theme").textContent = next;
+  try { localStorage.setItem("nominee-theme", next); } catch (e) { /* private window */ }
+}
+$("theme").addEventListener("click", () => {
+  const now = $("theme").textContent.trim();
+  applyTheme(THEMES[(THEMES.indexOf(now) + 1) % THEMES.length]);
+});
+(() => {
+  let saved = "auto";
+  try { saved = localStorage.getItem("nominee-theme") || "auto"; } catch (e) { /* ignore */ }
+  applyTheme(THEMES.includes(saved) ? saved : "auto");
+})();
+
+/* ── rendering ─────────────────────────────────────────────────────── */
 function renderPlan(p) {
   VIEW = p.view;
   $("m-view").textContent = p.view;
@@ -246,30 +379,33 @@ function renderPlan(p) {
   $("m-skip").textContent = p.skipped.length;
   const hid = $("m-hidden");
   hid.textContent = p.hidden;
-  hid.classList.toggle("alert", p.hidden > 0);
-  $("m-cost").textContent = "$" + p.estimated_cost_usd.toFixed(2);
+  hid.classList.toggle("flag", p.hidden > 0);
+  $("m-cost").innerHTML = "$" + p.estimated_cost_usd.toFixed(2) + " <small>est.</small>";
 
   $("planned").innerHTML = p.planned.map(x => `
-    <div class="item">
-      <div class="head">
-        <span class="rid">${esc(x.request_id)}</span>
-        <span class="emp">${esc(x.employer)}</span>
-        <span class="num">${esc(x.masked_number)}</span>
-        <span class="src">${esc(x.source.replace(/_/g, " "))}</span>
+    <article class="row">
+      <div class="rid">${esc(x.request_id)}</div>
+      <div class="who">
+        <div class="org">${esc(x.employer)}</div>
+        <div class="meta">
+          <span>${esc(x.masked_number)}</span>
+          <span class="prov">${esc(x.source.replace(/_/g, " "))}</span>
+        </div>
+        <details><summary>What will be said</summary><pre class="script">${esc(x.task)}</pre></details>
       </div>
-      <details><summary>what will be said</summary><pre>${esc(x.task)}</pre></details>
-    </div>`).join("") || `<p class="note">Nothing in this view is ready to call.</p>`;
+      <span class="tag" data-w="clear">Ready</span>
+    </article>`).join("") || `<p class="say">Nothing in this view is ready to call.</p>`;
 
   $("s-skip").hidden = p.skipped.length === 0;
   $("skipped").innerHTML = p.skipped.map(x => `
-    <div class="item skip">
-      <div class="head">
-        <span class="rid">${esc(x.request_id)}</span>
-        <span class="emp">${esc(x.employer)}</span>
-        <span class="pill skipped">not called</span>
+    <article class="row">
+      <div class="rid">${esc(x.request_id)}</div>
+      <div class="who">
+        <div class="org">${esc(x.employer)}</div>
+        <p class="say">${esc(x.reason)}</p>
       </div>
-      <p class="why">${esc(x.reason)}</p>
-    </div>`).join("");
+      <span class="tag" data-w="muted">Not called</span>
+    </article>`).join("");
 
   $("run").disabled = p.call_count === 0;
   $("hint").textContent = p.call_count
@@ -279,26 +415,52 @@ function renderPlan(p) {
 
 function renderRun(s) {
   $("s-res").hidden = false;
-  const order = ["verified","partial","needs_review","declined","not_verified","employer_unreachable","pending","skipped"];
-  const rows = [...s.rows].sort((a,b) => order.indexOf(a.disposition) - order.indexOf(b.disposition));
+  const rows = [...s.rows].sort((a, b) => ORDER.indexOf(a.disposition) - ORDER.indexOf(b.disposition));
   $("results").innerHTML = rows.map(r => `
-    <div class="item">
-      <div class="head">
-        <span class="rid">${esc(r.request_id)}</span>
-        <span class="pill ${esc(r.disposition)}">${esc(r.disposition.replace(/_/g, " "))}</span>
-        ${r.confidence != null ? `<span class="num">confidence ${r.confidence.toFixed(2)}</span>` : ""}
+    <article class="row">
+      <div class="rid">${esc(r.request_id)}</div>
+      <div class="who">
+        <p class="say" style="margin-top:0">${esc(r.reason)}</p>
+        ${(r.evidence || []).map(e => `<p class="quote">${esc(e)}</p>`).join("")}
       </div>
-      <p class="why">${esc(r.reason)}</p>
-      ${(r.evidence || []).map(e => `<p class="ev">${esc(e)}</p>`).join("")}
-    </div>`).join("");
+      <span class="tag" data-w="${WEIGHT[r.disposition] || "muted"}">
+        ${esc(r.disposition.replace(/_/g, " "))}${r.confidence != null ? " · " + r.confidence.toFixed(2) : ""}
+      </span>
+    </article>`).join("");
   if (s.error) showError(s.error);
   if (s.finished && !s.running) {
-    const parts = Object.entries(s.counts).map(([k, v]) => `${v} ${k.replace(/_/g," ")}`);
-    $("hint").textContent = parts.length ? `${parts.join(", ")} in ${s.elapsed}s` : "";
-    $("run").disabled = false;
-    $("refresh").disabled = false;
+    const parts = Object.entries(s.counts).map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`);
+    $("hint").textContent = parts.length ? `${parts.join(" · ")} in ${s.elapsed}s` : "";
+    $("run").disabled = false; $("refresh").disabled = false;
     clearInterval(polling); polling = null;
     loadAudit();
+  }
+}
+
+function renderConfig(c) {
+  VIEW = c.view; MODE = c.mode;
+  const m = $("mode");
+  m.textContent = { fixtures: "Sample data", preview: "Preview only", live: "Live" }[MODE] || MODE;
+  m.dataset.live = String(MODE === "live");
+
+  $("s-token").textContent = c.airtable_token || "";
+  $("s-key").textContent = c.calle_api_key || "";
+  $("f-base").value = c.airtable_base_id || "";
+  $("f-req").value = c.requester_name || "";
+  $("perm").textContent = c.permission_warning || "";
+  $("perm").className = c.permission_warning ? "bad" : "";
+
+  const n = $("notice"), t = $("notice-text"), cta = $("notice-cta");
+  if (MODE === "fixtures" && !c.forced_fixtures) {
+    n.hidden = false;
+    t.innerHTML = "<b>Sample data.</b> Everything here is real except the phone calls. Connect your Airtable base to run your own verification queue.";
+    cta.textContent = "Connect";
+  } else if (MODE === "preview") {
+    n.hidden = false;
+    t.innerHTML = "<b>Preview only.</b> Reading your table, but there is no CALL-E key yet, so nothing can be dialled.";
+    cta.textContent = "Add key";
+  } else {
+    n.hidden = true;
   }
 }
 
@@ -311,20 +473,51 @@ async function loadAudit() {
   try {
     const a = await api("/api/audit");
     const el = $("chain");
-    el.classList.toggle("bad", !a.ok);
+    el.className = a.ok ? "" : "bad";
     el.textContent = a.ok
-      ? `audit: chain intact — ${a.records} records, head ${a.head}`
-      : `audit: CHAIN BROKEN at seq ${a.broken_at} — ${a.reason}`;
-  } catch (e) { /* panel still usable without it */ }
+      ? `audit — chain intact · ${a.records} records · head ${a.head}`
+      : `audit — CHAIN BROKEN at seq ${a.broken_at} · ${a.reason}`;
+  } catch (e) { /* panel is still usable */ }
 }
 
+/* ── setup ─────────────────────────────────────────────────────────── */
+const toggleSetup = (show) => {
+  $("setup").hidden = !show;
+  if (show) $("setup").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+$("open-setup").addEventListener("click", () => toggleSetup($("setup").hidden));
+$("notice-cta").addEventListener("click", () => toggleSetup(true));
+$("close-setup").addEventListener("click", () => toggleSetup(false));
+
+$("save").addEventListener("click", async () => {
+  const body = {};
+  const pairs = [["f-token","airtable_token"],["f-key","calle_api_key"],["f-base","airtable_base_id"],["f-req","requester_name"]];
+  for (const [id, key] of pairs) { const v = $(id).value.trim(); if (v) body[key] = v; }
+
+  $("save").disabled = true; $("setup-msg").textContent = "saving…";
+  try {
+    const c = await api("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    $("f-token").value = ""; $("f-key").value = "";
+    renderConfig(c);
+    $("setup-msg").textContent = "connected";
+    toggleSetup(false);
+    await loadPlan();
+  } catch (e) {
+    $("setup-msg").textContent = ""; showError(e.message);
+  } finally { $("save").disabled = false; }
+});
+
+/* ── run ───────────────────────────────────────────────────────────── */
 $("refresh").addEventListener("click", loadPlan);
 
 $("run").addEventListener("click", async () => {
   const n = $("m-call").textContent;
   if (!confirm(`Place ${n} real phone call${n === "1" ? "" : "s"} to real employers.\n\nThis cannot be undone.`)) return;
-  $("run").disabled = true; $("refresh").disabled = true;
-  showError("");
+  $("run").disabled = true; $("refresh").disabled = true; showError("");
   try {
     await api("/api/run", {
       method: "POST",
@@ -339,78 +532,6 @@ $("run").addEventListener("click", async () => {
   } catch (e) {
     showError(e.message);
     $("run").disabled = false; $("refresh").disabled = false;
-  }
-});
-
-const MODE_LABEL = {
-  fixtures: "sample data — no calls",
-  preview: "your table — preview only",
-  live: "live — can place calls",
-};
-
-function renderConfig(c) {
-  VIEW = c.view; MODE = c.mode;
-  const m = $("mode");
-  m.textContent = MODE_LABEL[MODE] || MODE;
-  m.classList.toggle("live", MODE === "live");
-
-  $("s-token").textContent = c.airtable_token || "";
-  $("s-key").textContent = c.calle_api_key || "";
-  $("f-base").value = c.airtable_base_id || "";
-  $("f-req").value = c.requester_name || "";
-
-  const perm = $("perm");
-  perm.hidden = !c.permission_warning;
-  perm.textContent = c.permission_warning || "";
-
-  const banner = $("banner"), text = $("banner-text"), cta = $("banner-cta");
-  if (MODE === "fixtures" && !c.forced_fixtures) {
-    banner.hidden = false;
-    text.innerHTML = "<strong>You're on sample data.</strong> Everything here is real except the phone calls. Connect your Airtable base to run your own verification queue.";
-    cta.textContent = "Connect my Airtable";
-  } else if (MODE === "preview") {
-    banner.hidden = false;
-    text.innerHTML = "<strong>Preview only.</strong> Reading your table, but no CALL-E key yet, so nothing can be dialled.";
-    cta.textContent = "Add CALL-E key";
-  } else {
-    banner.hidden = true;
-  }
-}
-
-function toggleSetup(show) {
-  $("setup").hidden = !show;
-  if (show) $("setup").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-$("open-setup").addEventListener("click", () => toggleSetup($("setup").hidden));
-$("banner-cta").addEventListener("click", () => toggleSetup(true));
-$("close-setup").addEventListener("click", () => toggleSetup(false));
-
-$("save").addEventListener("click", async () => {
-  const body = {};
-  const token = $("f-token").value.trim(); if (token) body.airtable_token = token;
-  const key = $("f-key").value.trim();     if (key)   body.calle_api_key = key;
-  const base = $("f-base").value.trim();   if (base)  body.airtable_base_id = base;
-  const req = $("f-req").value.trim();     if (req)   body.requester_name = req;
-
-  $("save").disabled = true;
-  $("setup-msg").textContent = "saving…";
-  try {
-    const c = await api("/api/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    $("f-token").value = ""; $("f-key").value = "";
-    renderConfig(c);
-    $("setup-msg").textContent = "connected.";
-    toggleSetup(false);
-    await loadPlan();
-  } catch (e) {
-    $("setup-msg").textContent = "";
-    showError(e.message);
-  } finally {
-    $("save").disabled = false;
   }
 });
 
