@@ -324,7 +324,7 @@ the only signal, so `404` (not routable), `486` (Busy Here) and `603` (Decline)
 collapse into one outcome. `docs/found-by-the-corpus.md` carries the full
 correction.
 
-The second is worse, and it is in a project that screens job candidates.
+The second is in a project that screens job candidates.
 `apps/typescript/hirecall` guards against scoring somebody who was never reached
 by testing `end_reason`. That field does not appear in any of the fifteen
 responses here, so the app's own schema parser manufactures one, defaulting it to
@@ -334,6 +334,14 @@ guard misses on exactly the payloads it exists for. The value the check reads wa
 invented by the app, from a field the platform did not send. Two fields it already
 receives, a non-null `failureCode` and an empty transcript, would settle it
 without guessing. It ships no tests, so nothing exercises the branch.
+
+**Correction, 9 September 2026.** A maintainer replayed these seven failed
+samples through the current `hirecall` workflow and reported that its existing
+checks filter failed results out before model scoring, so none of them reached
+scoring or produced a rejection. The guard described above still misses on
+exactly the payloads it exists for, and that is what this entry claims. It does
+not claim a candidate is scored or rejected as a result;
+`docs/found-by-the-corpus.md` carries the full correction.
 
 ## What the re-read found
 

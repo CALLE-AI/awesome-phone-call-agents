@@ -147,12 +147,24 @@ second half cannot save it either: `mapCalleSnapshotToStatus` (`place-call.ts:90
 returns `"failed"` for a snapshot whose status is `failed`, never `"no_answer"`,
 which is exactly the payload at issue. The next guard, `if (!response.result)`, is
 false because `parseScreeningResult` returns a filled object for any object at
-all, including `{"heard_clearly": "unknown"}`. What follows is a Gemini call that
-produces a score and a `decision` for a candidate whose phone never rang.
+all, including `{"heard_clearly": "unknown"}`. Past that point the guard has missed, on
+exactly the payloads it exists for.
 
 So the defect is not that the check reads what it is checking. It is that the
 value the check reads is invented by the app's own parser, from a field the API
 did not send, and the invented default is the one value that makes the guard miss.
+
+**Correction, 9 September 2026.** An earlier version of this entry ended the
+paragraph above by saying that what follows is a model call producing a score and
+a decision for a candidate whose phone never rang. A maintainer replayed the seven
+failed samples in this corpus through the current `hirecall` workflow and reported
+that its existing checks filter failed results out before model scoring: none of
+the seven reached scoring, and none produced a rejection. That consequence is
+withdrawn. What the replay did not contradict, and what this entry still claims,
+is the guard itself: `end_reason` is absent from all fifteen responses, the app's
+own parser manufactures it as `"failed"`, and `"failed"` is not `"no_answer"`, so
+the guard misses on the payloads it exists for. The entry now stops where the
+evidence stops.
 
 **Scope of the claim, stated narrowly.** Fifteen responses from one account cannot
 establish that the platform never sends `end_reason`; it may appear under
