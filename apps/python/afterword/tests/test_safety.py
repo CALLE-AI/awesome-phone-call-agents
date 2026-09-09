@@ -6,11 +6,18 @@ a terminal or an HTTP response may carry a dialable number.
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 import pytest
 
 from afterword import calle
-from afterword.api import capture_payload
+from afterword.api import _conflict_payload, _requirement_payload, capture_payload
+from afterword.cli import _print_result
+from afterword.models import CaptureResult, Conflict, Grade, Requirement
+from afterword.runner import plan_call
 from afterword.safety import redact, redact_all
+from tests.builders import make_estate, make_institution
 
 
 class TestCredentialsStayOnTheApprovedOrigin:
@@ -82,3 +89,62 @@ class TestNothingDialableLeaves:
         import re
         for run in re.findall(r"\d[\d\s().-]{5,}\d", blob):
             assert len(re.sub(r"\D", "", run)) < 7, run
+
+    def test_provider_derived_api_fields_are_masked(self) -> None:
+        phone = "+12025550146"
+        requirement = Requirement(
+            department=f"Call {phone}",
+            documents_needed=(f"Send records to {phone}",),
+            reference_opened=f"Reference from {phone}",
+        )
+        conflict = Conflict(
+            field_name="documents_needed",
+            stated=f"Stated by {phone}",
+            stated_source=f"Source {phone}",
+            counter=f"Counter from {phone}",
+            counter_source=f"Policy {phone}",
+            quote=f"Quote {phone}",
+        )
+        blob = json.dumps(
+            {
+                "requirement": _requirement_payload(requirement),
+                "conflict": _conflict_payload(conflict),
+            }
+        )
+        assert phone not in blob
+        assert "*" in blob
+
+    def test_provider_derived_cli_fields_are_masked(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        phone = "+12025550146"
+        plan = plan_call(make_estate(), make_institution())
+        result = CaptureResult(
+            estate_id=plan.estate.estate_id,
+            institution_id=plan.institution.institution_id,
+            run_id="afterword_test-run",
+            captured_at=datetime.now(timezone.utc),
+            grade=Grade.DISPUTED,
+            reasons=(f"Reason from {phone}",),
+            requirement=Requirement(
+                department=f"Department {phone}",
+                documents_needed=(f"Document {phone}",),
+                reference_opened=f"Reference {phone}",
+            ),
+            conflicts=(
+                Conflict(
+                    field_name="documents_needed",
+                    stated=f"Stated by {phone}",
+                    stated_source="this_call",
+                    counter=f"Counter from {phone}",
+                    counter_source=f"Policy {phone}",
+                ),
+            ),
+            evidence_quotes=(f"Quote {phone}",),
+        )
+
+        _print_result(plan, result)
+
+        output = capsys.readouterr().out
+        assert phone not in output
+        assert "*" in output

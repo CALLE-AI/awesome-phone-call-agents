@@ -32,11 +32,11 @@ def _requirement_payload(requirement: Requirement | None) -> dict | None:
     if requirement is None:
         return None
     return {
-        "department": requirement.department,
-        "documents_needed": list(requirement.documents_needed),
+        "department": redact(requirement.department),
+        "documents_needed": list(redact_all(requirement.documents_needed)),
         "certified_copy_accepted": requirement.certified_copy_accepted.value,
         "direct_debits_action": requirement.direct_debits_action.value,
-        "reference_opened": requirement.reference_opened,
+        "reference_opened": redact(requirement.reference_opened),
         "missing": list(requirement.missing),
     }
 
@@ -45,11 +45,11 @@ def _conflict_payload(conflict: Conflict) -> dict:
     """Both sides, no winner. The console renders them side by side."""
     return {
         "field": conflict.field_name,
-        "stated": conflict.stated,
-        "stated_source": conflict.stated_source,
-        "counter": conflict.counter,
-        "counter_source": conflict.counter_source,
-        "quote": conflict.quote,
+        "stated": redact(conflict.stated),
+        "stated_source": redact(conflict.stated_source),
+        "counter": redact(conflict.counter),
+        "counter_source": redact(conflict.counter_source),
+        "quote": redact(conflict.quote),
     }
 
 
@@ -65,7 +65,7 @@ def _result_payload(
         "captured_at": result.captured_at.isoformat(),
         "call_id": result.call_id,
         "grade": result.grade.value,
-        "reasons": list(result.reasons),
+        "reasons": list(redact_all(result.reasons)),
         "requirement": _requirement_payload(result.requirement),
         "conflicts": [_conflict_payload(c) for c in result.conflicts],
         "evidence_quotes": list(redact_all(result.evidence_quotes)),
