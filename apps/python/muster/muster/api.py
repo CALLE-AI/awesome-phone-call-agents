@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import adversary, backtest, cadence, demo, ladder, register, roster
 from .ledger import Ledger
+from .safety import redact, redact_all
 from .runner import plan_call, run_cycle
 from . import calle
 
@@ -79,7 +80,7 @@ def attest_payload(subject_id: str, scenario: str | None) -> dict:
              "co_resident_safe": p.co_resident_safe}
             for p in plan.prompts
         ],
-        "task_text": plan.task_text,
+        "task_text": redact(plan.task_text),
         "grade": attestation.grade.value,
         "reasons": list(attestation.reasons),
         "nonce_ok": attestation.nonce_ok,
@@ -88,7 +89,7 @@ def attest_payload(subject_id: str, scenario: str | None) -> dict:
         "coaching_suspected": attestation.coaching_suspected,
         "auto_closes": attestation.auto_closes,
         "stops_payment": attestation.stops_payment,
-        "evidence_quotes": list(attestation.evidence_quotes),
+        "evidence_quotes": list(redact_all(attestation.evidence_quotes)),
         "reconciliation": {
             "outcome": reconciled.outcome.value,
             "reasons": list(reconciled.reasons),
@@ -109,7 +110,7 @@ def attest_payload(subject_id: str, scenario: str | None) -> dict:
         "next_step_purpose": ladder.RUNGS[step].purpose if step else None,
         "next_step_may_attest": ladder.may_attest(step) if step else None,
         "transcript": [
-            {"offset_seconds": t.offset_seconds, "speaker": t.speaker, "text": t.text}
+            {"offset_seconds": t.offset_seconds, "speaker": t.speaker, "text": redact(t.text)}
             for t in _turns_for(plan, chosen)
         ],
     }

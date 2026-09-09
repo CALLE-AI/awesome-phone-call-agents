@@ -13,6 +13,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
+from .safety import redact
 from . import adversary, backtest, cadence, calle, demo, ladder, register, roster
 from .models import Attestation
 from .runner import Plan, payload_for, plan_call, run_cycle
@@ -35,7 +36,7 @@ def _print_attestation(plan: Plan, attestation: Attestation) -> None:
     print(f"  auto-closes  {attestation.auto_closes}")
     print(f"  stops pay    {attestation.stops_payment}")
     for quote in attestation.evidence_quotes:
-        print(f"    > {quote}")
+        print(f"    > {redact(quote)}")
 
 
 def cmd_roster(_: argparse.Namespace) -> int:
@@ -53,7 +54,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print(f"challenge        {plan.issued_nonce.words} / {plan.issued_nonce.weekday}")
     print(f"prompts          {[p.prompt_id for p in plan.prompts]}")
     print("\n--- what the agent says ---")
-    print(plan.task_text)
+    print(redact(plan.task_text))
     if args.show_payload:
         body = payload_for(plan)
         body["recipients"] = [{"phones": [plan.masked_phone()]}]
