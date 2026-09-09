@@ -197,6 +197,19 @@ python3 -m nominee verify      # walk the audit chain
 
 ---
 
+## The landing page
+
+`site/index.html` is a single static file describing the product for someone
+who has not seen it: the problem with its sources, the three-step flow, and
+both boundaries. It has no build step and no dependencies, so it can be opened
+directly or served from any static host.
+
+```bash
+python3 -m http.server 8090 --bind 127.0.0.1 --directory site
+```
+
+---
+
 ## Plugin contract
 
 | | |
