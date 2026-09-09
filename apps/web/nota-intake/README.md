@@ -30,6 +30,12 @@ common fields, the type-specific column, CALL-E's summary and confidence, and th
 places a **consultation reminder call** in the client's language; its outcome (confirmed / can't make it /
 reschedule request) syncs back onto the record.
 
+## Demo video
+
+`docs/video/` holds the reproducible pipeline (`build.py`, `cards.py`, `narration.json`). Scene 4 plays the real
+lawsuit intake call from Sept 8, 2026, recorded on the client's phone (CALL-E returns transcript turns but no audio);
+narration is a voice clone of the author. Records shown in the console are real CALL-E results.
+
 ## Why phone, not form
 
 Long intake forms get abandoned, and the people a small firm most wants to reach — older clients,

@@ -1,0 +1,34 @@
+[
+ {
+  "id": "s1_title",
+  "tts": "Small law firms lose clients in the intake form. Older clients, people at work, anyone reading a second language. They don't finish it. So we made the form three steps, and let the phone do the intake."
+ },
+ {
+  "id": "s2_form",
+  "tts": "This is Not a Lawyer Intake. Step one: pick a topic. Real estate, a will, a trust, a lawsuit. That choice plans the call: a lawsuit intake asks who the other side is and what deadline is on the court papers; a will intake asks about family and an executor. Step two: leave your number. The interview language follows the phone's country, straight from Call E's region table, and the page says plainly what your number supports."
+ },
+ {
+  "id": "s3_submit",
+  "tts": "Submit, and the page tells you exactly what happens next: your phone rings in about a minute, what the assistant will ask, and what the firm does afterward."
+ },
+ {
+  "id": "s4_call",
+  "tts": "This is a real call from our tests, reconstructed from the Call E transcript with a synthetic voice, since Call E doesn't return audio. It confirms the name, states that this is intake and not legal advice, then works through the matter, the other party for the conflict check, deadlines, urgency, best time to reach them, and consent."
+ },
+ {
+  "id": "s5_review",
+  "tts": "Thirty seconds after the call, the staff console has this. Summary, the other parties for the conflict check, urgency, consent, transcript, and Call E's confidence score. Each topic gets its own column of fields, and a date picker places a reminder call in the client's language. Staff can also start an intake call from the desk, for a walk-in or a voicemail, and watch it land."
+ },
+ {
+  "id": "s6_bahasa",
+  "tts": "Same number, different language. This is the Bahasa Indonesia call, also real, also on a US line. Adding a language is one row in a JSON file and one script block."
+ },
+ {
+  "id": "s8_limits",
+  "tts": "One limit, stated plainly. Call E does not carry Spanish on US lines yet. We tried the locale, the task text, and the MCP planner; all three declined before dialing. The Spanish script is written and wired. Until it's enabled, those callers go to a human, and the form says so."
+ },
+ {
+  "id": "s9_arch",
+  "tts": "No servers. Cloudflare Pages, a few Functions, KV, and the Call E API: a task and a result schema planned per matter type, webhooks, and idempotency keys. Repo and live link are in the description. This is Not a Lawyer Intake."
+ }
+]
