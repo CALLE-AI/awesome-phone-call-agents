@@ -61,6 +61,8 @@ def _result_payload(
         "kind": institution.kind.value,
         "masked_phone": institution.masked_phone(),
         "scenario": scenario,
+        "captured_at": result.captured_at.isoformat(),
+        "call_id": result.call_id,
         "grade": result.grade.value,
         "reasons": list(result.reasons),
         "requirement": _requirement_payload(result.requirement),
@@ -149,7 +151,16 @@ def pack_payload() -> dict:
         "deceased_name": registry.ESTATE.deceased_name,
         "counts": {grade.value: len(items) for grade, items in pack.by_grade.items()},
         "disputes": [_conflict_payload(c) for c in pack.disputes],
-        "outstanding": len(pack.outstanding),
+        "outstanding": [
+            {
+                "institution_id": result.institution_id,
+                "institution": registry.get(result.institution_id).name,
+                "grade": result.grade.value,
+                "captured_at": result.captured_at.isoformat(),
+            }
+            for result in pack.outstanding
+        ],
+        "outstanding_count": len(pack.outstanding),
         "entries": entries,
     }
 

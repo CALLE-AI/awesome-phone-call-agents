@@ -153,9 +153,21 @@
     return Number(parts[2]) + " " + month + " " + parts[0];
   }
 
-  function today() {
-    var now = new Date();
-    return now.getDate() + " " + MONTHS[now.getMonth()] + " " + now.getFullYear();
+  function stampDay(iso) {
+    if (!iso) {
+      return "";
+    }
+    return longDate(String(iso).slice(0, 10));
+  }
+
+  function latestCapture(entries) {
+    var latest = "";
+    (entries || []).forEach(function (entry) {
+      if (entry.captured_at && entry.captured_at > latest) {
+        latest = entry.captured_at;
+      }
+    });
+    return latest;
   }
 
   function reasonWord(reason) {
@@ -272,6 +284,9 @@
     var requirement = entry.requirement;
     var rows = [];
 
+    if (entry.captured_at) {
+      rows.push(["Asked on", esc(stampDay(entry.captured_at))]);
+    }
     if (requirement && requirement.department) {
       rows.push(["Department", esc(requirement.department)]);
     }
@@ -440,8 +455,8 @@
           "<dt>Institutions called</dt><dd>" +
           data.entries.length +
           "</dd>" +
-          "<dt>Pack prepared</dt><dd>" +
-          esc(today()) +
+          "<dt>Last call placed</dt><dd>" +
+          esc(stampDay(latestCapture(data.entries)) || "no calls recorded") +
           "</dd>" +
           "</dl>" +
           '<p class="pack-standing">Everything below is what somebody at the ' +
