@@ -9,10 +9,15 @@ delete process.env.CALLE_AUTHORIZED_DESTINATION;
 
 const { app } = await import("../server.mjs");
 const {
+  EXAMPLE_E164,
+  EXAMPLE_E164_OTHER,
   isE164,
   maskPhone,
   reminderIntentKey,
   isAmbiguousProviderError,
+  sanitizeError,
+  sanitizeSensitiveData,
+  sanitizeEvidence,
 } = await import("../safety.mjs");
 
 const auth = { Authorization: "Bearer test-operator-token" };
@@ -20,7 +25,7 @@ const auth = { Authorization: "Bearer test-operator-token" };
 const validBody = {
   parentName: "John Banda",
   studentName: "Mary Banda",
-  phoneNumber: "+12025550100",
+  phoneNumber: EXAMPLE_E164,
   amount: "K2,500",
   dueDate: "2026-09-30",
   schoolName: "ABC Private School",
@@ -29,16 +34,16 @@ const validBody = {
 
 describe("safety helpers", () => {
   it("accepts strict ASCII E.164 only", () => {
-    expect(isE164("+12025550100")).toBe(true);
-    expect(isE164("+12025550100")).toBe(true);
+    expect(isE164(EXAMPLE_E164)).toBe(true);
+    expect(isE164(EXAMPLE_E164_OTHER)).toBe(true);
     expect(isE164("12025550100")).toBe(false);
     expect(isE164("+01")).toBe(false);
-    expect(isE164("+١٤١٥٥٥٥٠١٠٠")).toBe(false);
+    expect(isE164("+١٢٠٢٥٥٥٠١٠٠")).toBe(false);
   });
 
   it("masks E.164 numbers", () => {
-    expect(maskPhone("+12025550100")).toMatch(/^\+14.+100$/);
-    expect(maskPhone("+12025550100")).not.toContain("55501");
+    expect(maskPhone(EXAMPLE_E164)).toMatch(/^\+120.+0100$/);
+    expect(maskPhone(EXAMPLE_E164)).not.toContain("55501");
   });
 
   it("builds a stable intent key for the same authorized fields", () => {
@@ -56,6 +61,24 @@ describe("safety helpers", () => {
     expect(isAmbiguousProviderError({ status: 503 })).toBe(true);
     expect(isAmbiguousProviderError({ status: 400 })).toBe(false);
     expect(isAmbiguousProviderError({ status: 401 })).toBe(false);
+  });
+
+  it("deeply masks phones inside provider errors, results, and evidence", () => {
+    expect(sanitizeError(`failed for ${EXAMPLE_E164}`)).not.toContain(EXAMPLE_E164);
+    expect(sanitizeError(`failed for ${EXAMPLE_E164}`)).toContain("[phone masked]");
+
+    const maskedResult = sanitizeSensitiveData({
+      payment_awareness: "yes",
+      parent_response: `Call me back at ${EXAMPLE_E164} please`,
+      nested: { phone: EXAMPLE_E164 },
+    });
+    expect(JSON.stringify(maskedResult)).not.toContain(EXAMPLE_E164);
+    expect(maskedResult.nested.phone).toMatch(/•/);
+
+    const evidence = sanitizeEvidence([
+      { quote: `Reached ${EXAMPLE_E164}`, phoneNumber: EXAMPLE_E164 },
+    ]);
+    expect(JSON.stringify(evidence)).not.toContain(EXAMPLE_E164);
   });
 });
 
@@ -95,7 +118,7 @@ describe("POST /api/reminder", () => {
       .set(auth)
       .send({
         parentName: "John Banda",
-        phoneNumber: "+12025550100",
+        phoneNumber: EXAMPLE_E164,
         amount: "K2,500",
         dueDate: "2026-09-30",
       });
@@ -124,7 +147,7 @@ describe("POST /api/reminder", () => {
       .send({
         parentName: "John Banda",
         studentName: "Mary Banda",
-        phoneNumber: "+12025550100",
+        phoneNumber: EXAMPLE_E164,
         dueDate: "2026-09-30",
       });
 
@@ -138,7 +161,7 @@ describe("POST /api/reminder", () => {
       .send({
         parentName: "John Banda",
         studentName: "Mary Banda",
-        phoneNumber: "+12025550100",
+        phoneNumber: EXAMPLE_E164,
         amount: "K2,500",
       });
 
@@ -164,7 +187,7 @@ describe("POST /api/reminder", () => {
   it("refuses live destinations that do not exactly match CALLE_AUTHORIZED_DESTINATION", async () => {
     process.env.CALLE_LIVE_ENABLED = "true";
     process.env.CALLE_API_KEY = "test-calle-key";
-    process.env.CALLE_AUTHORIZED_DESTINATION = "+12025550199";
+    process.env.CALLE_AUTHORIZED_DESTINATION = EXAMPLE_E164_OTHER;
 
     try {
       const response = await request(app)

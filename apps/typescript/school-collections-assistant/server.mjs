@@ -4,6 +4,7 @@ import { CalleClient } from "@call-e/calle";
 import {
   bearerToken,
   buildReminderTask,
+  EXAMPLE_E164,
   fakeReminderResult,
   isAmbiguousProviderError,
   isE164,
@@ -11,6 +12,9 @@ import {
   reminderIntentKey,
   RESULT_SCHEMA,
   safeEqual,
+  sanitizeError,
+  sanitizeEvidence,
+  sanitizeSensitiveData,
 } from "./safety.mjs";
 
 const app = express();
@@ -77,8 +81,7 @@ function validateReminderBody(body) {
 
   if (!isE164(fields.phoneNumber)) {
     return {
-      error:
-        "Phone number must be strict ASCII E.164 (for example +12025550100).",
+      error: `Phone number must be strict ASCII E.164 (for example ${EXAMPLE_E164}).`,
       status: 400,
     };
   }
@@ -104,21 +107,32 @@ async function placeAuthorizedCall(fields, intentKey, calleApiKey) {
   } catch (error) {
     if (!isAmbiguousProviderError(error)) throw error;
 
-    // Ambiguous create: the call may already exist. Reconcile under the same
-    // stable intent key and never mint a replacement key or place a second dial.
-    try {
-      return await client.calls.createAndWait(input, options);
-    } catch (reconcileError) {
-      const err = new Error(
-        `Call outcome is ambiguous for ${maskPhone(fields.phoneNumber)}. Halted for reconciliation under intent key ${intentKey}. Do not retry with a new key.`
-      );
-      err.status = 409;
-      err.code = "needs_human_reconciliation";
-      err.intentKey = intentKey;
-      err.cause = reconcileError;
-      throw err;
-    }
+    // Ambiguous create may mean the call already exists. Do not call create
+    // again. Halt for read-only reconciliation under the same intent key.
+    const err = new Error(
+      `Call create outcome is ambiguous for ${maskPhone(fields.phoneNumber)}. Halted for read-only reconciliation under intent key ${intentKey}. Do not create or dial again with a new key.`
+    );
+    err.status = 409;
+    err.code = "needs_human_reconciliation";
+    err.intentKey = intentKey;
+    err.cause = error;
+    throw err;
   }
+}
+
+function publicCallPayload(call, fields, intentKey, mode) {
+  return {
+    success: true,
+    mode,
+    realCallPlaced: mode === "live",
+    intentKey,
+    phoneMasked: maskPhone(fields.phoneNumber),
+    status: call.status,
+    taskCompleted: call.taskCompleted,
+    completionConfidence: sanitizeSensitiveData(call.completionConfidence),
+    structuredResult: sanitizeSensitiveData(call.structuredResult || {}),
+    evidence: sanitizeEvidence(call.evidence),
+  };
 }
 
 app.get("/api/health", (_req, res) => {
@@ -201,32 +215,21 @@ app.post("/api/reminder", requireApiAuth, async (req, res) => {
     );
 
     const call = await placeAuthorizedCall(fields, intentKey, cfg.calleApiKey);
-
-    return res.json({
-      success: true,
-      mode: "live",
-      realCallPlaced: true,
-      intentKey,
-      phoneMasked: maskPhone(fields.phoneNumber),
-      status: call.status,
-      taskCompleted: call.taskCompleted,
-      completionConfidence: call.completionConfidence,
-      structuredResult: call.structuredResult,
-      evidence: call.evidence,
-    });
+    return res.json(publicCallPayload(call, fields, intentKey, "live"));
   } catch (error) {
+    const safeMessage = sanitizeError(error);
     console.error(
       JSON.stringify({
         event: "reminder_error",
         code: error.code || "error",
-        message: error.message,
+        message: safeMessage,
         intentKey: error.intentKey,
       })
     );
 
     return res.status(error.status || 500).json({
       success: false,
-      error: error.message || "Something went wrong.",
+      error: safeMessage || "Something went wrong.",
       code: error.code,
       intentKey: error.intentKey,
     });

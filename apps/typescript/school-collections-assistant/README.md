@@ -53,10 +53,12 @@ Phone calls are real-world side effects. This app enforces:
 * Exact per-run destination authorization: the request phone must equal `CALLE_AUTHORIZED_DESTINATION`
 * Strict ASCII E.164 validation
 * Masked phone numbers in logs and API responses
+* Deep masking of provider errors, structured results, and evidence before logging or returning them
 * A stable intent / idempotency key derived from the authorized reminder fields
 * Explicit `confirmLiveCall: true` for live runs
-* Halt and reconciliation under the same intent key when the provider outcome is ambiguous
+* Halt for read-only reconciliation under the same intent key when create is ambiguous (no automatic second create/dial)
 * Provider-controlled result and error strings rendered as text in the UI (not HTML injection)
+* Docs and tests use NANP reserved fictional destinations (`NPA` + `555-01xx`), for example `+12025550100`
 
 ## Requirements
 
