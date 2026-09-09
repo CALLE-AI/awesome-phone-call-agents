@@ -5,326 +5,429 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nominee</title>
 <style>
-  /* ───────────────────────────────────────────────────────────────────
-     Monochrome. No hue anywhere. Status is carried by weight, inversion
-     and rule — which also means it survives a compressed screen recording
-     and reads identically to anyone with a colour vision deficiency.
-     ─────────────────────────────────────────────────────────────────── */
-  :root {
-    --paper:  #ffffff;
-    --sunk:   #f4f4f4;
-    --ink:    #000000;
-    --g80:    #1c1c1c;
-    --g55:    #6b6b6b;
-    --g40:    #969696;
-    --g25:    #c4c4c4;
-    --rule:   #e2e2e2;
-    --edge:   #111111;
+/* ═══════════════════════════════════════════════════════════════════════
+   Near-monochrome foundation; colour carries state and nothing else.
+   Dark first, light second. Spacing is generous by design: this is read
+   under time pressure, and the eye needs somewhere to rest.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:        #0a0b0d;
+  --surface:   #111316;
+  --raised:    #16191d;
+  --hover:     #1b1f24;
+  --line:      #23282f;
+  --line-soft: #1a1e23;
+  --text:      #f2f4f7;
+  --muted:     #98a2b3;
+  --faint:     #667085;
 
-    --sans: "Helvetica Neue", Helvetica, Inter, Arial, sans-serif;
-    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  --ok:        #3ccb7f;   --ok-bg:      #0e2a1d;   --ok-line:    #17452f;
+  --attn:      #fdb022;   --attn-bg:    #2b1e05;   --attn-line:  #4a340a;
+  --stop:      #f97066;   --stop-bg:    #2d1211;   --stop-line:  #4c1f1d;
+  --idle:      #98a2b3;   --idle-bg:    #191c21;   --idle-line:  #262b32;
 
-    --u: 8px;                 /* the whole layout is a multiple of this */
-    --gutter: 24px;
-  }
-  :root[data-theme="dark"], html:not([data-theme="light"]) {
+  --ink-btn:      #f2f4f7;  --ink-btn-fg: #0a0b0d;  --ink-btn-hov: #ffffff;
+  --focus:        #7d8794;
+  --shadow:  0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.7);
+  --shadow-lift: 0 2px 4px rgba(0,0,0,.5), 0 16px 40px -16px rgba(0,0,0,.8);
+
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+          "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: "SF Mono", ui-monospace, "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+
+  --r-lg: 12px; --r-md: 10px; --r-sm: 7px;
+  --page: 26px;
+
+  --fast: 120ms cubic-bezier(.16,1,.3,1);
+  --mid:  220ms cubic-bezier(.16,1,.3,1);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) {
+    --bg:        #ffffff;
+    --surface:   #fcfcfd;
+    --raised:    #ffffff;
+    --hover:     #f9fafb;
+    --line:      #e4e7ec;
+    --line-soft: #f1f3f6;
+    --text:      #101828;
+    --muted:     #475467;
+    --faint:     #667085;
+
+    --ok:   #067647;  --ok-bg:   #ecfdf3;  --ok-line:   #abefc6;
+    --attn: #b54708;  --attn-bg: #fffaeb;  --attn-line: #fedf89;
+    --stop: #b42318;  --stop-bg: #fef3f2;  --stop-line: #fecdca;
+    --idle: #475467;  --idle-bg: #f9fafb;  --idle-line: #e4e7ec;
+
+    --ink-btn: #101828; --ink-btn-fg: #ffffff; --ink-btn-hov: #000000;
+    --focus:   #98a2b3;
+    --shadow:  0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-lift: 0 2px 4px rgba(16,24,40,.06), 0 12px 28px -10px rgba(16,24,40,.16);
     color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme="light"]) {
-      --paper:  #000000;
-      --sunk:   #0d0d0d;
-      --ink:    #ffffff;
-      --g80:    #e8e8e8;
-      --g55:    #9a9a9a;
-      --g40:    #6e6e6e;
-      --g25:    #3d3d3d;
-      --rule:   #232323;
-      --edge:   #ededed;
-      color-scheme: dark;
-    }
-  }
-  html[data-theme="dark"] {
-    --paper:  #000000;
-    --sunk:   #0d0d0d;
-    --ink:    #ffffff;
-    --g80:    #e8e8e8;
-    --g55:    #9a9a9a;
-    --g40:    #6e6e6e;
-    --g25:    #3d3d3d;
-    --rule:   #232323;
-    --edge:   #ededed;
-    color-scheme: dark;
-  }
+}
+html[data-theme="light"] {
+  --bg:#ffffff; --surface:#fcfcfd; --raised:#ffffff; --hover:#f9fafb;
+  --line:#e4e7ec; --line-soft:#f1f3f6; --text:#101828; --muted:#475467; --faint:#667085;
+  --ok:#067647; --ok-bg:#ecfdf3; --ok-line:#abefc6;
+  --attn:#b54708; --attn-bg:#fffaeb; --attn-line:#fedf89;
+  --stop:#b42318; --stop-bg:#fef3f2; --stop-line:#fecdca;
+  --idle:#475467; --idle-bg:#f9fafb; --idle-line:#e4e7ec;
+  --ink-btn:#101828; --ink-btn-fg:#ffffff; --ink-btn-hov:#000000; --focus:#98a2b3;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  --shadow-lift: 0 2px 4px rgba(16,24,40,.06), 0 12px 28px -10px rgba(16,24,40,.16);
+  color-scheme: light;
+}
 
-  * { box-sizing: border-box; }
-  html, body { background: var(--paper); }
-  body {
-    margin: 0; color: var(--ink);
-    font: 400 13px/1.5 var(--sans);
-    letter-spacing: -0.005em;
-    -webkit-font-smoothing: antialiased;
-    font-variant-numeric: tabular-nums;
-  }
-  .sheet { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter) 96px; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body {
+  margin: 0; color: var(--text);
+  font: 400 14px/1.6 var(--sans);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.page { max-width: 1140px; margin: 0 auto; padding: 0 var(--page) 120px; }
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+code { font: 400 .92em var(--mono); }
 
-  /* ── masthead ───────────────────────────────────────────────────── */
-  .masthead {
-    display: grid; grid-template-columns: 1fr auto; align-items: end;
-    gap: var(--gutter); padding: 40px 0 12px;
-    border-bottom: 2px solid var(--ink);
-  }
-  .wordmark { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-  .wordmark span {
-    display: block; font-weight: 400; font-size: 11px; color: var(--g55);
-    letter-spacing: 0.16em; text-transform: uppercase; margin-top: 5px;
-  }
-  .controls { display: flex; align-items: center; gap: 12px; }
-  .mode {
-    font: 500 10px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
-    padding: 6px 9px; border: 1px solid var(--g25); color: var(--g55);
-    white-space: nowrap;
-  }
-  .mode[data-live="true"] {
-    background: var(--ink); border-color: var(--ink);
-    color: var(--paper); font-weight: 700;
-  }
-  .theme {
-    font: 500 10px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
-    padding: 6px 9px; border: 1px solid var(--g25); background: none;
-    color: var(--g55); cursor: pointer;
-  }
-  .theme:hover { border-color: var(--ink); color: var(--ink); }
+/* ── top bar ─────────────────────────────────────────────────────────── */
+.top {
+  display: flex; align-items: center; gap: 16px;
+  padding: 26px 0 24px; margin-bottom: 40px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mark { display: flex; align-items: center; gap: 11px; margin-right: auto; }
+.glyph {
+  width: 28px; height: 28px; border-radius: 8px; flex: none;
+  background: var(--ink-btn); color: var(--ink-btn-fg);
+  display: grid; place-items: center; font-weight: 650; font-size: 13px;
+  letter-spacing: -0.03em;
+}
+.mark b { font-size: 15px; font-weight: 600; letter-spacing: -0.018em; }
+.mark span { color: var(--faint); font-size: 13px; margin-left: 2px; }
 
-  /* ── metric band: hairline-divided, no cards ────────────────────── */
-  .band {
-    display: grid; grid-template-columns: 2fr repeat(4, 1fr);
-    border-bottom: 1px solid var(--ink); margin: 0 0 40px;
-  }
-  .band > div {
-    padding: 18px 16px 20px; border-left: 1px solid var(--rule); min-width: 0;
-  }
-  .band > div:first-child { border-left: 0; padding-left: 0; }
-  .band dt {
-    font: 500 9.5px/1 var(--mono); letter-spacing: 0.15em; text-transform: uppercase;
-    color: var(--g40); margin: 0 0 10px;
-  }
-  .band dd {
-    margin: 0; font: 500 26px/1 var(--sans); letter-spacing: -0.035em;
-    font-variant-numeric: tabular-nums;
-  }
-  .band dd.txt { font-size: 15px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
-  .band dd small { font: 400 11px/1 var(--sans); color: var(--g55); letter-spacing: 0; }
-  .band dd.flag { text-decoration: underline; text-decoration-thickness: 2px;
-                  text-underline-offset: 5px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 500; padding: 6px 11px 6px 9px;
+  border: 1px solid var(--line); border-radius: 100px;
+  background: var(--surface); color: var(--muted); white-space: nowrap;
+}
+.chip .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none;
+}
+.chip[data-live="true"] { color: var(--stop); border-color: var(--stop-line); background: var(--stop-bg); }
+.chip[data-live="true"] .dot { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 
-  /* ── section rule ───────────────────────────────────────────────── */
-  .rubric {
-    display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px;
-    font: 500 10px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--g40); margin: 0 0 4px;
-  }
-  .rubric::after { content: ""; height: 1px; background: var(--rule); }
-  section + section { margin-top: 44px; }
+/* ── buttons ─────────────────────────────────────────────────────────── */
+button {
+  font: 500 13.5px/1 var(--sans); letter-spacing: -0.008em;
+  padding: 10px 16px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--fast), border-color var(--fast),
+              transform var(--fast), opacity var(--fast);
+}
+button:hover { background: var(--hover); border-color: var(--faint); }
+button:active { transform: scale(.985); }
+button.primary { background: var(--ink-btn); color: var(--ink-btn-fg); border-color: var(--ink-btn); font-weight: 560; }
+button.primary:hover { background: var(--ink-btn-hov); border-color: var(--ink-btn-hov); }
+button.ghost { background: none; border-color: transparent; color: var(--muted); padding-inline: 10px; }
+button.ghost:hover { background: var(--hover); color: var(--text); }
+button.sm { padding: 7px 11px; font-size: 12.5px; }
+button[disabled] { opacity: .38; cursor: not-allowed; transform: none; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
 
-  /* ── record rows ────────────────────────────────────────────────── */
-  .row {
-    display: grid; grid-template-columns: 92px 1fr auto;
-    gap: 0 var(--gutter); align-items: start;
-    padding: 18px 0; border-bottom: 1px solid var(--rule);
-  }
-  .row:first-of-type { border-top: 1px solid var(--g25); }
-  .rid { font: 500 11.5px/1.6 var(--mono); letter-spacing: 0.02em; }
-  .who { min-width: 0; }
-  .org { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
-  .meta {
-    font: 400 11px/1.7 var(--mono); color: var(--g55); margin-top: 3px;
-    display: flex; gap: 14px; flex-wrap: wrap;
-  }
-  .meta .prov { text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; color: var(--g40); }
-  .say { color: var(--g55); font-size: 12.5px; margin: 8px 0 0; max-width: 62ch; }
+/* ── metrics ─────────────────────────────────────────────────────────── */
+.metrics {
+  display: grid; grid-template-columns: 1.6fr repeat(4, 1fr);
+  gap: 1px; background: var(--line-soft);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  overflow: hidden; margin-bottom: 56px;
+}
+.metric { background: var(--bg); padding: 20px 22px 22px; min-width: 0; }
+.metric dt {
+  font-size: 12px; font-weight: 500; color: var(--faint);
+  margin: 0 0 10px; letter-spacing: -0.004em;
+}
+.metric dd {
+  margin: 0; font-size: 32px; font-weight: 560; letter-spacing: -0.032em; line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.metric dd.text { font-size: 17px; font-weight: 550; letter-spacing: -0.02em; line-height: 1.35; padding-top: 4px; }
+.metric dd small { font-size: 13px; font-weight: 400; color: var(--faint); letter-spacing: -0.005em; margin-left: 3px; }
+.metric[data-flag="true"] dd { color: var(--attn); }
 
-  /* status: monochrome, distinguished by fill and weight */
-  .tag {
-    font: 500 9.5px/1 var(--mono); letter-spacing: 0.13em; text-transform: uppercase;
-    padding: 6px 9px; border: 1px solid var(--g25); color: var(--g55);
-    white-space: nowrap; align-self: start;
-  }
-  .tag[data-w="attention"] { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
-  .tag[data-w="clear"]     { border-color: var(--ink); color: var(--ink); }
-  .tag[data-w="muted"]     { border-style: dashed; }
+/* ── sections ────────────────────────────────────────────────────────── */
+section { margin-bottom: 56px; }
+.head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+.head h2 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: -0.012em; }
+.head .count {
+  font-size: 12px; font-weight: 500; color: var(--faint);
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 2px 8px; border-radius: 100px;
+}
 
-  details { margin-top: 10px; }
-  summary {
-    cursor: pointer; font: 500 10.5px/1 var(--mono); letter-spacing: 0.11em;
-    text-transform: uppercase; color: var(--g40); padding: 2px 0;
-    list-style: none; display: inline-flex; gap: 8px; align-items: center;
-  }
-  summary::-webkit-details-marker { display: none; }
-  summary::before { content: "+"; font-size: 12px; }
-  details[open] summary::before { content: "\2212"; }
-  summary:hover { color: var(--ink); }
-  .script {
-    margin: 12px 0 0; padding: 16px 18px; background: var(--sunk);
-    border-left: 2px solid var(--ink);
-    font: 400 11.5px/1.72 var(--mono); white-space: pre-wrap;
-    overflow-x: auto; color: var(--g80);
-  }
-  .quote {
-    margin: 8px 0 0; padding-left: 14px; border-left: 1px solid var(--g25);
-    font-size: 12.5px; color: var(--g55);
-  }
+/* ── rows ────────────────────────────────────────────────────────────── */
+.list { display: flex; flex-direction: column; gap: 10px; }
+.row {
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 20px 22px;
+  box-shadow: var(--shadow);
+  transition: border-color var(--fast), box-shadow var(--fast), transform var(--fast);
+  animation: rise var(--mid) both;
+}
+.row:hover { border-color: var(--faint); box-shadow: var(--shadow-lift); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.row-top { display: flex; align-items: flex-start; gap: 16px; }
+.row-id {
+  font: 500 12px/1.5 var(--mono); color: var(--faint);
+  flex: none; width: 74px; padding-top: 2px;
+}
+.row-body { flex: 1; min-width: 0; }
+.row-org { font-size: 15px; font-weight: 570; letter-spacing: -0.016em; }
+.row-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 13px; color: var(--muted);
+}
+.row-meta .phone { font: 400 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+.row-meta .sep { color: var(--line); }
+.row-meta .prov { color: var(--faint); }
+.row-note { color: var(--muted); font-size: 13.5px; margin: 9px 0 0; max-width: 68ch; line-height: 1.62; }
+.row-quote {
+  margin: 10px 0 0; padding: 11px 14px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--line-soft);
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
 
-  /* ── notices ────────────────────────────────────────────────────── */
-  .notice {
-    display: grid; grid-template-columns: 1fr auto; gap: var(--gutter);
-    align-items: center; border: 1px solid var(--ink);
-    padding: 16px 18px; margin: 0 0 32px;
-  }
-  .notice p { margin: 0; font-size: 13px; color: var(--g55); }
-  .notice b { color: var(--ink); font-weight: 600; }
+/* status pill: colour carries state, and only state */
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  font-size: 12px; font-weight: 550; letter-spacing: -0.004em;
+  padding: 5px 11px 5px 9px; border-radius: 100px;
+  border: 1px solid var(--idle-line); background: var(--idle-bg); color: var(--idle);
+  text-transform: capitalize;
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.pill[data-s="ok"]   { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-line); }
+.pill[data-s="attn"] { color: var(--attn); background: var(--attn-bg); border-color: var(--attn-line); }
+.pill[data-s="stop"] { color: var(--stop); background: var(--stop-bg); border-color: var(--stop-line); }
+.pill .conf { font: 400 11.5px/1 var(--mono); opacity: .75; }
 
-  /* ── setup ──────────────────────────────────────────────────────── */
-  .setup { border: 1px solid var(--ink); padding: 26px 28px 24px; margin: 0 0 40px; }
-  .setup h2 { font-size: 14px; font-weight: 700; margin: 0 0 5px; letter-spacing: -0.01em; }
-  .setup > .lede { margin: 0 0 26px; color: var(--g55); font-size: 12.5px; max-width: 66ch; }
-  .grid {
-    display: grid; gap: 22px var(--gutter);
-    grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
-  }
-  label {
-    display: block; font: 500 10px/1 var(--mono); letter-spacing: 0.14em;
-    text-transform: uppercase; color: var(--g40); margin-bottom: 9px;
-  }
-  label b { color: var(--ink); font-weight: 500; }
-  input {
-    width: 100%; font: 400 13px/1.4 var(--mono); padding: 10px 0;
-    border: 0; border-bottom: 1px solid var(--g25); background: none; color: var(--ink);
-    border-radius: 0;
-  }
-  input::placeholder { color: var(--g40); }
-  input:focus { outline: none; border-bottom-color: var(--ink); border-bottom-width: 2px; padding-bottom: 9px; }
-  .hint { font-size: 11px; color: var(--g40); margin: 8px 0 0; line-height: 1.5; }
-  .hint a { color: var(--ink); text-underline-offset: 2px; }
+/* ── disclosure ──────────────────────────────────────────────────────── */
+details { margin-top: 14px; }
+summary {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font-size: 12.5px; font-weight: 500; color: var(--faint); list-style: none;
+  padding: 5px 9px; margin-left: -9px; border-radius: var(--r-sm);
+  transition: color var(--fast), background var(--fast);
+}
+summary::-webkit-details-marker { display: none; }
+summary:hover { color: var(--text); background: var(--hover); }
+summary .caret { transition: transform var(--fast); font-size: 10px; opacity: .8; }
+details[open] summary .caret { transform: rotate(90deg); }
+.script {
+  margin: 10px 0 0; padding: 18px 20px; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--line-soft);
+  font: 400 12.5px/1.75 var(--mono); color: var(--muted);
+  white-space: pre-wrap; overflow-x: auto;
+  animation: reveal var(--mid) both;
+}
+@keyframes reveal { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: none } }
 
-  /* ── actions ────────────────────────────────────────────────────── */
-  .actions {
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    margin-top: 36px; padding-top: 20px; border-top: 2px solid var(--ink);
-  }
-  .setup .actions { margin-top: 28px; padding-top: 20px; border-top-width: 1px; border-top-color: var(--rule); }
-  button {
-    font: 500 11px/1 var(--mono); letter-spacing: 0.11em; text-transform: uppercase;
-    padding: 12px 20px; border: 1px solid var(--ink); background: var(--paper);
-    color: var(--ink); cursor: pointer; border-radius: 0;
-  }
-  button:hover { background: var(--sunk); }
-  button.primary { background: var(--ink); color: var(--paper); }
-  button.primary:hover { background: var(--g80); }
-  button[disabled] { opacity: .3; cursor: not-allowed; }
-  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-  .say-more { font-size: 12px; color: var(--g55); }
-  .say-more.bad { color: var(--ink); font-weight: 600; }
+/* ── onboarding ──────────────────────────────────────────────────────── */
+.onboard {
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--raised); box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 56px; animation: rise var(--mid) both;
+}
+.onboard-head { padding: 26px 28px 0; }
+.onboard-head h2 { font-size: 19px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.024em; }
+.onboard-head p { margin: 0; color: var(--muted); font-size: 13.5px; max-width: 64ch; line-height: 1.62; }
+.steps { display: flex; gap: 6px; padding: 22px 28px 0; }
+.step {
+  flex: 1; display: flex; align-items: center; gap: 9px;
+  padding: 11px 13px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--surface);
+  font-size: 12.5px; font-weight: 500; color: var(--faint);
+  transition: color var(--fast), border-color var(--fast), background var(--fast);
+}
+.step .n {
+  width: 19px; height: 19px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 11px; font-weight: 600;
+  border: 1px solid currentColor;
+}
+.step[data-state="active"] { color: var(--text); border-color: var(--faint); background: var(--hover); }
+.step[data-state="done"] { color: var(--ok); border-color: var(--ok-line); background: var(--ok-bg); }
+.step[data-state="done"] .n { border-color: transparent; background: currentColor; color: var(--raised); }
+.onboard-body { padding: 26px 28px; }
+/* 2x2 rather than auto-fit: four fields across three columns leaves the last
+   one alone in a row, which reads as an afterthought. */
+.fields { display: grid; gap: 24px 26px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+label { display: block; font-size: 12.5px; font-weight: 550; margin-bottom: 8px; letter-spacing: -0.006em; }
+label em { font-style: normal; font-weight: 400; color: var(--ok); font-size: 12px; margin-left: 6px; }
+input {
+  width: 100%; font: 400 13.5px/1.4 var(--sans); padding: 10px 13px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+  transition: border-color var(--fast), background var(--fast);
+}
+input[type="password"], input#f-base { font-family: var(--mono); font-size: 13px; }
+input::placeholder { color: var(--faint); }
+input:hover { border-color: var(--faint); }
+input:focus { outline: none; border-color: var(--focus); background: var(--raised); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent); }
+.hint { font-size: 12px; color: var(--faint); margin: 8px 0 0; line-height: 1.55; }
+.hint a { color: var(--muted); text-underline-offset: 2px; }
+.hint a:hover { color: var(--text); }
+.onboard-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 20px 28px; border-top: 1px solid var(--line-soft); background: var(--surface);
+}
+.privacy { font-size: 12.5px; color: var(--faint); margin-right: auto; max-width: 52ch; line-height: 1.55; }
 
-  footer {
-    margin-top: 56px; padding-top: 14px; border-top: 1px solid var(--rule);
-    font: 400 11px/1.7 var(--mono); color: var(--g40);
-    display: flex; justify-content: space-between; gap: var(--gutter); flex-wrap: wrap;
-  }
-  footer .bad { color: var(--ink); font-weight: 600; }
+/* ── notice ──────────────────────────────────────────────────────────── */
+.notice {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); padding: 16px 20px; margin-bottom: 32px;
+  animation: rise var(--mid) both;
+}
+.notice p { margin: 0; flex: 1 1 340px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+.notice b { color: var(--text); font-weight: 570; }
 
-  @media (max-width: 720px) {
-    .band { grid-template-columns: 1fr 1fr; }
-    .band > div { border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); }
-    .band > div:first-child { padding-left: 16px; }
-    .row { grid-template-columns: 1fr; gap: 10px; }
-    .notice { grid-template-columns: 1fr; }
-  }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-  [hidden] { display: none !important; }
+/* ── action bar ──────────────────────────────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 20px 22px; border-radius: var(--r-lg);
+  border: 1px solid var(--line); background: var(--surface);
+  margin-bottom: 40px;
+}
+.bar .status { font-size: 13px; color: var(--muted); margin-left: auto; text-align: right; }
+.bar .status.warn { color: var(--stop); font-weight: 500; }
+
+/* skeleton */
+.skel { border-radius: var(--r-md); background: var(--surface); height: 84px; border: 1px solid var(--line-soft); position: relative; overflow: hidden; }
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--hover), transparent);
+  animation: sweep 1.4s ease-in-out infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+
+footer {
+  display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between;
+  padding-top: 22px; border-top: 1px solid var(--line-soft);
+  font-size: 12.5px; color: var(--faint);
+}
+footer .mono { font-family: var(--mono); font-size: 12px; }
+footer .bad { color: var(--stop); font-weight: 500; }
+
+@media (max-width: 860px) {
+  .metrics { grid-template-columns: 1fr 1fr; }
+  .fields { grid-template-columns: 1fr; }
+  .steps { flex-direction: column; }
+  .row-top { flex-wrap: wrap; }
+  .row-id { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+[hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div class="sheet">
+<div class="page">
 
-  <header class="masthead">
-    <h1 class="wordmark">Nominee<span>Verification of employment</span></h1>
-    <div class="controls">
-      <span class="mode" id="mode">—</span>
-      <button class="theme" id="theme" title="Light, dark, or follow the system">Auto</button>
+  <header class="top">
+    <div class="mark">
+      <div class="glyph">N</div>
+      <div><b>Nominee</b> <span>Verification of employment</span></div>
     </div>
+    <span class="chip" id="mode" data-live="false"><i class="dot"></i><span id="mode-text">Loading</span></span>
+    <button class="ghost sm" id="theme">Auto</button>
   </header>
 
-  <dl class="band" id="band">
-    <div><dt>View</dt><dd class="txt" id="m-view">—</dd></div>
-    <div><dt>Will call</dt><dd id="m-call">—</dd></div>
-    <div><dt>Skipped</dt><dd id="m-skip">—</dd></div>
-    <div><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
-    <div><dt>Estimated</dt><dd id="m-cost">—</dd></div>
+  <dl class="metrics">
+    <div class="metric"><dt>View</dt><dd class="text" id="m-view">—</dd></div>
+    <div class="metric"><dt>Will call</dt><dd id="m-call">—</dd></div>
+    <div class="metric"><dt>Skipped</dt><dd id="m-skip">—</dd></div>
+    <div class="metric" id="metric-hidden"><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
+    <div class="metric"><dt>Estimated</dt><dd id="m-cost">—</dd></div>
   </dl>
 
   <div class="notice" id="notice" hidden>
     <p id="notice-text"></p>
-    <button id="notice-cta">Connect</button>
+    <button class="primary" id="notice-cta">Connect</button>
   </div>
 
-  <section class="setup" id="setup" hidden>
-    <h2>Connect your data</h2>
-    <p class="lede">Stored in a local <code>.env</code> created readable only by you. Never written to your base, never logged, and never returned by this panel — only the last four characters are ever shown again.</p>
-    <div class="grid">
-      <div>
-        <label for="f-token">Airtable token <b id="s-token"></b></label>
-        <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
-        <p class="hint">Scope <code>schema.bases:read</code> plus record read/write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create one</a></p>
-      </div>
-      <div>
-        <label for="f-base">Airtable base</label>
-        <input id="f-base" autocomplete="off" placeholder="app…">
-        <p class="hint">The <code>app…</code> segment of your base URL.</p>
-      </div>
-      <div>
-        <label for="f-key">CALL-E key <b id="s-key"></b></label>
-        <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
-        <p class="hint">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Dashboard</a></p>
-      </div>
-      <div>
-        <label for="f-req">Your organisation</label>
-        <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
-        <p class="hint">Spoken on every call. An unnamed caller asking about an employee is pretexting.</p>
+  <section class="onboard" id="onboard" hidden>
+    <div class="onboard-head">
+      <h2>Connect your verification queue</h2>
+      <p>Two connections and you are working from your own Airtable base. Everything stays on this machine.</p>
+    </div>
+    <div class="steps">
+      <div class="step" id="step-1"><span class="n">1</span> Airtable base</div>
+      <div class="step" id="step-2"><span class="n">2</span> CALL-E account</div>
+      <div class="step" id="step-3"><span class="n">3</span> Your organisation</div>
+    </div>
+    <div class="onboard-body">
+      <div class="fields">
+        <div>
+          <label for="f-token">Airtable token <em id="s-token"></em></label>
+          <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
+          <p class="hint">Scope <code>schema.bases:read</code> plus record read and write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token →</a></p>
+        </div>
+        <div>
+          <label for="f-base">Airtable base</label>
+          <input id="f-base" autocomplete="off" placeholder="app…">
+          <p class="hint">The <code>app…</code> segment of your base URL.</p>
+        </div>
+        <div>
+          <label for="f-key">CALL-E API key <em id="s-key"></em></label>
+          <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
+          <p class="hint">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Open dashboard →</a></p>
+        </div>
+        <div>
+          <label for="f-req">Your organisation</label>
+          <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
+          <p class="hint">Spoken aloud on every call. An unnamed caller asking about an employee is pretexting.</p>
+        </div>
       </div>
     </div>
-    <div class="actions">
+    <div class="onboard-foot">
+      <p class="privacy" id="privacy">Saved to a local file only you can read. Never written to your base, never logged, and never shown again — only the last four characters.</p>
+      <button id="close-onboard">Cancel</button>
       <button class="primary" id="save">Save and connect</button>
-      <button id="close-setup">Cancel</button>
-      <span class="say-more" id="setup-msg"></span>
+      <span class="status" id="setup-msg"></span>
     </div>
   </section>
 
   <section id="s-plan">
-    <p class="rubric"><span>Will be called</span></p>
-    <div id="planned"></div>
+    <div class="head"><h2>Will be called</h2><span class="count" id="c-plan">—</span></div>
+    <div class="list" id="planned"><div class="skel"></div><div class="skel"></div></div>
   </section>
 
   <section id="s-skip" hidden>
-    <p class="rubric"><span>Will not be called</span></p>
-    <div id="skipped"></div>
+    <div class="head"><h2>Will not be called</h2><span class="count" id="c-skip">—</span></div>
+    <div class="list" id="skipped"></div>
   </section>
 
-  <div class="actions">
-    <button id="refresh">Preview again</button>
-    <button id="open-setup">Setup</button>
+  <div class="bar">
     <button class="primary" id="run">Run</button>
-    <span class="say-more" id="hint"></span>
+    <button id="refresh">Preview again</button>
+    <button class="ghost" id="open-onboard">Connections</button>
+    <span class="status" id="hint"></span>
   </div>
-  <p class="say-more bad" id="err" hidden></p>
 
   <section id="s-res" hidden>
-    <p class="rubric"><span>Results</span></p>
-    <div id="results"></div>
+    <div class="head"><h2>Results</h2><span class="count" id="c-res">—</span></div>
+    <div class="list" id="results"></div>
   </section>
 
   <footer>
-    <span id="chain">audit —</span>
+    <span class="mono" id="chain">audit —</span>
     <span id="perm"></span>
   </footer>
 </div>
@@ -333,14 +436,13 @@
 const TOKEN = new URLSearchParams(location.search).get("token") || "";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let VIEW = "", MODE = "fixtures", polling = null;
+let VIEW = "", MODE = "fixtures", CONFIG = {}, polling = null;
 
-/* Status weight, not colour. Inversion is reserved for what needs a human. */
-const WEIGHT = {
-  needs_review: "attention", partial: "attention",
-  verified: "clear",
-  not_verified: "muted", employer_unreachable: "muted",
-  declined: "muted", skipped: "muted", pending: "muted",
+const TONE = {
+  verified: "ok",
+  needs_review: "attn", partial: "attn",
+  employer_unreachable: "stop", not_verified: "stop", skipped: "stop",
+  declined: "idle", pending: "idle",
 };
 const ORDER = ["needs_review","partial","verified","declined","not_verified","employer_unreachable","pending","skipped"];
 
@@ -351,97 +453,129 @@ const api = async (path, opts) => {
   return j;
 };
 
-const showError = (msg) => { $("err").hidden = !msg; $("err").textContent = msg || ""; };
+function say(msg, bad) {
+  const el = $("hint");
+  el.textContent = msg || "";
+  el.classList.toggle("warn", !!bad);
+}
 
-/* ── theme: light / dark / follow the system ───────────────────────── */
-const THEMES = ["auto", "light", "dark"];
+/* ── theme ─────────────────────────────────────────────────────────── */
+const THEMES = ["Auto", "Light", "Dark"];
 function applyTheme(next) {
-  if (next === "auto") document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.setAttribute("data-theme", next);
+  const root = document.documentElement;
+  if (next === "Auto") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", next.toLowerCase());
   $("theme").textContent = next;
   try { localStorage.setItem("nominee-theme", next); } catch (e) { /* private window */ }
 }
 $("theme").addEventListener("click", () => {
-  const now = $("theme").textContent.trim();
-  applyTheme(THEMES[(THEMES.indexOf(now) + 1) % THEMES.length]);
+  applyTheme(THEMES[(THEMES.indexOf($("theme").textContent.trim()) + 1) % THEMES.length]);
 });
 (() => {
-  let saved = "auto";
-  try { saved = localStorage.getItem("nominee-theme") || "auto"; } catch (e) { /* ignore */ }
-  applyTheme(THEMES.includes(saved) ? saved : "auto");
+  let saved = "Auto";
+  try { saved = localStorage.getItem("nominee-theme") || "Auto"; } catch (e) { /* ignore */ }
+  applyTheme(THEMES.includes(saved) ? saved : "Auto");
 })();
 
-/* ── rendering ─────────────────────────────────────────────────────── */
+/* ── plan ──────────────────────────────────────────────────────────── */
+function planRow(x) {
+  return `
+  <article class="row">
+    <div class="row-top">
+      <div class="row-id">${esc(x.request_id)}</div>
+      <div class="row-body">
+        <div class="row-org">${esc(x.employer)}</div>
+        <div class="row-meta">
+          <span class="phone">${esc(x.masked_number)}</span>
+          <span class="sep">·</span>
+          <span class="prov">sourced from ${esc(x.source.replace(/_/g, " "))}</span>
+        </div>
+        <details>
+          <summary><span class="caret">▶</span> What will be said on this call</summary>
+          <pre class="script">${esc(x.task)}</pre>
+        </details>
+      </div>
+      <span class="pill" data-s="idle">Ready</span>
+    </div>
+  </article>`;
+}
+
+function skipRow(x) {
+  return `
+  <article class="row">
+    <div class="row-top">
+      <div class="row-id">${esc(x.request_id)}</div>
+      <div class="row-body">
+        <div class="row-org">${esc(x.employer)}</div>
+        <p class="row-note">${esc(x.reason)}</p>
+      </div>
+      <span class="pill" data-s="stop">Not called</span>
+    </div>
+  </article>`;
+}
+
 function renderPlan(p) {
   VIEW = p.view;
   $("m-view").textContent = p.view;
   $("m-call").textContent = p.call_count;
   $("m-skip").textContent = p.skipped.length;
-  const hid = $("m-hidden");
-  hid.textContent = p.hidden;
-  hid.classList.toggle("flag", p.hidden > 0);
+  $("m-hidden").textContent = p.hidden;
+  $("metric-hidden").dataset.flag = String(p.hidden > 0);
   $("m-cost").innerHTML = "$" + p.estimated_cost_usd.toFixed(2) + " <small>est.</small>";
+  $("c-plan").textContent = p.call_count;
+  $("c-skip").textContent = p.skipped.length;
 
-  $("planned").innerHTML = p.planned.map(x => `
-    <article class="row">
-      <div class="rid">${esc(x.request_id)}</div>
-      <div class="who">
-        <div class="org">${esc(x.employer)}</div>
-        <div class="meta">
-          <span>${esc(x.masked_number)}</span>
-          <span class="prov">${esc(x.source.replace(/_/g, " "))}</span>
-        </div>
-        <details><summary>What will be said</summary><pre class="script">${esc(x.task)}</pre></details>
-      </div>
-      <span class="tag" data-w="clear">Ready</span>
-    </article>`).join("") || `<p class="say">Nothing in this view is ready to call.</p>`;
-
+  $("planned").innerHTML = p.planned.map(planRow).join("")
+    || `<p class="row-note">Nothing in this view is ready to call.</p>`;
   $("s-skip").hidden = p.skipped.length === 0;
-  $("skipped").innerHTML = p.skipped.map(x => `
-    <article class="row">
-      <div class="rid">${esc(x.request_id)}</div>
-      <div class="who">
-        <div class="org">${esc(x.employer)}</div>
-        <p class="say">${esc(x.reason)}</p>
-      </div>
-      <span class="tag" data-w="muted">Not called</span>
-    </article>`).join("");
+  $("skipped").innerHTML = p.skipped.map(skipRow).join("");
 
   $("run").disabled = p.call_count === 0;
-  $("hint").textContent = p.call_count
-    ? `${p.call_count} real call${p.call_count > 1 ? "s" : ""}. This cannot be undone.`
-    : "";
+  say(p.call_count ? `${p.call_count} real call${p.call_count > 1 ? "s" : ""} · cannot be undone` : "");
 }
 
 function renderRun(s) {
   $("s-res").hidden = false;
   const rows = [...s.rows].sort((a, b) => ORDER.indexOf(a.disposition) - ORDER.indexOf(b.disposition));
+  $("c-res").textContent = rows.length;
   $("results").innerHTML = rows.map(r => `
     <article class="row">
-      <div class="rid">${esc(r.request_id)}</div>
-      <div class="who">
-        <p class="say" style="margin-top:0">${esc(r.reason)}</p>
-        ${(r.evidence || []).map(e => `<p class="quote">${esc(e)}</p>`).join("")}
+      <div class="row-top">
+        <div class="row-id">${esc(r.request_id)}</div>
+        <div class="row-body">
+          <p class="row-note" style="margin-top:2px">${esc(r.reason)}</p>
+          ${(r.evidence || []).map(e => `<p class="row-quote">${esc(e)}</p>`).join("")}
+        </div>
+        <span class="pill" data-s="${TONE[r.disposition] || "idle"}">
+          ${esc(r.disposition.replace(/_/g, " "))}
+          ${r.confidence != null ? `<span class="conf">${r.confidence.toFixed(2)}</span>` : ""}
+        </span>
       </div>
-      <span class="tag" data-w="${WEIGHT[r.disposition] || "muted"}">
-        ${esc(r.disposition.replace(/_/g, " "))}${r.confidence != null ? " · " + r.confidence.toFixed(2) : ""}
-      </span>
     </article>`).join("");
-  if (s.error) showError(s.error);
+
+  if (s.error) say(s.error, true);
   if (s.finished && !s.running) {
     const parts = Object.entries(s.counts).map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`);
-    $("hint").textContent = parts.length ? `${parts.join(" · ")} in ${s.elapsed}s` : "";
+    if (!s.error) say(parts.length ? `${parts.join(" · ")} in ${s.elapsed}s` : "");
     $("run").disabled = false; $("refresh").disabled = false;
     clearInterval(polling); polling = null;
     loadAudit();
   }
 }
 
+/* ── connections ───────────────────────────────────────────────────── */
+function renderSteps() {
+  const c = CONFIG;
+  $("step-1").dataset.state = c.can_read_table ? "done" : "active";
+  $("step-2").dataset.state = c.calle_api_key ? "done" : (c.can_read_table ? "active" : "");
+  $("step-3").dataset.state = c.requester_name ? "done" : (c.calle_api_key ? "active" : "");
+}
+
 function renderConfig(c) {
-  VIEW = c.view; MODE = c.mode;
-  const m = $("mode");
-  m.textContent = { fixtures: "Sample data", preview: "Preview only", live: "Live" }[MODE] || MODE;
-  m.dataset.live = String(MODE === "live");
+  CONFIG = c; VIEW = c.view; MODE = c.mode;
+  const label = { fixtures: "Sample data", preview: "Preview only", live: "Live" }[MODE] || MODE;
+  $("mode-text").textContent = label;
+  $("mode").dataset.live = String(MODE === "live");
 
   $("s-token").textContent = c.airtable_token || "";
   $("s-key").textContent = c.calle_api_key || "";
@@ -449,88 +583,90 @@ function renderConfig(c) {
   $("f-req").value = c.requester_name || "";
   $("perm").textContent = c.permission_warning || "";
   $("perm").className = c.permission_warning ? "bad" : "";
+  renderSteps();
 
   const n = $("notice"), t = $("notice-text"), cta = $("notice-cta");
   if (MODE === "fixtures" && !c.forced_fixtures) {
     n.hidden = false;
-    t.innerHTML = "<b>Sample data.</b> Everything here is real except the phone calls. Connect your Airtable base to run your own verification queue.";
+    t.innerHTML = "<b>You are looking at sample data.</b> Every part of this is real except the phone calls. Connect your Airtable base to run your own verification queue.";
     cta.textContent = "Connect";
   } else if (MODE === "preview") {
     n.hidden = false;
-    t.innerHTML = "<b>Preview only.</b> Reading your table, but there is no CALL-E key yet, so nothing can be dialled.";
+    t.innerHTML = "<b>Preview only.</b> Reading your real table, but there is no CALL-E key yet, so nothing can be dialled.";
     cta.textContent = "Add key";
   } else {
     n.hidden = true;
   }
 }
 
+const toggleOnboard = (show) => {
+  $("onboard").hidden = !show;
+  if (show) {
+    $("onboard").scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => (CONFIG.can_read_table ? $("f-key") : $("f-token")).focus(), 260);
+  }
+};
+$("open-onboard").addEventListener("click", () => toggleOnboard($("onboard").hidden));
+$("notice-cta").addEventListener("click", () => toggleOnboard(true));
+$("close-onboard").addEventListener("click", () => toggleOnboard(false));
+
+$("save").addEventListener("click", async () => {
+  const body = {};
+  for (const [id, key] of [["f-token","airtable_token"],["f-key","calle_api_key"],["f-base","airtable_base_id"],["f-req","requester_name"]]) {
+    const v = $(id).value.trim(); if (v) body[key] = v;
+  }
+  $("save").disabled = true;
+  $("setup-msg").textContent = "Connecting…";
+  try {
+    const c = await api("/api/setup", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    $("f-token").value = ""; $("f-key").value = "";
+    renderConfig(c);
+    $("setup-msg").textContent = "Connected";
+    setTimeout(() => { toggleOnboard(false); $("setup-msg").textContent = ""; }, 700);
+    await loadPlan();
+  } catch (e) {
+    $("setup-msg").textContent = "";
+    say(e.message, true);
+  } finally { $("save").disabled = false; }
+});
+
+/* ── load ──────────────────────────────────────────────────────────── */
 async function loadPlan() {
-  try { renderPlan(await api("/api/plan?view=" + encodeURIComponent(VIEW))); showError(""); }
-  catch (e) { showError(e.message); }
+  try { renderPlan(await api("/api/plan?view=" + encodeURIComponent(VIEW))); }
+  catch (e) { say(e.message, true); $("planned").innerHTML = ""; }
 }
 
 async function loadAudit() {
   try {
     const a = await api("/api/audit");
     const el = $("chain");
-    el.className = a.ok ? "" : "bad";
+    el.className = a.ok ? "mono" : "mono bad";
     el.textContent = a.ok
-      ? `audit — chain intact · ${a.records} records · head ${a.head}`
-      : `audit — CHAIN BROKEN at seq ${a.broken_at} · ${a.reason}`;
-  } catch (e) { /* panel is still usable */ }
+      ? `audit · chain intact · ${a.records} records · head ${a.head}`
+      : `audit · CHAIN BROKEN at seq ${a.broken_at} · ${a.reason}`;
+  } catch (e) { /* panel remains usable */ }
 }
 
-/* ── setup ─────────────────────────────────────────────────────────── */
-const toggleSetup = (show) => {
-  $("setup").hidden = !show;
-  if (show) $("setup").scrollIntoView({ behavior: "smooth", block: "start" });
-};
-$("open-setup").addEventListener("click", () => toggleSetup($("setup").hidden));
-$("notice-cta").addEventListener("click", () => toggleSetup(true));
-$("close-setup").addEventListener("click", () => toggleSetup(false));
-
-$("save").addEventListener("click", async () => {
-  const body = {};
-  const pairs = [["f-token","airtable_token"],["f-key","calle_api_key"],["f-base","airtable_base_id"],["f-req","requester_name"]];
-  for (const [id, key] of pairs) { const v = $(id).value.trim(); if (v) body[key] = v; }
-
-  $("save").disabled = true; $("setup-msg").textContent = "saving…";
-  try {
-    const c = await api("/api/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    $("f-token").value = ""; $("f-key").value = "";
-    renderConfig(c);
-    $("setup-msg").textContent = "connected";
-    toggleSetup(false);
-    await loadPlan();
-  } catch (e) {
-    $("setup-msg").textContent = ""; showError(e.message);
-  } finally { $("save").disabled = false; }
-});
-
-/* ── run ───────────────────────────────────────────────────────────── */
 $("refresh").addEventListener("click", loadPlan);
 
 $("run").addEventListener("click", async () => {
   const n = $("m-call").textContent;
   if (!confirm(`Place ${n} real phone call${n === "1" ? "" : "s"} to real employers.\n\nThis cannot be undone.`)) return;
-  $("run").disabled = true; $("refresh").disabled = true; showError("");
+  $("run").disabled = true; $("refresh").disabled = true;
+  say("Dialling…");
   try {
     await api("/api/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ view: VIEW, confirm: true }),
     });
-    $("hint").textContent = "dialling…";
     polling = setInterval(async () => {
       try { renderRun(await api("/api/status")); }
-      catch (e) { showError(e.message); clearInterval(polling); polling = null; }
+      catch (e) { say(e.message, true); clearInterval(polling); polling = null; }
     }, 1000);
   } catch (e) {
-    showError(e.message);
+    say(e.message, true);
     $("run").disabled = false; $("refresh").disabled = false;
   }
 });
@@ -541,7 +677,8 @@ $("run").addEventListener("click", async () => {
     await loadPlan();
     await loadAudit();
   } catch (e) {
-    showError(e.message + " — open the URL printed by ./run.sh, which carries the token.");
+    say(e.message + " — open the URL printed when Nominee started; it carries the access token.", true);
+    $("planned").innerHTML = "";
   }
 })();
 </script>
