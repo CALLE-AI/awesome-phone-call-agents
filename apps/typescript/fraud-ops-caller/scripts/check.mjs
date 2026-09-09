@@ -3,7 +3,7 @@
  * Smallest check that fails if case/outcome contracts break.
  * Run: npm run check
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -99,6 +99,12 @@ for (const item of cases) {
   if (!item.contact?.phone_e164?.startsWith("+")) {
     fail(`${item.case_id} phone is not E.164`);
   }
+  if (!/^\+121255501\d{2}$/.test(item.contact.phone_e164)) {
+    fail(`${item.case_id} must use NANP reserved fiction NPA-555-01xx`);
+  }
+  if (!/Example|Placeholder/.test(item.contact.name)) {
+    fail(`${item.case_id} contact.name must be clearly fictional`);
+  }
 }
 
 const ev = cases.filter((c) => c.intent === "evidence_collection");
@@ -139,5 +145,26 @@ if (DISPOSITIONS.kyc_chase.includes("paid")) fail("kyc disposition list drifted"
 if (DISPOSITIONS.evidence_collection.includes("ptp")) {
   fail("evidence disposition list drifted");
 }
+
+const BANNED_PUBLIC_VIDEO = [
+  ["FHa4", "QgJPgj4"].join(""),
+  ["fraud-ops-caller-demo", "tight.mp4"].join("-"),
+];
+function scanBannedVideo(dir) {
+  for (const name of readdirSync(dir)) {
+    if (name === "node_modules" || name === ".git" || name === ".next") continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      scanBannedVideo(full);
+      continue;
+    }
+    if (!/\.(md|json|ts|tsx|mjs|cjs|js|example|yml|yaml|txt|html)$/i.test(name)) continue;
+    const text = readFileSync(full, "utf8");
+    for (const token of BANNED_PUBLIC_VIDEO) {
+      if (text.includes(token)) fail(`${full} must not reference leaked demo video`);
+    }
+  }
+}
+scanBannedVideo(root);
 
 console.log("ok: 5 cases + 4 intents + linked evidence pair match schemas");

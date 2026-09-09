@@ -354,12 +354,26 @@ export async function runSelfCheck(): Promise<void> {
     throw new Error("compose after live validate failure must persist outcome_unknown");
   }
 
-  const { executeCallRun, resetIdempotencyForTests, LIVE_CONFIRM_PHRASE } = await import("./run-call");
+  process.env.CALL_CLAIMS_PATH = `/tmp/fraud-ops-claims-self-check-${process.pid}.json`;
+  const { executeCallRun, resetIdempotencyForTests, LIVE_CONFIRM_PHRASE, durableClaimKey } =
+    await import("./run-call");
+  if (
+    durableClaimKey(kycCase.case_id, kycCase.contact.phone_e164, "plan") !==
+    `${kycCase.case_id}|${kycCase.contact.phone_e164}|plan`
+  ) {
+    throw new Error("durable claim must be keyed by case+destination");
+  }
   resetIdempotencyForTests();
   const missing = await executeCallRun({ caseId: "nope", mode: "demo", fast: true, now });
   if (missing.status !== 404) throw new Error("unknown case must 404");
 
-  const calleKeys = ["CALLE_API_KEY", "CALLE_BASE_URL", "CALLE_LIVE_CALLS_ENABLED"] as const;
+  const calleKeys = [
+    "CALLE_API_KEY",
+    "CALLE_BASE_URL",
+    "CALLE_LIVE_CALLS_ENABLED",
+    "OPS_RUN_SECRET",
+    "LIVE_DIAL_ALLOWLIST",
+  ] as const;
   const calleSnap = Object.fromEntries(calleKeys.map((key) => [key, process.env[key]]));
   try {
     for (const key of calleKeys) delete process.env[key];
@@ -384,6 +398,45 @@ export async function runSelfCheck(): Promise<void> {
     });
     if (wrongPhrase.status !== 403) {
       throw new Error("live with flags on but wrong phrase must 403");
+    }
+
+    process.env.OPS_RUN_SECRET = "self-check-ops-secret";
+    const { signLiveGrant } = await import("./ops-auth");
+    const grant = signLiveGrant(kycCase.case_id, kycCase.contact.phone_e164);
+    const noGrant = await executeCallRun({
+      caseId: "case_demo_kyc_001",
+      mode: "live",
+      confirmLive: LIVE_CONFIRM_PHRASE,
+      fast: true,
+      now,
+    });
+    if (noGrant.status !== 403) {
+      throw new Error("live without destination grant must 403");
+    }
+    const wrongTo = await executeCallRun({
+      caseId: "case_demo_kyc_001",
+      mode: "live",
+      confirmLive: LIVE_CONFIRM_PHRASE,
+      liveGrant: grant.token,
+      to: "+12125550199",
+      fast: true,
+      now,
+    });
+    if (wrongTo.status !== 403) {
+      throw new Error("live with mismatched destination must 403");
+    }
+    const wrongGrantPhone = signLiveGrant(kycCase.case_id, "+12125550199");
+    const boundWrong = await executeCallRun({
+      caseId: "case_demo_kyc_001",
+      mode: "live",
+      confirmLive: LIVE_CONFIRM_PHRASE,
+      liveGrant: wrongGrantPhone.token,
+      to: kycCase.contact.phone_e164,
+      fast: true,
+      now,
+    });
+    if (boundWrong.status !== 403) {
+      throw new Error("grant bound to a different phone must 403");
     }
   } finally {
     for (const key of calleKeys) {
@@ -410,4 +463,157 @@ export async function runSelfCheck(): Promise<void> {
   if (!replay.ok || replay.body.outcome.call_id !== first.body.outcome.call_id) {
     throw new Error("replay must return same outcome");
   }
+  if (
+    first.body.outcome.transcript_snippet.includes("+12125550101") ||
+    /\+[1-9][0-9]{7,14}/.test(JSON.stringify(first.body.outcome))
+  ) {
+    throw new Error("browser outcome must not contain a raw E.164");
+  }
+
+  const { assertCalleBaseUrl, CALLE_PRODUCTION_ORIGIN } = await import("./calle-origin");
+  assertCalleBaseUrl(CALLE_PRODUCTION_ORIGIN);
+  for (const bad of [
+    "http://127.0.0.1:9",
+    "http://localhost:43127",
+    "https://evil.example",
+    "https://api.heycall-e.com/extra",
+    "https://user:pass@api.heycall-e.com",
+  ]) {
+    let rejected = false;
+    try {
+      assertCalleBaseUrl(bad);
+    } catch {
+      rejected = true;
+    }
+    if (!rejected) throw new Error(`CALLE_BASE_URL must reject ${bad}`);
+  }
+
+  const { authorizeOpsRequest, signLiveGrant, verifyLiveGrant, safeEqual } = await import("./ops-auth");
+  const { maskOutcomeForBrowser } = await import("./mask-public");
+  const priorSecret = process.env.OPS_RUN_SECRET;
+  delete process.env.OPS_RUN_SECRET;
+  const unconfigured = authorizeOpsRequest(new Request("http://127.0.0.1/api/calls/run"));
+  if (unconfigured.ok || unconfigured.status !== 503) {
+    throw new Error("missing OPS_RUN_SECRET must fail closed");
+  }
+  process.env.OPS_RUN_SECRET = "self-check-ops-secret";
+  const denied = authorizeOpsRequest(new Request("http://127.0.0.1/api/calls/run"));
+  if (denied.ok || denied.status !== 401) {
+    throw new Error("anonymous call run must 401");
+  }
+  const allowed = authorizeOpsRequest(
+    new Request("http://127.0.0.1/api/calls/run", {
+      headers: { authorization: "Bearer self-check-ops-secret" },
+    })
+  );
+  if (!allowed.ok) throw new Error("bearer OPS_RUN_SECRET must authorize");
+  if (!safeEqual("self-check-ops-secret", "self-check-ops-secret")) {
+    throw new Error("safeEqual true path");
+  }
+  const grant = signLiveGrant(kycCase.case_id, kycCase.contact.phone_e164);
+  if (!verifyLiveGrant(grant.token, kycCase.case_id, kycCase.contact.phone_e164)) {
+    throw new Error("live grant must verify against the approved phone");
+  }
+  if (verifyLiveGrant(grant.token, kycCase.case_id, "+12125550199")) {
+    throw new Error("live grant must not verify a different phone");
+  }
+  const leaked = maskOutcomeForBrowser({
+    ...first.body.outcome,
+    transcript_snippet: `Call ${kycCase.contact.phone_e164} please also try +12125550199`,
+    quotes: [`Reach me at ${kycCase.contact.phone_e164}`],
+  });
+  if (leaked.transcript_snippet.includes(kycCase.contact.phone_e164)) {
+    throw new Error("transcript mask leaked approved phone");
+  }
+  if (leaked.quotes.some((q) => q.includes(kycCase.contact.phone_e164))) {
+    throw new Error("quote mask leaked approved phone");
+  }
+
+  const reservedE164 = "+12125550101";
+  const reservedMasked = "+121****0101";
+  if (maskE164(reservedE164) !== reservedMasked) {
+    throw new Error("maskE164 must keep last 4 on reserved NPA-555-01xx");
+  }
+  if (maskFromView(reservedE164) !== reservedMasked) {
+    throw new Error("plan-view maskE164 must keep last 4 on reserved NPA-555-01xx");
+  }
+  const ukOfcomE164 = "+447700900123";
+  const ukOfcomMasked = "+447*****0123";
+  if (maskE164(ukOfcomE164) !== ukOfcomMasked) {
+    throw new Error("maskE164 must still mask non-NANP E.164");
+  }
+  const { redactPhones } = await import("./mask-public");
+  if (redactPhones(`Reach ${ukOfcomE164}`) !== `Reach ${ukOfcomMasked}`) {
+    throw new Error("redactPhones must not weaken E.164 masking");
+  }
+  if (redactPhones(`Call ${reservedE164}`) !== `Call ${reservedMasked}`) {
+    throw new Error("redactPhones must still mask reserved E.164");
+  }
+  const formattedLeaks = [
+    "(212) 555-0101",
+    "212-555-0101",
+    "212.555.0101",
+    "212 555 0101",
+    "555-0101",
+    "555.0101",
+    "555 0101",
+    "12125550101",
+    "2125550101",
+    "1-212-555-0101",
+    "+1 212 555 0101",
+    "+1 (212) 555-0101",
+  ];
+  for (const raw of formattedLeaks) {
+    const masked = redactPhones(`Please call ${raw} today`);
+    if (masked.includes(raw)) {
+      throw new Error(`redactPhones leaked formatted phone ${raw}`);
+    }
+    if (masked.includes("2125550101") || masked.includes("555-0101") || masked.includes("(212)")) {
+      throw new Error(`redactPhones left reconstructable digits for ${raw}`);
+    }
+    if (!masked.includes("0101") && !masked.includes("****")) {
+      throw new Error(`redactPhones fail-closed mask missing for ${raw}: ${masked}`);
+    }
+  }
+  const formatOutcome = maskOutcomeForBrowser({
+    ...first.body.outcome,
+    transcript_snippet: "Call (212) 555-0101 or 212-555-0101 or 555-0101",
+    quotes: ["Reach me at 212.555.0101"],
+    next_action: "Try 1-212-555-0101 if needed",
+  });
+  const formatBlob = JSON.stringify(formatOutcome);
+  for (const raw of ["(212) 555-0101", "212-555-0101", "212.555.0101", "555-0101", "1-212-555-0101"]) {
+    if (formatBlob.includes(raw)) {
+      throw new Error(`browser outcome leaked formatted phone ${raw}`);
+    }
+  }
+  const intact = redactPhones("HKD 2,400 due 21:00-08:00 case_demo_kyc_001 on 2026-09-10");
+  if (intact !== "HKD 2,400 due 21:00-08:00 case_demo_kyc_001 on 2026-09-10") {
+    throw new Error(`redactPhones must not eat non-phone text: ${intact}`);
+  }
+
+  const { forceHaltForTests, dropClaimsMemoryForTests } = await import("./claims-store");
+  forceHaltForTests("case_demo_mer_001", "outcome_unknown");
+  dropClaimsMemoryForTests();
+  const halted = await executeCallRun({
+    caseId: "case_demo_mer_001",
+    mode: "demo",
+    fast: true,
+    now,
+  });
+  if (halted.status !== 409 || halted.body.error !== "halted for reconciliation") {
+    throw new Error("ambiguous halt must block later submissions after reload");
+  }
+
+  for (const fraudCase of MOCK_CASES) {
+    if (!/^\+121255501\d{2}$/.test(fraudCase.contact.phone_e164)) {
+      throw new Error(`${fraudCase.case_id} must use reserved NPA-555-01xx`);
+    }
+    if (!/Example|Placeholder/.test(fraudCase.contact.name)) {
+      throw new Error(`${fraudCase.case_id} contact.name must be clearly fictional`);
+    }
+  }
+
+  if (priorSecret === undefined) delete process.env.OPS_RUN_SECRET;
+  else process.env.OPS_RUN_SECRET = priorSecret;
 }

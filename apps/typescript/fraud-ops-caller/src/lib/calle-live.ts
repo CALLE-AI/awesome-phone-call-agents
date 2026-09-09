@@ -2,29 +2,13 @@ import "server-only";
 
 import { CalleClient } from "@call-e/calle";
 import type { DialResult } from "./calle";
+import { assertCalleBaseUrl } from "./calle-origin";
 import { failClosed, mapLiveResult } from "./map-live-result";
 import type { CallPlan } from "./plan";
 import type { FraudOpsCase } from "./types";
 
 export { failClosed, mapLiveResult } from "./map-live-result";
-
-export function assertCalleBaseUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("CALLE_BASE_URL is not a URL");
-  }
-  const local =
-    (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") &&
-    parsed.port !== "";
-  if (parsed.protocol === "http:" && !local) {
-    throw new Error("plain HTTP only for 127.0.0.1 or localhost with a port");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("CALLE_BASE_URL must be http(s)");
-  }
-}
+export { assertCalleBaseUrl, CALLE_PRODUCTION_ORIGIN } from "./calle-origin";
 
 export async function placeLiveCall(
   fraudCase: FraudOpsCase,
@@ -32,6 +16,9 @@ export async function placeLiveCall(
 ): Promise<DialResult> {
   const apiKey = process.env.CALLE_API_KEY?.trim() ?? "";
   const baseUrl = process.env.CALLE_BASE_URL?.trim() ?? "";
+  if (!apiKey) {
+    throw new Error("CALLE_API_KEY is not configured");
+  }
   assertCalleBaseUrl(baseUrl);
   const client = new CalleClient({ apiKey, baseUrl });
 

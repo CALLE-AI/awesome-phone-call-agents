@@ -66,6 +66,9 @@ export function Desk() {
   const [outcomes, setOutcomes] = useState<Record<string, FraudOpsOutcome>>({});
   const [showJsonFor, setShowJsonFor] = useState<string | null>(null);
   const [liveAvailable, setLiveAvailable] = useState(false);
+  const [authConfigured, setAuthConfigured] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  const [opsSecret, setOpsSecret] = useState("");
   const [livePhraseFor, setLivePhraseFor] = useState<string | null>(null);
   const [livePhrase, setLivePhrase] = useState("");
   const startedAt = useRef<number | null>(null);
@@ -90,14 +93,52 @@ export function Desk() {
       .then((r) => r.json())
       .then((data) => {
         if (data && data.liveAvailable === true) setLiveAvailable(true);
+        if (data && data.authConfigured === true) setAuthConfigured(true);
       })
       .catch(() => {
         setLiveAvailable(false);
+        setAuthConfigured(false);
+      });
+    fetch("/api/auth/session", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.authorized === true) setAuthed(true);
+      })
+      .catch(() => {
+        setAuthed(false);
       });
   }, []);
 
+  async function unlockOperator() {
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/session", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: opsSecret }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Unlock failed");
+      }
+      setAuthed(true);
+      setOpsSecret("");
+    } catch (err) {
+      setAuthed(false);
+      setError({
+        caseId: row?.cases[0]?.case_id ?? "auth",
+        message: err instanceof Error ? err.message : "Unlock failed",
+      });
+    }
+  }
+
   async function onConfirm(fraudCase: FraudOpsCase, mode: "demo" | "live") {
     if (callingCaseId) return;
+    if (!authed) {
+      setError({ caseId: fraudCase.case_id, message: "Unlock the desk with the operator secret." });
+      return;
+    }
     if (mode === "live" && livePhrase !== LIVE_CONFIRM_PHRASE) {
       setError({ caseId: fraudCase.case_id, message: "Type the live confirm phrase exactly." });
       return;
@@ -106,13 +147,29 @@ export function Desk() {
     setElapsedMs(0);
     setCallingCaseId(fraudCase.case_id);
     try {
+      let liveGrant: string | undefined;
+      if (mode === "live") {
+        const grantRes = await fetch("/api/calls/authorize", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ caseId: fraudCase.case_id }),
+        });
+        const grantData = await grantRes.json();
+        if (!grantRes.ok || typeof grantData.liveGrant !== "string") {
+          throw new Error(grantData.error ?? `HTTP ${grantRes.status}`);
+        }
+        liveGrant = grantData.liveGrant;
+      }
       const res = await fetch("/api/calls/run", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           caseId: fraudCase.case_id,
           mode,
           confirmLive: mode === "live" ? livePhrase : undefined,
+          liveGrant,
         }),
       });
       const data = await res.json();
@@ -161,8 +218,33 @@ export function Desk() {
             <Badge variant="outline">4 intents · one runtime</Badge>
             <Badge variant="secondary">CALL-E plan-first</Badge>
             <Badge variant="outline">{liveAvailable ? "live ready" : "demo"}</Badge>
+            <Badge variant={authed ? "secondary" : "outline"}>
+              {authed ? "operator unlocked" : "locked"}
+            </Badge>
           </div>
         </div>
+        {!authConfigured ? (
+          <p className="mx-auto w-full max-w-[1400px] px-4 pb-4 text-xs text-muted-foreground">
+            Set <span className="font-mono">OPS_RUN_SECRET</span> on the server. The confirm
+            phrase is not access control.
+          </p>
+        ) : !authed ? (
+          <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-2 px-4 pb-4 sm:flex-row sm:items-end">
+            <label className="flex-1 text-xs text-muted-foreground">
+              Operator secret
+              <input
+                type="password"
+                autoComplete="off"
+                className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 font-mono text-xs"
+                value={opsSecret}
+                onChange={(e) => setOpsSecret(e.target.value)}
+              />
+            </label>
+            <Button size="sm" disabled={!opsSecret} onClick={() => void unlockOperator()}>
+              Unlock desk
+            </Button>
+          </div>
+        ) : null}
       </header>
 
       <main
@@ -195,6 +277,7 @@ export function Desk() {
             setLivePhraseFor={setLivePhraseFor}
             setLivePhrase={setLivePhrase}
             onConfirm={onConfirm}
+            authed={authed}
           />
         ) : row ? (
           <>
@@ -210,6 +293,7 @@ export function Desk() {
               setLivePhraseFor={setLivePhraseFor}
               setLivePhrase={setLivePhrase}
               onConfirm={onConfirm}
+              authed={authed}
             />
             <OutcomePane
               fraudCase={row.cases[0]}
@@ -338,6 +422,7 @@ function InvestigationPane({
   setLivePhraseFor,
   setLivePhrase,
   onConfirm,
+  authed,
 }: {
   row: QueueRow;
   outcomes: Record<string, FraudOpsOutcome>;
@@ -352,6 +437,7 @@ function InvestigationPane({
   setLivePhraseFor: (id: string | null) => void;
   setLivePhrase: (value: string) => void;
   onConfirm: (fraudCase: FraudOpsCase, mode: "demo" | "live") => void;
+  authed: boolean;
 }) {
   const lead = row.cases[0];
   return (
@@ -392,6 +478,7 @@ function InvestigationPane({
               setLivePhraseFor={setLivePhraseFor}
               setLivePhrase={setLivePhrase}
               onConfirm={onConfirm}
+              authed={authed}
             />
             <OutcomePane
               fraudCase={fraudCase}
@@ -425,6 +512,7 @@ function CasePack({
   setLivePhraseFor,
   setLivePhrase,
   onConfirm,
+  authed,
   compact,
 }: {
   fraudCase: FraudOpsCase;
@@ -438,6 +526,7 @@ function CasePack({
   setLivePhraseFor: (id: string | null) => void;
   setLivePhrase: (value: string) => void;
   onConfirm: (fraudCase: FraudOpsCase, mode: "demo" | "live") => void;
+  authed: boolean;
   compact?: boolean;
 }) {
   const gate = useMemo(() => evaluateGate(fraudCase), [fraudCase]);
@@ -471,7 +560,15 @@ function CasePack({
             label="Contact"
             value={`${fraudCase.contact.name} · ${fraudCase.contact.role}`}
           />
-          <Field label="Phone" value={fraudCase.contact.phone_e164} mono />
+          <Field
+            label="Phone"
+            value={
+              fraudCase.contact.phone_e164.includes("*")
+                ? fraudCase.contact.phone_e164
+                : maskE164(fraudCase.contact.phone_e164)
+            }
+            mono
+          />
           {!compact ? <Field label="Locale" value={fraudCase.contact.locale} /> : null}
           <Field
             label="Attempt"
@@ -540,7 +637,7 @@ function CasePack({
           <Button
             size="lg"
             className="h-10 px-4"
-            disabled={dialLocked || caseIssues.length > 0 || !gate.automate}
+            disabled={dialLocked || caseIssues.length > 0 || !gate.automate || !authed}
             onClick={() => onConfirm(fraudCase, "demo")}
           >
             {calling ? (
@@ -559,7 +656,7 @@ function CasePack({
             <Button
               size="lg"
               variant="outline"
-              disabled={dialLocked || caseIssues.length > 0 || !gate.automate}
+              disabled={dialLocked || caseIssues.length > 0 || !gate.automate || !authed}
               onClick={() => setLivePhraseFor(fraudCase.case_id)}
             >
               Confirm live call
@@ -577,7 +674,7 @@ function CasePack({
               />
             </label>
             <Button
-              disabled={livePhrase !== LIVE_CONFIRM_PHRASE || dialLocked}
+              disabled={livePhrase !== LIVE_CONFIRM_PHRASE || dialLocked || !authed}
               onClick={() => onConfirm(fraudCase, "live")}
             >
               Place live call

@@ -12,7 +12,7 @@ This app does **not** host propensity ML or a consortium score. An optional Tark
 
 ```bash
 npm install
-cp .env.example .env.local   # leave CALLE_* empty
+cp .env.example .env.local   # set OPS_RUN_SECRET; leave CALLE_* empty for demo
 npm run dev
 ```
 
@@ -30,21 +30,23 @@ Queue is four rows: KYC, a **two-party evidence investigation**, collections, me
 
 **Demo (default)** = Confirm demo. No keys. Stub in [`src/lib/calle.ts`](./src/lib/calle.ts) sleeps 5–8s and returns a deterministic `DialResult`. No real phone rings.
 
-**Live** = set all three in `.env.local` (`CALLE_API_KEY`, `CALLE_BASE_URL`, `CALLE_LIVE_CALLS_ENABLED=true`) and type exactly `I understand this places a real phone call`. The swap point is [`src/lib/calle-live.ts`](./src/lib/calle-live.ts): `CalleClient.calls.createAndWait` with the plan’s task, schema, and idempotency key. Timeout / malformed / illegal disposition fail closed to `handoff` + `outcome_unknown` (no retry).
+**Live** = set `OPS_RUN_SECRET`, `CALLE_API_KEY`, `CALLE_BASE_URL=https://api.heycall-e.com`, and `CALLE_LIVE_CALLS_ENABLED=true`. Unlock the desk with the operator secret, then type exactly `I understand this places a real phone call`. The phrase is **not** access control. `/api/calls/run`, `/api/calls/authorize`, and `/api/calls/result` require the secret (Bearer, `x-ops-run-secret`, or unlock cookie). Live dial uses the case’s approved `phone_e164` only; a signed grant is HMAC-bound to that number. A client `to` that does not match is rejected.
 
-Production `CALLE_BASE_URL` is `https://api.heycall-e.com`. Other https URLs are allowed for capture tests. Plain HTTP only for `127.0.0.1` or `localhost` with an explicit port.
+The swap point is [`src/lib/calle-live.ts`](./src/lib/calle-live.ts): `CalleClient.calls.createAndWait` with the plan’s task, schema, and idempotency key. Timeout / malformed / illegal disposition fail closed to `handoff` + `outcome_unknown` and **halt for reconciliation** (durable claim keyed by case + destination). A later conflicting submission is rejected; do not auto-retry.
 
-Do not put real credentials in git. `.env*` is gitignored. The browser never receives the keys.
+`CALLE_BASE_URL` is fail-closed to the HTTPS production origin `https://api.heycall-e.com`. Unset, HTTP, localhost, and any other host never receive `CALLE_API_KEY`.
+
+Do not put real credentials in git. `.env*` is gitignored. The browser never receives the keys. Desk UI and API JSON mask E.164, formatted NANP, and local numbers in transcripts (last-4 or hash only).
 
 `composeOutcome` in `src/lib/outcome.ts` turns `DialResult` into the write-back object and validates it before the UI shows it.
 
 ## Side effects
 
 - **Default:** local stub dial only. No outbound telephony, no SMS, no CRM mutation. Outcomes stay in the browser session.
-- **Live dial:** only when all three CALLE env gates are set and the exact confirm phrase is typed. That places one real CALL-E call to the case contact and consumes CALL-E credit.
-- **No recurring schedules.** There is no automatic retry loop. Discard the run or leave the desk to cancel before confirming live.
+- **Live dial:** only when `OPS_RUN_SECRET` unlocks the desk, all three CALLE env gates are set, the origin is the pinned CALL-E host, a destination grant matches the approved E.164, and the exact confirm phrase is typed. That places one real CALL-E call and consumes CALL-E credit. Phrase alone is FAIL.
+- **No recurring schedules.** There is no automatic retry loop. An uncertain live outcome writes a durable halt; a human must reconcile before a second live submit.
 - Once a live call has started, use CALL-E dashboard controls; the agent script also ends the call if the recipient asks to stop.
-- Sample phones in [`data/cases.json`](./data/cases.json) are **fictional demo fixtures** (for example `+12125550101`, `+12125550105`). Call plans show destinations **masked** (for example `+121****0101`). Do not replace them with real customer numbers in commits.
+- Sample phones in [`data/cases.json`](./data/cases.json) are reserved NANP fiction **NPA-555-01XX** (area code 212 + exchange 555 + 01xx), for example `+12125550101` / `(212) 555-0101`. 555 is never an area code. Contacts use clearly fictional Example / Placeholder names. Call plans and the desk show destinations **masked** (last-4, for example `+121****0101`). Do not replace them with real customer numbers in commits.
 
 ## Contracts
 
