@@ -61,13 +61,21 @@ gate is implemented, tested, and cannot be bypassed by a flag.
 asked the obvious next question: the constant is English, so is a Tamil-speaking parent
 disclosed to in English? The answer is on a real call. Work item `S-4106`, `ta-IN`, opens:
 
-> இது பள்ளி வருகைக் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.
+> இது பள்ளி வருகைப் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.
 >
-> நீங்கள் ஒரு நபருடன் அல்ல, AI உதவியாளருடன் பேசுகிறீர்கள்.
+> This is an automated call from the school attendance office.
+>
+> நீங்கள் ஒரு நபருடன் அல்ல, AI உதவியாளருடன் பேசுகிறீர்கள். எந்த நேரத்திலும் பணியாளர் ஒருவருடன் பேச வேண்டும் என்று கேட்டால்,
+>
+> You are speaking with an AI assistant, not a person. If at any time you ask to speak with a staff member,
 
 That is the first thing said, before anything is asked, and it is the disclosure the FCC
-ruling is about. It is not a translation this project wrote: the locale is one column in
-the work file, and the recording is on the [evidence
+ruling is about. The Tamil is not a translation this project wrote: the locale is one column in
+the work file, and CALL-E spoke and transcribed the rest. The English under each
+Tamil line is ours, written afterwards from that Tamil and kept in
+[`tools/glosses.json`](../tools/glosses.json) so the page and this document cannot
+carry two different readings of one sentence. The second line runs on into the next
+turn, which is why it stops where it does. The recording is on the [evidence
 page](https://firstbell-evidence.vercel.app), which is where every recording lives and not
 in this repository, for the reason [`evidence/README.md`](../evidence/README.md) gives. The
 English call opens with the same sentence in English. Whether a district's counsel accepts a machine translation of a

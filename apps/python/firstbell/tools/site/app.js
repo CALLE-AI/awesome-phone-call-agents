@@ -113,28 +113,95 @@ function sceneGroups() {
   return groups;
 }
 
+/* ---- holding a scene still --------------------------------------------------------------
+ *
+ * Three scenes start themselves and between them they move for about twenty seconds beside
+ * prose a reader is trying to read. Reduced motion is honoured and always was, but that only
+ * answers the reader who has set an OS preference, and the guideline asks for a control as
+ * well as a query. This is the control.
+ *
+ * It is a pause and not a stop. Stopping settles the row to its finished state, which is the
+ * right answer for a reader who has scrolled away or grabbed the playhead and the wrong one
+ * for a reader who wants to look at the frame it is on.
+ *
+ * The words come off the button, so the visible label and the accessible name are set from
+ * one string and cannot disagree. That is the same treatment announceControl gives the play
+ * button, for the same reason: a voice user asks for the words they can see.
+ */
+function pauseControlFor(name) {
+  for (const b of document.querySelectorAll('[data-scene-pause]')) {
+    if (b.dataset.scenePause === name) return b;
+  }
+  return null;
+}
+
+function syncPauseControl(b, members) {
+  const running = members.some((p) => p.sceneRunning);
+  const moving = members.some((p) => p.sceneMoving());
+  // A finished scene has nothing to hold, so the control says so rather than lying about it.
+  // Disabled rather than hidden: hiding it here would move the row every time a scene ended.
+  b.disabled = !running;
+  const words = (running && !moving)
+    ? (b.dataset.wordsResume || 'Play the scene')
+    : (b.dataset.wordsPause || 'Pause the scene');
+  if (b.textContent !== words) b.textContent = words;
+  b.setAttribute('aria-label', words);
+  b.setAttribute('aria-pressed', running && !moving ? 'true' : 'false');
+}
+
+/** A player changed running state, so the control for its group is restated. */
+function onSceneState(player) {
+  const name = groupOf(player);
+  const b = pauseControlFor(name);
+  if (!b) return;
+  syncPauseControl(b, sceneGroups().get(name) || [player]);
+}
+
 function wireScene() {
   const groups = sceneGroups();
   if (!groups.size) return;
 
   if (REDUCED) {
     for (const members of groups.values()) members.forEach((p) => p.sceneSettle());
+    // The pause controls stay hidden and stay disabled. With reduced motion asked for, every
+    // scene settles instead of running and there is nothing in motion to hold still.
     return;
   }
 
   /* Running a group also reveals the one button that replays it, for the reason written
    * over `runScene`: a control offering a replay of something that has not happened is the
-   * page claiming a state the reader has not reached. */
+   * page claiming a state the reader has not reached. The control that holds it still is
+   * revealed in the same breath and on the same argument: before the scene runs there is
+   * nothing to pause, so the button is served hidden and disabled and a reader with no
+   * script never sees it at all. */
   const run = (members) => {
     members.forEach((p) => p.runScene());
-    const name = members[0]?.root?.closest('[data-group]')?.dataset.group;
-    if (!name) return;
+    const name = groupOf(members[0]);
+    const pause = pauseControlFor(name);
+    if (pause) {
+      pause.removeAttribute('hidden');
+      syncPauseControl(pause, members);
+    }
+    if (name === 'hero') return;
     // Compared rather than interpolated: building the selector out of the group name puts
     // a value inside a quoted attribute, and the escaping gate is right to refuse that.
     for (const b of document.querySelectorAll('[data-replay-group]')) {
       if (b.dataset.replayGroup === name) b.removeAttribute('hidden');
     }
   };
+
+  /* One press holds the whole group, for the reason the replay is one button per group:
+   * pausing one lane of a duet and letting the other run would demonstrate the opposite of
+   * the point the duet exists to make. */
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-scene-pause]');
+    if (!b) return;
+    const members = sceneGroups().get(b.dataset.scenePause);
+    if (!members || !members.length) return;
+    const moving = members.some((p) => p.sceneMoving());
+    members.forEach((p) => (moving ? p.pauseScene() : p.resumeScene()));
+    syncPauseControl(b, members);
+  });
 
   const hero = groups.get('hero');
   // Off the first frame after boot rather than from boot itself, so a scene cannot lengthen
@@ -264,7 +331,7 @@ function wirePlayers() {
       .split(',').filter(Boolean).map(Number);
     players.push(new CallPlayer(root, DATA.calls, {
       ids, start: ids[0], cueAt: Number(root.dataset.cue || 0), audioBase: AUDIO,
-      onTurn: paintRail, commits,
+      onTurn: paintRail, commits, onScene: onSceneState,
     }));
   }
   // Only one call may be audible at a time. Two players talking over each other turn the
@@ -282,22 +349,39 @@ function wirePlayers() {
  * large in Act 0 and then rides in the rail as a 48px miniature, so the reader never loses
  * it. The miniature is redrawn when the spoken turn changes, not every frame. */
 let railCanvas = null;
+/* The miniature's box and its two inks, resolved when they can have changed rather than on
+ * every turn. paintRail used to call getBoundingClientRect and getComputedStyle on the way
+ * in, which is a forced layout and a full style resolve on the document element, and it runs
+ * off the player's onTurn: on the hero scene that is once per spoken turn while the register
+ * beside it is being written to. The width answers to the rail's own box, which is what the
+ * observer below watches, and both inks are declared once at :root. */
+let railBox = null;
+let railInk = null;
 
-function paintRail(player) {
+function measureRail() {
   if (!railCanvas) return;
-  const ctx = railCanvas.getContext('2d');
-  const peaks = player.call.peaks || [];
   const { width: w, height: h } = railCanvas.getBoundingClientRect();
-  if (!w || !peaks.length) return;
+  railBox = { w, h };
+  const cs = getComputedStyle(document.documentElement);
+  railInk = {
+    done: cs.getPropertyValue('--ink').trim(),
+    todo: cs.getPropertyValue('--ink-4').trim(),
+  };
   const dpr = Math.min(devicePixelRatio || 1, 2);
-  if (railCanvas.width !== Math.round(w * dpr)) {
+  if (w && railCanvas.width !== Math.round(w * dpr)) {
     railCanvas.width = Math.round(w * dpr);
     railCanvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    railCanvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const cs = getComputedStyle(document.documentElement);
-  const done = cs.getPropertyValue('--ink').trim();
-  const todo = cs.getPropertyValue('--ink-4').trim();
+}
+
+function paintRail(player) {
+  if (!railCanvas || !railBox || !railInk) return;
+  const peaks = player.call.peaks || [];
+  const { w, h } = railBox;
+  if (!w || !peaks.length) return;
+  const ctx = railCanvas.getContext('2d');
+  const done = railInk.done, todo = railInk.todo;
   const n = 24, step = w / n, played = (player.t / player.call.seconds) * w;
   ctx.clearRect(0, 0, w, h);
   for (let i = 0; i < n; i++) {
@@ -310,6 +394,15 @@ function paintRail(player) {
 
 function wireRail() {
   railCanvas = document.querySelector('[data-rail-wave]');
+  // The rail is desktop-only, so at a narrow width this box is zero and stays zero until the
+  // window is widened. Watching it is what keeps the cache honest across that crossing.
+  if (railCanvas) {
+    measureRail();
+    new ResizeObserver(() => {
+      measureRail();
+      if (players[0]) paintRail(players[0]);
+    }).observe(railCanvas);
+  }
   const links = [...document.querySelectorAll('.rail a')];
   const acts = links.map((a) => document.querySelector(a.getAttribute('href'))).filter(Boolean);
   if (!acts.length) return;
@@ -321,11 +414,31 @@ function wireRail() {
    * the bottom and back to the top left the rail still pointing at act 2. Reading what is
    * actually painted answers in both directions, and it is the same rule the reader's eye
    * uses, since the act on top is the act you are looking at. */
+  /* Where act 0 sits when nothing is holding it up.
+   *
+   * Read once, here, before any scrolling has happened, because `position: sticky` has not
+   * engaged yet at the top of the document and the box is in its own place. After that the
+   * number never changes: act 0 is the first thing in the page and nothing above it moves. */
+  const curtain = acts[0];
+  const curtainFlow = curtain ? curtain.getBoundingClientRect().top + scrollY : 0;
+  const curtainEnd = curtain ? curtainFlow + curtain.offsetHeight : 0;
+
   const mark = () => {
     const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
     const here = hit && hit.closest('section[id^="act-"]');
     const i = here ? acts.indexOf(here) : -1;
     if (i < 0) return;   // between acts, or over something that is not one: keep the last
+    /* Act 0 is sticky under the curtain, and a sticky box is a positioned box, so it answers
+     * a hit test at the middle of the viewport at every scroll position on the page. That
+     * includes the footer, where it is the only act under the middle at all. Reading it
+     * there marked the rail "00 The call" while the reader was at the bottom, and because
+     * the observer below only fires on a crossing, that wrong answer then survived the
+     * whole way back up.
+     *
+     * A hit on act 0 counts only where act 0 actually is, which is the top of the document.
+     * Everywhere else the hit is the curtain showing through and the last real answer is
+     * the better one. */
+    if (here === curtain && scrollY + innerHeight / 2 > curtainEnd) return;
     links.forEach((a, k) => a.setAttribute('aria-current', k === i ? 'true' : 'false'));
   };
   // The observer is only the trigger now, so it fires on leaving as well as entering, and

@@ -65,6 +65,22 @@ export class CallPlayer {
     this.scene = null;                        // the schedule, built on first run
     this.sceneRaf = 0;
     this.sceneRunning = false;
+    this.scenePaused = false;
+    this.sceneBegan = 0;                      // performance.now() the run is measured from
+    this.sceneElapsed = 0;                    // scene seconds held across a pause
+    this.onScene = opts.onScene || null;      // told whenever the running state changes
+
+    /* Everything draw() needs that is not the playhead, resolved once here and refreshed in
+     * resize(). draw() runs per frame from two callers and there are three players on the
+     * page, so a getBoundingClientRect plus a getComputedStyle in it was up to six forced
+     * layouts and six full style resolves per frame while a scene ran. The width only moves
+     * when the canvas box moves, which is what the ResizeObserver already watches, and both
+     * colours are declared once at :root and never restated, so neither can change without
+     * a stylesheet change. */
+    this.w = 0;
+    this.h = 0;
+    this.wavePlayed = '#e8e4de';
+    this.waveAhead = '#5a5550';
 
     this.bind();
     this.upgrade();
@@ -176,26 +192,65 @@ export class CallPlayer {
     this.t = 0;
     this.activeTurn = -1;
     this.sceneRunning = true;
+    this.scenePaused = false;
+    this.sceneElapsed = 0;
     // The light belongs to the row that is running, not to the register around it.
     this.setLive('on');
-    const began = performance.now();
-    const step = (now) => {
-      if (!this.sceneRunning) return;
-      const elapsed = (now - began) / 1000;
-      this.t = this.callTimeAt(elapsed);
-      this.sync();
-      this.markFields();
-      this.showClock();
-      this.draw();
-      if (elapsed >= this.scene.length) { this.endScene(); return; }
-      this.sceneRaf = requestAnimationFrame(step);
-    };
-    this.sceneRaf = requestAnimationFrame(step);
+    this.sceneBegan = performance.now();
+    this.sceneRaf = requestAnimationFrame((now) => this.sceneStep(now));
+    this.tellScene();
   }
+
+  /* One frame of the scene. Lifted out of runScene so that pausing has something to stop
+   * and resuming has something to start again; it was a closure over `began`, and a closure
+   * cannot be re-entered with a new origin. */
+  sceneStep(now) {
+    if (!this.sceneRunning || this.scenePaused) return;
+    const elapsed = (now - this.sceneBegan) / 1000;
+    this.sceneElapsed = elapsed;
+    this.t = this.callTimeAt(elapsed);
+    this.sync();
+    this.markFields();
+    this.showClock();
+    this.draw();
+    if (elapsed >= this.scene.length) { this.endScene(); return; }
+    this.sceneRaf = requestAnimationFrame((n) => this.sceneStep(n));
+  }
+
+  /* Held where it stands, with everything it has written so far left written.
+   *
+   * This is a pause and not a stop: stopScene settles the row to its finished state, which
+   * is the right answer when the reader has left or taken the playhead, and the wrong one
+   * when they have asked the motion to hold still so they can read the prose beside it.
+   * The elapsed time is kept rather than the timestamp, so resuming re-bases the origin and
+   * the scene carries on from the frame it was on instead of jumping forward by however
+   * long the reader waited.
+   */
+  pauseScene() {
+    if (!this.sceneRunning || this.scenePaused) return;
+    this.scenePaused = true;
+    cancelAnimationFrame(this.sceneRaf);
+    this.tellScene();
+  }
+
+  resumeScene() {
+    if (!this.sceneRunning || !this.scenePaused) return;
+    this.scenePaused = false;
+    this.sceneBegan = performance.now() - this.sceneElapsed * 1000;
+    this.sceneRaf = requestAnimationFrame((now) => this.sceneStep(now));
+    this.tellScene();
+  }
+
+  /** Whether this player is currently putting anything in motion. */
+  sceneMoving() { return this.sceneRunning && !this.scenePaused; }
+
+  /** Tell whoever wired the control that the running state changed. */
+  tellScene() { if (this.onScene) this.onScene(this); }
 
   /** The light goes out and the record it produced stays on the paper. */
   endScene() {
     this.sceneRunning = false;
+    this.scenePaused = false;
     cancelAnimationFrame(this.sceneRaf);
     this.t = this.call.seconds;
     this.sync();
@@ -203,6 +258,7 @@ export class CallPlayer {
     this.showClock();
     this.draw();
     this.setLive('off');
+    this.tellScene();
   }
 
   /* Interrupted rather than finished: a reader who scrolls away or reaches for the
@@ -211,9 +267,11 @@ export class CallPlayer {
   stopScene() {
     if (!this.sceneRunning) return;
     this.sceneRunning = false;
+    this.scenePaused = false;
     cancelAnimationFrame(this.sceneRaf);
     this.sceneSettle();
     this.setLive('off');
+    this.tellScene();
   }
 
   get call() { return this.data[this.id]; }
@@ -418,9 +476,20 @@ export class CallPlayer {
 
   reveal() { this.resultEl.dataset.state = 'in'; }
 
+  /* The only place the canvas box and the two wave colours are read.
+   *
+   * It runs under a ResizeObserver on the canvas, so it fires whenever the width it caches
+   * could have changed, and again out of select(). Reading the colours here as well costs
+   * one style resolve per resize instead of one per frame per player.
+   */
   resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     const r = this.canvas.getBoundingClientRect();
+    this.w = r.width;
+    this.h = r.height;
+    const cs = getComputedStyle(this.root);
+    this.wavePlayed = cs.getPropertyValue('--wave-played').trim() || '#e8e4de';
+    this.waveAhead = cs.getPropertyValue('--wave-ahead').trim() || '#5a5550';
     this.canvas.width = Math.round(r.width * dpr);
     this.canvas.height = Math.round(r.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -445,14 +514,15 @@ export class CallPlayer {
    * dressing it up would make it look like an illustration of a waveform instead of one. */
   draw() {
     const peaks = this.call.peaks || [];
-    const r = this.canvas.getBoundingClientRect();
-    const w = r.width, h = r.height;
+    // Read off `this`, never off the box or the cascade. This is the render function: it is
+    // called from loop() and from sceneStep(), both per frame, and a layout read here is a
+    // forced synchronous layout in the middle of a paint. resize() owns all four values.
+    const w = this.w, h = this.h;
     if (!w || !peaks.length) return;
     const mid = h / 2;
     const played = (this.t / this.call.seconds) * w;
-    const cs = getComputedStyle(this.root);
-    const done = cs.getPropertyValue('--wave-played').trim() || '#e8e4de';
-    const todo = cs.getPropertyValue('--wave-ahead').trim() || '#5a5550';
+    const done = this.wavePlayed;
+    const todo = this.waveAhead;
     const bar = 2, step = 3;
     const n = Math.floor(w / step);
     this.ctx.clearRect(0, 0, w, h);

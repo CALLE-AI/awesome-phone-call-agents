@@ -378,11 +378,17 @@ h1 {
   margin: 0 0 1rem;
   letter-spacing: -0.018em;
 }
+/* The nine act headlines are the argument, and every one of them is a full sentence set at
+ * up to 2.6rem, which is where a browser's greedy line breaker leaves a one-word last line.
+ * `balance` rather than `pretty`, because these are short enough to sit inside the four-line
+ * limit browsers apply to balancing, and it evens every line rather than only the last. The
+ * body copy keeps `pretty`: it is too long to balance and only the widow needs fixing. */
 h2 {
   font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.6rem);
   line-height: 1.12;
   margin: 0 0 0.75rem;
   letter-spacing: -0.012em;
+  text-wrap: balance;
 }
 h3 {
   font-family: var(--ui-display);
@@ -392,6 +398,7 @@ h3 {
   text-transform: uppercase;
   color: var(--ink-3);
   margin: 0 0 0.6rem;
+  text-wrap: balance;
 }
 /* The act number. It reads as an eyebrow and it used to be marked up as one, an <h3> sitting
  * above the act's <h2>. That made the document outline run h1, h3, h2, h3, h2, and a screen
@@ -406,6 +413,7 @@ h3 {
   text-transform: uppercase;
   color: var(--ink-3);
   margin: 0 0 0.6rem;
+  text-wrap: balance;
 }
 
 p { margin: 0 0 1.1rem; max-width: var(--measure); }
@@ -479,9 +487,26 @@ code { font-size: 0.88em; }
  * measure 2.4 to 3.0 and would fail, and the reason they are absent is better than a remap:
  * while a call is running there is no outcome yet. The colours that state an outcome arrive
  * when the light goes out, which is also when the outcome does. */
-.reg-row {
-  transition: background-color var(--dur-mode) var(--ease-both);
-}
+/* ---- why ten colour cross-fades were deleted rather than rewritten -----------------------
+ *
+ * "Animate transform/opacity only (compositor-friendly)" is unconditional, and ten rules on
+ * this page transitioned background-color, border-color or color. Every one of them was
+ * paint-only and none cost layout, so the frames were cheap; the rule is still the rule.
+ *
+ * The compliant way to keep a cross-fade is to move the colour onto a pseudo-element and
+ * animate its opacity. That was rejected here on evidence rather than taste, twice over.
+ * The contrast gate resolves a text run's ground by walking what is painted BEHIND it, which
+ * is written down at :533 because getting it wrong once already produced a number measured
+ * against the wrong layer. `--live` on `.reg-row` and `.lane-fields` is exactly such a
+ * ground, and moving it into an overlay hides it from that walk: the gate would keep
+ * reporting a ratio, and the ratio would be against paper the reader never sees. Second,
+ * :586 records that opacity was already tried as the channel on `.turns li` and measured
+ * 1.77 and 2.49 against a floor of 4.5.
+ *
+ * So the transitions are gone and the state changes are instant. Every end state, every
+ * colour and every contrast ratio is untouched; only the 120ms it took to arrive is. The
+ * transitions that were already on transform or opacity are all kept, which is what leaves
+ * `.hear`, `.turns li`, `.replay` and `.filings li` with their transform lines below. */
 .reg-row[data-live="on"] { background: var(--live); }
 
 /* ---- the call player ----------------------------------------------------------------- */
@@ -499,9 +524,7 @@ code { font-size: 0.88em; }
   border: 1px solid var(--line-strong); border-radius: 2px;
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: color var(--dur-micro) var(--ease-both),
-              border-color var(--dur-micro) var(--ease-both),
-              transform var(--dur-micro) var(--ease-out);
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 .hear:hover { color: var(--ink); border-color: currentColor; }
 .hear:active { transform: scale(0.97); }
@@ -518,8 +541,7 @@ canvas[data-waveform] {
 .switch button {
   font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.05em; text-transform: uppercase;
   padding: 0.4rem 0.85rem; background: transparent; color: var(--ink-3);
-  border: 0; cursor: pointer; transition: color var(--dur-micro) var(--ease-both),
-              background-color var(--dur-micro) var(--ease-both);
+  border: 0; cursor: pointer;
 }
 /* The pressed language is filled, but filled light and written in ink rather than the
  * other way round.
@@ -564,8 +586,7 @@ canvas[data-waveform] {
   border-top: 1px solid var(--line);
   border-left: 2px solid transparent;
   padding-left: 0.5rem;
-  transition: border-left-color var(--dur-micro) var(--ease-both),
-              transform var(--dur-micro) var(--ease-both);
+  transition: transform var(--dur-micro) var(--ease-both);
 }
 /* Opacity is not the channel for this. The dimming pointed at the line being spoken, and
  * it was first fixed only for the build with no audio, where no playhead runs and every
@@ -942,7 +963,6 @@ footer .plate-royal .source-link { margin-top: var(--space-3); }
      * matters least and the sense that matters most. ink-4 stays for the unplayed
      * waveform bars, which are a graphic and carry no words. */
     text-decoration: none; color: var(--ink-3);
-    transition: color var(--dur-micro) var(--ease-both);
   }
   .rail a[aria-current="true"] { color: var(--ink); }
   .rail a:hover { color: var(--ink-2); }
@@ -1064,6 +1084,102 @@ footer .source-link { margin-top: var(--space-3); }
    * real face would spend a full line box, which is 0.03 or worse. */
   max-width: 11em;
 }
+/* ---- the exchange ----------------------------------------------------------------------
+ * The call that makes the argument, on the screen that decides whether anybody reads the
+ * rest. Two voices, and they are not the same weight: the office asks in the interface
+ * face at small print size, the guardian answers in the display face at something close to
+ * a headline. A reader who takes one thing off this page should take her sentence.
+ *
+ * No `text-wrap: balance` on the answer, deliberately, and the measure is in em rather than
+ * ch. Both are the same lesson the headline above already learned the hard way: ch is the
+ * advance width of a zero in whatever face happens to be rendering, so it resolves
+ * differently against the fallback and against Freight Text, the line count changes, and
+ * the block moves by a whole line box. The CLS ceiling on this page is 0.001 and one
+ * reflowed line spends thirty times that. em scales with the type and depends on no glyph.
+ */
+.exchange {
+  margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui);
+}
+.exchange blockquote { margin: 0; }
+
+.xc-who {
+  display: block;
+  font-family: var(--ui); font-size: var(--size-0);
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--space-1);
+}
+
+.xc-ask {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.5;
+  color: var(--ink-3);
+  margin: 0 0 var(--space-3);
+  max-width: 34em;
+}
+
+/* Her answer. The largest thing on this screen after the headline, and the only sentence on
+ * it spoken by a person.
+ *
+ * 19em, and the number is the whole point. At 26em this sentence fitted on one line and
+ * then did not: swapping one straight apostrophe for a curly one, which is two or three
+ * pixels, pushed it onto a second line and left `morning.` alone there. A block whose line
+ * count turns on three pixels is a block that will render differently against the fallback
+ * face than against Freight Text, and one reflowed line at this size is a 0.03 layout
+ * shift into a 0.001 ceiling.
+ *
+ * The sentence is about 34em of text. At 19em it cannot reach one line and cannot reach
+ * three, so it is two lines in every face, and the height under it never moves. The break
+ * point may wander inside those two lines, which costs nothing: nothing below it depends
+ * on where a line breaks, only on how many there are. */
+.xc-say {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.25rem, 0.95rem + 1.05vw, 1.75rem);
+  line-height: 1.28; letter-spacing: -0.008em;
+  color: var(--ink);
+  margin: 0;
+  max-width: 19em;
+}
+
+.exchange figcaption {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.5;
+  color: var(--ink-3);
+  margin-top: var(--space-3);
+  max-width: var(--measure-ui);
+}
+.exchange figcaption a { color: var(--ink-2); }
+
+/* What the office was left with. Interface face, because it is the system talking about
+ * itself rather than anybody speaking. */
+/* The line-height is a length, not a ratio, and that is load-bearing.
+ *
+ * This paragraph mixes three faces: the interface face for the prose, the mono face for the
+ * two field values, and the interface face again for the state. A unitless line-height is
+ * resolved separately against each of those font-sizes, so the tallest inline box on a line
+ * decides that line's height, and when the mono webfont replaces its fallback the answer
+ * changes by a pixel. One pixel here moved the register and all nine acts under it, which
+ * the CLS gate scored 0.00140 against a 0.001 ceiling. A length is inherited as the same
+ * computed value by every inline child, so the line box is 22px whatever is on the line. */
+.hero-turn {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.375rem;
+  color: var(--ink-2);
+  margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui);
+}
+/* The two field values are NOT set in the mono face, and the reason is written at the
+ * @font-face block above: the mono fallback resolves to Consolas or Menlo depending on the
+ * machine, it is approximate, and the comment there records that it "sets no width anything
+ * else depends on". That held while mono appeared in table cells and on lines of its own.
+ * Put it inline in a sentence and the sentence depends on its width: when azeret-mono
+ * replaced the local fallback, every inline box after `unknown` slid along its line and the
+ * CLS gate scored the movement. Weight and ink separate a field value from the prose around
+ * it without introducing a second set of metrics into one line. */
+.hero-turn b { font-weight: inherit; color: var(--ink); }
+/* The state chips are authored for the figure key, where each one starts a row and the
+ * rule down its left edge is what makes three of them read as a set. Inline in a sentence
+ * that rule is a stray mark between two words. Colour and weight are the whole job here. */
+.hero-turn .state { border-left: 0; padding-left: 0; font-weight: inherit; font-size: inherit; }
+
 .hero-foot {
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
   max-width: var(--measure-ui); margin-top: var(--space-4);
@@ -1179,7 +1295,6 @@ footer .source-link { margin-top: var(--space-3); }
   margin-top: var(--space-5);
   padding-left: var(--space-4);
   border-left: 2px solid var(--line);
-  transition: border-color var(--dur-mode) var(--ease-both);
 }
 .scene[data-live="on"] .reg-open { border-left-color: var(--live-mark); }
 .reg-open .turns {
@@ -1232,9 +1347,7 @@ footer .source-link { margin-top: var(--space-3); }
   border: 1px solid var(--line-strong); border-radius: 2px;
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: color var(--dur-micro) var(--ease-both),
-              border-color var(--dur-micro) var(--ease-both),
-              transform var(--dur-micro) var(--ease-out);
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 .replay:hover { color: var(--ink); border-color: currentColor; }
 /* Pressed is 0.97, not 0.95. This control is 28px tall, and a scale a reader can measure
@@ -1243,6 +1356,19 @@ footer .source-link { margin-top: var(--space-3); }
 
 /* Act 1 rides over the pinned hero, so it needs its own ground and an edge. */
 .act-01 { position: relative; z-index: 2; background: var(--paper); border-top: 1px solid var(--line); }
+/* Every act after the first sits above the curtain too, and until now only act 01 did.
+ *
+ * Act 00 is `position: sticky` under the curtain, which makes it a positioned element, and
+ * a positioned element hit-tests above static ones however little it paints. Acts 02 to 08
+ * were static, so `document.elementFromPoint` at the middle of the viewport could return
+ * act 00 while the reader was somewhere else entirely, and the rail named the act the
+ * reader had left twelve screens ago. It was invisible on the way down, because the
+ * observer that triggers the hit test happened to fire on a real act first, and it appeared
+ * on the way back up.
+ *
+ * Nothing moves and nothing repaints: these acts were already drawn in this order by flow.
+ * This only says so in a way that hit testing can read. */
+.act:not(.act-00) { position: relative; z-index: 2; }
 
 /* ---- the diptych ---------------------------------------------------------------------- */
 /* The artifact holds still while the argument scrolls past it. One CSS rule, no JavaScript,
@@ -1330,11 +1456,11 @@ footer .source-link { margin-top: var(--space-3); }
 .dist { margin: 1.5rem 0 0; }
 .dist svg { display: block; width: 100%; height: auto; overflow: visible; }
 .dist-k {
-  font-family: var(--mono); font-size: 11px; fill: var(--ink-3);
+  font-family: var(--mono); font-size: var(--size-0); fill: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 .dist-n {
-  font-family: var(--mono); font-size: 11px; fill: var(--ink-2);
+  font-family: var(--mono); font-size: var(--size-0); fill: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 .dist figcaption {
@@ -1407,7 +1533,6 @@ footer .source-link { margin-top: var(--space-3); }
   min-width: 0;
   padding-left: var(--space-3);
   border-left: 2px solid var(--line);
-  transition: border-color var(--dur-mode) var(--ease-both);
 }
 /* The same rule the register uses, for the same reason: while this lane's call is running,
  * the mark ties the waveform to the language label above it. It is a stroke and never a
@@ -1433,7 +1558,6 @@ footer .source-link { margin-top: var(--space-3); }
   padding: var(--space-2) 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  transition: background-color var(--dur-mode) var(--ease-both);
 }
 .lane-fields[data-live="on"] { background: var(--live); }
 .lane-f { display: grid; gap: 0.1rem; min-width: 0; }
@@ -1537,8 +1661,7 @@ footer .source-link { margin-top: var(--space-3); }
   grid-template-areas: "verdict name" "verdict who" "verdict cost";
   padding-left: var(--space-3);
   border-left: 2px solid var(--line);
-  transition: border-color var(--dur-enter) var(--ease-both),
-              transform var(--dur-enter) var(--ease-out);
+  transition: transform var(--dur-enter) var(--ease-out);
 }
 /* Where the reader is being asked to look, and only while the scene is walking the list.
  * The live colour means one thing on this page and this is that thing: it is happening now. */
@@ -1719,7 +1842,7 @@ button[data-copy][data-copied]::after {
  * itself underneath in the face it is written in. Nothing was deleted: the other 133 are one
  * click away in the same shape they were always in. */
 .mut-plain {
-  margin: 0 0 0.35rem; max-width: 44ch;
+  margin: 0 0 0.35rem; max-width: 24.64em;   /* was 44ch of Freight Text Pro */
   font-family: var(--serif); font-size: var(--size-4); color: var(--ink);
   text-wrap: pretty;
 }
@@ -1773,7 +1896,7 @@ button[data-copy][data-copied]::after {
 .fig-row { display: grid; grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr); gap: 0.9rem; }
 .fig-row .state { margin: 0; align-self: start; }
 .fig-say {
-  margin: 0; max-width: 52ch;
+  margin: 0; max-width: 29.12em;             /* was 52ch of Freight Text Pro */
   font-size: var(--size-3); color: var(--ink-2); text-wrap: pretty;
 }
 .endings-fig figcaption {
@@ -1818,7 +1941,7 @@ button[data-copy][data-copied]::after {
   border-bottom: 1px solid var(--line);
 }
 .queue-n {
-  margin: 0; font-family: var(--display); font-size: 2rem; line-height: 1;
+  margin: 0; font-family: var(--display); font-size: var(--size-7); line-height: 1;
   color: var(--ink); font-variant-numeric: tabular-nums;
 }
 .queue-said { margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
@@ -1829,7 +1952,7 @@ button[data-copy][data-copied]::after {
 .queue-why {
   margin: 0; padding: 0.85rem 1.15rem;
   border-bottom: 1px solid var(--line);
-  font-size: var(--size-3); color: var(--ink); max-width: 62ch; text-wrap: pretty;
+  font-size: var(--size-3); color: var(--ink); max-width: var(--measure); text-wrap: pretty;
 }
 .queue-why b {
   display: block; margin-top: 0.3rem; font-weight: 400;
@@ -1855,8 +1978,8 @@ button[data-copy][data-copied]::after {
   margin: 0; font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
-.q-head { margin: 0 0 0.2rem; max-width: 46ch; font-size: var(--size-3); color: var(--ink); text-wrap: pretty; }
-.q-todo { margin: 0; max-width: 46ch; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2); }
+.q-head { margin: 0 0 0.2rem; max-width: 25.76em; font-size: var(--size-3); color: var(--ink); text-wrap: pretty; }
+.q-todo { margin: 0; max-width: 30.68em; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2); }
 .q-body { min-width: 0; }
 .queue-row .state { margin: 0; }
 .q-tried {
@@ -1894,7 +2017,7 @@ button[data-copy][data-copied]::after {
 }
 .money-why {
   margin: 0.6rem 0 0; font-size: var(--size-2); color: var(--ink-3);
-  max-width: 42ch; text-wrap: pretty;
+  max-width: 23.52em; text-wrap: pretty;     /* was 42ch of Freight Text Pro */
 }
 .money-why b { font-weight: 400; color: var(--ink); }
 .money-src { color: var(--ink-3); }
@@ -1930,8 +2053,14 @@ button[data-copy][data-copied]::after {
   justify-content: space-between;
 }
 
+/* These four sat off the scale: 0.86, 1.02, 0.78 and 0.72rem, written after the ladder was
+ * declared. Each is snapped to its nearest step, the same way the original fourteen ad-hoc
+ * sizes were. The largest move is 0.68px, on `.money-key dd`. Nothing crosses 18.66px or
+ * 24px, so no run changes the contrast ratio WCAG asks of it. `.money-key-foot` was a near
+ * tie, 0.48px from --size-1 and 0.52px from --size-2; it is small print under a figure, so
+ * it takes the step whose stated job is small print. */
 .money-key dt {
-  font-size: 0.86rem;
+  font-size: var(--size-3);
   color: var(--ink-2);
 }
 
@@ -1939,13 +2068,13 @@ button[data-copy][data-copied]::after {
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: var(--size-5);
   color: var(--ink);
 }
 
 .money-key-foot {
   margin-block: 0 1rem;
-  font-size: 0.78rem;
+  font-size: var(--size-2);
   line-height: 1.45;
   color: var(--ink-3);
 }
@@ -1956,7 +2085,7 @@ button[data-copy][data-copied]::after {
 .row-flag {
   display: block;
   margin-block-start: 0.25rem;
-  font-size: 0.72rem;
+  font-size: var(--size-1);
   line-height: 1.25;
   color: var(--ink-2);
   text-decoration-thickness: 1px;
@@ -1973,7 +2102,7 @@ button[data-copy][data-copied]::after {
   margin: 0; padding: 0.7rem 1.15rem;
   border-bottom: 1px solid var(--line);
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
-  max-width: 62ch; text-wrap: pretty;
+  max-width: var(--measure-ui); text-wrap: pretty;
 }
 .queue-foot {
   margin: 0; padding: 0.8rem 1.15rem;
@@ -2075,3 +2204,61 @@ button[data-copy][data-copied]::after {
 .sources p { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
              margin: 0.3rem 0 0; max-width: var(--measure-ui); }
 .sources .read-at { color: var(--ink-3); }
+
+/* ---- stopping the showcase figure ------------------------------------------------------ */
+/* The figure runs four loops of --cs-loop (9s) forever, in act 02, beside prose a reader is
+ * trying to read. The reduced-motion rest state in showcase.css already answers the reader
+ * who set an OS preference; this answers everyone else, which is most people.
+ *
+ * These rules live here rather than in showcase.css because that file is not mine to edit
+ * on this pass. Placement costs nothing either way: page_css() concatenates page.css and
+ * then showcase.css, so these come first in source order, but a selector carrying four
+ * classes beats showcase.css's two and order never gets a vote.
+ *
+ * The rest positions are the ones the reduced-motion block already authored, so a paused
+ * frame is a composed picture rather than a loop caught mid-stride, and the two paths agree
+ * with each other by construction.
+ *
+ * A general sibling combinator rather than :has(), because the control, its label and the
+ * figure are emitted as three siblings and `~` has no support floor worth naming. */
+.cs-motion {
+  appearance: none;
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0 var(--space-2) var(--space-2) 0;
+  vertical-align: -0.12em;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  /* The pointer is on the control and not on its label: the keyboard gate flags any
+   * element that paints `cursor: pointer` without being reachable by Tab, and a <label>
+   * is not focusable. Clicking the words still toggles it; the browser does that. */
+  cursor: pointer;
+}
+.cs-motion:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+/* The shared ring at :419 covers a, button, [tabindex] and pre, not input. */
+.cs-motion:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px;
+}
+.cs-motion-label {
+  display: inline-block;
+  margin: 0 0 var(--space-2);
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.cs-motion:checked ~ .calle-showcase .cs-run__x,
+.cs-motion:checked ~ .calle-showcase .cs-run__y,
+.cs-motion:checked ~ .calle-showcase .cs-esc__x,
+.cs-motion:checked ~ .calle-showcase .cs-esc__y {
+  animation: none;
+  opacity: 1;
+}
+.cs-motion:checked ~ .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+.cs-motion:checked ~ .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+.cs-motion:checked ~ .calle-showcase .cs-esc__x { transform: translateX(150px); }
+.cs-motion:checked ~ .calle-showcase .cs-esc__y { transform: translateY(-312px); }

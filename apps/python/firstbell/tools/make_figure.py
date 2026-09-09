@@ -36,13 +36,13 @@ APP = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(APP / "tools"))
 
 from lottie import objects, Color, Point  # noqa: E402
-from lottie.objects.easing import EaseOut  # noqa: E402
+from lottie.objects.easing import EaseOut, Sigmoid  # noqa: E402
 from lottie.exporters.core import export_lottie  # noqa: E402
 from lottie.exporters.svg import export_svg  # noqa: E402
 
 import video_facts  # noqa: E402
 
-W, H, FPS, DUR = 900, 300, 30, 150
+W, H, FPS, DUR = 900, 300, 30, 240
 
 
 def _rgb(hex_string: str) -> Color:
@@ -50,13 +50,65 @@ def _rgb(hex_string: str) -> Color:
     return Color(*(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)))
 
 
-def _rounded(group, x, y, w, h, fill, radius=8.0):
+def _lift(colour: Color, amount: float) -> Color:
+    """The same ink with a light on it, for the top of a surface.
+
+    A premium surface is not a flat swatch: it carries the light it is under. Both stops are
+    computed from the one palette colour rather than typed as a second hex, so re-cutting the
+    palette moves the highlight with it and the two can never disagree.
+    """
+    def shift(c: float) -> float:
+        # Toward white by a share of the headroom above, toward black by a share of the ink
+        # already there. Doing it the first way in both directions drives a dark colour
+        # negative, which python-lottie writes out as an invalid stop.
+        return c + (1.0 - c) * amount if amount >= 0 else c * (1.0 + amount)
+
+    return Color(*(shift(c) for c in (colour.r, colour.g, colour.b)))
+
+
+def _rounded(group, x, y, w, h, fill, radius=8.0, lit=0.0):
     rect = group.add_shape(objects.Rect())
     rect.position.value = Point(x + w / 2, y + h / 2)
     rect.size.value = Point(w, h)
     rect.rounded.value = radius
-    group.add_shape(objects.Fill(fill))
+    if lit:
+        # A vertical two-stop gradient, lighter at the top, because every surface in this
+        # drawing is lying on paper under a light. Gradients are used rather than the drop
+        # shadow the effect panel offers: the page renders this with lottie-web, which drops
+        # native effects silently, so a shadow would look right in the editor and be absent
+        # for every reader. A gradient fill is drawn by every player there is.
+        grad = group.add_shape(objects.GradientFill())
+        grad.gradient_type = objects.GradientType.Linear
+        grad.start_point.value = Point(x + w / 2, y)
+        grad.end_point.value = Point(x + w / 2, y + h)
+        grad.colors.set_stops([(0.0, _lift(fill, lit)), (1.0, _lift(fill, -lit * 0.5))])
+    else:
+        group.add_shape(objects.Fill(fill))
     return rect
+
+
+def _stroke_path(group, points, colour, width, cx, cy):
+    """An open stroked path, drawn in scene coordinates around a centre.
+
+    Round caps and round joins, because every corner in this drawing is round and a mark with
+    mitred ends is a mark from a different set.
+    """
+    path = group.add_shape(objects.Path())
+    bez = path.shape.value
+    for dx, dy in points:
+        bez.add_point(Point(cx + dx, cy + dy))
+    stroke = group.add_shape(objects.Stroke(colour, width))
+    stroke.line_cap = objects.LineCap.Round
+    stroke.line_join = objects.LineJoin.Round
+    return path
+
+
+def _dot(group, cx, cy, diameter, fill):
+    circle = group.add_shape(objects.Ellipse())
+    circle.position.value = Point(cx, cy)
+    circle.size.value = Point(diameter, diameter)
+    group.add_shape(objects.Fill(fill))
+    return circle
 
 
 def build() -> objects.Animation:
@@ -94,11 +146,51 @@ def build() -> objects.Animation:
         ("undetermined", palette["undetermined"], 2),
         ("failed", palette["failed"], 1),
     ]
+    live = _rgb(palette["live"])
+    paper = _rgb(palette["paper"])
     ease = EaseOut(0.42)
+    # The breath is the only easing here that is symmetric, because it is the only motion
+    # that is not an arrival. Everything else lands once and stops.
+    breath = Sigmoid(0.5)
+
+    # Two beats after the last ending lands. `SETTLED` is when the route that carried the
+    # call stops competing for attention; `OPEN` is when the one unfinished ending starts
+    # saying so. They overlap by ten frames so the figure never fully rests.
+    SETTLED, OPEN = 100, 110
+
+    # Three 60px rows on an 88px pitch, centred in the 300px box: 32 above, 32 below,
+    # and the middle row's centre on the spine the connectors leave from.
+    ROW_TOP, ROW_PITCH = 32, 88
+    ROW_MID = ROW_TOP + 30
+    # Where a row's mark sits: far enough in from the rounded corner to look placed.
+    MARK_X = 514
 
     anim = objects.Animation(DUR, FPS)
     anim.width, anim.height = W, H
     layer = anim.add_layer(objects.ShapeLayer())
+
+    # Declared first and animated last. A Lottie shape list draws its FIRST entry on top, so
+    # a group appended at the end of the build sits underneath everything: the open-case
+    # light was authored correctly, keyframed correctly, and painted behind the very bar it
+    # marks. Nothing reported it, because a dot that never draws still exports.
+    open_case = layer.add_shape(objects.Group())
+
+    # One mark per ending, knocked out of the bar in the paper colour.
+    #
+    # The three bars used to differ only by hue, which made the drawing depend entirely on
+    # the HTML labels sitting beside it. That is fine on the page and useless everywhere
+    # else: the same figure goes into the video, where nothing is beside it, and a reader
+    # with a colour vision deficiency got three slabs in three greys. A tick, a light and a
+    # rule say which is which without a word, and they are the marks this product already
+    # uses: the office has its answer, somebody still has to act, nothing happened.
+    marks = [layer.add_shape(objects.Group()) for _ in range(3)]
+
+    # The tick, at the head of the row the office can close.
+    _stroke_path(marks[0], [(-7, 0), (-2, 5.5), (7.5, -6)], paper, 3.0, MARK_X, ROW_MID)
+    # Nothing at the head of `undetermined`: the open-case light below stands in its place,
+    # and two marks on one row would be the figure hedging about which one matters.
+    # The rule, at the head of the row where nothing happened.
+    _stroke_path(marks[2], [(-7, 0), (7, 0)], paper, 3.0, MARK_X, ROW_MID + 2 * ROW_PITCH)
 
     # The spine, drawn first so everything sits on it. It grows from the call rather than
     # being there already: the path is made by the call, not waiting for it.
@@ -111,30 +203,82 @@ def build() -> objects.Animation:
 
     # The call itself. One plate, and it settles before the spine starts.
     call = layer.add_shape(objects.Group())
-    _rounded(call, 30, 120, 130, 60, ink, 10.0)
+    _rounded(call, 30, 120, 130, 60, ink, 10.0, lit=0.05)
     call.transform.opacity.add_keyframe(0, 0)
     call.transform.opacity.add_keyframe(12, 100, ease)
     call.transform.position.add_keyframe(0, Point(-26, 0))
     call.transform.position.add_keyframe(16, Point(0, 0), ease)
+
+    # The path the call travelled, as opposed to the call itself or where it ended up.
+    # The plate is deliberately not in here: it is the subject the drawing opens on, and
+    # fading it left the exported still showing near-black ink as mid grey.
+    route = [spine]
 
     # The three endings. Staggered, and each one slides a little way in rather than fading
     # on the spot, so a reader's eye is carried from the spine to the row.
     for row, (_name, colour, arrival) in enumerate(endings):
         at = 40 + arrival * 20
         arm = layer.add_shape(objects.Group())
-        _rounded(arm, 486, 44 + row * 88, 384, 60, _rgb(colour), 10.0)
+        _rounded(arm, 486, ROW_TOP + row * ROW_PITCH, 384, 60, _rgb(colour), 10.0, lit=0.05)
         arm.transform.opacity.add_keyframe(0, 0)
         arm.transform.opacity.add_keyframe(at, 0)
         arm.transform.opacity.add_keyframe(at + 16, 100, ease)
         arm.transform.position.add_keyframe(at, Point(-22, 0))
         arm.transform.position.add_keyframe(at + 20, Point(0, 0), ease)
 
-        # The short connector from the spine to this row, drawn just before it arrives.
+        # The short connector from the spine to this row, drawn just before it arrives. It
+        # grows outward from the spine rather than outward from its own centre: the route is
+        # made by the call travelling it, and a connector that appears from the middle of
+        # nowhere says the opposite.
         arm_line = layer.add_shape(objects.Group())
-        joint = _rounded(arm_line, 468, 72 + row * 88, 18, 3, line, 1.5)
+        joint = _rounded(arm_line, 468, ROW_MID + row * ROW_PITCH - 1.5, 18, 3, line, 1.5)
         joint.size.add_keyframe(0, Point(0, 3))
         joint.size.add_keyframe(at, Point(0, 3))
         joint.size.add_keyframe(at + 12, Point(18, 3), ease)
+        joint.position.add_keyframe(0, Point(468, ROW_MID + row * ROW_PITCH))
+        joint.position.add_keyframe(at, Point(468, ROW_MID + row * ROW_PITCH))
+        joint.position.add_keyframe(at + 12, Point(477, ROW_MID + row * ROW_PITCH), ease)
+        route.append(arm_line)
+
+        mark = marks[row]
+        mark.transform.opacity.add_keyframe(0, 0)
+        mark.transform.opacity.add_keyframe(at + 10, 0)
+        mark.transform.opacity.add_keyframe(at + 22, 100, ease)
+
+    # The route recedes once all three endings exist.
+    #
+    # Until this beat the drawing has two subjects competing for the same eye: the path the
+    # call took, and where it ended up. Only the second one is what the three words beside
+    # the figure mean. So the call plate, the spine and the three connectors ease back to
+    # 45% and the endings hold, which is the difference between a diagram that is still
+    # explaining itself and one that has finished.
+    for group in route:
+        group.transform.opacity.add_keyframe(SETTLED, 100)
+        group.transform.opacity.add_keyframe(SETTLED + 30, 62, breath)
+
+    # The one ending that is not over.
+    #
+    # `resolved` and `failed` are finished: the office has an answer, or there was nobody to
+    # get one from and nothing is owed. `undetermined` is a call that reached a person and
+    # came back with nothing usable, and this software will not close it. Something is still
+    # owed to a child, by a named human being, and the figure said none of that: three bars
+    # arrived and three bars sat there, all equally done.
+    #
+    # So the middle one keeps a light on. It is the same yellow the register uses for a call
+    # that is still running, at the left edge of the row, breathing three times and then
+    # holding. It is the last thing moving and the last thing drawn, which is the whole
+    # argument of the product stated in the one place a reader is still looking.
+    _dot(open_case, MARK_X, ROW_MID + ROW_PITCH, 13, live)
+    open_case.transform.opacity.add_keyframe(0, 0)
+    open_case.transform.opacity.add_keyframe(OPEN, 0)
+    open_case.transform.opacity.add_keyframe(OPEN + 12, 100, ease)
+    # Three breaths, then rest. Not an infinite loop: a figure that never stops moving is a
+    # figure a reader has to look away from, and this page holds a reduced-motion promise it
+    # would rather keep by not needing it.
+    for beat in range(3):
+        start = OPEN + 12 + beat * 36
+        open_case.transform.opacity.add_keyframe(start + 18, 40, breath)
+        open_case.transform.opacity.add_keyframe(start + 36, 100, breath)
 
     return anim
 

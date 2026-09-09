@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
 import html
 import json
@@ -37,6 +38,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -489,6 +491,101 @@ def _conformance_figures() -> tuple[int, int, int]:
             len(record["missing_in_double"]))
 
 
+def exchange_markup(call: dict, call_id: str) -> str:
+    """The two turns that are the whole argument, on the screen a reviewer opens first.
+
+    A reader with thirty seconds used to meet this product as a claim: a standfirst saying
+    that a call which reached a parent and learned nothing is not a family contacted. The
+    call that demonstrates it was already on the page, at turn five of a seventeen-turn
+    scroller, nine screens down. A claim on the first screen with its proof on the tenth is
+    the wrong way round for a page whose whole argument is that assertions are cheap.
+
+    Both lines come off the same committed turns that act 02 prints and the register plays,
+    so the first screen cannot drift from the recording. When the receipts are not on this
+    machine the block renders as nothing, because a first screen built on a sentence no
+    reader can check is the one thing this page must never be.
+
+    The question is trimmed and the trim is marked. It is split across two turns by the
+    transcriber and it carries the scripted absence date, which is not the date the call was
+    placed and reads as an error to anybody checking one against the other. The answer is
+    whole. It is the reason this screen exists.
+    """
+    turns = _hero_exchange(call)
+    if turns is None:
+        return ""
+    asked, answered = turns
+    return (
+        '<figure class=exchange>'
+        '<blockquote>'
+        f'<p class=xc-ask><span class=xc-who>The call</span>{esc(asked)}</p>'
+        f'<p class=xc-say><span class=xc-who>Her guardian</span>{esc(answered)}</p>'
+        '</blockquote>'
+        f'<figcaption>Call {esc(call_id)}, placed through CALL-E and transcribed by it. The '
+        f'scenario is scripted, the pupil name is invented, and the number dialled was the '
+        f'author’s own line, with consent. What is real is the call, the transcript, and '
+        f'what the software did with it. '
+        f'<a href="#act-02">The whole conversation is in act 02</a>.</figcaption>'
+        '</figure>'
+    )
+
+
+def _typeset(said: str) -> str:
+    """The transcriber’s apostrophes, made one shape.
+
+    CALL-E returns both: the agent’s own lines come back with U+2019 and the guardian’s
+    with U+0027, because one side is synthesised from a script and the other is transcribed
+    from speech. That is invisible in a scrolling transcript and impossible to miss on the
+    first screen, where the two sit four lines apart and the page looks like it has a typo
+    in the one sentence a reader is meant to remember.
+
+    This changes the glyph and never the words. The transcript in act 02 and the receipts
+    both keep exactly what came back.
+    """
+    return said.replace("'", "’")
+
+
+def _hero_exchange(call: dict) -> tuple[str, str] | None:
+    """The office question and the guardian answer, found by what they say.
+
+    Located by phrase rather than by index. The transcriber split the question across two
+    turns and could split it differently on a re-run; an index would then quietly quote the
+    wrong line, which is the exact failure this page is about.
+    """
+    said = [(t.get("text") or "").strip() for t in call.get("turns", ())]
+    answered = next((t for t in said if "left for school this morning" in t), None)
+    opened = next((t for t in said if "marked absent" in t), None)
+    closed = next((t for t in said if "aware of the absence?" in t), None)
+    if not (opened and closed and answered):
+        return None
+    head = opened.partition(" on September")[0].rstrip(" ,")
+    tail = closed.partition("; ")[2] or closed
+    return (_typeset(f"{head}… {tail}"), _typeset(answered))
+
+
+def hero_turn_markup(call: dict) -> str:
+    """What the office was left with, and what this software did about it.
+
+    `parent_confirmed_aware` is not in the schema required list and is not treated as one
+    here: the guardian saying no is an answer, and an alarming one. The two fields that
+    decide whether a record may close are `reason_category` and `expected_return`, and this
+    reads their values rather than restating them, so the sentence cannot outlive the data.
+    """
+    found = call.get("structured") or {}
+    decisive = [found.get("reason_category"), found.get("expected_return")]
+    if not all(isinstance(v, str) and v for v in decisive):
+        return ""
+    why, when = (esc(v) for v in decisive)
+    return (
+        '<p class=hero-turn>The guardian was not aware of the absence. That is the answer '
+        'that matters, and it is the only answer the call got. Why the pupil was away came '
+        f'back <b>{why}</b>. When to expect her back came back <b>{when}</b>. Those two are '
+        'what the office needs before it can act, so a system that counts contacts would '
+        'mark this “family contacted” and close it. This one files it '
+        '<span class="state state-undetermined">undetermined</span> and puts it on a named '
+        'person’s desk.</p>'
+    )
+
+
 def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> str:
     """The register: one row per call, one column per field, and one row still running.
 
@@ -543,6 +640,112 @@ def register_markup(data: dict, rows: list[str], live: str, has_audio: bool) -> 
 SCENE_GAP_MAX = 1.5
 
 
+@functools.lru_cache(maxsize=1)
+def glosses() -> dict:
+    """The English written for the turns CALL-E transcribed in another language.
+
+    Committed next to this script rather than read from the receipts, because it is not
+    something CALL-E returned: the platform gave back Tamil, and the English is a later
+    translation of that Tamil. Keeping the two apart is the point. A reader can see which
+    words came off the call and which were written afterwards, and the file itself says so.
+    """
+    raw = (Path(__file__).resolve().parent / "glosses.json").read_text(encoding="utf-8")
+    return json.loads(raw)["calls"]
+
+
+def needs_english(said: str) -> bool:
+    """Whether a line of a transcript is written in something other than the Latin alphabet.
+
+    Asked of the text rather than of the call's locale, and this is not a detail. The suite
+    builds the page a second time from an authored fixture, and that fixture carries English
+    turns on calls it labels `ta-IN`, because what it exists to test is identifier masking.
+    A rule that read the locale would have demanded a translation of "Good morning." A rule
+    that reads the text asks the question the organiser's language requirement actually
+    asks, which is what language the reader is being handed, not what the metadata says.
+
+    Punctuation, digits and spacing are ignored, so a Tamil line and an English line that
+    share a full stop are not confused. A Spanish or French line is Latin and passes here;
+    the locale check in `bind_glosses` is what would catch that one.
+    """
+    for ch in said:
+        if unicodedata.category(ch)[0] in "PZNSCM":
+            continue
+        if not unicodedata.name(ch, "").startswith("LATIN"):
+            return True
+    return False
+
+
+def bind_glosses(data: dict) -> None:
+    """Attach the English to every turn CALL-E did not return in English.
+
+    Done once, on the data, rather than at each place a turn is printed. The page writes a
+    transcript three ways: `turns_markup` builds the duet lane, `player.js` rebuilds the
+    scene out of the JSON island, and the island is itself a published file a reader can
+    open. Glossing at the markup would have left the other two in Tamil with nothing under
+    them, which is the same failure as glossing none of them, only harder to notice.
+
+    Looked up by what the line says, not by its position. The transcriber splits a long
+    answer into turns and could split it differently on a re-run; an index would then put
+    the English for one sentence under a different one, silently, which is worse than no
+    translation. A line whose text is not in the table stops the build, so a transcript that
+    moves under `tools/glosses.json` cannot be published half translated.
+    """
+    table = glosses()
+    for cid, call in data.get("calls", {}).items():
+        said = call.get("turns", ())
+        foreign = [t for t in said if needs_english(t.get("text", ""))]
+        if not foreign:
+            continue
+        found = table.get(cid)
+        if found is None:
+            raise SystemExit(f"{cid} has {len(foreign)} turns that are not in the Latin "
+                             "alphabet and no entry in tools/glosses.json, which has to "
+                             "carry every call this page carries")
+        english = {row["ta"].strip(): row["en"].strip() for row in found["turns"]}
+        for index, turn in enumerate(said):
+            if turn not in foreign:
+                continue
+            gloss = english.get(turn["text"].strip())
+            if not gloss:
+                raise SystemExit(f"{cid} turn {index} has no English in "
+                                 "tools/glosses.json: either the gloss is missing or the "
+                                 "transcript changed under it")
+            turn["gloss"] = gloss
+
+
+def turn_li(call: dict, turn: dict) -> str:
+    """One line of a transcript, wherever the page prints it.
+
+    One builder for the scene and for both lanes of the duet. They used to hold the same
+    markup twice, which was survivable while a turn was three spans, and stops being
+    survivable the moment a turn can carry a translation: one of them printing the English
+    and the other not would read as two different transcripts of one call. `player.js`
+    builds the third copy from the same field on the same object.
+    """
+    who = "agent" if turn["speaker"] == "bot" else "parent"
+    m, s = divmod(int(turn["offset_seconds"]), 60)
+    said = (f'<span class=turn-text lang="{esc(call["locale"])}">'
+            f'{esc(turn["text"])}</span>')
+    if turn.get("gloss"):
+        said += f'<span class=turn-gloss lang=en>{esc(turn["gloss"])}</span>'
+    return (f'<li data-at="{int(turn["offset_seconds"])}" data-who="{esc(turn["speaker"])}" '
+            f'data-rel=ahead><span class=turn-at>{m}:{s:02d}</span>'
+            f'<span class=turn-who>{who}</span>{said}</li>')
+
+
+def turns_note(call: dict) -> str:
+    """Who wrote the English, said once under the transcript that carries it.
+
+    Empty for a call that was in English, because there is nothing to explain there.
+    """
+    if str(call.get("locale", "")).startswith("en"):
+        return ""
+    return ('<p class=scene-note>Each Tamil line is followed by its English. The Tamil is '
+            'what CALL-E heard and returned. The English was written afterwards from that '
+            'text, with a language model reading only the Tamil, and nobody spoke it on '
+            'the call.</p>')
+
+
 def scene_seconds(call: dict) -> float:
     """How long the scene takes to show a call, by the rule the browser uses.
 
@@ -584,19 +787,27 @@ def scene_call(call: dict, has_audio: bool) -> str:
     # markup rather than built in JavaScript so that its words live with the rest of them.
     out.append('<button class=replay type=button data-replay hidden>'
                'Run the transcript again</button>')
+    # The scene moves for about twenty seconds beside prose, and it starts itself, so the
+    # guideline asks for a control and not only a reduced-motion query. Served hidden and
+    # disabled on the same argument as the replay beside it: before the scene has run there
+    # is nothing to hold still, and with no script it never appears at all. app.js reveals
+    # it, and takes its words from here so they live with the rest of them.
+    #
+    # `data-scene-pause` and not `data-replay`: two gates select replay controls by that
+    # attribute and assert one per scene, and a pause control answering to it would read as
+    # a second replay for a scene that already has one.
+    out.append('<button class=replay type=button data-scene-pause=hero '
+               'data-words-pause="Pause the transcript" '
+               'data-words-resume="Play the transcript" '
+               'hidden disabled>Pause the transcript</button>')
     out.append('</div>')
     out.append('<ol class=turns data-turns aria-live=off tabindex=0 '
         'aria-label="What was said on the call, turn by turn. Scrolls, so it takes '
         'focus and answers the arrow keys.">')
     for turn in call["turns"]:
-        who = "agent" if turn["speaker"] == "bot" else "parent"
-        m, s = divmod(int(turn["offset_seconds"]), 60)
-        out.append(
-            f'<li data-at="{int(turn["offset_seconds"])}" data-who="{esc(turn["speaker"])}" '
-            f'data-rel=ahead><span class=turn-at>{m}:{s:02d}</span>'
-            f'<span class=turn-who>{who}</span>'
-            f'<span class=turn-text lang="{esc(call["locale"])}">{esc(turn["text"])}</span></li>')
+        out.append(turn_li(call, turn))
     out.append('</ol>')
+    out.append(turns_note(call))
     # Two claims the scene would otherwise make silently. Both are cheaper to print than to
     # be caught on: a judge who works out either of them for themselves stops believing the
     # rest of the page, and this one is built entirely out of things that can be checked.
@@ -627,14 +838,9 @@ def turns_markup(call: dict) -> str:
         'aria-label="What was said on the call, turn by turn. Scrolls, so it takes '
         'focus and answers the arrow keys.">']
     for turn in call["turns"]:
-        who = "agent" if turn["speaker"] == "bot" else "parent"
-        m, s = divmod(int(turn["offset_seconds"]), 60)
-        out.append(
-            f'<li data-at="{int(turn["offset_seconds"])}" data-who="{esc(turn["speaker"])}" '
-            f'data-rel=ahead><span class=turn-at>{m}:{s:02d}</span>'
-            f'<span class=turn-who>{who}</span>'
-            f'<span class=turn-text lang="{esc(call["locale"])}">{esc(turn["text"])}</span></li>')
+        out.append(turn_li(call, turn))
     out.append('</ol>')
+    out.append(turns_note(call))
     return "".join(out)
 
 
@@ -696,6 +902,13 @@ def duet_markup(data: dict, en: str, ta: str, has_audio: bool) -> str:
     # keep. app.js shows it once both lanes are real players.
     out.append('<button class=replay type=button data-replay-group=duet hidden>'
                'Run both again</button>')
+    # One control for the pair, because two calls that started together have to hold
+    # together: pausing one lane and leaving the other running would demonstrate the
+    # opposite of what the duet is for. See scene_call for why it is not `data-replay`.
+    out.append('<button class=replay type=button data-scene-pause=duet '
+               'data-words-pause="Pause both" '
+               'data-words-resume="Play both" '
+               'hidden disabled>Pause both</button>')
     out.append(f'<span class=duet-len>{en_c["seconds"]:.0f}s and '
                f'{ta_c["seconds"]:.0f}s of real recording, each playing whole at its own '
                f'speed; the two scenes take about {scene_seconds(en_c):.0f}s and '
@@ -2026,11 +2239,30 @@ def showcase_figure() -> str:
 
     It is CSS and SVG with no script, so it survives the no-JavaScript pass, and it
     reserves its own box, so it costs nothing against the layout-shift budget.
+
+    The control above it stops the figure's four loops. It is a checkbox rather than the
+    button this would normally be, and that is the whole reason it works: the figure
+    carries no script, and `gateNoJs` flags any element that claims an operable role with
+    no script behind it. A `<button aria-pressed>` here would be exactly that claim. A
+    checkbox is native, so the browser operates it with every script on the page stripped,
+    and one `:checked ~` rule in page.css rests every mark at the position the
+    reduced-motion block already authored.
+
+    It sits above the figure rather than inside it because `.calle-showcase` is a scroll
+    box at every width (`overflow-x: auto`), and a focus ring drawn 3px outside a control
+    inside that box is clipped by it, which `gateKeyboard` measures and fails.
+
+    `aria-label` as well as the visible `<label>`, because an `<input>` has no text of its
+    own and the accessible-name check reads the element, not the `for` association.
     """
     spec = spec_from_file_location("showcase", SITE / "showcase.py")
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.showcase_markup()
+    label = "Pause the diagram"
+    return ('<input type=checkbox class=cs-motion id=cs-motion '
+            f'aria-label="{esc(label)}">'
+            f'<label class=cs-motion-label for=cs-motion>{esc(label)}</label>'
+            + module.showcase_markup())
 
 
 def page_css() -> str:
@@ -2108,6 +2340,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         for _key in ("apiId", "providerId"):
             if _call.get(_key):
                 _call[_key] = mask_id(_call[_key])
+    # Before anything reads a turn, so the markup here, the island `player.js` reads and
+    # the published JSON all carry the same English or the build stops.
+    bind_glosses(data)
     recs = receipts()
     muts = mutation_rows()
     recovered = recovered_provider_ids()
@@ -2219,16 +2454,19 @@ def build(has_audio: bool, repo_url: str | None = None,
         # qualify, and the ceiling has moved to act 01, one screen down, where it can name
         # the run that shows it. Both sentences now describe what the software does, and
         # the second one is the one nothing else on the market does.
-        '<p class=standfirst>When a school’s absence notification goes unanswered, '
-        'this calls the family and brings back a reason the office can act on. When it '
-        'cannot get one, it says so and puts the call on a named person’s desk, '
-        'because a call that reached a parent and learned nothing is not a family '
-        'contacted.</p>',
+        # One line, not five. The paragraph that was here described what this software
+        # does when a call comes back with nothing usable. The screen underneath it now
+        # shows that happening, on a real call, with the receipt beside it, and a
+        # description sitting on top of a demonstration is the page talking over
+        # itself. The full statement moves to act 01, next to the numbers behind it.
+        '<p class=standfirst>Absence calls to families, and an escalation for every call that reaches somebody and still learns nothing.</p>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
+        exchange_markup(calls[hero], hero),
+        hero_turn_markup(calls[hero]),
         register_markup(data, rows, hero, has_audio),
         # Four rows, twelve calls, and the page used to say only the first number.
         # Everything else in the entry says twelve, so the first screen was the one place
@@ -2710,13 +2948,21 @@ def build(has_audio: bool, repo_url: str | None = None,
     # and a policy that has to grow a hash for every small script is a policy somebody
     # eventually widens.
     add('<script type=module src="console.js"></script>')
-    # The animation, and the player that reads it. Both are deferred and both come after
-    # app.js, because the figure is nine screens down and nothing above it waits on either.
-    # Served from this origin rather than a CDN, so the derived policy covers them under
-    # 'self' and there is no third party in the path of a page about children.
+    # The animation and the script that decides whether to play it. Both are deferred and
+    # both come after app.js, because the figure is nine screens down and nothing above it
+    # waits on either. Served from this origin rather than a CDN, so the derived policy
+    # covers them under 'self' and there is no third party in the path of a page about
+    # children.
+    #
+    # The player itself is not listed here. `lottie_light.min.js` is 45.6 KB gzipped, more
+    # than half of what this page weighs without it, and it draws one figure nine screens
+    # down that a reader who asked for reduced motion never sees. `figure.js` requests it
+    # from inside the observer it already runs, so it is fetched when somebody reaches the
+    # figure and not before. It is still copied into the build, and the weight gate counts
+    # what the browser fetches rather than a list of names, so leaving it out of the first
+    # view shows up in the measurement instead of hiding in it.
     if (SITE / "figures" / "three-endings.json").exists():
         add('<script src="figure-data.js" defer></script>')
-        add('<script src="lottie_light.min.js" defer></script>')
         add('<script src="figure.js" defer></script>')
     add('</html>')
     return "".join(p)
