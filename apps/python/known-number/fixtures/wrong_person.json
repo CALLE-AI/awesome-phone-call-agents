@@ -1,0 +1,60 @@
+{
+ "id": "call_fixture_wrong_person",
+ "object": "call_task",
+ "status": "completed",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.93,
+  "label": "high"
+ },
+ "summary": "Reception could not transfer.",
+ "evidence": [],
+ "structured_result": {
+  "reached_authorized_contact": false,
+  "contact_name_given": "Reception",
+  "requested_change": "unknown",
+  "notice_matches_request": "unknown",
+  "request_channel_confirmed": "unknown",
+  "alternate_details_offered": false,
+  "call_disposition": "wrong_person",
+  "reference_delivered": false
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12025550147"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Reception could not transfer.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12025550147",
+     "status": "completed",
+     "started_at": "2026-09-05T09:00:05Z",
+     "completed_at": "2026-09-05T09:02:40Z",
+     "summary": "Reception could not transfer.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "bot",
+       "text": "Hello, I am an automated assistant calling on behalf of the supplier administration team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
+      },
+      {
+       "offset_seconds": 9,
+       "speaker": "user",
+       "text": "This is Priya."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}

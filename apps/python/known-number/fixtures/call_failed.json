@@ -1,0 +1,51 @@
+{
+ "id": "call_fixture_call_failed",
+ "object": "call_task",
+ "status": "failed",
+ "task_completed": false,
+ "completion_confidence": {
+  "score": 0.35,
+  "label": "low"
+ },
+ "summary": "Call failed to connect.",
+ "evidence": [],
+ "structured_result": null,
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12025550147"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "failed",
+   "structured_result": null,
+   "summary": "Call failed to connect.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12025550147",
+     "status": "failed",
+     "started_at": "2026-09-05T09:00:05Z",
+     "completed_at": "2026-09-05T09:02:40Z",
+     "summary": "Call failed to connect.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "bot",
+       "text": "Hello, I am an automated assistant calling on behalf of the supplier administration team at Example Manufacturing Ltd. I am not a person, and this call is recorded and written down. May I speak with Priya Raman or Daniel Okafor?"
+      },
+      {
+       "offset_seconds": 9,
+       "speaker": "user",
+       "text": "This is Priya."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}
