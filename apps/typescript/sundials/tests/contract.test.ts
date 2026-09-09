@@ -576,8 +576,10 @@ test("mock fixtures: JSON queue is typed, varied, and Harbor-shaped", () => {
   const northDone = calls.find((call) => call.id === "11111111-0003-4000-8000-000000000003");
   assert.deepEqual(
     (northDone?.transcript || []).map((turn) => turn.timestamp),
-    ["1", "5", "19", "33", "51", "65", "79"]
+    ["1", "5", "19", "33", "48", "62", "78", "92", "108", "124", "142", "158", "176", "192", "208", "224", "242", "258", "274", "290", "308", "324"]
   );
+  assert.ok((northDone?.transcript?.length || 0) >= 15);
+  assert.equal(northDone?.durationSec, 332);
   assert.equal(formatTranscriptOffset(northDone?.transcript?.[0]?.timestamp), "0:01");
   assert.ok(completed.every((call) => call.durationSec > 0));
   assert.ok(

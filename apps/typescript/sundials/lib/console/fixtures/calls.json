@@ -383,9 +383,9 @@
     "requestedAt": "2026-09-04T17:00:00.000Z",
     "dialedAt": "2026-09-04T17:00:19.000Z",
     "connectedAt": "2026-09-04T17:00:22.000Z",
-    "endedAt": "2026-09-04T17:03:34.000Z",
+    "endedAt": "2026-09-04T17:05:54.000Z",
     "speedToDialSec": 19,
-    "durationSec": 192,
+    "durationSec": 332,
     "calleCallId": "calle_northline_done",
     "recordingUrl": "https://storage.sundials.dev/recordings/northline-maya.mp3",
     "transcript": [
@@ -406,26 +406,101 @@
       },
       {
         "speaker": "agent",
-        "text": "Got it — replacing Salesforce, scaling the team. What does a good timeline look like?",
+        "text": "Got it — replacing Salesforce and scaling the team. What breaks first today: reporting, routing, or day-to-day admin?",
         "timestamp": "33"
       },
       {
         "speaker": "user",
-        "text": "One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.",
-        "timestamp": "51"
+        "text": "Admin and routing. Reps rebuild views every week, and inbound form fills sit in a shared inbox until an SDR notices them.",
+        "timestamp": "48"
       },
       {
         "speaker": "agent",
-        "text": "Thanks. I will make sure the Harbor team has your notes. Anything we should not miss?",
-        "timestamp": "65"
+        "text": "Understood. When someone hits Talk to sales on pricing, how long before a human calls back?",
+        "timestamp": "62"
       },
       {
         "speaker": "user",
-        "text": "Migration effort is the main objection. HubSpot is the other option on the table.",
-        "timestamp": "79"
+        "text": "Honestly, forty minutes on a good day. High-intent leads from paid search wait even longer if the queue is busy.",
+        "timestamp": "78"
+      },
+      {
+        "speaker": "agent",
+        "text": "That helps. What does a good timeline look like for a pilot?",
+        "timestamp": "92"
+      },
+      {
+        "speaker": "user",
+        "text": "One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.",
+        "timestamp": "108"
+      },
+      {
+        "speaker": "agent",
+        "text": "On migration — are you moving contacts and open deals only, or activity history and reporting too?",
+        "timestamp": "124"
+      },
+      {
+        "speaker": "user",
+        "text": "Contacts, open opportunities, and twelve months of activity history. We can leave ancient closed-won in a read-only archive.",
+        "timestamp": "142"
+      },
+      {
+        "speaker": "agent",
+        "text": "Who owns RevOps tooling decisions, and who has to bless security?",
+        "timestamp": "158"
+      },
+      {
+        "speaker": "user",
+        "text": "I own the evaluation. Our CFO signs anything over eighty seats. She is skeptical of rip-and-replace but open if security passes.",
+        "timestamp": "176"
+      },
+      {
+        "speaker": "agent",
+        "text": "Besides HubSpot, is Salesforce staying on the table because of reporting or integrations?",
+        "timestamp": "192"
+      },
+      {
+        "speaker": "user",
+        "text": "Reporting and a custom CPQ bolt-on. Harbor would need to show how forecasting survives the move.",
+        "timestamp": "208"
+      },
+      {
+        "speaker": "agent",
+        "text": "For security, do you need SOC 2, SSO, and a written review before a pilot touches real pipeline?",
+        "timestamp": "224"
+      },
+      {
+        "speaker": "user",
+        "text": "Yes — US workspace, SSO with Okta, and a written security review before we pilot with live inbound leads.",
+        "timestamp": "242"
+      },
+      {
+        "speaker": "agent",
+        "text": "If the pilot works, would you start with one squad or all eighty seats?",
+        "timestamp": "258"
+      },
+      {
+        "speaker": "user",
+        "text": "Start with twenty SDRs and ten AEs on inbound. Roll the rest after Q4 planning.",
+        "timestamp": "274"
+      },
+      {
+        "speaker": "agent",
+        "text": "Thanks. Migration effort and HubSpot are the other options — anything we should not miss?",
+        "timestamp": "290"
+      },
+      {
+        "speaker": "user",
+        "text": "Migration effort is the main objection. HubSpot is the other option on the table. Send a side-by-side on migration and a forecast demo with our field names before Thursday.",
+        "timestamp": "308"
+      },
+      {
+        "speaker": "agent",
+        "text": "Perfect — I will make sure Harbor sales has your notes and those follow-ups. Appreciate the time, Maya.",
+        "timestamp": "324"
       }
     ],
-    "fullTranscript": "[SYSTEM]: Harbor sales discovery for Northline Revenue. Intent score 72 (high).\n\n[AGENT]: Hi Maya, this is an automated assistant calling on behalf of Harbor sales. You asked to talk with our team about Harbor CRM. This call may be recorded. What are you hoping Harbor can help with?\n\n[USER]: We are drowning in Salesforce admin. Eighty people in the CRM today, heading toward one hundred fifty, and I need a cleaner inbound motion.\n\n[AGENT]: Got it — replacing Salesforce, scaling the team. What does a good timeline look like?\n\n[USER]: One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.\n\n[AGENT]: Thanks. I will make sure the Harbor team has your notes. Anything we should not miss?\n\n[USER]: Migration effort is the main objection. HubSpot is the other option on the table.",
+    "fullTranscript": "[SYSTEM]: Harbor sales discovery for Northline Revenue. Intent score 72 (high).\n\n[AGENT]: Hi Maya, this is an automated assistant calling on behalf of Harbor sales. You asked to talk with our team about Harbor CRM. This call may be recorded. What are you hoping Harbor can help with?\n\n[USER]: We are drowning in Salesforce admin. Eighty people in the CRM today, heading toward one hundred fifty, and I need a cleaner inbound motion.\n\n[AGENT]: Got it — replacing Salesforce and scaling the team. What breaks first today: reporting, routing, or day-to-day admin?\n\n[USER]: Admin and routing. Reps rebuild views every week, and inbound form fills sit in a shared inbox until an SDR notices them.\n\n[AGENT]: Understood. When someone hits Talk to sales on pricing, how long before a human calls back?\n\n[USER]: Honestly, forty minutes on a good day. High-intent leads from paid search wait even longer if the queue is busy.\n\n[AGENT]: That helps. What does a good timeline look like for a pilot?\n\n[USER]: One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.\n\n[AGENT]: On migration — are you moving contacts and open deals only, or activity history and reporting too?\n\n[USER]: Contacts, open opportunities, and twelve months of activity history. We can leave ancient closed-won in a read-only archive.\n\n[AGENT]: Who owns RevOps tooling decisions, and who has to bless security?\n\n[USER]: I own the evaluation. Our CFO signs anything over eighty seats. She is skeptical of rip-and-replace but open if security passes.\n\n[AGENT]: Besides HubSpot, is Salesforce staying on the table because of reporting or integrations?\n\n[USER]: Reporting and a custom CPQ bolt-on. Harbor would need to show how forecasting survives the move.\n\n[AGENT]: For security, do you need SOC 2, SSO, and a written review before a pilot touches real pipeline?\n\n[USER]: Yes — US workspace, SSO with Okta, and a written security review before we pilot with live inbound leads.\n\n[AGENT]: If the pilot works, would you start with one squad or all eighty seats?\n\n[USER]: Start with twenty SDRs and ten AEs on inbound. Roll the rest after Q4 planning.\n\n[AGENT]: Thanks. Migration effort and HubSpot are the other options — anything we should not miss?\n\n[USER]: Migration effort is the main objection. HubSpot is the other option on the table. Send a side-by-side on migration and a forecast demo with our field names before Thursday.\n\n[AGENT]: Perfect — I will make sure Harbor sales has your notes and those follow-ups. Appreciate the time, Maya.",
     "leadDossier": {
       "id": "lead-northline",
       "callId": "11111111-0003-4000-8000-000000000003",
@@ -565,7 +640,7 @@
         "confidence": 0.9
       }
     },
-    "brainExtractedAt": "2026-09-04T17:03:40.000Z",
+    "brainExtractedAt": "2026-09-04T17:06:00.000Z",
     "intentSnapshot": {
       "score": 72,
       "level": "high",

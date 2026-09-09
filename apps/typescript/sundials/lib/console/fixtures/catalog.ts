@@ -575,23 +575,98 @@ const northTranscript = turns([
   ],
   [
     "agent",
-    "Got it — replacing Salesforce, scaling the team. What does a good timeline look like?",
+    "Got it — replacing Salesforce and scaling the team. What breaks first today: reporting, routing, or day-to-day admin?",
     "33"
   ],
   [
     "user",
-    "One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.",
-    "51"
+    "Admin and routing. Reps rebuild views every week, and inbound form fills sit in a shared inbox until an SDR notices them.",
+    "48"
   ],
   [
     "agent",
-    "Thanks. I will make sure the Harbor team has your notes. Anything we should not miss?",
-    "65"
+    "Understood. When someone hits Talk to sales on pricing, how long before a human calls back?",
+    "62"
   ],
   [
     "user",
-    "Migration effort is the main objection. HubSpot is the other option on the table.",
-    "79"
+    "Honestly, forty minutes on a good day. High-intent leads from paid search wait even longer if the queue is busy.",
+    "78"
+  ],
+  [
+    "agent",
+    "That helps. What does a good timeline look like for a pilot?",
+    "92"
+  ],
+  [
+    "user",
+    "One to two months if security review clears. I can sign for the pilot; our CFO joins for the full rollout.",
+    "108"
+  ],
+  [
+    "agent",
+    "On migration — are you moving contacts and open deals only, or activity history and reporting too?",
+    "124"
+  ],
+  [
+    "user",
+    "Contacts, open opportunities, and twelve months of activity history. We can leave ancient closed-won in a read-only archive.",
+    "142"
+  ],
+  [
+    "agent",
+    "Who owns RevOps tooling decisions, and who has to bless security?",
+    "158"
+  ],
+  [
+    "user",
+    "I own the evaluation. Our CFO signs anything over eighty seats. She is skeptical of rip-and-replace but open if security passes.",
+    "176"
+  ],
+  [
+    "agent",
+    "Besides HubSpot, is Salesforce staying on the table because of reporting or integrations?",
+    "192"
+  ],
+  [
+    "user",
+    "Reporting and a custom CPQ bolt-on. Harbor would need to show how forecasting survives the move.",
+    "208"
+  ],
+  [
+    "agent",
+    "For security, do you need SOC 2, SSO, and a written review before a pilot touches real pipeline?",
+    "224"
+  ],
+  [
+    "user",
+    "Yes — US workspace, SSO with Okta, and a written security review before we pilot with live inbound leads.",
+    "242"
+  ],
+  [
+    "agent",
+    "If the pilot works, would you start with one squad or all eighty seats?",
+    "258"
+  ],
+  [
+    "user",
+    "Start with twenty SDRs and ten AEs on inbound. Roll the rest after Q4 planning.",
+    "274"
+  ],
+  [
+    "agent",
+    "Thanks. Migration effort and HubSpot are the other options — anything we should not miss?",
+    "290"
+  ],
+  [
+    "user",
+    "Migration effort is the main objection. HubSpot is the other option on the table. Send a side-by-side on migration and a forecast demo with our field names before Thursday.",
+    "308"
+  ],
+  [
+    "agent",
+    "Perfect — I will make sure Harbor sales has your notes and those follow-ups. Appreciate the time, Maya.",
+    "324"
   ]
 ]);
 
@@ -1412,9 +1487,9 @@ export const fixtureCalls: SundialCallRecord[] = [
     requestedAt: at(-1 * day - 5 * hour),
     dialedAt: at(-1 * day - 5 * hour + 19_000),
     connectedAt: at(-1 * day - 5 * hour + 22_000),
-    endedAt: at(-1 * day - 5 * hour + 214_000),
+    endedAt: at(-1 * day - 5 * hour + 354_000),
     speedToDialSec: 19,
-    durationSec: 192,
+    durationSec: 332,
     calleCallId: "calle_northline_done",
     recordingUrl: "https://storage.sundials.dev/recordings/northline-maya.mp3",
     transcript: northTranscript,
@@ -1430,7 +1505,7 @@ export const fixtureCalls: SundialCallRecord[] = [
       next: "Sales rep follow-up within 1 hour"
     }),
     opportunityProfile: northOpp,
-    brainExtractedAt: at(-1 * day - 5 * hour + 220_000),
+    brainExtractedAt: at(-1 * day - 5 * hour + 360_000),
     intentSnapshot: { score: 72, level: "high", signals: [] },
     behaviorSnapshot: behavior(
       [
