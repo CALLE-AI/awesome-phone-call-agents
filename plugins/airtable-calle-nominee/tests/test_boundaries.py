@@ -48,6 +48,7 @@ def a_request(
         request_id=request_id,
         applicant_ref="APP-8823",
         employer_name="Cascade Freight Systems",
+        applicant_name="Dana Okafor",
         consent=a_receipt() if consent is None else consent,
         applicant_supplied=ApplicantSuppliedNumber(raw="+15550109999"),
         sourced=(
@@ -78,6 +79,7 @@ class ConstructionBoundary(unittest.TestCase):
                 request_id="VR-1041",
                 applicant_ref="APP-8823",
                 employer_name="Cascade Freight Systems",
+                applicant_name="Dana Okafor",
                 number=source_number(FICTIONAL_A, NumberSource.OFFICIAL_SITE),
                 relationship=Relationship.EMPLOYER,
                 consent_receipt_id="CR-1",
@@ -177,6 +179,7 @@ class ConsentBoundary(unittest.TestCase):
             request_id=request.request_id,
             applicant_ref=request.applicant_ref,
             employer_name=request.employer_name,
+            applicant_name=request.applicant_name,
             consent=a_receipt("CR-2"),
             applicant_supplied=request.applicant_supplied,
             sourced=request.sourced,

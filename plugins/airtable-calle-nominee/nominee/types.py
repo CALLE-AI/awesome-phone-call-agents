@@ -160,6 +160,7 @@ class VerificationRequest:
     request_id: str
     applicant_ref: str
     employer_name: str
+    applicant_name: str = ""
     consent: ConsentReceipt | None = None
     applicant_supplied: ApplicantSuppliedNumber | None = None
     sourced: SourcedNumber | None = None
@@ -182,6 +183,7 @@ class ConsentedEmployerContact:
     request_id: str
     applicant_ref: str
     employer_name: str
+    applicant_name: str
     number: SourcedNumber
     relationship: Relationship
     consent_receipt_id: str

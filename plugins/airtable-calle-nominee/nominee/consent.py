@@ -123,6 +123,7 @@ def authorize(
         request_id=request.request_id,
         applicant_ref=request.applicant_ref,
         employer_name=request.employer_name,
+        applicant_name=request.applicant_name,
         number=request.sourced,
         relationship=relationship,
         consent_receipt_id=request.consent.receipt_id,
