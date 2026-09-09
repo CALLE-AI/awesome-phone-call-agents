@@ -19,7 +19,7 @@
 // than the thing it replaces.
 (function () {
   const fig = document.querySelector('[data-lottie]');
-  if (!fig || !window.lottie || !window.__firstbellFigure) return;
+  if (!fig || !window.__firstbellFigure) return;
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (reduced.matches) return;
@@ -27,9 +27,36 @@
   let started = false;
   let anim = null;
 
-  const start = () => {
+  // The player is fetched here rather than by a script tag in the head, and it is the
+  // largest thing this page loads: 45.6 KB gzipped, against a page that is 80 KB with it
+  // left out. It draws one figure nine screens down. Every reader who opened the page paid
+  // for it, including the ones who read two screens and left and the ones who asked for
+  // reduced motion, who are turned away four lines above this and never needed it at all.
+  //
+  // Requested from this origin, so the derived policy covers it under `script-src 'self'`
+  // and no third party is in the path. A failure to arrive is not handled as an error
+  // because it is not one: the still is in the markup, it is correct, and it stays.
+  const player = () => {
+    if (window.lottie) return Promise.resolve(window.lottie);
+    if (!player.pending) {
+      player.pending = new Promise((resolve) => {
+        const tag = document.createElement('script');
+        tag.src = 'lottie_light.min.js';
+        tag.addEventListener('load', () => resolve(window.lottie || null));
+        tag.addEventListener('error', () => resolve(null));
+        document.head.appendChild(tag);
+      });
+    }
+    return player.pending;
+  };
+
+  const start = async () => {
     if (started) return;
     started = true;
+    // Asked for after the reader reached the figure, and asked for once. A reader who
+    // turned motion off between the observer firing and the player arriving is checked
+    // again below, because the fetch takes long enough for that to happen.
+    if (!(await player()) || reduced.matches) return;
     const mount = document.createElement('div');
     mount.className = 'fig-anim';
     // The still keeps the box. Swapping it for an empty div first would collapse the figure

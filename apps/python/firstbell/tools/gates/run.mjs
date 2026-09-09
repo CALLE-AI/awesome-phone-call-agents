@@ -161,32 +161,100 @@ async function visibleActs(page) {
   }), ACTS);
 }
 
-async function gateWeight() {
-  // The CSS is inlined into index.html by the generator, so it is counted there rather
-  // than as its own file. An earlier version of this gate looked for page.css in out/,
-  // did not find it, and reported COULD-NOT-MEASURE, which was the gate being wrong
-  // about the build rather than the build being wrong.
-  const counted = ["index.html", "app.js", "player.js"];
-  let total = 0;
-  const parts = {};
-  for (const name of counted) {
-    const path = join(OUT, name);
+async function gateWeight(browser, url) {
+  // What the browser fetched, not a list of filenames.
+  //
+  // This gate used to name three files: index.html, app.js, player.js. It reported 74.3 KB
+  // against a 120 KB ceiling and passed for weeks while the page really shipped 126.2 KB,
+  // because the list was written when those were the only three and nothing made it grow
+  // when a fourth arrived. The largest single thing the page loaded, a 45.6 KB animation
+  // player, had never been counted by the gate that exists to count it. A ceiling measured
+  // against a hand-maintained list is a ceiling on the list.
+  //
+  // So the page is opened and every response is weighed. A file added tomorrow is counted
+  // tomorrow, by nobody, which is the only version of this that stays true.
+  //
+  // Three numbers, because they are three different claims and adding them up hides all
+  // three. The ceiling is on what this origin serves for a first view, which is what the
+  // ceiling was written about. The CDN bytes are Lenis, which the page loads and which is
+  // outside anybody here's control. Audio is counted separately because a recording is
+  // fetched when a reader presses play and is not part of opening the page.
+  const page = await browser.newPage();
+  const weighing = [];
+  const origin = new URL(url).origin;
+
+  const weigh = async (res) => {
+    const headers = res.headers();
+    const declared = Number(headers["content-length"]);
+    if (Number.isFinite(declared) && declared > 0) return declared;
+    // A third party that does not declare a length still costs what it costs on the wire,
+    // so it is compressed here the way our own server compresses ours.
     try {
-      const raw = await readFile(path);
-      const gz = gzipSync(raw).length;
-      parts[name] = Math.round(gz / 102.4) / 10;
-      total += gz;
+      const raw = await res.buffer();
+      return /text|javascript|json|svg|xml/.test(headers["content-type"] || "")
+        ? gzipSync(raw).length : raw.length;
     } catch {
-      record("weight", "COULD-NOT-MEASURE",
-        `${name} is not in out/. Run tools/judge_page.py first.`);
-      return;
+      return 0;
     }
+  };
+
+  page.on("response", (res) => {
+    weighing.push((async () => ({
+      url: res.url(),
+      status: res.status(),
+      bytes: await weigh(res),
+    }))());
+  });
+
+  await page.goto(url, { waitUntil: "networkidle0" });
+  const fetched = await Promise.all(weighing);
+  await page.close();
+
+  const served = fetched.find((r) => r.url === url || r.url === url + "/");
+  if (!served || served.status !== 200) {
+    record("weight", "COULD-NOT-MEASURE",
+      "the page did not answer 200, so nothing it loads could be weighed");
+    return;
   }
+
+  const parts = {};
+  const hosts = {};
+  let total = 0;
+  let cdn = 0;
+  let audio = 0;
+  for (const one of fetched) {
+    if (one.status >= 300) continue;
+    if (!one.url.startsWith(origin)) {
+      // Named by host rather than summed into one number. A single figure for "the CDN"
+      // invites the reading that weight is being parked outside the ceiling, and most of
+      // this is webfont files, which is a different thing from a script.
+      const host = new URL(one.url).host;
+      hosts[host] = Math.round(((hosts[host] || 0) * 102.4 + one.bytes) / 102.4) / 10;
+      cdn += one.bytes;
+      continue;
+    }
+    if (/[.](m4a|mp3|mp4|wav)$/.test(new URL(one.url).pathname)) {
+      audio += one.bytes;
+      continue;
+    }
+    const name = new URL(one.url).pathname.replace(/^\//, "") || "index.html";
+    parts[name] = Math.round(one.bytes / 102.4) / 10;
+    total += one.bytes;
+  }
+
   const kb = Math.round(total / 102.4) / 10;
+  const listed = Object.entries(parts).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k} ${v}`).join(", ");
   record("weight", kb <= WEIGHT_CEILING_KB ? "PASS" : "FAIL",
-    `${kb} KB gzipped over ${WEIGHT_CEILING_KB} KB ceiling, excluding Lenis and audio. `
-    + Object.entries(parts).map(([k, v]) => `${k} ${v}`).join(", "),
-    { kb, parts });
+    `${kb} KB gzipped from this origin over a ${WEIGHT_CEILING_KB} KB ceiling, across `
+    + `${Object.keys(parts).length} files: ${listed}. Plus `
+    + `${Math.round(cdn / 102.4) / 10} KB from elsewhere (`
+    + Object.entries(hosts).sort((a, b) => b[1] - a[1])
+        .map(([h, v]) => `${h} ${v}`).join(", ")
+    + `) and ${Math.round(audio / 102.4) / 10} KB of audio, which is fetched when a reader `
+    + `presses play. Neither is inside the ceiling.`,
+    { kb, parts, cdn_kb: Math.round(cdn / 102.4) / 10, cdn_hosts: hosts,
+      audio_kb: Math.round(audio / 102.4) / 10, files: Object.keys(parts).length });
 }
 
 const CLS_RUNS = 5;
@@ -659,6 +727,50 @@ async function settleScroll(page) {
 async function gateRail(browser, url) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
+
+  /* Where an act sits in the document, which is not where it is on the screen.
+   *
+   * This gate used to read `getBoundingClientRect().top + scrollY`. For everything on the
+   * page that is the same number. For act 00 it is not: above 60rem the curtain makes it
+   * `position: sticky`, so its rect is where it is currently painted, and adding the scroll
+   * offset back gives a document position that slides down the page as the reader scrolls.
+   * Act 00 then appeared to cover wherever the reader happened to be, its range overlapped
+   * the real act at almost every stop, and the gate passed for six months by agreeing with
+   * itself twice.
+   *
+   * It broke the day act 00 grew by sixteen pixels: at one stop the midpoint landed
+   * seventeen pixels past the end of act 08, act 08 dropped out of the answer, act 00's
+   * phantom range was all that was left, and the gate failed a rail that was correct.
+   *
+   * `offsetTop` and `offsetHeight` are laid out in flow and ignore sticky and relative
+   * offsets entirely, which is the quantity this arithmetic always meant.
+   *
+   * Note for whoever changes this next: the file:// build does not reproduce any of it. The
+   * curtain is wired by app.js against Lenis, Lenis comes off a CDN, and that request fails
+   * on file://, so act 00 is never sticky there and the bug is invisible. Serve the page. */
+  await page.evaluateOnNewDocument(() => {
+    window.flowTops = (els) => {
+      // `offsetTop` does not help here. On a stuck element Chrome reports it including the
+      // sticky displacement, identical to rect.top + scrollY, so walking offsetParent gives
+      // the same wrong number by a longer route. The only reliable way to ask where an
+      // element sits in flow is to take the sticky off it and look.
+      //
+      // All of them are unstuck first and all of them measured after, so the layout is
+      // flushed once rather than once per act, and every value comes from the same layout.
+      // The inline style is restored before this function returns and nothing paints in
+      // between, so the page under test is unchanged by having been measured.
+      const was = els.map((el) => el.style.position);
+      els.forEach((el) => { el.style.position = "static"; });
+      const out = els.map((el) => ({
+        id: el.id,
+        top: Math.round(el.getBoundingClientRect().top + window.scrollY),
+        height: el.offsetHeight,
+      }));
+      els.forEach((el, i) => { el.style.position = was[i]; });
+      return out;
+    };
+  });
+
   await page.goto(url, { waitUntil: "networkidle0" });
 
   const present = await page.evaluate(() => {
@@ -681,11 +793,7 @@ async function gateRail(browser, url) {
     return {
       height: window.innerHeight,
       docHeight: document.documentElement.scrollHeight,
-      acts: links.map((a) => {
-        const el = document.querySelector(a.getAttribute("href"));
-        const r = el.getBoundingClientRect();
-        return { id: el.id, top: Math.round(r.top + window.scrollY), height: Math.round(r.height) };
-      }),
+      acts: flowTops(links.map((a) => document.querySelector(a.getAttribute("href")))),
     };
   });
 
@@ -728,11 +836,8 @@ async function gateRail(browser, url) {
     // height as it is read: acts reveal, a player mounts, a figure swaps its still for an
     // animation. The gate was comparing what is painted now against where things were then,
     // and reporting the difference as the rail pointing at the wrong act.
-    const acts = await page.evaluate(() => [...document.querySelectorAll('section[id^="act-"]')]
-      .map((el) => {
-        const r = el.getBoundingClientRect();
-        return { id: el.id, top: Math.round(r.top + window.scrollY), height: Math.round(r.height) };
-      }));
+    const acts = await page.evaluate(
+      () => flowTops([...document.querySelectorAll('section[id^="act-"]')]));
     map.acts = acts;
     const want = expected(seen.y);
     if (want === null) continue;   // a midpoint in no act at all is not this gate's business
@@ -2356,7 +2461,7 @@ async function main() {
   });
 
   try {
-    await runGate("weight", () => gateWeight());
+    await runGate("weight", () => gateWeight(browser, url));
     await runGate("cls", () => gateCls(browser, url));
     await runGate("long tasks", () => gateLongTasks(browser, url));
     await runGate("reduced motion", () => gateReducedMotion(browser, url));
