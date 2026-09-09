@@ -936,9 +936,10 @@
             : accepts + " calls reported accepting terms. That is a bug.") +
           "</span></li>" +
           '<li><span class="fact-name">binding = false</span>' +
-          '<span class="fact-said">A requirement in the pack is a record of ' +
-          "what an adviser said, dated and quoted. It does not oblige the " +
-          "institution and it does not oblige the family.</span></li>" +
+          '<span class="fact-said">The default on every capture record, and ' +
+          "the one fact on this page the API does not carry: a requirement " +
+          "in the pack is what an adviser said, quoted. It does not oblige " +
+          "the institution and it does not oblige the family.</span></li>" +
           "</ul></div>" +
           '<div class="section"><span class="label">The disclosure ' +
           "budget</span>" +
