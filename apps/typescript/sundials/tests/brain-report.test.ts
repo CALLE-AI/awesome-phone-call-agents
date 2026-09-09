@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultBrainConfig, defaultBrainGoals, enabledGoals, normalizeBrainConfig, brainCallDirectives } from "../lib/brain/config.ts";
+import {
+  defaultBrainConfig,
+  defaultBrainGoals,
+  defaultBrainSuggestions,
+  enabledGoals,
+  normalizeBrainConfig,
+  brainCallDirectives
+} from "../lib/brain/config.ts";
 import { applyCopilotHeuristics, applySuggestionToConfig } from "../lib/brain/copilot.ts";
 import { goalFromSentence } from "../lib/brain/goals.ts";
 import { HARBOR_COMPANY_ABOUT, HARBOR_QUALIFICATION_REPORT, harborCompanyCorpus } from "../lib/brain/harbor-corpus.ts";
@@ -102,15 +109,25 @@ test("brain ingest: merging a source redrafts company copy and keeps goals", () 
   assert.equal(mergeSource(next, next.sources[0]).length, 1);
 });
 
-test("brain copilot: retry, intents, and suggestions without touching voice", () => {
+test("brain config: seeds two copilot proposals when none are saved", () => {
+  assert.equal(defaultBrainSuggestions().length, 2);
+  const restored = normalizeBrainConfig({ accountId: "harbor", suggestions: [] }, "harbor");
+  assert.equal(restored.suggestions.length, 2);
+  assert.equal(restored.suggestions[0]?.id, "sugg_migration_scope");
+  assert.equal(restored.suggestions[1]?.id, "sugg_prompt_team_size");
+});
+
+test("brain copilot: retry is locked; intents and suggestions still apply", () => {
   const base = defaultBrainConfig();
   const retry = applyCopilotHeuristics(base, "retry in 2 hours");
-  assert.equal(retry?.config.retryDelayHours, 2);
+  assert.equal(retry?.config.retryDelayHours, base.retryDelayHours);
+  assert.match(retry?.reply || "", /locked/i);
   assert.equal(retry?.config.tonePersona, base.tonePersona);
   assert.equal(retry?.config.agentIdentity, base.agentIdentity);
 
   const skip = applyCopilotHeuristics(base, "don't retry missed pickups");
-  assert.equal(skip?.config.retryDelayHours, null);
+  assert.equal(skip?.config.retryDelayHours, base.retryDelayHours);
+  assert.match(skip?.reply || "", /locked/i);
 
   const added = applyCopilotHeuristics(base, "add a goal for budget range");
   assert.ok(added?.config.goals.some((goal) => /budget/i.test(goal.label)));

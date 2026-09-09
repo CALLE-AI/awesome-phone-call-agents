@@ -1,12 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { DataSource, WorkspaceSettings } from "@/lib/types";
+import type { DataSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useWorkspaceDataSource } from "./DataSourceProvider";
 import { useTheme, type Theme } from "./ThemeProvider";
 
 const COMING_SOON = [
@@ -18,35 +17,9 @@ const COMING_SOON = [
   { label: "Integrations", detail: "CRM bulk sync, Slack alerts, and calendar booking." }
 ];
 
-export function SettingsPanel({ initial }: { initial: WorkspaceSettings }) {
-  const router = useRouter();
+export function SettingsPanel() {
   const { theme, setTheme } = useTheme();
-  const [dataSource, setDataSource] = useState<DataSource>(initial.dataSource);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const save = async (next: DataSource) => {
-    const previous = dataSource;
-    setDataSource(next);
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/sundials/console/settings", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataSource: next })
-      });
-      if (!res.ok) throw new Error("Could not save settings");
-      const body = (await res.json()) as { settings?: WorkspaceSettings };
-      if (body.settings?.dataSource) setDataSource(body.settings.dataSource);
-      router.refresh();
-    } catch (err) {
-      setDataSource(previous);
-      setError(err instanceof Error ? err.message : "Could not save settings");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { dataSource, saving, error, setDataSource } = useWorkspaceDataSource();
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -66,7 +39,7 @@ export function SettingsPanel({ initial }: { initial: WorkspaceSettings }) {
             value={dataSource}
             disabled={saving}
             onValueChange={(next) => {
-              if (next === "live" || next === "mock") void save(next);
+              if (next === "live" || next === "mock") void setDataSource(next);
             }}
             className="grid gap-3 sm:grid-cols-2"
           >

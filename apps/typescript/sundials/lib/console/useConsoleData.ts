@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AnalyticsSnapshot, DataSource, LeadQueueItem, SundialCallRecord } from "@/lib/types";
+import { useWorkspaceDataSource } from "./DataSourceProvider";
 import { EMPTY_ANALYTICS, type Range } from "./format";
 
 export function useConsoleData(
@@ -13,13 +14,15 @@ export function useConsoleData(
   },
   range?: Range
 ) {
+  const { dataSource: workspaceSource, revision } = useWorkspaceDataSource();
   const [calls, setCalls] = useState<SundialCallRecord[]>(initial?.calls ?? []);
   const [leads, setLeads] = useState<LeadQueueItem[]>(initial?.leads ?? []);
   const [analytics, setAnalytics] = useState<AnalyticsSnapshot>(initial?.analytics ?? EMPTY_ANALYTICS);
-  const [source, setSource] = useState<DataSource>(initial?.source ?? "live");
+  const [source, setSource] = useState<DataSource>(initial?.source ?? workspaceSource);
   const [isLoading, setIsLoading] = useState(!initial);
 
   useEffect(() => {
+    setSource(workspaceSource);
     const fetchConsoleData = async () => {
       try {
         const analyticsUrl = range
@@ -51,12 +54,13 @@ export function useConsoleData(
         setIsLoading(false);
       }
     };
+    setIsLoading(true);
     void fetchConsoleData();
     const interval = setInterval(() => {
       void fetchConsoleData();
     }, 3000);
     return () => clearInterval(interval);
-  }, [range]);
+  }, [range, workspaceSource, revision]);
 
   return { calls, leads, analytics, source, isLoading };
 }

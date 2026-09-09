@@ -95,21 +95,6 @@ export function defaultBrainSuggestions(): BrainSuggestion[] {
       title: "Anchor team size to pain first",
       reason: "Call-E asks about team size too abruptly in minute 1. Suggestion: Anchor team size to their specific pain point first.",
       proposedDirective: "Do not ask team size in the first minute. Anchor seat count to the pain they just described, then ask how many people feel that pain today."
-    },
-    {
-      id: "sugg_security_review",
-      type: "new_goal",
-      title: "Security review",
-      reason: "Two recent calls asked about SOC 2 and data residency before they would continue. Add a listening intent for security review.",
-      proposedGoal: {
-        label: "Security review",
-        targetField: "securityReview",
-        priority: "medium",
-        enabled: true,
-        guidance: "Ask about compliance, residency, or SSO only if they raise it.",
-        naturalTrigger: "When they mention security, SOC 2, or where data lives",
-        exampleAsk: "Do you need a US or EU workspace, or is that not a factor yet?"
-      }
     }
   ];
 }
@@ -234,7 +219,7 @@ export function normalizeBrainConfig(raw: Partial<BrainConfig> | null | undefine
     closingScript: typeof raw.closingScript === "string" ? raw.closingScript.trim() : fallback.closingScript,
     playbookNotes: typeof raw.playbookNotes === "string" ? raw.playbookNotes : "",
     goals: goals.length > 0 ? goals : fallback.goals,
-    suggestions,
+    suggestions: suggestions.length > 0 ? suggestions : fallback.suggestions,
     lastClusteredCompletedCount:
       typeof raw.lastClusteredCompletedCount === "number" && Number.isFinite(raw.lastClusteredCompletedCount)
         ? raw.lastClusteredCompletedCount

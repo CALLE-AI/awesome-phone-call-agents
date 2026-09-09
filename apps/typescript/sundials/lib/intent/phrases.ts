@@ -28,3 +28,23 @@ export function shortInsightLabel(text: string | undefined): string | undefined 
   if (mapped && wordCount(cleaned) <= 8) return mapped;
   return cleaned;
 }
+
+const YEAR_TOKEN = /^(?:19|20)\d{2}$/;
+
+/** Chart label only. Keep the original company-size sentence on the lead profile. */
+export function companySizeChartLabel(text: string | null | undefined): string | undefined {
+  const cleaned = insightText(text);
+  if (!cleaned) return undefined;
+
+  const range = cleaned.match(/\b(\d{1,3})\s*[–-]\s*(\d{1,6})\b/);
+  if (range) return `${Number(range[1])}–${Number(range[2])}`;
+
+  for (const match of cleaned.matchAll(/\d{1,3}(?:,\d{3})+|\d+/g)) {
+    const digits = match[0].replace(/,/g, "");
+    if (YEAR_TOKEN.test(digits)) continue;
+    const n = Number(digits);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    return n.toLocaleString("en-US");
+  }
+  return undefined;
+}

@@ -1,6 +1,6 @@
 import { behaviorFromEvents, declaredInterestFromEvents } from "./profile.ts";
 import { queuePriority } from "./opportunity.ts";
-import { insightText, wordCount } from "./phrases.ts";
+import { companySizeChartLabel, insightText, wordCount } from "./phrases.ts";
 import { scoreEvents } from "./score.ts";
 import type {
   AnalyticsSnapshot,
@@ -145,7 +145,7 @@ export function buildAnalytics(
     if (!opp) return;
     bump(pains, analyticsPainLabel(opp));
     bump(uses, insightText(typeof opp.useCase?.value === "string" ? opp.useCase.value : undefined));
-    bump(sizes, insightText(typeof opp.companySize?.value === "string" ? opp.companySize.value : undefined));
+    bump(sizes, companySizeChartLabel(typeof opp.companySize?.value === "string" ? opp.companySize.value : undefined));
     bump(timelines, insightText(typeof opp.timeline?.value === "string" ? opp.timeline.value : undefined));
     for (const name of opp.alternatives?.value || []) bump(competitors, name);
     for (const obj of opp.objections?.value || []) bump(objections, obj);

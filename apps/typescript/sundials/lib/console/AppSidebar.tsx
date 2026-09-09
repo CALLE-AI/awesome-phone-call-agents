@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, ChartLine, ExternalLink, KeyRound, Settings, Store, Users } from "lucide-react";
+import { Brain, ChartLine, ExternalLink, KeyRound, LogOut, Settings, Store, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +19,10 @@ import {
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useWorkspaceDataSource } from "@/lib/console/DataSourceProvider";
 
 const NAV = [
   {
@@ -68,10 +70,12 @@ function SidebarBrand() {
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ companyName, accountId }: { companyName: string; accountId: string }) {
   const pathname = usePathname() || "/app/home";
   const keysActive = pathname.startsWith("/app/keys");
   const settingsActive = pathname.startsWith("/app/settings");
+  const { mockEnabled, saving: mockSaving, setDataSource } = useWorkspaceDataSource();
+  const initial = (companyName.trim().charAt(0) || "S").toUpperCase();
 
   return (
     <Sidebar collapsible="none" className="border-r">
@@ -117,6 +121,19 @@ export function AppSidebar() {
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
               ))}
+              <SidebarMenuSubItem>
+                <div className="flex h-7 min-w-0 -translate-x-px items-center justify-between gap-2 overflow-hidden rounded-md px-2 text-sm text-sidebar-foreground">
+                  <span className="truncate">Mock data</span>
+                  <Switch
+                    checked={mockEnabled}
+                    disabled={mockSaving}
+                    aria-label="Toggle mock analytics and leads overlay"
+                    onCheckedChange={(checked) => {
+                      void setDataSource(checked ? "mock" : "live");
+                    }}
+                  />
+                </div>
+              </SidebarMenuSubItem>
             </SidebarMenuSub>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -135,16 +152,29 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="h-10 px-3"
+              onClick={() => {
+                void fetch("/api/sundials/auth/logout", { method: "POST" }).then(() => {
+                  window.location.href = "/login";
+                });
+              }}
+            >
+              <LogOut />
+              <span>Sign out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
         <div className="mx-1 rounded-md border border-sidebar-border bg-sidebar px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <Avatar className="size-8" aria-label="Harbor">
-              <AvatarFallback className="bg-teal-800 text-sm font-semibold text-white">H</AvatarFallback>
+            <Avatar className="size-8" aria-label={companyName}>
+              <AvatarFallback className="bg-teal-800 text-sm font-semibold text-white">{initial}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">Harbor</p>
-                <Badge variant="secondary">Mock</Badge>
+                <p className="truncate text-sm font-medium">{companyName}</p>
+                {accountId === "harbor" ? <Badge variant="secondary">Demo</Badge> : null}
               </div>
             </div>
           </div>

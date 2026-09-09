@@ -18,7 +18,7 @@ import { CalleAPIError } from "@call-e/calle";
 import { scoreEvents, intentLevelFromScore } from "../lib/intent/score.ts";
 import { behaviorFromEvents, declaredInterestFromEvents, interestThemes } from "../lib/intent/profile.ts";
 import { harborFixtureOpportunity, GENERIC_FOLLOW_UP_TODAY, MISSED_PICKUP_ACTION, opportunityFromCall, queuePriority } from "../lib/intent/opportunity.ts";
-import { shortInsightLabel } from "../lib/intent/phrases.ts";
+import { companySizeChartLabel, shortInsightLabel } from "../lib/intent/phrases.ts";
 import { buildAnalytics } from "../lib/intent/analytics.ts";
 import {
   callJourneyBlurb,
@@ -54,8 +54,11 @@ import { resolveAllCalls, resolveAnalytics, resolveCallDetail, resolveLeadDetail
 import { readWorkspaceSettings, writeWorkspaceSettings } from "../lib/console/workspace-settings.ts";
 import { parseTheme } from "../lib/console/theme.ts";
 import { authenticateSdkRequest } from "../lib/sdk/auth.ts";
+import { SUNDIALS_API_KEY_HEADER } from "../lib/sdk/public-key.ts";
+import { verifyPassword } from "../lib/accounts.ts";
+import { decodeSessionCookie, encodeSessionCookie, sessionFromRequest, SESSION_COOKIE } from "../lib/console/session.ts";
 import { DEFAULT_RETRY_DELAY_HOURS, defaultBrainConfig, defaultBrainGoals, enabledGoals, HARBOR_CLOSING_SCRIPT, HARBOR_OPENING_SCRIPT, MAX_RETRY_DELAY_HOURS, MIN_RETRY_DELAY_HOURS, normalizeBrainConfig, normalizeRetryDelayHours, readBrainConfig, writeBrainConfig } from "../lib/brain/config.ts";
-import { liveCreateInputForRecord, stopFollowUpsForVisitor } from "../lib/calle/retry.ts";
+import { liveCreateInputForRecord, processDueRetries, stopFollowUpsForVisitor } from "../lib/calle/retry.ts";
 import { ingestCalleWebhook } from "../lib/calle/webhook.ts";
 import { parseTrackingConsent, serializeTrackingConsent, TRACKING_CONSENT_TTL_MS } from "../lib/sdk/tracking-consent.ts";
 import { applyGeminiCallProfile, buildCallProfilePrompt, clampPainCategory, hasGeminiBriefing, mergeBrainExtraction, mergePainCatalogs, resolvePainCategory, sanitizeTranscriptForGemini } from "../lib/brain/extract.ts";
@@ -416,6 +419,36 @@ test("intelligence: pain labels keep long CALL-E wording and skip placeholders",
   const analytics = buildAnalytics([], [], [call]);
   assert.ok(analytics.intelligence.topPainPoints.some((row) => row.label === "HubSpot cost"));
   assert.equal(analytics.intelligence.topPainPoints.some((row) => row.label === long), false);
+});
+
+test("intelligence: company size chart extracts a number and keeps profile text", () => {
+  assert.equal(companySizeChartLabel("about 200 users now, expected about 500 by next year"), "200");
+  assert.equal(companySizeChartLabel("500 team members (~10,000 users)"), "500");
+  assert.equal(companySizeChartLabel("10 internal users"), "10");
+  assert.equal(companySizeChartLabel("150 users"), "150");
+  assert.equal(companySizeChartLabel("11–50"), "11–50");
+  assert.equal(companySizeChartLabel("45-person RevOps team"), "45");
+  assert.equal(companySizeChartLabel("80 current users, planning 150"), "80");
+  assert.equal(companySizeChartLabel("Student project"), undefined);
+  assert.equal(companySizeChartLabel("See live transcript"), undefined);
+
+  const call = createFixtureCallRecord("+15550192831", session(), "Casey Example", "casey@example.com");
+  const sizeText = "about 200 users now, expected about 500 by next year";
+  call.opportunityProfile = {
+    ...call.opportunityProfile!,
+    companySize: { value: sizeText, source: "explicit", confidence: 0.9 }
+  };
+  const analytics = buildAnalytics([], [], [call]);
+  assert.deepEqual(analytics.intelligence.companySizeDistribution, [{ label: "200", count: 1 }]);
+  assert.equal(call.opportunityProfile?.companySize?.value, sizeText);
+
+  const other = createFixtureCallRecord("+15550192832", session(), "Riley Example", "riley@example.com");
+  other.opportunityProfile = {
+    ...other.opportunityProfile!,
+    companySize: { value: "200 analytics seats", source: "explicit", confidence: 0.9 }
+  };
+  const merged = buildAnalytics([], [], [call, other]);
+  assert.deepEqual(merged.intelligence.companySizeDistribution, [{ label: "200", count: 2 }]);
 });
 
 test("theme: parseTheme accepts light dark system and defaults to light", () => {
@@ -1273,19 +1306,67 @@ test("ids: new entity ids are UUID-shaped and lookup works for prefixed or UUID 
   assert.equal(store.getCall(fixture.id)?.id, fixture.id);
 });
 
-test("sdk auth: harbor demo key maps to harbor and rejects anything else", () => {
-  const ok = authenticateSdkRequest(new Headers({ "x-sundials-api-key": "hardcoded-sdk-key" }), "harbor");
+test("sdk auth: generated account key maps to the account and rejects anything else", () => {
+  const store = new SundialsDatabase(":memory:");
+  const harbor = store.getAccount("harbor");
+  assert.ok(harbor);
+  assert.equal(harbor?.sdkKey, null);
+  const key = store.generateSdkKey("harbor");
+  assert.match(key, /^Harbor-[0-9a-f-]{36}$/i);
+
+  const ok = authenticateSdkRequest(new Headers({ [SUNDIALS_API_KEY_HEADER]: key }), "harbor", store);
   assert.equal(ok.ok, true);
   if (ok.ok) assert.equal(ok.accountId, "harbor");
 
-  const missing = authenticateSdkRequest(new Headers());
+  const missing = authenticateSdkRequest(new Headers(), undefined, store);
   assert.equal(missing.ok, false);
 
-  const wrong = authenticateSdkRequest(new Headers({ "x-sundials-api-key": "other-key" }));
+  const wrong = authenticateSdkRequest(new Headers({ [SUNDIALS_API_KEY_HEADER]: "not-an-issued-key" }), undefined, store);
   assert.equal(wrong.ok, false);
 
-  const mismatch = authenticateSdkRequest(new Headers({ "x-sundials-api-key": "hardcoded-sdk-key" }), "acme");
+  const mismatch = authenticateSdkRequest(new Headers({ [SUNDIALS_API_KEY_HEADER]: key }), "acme", store);
   assert.equal(mismatch.ok, false);
+});
+
+test("accounts: harbor seed, signup, password hash, and session cookie", () => {
+  const store = new SundialsDatabase(":memory:");
+  const harbor = store.getAccountByUsername("harbor");
+  assert.ok(harbor);
+  assert.equal(harbor?.id, "harbor");
+  assert.equal(harbor?.sdkKey, null);
+  assert.equal(verifyPassword("harbor", harbor!.passwordHash), true);
+  assert.equal(verifyPassword("nope", harbor!.passwordHash), false);
+
+  const created = store.createAccount({ username: "northline", password: "secret1", companyName: "Northline" });
+  assert.equal(created.ok, true);
+  if (created.ok) {
+    assert.equal(created.account.username, "northline");
+    assert.match(created.account.id, /^northline/);
+    const sdk = store.generateSdkKey(created.account.id);
+    assert.match(sdk, /^Northline-/);
+    const auth = authenticateSdkRequest(
+      new Headers({ [SUNDIALS_API_KEY_HEADER]: sdk }),
+      created.account.id,
+      store
+    );
+    assert.equal(auth.ok, true);
+  }
+
+  const taken = store.createAccount({ username: "harbor", password: "secret1", companyName: "Other" });
+  assert.equal(taken.ok, false);
+
+  const token = encodeSessionCookie({ accountId: "harbor", username: "harbor", exp: Date.now() + 60_000 });
+  const session = decodeSessionCookie(token);
+  assert.equal(session?.accountId, "harbor");
+  assert.equal(decodeSessionCookie("tampered"), null);
+
+  const unauth = sessionFromRequest({ cookies: { get: () => undefined } });
+  assert.equal(unauth, null);
+
+  const authed = sessionFromRequest({
+    cookies: { get: (name: string) => (name === SESSION_COOKIE ? { value: token } : undefined) }
+  });
+  assert.equal(authed?.accountId, "harbor");
 });
 
 test("brain: default Harbor config includes Harbor opening", () => {
@@ -1490,26 +1571,22 @@ test("brain: retryDelayHours default, bounds, and skip-if-invalid", () => {
   assert.equal(normalizeBrainConfig({ ...defaultBrainConfig(), retryDelayHours: 0 }).retryDelayHours, undefined);
 });
 
-test("retry: failed/no-answer schedules exactly one retry due X hours later from Brain", () => {
+test("retry: failed/no-speech marks reconciliation and does not schedule another call", () => {
   withBrain({ retryDelayHours: 2 }, () => {
     const store = new SundialsDatabase(":memory:");
     const parent = missedPickupRecord();
     store.saveCall(parent);
 
-    const calls = store.peekCalls();
-    assert.equal(calls.length, 2);
-    const retry = calls.find((call) => call.retryOfCallId === parent.id);
-    assert.ok(retry);
-    assert.equal(retry?.status, "queued");
-    assert.equal(retry?.retryCount, 1);
-    assert.equal(retry?.dryRun, true);
-    const scheduled = Date.parse(retry?.retryScheduledAt || "");
-    const due = Date.parse(retry?.retryDueAt || "");
-    assert.ok(Number.isFinite(scheduled));
-    assert.equal(due - scheduled, 2 * 3_600_000);
-
-    store.saveCall(store.peekCalls().find((call) => call.id === parent.id)!);
-    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === parent.id).length, 1);
+    const saved = store.peekCalls().find((call) => call.id === parent.id);
+    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === parent.id).length, 0);
+    assert.equal(saved?.retryDueAt, undefined);
+    assert.equal(saved?.needsReconciliation, true);
+    assert.match(saved?.errorReason || "", /ambiguous provider outcome/i);
+    const review = leadStatusSummary(
+      sampleLead({ latestCallId: saved!.id, latestCallStatus: "no_answer" }),
+      saved
+    );
+    assert.equal(review.headline, "Needs review");
 
     const failedSilent = missedPickupRecord({
       id: newEntityId(),
@@ -1518,7 +1595,8 @@ test("retry: failed/no-answer schedules exactly one retry due X hours later from
       session: { ...session(), visitorId: "vis_failed_silent" }
     });
     store.saveCall(failedSilent);
-    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === failedSilent.id).length, 1);
+    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === failedSilent.id).length, 0);
+    assert.equal(store.peekCalls().find((call) => call.id === failedSilent.id)?.needsReconciliation, true);
   });
 });
 
@@ -1531,6 +1609,7 @@ test("retry: completed and failed-with-speech do not retry", () => {
     store.saveCall(completed);
     assert.equal(store.peekCalls().length, 1);
     assert.ok(!store.peekCalls().some((call) => call.retryOfCallId));
+    assert.equal(store.peekCalls()[0]?.needsReconciliation, undefined);
 
     const spoke = missedPickupRecord({
       status: "failed",
@@ -1543,46 +1622,37 @@ test("retry: completed and failed-with-speech do not retry", () => {
     });
     store.saveCall(spoke);
     assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === spoke.id).length, 0);
+    assert.equal(store.peekCalls().find((call) => call.id === spoke.id)?.needsReconciliation, undefined);
   });
 });
 
-test("retry: already-retried does not retry again", () => {
-  withBrain({ retryDelayHours: 1 }, () => {
-    const store = new SundialsDatabase(":memory:");
-    const parent = missedPickupRecord();
-    store.saveCall(parent);
-    const retry = store.peekCalls().find((call) => call.retryOfCallId === parent.id);
-    assert.ok(retry);
-
-    retry!.status = "no_answer";
-    retry!.transcript = [];
-    retry!.fullTranscript = "";
-    store.saveCall(retry!);
-    assert.equal(store.peekCalls().filter((call) => Boolean(call.retryOfCallId)).length, 1);
-
-    const secondParent = missedPickupRecord({
-      id: newEntityId(),
-      retryCount: 1,
-      retryOfCallId: parent.id,
-      visitorId: "vis_already"
-    });
-    store.saveCall(secondParent);
-    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === secondParent.id).length, 0);
+test("retry: leftover queued retries are cancelled by the hackathon lock", () => {
+  const store = new SundialsDatabase(":memory:");
+  const parent = missedPickupRecord({ status: "queued", retryOfCallId: undefined });
+  const leftover = missedPickupRecord({
+    id: newEntityId(),
+    status: "queued",
+    retryOfCallId: parent.id,
+    retryCount: 1,
+    retryDueAt: new Date(Date.now() - 1000).toISOString(),
+    visitorId: parent.visitorId
   });
+  store.saveCall(parent, { skipRetryHooks: true });
+  store.saveCall(leftover, { skipRetryHooks: true });
+  processDueRetries(store);
+  const retry = store.peekCalls().find((call) => call.id === leftover.id);
+  assert.equal(retry?.status, "failed");
+  assert.match(retry?.retryCancelReason || retry?.errorReason || "", /hackathon retry lock/i);
 });
 
 test("retry: live create uses current Brain openingScript", () => {
   withBrain({ openingScript: "FIRST SCRIPT unique-aaa. This call may be recorded." }, () => {
-    const store = new SundialsDatabase(":memory:");
-    store.saveCall(missedPickupRecord());
-    const retry = store.peekCalls().find((call) => call.retryOfCallId);
-    assert.ok(retry);
-
+    const retry = missedPickupRecord({ status: "queued", retryOfCallId: newEntityId(), retryCount: 1 });
     writeBrainConfig({
       ...defaultBrainConfig(),
       openingScript: "UPDATED SCRIPT unique-bbb. This call may be recorded. How can we help?"
     });
-    const input = liveCreateInputForRecord(retry!);
+    const input = liveCreateInputForRecord(retry);
     assert.ok(input);
     assert.match(input?.task || "", /UPDATED SCRIPT unique-bbb/);
     assert.doesNotMatch(input?.task || "", /unique-aaa/);
@@ -1590,27 +1660,16 @@ test("retry: live create uses current Brain openingScript", () => {
   });
 });
 
-test("retry: invalid Brain delay skips and a later completed call cancels the queued retry", () => {
-  withBrain({ retryDelayHours: 0 }, () => {
-    const store = new SundialsDatabase(":memory:");
-    store.saveCall(missedPickupRecord());
-    assert.equal(store.peekCalls().length, 1);
-  });
-
+test("retry: stop follow-up revokes consent even when no retry was queued", () => {
   withBrain({ retryDelayHours: 1 }, () => {
     const store = new SundialsDatabase(":memory:");
     const parent = missedPickupRecord();
     store.saveCall(parent);
-    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId).length, 1);
+    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === parent.id).length, 0);
 
-    const completed = createFixtureCallRecord("+15550192831", session(), "Alex", "alex@example.com", {
-      visitorId: "vis_unit_test"
-    });
-    store.saveCall(completed);
-    const retry = store.peekCalls().find((call) => call.retryOfCallId === parent.id);
-    assert.equal(retry?.status, "failed");
-    assert.match(retry?.errorReason || "", /later completed call/i);
-    assert.equal((retry?.errorReason || "").includes(parent.id), false);
+    const cancelled = stopFollowUpsForVisitor(store, parent.visitorId, parent.rawPhoneNumber);
+    assert.equal(cancelled, 0);
+    assert.equal(store.peekCalls().find((call) => call.id === parent.id)?.callConsentAllowOneRetry, false);
   });
 });
 
@@ -1645,22 +1704,6 @@ test("retry: missing or mismatched call consent does not schedule a follow-up", 
 
     store.saveCall(missedPickupRecord({ id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff", callConsentE164: "+6555501010" }));
     assert.equal(store.peekCalls().filter((call) => Boolean(call.retryOfCallId)).length, 0);
-  });
-});
-
-test("retry: stop follow-up revokes consent and cancels the queued retry", () => {
-  withBrain({ retryDelayHours: 1 }, () => {
-    const store = new SundialsDatabase(":memory:");
-    const parent = missedPickupRecord();
-    store.saveCall(parent);
-    assert.equal(store.peekCalls().filter((call) => call.retryOfCallId === parent.id).length, 1);
-
-    const cancelled = stopFollowUpsForVisitor(store, parent.visitorId, parent.rawPhoneNumber);
-    assert.equal(cancelled, 1);
-    const retry = store.peekCalls().find((call) => call.retryOfCallId === parent.id);
-    assert.equal(retry?.status, "failed");
-    assert.match(retry?.errorReason || "", /stopped the follow-up/i);
-    assert.equal(store.peekCalls().find((call) => call.id === parent.id)?.callConsentAllowOneRetry, false);
   });
 });
 
