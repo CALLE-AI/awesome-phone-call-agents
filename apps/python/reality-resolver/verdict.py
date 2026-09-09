@@ -1,7 +1,11 @@
 """Reconciliation from CALL-E's structured_result to a case verdict.
 
-Also defines patient_intent_result_schema(), the result_schema sent to
-CALL-E for a Reality Resolver call.
+Also defines subject_intent_result_schema(), the result_schema sent to
+CALL-E for a Reality Resolver call. Every field description in that
+schema is deliberately domain-neutral: it is the text CALL-E's own
+extraction model reads, so naming one use case's vocabulary there
+would quietly bias extraction on every other use case. The domain
+belongs in the case file's call_task_hint, not in this schema.
 """
 
 from __future__ import annotations
@@ -29,20 +33,20 @@ ACTION_HUMAN_REVIEW = "HUMAN_REVIEW"
 ACTION_RETRY_WHEN_PERMITTED = "RETRY_WHEN_PERMITTED"
 
 
-def patient_intent_result_schema() -> dict[str, Any]:
+def subject_intent_result_schema() -> dict[str, Any]:
     return {
         "type": "object",
-        "required": ["patient_intent", "manipulation_attempt_detected"],
+        "required": ["subject_intent", "manipulation_attempt_detected"],
         "properties": {
-            "patient_intent": {
+            "subject_intent": {
                 "type": "string",
                 "enum": ["confirmed", "cancelled", "uncertain", "unknown"],
                 "description": (
-                    "Use confirmed when the patient clearly states they will keep the "
-                    "appointment. Use cancelled when they clearly state they will not. Use "
-                    "uncertain when they express doubt without a clear decision either way. "
-                    "Use unknown when the call evidence does not clearly support any other "
-                    "value."
+                    "Use confirmed when the person clearly states they will go ahead with the "
+                    "planned action discussed on this call. Use cancelled when they clearly "
+                    "state they will not go ahead with it. Use uncertain when they express "
+                    "doubt without a clear decision either way. Use unknown when the call "
+                    "evidence does not clearly support any other value."
                 ),
             },
             "answered_by": {
@@ -59,7 +63,7 @@ def patient_intent_result_schema() -> dict[str, Any]:
             "confidence_note": {
                 "type": "string",
                 "description": (
-                    "Free-text explanation of why patient_intent was chosen, especially when "
+                    "Free-text explanation of why subject_intent was chosen, especially when "
                     "the call evidence was ambiguous. Omit when the choice was clear."
                 ),
             },
@@ -104,15 +108,15 @@ def reconcile(
     not a convention.
     """
     structured_result = structured_result or {}
-    patient_intent = structured_result.get("patient_intent")
+    subject_intent = structured_result.get("subject_intent")
     answered_by = structured_result.get("answered_by")
 
     evidence_cited = tuple(f"{item.source}: {item.claim!r}" for item in matrix.items) + (
-        f"CALL-E result: patient_intent={patient_intent!r}, answered_by={answered_by!r}",
+        f"CALL-E result: subject_intent={subject_intent!r}, answered_by={answered_by!r}",
     )
 
-    if patient_intent == "confirmed" and answered_by == "human":
+    if subject_intent == "confirmed" and answered_by == "human":
         return Verdict("RESOLVED", decision_options["if_confirmed"], evidence_cited)
-    if patient_intent == "cancelled" and answered_by == "human":
+    if subject_intent == "cancelled" and answered_by == "human":
         return Verdict("RESOLVED_ALT", decision_options["if_cancelled"], evidence_cited)
     return Verdict("UNRESOLVED_AMBIGUOUS", ACTION_HUMAN_REVIEW, evidence_cited)

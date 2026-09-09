@@ -6,9 +6,9 @@ purpose-agnostic: they produce the full set of checks for a phone
 number regardless of why the call is being made. This module is the
 one place that knows which of those checks are about commercial
 solicitation specifically - and therefore do not apply to a
-non-commercial use case like appointment_confirmation - versus
-generically applicable regardless of purpose (AI-disclosure,
-revocation, a documented legal basis for processing personal data).
+non-solicitation use case - versus generically applicable regardless
+of purpose (AI-disclosure, revocation, a documented legal basis for
+processing personal data).
 
 Sourced from the multi-jurisdiction legal research: the calling-window
 statutes (47 CFR 64.1200(c)(1), Oregon HB 3865), the prior-express-consent
@@ -52,8 +52,25 @@ _COMMERCIAL_SOLICITATION_SUFFIXES = (
 # not matching a listed suffix stays applicable regardless of use_case
 # (today: AI-disclosure, revocation, GDPR basis, and jurisdiction
 # resolution itself).
+#
+# Both shipped use cases dereference the same tuple, and that is a
+# finding rather than a shortcut: the solicitation scoping above is a
+# property of the *statutes*, not of the use case, so any call that is
+# genuinely not solicitation lands on the same exempt set. Reviewing
+# critical_service_escalation for a narrower or wider set found no
+# honest basis for one - a dispatch call to an already-assigned
+# technician is, if anything, further outside "telephone solicitation"
+# than an appointment confirmation is (an existing service contract,
+# a business rather than residential subscriber, and no offer to sell
+# anything). Inventing a distinction here purely to make the two
+# entries look different would have been a fabricated legal claim, so
+# the difference between use cases stays where it is real: which
+# checks remain applicable is identical, but what the *engine* does
+# with the outcome is driven entirely by each case's own
+# decision_options and evidence.
 _EXEMPT_SUFFIXES_BY_USE_CASE: dict[str, tuple[str, ...]] = {
     "appointment_confirmation": _COMMERCIAL_SOLICITATION_SUFFIXES,
+    "critical_service_escalation": _COMMERCIAL_SOLICITATION_SUFFIXES,
 }
 
 
