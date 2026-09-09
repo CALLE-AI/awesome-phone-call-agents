@@ -48,6 +48,7 @@ pytest -q                                  # 62 tests: timing, compliance, evide
 | *(none)* | fixtures only, no key, ephemeral console token printed at startup |
 | `CRC_CONSOLE_TOKEN` | stable console token instead of the per-process one |
 | `CRC_WEBHOOK_TOKEN` | **required** for `POST /calle/webhook`; unset means every delivery is refused |
+| `CRC_DEMO` | marks a **published fixtures-only demo**: `/api/ping` then publishes the console token so a hosted link is usable. Needs `CRC_CONSOLE_TOKEN` set explicitly (the random per-process token is never published) and no `CALLE_API_KEY` (a deployment that can reach real calls is not a demo). It does not weaken the routes: a request without the token is still refused. |
 | `CALLE_API_KEY` | enables opt-in read-only fetch of your own calls by id |
 | `CALLE_ALLOWED_HOSTS` | hosts the key may be sent to (default `api.heycall-e.com`, https only) |
 | `CALLE_BASE_URL` | API origin, checked against the allow-list above |

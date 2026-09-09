@@ -172,7 +172,9 @@ def test_redaction_is_idempotent(tmp_path, monkeypatch):
 
 def test_ping_stays_open_but_leaks_nothing(client):
     body = client.get("/api/ping").json()
-    assert body == {"ok": True, "auth_required": True}
+    assert body == {"ok": True, "auth_required": True, "demo": False}
+    # Exact equality on purpose: a new key on this unauthenticated route is
+    # how a leak would arrive, so it has to be declared here to pass.
 
 
 # --- finding 2: the API key's destination ---------------------------------
@@ -279,3 +281,57 @@ def test_no_contact_detail_of_any_form_reaches_disk(tmp_path, monkeypatch):
         assert secret not in raw, f"{secret} was written to disk"
     assert "2026-09-04T15:03:06Z" in raw  # timestamp intact
     assert "9:30 am" in raw               # spoken time intact
+
+
+# --- demo mode: a published fixtures-only deployment ------------------------
+# The hosted demo was unreachable: the console token is minted per process and
+# printed to stdout, which nobody visiting a Cloud Run URL can read. Demo mode
+# publishes a token that was set on purpose, and nothing else.
+
+
+def _ping(monkeypatch, **env):
+    for k in ("CRC_DEMO", "CRC_CONSOLE_TOKEN", "CALLE_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    from fastapi.testclient import TestClient
+
+    from crc.app import app
+    return TestClient(app).get("/api/ping").json()
+
+
+def test_ping_publishes_nothing_by_default(monkeypatch):
+    body = _ping(monkeypatch)
+    assert body["demo"] is False and "demo_token" not in body
+
+
+def test_demo_flag_alone_publishes_nothing(monkeypatch):
+    """Without an explicitly set token there is only the random per-process one,
+    and that must never be published."""
+    body = _ping(monkeypatch, CRC_DEMO="true")
+    assert body["demo"] is False and "demo_token" not in body
+
+
+def test_demo_mode_refuses_when_a_live_key_is_present(monkeypatch):
+    """A deployment that can reach real calls is not a fixtures-only demo."""
+    body = _ping(monkeypatch, CRC_DEMO="true", CRC_CONSOLE_TOKEN="demo", CALLE_API_KEY="iams_x")
+    assert body["demo"] is False and "demo_token" not in body
+
+
+def test_demo_mode_publishes_only_the_configured_token(monkeypatch):
+    body = _ping(monkeypatch, CRC_DEMO="true", CRC_CONSOLE_TOKEN="open-sesame")
+    assert body["demo"] is True and body["demo_token"] == "open-sesame"
+
+
+def test_demo_mode_does_not_weaken_the_routes(monkeypatch):
+    """Publishing the token is not the same as dropping the check: a request
+    without it is still refused."""
+    from fastapi.testclient import TestClient
+
+    from crc.app import app
+    for k, v in (("CRC_DEMO", "true"), ("CRC_CONSOLE_TOKEN", "open-sesame")):
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("CALLE_API_KEY", raising=False)
+    c = TestClient(app)
+    assert c.get("/api/calls").status_code == 401
+    assert c.get("/api/calls", headers={"X-CRC-Console": "open-sesame"}).status_code == 200

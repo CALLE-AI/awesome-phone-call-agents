@@ -97,6 +97,28 @@ def console_token_is_ephemeral() -> bool:
     return not os.getenv("CRC_CONSOLE_TOKEN")
 
 
+def demo_mode() -> bool:
+    """Whether this deployment is a published, fixtures-only demo.
+
+    A public demo has a problem the operator case does not: the visitor cannot
+    read the server's stdout, so an ephemeral token locks everyone out and the
+    hosted link is dead. Demo mode lets such a deployment publish its own token
+    through the unauthenticated ping route.
+
+    It is opt-in and it is narrow. ``CRC_DEMO=true`` alone does nothing: the
+    token must also be set explicitly, so a deployment can never publish the
+    random per-process token, and live fetch must be off, so demo mode cannot
+    be turned on over a deployment holding somebody's real calls. Both
+    conditions are re-read on every call rather than cached, so an environment
+    that changes cannot leave a stale answer behind.
+    """
+    return (
+        os.getenv("CRC_DEMO", "").strip().lower() in ("1", "true", "yes")
+        and bool(os.getenv("CRC_CONSOLE_TOKEN"))
+        and not os.getenv("CALLE_API_KEY")
+    )
+
+
 def webhook_token() -> str:
     """The webhook token. Empty means the receiver must refuse.
 

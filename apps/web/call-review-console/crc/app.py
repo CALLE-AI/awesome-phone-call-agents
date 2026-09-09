@@ -174,5 +174,13 @@ def health():
 
 @app.get("/api/ping")
 def ping():
-    """Unauthenticated liveness only: says nothing about the calls on file."""
-    return {"ok": True, "auth_required": True}
+    """Unauthenticated liveness only: says nothing about the calls on file.
+
+    The one exception is a deployment that has declared itself a fixtures-only
+    public demo, which publishes its own console token here so the hosted link
+    is usable. See ``security.demo_mode`` for what that costs.
+    """
+    body = {"ok": True, "auth_required": True, "demo": security.demo_mode()}
+    if security.demo_mode():
+        body["demo_token"] = security.console_token()
+    return body
