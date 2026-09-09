@@ -1,0 +1,6 @@
+{
+  "name": "RECALL-E",
+  "description": "Staff dashboard for memory care facilities managing CALL-E scheduled AI reminiscence therapy phone calls with real-time validation therapy and mood analytics.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

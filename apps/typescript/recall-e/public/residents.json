@@ -1,0 +1,31 @@
+{
+  "residents": [
+    {
+      "id": "res_001",
+      "name": "Dorothy",
+      "pronoun": "her",
+      "room": "112",
+      "language": "English",
+      "topics": [{ "label": "her years as a schoolteacher" }],
+      "consent": { "consentOnFile": true }
+    },
+    {
+      "id": "res_002",
+      "name": "Harold",
+      "pronoun": "his",
+      "room": "108",
+      "language": "English",
+      "topics": [{ "label": "his time serving in the Navy" }],
+      "consent": { "consentOnFile": true }
+    },
+    {
+      "id": "res_003",
+      "name": "Rosa",
+      "pronoun": "her",
+      "room": "203",
+      "language": "Spanish",
+      "topics": [{ "label": "raising her four children" }],
+      "consent": { "consentOnFile": true }
+    }
+  ]
+}
