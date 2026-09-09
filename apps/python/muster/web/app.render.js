@@ -147,9 +147,10 @@ Muster.registerRow = function (row) {
   return '<tr class="subject-row" tabindex="0" role="button" data-subject="' +
       Muster.escape(s.subject_id) + '"' +
       (Muster.state.selected === s.subject_id ? ' aria-selected="true"' : '') + '>' +
-    '<td><span class="cell-name">' + Muster.escape(s.display_name) + '</span>' +
-      '<span class="cell-sub">' + Muster.escape(s.subject_id) +
-      (s.needs_human_path ? ' &middot; enrolled human path' : '') + '</span></td>' +
+    '<td><div class="subject-cell">' + Muster.avatar(s.display_name, s.subject_id) +
+      '<div><span class="cell-name">' + Muster.escape(s.display_name) + '</span>' +
+      '<span class="cell-sub mono">' + Muster.escape(s.subject_id) +
+      (s.needs_human_path ? ' &middot; enrolled human path' : '') + '</span></div></div></td>' +
     '<td class="mono nowrap">' + Muster.escape(s.reference) + '</td>' +
     '<td class="mono nowrap">' + Muster.escape(s.country_code) + '</td>' +
     '<td>' + (a ? Muster.gradeChip(a.grade) : '<span class="chip plain">pending</span>') + '</td>' +
@@ -186,8 +187,13 @@ Muster.renderRegisterGrid = function () {
 
   var body = order.map(function (key) {
     var bucket = buckets[key];
-    return '<tr class="group-row"><th colspan="7" scope="colgroup">' +
-      Muster.escape(key) + ' &middot; ' + bucket.rows.length + '</th></tr>' +
+    var lead = bucket.rows[0];
+    var grade = (groupBy === 'status' && lead && lead.attestation) ? lead.attestation.grade : '';
+    return '<tr class="group-row"><th colspan="7" scope="colgroup"' +
+      (grade ? ' data-grade="' + Muster.escape(grade) + '"' : '') + '>' +
+      '<span class="group-dot" aria-hidden="true"></span>' +
+      '<span class="group-name">' + Muster.escape(key) + '</span>' +
+      '<span class="group-count">' + bucket.rows.length + '</span></th></tr>' +
       bucket.rows.map(Muster.registerRow).join('');
   }).join('');
 
@@ -276,8 +282,9 @@ Muster.renderCases = function () {
     var a = row.attestation;
     return '<tr class="subject-row" tabindex="0" role="button" data-subject="' +
         Muster.escape(s.subject_id) + '">' +
-      '<td><span class="cell-name">' + Muster.escape(s.display_name) + '</span>' +
-        '<span class="cell-sub">' + Muster.escape(s.reference) + '</span></td>' +
+      '<td><div class="subject-cell">' + Muster.avatar(s.display_name, s.subject_id) +
+        '<div><span class="cell-name">' + Muster.escape(s.display_name) + '</span>' +
+        '<span class="cell-sub mono">' + Muster.escape(s.reference) + '</span></div></div></td>' +
       '<td>' + Muster.gradeChip(a.grade) + '</td>' +
       '<td>' + Muster.escape(Muster.GRADE_MEANING[a.grade] || '') + '</td>' +
       '<td><div class="reason-chips">' + a.reasons.map(function (r) {

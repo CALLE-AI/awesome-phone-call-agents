@@ -282,6 +282,32 @@ Muster.formatStamp = function (iso) {
   return String(iso).slice(0, 10) + ' ' + String(iso).slice(11, 19) + ' UTC';
 };
 
+/* A person's row carries a circular badge of their initials. The tint is
+   derived from the subject id, so the same person keeps the same colour. */
+
+Muster.initials = function (name) {
+  var parts = String(name || '').trim().split(/\s+/);
+  var first = parts[0] ? parts[0].charAt(0) : '';
+  var last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+  return (first + last).toUpperCase() || '?';
+};
+
+Muster.tintHue = function (seed) {
+  var text = String(seed || '');
+  var total = 0;
+  for (var i = 0; i < text.length; i += 1) {
+    total = (total * 31 + text.charCodeAt(i)) % 360;
+  }
+  return total;
+};
+
+Muster.avatar = function (name, seed) {
+  var hue = Muster.tintHue(seed);
+  return '<span class="avatar-lg" aria-hidden="true" style="background:hsl(' + hue +
+    ', 62%, 93%);color:hsl(' + hue + ', 46%, 34%)">' +
+    Muster.escape(Muster.initials(name)) + '</span>';
+};
+
 Muster.gradeChip = function (grade) {
   return '<span class="chip" data-grade="' + Muster.escape(grade) + '">' +
     Muster.escape(Muster.GRADE_LABEL[grade] || grade) + '</span>';
