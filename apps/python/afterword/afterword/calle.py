@@ -13,11 +13,50 @@ from __future__ import annotations
 import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .safety import redact
+
 BASE_URL = "https://api.heycall-e.com/v1"
+
+#: The only origins this client will send an API key to. A base_url override is
+#: useful for a staging host, but it must never become a way to post a bearer
+#: token to an arbitrary server.
+ALLOWED_ORIGINS = frozenset({"https://api.heycall-e.com"})
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect while carrying a credential.
+
+    urllib re-sends the Authorization header across hosts by default, so a
+    single 302 from a compromised or misconfigured endpoint would hand the API
+    key to whoever it points at.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+        raise CalleError(
+            "forbidden",
+            f"refusing to follow a redirect to {redact(str(newurl))} while sending credentials",
+        )
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects)
+
+
+def _approved(base_url: str) -> str:
+    """Return `base_url` if it is an approved HTTPS origin, else refuse."""
+    parsed = urllib.parse.urlsplit(base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if parsed.scheme != "https" or origin not in ALLOWED_ORIGINS:
+        raise CalleError(
+            "forbidden",
+            f"refusing to send credentials to {origin!r}; "
+            f"allowed origins are {sorted(ALLOWED_ORIGINS)}",
+        )
+    return base_url
 
 #: Lifecycle states from which no further change is expected.
 TERMINAL_STATUSES = {"completed", "failed", "canceled"}
@@ -51,6 +90,9 @@ class HttpClient:
     base_url: str = BASE_URL
     timeout: float = 30.0
 
+    def __post_init__(self) -> None:
+        _approved(self.base_url)
+
     def _request(self, method: str, path: str, body: dict | None = None,
                  headers: dict[str, str] | None = None) -> dict[str, Any]:
         data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -66,7 +108,7 @@ class HttpClient:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with _OPENER.open(request, timeout=self.timeout) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             raw = error.read().decode("utf-8", "replace")
@@ -74,11 +116,11 @@ class HttpClient:
                 envelope = json.loads(raw)["error"]
                 raise CalleError(
                     envelope.get("code", "unknown"),
-                    envelope.get("message", raw),
+                    redact(envelope.get("message", raw)),
                     error.code,
                 ) from None
             except (ValueError, KeyError):
-                raise CalleError("http_error", raw, error.code) from None
+                raise CalleError("http_error", redact(raw), error.code) from None
 
     def create_call(self, payload: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
         # The key is derived from the estate and the institution, not the

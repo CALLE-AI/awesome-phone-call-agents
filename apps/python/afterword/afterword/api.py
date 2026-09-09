@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import calle, demo, extract, registry
+from .safety import redact, redact_all
 from .models import CaptureResult, Conflict, Institution, Pack, Requirement
 from .runner import Plan, plan_call, run_institution
 
@@ -67,12 +68,12 @@ def _result_payload(
         "reasons": list(result.reasons),
         "requirement": _requirement_payload(result.requirement),
         "conflicts": [_conflict_payload(c) for c in result.conflicts],
-        "evidence_quotes": list(result.evidence_quotes),
+        "evidence_quotes": list(redact_all(result.evidence_quotes)),
         "goes_in_pack": result.goes_in_pack,
         "needs_executor": result.needs_executor,
         "closes_account": result.closes_account,
         "accepts_terms": result.accepts_terms,
-        "task_text": plan.task_text,
+        "task_text": redact(plan.task_text),
     }
 
 
@@ -127,7 +128,7 @@ def capture_payload(institution_id: str, scenario: str | None) -> dict:
     plan, result, scripted, chosen = _capture_once(institution, scenario)
     payload = _result_payload(institution, plan, result, chosen)
     payload["transcript"] = [
-        {"offset_seconds": t.offset_seconds, "speaker": t.speaker, "text": t.text}
+        {"offset_seconds": t.offset_seconds, "speaker": t.speaker, "text": redact(t.text)}
         for t in extract.transcript_turns(scripted)
     ]
     return payload

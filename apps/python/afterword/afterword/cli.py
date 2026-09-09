@@ -13,6 +13,7 @@ import json
 import os
 import sys
 
+from .safety import redact
 from . import calle, demo, registry
 from .models import CaptureResult, Grade, Pack
 from .runner import Plan, payload_for, plan_call, run_institution
@@ -38,7 +39,7 @@ def _print_result(plan: Plan, result: CaptureResult) -> None:
     print(f"  closes acct   {result.closes_account}")
     print(f"  accepts terms {result.accepts_terms}")
     for quote in result.evidence_quotes:
-        print(f"    > {quote}")
+        print(f"    > {redact(quote)}")
 
 
 def _print_pack(pack: Pack) -> None:
@@ -76,7 +77,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print(f"idempotency key  {plan.idempotency_key}")
     print(f"disclosure       {', '.join(plan.estate.disclosable)}")
     print("\n--- what the agent says ---")
-    print(plan.task_text)
+    print(redact(plan.task_text))
     if args.show_payload:
         body = payload_for(plan)
         body["recipients"] = [{"phones": [plan.masked_phone()]}]
