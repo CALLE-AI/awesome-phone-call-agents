@@ -1,0 +1,227 @@
+---
+name: countercall
+description: Call a government service counter to find out exactly what a person must bring before they travel there, and return it as a validated checklist. Use when published requirements are incomplete or contradicted at the window and the only reliable source is the office's phone line. Returns required documents, total fee, payment method, whether an appointment is needed, and how certain the clerk sounded.
+license: MIT
+---
+
+# CounterCall
+
+Pak Yanto took the morning off work, rode forty minutes to the Samsat counter, and was
+turned away because his photocopy was folio instead of A4. He lost a day's income, and he
+still did not know what else was missing for tomorrow.
+
+Public service counters publish requirement lists that are incomplete, outdated, or quietly
+contradicted at the window. The one reliable source is the office's phone line, and that
+line is busy, IVR-gated, and answered on the fourth try. So people do not call. They
+travel, they queue, and they get turned away over one document.
+
+This skill makes the call instead, and returns a checklist the person can screenshot and
+take with them.
+
+It is a good fit for CALL-E's design: low-frequency, personal, high-stakes phone work
+against a number that a human would otherwise have to redial all morning.
+
+## Before you start
+
+**This skill places a real phone call to a real public office.** Confirm with the user:
+
+- which procedure they are asking about, in the office's own words
+- which office, and the phone number in E.164 format, from the office's published page
+- that they want a call placed now
+
+**Never infer a phone number.** Not from a directory, not from a similar office, not by
+guessing a country code. A number enters the flow only when a human has read it off the
+office's own published page. Calling the wrong number means an automated caller reaches a
+stranger, which is the worst thing this skill can do.
+
+## Safety boundaries
+
+This skill gathers **counter requirements only**.
+
+- It does not submit an application, book an appointment, pay a fee, or commit the user to
+  anything. It asks and reports.
+- It does not give legal or immigration advice. If a clerk suggests an alternative route,
+  report it verbatim as something the clerk said, never as a recommendation.
+- A clerk's spoken answer is **informational, not legally binding**, and every rendered
+  result says so. Requirements change and individual counters apply discretion.
+- It states plainly at the start of the call that it is an automated assistant, and why it
+  is calling. If the person declines to answer, it thanks them and ends the call. It does
+  not persist, re-ask, or call back the same day.
+- **One call per office per procedure per day.** These are public service lines staffed by
+  people with a queue in front of them. The idempotency key enforces this; do not remove it.
+- When the clerk is unsure, the result says unsure. It never fills a gap with what is
+  typical, and it never presents a hedge as a fact. A person may travel across a city on
+  the strength of this answer.
+- It calls offices during their published opening hours only. A public line ringing out at
+  22:00 is not a data point, it is a nuisance.
+
+Read `references/safety.md` before adapting this skill to a new institution. Some callees
+are not appropriate targets for an automated caller at all.
+
+## What makes this different from a transcript
+
+Most call skills return prose and let the reader interpret it. This one returns a **pinned,
+validated object**, and refuses to return anything else.
+
+The pinned `result_schema` sets `additionalProperties: false` and constrains four fields to
+enumerations — `payment_method`, `appointment_required`, `originals_or_copies` and
+`clerk_certainty`, each of which includes a value for "the clerk did not know". If the call comes back shaped differently, the result is quarantined rather
+than rendered. A half-parsed checklist is worse than no checklist, because the user acts
+on it.
+
+The full contract is in `references/result-contract.md`.
+
+## Workflow
+
+### 1. Collect the request
+
+Required: the procedure name, the office name, the office's phone number in E.164, and the
+published source URL the number came from.
+
+**Validate the number before anything else happens.** E.164 is a plus, a non-zero country
+code digit, then 7 to 14 more digits: `^\+[1-9]\d{7,14}$`. Reject anything else and ask the
+user. Never guess a country code. A local-format number reaching the dialler is how the
+wrong person gets called.
+
+Run `scripts/preflight.mjs` to check the number and the contract without dialling.
+
+### 2. Pick a transport, then make sure the contract is honest
+
+There are two ways to reach CALL-E, and `scripts/transport.mjs` picks between them. Both
+place a real outbound call and both return the **same validated shape**, so nothing above the
+transport changes.
+
+| | needs | who owns the schema |
+|---|---|---|
+| **`calls`** *(default)* | `CALLE_API_KEY` | you do — it ships with the request as `result_schema` |
+| **`goals`** | `CALLE_API_KEY` + `COUNTERCALL_GOAL_ID` | the published Goal |
+
+`selectTransport()` uses `goals` when `COUNTERCALL_GOAL_ID` is set and `calls` otherwise.
+`COUNTERCALL_TRANSPORT=goals|calls` forces one, and an unrecognised value throws rather than
+falling back — a typo must not silently dial on a path nobody chose.
+
+**Why `calls` is the default.** Publishing a Goal is only possible inside CALL-E Chat: there
+is no `POST /v1/goals`, no MCP publish tool, and no action on the Goal detail page. That makes
+the Goals path dependent on a surface you may not be able to reach — during the 2026-09-02
+CALL-E login suspension it was reachable by nobody. The Calls transport needs one credential
+and works regardless.
+
+**On `calls`, drift is impossible by construction.** `resultSchemaJSON()` generates the
+request-scoped schema from the same `CONTRACT` object that `validateResult` checks the reply
+against, so the two cannot disagree. There is nothing to compare.
+
+**On `goals`, compare before every run.** The published Goal owns the schema, so it can move
+underneath you:
+
+```js
+import { diffContract, publishedRunSpec } from './scripts/_lib.mjs';
+
+const goal = await client.goals.get(GOAL_ID);
+const drift = diffContract(PINNED_CONTRACT, publishedRunSpec(goal));
+if (drift.length) throw new ContractDrift(drift);   // refuse to dial
+```
+
+**Use the `publishedRunSpec(goal)` helper, not `goal.published_run_spec` directly.** The wire
+format and the docs spell it `published_run_spec.result_schema`; the TypeScript SDK camelCases
+it to `publishedRunSpec.resultSchema`. Reading only the documented name against the TS client
+returns `undefined` rather than throwing — the guard then concludes "no published spec" and
+**refuses every single dial while looking like it is working**. The helper reads both spellings.
+This cost us a day; it is written up in `FEEDBACK.md` at the repo root.
+
+The CALL-E documentation recommends this comparison before deploying a variable change.
+Doing it on **every run** costs one API call and converts a silent failure into a loud
+refusal. Dialling a real person with a stale schema produces a result that looks fine and
+is quietly wrong.
+
+### 3. Place one call
+
+`transport.run(...)` — `goals.run` or `calls.create` depending on the transport — always with
+an `Idempotency-Key` scoped to office, procedure and date, so a retry never double-dials a
+public line:
+
+```text
+countercall:{office}:{procedure}:{yyyy-mm-dd}:v1
+```
+
+### 4. Poll to a result or an error
+
+`goals.waitForResult` has one completion rule: stop when either `result` or `error` is
+non-null. A completed call can briefly return both null while CALL-E parses the structured
+result, so do not treat that window as a failure.
+
+`calls.waitForResult` returns a terminal `CallTask` instead, and `normaliseCall()` folds it
+onto the same shape. One case there is worth knowing: **`status: "completed"` with
+`structuredResult: null`** means the call connected but the evidence could not satisfy the
+schema. That is terminal — it becomes `result_unextractable`, never an empty card. Handing a
+null result upward would make the renderer decide what a missing checklist means, and the only
+safe answer is to render nothing.
+
+### 5. Render, or fail honestly
+
+All eight published `GoalRunError` codes route to a distinct outcome. The set below is the
+one `scripts/render.mjs` implements — keep them in step if CALL-E adds a code.
+
+| Outcome | What the user sees |
+|---|---|
+| valid result | the checklist, with the clerk's verbatim line and the source URL |
+| `no_answer` | "the line did not answer". No checklist |
+| `declined` | "the office declined to answer an automated caller". No checklist |
+| `result_invalid` | the call completed but the answer did not match the contract. Quarantined |
+| `result_unavailable` | the call completed but produced no structured answer. No checklist |
+| `result_failed` | the answer could not be processed into a checklist. No checklist |
+| `timed_out` | "no usable answer" before the deadline. No checklist |
+| `call_failed` | the call could not be completed. No checklist |
+| `canceled` | cancelled before it produced an answer. No checklist |
+
+**No branch renders a partial checklist.** Worked examples of each are in
+`references/examples.md`.
+
+## Running it
+
+`scripts/call.mjs` is **dry-run by default**. It prints the exact request it would send and
+places no call. Dialling requires an explicit `--live`:
+
+```bash
+# dry run — prints the request it would send, dials nothing, needs no credentials
+node scripts/call.mjs --office <id> --procedure "<procedure>"
+
+# actually rings a phone
+node scripts/call.mjs --office <id> --procedure "<procedure>" --live
+```
+
+A skill that dials by default is a skill that dials by accident.
+
+**`data/offices.json` ships with its phone number masked** (`+62XXXXXXXXXX`), so the seeded
+entry cannot dial and every command against it exits `3` with `REFUSING TO DIAL`. That is
+deliberate: a number enters the file only when a human has read it off the office's own
+published page and recorded `source_url` and `source_checked`. Add your own entry before
+running anything.
+
+To see the dry-run output immediately, the test fixture carries a valid fictional number:
+
+```bash
+node scripts/call.mjs --offices ../../test/fixtures/offices.test.json \
+  --office fixture-sourced --procedure "perpanjangan paspor"
+```
+
+## When not to use this
+
+- **Emergencies.** This is a requirements lookup with a multi-minute latency. It is not a
+  way to reach anyone urgently.
+- **Offices with a published, reliable, current requirements page.** If the website is
+  right, read the website. The call is justified only where the published answer is known
+  to be incomplete.
+- **Any institution that has asked not to be called by automated systems**, or where local
+  law restricts automated calling. Check before adding an office.
+- **High-volume lookups.** One office per procedure per day is the ceiling by design. If
+  you need bulk, you need a data-sharing agreement, not a phone.
+- **Anything where being wrong is cheap.** The value here comes from the cost of a wasted
+  trip. If the user can simply go and find out, let them.
+
+## Honest limitations
+
+- Coverage is limited to offices in the seed file, each with a published-source URL.
+- Answer rates on public service lines vary by office and time of day, and a large share of
+  calls will not be answered. That unreliability is the reason this skill exists, and it is
+  reported rather than hidden.
+- The result is one clerk's answer on one day. It is evidence, not a guarantee.
