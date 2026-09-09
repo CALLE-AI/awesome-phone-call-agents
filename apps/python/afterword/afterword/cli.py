@@ -13,7 +13,7 @@ import json
 import os
 import sys
 
-from .safety import redact
+from .safety import redact, redact_all
 from . import calle, demo, registry
 from .models import CaptureResult, Grade, Pack
 from .runner import Plan, payload_for, plan_call, run_institution
@@ -23,18 +23,18 @@ def _print_result(plan: Plan, result: CaptureResult) -> None:
     print(f"  institution   {plan.institution.name}  ({plan.institution.institution_id})")
     print(f"  number        {plan.masked_phone()}")
     print(f"  grade         {result.grade.value}")
-    print(f"  reasons       {', '.join(result.reasons)}")
+    print(f"  reasons       {', '.join(redact_all(result.reasons))}")
     requirement = result.requirement
     if requirement is not None:
-        print(f"  department    {requirement.department or '-'}")
-        print(f"  documents     {'; '.join(requirement.documents_needed) or '-'}")
+        print(f"  department    {redact(requirement.department) or '-'}")
+        print(f"  documents     {'; '.join(redact_all(requirement.documents_needed)) or '-'}")
         print(f"  certified ok  {requirement.certified_copy_accepted.value}")
         print(f"  direct debits {requirement.direct_debits_action.value}")
-        print(f"  reference     {requirement.reference_opened or '-'}")
+        print(f"  reference     {redact(requirement.reference_opened) or '-'}")
     for item in result.conflicts:
         print(f"  conflict      {item.field_name}")
-        print(f"    this call   {item.stated}")
-        print(f"    on file     {item.counter}  [{item.counter_source}]")
+        print(f"    this call   {redact(item.stated)}")
+        print(f"    on file     {redact(item.counter)}  [{redact(item.counter_source)}]")
     print(f"  in pack       {result.goes_in_pack}")
     print(f"  closes acct   {result.closes_account}")
     print(f"  accepts terms {result.accepts_terms}")
