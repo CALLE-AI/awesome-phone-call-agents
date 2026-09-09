@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the thirty-two marked **needs the built page**. Those thirty-two are held by gates
+the thirty-four marked **needs the built page**. Those thirty-four are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -652,6 +652,9 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 353 | Return to what this module did for as long as it existed: keep the set of allowed tags as a comment and check nothing against it, so any tag the renderer emits reaches a public page with no style written for it | 1 |
 | 354 | Take one document off the published list while it is still cited by name from another page, which is how `docs/district-ingest.md` and `docs/consent-record.md` came to be unreachable | 1 |
 | 355 | Accept a name in the withheld register with no reason written beside it, so a document can be kept off the site by an empty string | 1 |
+| 356 | Leave a document table with only the roles a stylesheet leaves it, so the stacked form under 38rem is a run of blocks to a screen reader: no row, no column, and no header attached to any cell | 2 |
+| 357 | Take `scope` off the header cells of the page's five tables, so a header stops saying whether it runs down a column or across a row at the width where the stylesheet has already taken the implicit answer away **Needs the built page.** | 1 |
+| 358 | Take the caption off one table, so it is announced by its size and nothing else **Needs the built page.** | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures

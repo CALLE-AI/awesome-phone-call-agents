@@ -224,8 +224,12 @@ def test_every_cell_in_a_table_carries_the_name_of_its_column():
 |---|---|
 | `firstbell` | `id` and `phones` |
 """)
-    assert '<td data-label="Format"><code>firstbell</code></td>' in body
-    assert '<td data-label="Recognised by">' in body
+    assert '<td role=cell data-label="Format"><code>firstbell</code></td>' in body
+    assert '<td role=cell data-label="Recognised by">' in body
+    # The roles go on with the labels, because the stylesheet that stacks these rows takes
+    # the implicit ones off: `display: block` on a row is not a row to a screen reader.
+    assert "<table role=table>" in body
+    assert "<th scope=col role=columnheader>Format</th>" in body
 
     # And over the committed documents, where the shape is not a fixture's. A column with
     # a name in the header must carry that name on every one of its cells, because the
@@ -233,10 +237,10 @@ def test_every_cell_in_a_table_carries_the_name_of_its_column():
     # what it is. A column with no name in the header has none to print.
     wrong = []
     for _slug, path, _title, _why in doc_pages.PUBLISHED:
-        for table in re.findall(r"<table>(.*?)</table>", rendered(path), re.S):
+        for table in re.findall(r"<table[^>]*>(.*?)</table>", rendered(path), re.S):
             heads = [re.sub(r"<[^>]+>", "", head).strip()
                      for head in re.findall(r"<th(?![a-z])[^>]*>(.*?)</th>", table, re.S)]
-            for row in re.findall(r"<tr>(.*?)</tr>", table, re.S):
+            for row in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.S):
                 cells = re.findall(r"<td( [^>]*)?>", row)
                 for index, cell in enumerate(cells):
                     named = index < len(heads) and bool(heads[index])
@@ -262,26 +266,26 @@ def test_a_header_of_empty_cells_comes_off_and_the_first_column_becomes_a_term()
 |---|---|
 | Scale | Two schools in one district |
 """)
-    assert "<thead>" not in body
-    assert "<td data-term>Scale</td>" in body
-    assert "<td>Two schools in one district</td>" in body
+    assert "<thead" not in body
+    assert "<td role=cell data-term>Scale</td>" in body
+    assert "<td role=cell>Two schools in one district</td>" in body
 
     kept = doc_pages._render_markdown("""
 | Role | Owns |
 |---|---|
 | Officer | The exclusion list |
 """)
-    assert "<thead>" in kept and "data-term>" not in kept
-    assert '<td data-label="Role">Officer</td>' in kept
+    assert "<thead" in kept and "data-term>" not in kept
+    assert '<td role=cell data-label="Role">Officer</td>' in kept
 
     mixed = doc_pages._render_markdown("""
 | | Net-new per 100 answered calls |
 |---|---|
 | Measured on the calls that rang | 0 |
 """)
-    assert "<thead>" in mixed
-    assert "<td data-term>Measured on the calls that rang</td>" in mixed
-    assert '<td data-label="Net-new per 100 answered calls">0</td>' in mixed
+    assert "<thead" in mixed
+    assert "<td role=cell data-term>Measured on the calls that rang</td>" in mixed
+    assert '<td role=cell data-label="Net-new per 100 answered calls">0</td>' in mixed
 
 
 def test_a_tag_no_style_was_written_for_stops_the_build():

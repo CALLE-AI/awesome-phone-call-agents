@@ -1140,6 +1140,21 @@ def deployment_config(*pages: str) -> str:
     return json.dumps(config, indent=2) + "\n"
 
 
+def paper_hex(css: str) -> str:
+    """`--paper` as hex, for the one attribute on this page that cannot read a token."""
+    import check_contrast
+
+    value = check_contrast.tokens(css).get("--paper", "")
+    found = check_contrast.hex_of(value)
+    if not found:
+        raise SystemExit(
+            "the theme colour is computed from --paper and that token could not be read as "
+            f"a colour: {value!r}.\n"
+            "A browser chrome that does not match the page is a visible seam, so this "
+            "refuses rather than guessing a hex.")
+    return found
+
+
 def repo_link_markup(repo_url: str | None) -> str:
     """The source link, or nothing.
 
@@ -2415,6 +2430,12 @@ def build(has_audio: bool, repo_url: str | None = None,
     add('<!doctype html><html lang=en'
         + (' data-audio=present' if has_audio else ' data-audio=absent') + '>')
     add('<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">')
+    # The address bar, in the paper the page is printed on. Everything about this page is
+    # one unbroken sheet, and on a phone the browser chrome above it was system grey, which
+    # is the join the design spends nine acts not having. The value is computed from
+    # `--paper` rather than typed beside it, because two spellings of one colour drift the
+    # first time the ground is re-cut.
+    add(f'<meta name=theme-color content="{paper_hex(css)}">')
     add('<title>firstbell: it calls the parents who never replied</title>')
     add('<meta name=description content="Software that telephones the families of absent '
         'schoolchildren and refuses to close a case it could not get an answer to. It calls '
@@ -2614,8 +2635,10 @@ def build(has_audio: bool, repo_url: str | None = None,
         'count was committed before any call was placed, so it could not be chosen '
         'afterwards. All three mismatches are the speaker saying different things in the '
         'two calls, which a person recalling their own script from memory will do.</p>',
-        '<table class=pairs><thead><tr><th>scenario</th><th>en-IN</th><th>ta-IN</th>'
-        '<th>agreed</th></tr></thead><tbody>',
+        '<table class=pairs>'
+        '<caption class=visually-hidden>Each scenario performed once in English and once in Tamil, with whether the two calls agreed on every enumerated field.</caption>'
+        '<thead><tr><th scope=col>scenario</th><th scope=col>en-IN</th>'
+        '<th scope=col>ta-IN</th><th scope=col>agreed</th></tr></thead><tbody>',
     ]
     # Not `p`: build() holds the page's own parts in `p`, and a loop variable of the same
     # name rebinds it. The page still assembled, because `add` was already bound to the
@@ -2689,7 +2712,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         f'<p>{len(live)} of {len(recs)} committed receipts reached the production API and '
         f'{have} of {len(call_rows)} calls carry the provider identifier. The rest had it '
         'recovered afterwards with a <code>GET</code>, which places no call.</p>',
-        '<table class=compliance><tbody>'
+        '<table class=compliance>'
+        '<caption class=visually-hidden>What this repository holds, and what is held outside it.</caption>'
+        '<tbody>'
         '<tr><td>transcripts, waveforms, the audio, and the unshortened identifiers</td>'
         '<td class=dim>not in the repository. On this page'
         + (' in full' if has_audio else ' without the audio')
@@ -2706,20 +2731,22 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every call in this run, with its identifiers and fields. '
         'Scrolls sideways on a narrow screen.">'
-        '<table class=ids role=table><thead role=rowgroup><tr role=row>'
+        '<table class=ids role=table>'
+        '<caption class=visually-hidden>Every call placed, with the identifier the API returned, the identifier the billing dashboard is keyed on, and what CALL-E gave back.</caption>'
+        '<thead role=rowgroup><tr role=row>'
         # Both identifiers in one column, stacked. Two columns of masked ids set a
         # min-content width of 716px in a column that is 616px wide at 1440 and 404px at
         # 1152, so the last column sat past the scroll edge. They belong together anyway:
         # a reader checking one call against the billing panel wants that call's two
         # names one under the other, not two columns apart.
-        '<th role=columnheader>call id (API, then dashboard)</th>'
+        '<th scope=col role=columnheader>call id (API, then dashboard)</th>'
         # A break opportunity after each underscore, so `parent_confirmed_aware` breaks
         # where a reader would break it rather than mid-word. `<wbr>` adds nothing to the
         # text a screen reader or a copy takes, and it is the difference between a heading
         # that reads and a heading rendered two characters to a line.
-        + "".join(f'<th role=columnheader>{esc(f).replace("_", "_<wbr>")}</th>'
+        + "".join(f'<th scope=col role=columnheader>{esc(f).replace("_", "_<wbr>")}</th>'
                   for f in data["fieldOrder"])
-        + '<th role=columnheader>outcome</th></tr></thead>'
+        + '<th scope=col role=columnheader>outcome</th></tr></thead>'
         '<tbody role=rowgroup>',
     ]
     for call_id, provider, resolution, _src, fields in call_rows:
@@ -2773,8 +2800,10 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every gate broken on purpose, with the number of tests that '
         'noticed. Scrolls sideways on a narrow screen.">'
-        '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
-        '<th>tests that failed</th></tr></thead><tbody>',
+        '<table class=mutations>'
+        '<caption class=visually-hidden>Each change made to working code on purpose, and how many tests noticed it.</caption>'
+        '<thead><tr><th scope=col>#</th><th scope=col>the change</th>'
+        '<th scope=col>tests that failed</th></tr></thead><tbody>',
     ]
     lead = [row for row in muts if row[0] in LEAD_MUTATIONS]
     rest = [row for row in muts if row[0] not in LEAD_MUTATIONS]
@@ -2786,8 +2815,10 @@ def build(has_audio: bool, repo_url: str | None = None,
     body.append('</tbody></table>')
     body.append(
         f'<details class=fold><summary>The other {len(rest)}, in the same shape</summary>'
-        '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
-        '<th>tests that failed</th></tr></thead><tbody>')
+        '<table class=mutations>'
+        '<caption class=visually-hidden>Each change made to working code on purpose, and how many tests noticed it.</caption>'
+        '<thead><tr><th scope=col>#</th><th scope=col>the change</th>'
+        '<th scope=col>tests that failed</th></tr></thead><tbody>')
     for num, change, caught in rest:
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')

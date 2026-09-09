@@ -109,6 +109,31 @@ def in_gamut(value: str) -> bool:
     return all(-0.0005 <= c <= 1.0005 for c in rgb)
 
 
+def hex_of(value: str) -> str | None:
+    """One token as the six hex digits a `<meta>` can carry, or None.
+
+    `theme-color` takes a colour a browser understood before oklch existed, and the page's
+    ground is `oklch(0.973 0.006 75)`. Typing the hex beside it makes two values for one
+    colour and nothing to notice when the paper is re-cut, so it is computed here, next to
+    the matrices that already turn that token into light, rather than in the page builder.
+    """
+    m = OKLCH.search(value)
+    if not m:
+        found = HEXV.search(value)
+        return found.group(0).upper() if found else None
+    L = float(m.group(1))
+    if "%" in value.split(",")[0] and L > 1:
+        L /= 100
+    channels = []
+    for linear in oklch_to_srgb(L, float(m.group(2)), float(m.group(3))):
+        linear = min(max(linear, 0.0), 1.0)
+        # The transfer function, which the luminance path above deliberately does not apply:
+        # a ratio is computed on linear light and a hex string is encoded light.
+        encoded = 12.92 * linear if linear <= 0.0031308 else 1.055 * linear ** (1 / 2.4) - 0.055
+        channels.append(round(encoded * 255))
+    return "#{:02X}{:02X}{:02X}".format(*channels)
+
+
 def blocks(css: str) -> dict[str, dict[str, str]]:
     """Custom properties per selector.
 

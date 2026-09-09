@@ -425,6 +425,23 @@ p.lede {
 }
 
 a { color: var(--link); text-underline-offset: 0.18em; text-decoration-thickness: 0.06em; }
+/* Fifty-four links and, until this line, five hover rules in the whole stylesheet, none of
+ * them on a prose link. On a page whose argument is that every claim carries a source, the
+ * sources are what a reviewer puts the pointer on, and they answered nothing. The rule
+ * thickens rather than changing colour, so every ratio `tools/check_contrast.py` measures
+ * is the same ratio afterwards, and it reads as a pen pressing harder. */
+a:hover { text-decoration-thickness: 0.12em; text-underline-offset: 0.14em; }
+
+/* Two properties for a hand rather than a mouse. An act reached from the rail used to land
+ * with its heading flush against the top edge, and a 28px control on a phone carries the
+ * 300ms wait for a second tap that `manipulation` says will not come. The highlight is set
+ * rather than left alone because the default is a blue-grey box, which is the one colour
+ * on this page that came from nobody. */
+.act { scroll-margin-top: 2rem; }
+a, button, summary, label, [tabindex] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: color-mix(in oklch, var(--focus) 18%, transparent);
+}
 a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
 [data-turns]:focus-visible, pre:focus-visible {
   outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px;

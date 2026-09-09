@@ -332,6 +332,22 @@ def _shape_tables(body: str) -> str:
 
         return re.sub("<tr>(.*?)</tr>", row, table, flags=re.S)
 
+    def announce(table: str) -> str:
+        """The roles a table loses the moment a stylesheet makes it blocks.
+
+        `display: block` on a row or a cell takes the implicit table role with it, so the
+        stacked form under 38rem is a run of divs to a screen reader: no row, no column,
+        no header association. The main page carries these attributes on the identifier
+        table for exactly this reason and these pages had the same treatment without them.
+        """
+        for tag, role in (("<table>", "<table role=table>"),
+                          ("<thead>", "<thead role=rowgroup>"),
+                          ("<tbody>", "<tbody role=rowgroup>"),
+                          ("<tr>", "<tr role=row>")):
+            table = table.replace(tag, role)
+        table = re.sub("<th>", "<th scope=col role=columnheader>", table)
+        return re.sub("<td( |>)", r"<td role=cell" + chr(92) + "1", table)
+
     def one(match: re.Match[str]) -> str:
         table = match.group(0)
         # Inside the header row rather than across the table, because <th[^>]*> matches
@@ -340,12 +356,12 @@ def _shape_tables(body: str) -> str:
         head = re.search("<thead>(.*?)</thead>", table, re.S)
         cells = re.findall("<th[^>]*>(.*?)</th>", head.group(1), re.S) if head else []
         if not cells:
-            return table
+            return announce(table)
         heads = [html.escape(html.unescape(re.sub("<[^>]+>", "", cell)).strip(), quote=True)
                  for cell in cells]
         if not any(heads):
             table = re.sub("<thead>(.*?)</thead>", "", table, flags=re.S)
-        return label_cells(table, heads)
+        return announce(label_cells(table, heads))
 
     return re.sub("<table>(.*?)</table>", one, body, flags=re.S)
 

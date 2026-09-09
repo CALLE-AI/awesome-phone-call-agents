@@ -156,3 +156,32 @@ def test_the_limits_data_carries_no_markup_of_its_own():
     assert html.unescape(block) == block, (
         "the limits data holds an escaped sequence, which will be escaped again on the way "
         "to the page")
+
+
+def test_every_table_on_the_page_is_named_and_every_header_says_which_way_it_runs():
+    """Five tables, and until this was written not one of them had a name.
+
+    A reader using a screen reader meets tables by name, and these were announced as
+    "table" five times over: the identifiers, the pairs, the compliance rows and the two
+    mutation tables. The headers had no `scope`, which browsers infer inside a `thead` and
+    stop inferring the moment a stylesheet turns rows into blocks, which is what the
+    narrow layout does here.
+
+    The caption is visually hidden rather than printed, because every one of these tables
+    already has a sentence above it doing that job for a reader who can see it.
+    """
+    markup = _page()
+    tables = re.findall(r"<table\b[^>]*>", markup)
+    assert tables, "the page renders no tables at all, which is not a state it has ever had"
+
+    named = re.findall(r"<table\b[^>]*>\s*<caption", markup)
+    assert len(named) == len(tables), (
+        f"{len(tables)} tables and {len(named)} captions: a table with no caption is "
+        "announced by its size and nothing else")
+
+    heads = re.findall(r"<th\b[^>]*>", markup)
+    assert heads, "the page renders no header cells"
+    unscoped = [head for head in heads if "scope=" not in head]
+    assert not unscoped, (
+        f"{len(unscoped)} of {len(heads)} header cells do not say which way they run: "
+        + ", ".join(sorted(set(unscoped))[:3]))
