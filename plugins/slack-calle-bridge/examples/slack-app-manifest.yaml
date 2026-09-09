@@ -1,0 +1,27 @@
+_metadata:
+  major_version: 2
+
+display_information:
+  name: CALL-E Phone Bridge
+  description: Preview and explicitly confirm one CALL-E phone task from Slack.
+
+features:
+  bot_user:
+    display_name: CALL-E Phone Bridge
+    always_online: false
+  slash_commands:
+    - command: /calle-call
+      url: https://YOUR_HOST.example/slack/commands
+      description: Preview or run one CALL-E phone task
+      usage_hint: "[run] +12025550123 | call goal"
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - commands
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
