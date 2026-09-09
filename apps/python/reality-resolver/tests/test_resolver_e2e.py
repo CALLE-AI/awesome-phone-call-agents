@@ -14,14 +14,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fake_server import PATIENT_CANCELLED_PHONE, PATIENT_VOICEMAIL_PHONE, FakeCalleServer
+from fake_server import SUBJECT_CANCELLED_PHONE, SUBJECT_VOICEMAIL_PHONE, FakeCalleServer
 
 HERE = Path(__file__).resolve().parent.parent
 CASE = str(HERE / "cases" / "ghost-appointment.json")
+ESCALATION_CASE = str(HERE / "cases" / "critical-service-escalation.json")
 
 # 2026-09-10T20:00:00Z is 16:00 local New York time (EDT, UTC-4) - within
 # the 8:00-21:00 US federal calling window - and 18 hours before the case
 # fixture's 2026-09-11T14:00:00Z deadline (24h threshold), so R4 triggers.
+# The same instant is 12 hours before the escalation fixture's
+# 2026-09-11T08:00:00Z deadline (also a 24h threshold), so one --now-utc
+# value drives both cases through the identical pipeline.
 NEAR_DEADLINE_NOW = "2026-09-10T20:00:00Z"
 FAR_FROM_DEADLINE_NOW = "2026-09-01T10:00:00Z"
 
@@ -35,11 +39,13 @@ US_COMPLIANT_FLAGS = [
 ]
 
 
-def _run_resolver(server_base_url: str, extra_args: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_resolver(
+    server_base_url: str, extra_args: list[str], case: str = CASE
+) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
     env.pop("CALLE_API_KEY", None)
     return subprocess.run(
-        [sys.executable, str(HERE / "resolver.py"), CASE, "--base-url", server_base_url, "--poll-interval-seconds", "0.01", *extra_args],
+        [sys.executable, str(HERE / "resolver.py"), case, "--base-url", server_base_url, "--poll-interval-seconds", "0.01", *extra_args],
         capture_output=True,
         text=True,
         env=env,
@@ -111,7 +117,7 @@ def test_dry_run_permitted_previews_the_calle_request_without_sending_it() -> No
 
         assert result.returncode == 0, result.stderr
         assert "=== CALL-E ===" in result.stdout
-        assert '"patient_intent"' in result.stdout
+        assert '"subject_intent"' in result.stdout
         assert "Dry-run: call is justified and permitted." in result.stdout
         assert "=== VERDICT ===" not in result.stdout  # no structured_result to reconcile yet
         assert server.creates == 0
@@ -131,7 +137,7 @@ def test_execute_cancelled_by_human_resolves_to_release_slot() -> None:
     with FakeCalleServer() as server:
         result = _run_resolver(
             server.base_url,
-            ["--phone", PATIENT_CANCELLED_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute", *US_COMPLIANT_FLAGS],
+            ["--phone", SUBJECT_CANCELLED_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute", *US_COMPLIANT_FLAGS],
         )
 
         assert result.returncode == 0, result.stderr
@@ -147,7 +153,7 @@ def test_execute_voicemail_is_unresolved_ambiguous_never_release_slot() -> None:
     with FakeCalleServer() as server:
         result = _run_resolver(
             server.base_url,
-            ["--phone", PATIENT_VOICEMAIL_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute", *US_COMPLIANT_FLAGS],
+            ["--phone", SUBJECT_VOICEMAIL_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute", *US_COMPLIANT_FLAGS],
         )
 
         assert result.returncode == 0, result.stderr
@@ -240,3 +246,145 @@ def test_fake_target_without_allow_live_needs_no_authorization() -> None:
         assert "authorize-destination" not in result.stderr
         assert "Status: RESOLVED" in result.stdout
         assert server.creates == 1
+
+
+# --- P0: second use case, same engine ---------------------------------
+#
+# cases/critical-service-escalation.json is a different domain (a field
+# technician and a maintenance work order, not a patient and a dental
+# slot), a different use_case, and a different pair of decision_options
+# - loaded through the same unmodified evidence/ model, scored by the
+# same unmodified R1-R4, gated by the same compliance dispatcher, and
+# reconciled by the same unmodified verdict.reconcile(). If any of
+# those had been specialized for appointments, these tests could not
+# pass without editing them.
+
+
+def test_escalation_far_from_deadline_is_no_call_needed() -> None:
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url, ["--now-utc", FAR_FROM_DEADLINE_NOW], case=ESCALATION_CASE
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "Status: NO_CALL_NEEDED" in result.stdout
+        assert "Action: NO_ACTION_REQUIRED" in result.stdout
+        assert "=== CALL-E ===" not in result.stdout
+        assert server.creates == 0
+
+
+def test_escalation_confirmed_by_human_resolves_to_continue_dispatch() -> None:
+    """The case's own if_confirmed action, not a hardcoded KEEP_SLOT."""
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url,
+            ["--now-utc", NEAR_DEADLINE_NOW, "--execute"],
+            case=ESCALATION_CASE,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "R1-R4 all triggered" in result.stdout
+        assert "Compliance gate (applicable to 'critical_service_escalation'): allowed=True" in result.stdout
+        assert "Status: RESOLVED" in result.stdout
+        assert "Action: CONTINUE_DISPATCH" in result.stdout
+        assert "KEEP_SLOT" not in result.stdout
+        assert server.creates == 1
+
+
+def test_escalation_cancelled_by_human_resolves_to_reassign_technician() -> None:
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url,
+            ["--phone", SUBJECT_CANCELLED_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute"],
+            case=ESCALATION_CASE,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "Status: RESOLVED_ALT" in result.stdout
+        assert "Action: REASSIGN_TECHNICIAN" in result.stdout
+        assert "RELEASE_SLOT" not in result.stdout
+        assert server.creates == 1
+
+
+def test_escalation_voicemail_is_human_review_and_never_reassigns() -> None:
+    """The absolute rule, restated in the second domain: an unresolved
+    call must never be actioned as if the technician had cancelled.
+    Reaching voicemail is not a cancellation, so REASSIGN_TECHNICIAN
+    must not appear - and neither may CONTINUE_DISPATCH, since silence
+    is no more a confirmation than it is a cancellation.
+    """
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url,
+            ["--phone", SUBJECT_VOICEMAIL_PHONE, "--now-utc", NEAR_DEADLINE_NOW, "--execute"],
+            case=ESCALATION_CASE,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "Status: UNRESOLVED_AMBIGUOUS" in result.stdout
+        assert "Action: HUMAN_REVIEW" in result.stdout
+        assert "REASSIGN_TECHNICIAN" not in result.stdout
+        assert "CONTINUE_DISPATCH" not in result.stdout
+
+
+def test_escalation_unmapped_jurisdiction_still_blocks() -> None:
+    """The hard gate is not weakened by adding a use case: an unmapped
+    jurisdiction blocks this one exactly as it blocks the appointment
+    case, and the blocked verdict uses the generic retry action rather
+    than either of the case's own decision_options.
+    """
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url,
+            ["--phone", "+442079460123", "--now-utc", NEAR_DEADLINE_NOW],
+            case=ESCALATION_CASE,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "Status: UNRESOLVED_CALL_BLOCKED" in result.stdout
+        assert "Action: RETRY_WHEN_PERMITTED" in result.stdout
+        assert "no jurisdiction mapped" in result.stdout
+        assert "CONTINUE_DISPATCH" not in result.stdout
+        assert "REASSIGN_TECHNICIAN" not in result.stdout
+        assert server.creates == 0
+
+
+def test_escalation_asks_calle_for_the_same_subject_intent_schema() -> None:
+    """The result schema is domain-neutral: the second use case asks
+    CALL-E for subject_intent, exactly as the first does. Nothing named
+    for the appointment domain survives in the request.
+    """
+    with FakeCalleServer() as server:
+        result = _run_resolver(
+            server.base_url, ["--now-utc", NEAR_DEADLINE_NOW], case=ESCALATION_CASE
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert '"subject_intent"' in result.stdout
+        assert "patient_intent" not in result.stdout
+        assert "Dry-run: call is justified and permitted." in result.stdout
+        assert server.creates == 0
+
+
+def test_both_use_cases_reach_the_same_rules_and_diverge_only_in_action() -> None:
+    """Side by side at the same instant: identical rule evaluation and
+    identical verdict status, different actions - which is precisely the
+    claim that this is one engine rather than two.
+    """
+    with FakeCalleServer() as server:
+        appointment = _run_resolver(server.base_url, ["--now-utc", NEAR_DEADLINE_NOW, "--execute"])
+        escalation = _run_resolver(
+            server.base_url, ["--now-utc", NEAR_DEADLINE_NOW, "--execute"], case=ESCALATION_CASE
+        )
+
+        assert appointment.returncode == 0, appointment.stderr
+        assert escalation.returncode == 0, escalation.stderr
+
+        for rule in ("R1_structured_state", "R2_human_qualification", "R3_unresolved_evidence", "R4_decision_deadline"):
+            assert rule in appointment.stdout
+            assert rule in escalation.stdout
+
+        assert "Status: RESOLVED" in appointment.stdout
+        assert "Status: RESOLVED" in escalation.stdout
+        assert "Action: KEEP_SLOT" in appointment.stdout
+        assert "Action: CONTINUE_DISPATCH" in escalation.stdout
