@@ -203,6 +203,8 @@ export interface SundialCallRecord {
   retryDueAt?: string;
   retryFiredAt?: string;
   retryCancelReason?: string;
+  /** Failed/no-speech outcomes stay in the inbox for a human — no automatic follow-up. */
+  needsReconciliation?: boolean;
   callConsentE164?: string;
   callConsentAt?: string;
   callConsentAllowOneRetry?: boolean;

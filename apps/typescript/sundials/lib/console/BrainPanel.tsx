@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { goalFromSentence } from "@/lib/brain/goals";
 import { newEntityId } from "@/lib/ids";
 import { cn } from "@/lib/utils";
+import { HACKATHON_RETRY_LOCKED } from "@/lib/calle/retry-lock";
 import type { BrainConfig, BrainGoal, BrainSuggestion } from "@/lib/types";
 
 const ACCEPTED_FILES = ".txt,.md,.markdown,.html,.htm,.csv,.json";
@@ -665,6 +666,7 @@ function CallPolicyCard({
   onClosingCommit: (script: string) => void;
 }) {
   const selected = retrySelectValue(config.retryDelayHours);
+  const retryLocked = HACKATHON_RETRY_LOCKED;
   const [retryError, setRetryError] = useState<string | null>(null);
   const [customHours, setCustomHours] = useState(
     selected === "custom" && typeof config.retryDelayHours === "number" ? String(config.retryDelayHours) : "2"
@@ -683,6 +685,7 @@ function CallPolicyCard({
             value={selected}
             disabled={busy}
             onValueChange={(value) => {
+              if (retryLocked) return;
               setRetryError(null);
               if (value === "custom") {
                 const hours = Number(customHours);
@@ -703,14 +706,16 @@ function CallPolicyCard({
             </SelectTrigger>
             <SelectContent>
               {RETRY_PRESETS.map((preset) => (
-                <SelectItem key={preset.value} value={preset.value}>
+                <SelectItem key={preset.value} value={preset.value} disabled={retryLocked || busy}>
                   {preset.label}
                 </SelectItem>
               ))}
-              <SelectItem value="custom">Custom hours</SelectItem>
+              <SelectItem value="custom" disabled={retryLocked || busy}>
+                Custom hours
+              </SelectItem>
             </SelectContent>
           </Select>
-          {selected === "custom" ? (
+          {selected === "custom" && !retryLocked ? (
             <div className="grid gap-2">
               <Label htmlFor="retry-custom">Hours until one follow-up ring</Label>
               <Input
@@ -746,7 +751,8 @@ function CallPolicyCard({
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              One follow-up after a missed pickup or a failed call with no conversation.
+              Locked for this hackathon demo. Failed and no-speech outcomes stay in the inbox for
+              reconciliation — Sundials will not schedule another call.
             </p>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { AMBIGUOUS_OUTCOME_REASON, HACKATHON_RETRY_LOCKED } from "./retry-lock.ts";
 import { brainCallDirectives, getBrainConfigForAccount, retryDelayHoursOrSkip } from "../brain/config.ts";
 import { newEntityId } from "../ids.ts";
 import { isMissedPickup } from "../intent/opportunity.ts";
@@ -7,7 +8,7 @@ import { dispatchLiveCalleCall, liveCalleCreateInput, type LiveCallContext } fro
 import { isInFlightStatus } from "./sync-live.ts";
 
 export type RetryStore = {
-  saveCall(call: SundialCallRecord): void;
+  saveCall(call: SundialCallRecord, options?: { skipRetryHooks?: boolean }): void;
   getCall(id: string): SundialCallRecord | undefined;
   peekCalls(): SundialCallRecord[];
 };
@@ -79,6 +80,7 @@ function isLiveCalle(): boolean {
 }
 
 export function isRetryEligibleFailure(call: SundialCallRecord): boolean {
+  if (HACKATHON_RETRY_LOCKED) return false;
   if (isRetryRecord(call)) return false;
   if (call.retryScheduledAt) return false;
   if (isDisqualifiedCall(call)) return false;
@@ -86,6 +88,17 @@ export function isRetryEligibleFailure(call: SundialCallRecord): boolean {
   if (call.callConsentAllowOneRetry !== true) return false;
   if (!sameE164(call.callConsentE164, call.rawPhoneNumber)) return false;
   return isMissedPickup(call);
+}
+
+export function markAmbiguousProviderOutcome(
+  store: RetryStore,
+  call: SundialCallRecord
+): SundialCallRecord | undefined {
+  if (!isMissedPickup(call) || call.needsReconciliation) return undefined;
+  call.needsReconciliation = true;
+  call.errorReason = call.errorReason || AMBIGUOUS_OUTCOME_REASON;
+  store.saveCall(call, { skipRetryHooks: true });
+  return call;
 }
 
 function cancelRetry(store: RetryStore, retry: SundialCallRecord, reason: string): void {
@@ -259,6 +272,11 @@ export function processDueRetries(store: RetryStore): void {
   for (const call of store.peekCalls()) {
     if (!isQueuedRetry(call)) continue;
 
+    if (HACKATHON_RETRY_LOCKED) {
+      cancelRetry(store, call, "hackathon retry lock.");
+      continue;
+    }
+
     if (call.visitorId && visitorIsDisqualified(store, call.visitorId)) {
       cancelRetry(store, call, "the lead is disqualified.");
       continue;
@@ -286,5 +304,6 @@ export function handleCallSavedForRetry(store: RetryStore, call: SundialCallReco
       call.status === "completed" ? "a later completed call exists." : "the lead is disqualified."
     );
   }
+  markAmbiguousProviderOutcome(store, call);
   maybeScheduleFailedCallRetry(store, call);
 }

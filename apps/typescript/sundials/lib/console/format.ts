@@ -162,6 +162,12 @@ export function leadStatusSummary(
           : "Identified visitor; no CALL-E dispatch yet."
     };
   }
+  if (call?.needsReconciliation) {
+    return {
+      headline: "Needs review",
+      detail: call.errorReason || "Ambiguous provider outcome. No automatic follow-up."
+    };
+  }
   if (status === "queued") {
     if (call?.retryOfCallId || call?.retryDueAt) {
       const due = formatDateTime(call.retryDueAt);

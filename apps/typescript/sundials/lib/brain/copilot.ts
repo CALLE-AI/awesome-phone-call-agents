@@ -1,5 +1,4 @@
 import { newEntityId } from "../ids.ts";
-import { MIN_RETRY_DELAY_HOURS, MAX_RETRY_DELAY_HOURS, normalizeRetryDelayHours } from "./config.ts";
 import { generateGeminiJson, geminiConfigured } from "./gemini.ts";
 import { goalFromSentence } from "./goals.ts";
 import type { BrainConfig, BrainGoal, BrainSuggestion } from "../types.ts";
@@ -34,12 +33,6 @@ function matchGoal(config: BrainConfig, needle: string): BrainGoal | undefined {
   return config.goals.find(
     (goal) => goal.label.toLowerCase().includes(key) || goal.targetField.toLowerCase() === key.replace(/\s+/g, "")
   );
-}
-
-function hoursFromMatch(amount: number, unit: string): number | undefined {
-  const lowered = unit.toLowerCase();
-  const hours = lowered.startsWith("m") && !lowered.startsWith("mo") ? amount / 60 : amount;
-  return normalizeRetryDelayHours(hours);
 }
 
 export function applySuggestionToConfig(config: BrainConfig, suggestion: BrainSuggestion): BrainConfig {
@@ -83,20 +76,18 @@ export function applyCopilotHeuristics(config: BrainConfig, message: string): Co
 
   const skipRetry = /\b(don'?t|do not|skip|no)\s+(retry|call back|callback|follow[- ]?up)\b/i.test(text);
   if (skipRetry) {
-    return { reply: "Retry is off. Missed pickups will not get a follow-up ring.", config: { ...config, retryDelayHours: null } };
+    return {
+      reply: "Retry is locked for this hackathon demo. Failed and no-speech outcomes stay in the inbox for a human to reconcile.",
+      config
+    };
   }
 
   const delay = text.match(/\b(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)\b/i);
   if (delay && /\b(retry|call back|callback|follow[- ]?up|wait)\b/i.test(text)) {
-    const hours = hoursFromMatch(Number(delay[1]), delay[2]);
-    if (hours === undefined) {
-      return {
-        reply: `Retry delay must be between ${MIN_RETRY_DELAY_HOURS} and ${MAX_RETRY_DELAY_HOURS} hours.`,
-        config
-      };
-    }
-    const label = hours < 1 ? `${Math.round(hours * 60)} minutes` : `${hours} hour${hours === 1 ? "" : "s"}`;
-    return { reply: `Failed calls will retry once after ${label}.`, config: { ...config, retryDelayHours: hours } };
+    return {
+      reply: "Retry delay is locked for this hackathon demo. Sundials will not schedule another call automatically.",
+      config
+    };
   }
 
   const opening = text.match(/\bopening(?: script)?\s*[:-]\s*([\s\S]+)/i);
@@ -185,9 +176,6 @@ function applyGeminiPatch(config: BrainConfig, parsed: GeminiCopilotJson): Brain
   if (openingScript) next.openingScript = openingScript;
   const closingScript = asString(parsed.closingScript);
   if (closingScript) next.closingScript = closingScript;
-  if ("retryDelayHours" in parsed) {
-    next.retryDelayHours = parsed.retryDelayHours === null ? null : normalizeRetryDelayHours(parsed.retryDelayHours) ?? null;
-  }
   const addGoal = asString(parsed.addGoal);
   if (addGoal) {
     const goal = goalFromSentence(addGoal);
@@ -253,13 +241,13 @@ ${JSON.stringify(
 User: ${message.trim()}
 
 Return JSON with a short "reply" and only the fields that should change:
-productName, companyAbout, qualificationReport, openingScript, closingScript, retryDelayHours (number or null),
+productName, companyAbout, qualificationReport, openingScript, closingScript,
 addGoal (one sentence), removeGoalLabel, pauseGoalLabel, resumeGoalLabel, applySuggestionTitle.`,
     45_000
   );
   if (raw == null || typeof raw !== "object") {
     return {
-      reply: "I could not apply that yet. Try a concrete change such as “retry in 2 hours” or edit the report directly.",
+      reply: "I could not apply that yet. Try a concrete change such as “add a goal for budget” or edit the report directly.",
       config
     };
   }
