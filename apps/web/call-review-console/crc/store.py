@@ -3,13 +3,28 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from . import compliance
+from .security import UnsafeCallId, safe_call_id
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.getenv("CRC_DATA_DIR", ROOT / "data"))
 FIXTURES = ROOT / "fixtures"
+
+
+def _within(base: Path, name: str) -> Path:
+    """Resolve ``name`` under ``base`` and refuse anything that escapes it.
+
+    ``safe_call_id`` already rejects separators; this is the second line, so a
+    future caller that forgets to validate still cannot write outside the
+    directory.
+    """
+    p = (base / name).resolve()
+    if not p.is_relative_to(base.resolve()):
+        raise UnsafeCallId(f"path escapes the data directory: {name!r}")
+    return p
 
 
 def _load_dir(d: Path) -> dict[str, dict]:
@@ -17,9 +32,12 @@ def _load_dir(d: Path) -> dict[str, dict]:
     for p in sorted(d.glob("*.json")):
         try:
             j = json.loads(p.read_text())
-            if j.get("object") == "call_task" and j.get("id"):
-                out[j["id"]] = j
-        except Exception:
+            if j.get("object") != "call_task":
+                continue
+            # An id that would be unsafe to write is also unsafe to serve: it
+            # reaches the browser inside a JS string literal.
+            out[safe_call_id(j.get("id"))] = j
+        except (UnsafeCallId, Exception):
             continue
     return out
 
@@ -32,22 +50,57 @@ def load_all() -> dict[str, dict]:
 
 
 def save(task: dict) -> Path:
+    """Persist a snapshot under its own id.
+
+    The id arrives from a webhook body or the CALL-E API, so it is validated
+    before it is allowed anywhere near a path: ``../`` in an id would otherwise
+    write outside the data directory.
+    """
+    cid = safe_call_id(task.get("id"))
     DATA.mkdir(parents=True, exist_ok=True)
-    p = DATA / f"{task['id']}.json"
+    p = _within(DATA, f"{cid}.json")
     p.write_text(json.dumps(task, indent=1))
     return p
 
 
 def save_review_note(call_id: str, note: dict) -> Path:
+    cid = safe_call_id(call_id)
     DATA.mkdir(parents=True, exist_ok=True)
-    p = DATA / f"{call_id}.review.json"
+    p = _within(DATA, f"{cid}.review.json")
     p.write_text(json.dumps(note, indent=1))
     return p
 
 
 def review_note(call_id: str) -> dict | None:
-    p = DATA / f"{call_id}.review.json"
+    try:
+        cid = safe_call_id(call_id)
+    except UnsafeCallId:
+        return None
+    p = _within(DATA, f"{cid}.review.json")
     return json.loads(p.read_text()) if p.exists() else None
+
+
+_PHONE_IN_TEXT = re.compile(r"\+\d{7,15}")
+
+
+def _mask_text(value: str) -> str:
+    return _PHONE_IN_TEXT.sub(lambda m: compliance.mask_phone(m.group(0)), value)
+
+
+def _mask_deep(value):
+    """Mask phone-shaped runs in every string anywhere in the structure.
+
+    Masking only ``recipients`` and ``task`` left numbers exposed in the two
+    places a caller is most likely to say one out loud: transcript turns and the
+    model's structured result. Both are rendered in the console.
+    """
+    if isinstance(value, str):
+        return _mask_text(value)
+    if isinstance(value, list):
+        return [_mask_deep(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _mask_deep(v) for k, v in value.items()}
+    return value
 
 
 def masked(task: dict) -> dict:
@@ -58,6 +111,4 @@ def masked(task: dict) -> dict:
         for a in r.get("attempts") or []:
             if a.get("phone"):
                 a["phone"] = compliance.mask_phone(a["phone"])
-    import re
-    t["task"] = re.sub(r"\+\d{7,15}", lambda m: compliance.mask_phone(m.group(0)), t.get("task") or "")
-    return t
+    return _mask_deep(t)

@@ -4,12 +4,39 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from . import live, review, store
+from . import live, review, security, store
+from .security import UnsafeCallId, UnsafeOrigin, safe_call_id
+
+
+def require_console(request: Request) -> None:
+    """Every transcript-bearing route requires the console token.
+
+    Transcripts, results and review notes are caller data, and ``/api/fetch``
+    spends the CALL-E API key, so none of it may be reachable unauthenticated.
+    Set ``CRC_CONSOLE_TOKEN`` and send it as ``X-CRC-Console`` (or
+    ``Authorization: Bearer``); with no token set the app refuses rather than
+    defaulting open, so a deployment cannot leak by omission.
+    """
+    if not security.console_token():
+        raise HTTPException(
+            503,
+            "CRC_CONSOLE_TOKEN unset: set CRC_CONSOLE_TOKEN to serve this console. "
+            "It is refused rather than served openly because these routes expose "
+            "call transcripts and spend the CALL-E API key.",
+        )
+    presented = request.headers.get("x-crc-console") or ""
+    if not presented:
+        auth = request.headers.get("authorization") or ""
+        if auth.lower().startswith("bearer "):
+            presented = auth[7:]
+    if not security.token_matches(presented):
+        raise HTTPException(401, "missing or wrong X-CRC-Console token")
+
 
 app = FastAPI(title="Call Review Console")
 STATIC = Path(__file__).resolve().parents[1] / "static"
@@ -19,10 +46,12 @@ USE_LLM = os.getenv("CRC_USE_LLM", "false").lower() == "true"
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    """The shell only. It carries no call data and fetches with the token the
+    operator pastes in, so it stays reachable in order to prompt for one."""
     return (STATIC / "index.html").read_text()
 
 
-@app.get("/api/calls")
+@app.get("/api/calls", dependencies=[Depends(require_console)])
 def calls():
     out = []
     for cid, t in store.load_all().items():
@@ -32,8 +61,12 @@ def calls():
     return sorted(out, key=lambda x: (x["verdict"] == "approve", x["id"]))
 
 
-@app.get("/api/calls/{call_id}")
+@app.get("/api/calls/{call_id}", dependencies=[Depends(require_console)])
 def call(call_id: str, llm: bool = False):
+    try:
+        call_id = safe_call_id(call_id)
+    except UnsafeCallId:
+        raise HTTPException(400, "malformed call id") from None
     t = store.load_all().get(call_id)
     if not t:
         raise HTTPException(404)
@@ -46,9 +79,20 @@ class Note(BaseModel):
     note: str = ""
     reviewer: str = "reviewer"
 
+    @field_validator("verdict")
+    @classmethod
+    def _known_verdict(cls, v: str) -> str:
+        if v not in {"approve", "needs_human", "reject"}:
+            raise ValueError("verdict must be approve, needs_human or reject")
+        return v
 
-@app.post("/api/calls/{call_id}/note")
+
+@app.post("/api/calls/{call_id}/note", dependencies=[Depends(require_console)])
 def note(call_id: str, body: Note):
+    try:
+        call_id = safe_call_id(call_id)
+    except UnsafeCallId:
+        raise HTTPException(400, "malformed call id") from None
     if call_id not in store.load_all():
         raise HTTPException(404)
     import datetime as dt
@@ -69,20 +113,29 @@ async def webhook(request: Request):
     data = body.get("data") if isinstance(body, dict) else None
     if not data or data.get("object") != "call_task" or not data.get("id"):
         raise HTTPException(400, "expected a CALL-E webhook event with a call_task in data")
+    try:
+        # The id becomes a filename and reaches the browser; it is the one field
+        # in an unsigned delivery that must not be taken on trust.
+        cid = safe_call_id(data.get("id"))
+    except UnsafeCallId:
+        raise HTTPException(400, "malformed call id") from None
+    data["id"] = cid
     data.setdefault("metadata", {})["webhook_event"] = body.get("type")
     store.save(data)
-    return {"ok": True, "stored": data["id"]}
+    return {"ok": True, "stored": cid}
 
 
 class Fetch(BaseModel):
     call_id: str
 
 
-@app.post("/api/fetch")
+@app.post("/api/fetch", dependencies=[Depends(require_console)])
 def fetch(body: Fetch):
     """Opt-in: pull one existing call task by id with CALLE_API_KEY. Never creates a call."""
     try:
         t = live.fetch_call(body.call_id)
+    except (UnsafeCallId, UnsafeOrigin) as e:
+        raise HTTPException(400, str(e)) from None
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
@@ -91,7 +144,7 @@ def fetch(body: Fetch):
     return {"ok": True, "stored": t.get("id")}
 
 
-@app.get("/api/benchmark")
+@app.get("/api/benchmark", dependencies=[Depends(require_console)])
 def benchmark():
     """Across every call on file: completion, evidence and latency. Fixtures are synthetic and labelled as such."""
     rows = []
@@ -103,6 +156,12 @@ def benchmark():
     return {"aggregate": agg, "rows": rows}
 
 
-@app.get("/api/health")
+@app.get("/api/health", dependencies=[Depends(require_console)])
 def health():
     return {"ok": True, "calls_on_file": len(store.load_all()), "live_fetch_enabled": bool(os.getenv("CALLE_API_KEY")), "llm": USE_LLM}
+
+
+@app.get("/api/ping")
+def ping():
+    """Unauthenticated liveness only: says nothing about the calls on file."""
+    return {"ok": True, "auth_required": True}
