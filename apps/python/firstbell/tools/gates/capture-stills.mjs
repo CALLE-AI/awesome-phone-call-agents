@@ -1,5 +1,5 @@
 /**
- * Three annotated proof stills for judges who never run the code.
+ * Three annotated stills of the built page, for a reader who will not run the code.
  *
  *   node capture-stills.mjs
  *

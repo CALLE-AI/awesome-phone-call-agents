@@ -236,20 +236,62 @@ def test_no_provider_call_id_is_committed(tracked):
     )
 
 
-def test_transcript_text_appears_only_in_fixtures_that_declare_themselves_authored(tracked):
-    """Conversation text is the artifact itself, so the exceptions have to be explicit.
+# What a list of spoken turns looks like, whatever the key above it is called.
+#
+# This used to read `key == "transcript_turns"` and nothing else, and a file went straight
+# past it: `tools/glosses.json` holds 53 turns from four real calls under the key `turns`,
+# and the gate written to stop exactly that could not see it. A gate keyed on a name only
+# checks the files that happened to use the name, which is the same as checking the files
+# that were already known about.
+#
+# So the shape is the test. A turn is an object carrying something said and who said it,
+# and any list of those is dialogue no matter what its parent is called.
+TURN_KEYS = ({"text", "speaker"}, {"text", "who"}, {"said", "speaker"}, {"ta", "en"})
 
-    A fixture is allowed to hold dialogue somebody on this project wrote. It is not allowed
-    to hold dialogue and stay quiet about which of the two it is, because that is the state
-    a reader cannot tell apart from a recording.
+
+def turn_list(value: object) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    first = value[0]
+    if not isinstance(first, dict):
+        return False
+    keys = set(first)
+    return any(wanted <= keys for wanted in TURN_KEYS)
+
+
+# Files that hold real conversation on purpose, each with the reason written next to it.
+#
+# An exception a gate cannot see is an accident. An exception listed here is a decision, and
+# adding a line to this tuple is a visible act in a diff, which is the whole point.
+#
+# `tools/glosses.json` carries the Tamil turns of four real calls with their English. It is
+# here because the organiser's Language Requirements rule asks that an English translation
+# accompany every submitted material, and four of the eight published calls were placed in
+# Tamil. The page cannot print a Tamil transcript with no English beside it and satisfy that
+# rule, and the English cannot be checked against the Tamil unless both are committed. The
+# maintainer's ruling on PR #300 covers this file, `evidence/README.md` says so in the same
+# words, and the undertaking there is unconditional: say so on the pull request and this file
+# and the transcripts on the page both come off.
+DECLARED_TRANSCRIPT_FILES = (
+    "apps/python/firstbell/tools/glosses.json",
+)
+
+
+def transcript_offenders(documents) -> list[str]:
+    """The rule itself, lifted out of the gate so that it can be shown a document.
+
+    It used to sit inside the test, which meant the only documents it had ever been run
+    against were the ones already in the tree. That is how it spent a fortnight matching a
+    key name: nothing could hand it a file using a different one and watch what happened.
     """
     offenders = []
-    for path, document in json_documents(tracked):
-        spoken = [value for _t, key, value in walk(document)
-                  if key == "transcript_turns" and isinstance(value, list) and value]
+    for path, document in documents:
+        spoken = [value for _t, _key, value in walk(document) if turn_list(value)]
         if not spoken:
             continue
         relative = path.as_posix()
+        if any(relative.endswith(declared) for declared in DECLARED_TRANSCRIPT_FILES):
+            continue
         if AUTHORED_FIXTURES not in relative:
             offenders.append(f"{relative}: holds transcript turns and is not an authored fixture")
             continue
@@ -257,6 +299,74 @@ def test_transcript_text_appears_only_in_fixtures_that_declare_themselves_author
         if not isinstance(note, str) or "Authored, not recorded" not in note:
             offenders.append(
                 f"{relative}: holds transcript turns without saying it was authored")
+    return offenders
+
+
+def test_the_gate_catches_a_conversation_filed_under_an_unfamiliar_key():
+    """Hand the rule a document and watch it, rather than trusting the tree stays typical.
+
+    This is the file the previous gate would have let through: real dialogue, in a tracked
+    path that is not an authored fixture, under a key nobody had thought of. The gate is
+    given it directly, so the check does not depend on such a file existing in order to
+    mean something.
+    """
+    said = [{"text": "Hello, who's this?", "speaker": "user"}]
+    smuggled = Path("apps/python/firstbell/tools/somewhere-new.json")
+
+    assert transcript_offenders([(smuggled, {"lines": said})]), (
+        "a tracked file carrying a conversation under the key 'lines' passed the gate, "
+        "which is the shape of the miss this was written after")
+    assert transcript_offenders([(smuggled, {"calls": {"S-1": {"turns": said}}})]), (
+        "dialogue nested two levels down passed the gate")
+
+    # And the three outcomes that are not offences, so the gate cannot be made to pass by
+    # reporting everything it is shown.
+    assert not transcript_offenders([(smuggled, {"counts": {"calls": 12, "answered": 11}})])
+    assert not transcript_offenders(
+        [(Path("apps/python/firstbell/tools/glosses.json"), {"calls": {"S": {"turns": said}}})])
+    fixture = Path("apps/python/firstbell/tests/data/shape-call.json")
+    assert not transcript_offenders(
+        [(fixture, {"transcript_turns": said, "_provenance": "Authored, not recorded."})])
+
+
+def test_dialogue_is_recognised_by_its_shape_and_not_by_one_key_name():
+    """The detector itself, pinned, because narrowing it back would go unnoticed.
+
+    The gate below reads every tracked JSON document, and once `tools/glosses.json` is a
+    declared exception there is nothing left in the tree for it to catch. That is the state
+    the previous version was in without anybody knowing: it matched the key
+    `transcript_turns`, the one file holding real conversation used `turns`, and the suite
+    was green because the gate was looking in the wrong place rather than because the tree
+    was clean. A gate with nothing left to find has to be checked against examples instead.
+    """
+    said = [{"text": "Hello, who's this?", "speaker": "user"}]
+    assert turn_list(said), "a plain turn list is dialogue"
+
+    for key in ("transcript_turns", "turns", "lines", "exchange", "utterances"):
+        assert turn_list({key: said}[key]), (
+            f"dialogue under the key {key!r} was not recognised, so a file could carry a "
+            "conversation past this gate by naming its list something new")
+
+    for shape in ({"ta": "வணக்கம்", "en": "Greetings"},
+                  {"said": "Hello", "speaker": "bot"},
+                  {"text": "Hello", "who": "parent"}):
+        assert turn_list([shape]), f"{sorted(shape)} is a turn and was not seen as one"
+
+    for not_dialogue in ([], [1, 2, 3], ["a string"], [{"id": "S-1", "count": 4}],
+                         [{"file": "x.json", "sha256": "ab"}], "not a list even"):
+        assert not turn_list(not_dialogue), (
+            f"{not_dialogue!r} is not dialogue, and a detector that says it is would put "
+            "this gate in front of every list in the repository")
+
+
+def test_transcript_text_appears_only_in_fixtures_that_declare_themselves_authored(tracked):
+    """Conversation text is the artifact itself, so the exceptions have to be explicit.
+
+    A fixture is allowed to hold dialogue somebody on this project wrote. It is not allowed
+    to hold dialogue and stay quiet about which of the two it is, because that is the state
+    a reader cannot tell apart from a recording.
+    """
+    offenders = transcript_offenders(json_documents(tracked))
     assert not offenders, (
         "transcript text in the wrong place:\n  " + "\n  ".join(sorted(offenders))
     )

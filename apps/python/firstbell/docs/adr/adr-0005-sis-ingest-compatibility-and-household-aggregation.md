@@ -49,8 +49,10 @@ school reaches the wrong person even when it connects.
 **Household grouping, in `dispatch/households.py`.** Rows sharing a first number, compared
 on digits so `+1 555 010 0301` and `+15550100301` are one telephone, are one household for
 the run. The row the export put first is dialled. The rest are held, and the count of calls
-not placed is printed. The dialled row's context carries `also_absent`, so the instruction
-names every absent child in the house and the parent is asked once rather than once each.
+not placed is printed. The dialled row's context carries two keys, `also_absent` with
+their ids and `also_absent_names` with their names, and it is the second that reaches the
+instruction, so the parent is asked once about every absent child in the house rather than
+once each.
 
 Only rows that would actually be dialled are grouped. A sibling behind a family with no
 consent, or behind a family the telephone cannot reach, is not a call saved, and reporting

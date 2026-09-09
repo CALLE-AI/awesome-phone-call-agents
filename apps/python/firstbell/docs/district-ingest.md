@@ -132,8 +132,10 @@ records on it means writing an answer this program was never given into a record
 child. The held rows go to a person. Thirty seconds of a secretary's time against two
 calls to a family that did not need them.
 
-The instruction does name every absent child in the house, through `also_absent` on the
-dialled row, so the parent is asked once about all of them rather than once each.
+The instruction does name every absent child in the house, through `also_absent_names` on
+the dialled row, so the parent is asked once about all of them rather than once each.
+This sentence used to name `also_absent`, which is the neighbouring key holding their ids
+and is read by nothing in the task builder.
 
 A row nobody was going to dial holds nothing behind it. A sibling behind a family with no
 consent, or behind a family the telephone cannot reach, is not a call saved, and counting

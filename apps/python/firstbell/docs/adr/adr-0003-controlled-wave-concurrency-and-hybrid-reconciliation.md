@@ -33,7 +33,11 @@ Currently, [`dispatch.scheduler.WaveDispatcher`](../../dispatch/scheduler.py) sc
 In district deployments handling 500 absentees, thread-pool sleep polling presents technical liabilities:
 1. Thread starvation: OS threads remain blocked in sleep states rather than multiplexing network requests.
 2. Polling overhead: eleven real calls measured a mean of 51.0 seconds (`tools/throughput.py`, printed at `README.md`), so at the 2.0-second poll interval declared in `dispatch/scheduler.py` each call generates about 26 GET requests. A 500-call run generates about 13,000 HTTP requests, risking API rate limiting (`rate_limit_exceeded`).
-3. Window elongation: at concurrency 4, dialling 500 families takes 110.4 minutes, measured by `tools/throughput.py` from real call lengths and printed at `README.md`, which overruns the school morning attendance window (typically 08:30 to 09:15).
+3. Window elongation: at concurrency 4, dialling 500 families takes 110.4 minutes, measured by `tools/throughput.py` from real call lengths and printed at `README.md`, which overruns the school morning attendance window. This document used to put that window
+at 08:30 to 09:15, which is 45 minutes, while quoting the seventy-five minute measurement a
+hundred lines further down. The window used here is now the one the instrument uses:
+`tools/throughput.py` starts at 08:00 against a 09:15 cutoff, which North Carolina leaves
+for a school to set and 09:15 is a common choice, so seventy-five minutes.
 
 ### Constraints
 - Outbound calls cannot be aborted mid-flight by an API endpoint.

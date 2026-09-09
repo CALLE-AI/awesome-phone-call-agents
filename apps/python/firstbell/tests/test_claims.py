@@ -917,6 +917,14 @@ def test_the_page_says_where_its_source_is_and_whether_a_film_exists():
         "and Demo. A reader cannot tell an unlinked film from no film")
 
 GATES_THAT_CANNOT_ALWAYS_RUN = {
+    # Both read the built page, which a clean checkout does not carry. What is lost while
+    # they are quiet is the check that the four numbers on the first screen still match the
+    # committed files they are computed from. The third dateline gate, the one that proves
+    # they are computed at all rather than typed, runs anywhere.
+    "cells":
+        "reads out/index.html, which only exists after the page has been built",
+    "test_the_dateline_is_derived_and_not_written_out":
+        "asks the builder for the block twice, which needs the receipts on this machine",
     # Counts the history rather than the tree, so a checkout without git, or an export of
     # this directory on its own, cannot answer it. What is lost while it is quiet is the
     # claim that the provenance paragraph still describes the commits it is about, which

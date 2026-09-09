@@ -5,7 +5,7 @@ below is a change made to working code to check that a specific test notices. Ev
 was reverted and the suite returned to green.
 
 Reproduce any of them by making the change and running `python -m pytest tests/ -q`, except
-the thirty marked **needs the built page**. Those thirty are held by gates
+the thirty-two marked **needs the built page**. Those thirty-two are held by gates
 that read `out/index.html`, which is built from records of real calls kept outside this
 repository, so on a clean checkout they skip and measure zero. Rows 86 to 88 break the same builder and are
 caught by a gate that builds the page from an authored fixture, which does run on a clean
@@ -633,6 +633,18 @@ fields with the same idiom the wage class uses; the row says wage, and the wage 
 | 334 | Remove the note explaining the AGPL dependency while `requirements-dev.txt` still pins it, so a reviewer of an MIT repository meets an AGPL import with nothing written about it anywhere | 1 |
 | 335 | Put a kill count of 1 back beside the substring row in `docs/proving-a-gate-fires.md`, which is the defect that was actually in the tree: the document a reader is told to reproduce the mutations from copied a row whole and disagreed with the table it copied from, and the gate that checks these counts read only the README | 1 |
 | 336 | State a kill count in the README that the table does not measure for the substring row. The sentence used to name a test instead of a number, which is why nothing checked it while its three neighbours were checked | 1 |
+| 337 | State a call count on the first-screen dateline that `evidence/recorded-calls.json` does not measure, so the one number a reviewer meets before the fold is the one nothing checks **Needs the built page.** | 1 |
+| 338 | State a price on the dateline that the account was never billed, against the figure read off the usage panel on 2026-09-07 **Needs the built page.** | 1 |
+| 339 | Write the dateline's four numbers into the builder as literals instead of computing them. This is the failure the gate exists for: four values that are right the day they are typed and silently stop being right | 1 |
+| 340 | Render the dateline when no receipts are on the machine, so the first screen carries four numbers no reader of that build can check | 1 |
+| 341 | Guard the sibling sentence on the raw roster value while rendering the sanitised one. This is the defect that was in the tree: `str.strip()` leaves a zero-width space where `as_data` removes it, so a name made only of format characters passed the guard and the instruction that would have reached a real call asked why nobody was absent | 1 |
+| 342 | Take the sanitiser off the sibling names, so a format character in a roster cell reaches the words CALL-E speaks | 2 |
+| 343 | Use the singular verb however many siblings there are, so a call about two children asks why they is absent | 1 |
+| 344 | Drop the sibling sentence entirely, so a guardian with three absent children is asked about one and the other two records are held on an answer nobody gave | 3 |
+| 345 | Match committed transcript text by the key name `transcript_turns` instead of by the shape of a turn. This is the defect that was in the tree, and it is the worst kind: `tools/glosses.json` holds 53 turns of four real calls under `turns`, so the one committed file carrying real conversation was the single file this gate could not see, and the suite was green because the gate was looking in the wrong place | 1 |
+| 346 | Count a turn only when it carries both `text` and `speaker`, so the Tamil and English pairs the gloss file is made of stop reading as dialogue | 1 |
+| 347 | Empty the declared exception list while the file it names is still tracked, so real conversation sits in the tree with nothing recording that anybody decided it could | 2 |
+| 348 | Stop the gate walking into nested objects, so a conversation one level below the root of a committed document passes | 1 |
 
 Row 284 fails four tests and is the one row whose marker is only partly true. Three of the
 four read the built page, and the fourth reads the builder, so a clean checkout measures

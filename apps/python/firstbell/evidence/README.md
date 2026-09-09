@@ -5,12 +5,23 @@ are **not in this directory and not on the evidence page either**. This paragrap
 they were on that page, and a reader who went looking found recordings.
 
 What is published is the same material with the identifiers taken out. The
-[evidence page](https://firstbell-evidence.vercel.app) carries the recording of each call, its
-transcript turn by turn, its waveform and a shortened id, and it is linked rather than
-committed. What travels with the code is the arithmetic, in `recorded-calls.json`: all six
-receipt files by name, how many calls each one placed, how many were answered and how many
-needed a human, and the counts behind every money figure in this entry. No conversation, no
-telephone number, no call id.
+[evidence page](https://firstbell-evidence.vercel.app) carries a shortened id for all twelve
+and, for the eight that were recorded, the recording, the transcript turn by turn and the
+waveform, and it is linked rather than committed. What travels with the code is the
+arithmetic, in `recorded-calls.json`: all six receipt files by name, how many calls each one
+placed, how many were answered and how many needed a human, and the counts behind every money
+figure in this entry. That file carries no conversation, no telephone number and no call id.
+
+One committed file does carry conversation, and saying otherwise here would be the kind of
+claim this entry exists to argue against. `tools/glosses.json` holds fifty three Tamil turns
+from four of the calls with their English beside them. It is committed because the
+organiser's Language Requirements rule asks that an English translation accompany every
+submitted material, four of the eight published calls were placed in Tamil, and a translation
+nobody can check against its original is not a translation. `tests/test_privacy.py` names
+that file as a declared exception rather than letting it through quietly, which is what it
+used to do: the gate matched one key name, the gloss file uses another, and for a fortnight
+the only committed file holding real conversation was the one file that gate could not see.
+The undertaking below covers it.
 
 That is deliberate, and it is not our rule. The maintainer of this list has required, on
 several pull requests, that a contributor remove committed real-call transcripts and every
@@ -42,8 +53,9 @@ the author, on a line the author owns, on numbers that cannot be assigned to any
 a script the author wrote, about a pupil who does not exist. That is what the material is. It
 is not an argument that the requirement does not reach it.
 
-**The maintainer's reading is the one that counts, and the undertaking is unconditional: say
-so on the pull request and the recordings and the transcripts come off the page.** Removing
+**The maintainer's reading is the one that counts, and the undertaking does not wait for a
+second ruling: a word on the pull request, or the one already written on #300, and the
+recordings, the transcripts and `tools/glosses.json` all come off.** Removing
 the recordings is a build flag, `--audio-dir`, left off. Removing the transcripts is a change
 to `tools/judge_page.py`, which emits them unconditionally today. Neither is a rewrite of the
 argument: the structured results, the counts, the escalations and every figure on the
@@ -55,7 +67,7 @@ the calls produced, and the machinery that keeps both honest.
 | File | What it is |
 |---|---|
 | [`api-shape.json`](api-shape.json) | Every key path and JSON type the production API returned, next to what the offline double emits. Path names and type names only: no conversation, no number, no id, no field value. Regenerate with `tools/double_conformance.py`. |
-| [`MUTATIONS.md`](MUTATIONS.md) | Three hundred and thirty-six gates broken on purpose, with how many tests noticed each one. |
+| [`MUTATIONS.md`](MUTATIONS.md) | Three hundred and forty-eight gates broken on purpose, with how many tests noticed each one. |
 | [`observed-price.json`](observed-price.json) | What CALL-E actually billed this account: thirteen events at $0.05 a call, $0.65 over one month, read off the usage panel on 2026-09-07. A first-party observation rather than a published price, which is why it is not in `statistics.json`, and it carries the three things thirteen calls cannot settle. |
 | [`suite-pair.json`](suite-pair.json) | What the suite did on the tree it was last measured on: how many were collected, how many passed, how many skipped, and whether the page and the gate report were present. The stat card on the reviewer page reads this file. It cannot measure the pair for itself, because the suite reads the page the builder writes, so the card used to take the number out of a sentence in the README and it was the largest count on the front screen that nothing checked. Written by `tools/suite_pair.py`, which is deliberately not part of the suite: a test that ran it would be measuring a run containing itself. `--check` compares the file to a fresh run and exits 3 rather than 1 when the two trees are not comparable. |
 | [`film.json`](film.json) | What the demo film measures out at: 2:58, 21 shots, 37% of the running time carrying sound, no narration mixed in, and the sha256 of the file. The film is not committed either, so this is the same arrangement as the row below: the thing lives outside, the measurement lives here. It exists because three surfaces carried a running time typed by hand and one re-render made all three wrong. Written by `make-receipt.py` in the workshop, at the same moment it writes the film's own receipt. |

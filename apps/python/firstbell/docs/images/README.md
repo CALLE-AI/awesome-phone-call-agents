@@ -1,4 +1,4 @@
-# Judge-facing images
+# Images
 
 The rules for this event say a judge "may choose to judge based solely on the text
 description, images, and video." This directory is what exists for the images half of that

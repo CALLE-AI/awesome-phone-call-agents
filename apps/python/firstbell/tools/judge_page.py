@@ -1426,6 +1426,40 @@ def _figures() -> dict:
     return {f["id"]: f for f in record["figures"]}
 
 
+def topline_markup(run: dict) -> str:
+    """Four measured numbers, on the line under the standfirst.
+
+    A reviewer with five minutes and two hundred entries reported reaching the end of the
+    first screen without meeting a single number. Everything this page is arguing was
+    below the fold: the stat grid sits in act 01, one screen down, and act 00 opens with a
+    transcript. The transcript is the right thing to open with, and it is worth nothing to
+    somebody who has already decided this is another repository with a nice font.
+
+    So this is a dateline, not a stat bar. One line, the type the eyebrow already uses,
+    digits in mono so the eye catches them. Every value is computed from the same two
+    committed files the money band divides: `evidence/recorded-calls.json` for the counts
+    and `evidence/observed-price.json` for what the account was actually billed. None of
+    the four may be typed, which is what `tests/test_topline.py` is for.
+
+    It renders as nothing when the receipts are not on this machine, for the reason the
+    first-screen exchange does: a number on the first screen that no reader can check is
+    the one thing this page must never carry.
+    """
+    if not run:
+        return ""
+    f = money_facts(run)
+    pooled, price = f["pooled"], f["price"]
+    cells = (
+        (pooled["calls"], "real calls"),
+        (pooled["answered"], "answered"),
+        (pooled["escalated"], "escalated to a person"),
+        (f'${price["per_call_usd"]:.2f}', "a call, billed"),
+    )
+    items = "".join(f'<li><b>{esc(value)}</b> {esc(label)}</li>' for value, label in cells)
+    return (f'<ul class=topline aria-label="What this page is built on, measured">'
+            f'{items}</ul>')
+
+
 def money_facts(run: dict) -> dict:
     """What this run costs and what it sits beside, computed rather than asserted.
 
@@ -2460,6 +2494,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         # description sitting on top of a demonstration is the page talking over
         # itself. The full statement moves to act 01, next to the numbers behind it.
         '<p class=standfirst>Absence calls to families, and an escalation for every call that reaches somebody and still learns nothing.</p>',
+        topline_markup(next((d for name, d in recs if name.startswith("06-")), {})),
         video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',

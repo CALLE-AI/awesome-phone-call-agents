@@ -1041,6 +1041,31 @@ footer .plate-royal .source-link { margin-top: var(--space-3); }
   margin: 0; color: var(--ink-2);
   max-width: 30rem;
 }
+/* The dateline under the standfirst. Four measured numbers, and the only place on the
+ * first screen where a reader meets one.
+ *
+ * It is a dateline and not the stat grid act 01 already carries. A four-cell grid repeated
+ * two screens apart reads as a landing page rather than as a page making an argument, and
+ * the grid's whole design decides which of its four numbers leads. This one ranks nothing:
+ * it is the byline convention, set in the label type the eyebrow uses, with the digits in
+ * mono so the eye stops on them without the line shouting.
+ *
+ * Tabular figures because the four values are read as a set. Fixed line-height and no
+ * wrapping of a value away from its own label, so the block's height is the same in the
+ * fallback face as in the real one, which is what keeps it off the layout-shift budget. */
+.topline {
+  list-style: none; display: flex; flex-wrap: wrap;
+  gap: 0 var(--space-3); margin: var(--space-2) 0 0; padding: 0;
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.6;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
+  max-width: none;
+}
+.topline li { white-space: nowrap; }
+.topline b {
+  font-family: var(--mono); font-weight: 500; font-size: var(--size-2);
+  font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--ink);
+}
+
 .source-link {
   font-family: var(--ui); font-size: var(--size-2); margin: var(--space-2) 0 0;
 }

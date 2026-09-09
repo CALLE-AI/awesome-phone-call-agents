@@ -40,14 +40,15 @@ and nothing here is a screenshot.
 | A call costs $0.05 and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call**, thirteen events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv` prints four endings for four rows: a reason on record, the platform refusing Spanish, nobody answered, and a guardian the telephone cannot reach. Then `examples/absences-siblings.csv`, which places two calls for four rows |
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
-| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 336 rows, each with the change made and the number of tests that noticed |
+| Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 348 rows, each with the change made and the number of tests that noticed |
 
-Twelve of these calls were real, to real telephones, on 2026-09-04. Eight were recorded, and those recordings are on the
-[evidence page](https://firstbell-evidence.vercel.app), with their transcripts, beside a
-shortened id for all twelve. The receipt files are on neither that page nor in this tree, for the
-reason [`evidence/README.md`](evidence/README.md) gives, so what travels with the code is the
-arithmetic they produced: [`evidence/recorded-calls.json`](evidence/recorded-calls.json) names
-all six and holds the counts behind every money figure here.
+Twelve of these calls were real, to real telephones, on 2026-09-04. Eight were recorded, and
+those recordings are on the [evidence page](https://firstbell-evidence.vercel.app), with
+their transcripts, beside a shortened id for all twelve. The receipt files are on neither
+that page nor in this tree, for the reason [`evidence/README.md`](evidence/README.md) gives,
+so what travels with the code is the arithmetic they produced:
+[`evidence/recorded-calls.json`](evidence/recorded-calls.json) names all six receipt files
+and holds the counts behind every money figure here.
 
 ## If you have twenty minutes
 
@@ -59,7 +60,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and thirty-six gates broken on purpose, with how many tests noticed each one | 1 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and forty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
 | 7 | [`docs/consent-record.md`](docs/consent-record.md) | The dated consent record that replaces a boolean column, the eight checks that run before a phone rings, and the three decisions that stay with the district | 2 min |
@@ -1011,9 +1012,9 @@ says what would be reachable, and tells you how to proceed anyway.
 
 ## Evidence from real calls
 
-Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. The recording of each
-one, its transcript and its shortened id are on the
-[evidence page](https://firstbell-evidence.vercel.app). The receipt files are on **neither
+Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. A shortened id for each
+one is on the [evidence page](https://firstbell-evidence.vercel.app), and the eight that were
+recorded carry their recording and transcript there too. The receipt files are on **neither
 that page nor in this tree**,
 because the maintainer of this list requires that committed real-call artifacts be removed
 and has said the requirement holds even where the people on the call were team members
@@ -1092,24 +1093,25 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 788 tests collected
+python -m pytest tests/ -q          # 799 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**788 is the number collected, and two different pairs add up to it.** Some of these gates
+**799 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **754 passed, 34
-skipped**. The thirty-four name what is missing rather than passing quietly: thirty want a
-built page, four of those thirty also wanting its Content-Security-Policy, three want a gate
-report, and one is a run whose rows are all of one kind, so the ordering it would check
-proves nothing. Build the page and run the gates and
-the same suite reports **786 passed, 2 skipped**. Both pairs are measured, both add up to
-788, and the difference between them is what a reader has on their disk.
+A clean checkout of this commit into an empty directory reports **763 passed, 36
+skipped**. The thirty-six name what is missing rather than passing quietly:
+thirty-one want a built page, four of those thirty-one also wanting its
+Content-Security-Policy, three want a gate report, one wants the call receipts, which are
+not in this tree, and one is a run whose rows are all of one kind, so the ordering it would
+check proves nothing. Build the page and run the gates and
+the same suite reports **797 passed, 2 skipped**. Both pairs are measured, both add up to
+799, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 753 and 35.
+The very first run in a fresh clone reports one more skip and one fewer pass, 762 and 37.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on

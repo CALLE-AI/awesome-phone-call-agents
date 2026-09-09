@@ -22,8 +22,8 @@ else. The held rows go to a person, with the reason naming the call that was pla
 
 That leaves the spoken instruction, and it does say all three names, because asking a
 parent about one child while holding two more rows about her other children is a worse
-call than asking about three. `also_absent` reaches the task text through the dialled
-row's context. She is asked once, about all of them, and a person spends thirty seconds
+call than asking about three. `also_absent_names` reaches the task text through the
+dialled row's context, and `also_absent` beside it carries their ids for the ledger. She is asked once, about all of them, and a person spends thirty seconds
 closing two records instead of a machine spending two calls opening them.
 
 The missing piece is not in this repository. A structured result with one entry per
@@ -115,8 +115,11 @@ def group(items: list[WorkItem]) -> tuple[list[WorkItem], dict[str, list[str]]]:
                 # Short on purpose. It prints on a console line beside six other rows,
                 # and a reader scanning a morning's run needs the id and the reason in
                 # one glance. Why an answer about one child does not close a record about
-                # another is this module's docstring and `docs/households.md`, not a
-                # sentence repeated on every held row.
+                # another is this module's docstring and `docs/district-ingest.md`, not
+                # a sentence repeated on every held row. It used to send a reader to
+                # `docs/households.md`, which has never existed in this tree: a path in a
+                # Python comment is outside `tests/test_doc_links.py`, which reads
+                # markdown links, so nothing could notice.
                 held_reason=(
                     f"{HOUSEHOLD_HELD}: {dialled.id} is on the same number. One answer "
                     "closes one record, so a person closes this one."),
