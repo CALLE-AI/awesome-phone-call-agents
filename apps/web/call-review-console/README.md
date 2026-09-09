@@ -21,8 +21,12 @@ Roadmap item: `apps/web/call-review-console` ("Review call results, summaries, r
 
 - **The console never places a call.** There is no code path that calls `POST /v1/calls`; `crc/live.py` only reads `GET /v1/calls/{id}` and `/events`, and only when `CALLE_API_KEY` is set and a reviewer asks for a specific id.
 - **No-call path is the default.** With no key it runs entirely on the fictional fixtures in `fixtures/` (reserved `+1 555 01xx` numbers).
-- **Phone numbers are masked** everywhere they render (`+1********23`), including inside the task text.
-- **Webhook receiver** (`POST /calle/webhook`) stores terminal events only (`call.completed`, `call.failed`, `call.result_validation_failed`); put it behind your proxy's signature check or a secret path. It never acknowledges anything to CALL-E other than `{ok: true}`.
+- **Contact details are redacted at ingest, before anything reaches disk** (`crc/sanitize.py`), in every written form: E.164, `(555) 010-0123`, `555.010.0777`, email addresses, card-shaped and government-id-shaped runs. Masking only at render time left the raw values sitting in the stored snapshot. Timestamps, clock times, dates and decimals are protected before redaction and restored after, so `created_at` survives and the timing analysis still works. The compliance signal is computed *before* the digits are removed and recorded on `metadata.pii`, so "the agent read a card number back" is still reported without keeping the number.
+- **Phone numbers are masked again on the way out** (`+1********23`), in the recipient records and in every string anywhere in the payload, so the render path does not depend on redaction having caught everything.
+- **Nothing is served anonymously.** Every `/api/*` route requires the console token. The server mints an ephemeral one per process and prints it at startup; set `CRC_CONSOLE_TOKEN` for a stable one.
+- **The webhook fails closed.** `POST /calle/webhook` requires `CRC_WEBHOOK_TOKEN` in an `X-CRC-Token` header, and with no token configured it refuses every delivery with a 503 rather than storing payloads from whoever finds the URL. CALL-E deliveries are unsigned as of SDK 0.7, so there is nothing else to authenticate them by.
+- **Call ids are allow-listed** (`^[A-Za-z0-9._-]{1,128}$`) before one becomes a filename or reaches the browser. An id arrives from the URL and from unsigned webhook deliveries, so it may not contain a path separator, a parent-directory hop, or a quote.
+- **The API key only leaves for an allow-listed host, over https** — `api.heycall-e.com` by default, `CALLE_ALLOWED_HOSTS` to override for a private deployment.
 - No recurring jobs, no schedules, nothing to cancel.
 
 ## Run
@@ -33,8 +37,23 @@ uv venv && uv pip install -e ".[dev]"      # or: pip install -e ".[dev]"
 uvicorn crc.app:app --port 8080            # http://localhost:8080 — fixtures only, no key needed
 # The server prints a console token for the run. Paste it when the page asks.
 # Set CRC_CONSOLE_TOKEN to keep a stable one; the console is never anonymous.
-pytest -q                                  # 7 tests: timing, compliance, evidence, verdicts, webhook ingest, SDK-backed fetch
+pytest -q                                  # 62 tests: timing, compliance, evidence, verdicts, webhook ingest,
+                                           # SDK-backed fetch, redaction, path and origin guards
 ```
+
+## Environment
+
+| Variable | Effect |
+|---|---|
+| *(none)* | fixtures only, no key, ephemeral console token printed at startup |
+| `CRC_CONSOLE_TOKEN` | stable console token instead of the per-process one |
+| `CRC_WEBHOOK_TOKEN` | **required** for `POST /calle/webhook`; unset means every delivery is refused |
+| `CALLE_API_KEY` | enables opt-in read-only fetch of your own calls by id |
+| `CALLE_ALLOWED_HOSTS` | hosts the key may be sent to (default `api.heycall-e.com`, https only) |
+| `CALLE_BASE_URL` | API origin, checked against the allow-list above |
+| `CRC_DATA_DIR` | where redacted snapshots and review notes are written |
+| `CRC_USE_LLM`, `CRC_MODEL` | turn on the optional Gemini evidence pass and pick the model |
+| `GOOGLE_API_KEY` *or* `GOOGLE_GENAI_USE_VERTEXAI` + `GOOGLE_CLOUD_PROJECT` + `GOOGLE_CLOUD_LOCATION` | credentials for that pass |
 
 Opt-in live review of your own calls:
 
@@ -62,10 +81,14 @@ crc/compliance.py  disclosure, stop requests, sensitive readback, phone masking
 crc/evidence.py    structured result vs transcript (deterministic + optional Gemini)
 crc/review.py      scorecard and verdict rules
 crc/live.py        read-only Calls API access
-crc/app.py         FastAPI: /api/calls, /api/calls/{id}, /api/calls/{id}/note, /calle/webhook, /api/fetch, /api/benchmark
+crc/sanitize.py    ingest-time redaction of contact details, with timestamps preserved
+crc/security.py    call-id allow-list, API egress allow-list, console and webhook tokens
+crc/store.py       snapshot and review-note persistence, under CRC_DATA_DIR
+crc/app.py         FastAPI: /api/calls, /api/calls/{id}, /api/calls/{id}/note, /api/fetch,
+                   /api/benchmark, /api/health, /api/ping, /calle/webhook
 static/index.html  the console
 fixtures/          fictional call tasks
-tests/             pytest
+tests/             test_review.py (rules), test_security.py (redaction, guards, tokens)
 ```
 
 MIT (same as the repository).
