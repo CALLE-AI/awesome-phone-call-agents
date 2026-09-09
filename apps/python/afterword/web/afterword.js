@@ -254,6 +254,37 @@
     return esc(value);
   }
 
+  /* The rounded tile that opens every card. Its letter is the institution's
+     own initial, tinted by kind, and it carries no information a screen
+     reader is not already given by the heading beside it. */
+  function tileHTML(kind, name) {
+    var letter = String(name || "").trim().charAt(0).toUpperCase();
+    return (
+      '<span class="tile" data-kind="' +
+      esc(kind) +
+      '" aria-hidden="true">' +
+      esc(letter || "?") +
+      "</span>"
+    );
+  }
+
+  function initials(name) {
+    var words = String(name || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!words.length) {
+      return "AW";
+    }
+    var last = words.length > 1 ? words[words.length - 1].charAt(0) : "";
+    return (words[0].charAt(0) + last).toUpperCase();
+  }
+
+  var FLAG_ICON =
+    '<svg class="ico" viewBox="0 0 16 16" fill="currentColor" ' +
+    'aria-hidden="true"><path d="m8 1.6 1.9 4 4.4.6-3.2 3.1.8 4.3L8 11.6 ' +
+    '4.1 13.6l.8-4.3L1.7 6.2l4.4-.6z"/></svg>';
+
   function gradeHTML(grade) {
     return (
       '<p class="grade" data-grade="' +
@@ -372,7 +403,9 @@
 
     return (
       '<section class="entry">' +
-      '<div class="entry-head"><h3>' +
+      '<div class="entry-head">' +
+      tileHTML(entry.kind, entry.institution) +
+      '<div class="entry-head-text"><h3>' +
       esc(entry.institution) +
       "</h3>" +
       '<p class="entry-line"><span>' +
@@ -381,7 +414,7 @@
       esc(entry.masked_phone) +
       "</span></p>" +
       gradeHTML(entry.grade) +
-      "</div>" +
+      "</div></div>" +
       (rows.length
         ? '<dl class="fields">' +
           rows
@@ -472,7 +505,11 @@
           "<h2 class=\"label\">What each institution asked for</h2>" +
           main.map(packEntryHTML).join("") +
           (tail.length
-            ? '<div class="pack-section-head">' +
+            ? '<section class="standout">' +
+              '<p class="standout-flag">' +
+              FLAG_ICON +
+              "Still with the family</p>" +
+              '<div class="pack-section-head">' +
               '<p class="label">' +
               tail.length +
               " of " +
@@ -483,7 +520,8 @@
               "These are not failures to hide at the back of a report; they " +
               "are the calls a member of the family still has to make." +
               "</p></div>" +
-              tail.map(packEntryHTML).join("")
+              tail.map(packEntryHTML).join("") +
+              "</section>"
             : "") +
           '<p class="pack-close">Afterword asked. It did not act. Anything ' +
           "an institution offered stops here, with the family, for a " +
@@ -528,7 +566,8 @@
                 '<a class="call-row" href="#/calls/' +
                 esc(institution.institution_id) +
                 '">' +
-                "<span><span class=\"call-row-name\">" +
+                tileHTML(institution.kind, institution.institution) +
+                '<span class="call-row-text"><span class="call-row-name">' +
                 esc(institution.institution) +
                 '</span><span class="call-row-sub">' +
                 esc(kindWord(institution.kind)) +
@@ -648,8 +687,9 @@
 
         view.innerHTML =
           '<p><a class="back-link" href="#/calls">Back to all calls</a></p>' +
-          '<div class="page-head">' +
-          "<h1>" +
+          '<div class="page-head detail-head">' +
+          tileHTML(data.kind, data.institution) +
+          "<div><h1>" +
           esc(data.institution) +
           "</h1>" +
           '<p class="entry-line"><span>' +
@@ -660,7 +700,7 @@
           esc(data.institution_id) +
           "</span></p>" +
           gradeHTML(data.grade) +
-          "</div>" +
+          "</div></div>" +
           '<div class="section"><span class="label">Why this grade</span>' +
           '<ul class="chips">' +
           data.reasons
@@ -1071,6 +1111,63 @@
     renderPack();
   }
 
+  /* ---- the rail -------------------------------------------------------- */
+
+  /* The rail repeats two facts the pack already carries -- how many
+     institutions were called, and how many of those calls left nothing for a
+     person to do -- and reads them off the same endpoints the views read.
+     If either read fails the views say so loudly; the rail stays quiet. */
+  function fillRail() {
+    var count = document.getElementById("rail-count");
+    var fill = document.getElementById("rail-bar-fill");
+    var note = document.getElementById("rail-note");
+    var avatar = document.getElementById("avatar");
+
+    pack()
+      .then(function (data) {
+        var total = data.entries.length;
+        var settled = data.entries.filter(function (entry) {
+          return !STILL_NEEDS[entry.grade];
+        }).length;
+        var left = total - settled;
+        if (count) {
+          count.textContent = String(total);
+        }
+        if (fill && total) {
+          fill.style.width = Math.round((settled / total) * 100) + "%";
+        }
+        if (note) {
+          note.textContent =
+            settled +
+            " of " +
+            total +
+            " answered by a person." +
+            (left
+              ? left === 1
+                ? " One still needs somebody to call."
+                : " " + left + " still need somebody to call."
+              : "");
+        }
+      })
+      .catch(function () {});
+
+    estate()
+      .then(function (est) {
+        if (avatar) {
+          avatar.textContent = initials(est.executor_name);
+        }
+      })
+      .catch(function () {});
+  }
+
+  var railPrint = document.getElementById("side-print");
+  if (railPrint) {
+    railPrint.addEventListener("click", function () {
+      window.print();
+    });
+  }
+
   window.addEventListener("hashchange", route);
   route();
+  fillRail();
 })();
