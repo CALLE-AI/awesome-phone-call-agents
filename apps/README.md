@@ -11,6 +11,7 @@ Current apps:
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`typescript/clarity`](typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
+| [`typescript/fraud-ops-caller`](typescript/fraud-ops-caller/) | TypeScript / Next.js | Pack-fired fraud-ops desk: KYC, evidence, collections, and merchant intents with a stub dial by default, masked plan destinations, and live CALL-E gated by env + confirm phrase. |
 | [`python/audition-agent`](python/audition-agent/) | Python / React | Catalog and setup guide for producer-reviewed CALL-E role-disclosure callbacks, with upstream source and no-call verification. |
 | [`typescript/e-mploye-for-calle`](typescript/e-mploye-for-calle/) | TypeScript | Human-approved virtual employee for appointment, lead follow-up, and shift coordination workflows, with a fake-only public mode and opt-in CALL-E SDK integration. |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
