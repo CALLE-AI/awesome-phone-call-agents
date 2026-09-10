@@ -130,7 +130,10 @@ function placeCallsForSelectedRows() {
     }
     sheet.getRange(r, statusCol).setValue("CLEARED");
     sheet.getRange(r, outcomeCol).setValue(`${body.status} — ${body.summary || body.error || ""}`);
-    sheet.getRange(r, hashCol).setValue(body.callId || "");
+    // The real hash from the shared, hash-chained audit log (api/audit.py) — not the
+    // CALL-E call id. Shown truncated; CallGuardian > Verify audit log recomputes and
+    // checks the full chain, this is just a visible fingerprint per row.
+    sheet.getRange(r, hashCol).setValue(body.auditHash ? body.auditHash.slice(0, 16) + "…" : "");
     if (body.optOutDetected) {
       sheet.getRange(r, suppressedCol).setValue("TRUE");
     }
