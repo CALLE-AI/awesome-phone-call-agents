@@ -36,6 +36,7 @@ export async function GET() {
       connection: connection ? publicConnection(connection) : null,
       calleConnection: calleConnection ? publicConnection(calleConnection) : null,
       calleCredentialSource: calleConnection ? "saved" : String(process.env.CALLE_API_KEY || "").trim() ? "environment" : "missing",
+      liveCallsEnabled: process.env.CALLE_LIVE_CALLS_ENABLED === "true",
       bindings: bindings.map(publicBinding),
       credentialStorageReady: (process.env.INTEGRATION_ENCRYPTION_KEY || "").length >= 24,
     });

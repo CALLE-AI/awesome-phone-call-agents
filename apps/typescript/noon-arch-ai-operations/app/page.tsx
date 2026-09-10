@@ -21,7 +21,7 @@ type ClickUpPreviewRecord = { taskId: string; taskName: string; taskUrl?: string
 type ClickUpPreviewResponse = { records?: ClickUpPreviewRecord[]; autoLoad?: boolean; excludedCompleted?: number; needsSchedulingCount?: number; availableSlotCount?: number; warnings?: string[]; binding?: { sourceName?: string } };
 type ProviderBalance = { available: boolean; remainingCalls?: number; displayValue?: string; reason?: string; dashboardUrl: string; checkedAgainst?: string };
 type Usage = { appSubmittedCalls: number; providerBalance: ProviderBalance | null };
-type IntegrationSetupOverview = { calleConnection?: { status: string } | null; calleCredentialSource?: "saved" | "environment" | "missing" };
+type IntegrationSetupOverview = { calleConnection?: { status: string } | null; calleCredentialSource?: "saved" | "environment" | "missing"; liveCallsEnabled?: boolean };
 
 const viewTitles: Record<View, string> = { call: "مكالمة جديدة", requests: "الطلبات", contacts: "جهات الاتصال", history: "سجل المكالمات", settings: "الإعدادات والتكاملات" };
 const serviceConfig: Record<ServiceKey, { title: string; short: string; subjectLabel: string; itemsLabel: string; goal: string; recipientLabel: string; affiliationLabel: string; affiliationPlaceholder: string }> = {
@@ -180,6 +180,7 @@ export default function Home() {
   const [selectedCall, setSelectedCall] = useState<number | null>(null);
   const [usage, setUsage] = useState<Usage>({ appSubmittedCalls: 0, providerBalance: null });
   const [setupNeedsAttention, setSetupNeedsAttention] = useState<boolean | null>(null);
+  const [liveCallsEnabled, setLiveCallsEnabled] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultAppSettings);
   const [writebackBusy, setWritebackBusy] = useState<number | null>(null);
   const [clickUpLoading, setClickUpLoading] = useState<ServiceKey | null>(null);
@@ -209,7 +210,10 @@ export default function Home() {
       }).catch(() => setMessage(t("تعذر تحميل البيانات المحفوظة.")));
     loadHistory();
     void fetchJson<IntegrationSetupOverview>("/api/integrations")
-      .then((data) => setSetupNeedsAttention(data.calleCredentialSource === "missing" || data.calleConnection?.status === "error"))
+      .then((data) => {
+        setSetupNeedsAttention(data.calleCredentialSource === "missing" || data.calleConnection?.status === "error");
+        setLiveCallsEnabled(data.liveCallsEnabled === true);
+      })
       .catch(() => setSetupNeedsAttention(null));
   // Data loading is independent of the display language; labels update reactively.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -521,7 +525,7 @@ export default function Home() {
     </aside>
 
     <section className="workspace">
-      <header className="topbar"><div><p className="eyebrow">{t(appSettings.assistantName)}</p><h1>{t(viewTitles[activeView])}</h1></div><div className="topbar-actions"><button type="button" className="language-toggle" onClick={() => { toggleLanguage(); setMessage(""); }} aria-label={t("لغة الواجهة")} title={t("غيّر لغة الواجهة فقط؛ لغة المكالمة مستقلة في الإعدادات.")}><span aria-hidden="true">文</span>{language === "ar" ? "English" : "العربية"}</button><div className="simulation"><span /> {t("الاتصال المباشر مفعل")}</div></div></header>
+      <header className="topbar"><div><p className="eyebrow">{t(appSettings.assistantName)}</p><h1>{t(viewTitles[activeView])}</h1></div><div className="topbar-actions"><button type="button" className="language-toggle" onClick={() => { toggleLanguage(); setMessage(""); }} aria-label={t("لغة الواجهة")} title={t("غيّر لغة الواجهة فقط؛ لغة المكالمة مستقلة في الإعدادات.")}><span aria-hidden="true">文</span>{language === "ar" ? "English" : "العربية"}</button><div className={`simulation ${liveCallsEnabled ? "" : "disabled"}`}><span /> {t(liveCallsEnabled ? "الاتصال المباشر مفعل" : "الاتصال المباشر متوقف")}</div></div></header>
       <CalleUsageCard usage={usage} mobile/>
 
       {activeView === "call" && <>

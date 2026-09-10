@@ -22,6 +22,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
 .language-toggle span{font-size:1rem;line-height:1}
 .simulation{font-size:.8125rem}
 .simulation span{margin:0;margin-inline-end:6px}
+.simulation.disabled{background:#f1f2ef;color:#59645e;border-color:#d9dfda}
+.simulation.disabled span{background:#87928c}
 .service-tabs button{min-height:78px;padding:15px}
 .service-tabs button span{font-size:.75rem}
 .service-tabs button strong{font-size:.875rem;line-height:1.45}

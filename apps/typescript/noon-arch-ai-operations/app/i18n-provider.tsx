@@ -112,6 +112,7 @@ const english: Record<string, string> = {
   "اربط CALL-E واختبره دون مكالمة قبل الاستخدام.": "Connect CALL-E and test it without calling before use.",
   "فتح دليل الإعداد": "Open setup guide",
   "الاتصال المباشر مفعل": "Live calling enabled",
+  "الاتصال المباشر متوقف": "Live calling disabled",
   "لغة الواجهة": "Interface language",
   "غيّر لغة الواجهة فقط؛ لغة المكالمة مستقلة في الإعدادات.": "Changes the interface only; call language is configured separately.",
   "اختر خدمة الاتصال": "Choose a calling service",

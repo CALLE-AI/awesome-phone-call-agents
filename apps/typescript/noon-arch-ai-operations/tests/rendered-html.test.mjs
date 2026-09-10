@@ -47,12 +47,14 @@ test("server enforces manual confirmation and duplicate protection", async () =>
 });
 
 test("CALL-E credentials are configurable, encrypted, and tested without a phone call", async () => {
-  const [store, calleClient, calleRoute, calls, panel] = await Promise.all([
+  const [store, calleClient, calleRoute, calls, panel, integrationsRoute, page] = await Promise.all([
     readFile(new URL("../lib/integrations/store.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/integrations/calle.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/integrations/calle/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/calls/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/integrations-panel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/integrations/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(store, /saveCalleConnection/);
   assert.match(store, /encryptCredential\(apiKey/);
@@ -66,6 +68,8 @@ test("CALL-E credentials are configurable, encrypted, and tested without a phone
   assert.match(panel, /type="password"/);
   assert.match(calls, /getCalleApiKey/);
   assert.doesNotMatch(calls, /process\.env\.CALLE_API_KEY/);
+  assert.match(integrationsRoute, /liveCallsEnabled: process\.env\.CALLE_LIVE_CALLS_ENABLED === "true"/);
+  assert.match(page, /liveCallsEnabled \? "الاتصال المباشر مفعل" : "الاتصال المباشر متوقف"/);
   const output = ts.transpileModule(calleClient, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
   const calle = await import("data:text/javascript;base64," + Buffer.from(output).toString("base64"));
   assert.equal(calle.calleErrorDetails(401, {}).code, "invalid_api_key");
