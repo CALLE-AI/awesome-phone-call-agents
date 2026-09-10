@@ -1,0 +1,6 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {normalizeProvider,requestCall} from '../lib/provider.ts';
+import {fixtureExtraction} from '../lib/fixtures.ts';
+test('malformed terminal transcript becomes explicit unresolved result',()=>{for(const attempts of [null,{},[null],[{transcript_turns:{}}],[{transcript_turns:[null]}]]){const r=normalizeProvider({status:'completed',recipients:[{attempts,structured_result:fixtureExtraction}]},'Venue');assert.ok(r.issues.some(x=>x.includes('No transcript')));assert.ok(r.requirements.every(x=>x.effective==='unknown'))}});
+test('provider create does not retry after ambiguous network failure',async()=>{const original=globalThis.fetch;let count=0;globalThis.fetch=async()=>{count++;throw new Error('timeout')};try{await assert.rejects(requestCall('test-key',{},'stable'));assert.equal(count,1)}finally{globalThis.fetch=original}});
+test('status response must belong to requested call',async()=>{const {fetchCall}=await import('../lib/provider.ts');const original=globalThis.fetch;globalThis.fetch=async()=>Response.json({id:'call_other',status:'completed'});try{await assert.rejects(fetchCall('test-key','call_requested'),/identifier mismatch/)}finally{globalThis.fetch=original}});

@@ -168,6 +168,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
