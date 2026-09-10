@@ -203,11 +203,25 @@ function wireScene() {
     syncPauseControl(b, members);
   });
 
-  const hero = groups.get('hero');
-  // Off the first frame after boot rather than from boot itself, so a scene cannot lengthen
-  // the task that boots the page. The long-task ceiling here is 50ms.
-  if (hero) requestAnimationFrame(() => run(hero));
-  groups.delete('hero');
+  /* The hero starts on the same terms as the other two, and it did not used to.
+   *
+   * It was run off the first frame after boot, on the argument that a reader who has not
+   * scrolled is already looking at it. That argument stopped being true. wireOffscreen
+   * stops any player less than 40% visible, and it runs its first callback in the same
+   * frame this one schedules, so whichever landed second decided the outcome. Measured at
+   * 1440x900: the register's top is 869px down a 900px viewport and it is 472px tall, so
+   * 6.7% of it is on screen at load. It was 21% before the first screen grew a stat band,
+   * which is still under the threshold. The scene was started and immediately stopped, and
+   * `groups.delete('hero')` then took it out of the set the observer below watches, so it
+   * could never start again: scrolling the register to the middle of the screen and waiting
+   * twelve seconds left it settled. The one call this page is built around had never played
+   * for anybody, on any viewport, and the light, the breath and the whole field-versus-ink
+   * system the stylesheet is built on were arguments a reader was never shown.
+   *
+   * Falling through to the observer fixes it with a deletion rather than an addition, and
+   * it is also what the comment above this function already claims happens: a scene that
+   * finished before the reader arrived would be worse than no scene. That is as true of the
+   * hero as of the other two now that the first screen is taller than the fold. */
   if (!groups.size) return;
 
   /* Once each. A scene that replayed every time it came back into view would be an
@@ -626,11 +640,237 @@ function boot() {
   startScroll();
   wireScrubbed();
   wireReveal();
+  wireFirstScreen();
+  wireStagger();
   document.documentElement.dataset.ready = 'true';
+  wireCounts();
   wireScene();
   wireEndings();
+  wireCallscope();
 }
 
+
+/* ---- the first screen's recordings ----------------------------------------------------
+ *
+ * The instrument on the first screen draws two real calls on one axis of seconds and marks
+ * the moment each structured field was answered. Until now a reader could see that S-4105
+ * ran longer and came back emptier, and could not hear it. The recordings were on the page
+ * the whole time, nine screens down.
+ *
+ * Pressing a lane's button stops the ambient sweep, settles every mark to its final frame
+ * and drives the read-head from `audio.currentTime` instead, so the head crosses the axis
+ * at the recording's own speed against the same ticks. The lane you are not listening to
+ * dims. Nothing here is required for the figure to make its argument: with the script
+ * dead, with `AUDIO` null because the build had no clips, or with reduced motion asked
+ * for, the frame is the settled one and every verdict is already on it.
+ *
+ * One element for the whole figure, not one per lane. Two recordings playing over each
+ * other on a single time axis is not a comparison, it is noise. */
+function wireCallscope() {
+  const fig = document.querySelector('.callscope');
+  if (!fig || !AUDIO) return;
+  const buttons = [...fig.querySelectorAll('[data-csc-play]')];
+  if (!buttons.length) return;
+
+  const head = fig.querySelector('.csc-head');
+  const span = Number(fig.dataset.cscSpan || 0);
+  const travel = Number(fig.dataset.cscTravel || 0);
+  if (!head || !span || !travel) return;
+
+  const audio = new Audio();
+  audio.preload = 'none';
+  let current = null;
+  let frame = 0;
+
+  /* The head is positioned in the SVG's own user units, and the viewBox scales those to
+   * whatever width the figure got. Setting the transform in user units means the sync
+   * holds at every width without reading a single laid-out pixel. */
+  const place = (t) => {
+    const x = Math.max(0, Math.min(1, t / span)) * travel;
+    head.setAttribute('transform', `translate(${x.toFixed(2)} 0)`);
+  };
+
+  const stop = (settle) => {
+    cancelAnimationFrame(frame);
+    audio.pause();
+    fig.classList.remove('csc-live');
+    head.removeAttribute('transform');
+    fig.querySelectorAll('[data-csc-on]').forEach((g) => g.removeAttribute('data-csc-on'));
+    buttons.forEach((b) => {
+      b.setAttribute('aria-pressed', 'false');
+      const label = b.querySelector('[data-play-label]');
+      if (label) label.textContent = b.dataset.wordsPlay;
+      b.setAttribute('aria-label', b.dataset.wordsPlay);
+    });
+    current = settle ? null : current;
+  };
+
+  const tick = () => {
+    place(audio.currentTime);
+    if (!audio.paused) frame = requestAnimationFrame(tick);
+  };
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.cscPlay;
+      if (current === id && !audio.paused) { stop(true); return; }
+      stop(true);
+      current = id;
+      const lane = fig.querySelector(`[data-csc-lane="${id}"]`);
+      if (lane) lane.setAttribute('data-csc-on', '');
+      fig.classList.add('csc-live');
+      btn.setAttribute('aria-pressed', 'true');
+      const label = btn.querySelector('[data-play-label]');
+      if (label) label.textContent = btn.dataset.wordsPause;
+      btn.setAttribute('aria-label', btn.dataset.wordsPause);
+      audio.src = `${AUDIO}/${id}.m4a`;
+      place(0);
+      /* A blocked or missing recording must not leave the figure in the live state with a
+       * head parked at zero, which reads as a call that produced nothing. */
+      audio.play().then(() => { frame = requestAnimationFrame(tick); })
+           .catch(() => stop(true));
+    });
+  });
+
+  audio.addEventListener('ended', () => stop(true));
+}
+
+
+/* ---- the first screen, and the groups below it ----------------------------------------
+ *
+ * wireReveal above gives one entrance to each act, fired on scroll. Two things it cannot
+ * do, and both of them are on the screen a judge actually sees:
+ *
+ *   the first screen never scrolls, so it never entered. The masthead, the sentence and
+ *   the four measured numbers were painted finished. They are the argument, and they
+ *   arrived looking like they had always been there.
+ *
+ *   a group entered as one block. Four stat cells, three path steps and a register of
+ *   rows each faded as a single rectangle, which reads as a slide rather than as a set of
+ *   things. 55ms between members is the difference.
+ *
+ * Both respect the same rules as the entrance they extend: transform and opacity only, one
+ * class, never re-fired, and both are skipped whole when the reader has asked for less. */
+
+const STAGGER_GROUPS = ['.topline li', '.path-steps > *', '.stat-grid > *'];
+const STAGGER_CAP = 6;   /* see --stagger in page.css: a long group must not queue */
+
+function stage(el, i) {
+  el.style.setProperty('--reveal-i', String(Math.min(i, STAGGER_CAP)));
+  el.setAttribute('data-reveal', '');
+}
+
+/* The first screen enters on load rather than on scroll, because it is already on screen
+ * and an IntersectionObserver would fire for all of it in the same frame, which is the
+ * block entrance this is replacing. Two frames of delay so the class lands after the
+ * browser has painted the starting state; one frame is not reliably enough for that. */
+function wireFirstScreen() {
+  const head = document.querySelector('.masthead');
+  if (!head) return;
+  const members = [
+    head.querySelector('.wordmark'),
+    head.querySelector('.standfirst'),
+    ...head.querySelectorAll('.topline li'),
+  ].filter(Boolean);
+  if (!members.length) return;
+  if (REDUCED) { members.forEach((el) => el.classList.add('shown')); return; }
+  members.forEach(stage);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    members.forEach((el) => el.classList.add('shown'));
+  }));
+}
+
+function wireStagger() {
+  const groups = document.querySelectorAll(STAGGER_GROUPS.join(','));
+  if (!groups.length) return;
+  /* Members inside the masthead are owned by wireFirstScreen and are skipped here, or the
+   * four numbers would be staged twice and the second pass would reset the index. */
+  const targets = [...groups].filter((el) => !el.closest('.masthead'));
+  if (!targets.length) return;
+  if (REDUCED || !DESKTOP) { targets.forEach((el) => el.classList.add('shown')); return; }
+
+  const seen = new Map();
+  for (const el of targets) {
+    const key = el.parentElement;
+    const i = seen.get(key) || 0;
+    seen.set(key, i + 1);
+    stage(el, i);
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('shown');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -12% 0px' });
+  targets.forEach((el) => io.observe(el));
+}
+
+/* ---- the numbers ----------------------------------------------------------------------
+ *
+ * Four measured numbers sit on the first screen and they are the reason the page exists.
+ * A number that counts up is read; a number that is printed is scanned past.
+ *
+ * It costs nothing in layout, and the reason is worth stating because the obvious
+ * implementation does: counting 0, 1, ... 12 renders one character and then two, the box
+ * grows by a digit, and every line under it moves. This page has a 0.001 shift budget.
+ * So each frame is zero-padded to the character count of the final string and .topline b
+ * already sets tabular-nums, which makes every intermediate frame exactly as wide as the
+ * last one. The width is never measured and never locked, so a webfont landing mid-count
+ * cannot strand a pixel value either.
+ *
+ * Only the digits move. A currency mark, a decimal point and any trailing text are held
+ * from the final string, so $0.05 counts through $0.01 and never through a bare 5. */
+const COUNT_MS = 900;   /* one read of a four-number line, and it is over before a scroll */
+
+function countUp(el) {
+  const final = el.textContent.trim();
+  const m = final.match(/^(\D*)(\d[\d,]*)(?:([.,])(\d+))?(\D*)$/);
+  if (!m) return;
+  const [, pre, intRaw, sep, frac, post] = m;
+  const intDigits = intRaw.replace(/,/g, '');
+  const grouped = intRaw.includes(',');
+  const target = Number(intDigits + (frac || ''));
+  if (!Number.isFinite(target) || target <= 0) return;
+  const width = intDigits.length;
+
+  const render = (v) => {
+    let s = String(v).padStart(width + (frac ? frac.length : 0), '0');
+    let head = frac ? s.slice(0, s.length - frac.length) : s;
+    const tail = frac ? s.slice(s.length - frac.length) : '';
+    head = head.padStart(width, '0');
+    if (grouped) head = head.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return pre + head + (frac ? sep + tail : '') + post;
+  };
+
+  const t0 = performance.now();
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / COUNT_MS);
+    /* easeOutCubic, the same curve --ease-reveal names, so the count lands with the
+     * entrance it is riding in on rather than against it. */
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = render(Math.max(1, Math.round(target * eased)));
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = final;
+  };
+  requestAnimationFrame(step);
+}
+
+function wireCounts() {
+  const nums = document.querySelectorAll('.topline b');
+  if (!nums.length || REDUCED) return;
+  /* Held until the entrance has started, so the first frame a reader sees is the real
+   * number fading in rather than a zero that was never true. */
+  setTimeout(() => nums.forEach(countUp), 220);
+}
+
+/* Dispatched from the very bottom of this file, and it has to be.
+ *
+ * boot() reaches the const bindings the sections below it declare. A const is hoisted into
+ * scope but not initialised until its own line runs, so with this block in the middle the
+ * first call threw `Cannot access 'STAGGER_CAP' before initialization` and every wiring
+ * after it, the whole page's behaviour, silently did not happen. The page still rendered,
+ * which is what made it worth a comment: nothing about the paint said the script had died. */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot, { once: true });
 } else {

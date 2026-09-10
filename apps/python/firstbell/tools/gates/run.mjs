@@ -43,7 +43,14 @@ const ACTS = ["act-00", "act-01", "act-02", "act-03", "act-04",
 // Typekit carries the webfonts, and a font swap was the entire cause of this page's layout
 // shift once already. A loss gate that only covered one of them would have missed it.
 const CDN_HOSTS = ["cdn.jsdelivr.net", "use.typekit.net", "p.typekit.net"];
-const WEIGHT_CEILING_KB = 120;
+// Nothing in CALL-E's rules sets a page budget; this number is ours, and for a while it
+// was making the decisions. At 96.9 KB against 120 there was 23 KB of headroom, and the
+// next thing the first screen needed was audio playback for the two recordings the
+// instrument draws. A self-set ceiling that forbids the one interaction a reviewer of a
+// phone-call agent would want to try is measuring the wrong thing: it was written to stop
+// the page bloating, not to stop it working. It stays as a reported measurement and as a
+// regression alarm, at a number that leaves room to build.
+const WEIGHT_CEILING_KB = 160;
 
 const CHROME_CANDIDATES = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -494,42 +501,50 @@ async function gateFigure(browser, url) {
   page.on("requestfailed", (r) => refused.push("request failed: " + r.url().slice(-70)));
   await page.goto(url, { waitUntil: "networkidle0" });
 
-  const has = await page.$("[data-lottie]");
-  if (!has) {
-    record("animated figure", "COULD-NOT-MEASURE",
-           "the page carries no [data-lottie], so this checkout built without the figure");
+  const fig = await page.$(".endings-fig");
+  if (!fig) {
+    record("animated figure", "FAIL", "the page carries no .endings-fig");
     await page.close();
     return;
   }
 
   const before = await figureBoxes(page);
   await page.evaluate(() => document.querySelector(".endings-fig").scrollIntoView());
-  await new Promise((r) => setTimeout(r, 2200));
+  await new Promise((r) => setTimeout(r, 1200));
   const after = await figureBoxes(page);
 
-  const stage = await page.$(".fig-stage");
-  const frameA = await stage.screenshot({ encoding: "base64" });
+  const frameA = await fig.screenshot({ encoding: "base64" });
   await new Promise((r) => setTimeout(r, 800));
-  const frameB = await stage.screenshot({ encoding: "base64" });
+  const frameB = await fig.screenshot({ encoding: "base64" });
   await page.close();
 
-  const moving = frameA !== frameB;
-  const grew = ["fig", "stage", "key"].filter((k) => Math.abs(after[k] - before[k]) > 1);
   const problems = [];
-  if (!after.mounted) problems.push("the player never mounted");
-  if (!moving) problems.push("two frames 800ms apart are identical, so nothing is playing");
-  if (after.mounted && !after.stillHidden) problems.push("the still is still in the layout");
+  // The old figure was a Lottie, and this gate asked whether its player had mounted and
+  // whether its still had been hidden. Both were true of a drawing that was two grey
+  // rectangles in an empty box: the questions were about the machinery, so the machinery
+  // is what stayed green. These ask about the drawing. Three glyphs, one of them the
+  // accent, text a reader can select, and something moving.
+  if (after.glyphs !== 3) problems.push(`${after.glyphs} glyphs, expected 3`);
+  if (!after.focal) problems.push("no ending is marked as the one that does not close");
+  if (after.words < 30) problems.push(`only ${after.words} words of real text in the figure`);
+  if (!after.marks) problems.push("the figure carries no travelling mark");
+  if (frameA === frameB) {
+    problems.push("two frames 800ms apart are identical, so nothing is playing");
+  }
+  const grew = ["fig", "svg"].filter((k) => Math.abs(after[k] - before[k]) > 1);
   if (grew.length) problems.push("these boxes changed size: " + grew.map(
     (k) => `${k} ${before[k]} to ${after[k]}px`).join(", "));
+  if (after.scripts) problems.push(`the figure still pulls ${after.scripts}`);
   if (refused.length) problems.push(refused.join("; "));
 
   if (problems.length) {
     record("animated figure", "FAIL", problems.join(". "));
   } else {
     record("animated figure", "PASS",
-           `the figure plays: mounted, the still is out of the layout, two frames 800ms ` +
-           `apart differ, and the figure, stage and key are unchanged at ` +
-           `${after.fig}/${after.stage}/${after.key}px. Nothing refused`);
+           `the figure draws 3 glyphs and ${after.words} words of selectable text, one ` +
+           `ending is marked as the one that does not close, ${after.marks} marks travel ` +
+           `it, two frames 800ms apart differ, and the figure and its svg are unchanged ` +
+           `at ${after.fig}/${after.svg}px. No player, no request, nothing refused`);
   }
 }
 
@@ -539,12 +554,17 @@ function figureBoxes(page) {
       const el = document.querySelector(sel);
       return el ? +el.getBoundingClientRect().height.toFixed(1) : -1;
     };
-    const stage = document.querySelector(".fig-stage");
-    const still = stage && stage.querySelector(":scope > svg");
+    const fig = document.querySelector(".endings-fig");
+    const text = fig ? [...fig.querySelectorAll("svg text")]
+      .map((t) => t.textContent).join(" ") : "";
     return {
-      fig: h(".endings-fig"), stage: h(".fig-stage"), key: h(".fig-key"),
-      mounted: !!(stage && stage.querySelector(".fig-anim")),
-      stillHidden: !!(still && still.hasAttribute("hidden")),
+      fig: h(".endings-fig"), svg: h(".endings-fig__svg"),
+      glyphs: fig ? fig.querySelectorAll(".cs-glyph").length : -1,
+      focal: !!(fig && fig.querySelector(".cs-end-row--focal")),
+      marks: fig ? fig.querySelectorAll(".en-run").length : 0,
+      words: text.trim().split(/\s+/).filter(Boolean).length,
+      scripts: [...document.scripts].map((s) => s.src)
+        .filter((s) => /lottie|figure/.test(s)).join(", "),
     };
   });
 }
@@ -940,9 +960,19 @@ const CONTRAST_PROBE = () => {
     // colour of whatever is covering the element: light text on a dark band came back as
     // light on light, ratio exactly 1.00, for every one of them. Walk the ancestors
     // instead, and say so when even that finds nothing.
+    //
+    // The walk starts AT the element, not behind it. It used to start at start + 1, which
+    // drops the element's own background, and an element that paints the ground its own
+    // text sits on is then measured against whatever is behind it instead. That is right
+    // for the common case, a span on a parent that carries the colour, and wrong whenever
+    // the two are the same box: the money cell paints --brand-field and prints
+    // --lit-ink-3 directly inside it, which is 5.43, and this reported 2.13 by reading
+    // the graphite plate two levels up. The failure direction is not safe either way. It
+    // under-reports dark text on a light cell over a dark ground, and it would just as
+    // happily over-report the reverse and pass something unreadable.
     const behind = start >= 0
-      ? stack.slice(start + 1)
-      : (() => { const up = []; for (let n = el.parentElement; n; n = n.parentElement) up.push(n); return up; })();
+      ? stack.slice(start)
+      : (() => { const up = []; for (let n = el; n; n = n.parentElement) up.push(n); return up; })();
     let acc = null;
     for (const node of behind) {
       const c = paint(getComputedStyle(node).backgroundColor);
@@ -2244,8 +2274,21 @@ async function gateReplayControls(browser, url) {
     return;
   }
 
-  /* Every one of them says "again", so every one of them is a claim about the past. */
-  const early = atLoad.controls.filter((c) => c.group !== "hero" && !c.hidden);
+  /* Every one of them says "again", so every one of them is a claim about the past.
+   *
+   * The hero used to be exempt from this line and was checked by the opposite rule below:
+   * it had to be VISIBLE at load, because the hero scene started itself a frame after boot.
+   * It no longer does, and it never really did. wireOffscreen stops any player under 40%
+   * visible and fires its first callback in the same frame the boot start was scheduled in,
+   * and the register is 6.7% visible at 1440x900, so the scene was started and stopped in
+   * the same frame and then removed from the set that could restart it. The control was
+   * revealed by a scene that had not played, which is the exact defect the rest of this
+   * gate exists to catch, and the hero was the one scene exempted from the check.
+   *
+   * So the exemption comes off rather than the rule bending. All three controls are now
+   * held to one rule: hidden before the scene runs, visible after the scroll that runs it.
+   * The after-scroll half below is unchanged and is what proves the hero still appears. */
+  const early = atLoad.controls.filter((c) => !c.hidden);
   if (early.length) {
     await page.close();
     record("replay controls", "FAIL",
@@ -2253,15 +2296,6 @@ async function gateReplayControls(browser, url) {
       + `starting with the ${early[0].group} scene reading `
       + `${JSON.stringify(early[0].words)}. Nothing has scrolled yet, so that scene has `
       + "not played and the control is offering to repeat something that has not happened");
-    return;
-  }
-
-  const heroControl = atLoad.controls.find((c) => c.group === "hero");
-  if (heroControl && heroControl.hidden) {
-    await page.close();
-    record("replay controls", "FAIL",
-      "the hero scene starts itself a frame after boot and its replay control is still "
-      + "hidden, so the one scene that has played cannot be played again");
     return;
   }
 
@@ -2295,9 +2329,9 @@ async function gateReplayControls(browser, url) {
   record("replay controls", "PASS",
     `${atLoad.controls.length} replay control(s), each naming its own scene: `
     + atLoad.controls.map((c) => `${c.group} ${JSON.stringify(c.words)}`).join(", ")
-    + `. At 900x420 before any scroll, ${atLoad.controls.length - 1} of them were hidden `
-    + "and the hero's was not, and all of them are offered once their scene has run. No "
-    + "control offers to repeat something the reader has not seen",
+    + `. At 900x420 before any scroll, all ${atLoad.controls.length} were hidden, and all `
+    + "of them are offered once their scene has run. No control offers to repeat something "
+    + "the reader has not seen",
     { controls: atLoad.controls.length });
 }
 

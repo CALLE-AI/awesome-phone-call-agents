@@ -1093,25 +1093,25 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 805 tests collected
+python -m pytest tests/ -q          # 808 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**805 is the number collected, and two different pairs add up to it.** Some of these gates
+**808 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the twelve call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **768 passed, 37
+A clean checkout of this commit into an empty directory reports **771 passed, 37
 skipped**. The thirty-seven name what is missing rather than passing quietly:
 thirty-two want a built page, four of those thirty-two also wanting its
 Content-Security-Policy, three want a gate report, one wants the call receipts, which are
 not in this tree, and one is a run whose rows are all of one kind, so the ordering it would
 check proves nothing. Build the page and run the gates and
-the same suite reports **803 passed, 2 skipped**. Both pairs are measured, both add up to
-805, and the difference between them is what a reader has on their disk.
+the same suite reports **806 passed, 2 skipped**. Both pairs are measured, both add up to
+808, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 767 and 38.
+The very first run in a fresh clone reports one more skip and one fewer pass, 770 and 38.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on

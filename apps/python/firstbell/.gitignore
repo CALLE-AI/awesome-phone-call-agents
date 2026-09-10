@@ -35,3 +35,6 @@ profile-claim.lock
 *.egg-info/
 build/
 dist/
+
+# Debug screenshots from the browser probes. Scratch, never shipped.
+.probe/

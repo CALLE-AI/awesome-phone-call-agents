@@ -1,0 +1,151 @@
+/* ---- callscope ---------------------------------------------------------------------------
+ *
+ * The first-screen instrument: two real calls on one axis of real seconds. The geometry,
+ * the keyframes and the per-mark transform origins are generated in tools/site/callscope.py
+ * from transcripts.json. Nothing about the shape of it is decided here. This file sets the
+ * type, the ink and the strokes, and it owns exactly one behavioural rule: the width floor
+ * below which the frame scrolls instead of shrinking.
+ *
+ * Colour comes from the page's own tokens rather than from values chosen here, so the
+ * instrument follows the ground it is printed on. There are three inks in the drawing and
+ * they each mean one thing: --ink for a fact the call established, --ink-4 for the call
+ * itself (the envelope, the turn marks, the empty rails) and --brand-field for the one
+ * quantity the page is asking to be believed on. A fourth ink would be a fourth meaning and
+ * there are only three.
+ */
+
+/* A step above and a step below, so the figure is an object on the screen rather
+ * than a band the eyebrow under it runs straight into. */
+.callscope { margin: var(--space-5) 0 var(--space-6); }
+
+/* The one sentence above the drawing. It is not a caption: a caption explains a figure
+ * after the fact and this says what the figure is for, in front of it, at a size a reader
+ * cannot skip. Everything under it is the evidence for this line. */
+.csc-headline {
+  font-family: var(--ui); font-size: var(--size-6); line-height: 1.38;
+  color: var(--ink); max-width: var(--measure-ui); margin: 0 0 var(--space-4);
+}
+
+/* A 1000-unit frame squeezed into a 358px phone renders its 11px mono field names at
+ * 3.9px, which is a picture of a field name rather than a field name. Below 60rem the
+ * frame keeps a floor and this scrolls, the same treatment and the same reason as every
+ * wide table on this page: a scroll container nobody can reach with a keyboard is a column
+ * nobody can read. WCAG 2.1.1, which is why it is focusable and announced. */
+/* `min-width: 0; max-width: 100%` is not decoration, it is the whole containment.
+ * Without them the frame's own 47rem floor became the document's min-content width
+ * and the page was 772px wide at a 390px viewport: the overflow gate caught it and
+ * named `div.inner`, not this element, because a grid track sized `auto` is floored
+ * by its widest item's min-content and passes that all the way up. The wide tables on
+ * this page carry the same two declarations for the same reason. */
+.csc-scroll {
+  overflow-x: auto; min-width: 0; max-width: 100%;
+  overscroll-behavior-x: contain;
+  /* `contain: inline-size` is the declaration that actually holds the page at 390px, and
+   * the other two are not enough on their own. `min-width: 0` stops this box from being
+   * floored by its own contents; it does not stop the 47rem floor inside it from being
+   * reported upward as a min-content contribution, and an ancestor sized by content picks
+   * that up. Measured before: the document was 772px at a 390px viewport, which is the
+   * 752px floor plus this act's padding, and the overflow gate named `div.inner` because
+   * that is where a content-based size resolved. Size containment makes this box's inline
+   * size independent of what is in it, which is the same mechanism `.scrollbox` uses for
+   * the wide tables and the same reason. */
+  contain: inline-size;
+}
+.csc-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.csc-svg { display: block; width: 100%; min-width: 47rem; height: auto; color: var(--ink); }
+
+/* ---- the axis ---- */
+.csc-tick { stroke: var(--line); stroke-width: 1; }
+.csc-tick-t {
+  font-family: var(--mono); font-size: 11px; fill: var(--ink-4);
+  text-anchor: middle; letter-spacing: 0.02em;
+}
+
+/* ---- the lane head ---- */
+.csc-lane-id {
+  font-family: var(--mono); font-size: 13px; font-weight: 500; fill: var(--ink);
+  letter-spacing: 0.01em;
+}
+.csc-lane-meta { font-family: var(--ui); font-size: 11.5px; fill: var(--ink-3); }
+
+/* ---- the call itself ----
+ * The envelope is the quietest thing in the frame on purpose. It is what a reader looks
+ * past to read the rails, and a waveform drawn at full ink is the most eye-catching mark
+ * on any page it appears on while carrying, here, the least of the argument. */
+.csc-wave rect { fill: var(--ink-4); opacity: 0.42; }
+.csc-turn { stroke-width: 1.4; }
+.csc-turn-bot { stroke: var(--ink-3); }
+.csc-turn-you { stroke: var(--ink); }
+/* Where the call stopped. Dotted, because it is a boundary and not a value. */
+.csc-end { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 1 3; }
+
+/* ---- the field rails ---- */
+.csc-field {
+  font-family: var(--mono); font-size: 11px; fill: var(--ink-3);
+  letter-spacing: -0.01em;
+}
+.csc-rail { stroke: var(--line); stroke-width: 1.5; }
+/* A field with no answer. Dashed the whole way and open at the end: the rail ran the
+ * length of the call and nothing ever landed on it. */
+.csc-rail-none { stroke: var(--line-strong); stroke-dasharray: 3 4; }
+.csc-node-none { fill: var(--paper); stroke: var(--line-strong); stroke-width: 1.5; }
+/* A field the call answered. The fill is an overlay on the empty rail, so the empty rail
+ * is still there underneath and the length that filled is readable against it. */
+.csc-rail-on { stroke: var(--ink); stroke-width: 2.5; }
+.csc-node { fill: var(--brand-field); stroke: var(--ink); stroke-width: 1.5; }
+.csc-val { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.csc-val-none { fill: var(--ink-4); font-style: italic; }
+
+/* ---- what each system filed the call as ----
+ * Two rows, because one row was the defect. A lane that reported only what this software
+ * decided read, to somebody skimming, as this software answering one field out of three:
+ * the abstention looked like the failure rather than the catch. What the figure has to
+ * show is the same call under both systems, and the row where they disagree. */
+.csc-sys { font-family: var(--ui); font-size: 11px; fill: var(--ink-3); }
+.csc-out {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+  letter-spacing: 0.01em; fill: var(--ink);
+}
+.csc-out-note { font-family: var(--ui); font-size: 11.5px; fill: var(--ink-3); }
+/* The disagreement. Struck through where a two-bucket system is wrong, and the one mark
+ * in the frame allowed to use the brand ground, because it is the quantity the page is
+ * asking to be believed on. */
+.csc-out-wrong { fill: var(--ink-3); text-decoration: line-through; }
+.csc-out-ours { fill: var(--ink); }
+.csc-flag {
+  font-family: var(--ui); font-size: 10px; font-weight: 600; fill: var(--ink);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.csc-flag-plate { fill: var(--brand-field); }
+.csc-lane-label {
+  font-family: var(--ui); font-size: 12px; font-weight: 500; fill: var(--ink);
+}
+
+/* ---- the read-head ----
+ * One line and one gradient, both inside a single translated group, so the whole head is
+ * one composited layer and the sweep cannot desynchronise from itself. */
+.csc-head line { stroke: var(--ink); stroke-width: 1.25; opacity: 0.55; }
+.csc-swept { fill: url(#csc-swept); }
+
+.callscope figcaption {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.5;
+  color: var(--ink-3); max-width: var(--measure-ui); margin: var(--space-4) 0 0;
+}
+
+/* The two recordings, offered above the drawing of them.
+ *
+ * `.hear` carries the shape and the icon-swap; only the row that holds them is new. They
+ * sit above the scroller rather than inside the frame because the frame is an SVG at a
+ * fixed viewBox and a control inside it would scale with the drawing: at the narrow end
+ * it would be a four-pixel target. Above it, they are the same size at every width. */
+.csc-controls {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+}
+.csc-hear[aria-pressed="true"] { color: var(--ink); border-color: currentColor; }
+/* The button owns its own state here. The pair of rules above this one keys the icon swap
+ * off an ancestor's `data-playing`, which the lane players set; these two controls are not
+ * inside a player, so they carry the state themselves and `aria-pressed` is already the
+ * attribute saying it. One source, and a screen reader and the icon cannot disagree. */
+.csc-hear[aria-pressed="false"] .i-pause,
+.csc-hear[aria-pressed="true"] .i-play { display: none; }

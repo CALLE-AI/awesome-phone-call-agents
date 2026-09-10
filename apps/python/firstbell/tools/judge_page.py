@@ -1283,63 +1283,31 @@ LEAD_MUTATIONS = {
 def three_endings_figure() -> str:
     """The three words the product turns on, shown once instead of defined three times.
 
-    A reader coming to this page cold, as a school district administrator, listed `resolved`,
-    `undetermined` and `failed` among the words they could not follow, having met all three
-    as a table column. A sentence explaining three outcomes is a paragraph. Three outcomes
-    drawn once is a glance.
+    A reader coming to this page cold, as a school district administrator, listed
+    `resolved`, `undetermined` and `failed` among the words they could not follow, having
+    met all three as a table column. A sentence explaining three outcomes is a paragraph.
+    Three outcomes drawn once is a glance.
 
-    The geometry comes from `tools/make_figure.py`, which authors it as Lottie and exports a
-    still. The words do not: they are HTML beside the drawing rather than text inside it,
-    because text baked into an SVG carries no @font-face, cannot be selected, cannot be
-    found by a page search and is invisible to a translation tool, on a page whose subject is
-    families who do not read English.
+    It was a Lottie until now, and what a reader actually got was two grey rounded
+    rectangles and a hairline in three hundred pixels of empty page, with the words that
+    gave them meaning in a separate HTML list underneath. The drawing carried no content
+    and the list carried all of it, so the figure cost a 45.6 KB player, a CDN, a mounting
+    observer and a still-versus-animation swap to show nothing. Every gate passed the whole
+    time, because each one asked whether the machinery worked rather than whether the
+    figure said anything.
 
-    Returns an empty string when the figure has not been generated, so a checkout that has
-    not run the generator builds a page without it rather than a page with a broken image.
+    Now it is `tools/site/endings.py`: inline SVG and CSS, no script, no asset, no request,
+    and the definitions inside the drawing rather than beside it. It shares
+    `showcase.css` with the act 02 figure, so the closed ring, the half ring and the dashed
+    ring mean the same three things in both, and a reader learns the language once.
+
+    `make_figure.py` is untouched and still runs during the build. The film takes its
+    Lottie, which is what that generator was written for.
     """
-    svg_path = SITE / "figures" / "three-endings.svg"
-    if not svg_path.exists():
-        # Built here rather than committed. A drawing checked into a tree is a drawing
-        # somebody exported once, and this one is derived from the stylesheet's own inks, so
-        # generating it on every build is the only way the figure and the words beside it
-        # cannot disagree. A checkout without python-lottie builds a page without the figure
-        # rather than a page with a hole in it.
-        try:
-            import make_figure
-
-            make_figure.write(svg_path.parent)
-        except Exception:
-            return ""
-    svg = svg_path.read_text(encoding="utf-8")
-    # The generator writes a standalone document. Inline it as a graphic instead, so it
-    # inherits the page's own colours and carries the page's accessible name.
-    svg = re.sub(r"<\?xml[^>]*\?>", "", svg, count=1).strip()
-    svg = svg.replace("<svg ", '<svg role=img aria-label="Three endings: a call comes back '
-                               'resolved, undetermined, or failed." ', 1)
-
-    rows = [
-        ("resolved", "The office has an answer it can act on. The case closes."),
-        ("undetermined", "The call happened and produced nothing usable. A person has to "
-                         "pick it up, and the software says so rather than closing it."),
-        ("failed", "Nobody answered on any number. Nothing happened, and nothing is owed."),
-    ]
-    items = "".join(
-        f'<div class=fig-row><p class="state state-{name}">{name}</p>'
-        f'<p class=fig-say>{esc(text)}</p></div>'
-        for name, text in rows)
-    has_anim = (SITE / "figures" / "three-endings.json").exists()
-    # A marker, not a path. It used to hold the URL the player fetched, and a URL sitting
-    # in an attribute is an invitation to fetch it again.
-    data = ' data-lottie=window' if has_anim else ''
-    # The still lives in a stage that is always present. The animation, when there is
-    # one, is mounted inside that stage rather than inserted as a new child of the
-    # figure: inserting one would shift every sibling's nth-of-type, and the contrast
-    # census keys a text run by its DOM path, so the same six runs were counted once
-    # before the mount and once after and six of them were reported as unmeasurable.
-    return (f'<figure class=endings-fig{data}><div class=fig-stage>{svg}</div>'
-            f'<div class=fig-key>{items}</div>'
-            '<figcaption>Every call this software places comes back as exactly one of these '
-            'three. The third one is the whole argument.</figcaption></figure>')
+    spec = spec_from_file_location("endings", SITE / "endings.py")
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.endings_markup()
 
 
 # The languages this run's roster actually holds, spelled the way a school office would
@@ -1479,6 +1447,63 @@ def topline_markup(run: dict) -> str:
     items = "".join(f'<li><b>{esc(value)}</b> {esc(label)}</li>' for value, label in cells)
     return (f'<ul class=topline aria-label="What this page is built on, measured">'
             f'{items}</ul>')
+
+
+def one_minute_markup(run: dict) -> str:
+    """The whole argument in four cards, for the reader who will not scroll.
+
+    This page is sixteen thousand words. A hackathon judge with two hundred entries, or an
+    investor between meetings, reads the first screen and decides. Everything below that
+    screen is evidence, and evidence nobody reaches is worth nothing. The four numbers on
+    the dateline above say what the page is built on; they do not say what the page is
+    *for*, and a reader who gets 12, 11, 5 and five cents still has to read three acts to
+    find out why any of it matters.
+
+    So: the problem, the fix, what changes in an office, and why the numbers can be
+    believed. Four claims, one link each into the act that proves it. About a hundred
+    words, which is a minute out loud and twenty seconds scanning.
+
+    Nothing here is a new claim. Every card restates something the page already argues and
+    already checks further down, and each one carries the link to that place, so this band
+    can never quietly become the only version of a fact. The two counted values come from
+    the same committed files the dateline divides.
+    """
+    if not run:
+        return ""
+    ran, _skipped = _suite_pair()
+    cards = (
+        ("The problem", "Answered is not the same as answered usefully.",
+         "A call that connects and learns nothing looks exactly like a success. A system "
+         "with two buckets files it with the successes, and the dashboard reports full "
+         "coverage for a child nobody heard about.",
+         "#act-03", "The three endings", False),
+        ("What this does", "Three endings, not two.",
+         "resolved closes the case. failed is retried. undetermined never closes: the "
+         "call happened, it produced nothing usable, and the software says so instead of "
+         "counting it.",
+         "#act-03", "What the third one costs", True),
+        ("What it changes", "The office gets a list, not a percentage.",
+         "An attendance clerk opens a queue ordered worst first: safeguarding, then the "
+         "children nobody reached, then the calls that learned nothing. Every row names "
+         "the person it is waiting on.",
+         "#act-08", "Run it yourself", False),
+        ("Why it holds", f"{ran} tests, and every rule broken on purpose.",
+         "Every number on this page is computed from a recorded run rather than typed. "
+         "Break one of the rules deliberately and a named test fails; the broken rules "
+         "and what caught them are published.",
+         "#act-05", "Every rule, broken", False),
+    )
+    items = "".join(
+        f'<li class="minute-card{" minute-card--focal" if focal else ""}">'
+        f'<p class=minute-eyebrow>{esc(eyebrow)}</p>'
+        f'<p class=minute-claim>{esc(claim)}</p>'
+        f'<p class=minute-say>{esc(say)}</p>'
+        f'<a class=minute-link href="{href}">{esc(cue)}</a>'
+        "</li>"
+        for eyebrow, claim, say, href, cue, focal in cards
+    )
+    return ('<ul class=minute aria-label="The argument in one minute, and where each '
+            f'part is proved">{items}</ul>')
 
 
 def money_facts(run: dict) -> dict:
@@ -1713,6 +1738,24 @@ def money_markup(run: dict) -> str:
         return (f'<a class=money-src href="{esc(figure["url"])}">'
                 f'{esc(figure["publisher"].split(",")[0])}</a>')
 
+    # The provenance is set under the band, not inside the cells.
+    #
+    # A band of three cells is as tall as its longest cell, and the third one carries 140
+    # words about how CALL-E's usage panel was read. Measured at 1440: the band ran 430px
+    # while the first two cells finished after 170, so two thirds of it was empty ruled
+    # ground beside a wall of small print, in the act a buyer opens the page for. It also
+    # put the least skimmable prose on the page in the same object as its three most
+    # skimmable numbers.
+    #
+    # Nothing is hidden and nothing is cut. Each note keeps its figure at the front of it,
+    # so a reader still knows which number it is about, and the notes are set at the UI
+    # measure below the band, which is where every other provenance note on this page is.
+    whys = []
+
+    def why(figure: str, body: str) -> str:
+        whys.append(f'<p class=money-why><span class=money-why-of>{figure}</span>{body}</p>')
+        return ""
+
     return "".join([
         '<div class=money>',
         '<div class=money-row>',
@@ -1720,19 +1763,21 @@ def money_markup(run: dict) -> str:
         '<div class=money-cell>',
         f'<p class=money-n>${f["sis"]["value"]}</p>',
         '<p class=money-what>a year, for the system this would sit beside</p>',
-        f'<p class=money-why>One named district&#8217;s student records bundle, on its own '
-        f'board record, for {esc(f["enrolment"]["value"])} students. '
-        f'<b>${f["per_student"]:,.2f} a student a year.</b> One price on the record, not a '
-        f'market average. {cite(f["sis"])}</p>',
+        why(f'${f["sis"]["value"]} a year',
+            f'One named district&#8217;s student records bundle, on its own '
+            f'board record, for {esc(f["enrolment"]["value"])} students. '
+            f'<b>${f["per_student"]:,.2f} a student a year.</b> One price on the record, '
+            f'not a market average. {cite(f["sis"])}'),
         '</div>',
 
         '<div class=money-cell>',
         f'<p class=money-n>${f["per_absence"]:,.2f}</p>',
         '<p class=money-what>one student, one day, where funding follows attendance</p>',
-        f'<p class=money-why>Texas funds ${f["allotment"]["value"]} per student in average '
-        'daily attendance, over a 175-day year. Seven states funded on attendance as of '
-        '2022. Explaining an absence does not make a student present, so this run claims '
-        f'none of it. {cite(f["allotment"])}</p>',
+        why(f'${f["per_absence"]:,.2f} a student-day',
+            f'Texas funds ${f["allotment"]["value"]} per student in average '
+            'daily attendance, over a 175-day year. Seven states funded on attendance as '
+            'of 2022. Explaining an absence does not make a student present, so this run '
+            f'claims none of it. {cite(f["allotment"])}'),
         '</div>',
 
         '<div class=money-cell>',
@@ -1751,8 +1796,9 @@ def money_markup(run: dict) -> str:
         # Ten rows were read and thirteen is what the total divides into. The card
         # printed the thirteen as though it had been counted, which is an inference
         # dressed as an observation on the surface a judge reads first.
-        f'<p class=money-why>CALL-E publishes no price, so the left figure is what it '
-        f'billed this account: {f["price"]["call_rows_read"]} rows on the usage panel, '
+        why(f'${f["price"]["per_call_usd"]:,.2f} a call',
+            f'CALL-E publishes no price, so the left figure is what it '
+            f'billed this account: {f["price"]["call_rows_read"]} rows on the usage panel, '
         f'every one at ${f["price"]["per_call_usd"]:,.2f}, and a period total of '
         f'${f["price"]["period_total_usd"]:,.2f} over one month that divides by it '
         f'exactly, so {f["price"]["billed_events"]} events were priced the same. That '
@@ -1769,10 +1815,12 @@ def money_markup(run: dict) -> str:
         'is written down in <code>firstbell/scenario.py</code>, which is what lets anybody '
         'reproduce it with one command and also means somebody chose it. The measured '
         'figure is further down this paragraph, over every call this software has '
-        'placed.</p>'
+        'placed.'),
 
         '</div>',
         '</div>',
+        # The three notes, under the band, in the order of the cells above them.
+        f'<div class=money-whys>{"".join(whys)}</div>',
 
         # The numbers a school board asks for, out of the paragraph below.
         #
@@ -2320,6 +2368,25 @@ def showcase_figure() -> str:
             + module.showcase_markup())
 
 
+def callscope_figure(data: dict, lanes: list, headline: str) -> str:
+    """The first-screen instrument, loaded from the asset directory by path.
+
+    Same shape as `showcase_figure` above and for the same reason: the figure is a build
+    step over the evidence, not a template, and keeping the geometry out of this file
+    keeps it next to the comments that justify it.
+
+    It is handed `commit_turns` rather than importing it, because that function is this
+    page's own reading of the transcript and there must be exactly one of it. A figure
+    that marked a field answered at a different instant from the register two screens
+    below it would be two readings of one call, and the difference would be invisible.
+    """
+    spec = spec_from_file_location("callscope", SITE / "callscope.py")
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.callscope_markup(data["calls"], data["fieldOrder"],
+                                   commit_turns, lanes, headline)
+
+
 def page_css() -> str:
     """The whole stylesheet, as one string.
 
@@ -2334,7 +2401,8 @@ def page_css() -> str:
     nothing.
     """
     return ((SITE / "page.css").read_text(encoding="utf-8") + "\n"
-            + (SITE / "showcase.css").read_text(encoding="utf-8"))
+            + (SITE / "showcase.css").read_text(encoding="utf-8") + "\n"
+            + (SITE / "callscope.css").read_text(encoding="utf-8"))
 
 
 def css_for_serving(css: str) -> str:
@@ -2520,8 +2588,53 @@ def build(has_audio: bool, repo_url: str | None = None,
         # shows that happening, on a real call, with the receipt beside it, and a
         # description sitting on top of a demonstration is the page talking over
         # itself. The full statement moves to act 01, next to the numbers behind it.
-        '<p class=standfirst>Absence calls to families, and an escalation for every call that reaches somebody and still learns nothing.</p>',
-        topline_markup(next((d for name, d in recs if name.startswith("06-")), {})),
+        # Measured 2026-09-10 against the entry that won micro1: its whole site was 77
+        # visible words on one screen that never scrolled, and this first screen alone was
+        # 300. A judge gives thirty to sixty seconds, so a first screen that has to be
+        # read scores whatever a skimmed page scores no matter what is proved below it.
+        # The budget is now the metric. What was here -- four counters and four cards of
+        # prose, both of them descriptions -- moves to act 01, and the demonstration those
+        # descriptions were describing comes up here in their place.
+        '<p class=standfirst>firstbell places a school’s morning absence calls through '
+        'CALL-E, and refuses to close the ones that came back empty.</p>',
+        '</div>',
+        # The instrument, directly under the one-minute lane it is the evidence for.
+        #
+        # That lane was four cards of prose. A reader who gave the first screen thirty
+        # seconds left with four counters and none of the argument, because the argument
+        # is not a number: it is that a call can connect, run longer than the one beside
+        # it, and come back with nothing the office can act on. That is a comparison, and
+        # a comparison read as prose is four sentences a reader has to hold at once.
+        # Drawn, it is two rows of rails and the reader is holding nothing.
+        #
+        # The cards stay. They are the same four claims in words, above the drawing that
+        # shows them, for a reader who would rather read and for one whose browser drew
+        # nothing.
+        '<p class=eyebrow>Two real calls. Both reached a parent. Press play on either.</p>',
+        callscope_figure(
+            data,
+            # The verdicts, decided here rather than in the drawing. The two-bucket column
+            # is the rule act 03 states -- close anything that came back schema-valid --
+            # applied to these receipts. Both of these calls came back schema-valid, so it
+            # closes both, and the row where the two systems disagree is the product.
+            [
+                {"id": "S-4101", "label": "the parent knew, and said why",
+                 "two_bucket": "resolved", "two_bucket_note": "case closed",
+                 "ours": "resolved",
+                 "ours_note": "case closed. Three fields the office can act on."},
+                {"id": "S-4105", "label": "the parent did not know",
+                 "two_bucket": "resolved",
+                 "two_bucket_note": "case closed. Reported as a family contacted.",
+                 "ours": "undetermined",
+                 "ours_note": "held open and escalated to a named person."},
+            ],
+            # Three lines of prose sat here saying what the drawing underneath says, on
+            # the screen where the word budget is tightest. One line, and the instrument
+            # does the rest.
+            'Both came back schema-valid. Only one of them found the child.'),
+        # The two links a judge needs are on the first screen, under the thing that
+        # earned the click, rather than above it competing with the demonstration.
+        '<div class=after-minute>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
         '</div>',
@@ -2551,6 +2664,12 @@ def build(has_audio: bool, repo_url: str | None = None,
 
     # ---- Act 1: the residue
     body = [
+        # The counters and the four cards used to open the entry. They are descriptions,
+        # and act 00 now shows the thing they were describing, so they sit here instead:
+        # one screen down, where a reader who scrolled has asked for the summary rather
+        # than been handed it before the argument.
+        topline_markup(next((d for name, d in recs if name.startswith("06-")), {})),
+        one_minute_markup(next((d for name, d in recs if name.startswith("06-")), {})),
         path_markup(),
         '<div class=split><div class=claim>',
         '<div class=act-num>01</div><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
@@ -2695,39 +2814,41 @@ def build(has_audio: bool, repo_url: str | None = None,
     # ---- Act 4: check us
     have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
     body = [
-        '<div class="split split-long"><div class=claim>',
+        # Act 04 is stacked full-width bands, not a diptych, and the money leads.
+        #
+        # Three defects came from the diptych, all of them measured on 2026-09-10 and all
+        # of them the same shape: a full-width band cannot be a row of a grid whose other
+        # rows are sticky. `.split-long > .claim` is `position: sticky`, a sticky grid item
+        # is contained by the grid CONTAINER rather than by its own grid area, so the claim
+        # column's travel range was the whole split (2774px) minus its own height (1249px).
+        # It slid 1,526px down and came to rest sitting on top of the money band, which
+        # spans `grid-column: 1 / -1` in row two. 56 occlusion-verified text-on-text
+        # conflicts at 1280, 1440 and 1920, zero below 60rem where nothing is sticky.
+        #
+        # The second defect was the void the same row produced: row one is sized by the
+        # claim at 1249px, the artifact beside it is 754px and top-aligned, so column two
+        # was blank for 495px. The third was the reading order a buyer meets: the numbers
+        # this act exists to be checked against sat under 1,249px of prose about why call
+        # identifiers are shortened.
+        #
+        # Stacking removes all three at once and needs no sticky rule, no `order` override
+        # at 60rem, and no full-width row inside a two-column grid. It also gives the
+        # twelve-call table the full width it always wanted: the CSS above carries three
+        # separate comments about that table's min-content width fighting a 616px column.
+        '<div class=band>',
         '<div class=act-num>04</div><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
-        '<p>The API returns one identifier and the dashboard is keyed on another. Both are '
+        '<p class=lede>The API returns one identifier and the dashboard is keyed on another. Both are '
         'here, shortened at both ends, alongside the structured answer each call brought '
         'back, so CALL-E can match any row to their own records, which is a source with no '
         'stake in these claims. A reader who is not CALL-E can check the count rather than '
         'the rows: it is committed in <code>evidence/recorded-calls.json</code>, and the '
         'note below says why the identifiers are cut.</p>',
-        '<p class=note>The identifiers are shortened on purpose. A live call id is not a '
-        'credential, because another account&#8217;s key cannot read our call, but it is an '
-        'artifact of a real call to a real number and this repository asks contributors to '
-        'keep those out of what they publish. CALL-E hold the billing records this table '
-        'invites a check against and can match a row from what is shown; the unshortened '
-        'list travels with the submission rather than on a public page.</p>',
-        f'<p>{len(live)} of {len(recs)} committed receipts reached the production API and '
-        f'{have} of {len(call_rows)} calls carry the provider identifier. The rest had it '
-        'recovered afterwards with a <code>GET</code>, which places no call.</p>',
-        '<table class=compliance>'
-        '<caption class=visually-hidden>What this repository holds, and what is held outside it.</caption>'
-        '<tbody>'
-        '<tr><td>transcripts, waveforms, the audio, and the unshortened identifiers</td>'
-        '<td class=dim>not in the repository. On this page'
-        + (' in full' if has_audio else ' without the audio')
-        + ', apart from the identifiers, which are shortened</td></tr>'
-        '<tr><td>the rules those calls produced, and the tests that hold them</td>'
-        '<td class=ok>in the repository</td></tr>'
-        '</tbody></table>',
-        '<p class=note>The maintainer of this list requires committed real-call artifacts '
-        'to be removed, and has said so even where the people on the call were team members '
-        'playing a part on reserved numbers, which describes these calls exactly. So the '
-        'recordings live here, the reasoning lives there, and '
-        '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>',
-        '</div><div class=artifact>',
+        '</div>',
+        # The numbers second, directly under the headline that invites the check. This is
+        # the only act a buyer opens the page for and it used to be the part they reached
+        # last.
+        money_markup(run),
+        '<div class=band>',
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every call in this run, with its identifiers and fields. '
         'Scrolls sideways on a narrow screen.">'
@@ -2779,8 +2900,40 @@ def build(has_audio: bool, repo_url: str | None = None,
                     f'<span class="state state-{cls}">{esc(resolution)}</span>'
                     + _closed_on_nothing_mark(resolution, fields, data["fieldOrder"])
                     + '</td></tr>')
-    body.append('</tbody></table></div></div>')
-    body.append(money_markup(run))
+    body.append('</tbody></table></div>')
+    # The count a reader can check without reading a single row, set immediately under the
+    # rows it counts rather than in a column beside them.
+    body.append(f'<p class=band-count>{len(live)} of {len(recs)} committed receipts reached '
+                f'the production API and {have} of {len(call_rows)} calls carry the provider '
+                'identifier. The rest had it recovered afterwards with a <code>GET</code>, '
+                'which places no call.</p>')
+    body.append('</div>')
+    body.append('<div class="band band-fine">')
+    # Why the identifiers are cut, what is held where, and who requires it. Every word of
+    # it was in this act before; it is set after the evidence rather than in front of it,
+    # because it answers a question a reader only has once they have seen the rows.
+    body.append(
+        '<p class=note>The identifiers are shortened on purpose. A live call id is not a '
+        'credential, because another account&#8217;s key cannot read our call, but it is an '
+        'artifact of a real call to a real number and this repository asks contributors to '
+        'keep those out of what they publish. CALL-E hold the billing records this table '
+        'invites a check against and can match a row from what is shown; the unshortened '
+        'list travels with the submission rather than on a public page.</p>'
+        '<table class=compliance>'
+        '<caption class=visually-hidden>What this repository holds, and what is held outside it.</caption>'
+        '<tbody>'
+        '<tr><td>transcripts, waveforms, the audio, and the unshortened identifiers</td>'
+        '<td class=dim>not in the repository. On this page'
+        + (' in full' if has_audio else ' without the audio')
+        + ', apart from the identifiers, which are shortened</td></tr>'
+        '<tr><td>the rules those calls produced, and the tests that hold them</td>'
+        '<td class=ok>in the repository</td></tr>'
+        '</tbody></table>'
+        '<p class=note>The maintainer of this list requires committed real-call artifacts '
+        'to be removed, and has said so even where the people on the call were team members '
+        'playing a part on reserved numbers, which describes these calls exactly. So the '
+        'recordings live here, the reasoning lives there, and '
+        '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>')
     body.append('</div>')
     add(act("04", "Check us against your billing", "".join(body)))
 
@@ -3035,16 +3188,10 @@ def build(has_audio: bool, repo_url: str | None = None,
     # covers them under 'self' and there is no third party in the path of a page about
     # children.
     #
-    # The player itself is not listed here. `lottie_light.min.js` is 45.6 KB gzipped, more
-    # than half of what this page weighs without it, and it draws one figure nine screens
-    # down that a reader who asked for reduced motion never sees. `figure.js` requests it
-    # from inside the observer it already runs, so it is fetched when somebody reaches the
-    # figure and not before. It is still copied into the build, and the weight gate counts
-    # what the browser fetches rather than a list of names, so leaving it out of the first
-    # view shows up in the measurement instead of hiding in it.
-    if (SITE / "figures" / "three-endings.json").exists():
-        add('<script src="figure-data.js" defer></script>')
-        add('<script src="figure.js" defer></script>')
+    # There is no figure player any more. The three-endings figure was the only thing that
+    # needed one, and it is CSS now, so `figure.js`, `figure-data.js` and the 45.6 KB
+    # `lottie_light.min.js` it fetched have all left the page. That is one fewer script,
+    # one fewer request and one fewer third party in the path of a page about children.
     add('</html>')
     return "".join(p)
 
@@ -3105,33 +3252,24 @@ def main() -> int:
     # watch one file. What the page shows instead is drawn from the run itself: the register
     # plays, the waveform is the audio, and the figure in act 02 is the system's shape. All
     # of it is built rather than filmed, so it stays true when the code changes.
-    for asset in ("app.js", "player.js", "figure.js", "console.js"):
+    for asset in ("app.js", "player.js", "console.js"):
         shutil.copy2(SITE / asset, out / asset)
 
-    # Third-party code lives in its own directory and is declared in VENDOR.json with the
-    # digest of the exact bytes. It is kept out of tools/site/*.js on purpose: the escaping
-    # gate reads every authored script there and asks whether each attribute write is
-    # escaped, which is a question about code somebody here wrote. A minified library is a
-    # supply-chain question instead, and it is answered by the manifest rather than by a
-    # regex over somebody else's compiled output.
-    for asset in ("lottie_light.min.js",):
-        shutil.copy2(SITE / "vendor" / asset, out / asset)
-
-    # The animation the player reads. Built by tools/make_figure.py during this run rather
-    # than committed, so it is always the figure the current palette makes.
+    # The Lottie the film takes is still built during this run, and it is no longer copied
+    # into the page build: nothing on the page reads it, and neither the vendored player
+    # nor the data script ships any more.
     #
-    # It ships as a script that assigns the data, not as JSON the player fetches. The
-    # policy this build derives sets `connect-src 'none'`, because the page places no
-    # network call, and lottie-web reading a `path:` is a network call. The file returned
-    # 200 and the browser refused it, so the animation never once played on the deployed
-    # page while every check passed: the still is the fallback and the still is correct, so
-    # nothing looked wrong. A script from this origin is already granted by `script-src
-    # 'self'`, so this removes the request rather than widening the policy to permit it.
-    figure = SITE / "figures" / "three-endings.json"
-    if figure.exists():
-        (out / "figure-data.js").write_text(
-            "window.__firstbellFigure=" + figure.read_text(encoding="utf-8").strip() + ";",
-            encoding="utf-8")
+    # It keeps being generated here rather than committed because it is derived from the
+    # stylesheet's own inks, and a drawing checked into a tree is a drawing somebody
+    # exported once. A checkout without python-lottie simply does not get it, which is the
+    # honest outcome now that no page depends on it.
+    try:
+        sys.path.insert(0, str(APP / "tools"))
+        import make_figure
+
+        make_figure.write(SITE / "figures")
+    except Exception:
+        pass
 
     page = out / "index.html"
     markup = build(has_audio, args.repo_url, args.video_url)
