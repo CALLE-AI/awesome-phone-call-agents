@@ -2387,6 +2387,43 @@ def callscope_figure(data: dict, lanes: list, headline: str) -> str:
                                    commit_turns, lanes, headline)
 
 
+def morning_html() -> str:
+    """`the-morning.html`, whole, in the same inks and typefaces as everything else.
+
+    Loaded from the asset directory by path for the same reason the two figures are: the
+    geometry and the arithmetic behind it belong next to the comments that justify them,
+    not inside this file.
+    """
+    spec = spec_from_file_location("morning", SITE / "morning.py")
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    cspec = spec_from_file_location("cutoff", SITE / "cutoff.py")
+    cutoff = module_from_spec(cspec)
+    cspec.loader.exec_module(cutoff)
+    # A clone with no receipts gets the morning board and no cutoff board, rather than a
+    # cutoff board drawn over zeroes.
+    cut = cutoff.curve(RECEIPTS) if RECEIPTS and RECEIPTS.exists() else {}
+
+    return (
+        "<!doctype html><html lang=en>"
+        "<meta charset=utf-8>"
+        '<meta name=viewport content="width=device-width,initial-scale=1">'
+        "<title>One school morning: firstbell</title>"
+        '<meta name=description content="The scale of one morning of absence calls, '
+        'and the single case a two-bucket system closes without finding the child.">'
+        '<link rel=icon href="data:,">'
+        f"<style>{css_for_serving(page_css())}</style>"
+        f"<style>{module.MORNING_CSS}</style>"
+        f"<style>{cutoff.CUTOFF_CSS}</style>"
+        "<main>"
+        f"{module.morning_markup()}"
+        f"{cutoff.cutoff_markup(cut)}"
+        "</main>"
+        '<script type=module src="morning.js"></script>'
+        "</html>")
+
+
 def page_css() -> str:
     """The whole stylesheet, as one string.
 
@@ -2637,6 +2674,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=after-minute>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
+        '<a class=after-link href="the-morning.html">See a whole morning &#8594;</a>',
         '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
@@ -2646,19 +2684,24 @@ def build(has_audio: bool, repo_url: str | None = None,
         # Four rows, twelve calls, and the page used to say only the first number.
         # Everything else in the entry says twelve, so the first screen was the one place
         # a reader could find the two numbers disagreeing.
+        # Six sentences of footnote, about 180 words, on the screen with the tightest
+        # word budget on the page. Three of them explained things the acts below explain
+        # again with room to do it properly: what CALL-E is, what the three columns are,
+        # and the region ceiling. What has to stay here is the pair of numbers a reader
+        # would otherwise find contradicting each other nine screens apart, and the
+        # consent disclosure, which is not a footnote anywhere.
+        #
+        # Two tests read this sentence by regular expression, for the count of rows and
+        # for the total, so both phrasings are load-bearing and neither may be tidied:
+        # see `tests/test_page_prose_counts.py`.
         f'<p class=hero-foot>{_spelled(len(rows)).capitalize()} rows here, one per call. '
         'This '
-        f'software has placed {_recorded_call_total()} calls against CALL-E in total and '
-        'the money on this page is computed over all of them; these four are the ones '
-        'with a transcript on the page. CALL-E is the voice service that dials the '
-        'number and holds the '
-        'conversation; the three columns are the three fields it hands back. The '
-        'recordings are held outside this repository; the transcript, the offsets and the '
-        'shape of the waveform are what CALL-E returned. Every call went to the author’s '
-        'own line, scripted and consented, and the pupil names in the transcripts are '
-        'fictional. CALL-E offers one language for each country, and for a United States '
-        'number that language is English: <a href="#act-01">act 01</a> says what that '
-        'costs and <a href="#act-07">act 07</a> is the run that shows it.</p>',
+        f'software has placed {_recorded_call_total()} calls against CALL-E in total, and '
+        'these four are the ones with a transcript on the page; the money is computed '
+        'over all of them. The recordings are held outside this repository. Every call '
+        'went to the author’s own line, scripted and consented, and the pupil names are '
+        'fictional. <a href="#act-01">Act 01</a> says what the region ceiling costs, and '
+        '<a href="#act-07">act 07</a> is the run that shows it.</p>',
     ]
     add(act("00", "The call", "".join(body), "hero"))
 
@@ -3252,7 +3295,7 @@ def main() -> int:
     # watch one file. What the page shows instead is drawn from the run itself: the register
     # plays, the waveform is the audio, and the figure in act 02 is the system's shape. All
     # of it is built rather than filmed, so it stays true when the code changes.
-    for asset in ("app.js", "player.js", "console.js"):
+    for asset in ("app.js", "player.js", "console.js", "morning.js"):
         shutil.copy2(SITE / asset, out / asset)
 
     # The Lottie the film takes is still built during this run, and it is no longer copied
@@ -3283,6 +3326,15 @@ def main() -> int:
     # list rather than read from it does.
     docs = doc_pages.write_all(out, css_for_serving(page_css()),
                                args.repo_url, args.repo_ref)
+
+    # The room next door. The first screen is two calls and the sound of them; this is the
+    # scale of the morning they came out of, and it is one click away rather than below
+    # the fold, which is where the entry that won micro1 kept its own three-dimensional
+    # page. It is written here, beside the documents, because it is a served page and has
+    # to be in the policy union below for its style block to be allowed at all.
+    morning_page = out / "the-morning.html"
+    morning_page.write_text(morning_html(), encoding="utf-8", newline="\n")
+    docs = [*docs, morning_page]
 
     # The policy is derived from the bytes above rather than kept beside them, so the two
     # cannot disagree. Written after the pages for the same reason: there is nothing to

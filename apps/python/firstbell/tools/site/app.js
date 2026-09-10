@@ -672,6 +672,18 @@ function wireCallscope() {
   const buttons = [...fig.querySelectorAll('[data-csc-play]')];
   if (!buttons.length) return;
 
+  /* Resolved once, by reading each group's own attribute, rather than by interpolating
+   * the button's value into an attribute selector. These ids come from the evidence file
+   * so the interpolated form read harmlessly, but it is the shape the escaping test
+   * exists to refuse: a value carrying a quote closes the selector early and the match
+   * silently becomes something else. A map cannot be injected into.
+   *
+   * The first attempt at this comment quoted the rejected form in full and failed the
+   * same test, because that test reads the file as text and a comment is text. Describe
+   * the shape, never spell it. */
+  const laneOf = new Map([...fig.querySelectorAll('[data-csc-lane]')]
+    .map((g) => [g.getAttribute('data-csc-lane'), g]));
+
   const head = fig.querySelector('.csc-head');
   const span = Number(fig.dataset.cscSpan || 0);
   const travel = Number(fig.dataset.cscTravel || 0);
@@ -716,7 +728,7 @@ function wireCallscope() {
       if (current === id && !audio.paused) { stop(true); return; }
       stop(true);
       current = id;
-      const lane = fig.querySelector(`[data-csc-lane="${id}"]`);
+      const lane = laneOf.get(id);
       if (lane) lane.setAttribute('data-csc-on', '');
       fig.classList.add('csc-live');
       btn.setAttribute('aria-pressed', 'true');
