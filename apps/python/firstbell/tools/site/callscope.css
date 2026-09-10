@@ -293,3 +293,72 @@
   #h-00 { margin-bottom: var(--space-2); }
   .play-bar { margin-top: var(--space-2); }
 }
+
+/* ---- the bar, sticky ------------------------------------------------------------------
+ * Above every act (they are z-index 2 and act 00 is 0 under the curtain) and below the
+ * skip link at 100, which has to be able to take focus in front of it.
+ *
+ * `--bar-h` is declared rather than measured because two other rules need it: the scroll
+ * offset every in-page anchor lands at, and the top inset the walk gate checks against.
+ * A value read back off the element at runtime would be a third source for one number. */
+/* Measured, not guessed: the bar renders at 64px with these values, and the anchors
+ * reserve 76px, which clears it with a line of air. The first version declared 4.5rem
+ * against a bar that painted at 98px and thirteen anchors landed under it. */
+:root { --bar-h: 4rem; }
+.topbar {
+  position: sticky; top: 0; z-index: 6;
+  background: var(--paper);
+  padding: var(--space-1) 0;
+}
+.topbar .masthead {
+  margin: 0 auto; max-width: 76rem;
+  padding: var(--space-2) var(--space-4);
+  gap: var(--space-2) var(--space-4);
+}
+.topbar .standfirst { font-size: var(--size-1); line-height: 1.35; }
+
+/* An anchor that lands under the bar is an anchor that went to the wrong place. Every
+ * target on this page reserves the bar's height plus a line of air. */
+:target, [id] { scroll-margin-top: calc(var(--bar-h) + 0.75rem); }
+
+/* Act 00 sticks to the bottom of the window under the curtain, so what sits behind the
+ * bar while it is stuck is content the reader has already passed. Its resting offset is
+ * computed in app.js and needs no change. Below the curtain nothing is sticky but the
+ * bar, and every act scrolls under it against its own opaque ground. */
+@media (max-width: 60rem) {
+  .topbar { padding: var(--space-1) 0; }
+}
+
+/* ---- the three commands ----------------------------------------------------------------
+ * One row each, because a reader who copied the old block got three commands at once and
+ * a shell runs all three whether or not the first one worked. */
+.cmds { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: 2px; }
+.cmd {
+  /* `min-width: 0`, or the row will not shrink. A grid item's minimum is its content by
+   * default, and the content here is a line of mono that does not wrap, so at 390px the
+   * row held the page open to 540 and the whole document scrolled sideways. The `<pre>`
+   * scrolls instead, which is what it is for. */
+  min-width: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  background: var(--card); border: 1px solid var(--line); border-radius: 3px;
+  padding: 2px 2px 2px var(--space-3);
+}
+.cmd-line {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--space-2) 0;
+  background: none; border: 0; overflow-x: auto;
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
+}
+.cmd-copy {
+  flex: none; padding: 6px 12px;
+  font-family: var(--ui); font-size: var(--size-1); letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-3);
+  background: none; border: 1px solid transparent; border-radius: 2px; cursor: pointer;
+}
+.cmd-copy:hover { color: var(--ink); border-color: var(--line-strong); }
+/* The word changes, not only the colour. A confirmation carried by hue alone is not one a
+ * reader who cannot separate those two hues ever receives, and this is the button whose
+ * whole job is telling somebody the command is now on their clipboard. */
+.cmd-copy[data-copied] { color: var(--resolved); }
+.cmd-w2 { display: none; }
+.cmd-copy[data-copied] .cmd-w1 { display: none; }
+.cmd-copy[data-copied] .cmd-w2 { display: inline; }

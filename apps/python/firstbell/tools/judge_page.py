@@ -1176,6 +1176,52 @@ def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
     return "".join(out)
 
 
+QUICKSTART = (
+    "cd apps/python/firstbell",
+    "pip install -r requirements-dev.txt",
+    "python -m firstbell --work-file examples/absences.csv",
+)
+
+
+def quickstart_markup() -> str:
+    """The three commands, one row each, each with its own copy button.
+
+    They shipped as one `<pre>` and a reader who copied it got three commands on the
+    clipboard at once. Pasted into a shell that is one line short of the right directory,
+    the second and third run anyway and the failure arrives two commands later than its
+    cause. A developer who wants to run this had to select one line by hand off a block,
+    which is exactly the friction the id copy buttons elsewhere on this page exist to
+    remove.
+
+    One button per command, carrying only that command. `wireCopy` in app.js already
+    handles anything with `data-copy`, and when the clipboard is refused, which it is on
+    an insecure origin, it selects the text so the reader can copy it by hand. That
+    fallback selects the button unless something on the row says otherwise, and the
+    button here reads `copy`, so the `<pre>` carries `data-copy-shown` and the fallback
+    selects the command instead of the word.
+
+    The button says `copied` afterwards rather than only changing colour, because colour
+    alone is not a confirmation a reader who cannot see it ever receives.
+
+    Each command stays in its own `<pre>`, so what a reader copies by hand is byte for
+    byte what the button copies, and with no script the block is three lines of monospace
+    and the buttons do nothing, which is the right way round.
+    """
+    rows = "".join(
+        '<li class=cmd>'
+        f'<pre class=cmd-line data-copy-shown>{esc(line)}</pre>'
+        f'<button class=cmd-copy type=button data-copy="{esc(line)}" '
+        f'aria-label="Copy this command: {esc(line)}">'
+        '<span class=cmd-w1>copy</span><span class=cmd-w2>copied</span>'
+        '</button>'
+        '</li>'
+        for line in QUICKSTART)
+    return (
+        '<ol class=cmds aria-label="The three commands, verbatim, each with its own copy '
+        'button.">'
+        + rows + '</ol>')
+
+
 def nav_markup(repo_url: str | None, video_url: str | None) -> str:
     """Four places on this page, and the one place off it, on the bar.
 
@@ -2508,8 +2554,8 @@ def morning_html() -> str:
         'and the single case a two-bucket system closes without finding the child.">'
         '<link rel=icon href="data:,">'
         f"<style>{css_for_serving(page_css())}</style>"
-        f"<style>{module.MORNING_CSS}</style>"
-        f"<style>{cutoff.CUTOFF_CSS}</style>"
+        f"<style>{css_for_serving(module.MORNING_CSS)}</style>"
+        f"<style>{css_for_serving(cutoff.CUTOFF_CSS)}</style>"
         "<main>"
         f"{module.morning_markup(_spelled(_recorded_call_total()))}"
         f"{cutoff.cutoff_markup(cut)}"
@@ -2665,7 +2711,13 @@ def build(has_audio: bool, repo_url: str | None = None,
     # Byte-identical to the block `the-morning.html` serves, so the derived policy carries
     # one hash for the two pages rather than two. Not folded into `page_css`, because that
     # is also the document pages' stylesheet and none of them holds a board.
-    add(f'<style>{morning_module().MORNING_CSS}</style>')
+    #
+    # Through `css_for_serving` for the same reason page.css is: the board's stylesheet
+    # explains why each value is that value, at length, and none of that is worth a byte
+    # to a reader. It also reaches the `no javascript` gate as readable words, because
+    # that gate strips `<script>` and not `<style>`, so a comment here is counted as
+    # something the page says out loud.
+    add(f'<style>{css_for_serving(morning_module().MORNING_CSS)}</style>')
 
     # ---- rail
     add('<nav class=rail aria-label="Sections"><span class=rail-line aria-hidden=true>'
@@ -2682,6 +2734,20 @@ def build(has_audio: bool, repo_url: str | None = None,
     # way past it. The link is the first thing in the tab order and it is invisible until it
     # takes focus, which is the only time it is any use to anybody.
     add('<a class=skip href="#act-00">Skip to the call</a>')
+    # ---- the bar
+    #
+    # It left act 00 to sit here. A sticky child of a sticky parent is contained by that
+    # parent, and act 00 is sticky under the curtain, so a bar inside it stopped
+    # following the reader the moment act 01 arrived. As a sibling before `<main>` it
+    # holds for the whole document, above every act's stacking context and below the skip
+    # link, which has to be able to take focus in front of it.
+    add('<header class=topbar>'
+        '<div class=masthead>'
+        '<p class=wordmark>firstbell</p>'
+        + nav_markup(repo_url, video_url)
+        + '<p class=standfirst>firstbell places a school’s morning absence calls '
+          'through CALL-E, and refuses to close the ones that came back empty.</p>'
+        + '</div></header>')
 
     add('<main id=main>')
 
@@ -2716,37 +2782,6 @@ def build(has_audio: bool, repo_url: str | None = None,
          "ours_note": "held open and escalated to a named person."},
     ]
     body = [
-        '<div class=masthead>',
-        '<p class=wordmark>firstbell</p>',
-        nav_markup(repo_url, video_url),
-        # The first sentence a buyer reads. It used to promise language access, and a
-        # director of student services put it plainly: taken to a board, "in the language
-        # that family speaks" is a claim a trustee can disprove by reading one page of
-        # CALL-E's region table, and the meeting ends there. So the promise came off and
-        # the ceiling went on in its place, on the first screen.
-        #
-        # A district buyer then read the pair and named what the second sentence was
-        # spending: the escalation is the half of this product they would be buying, and
-        # the first screen gave that space to a platform limit with no demonstration
-        # beside it. The promise is gone either way, so there is nothing left up here to
-        # qualify, and the ceiling has moved to act 01, one screen down, where it can name
-        # the run that shows it. Both sentences now describe what the software does, and
-        # the second one is the one nothing else on the market does.
-        # One line, not five. The paragraph that was here described what this software
-        # does when a call comes back with nothing usable. The screen underneath it now
-        # shows that happening, on a real call, with the receipt beside it, and a
-        # description sitting on top of a demonstration is the page talking over
-        # itself. The full statement moves to act 01, next to the numbers behind it.
-        # Measured 2026-09-10 against the entry that won micro1: its whole site was 77
-        # visible words on one screen that never scrolled, and this first screen alone was
-        # 300. A judge gives thirty to sixty seconds, so a first screen that has to be
-        # read scores whatever a skimmed page scores no matter what is proved below it.
-        # The budget is now the metric. What was here -- four counters and four cards of
-        # prose, both of them descriptions -- moves to act 01, and the demonstration those
-        # descriptions were describing comes up here in their place.
-        '<p class=standfirst>firstbell places a school’s morning absence calls through '
-        'CALL-E, and refuses to close the ones that came back empty.</p>',
-        '</div>',
         # The instrument, directly under the one-minute lane it is the evidence for.
         #
         # That lane was four cards of prose. A reader who gave the first screen thirty
@@ -3295,10 +3330,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         # `pre:focus-visible` in the shared focus ring, so the ring was written expecting
         # this element to be focusable, and this was the only `<pre>` on the page that was
         # not.
-        '<pre tabindex=0 role=region aria-label="The commands, verbatim. Scrolls sideways '
-        'on a narrow screen.">cd apps/python/firstbell\n'
-        'pip install -r requirements-dev.txt\n'
-        'python -m firstbell --work-file examples/absences.csv</pre>',
+        quickstart_markup(),
         # The instruction used to name a button that no longer exists, and before that it
         # was the only thing telling a reader why the block below was empty. The block
         # ships whole now, so the instruction is about the optional part.

@@ -326,8 +326,14 @@ function wireCopy() {
     } catch {
       // Refused on an insecure origin and in some embedded viewers. Select the text so the
       // reader can still copy it rather than failing silently.
+      //
+      // Which text, though. On the id buttons the button IS the text, so selecting the
+      // button is right. On the quickstart rows the button reads "copy" and the command
+      // sits beside it, so selecting the button would hand the reader the word "copy".
+      // The row says which element shows the thing.
+      const shown = b.closest('li, p, div')?.querySelector('[data-copy-shown]');
       const r = document.createRange();
-      r.selectNodeContents(b);
+      r.selectNodeContents(shown || b);
       getSelection().removeAllRanges();
       getSelection().addRange(r);
     }
@@ -615,6 +621,31 @@ function wireScrubbed() {
    * which is the same answer as before. */
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(onResize).catch(() => {});
+  }
+
+  /* And every time a disclosure opens or shuts.
+   *
+   * Nine act bodies and the money card's derivation are behind `<details>` now, and each
+   * one changes the document's height by hundreds of pixels when a reader clicks it.
+   * Three things are computed from that height and none of them recompute on their own:
+   * the hero's resting offset under the curtain, the rail's fill, and which act the rail
+   * calls current. Neither `scroll` nor `resize` fires on a click, so before this the
+   * page kept whatever it worked out at boot and the rail pointed at the wrong act for
+   * the rest of the session.
+   *
+   * Both a `toggle` listener and a ResizeObserver, because they catch different things.
+   * `toggle` fires the instant the state flips, which is when the height changes for a
+   * plain disclosure. The observer catches everything after that: a fold whose contents
+   * reflow, a table that rewraps inside an open one, an image that arrives late. The
+   * observer's first callback fires on observe, so the flag below drops it rather than
+   * writing a layout offset ten times during boot. */
+  const folds = [...document.querySelectorAll('details')];
+  folds.forEach((d) => d.addEventListener('toggle', onResize));
+  if (typeof ResizeObserver === 'function' && folds.length) {
+    let settled = false;
+    const ro = new ResizeObserver(() => { if (settled) onResize(); });
+    folds.forEach((d) => ro.observe(d));
+    requestAnimationFrame(() => { settled = true; });
   }
   // A width change fires resize as well, so this is here for the other half of the query:
   // turning reduced motion on mid-session does not resize anything.
