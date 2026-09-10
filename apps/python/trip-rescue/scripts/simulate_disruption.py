@@ -34,8 +34,10 @@ from trip_rescue.calle_client import TripRescueCaller  # noqa: E402
 from trip_rescue.duffel_client import DuffelClient  # noqa: E402
 from trip_rescue.models import Booking, DisruptionEvent, RebookingOutcome  # noqa: E402
 from trip_rescue.orchestrator import handle_disruption  # noqa: E402
+from trip_rescue.store import RunStore  # noqa: E402
 
 _RUN_OUTPUT_PATH = _PROJECT_ROOT / "web" / "data" / "last_run.js"
+_DEFAULT_DB_PATH = _PROJECT_ROOT / "trip_rescue_runs.sqlite3"
 
 
 def main() -> None:
@@ -57,7 +59,14 @@ def main() -> None:
     )
     parser.add_argument("--name", default="Jordan Traveler")
     parser.add_argument("--reason", default="cancelled", choices=["cancelled", "delayed_missed_connection"])
+    parser.add_argument(
+        "--db-path",
+        default=str(_DEFAULT_DB_PATH),
+        help="SQLite file each run's disruption/outcome record is written to (see trip_rescue/store.py).",
+    )
     args = parser.parse_args()
+
+    store = RunStore(args.db_path)
 
     with DuffelClient() as duffel, TripRescueCaller() as caller:
         mode = "DRY RUN" if duffel.dry_run else "LIVE"
@@ -82,6 +91,7 @@ def main() -> None:
             duffel=duffel,
             caller=caller,
             new_departure_date=args.new_departure_date,
+            store=store,
         )
 
         print("\nOutcome:")
@@ -96,6 +106,7 @@ def main() -> None:
         )
         print(f"\nWrote results-viewer data to {run_path}")
         print(f"Open {_PROJECT_ROOT / 'web' / 'index.html'} in a browser to view it.")
+        print(f"Recorded this run in {args.db_path} (see trip_rescue/store.py).")
 
 
 def _serialize(outcome) -> dict:
