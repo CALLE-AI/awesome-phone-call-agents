@@ -9,11 +9,13 @@ from certa.airtable import (
     FixtureAirtable,
     LiveAirtable,
     answer_columns,
+    base_definition,
+    create_base,
     scope,
     to_row,
 )
 from certa.schema import derive_recipient_schema
-from certa.types import ApplicantSuppliedNumber, SourcedNumber
+from certa.types import ApplicantSuppliedNumber, NumberSource, SourcedNumber
 
 FIELDS = FieldMap()
 SOURCED = "+15550100471"
@@ -179,6 +181,45 @@ class FixtureClient(unittest.TestCase):
         client.update_records("T", [{"id": "recABC", "fields": {"Status": "Verified"}}])
         self.assertEqual(len(client.writes), 1)
         self.assertFalse(hasattr(client, "token"))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class BaseCreation(unittest.TestCase):
+    """`certa init` builds the table, because nineteen hand-made columns with
+    one wrong field type fails confusingly and much later."""
+
+    def setUp(self):
+        self.table = base_definition()["tables"][0]
+        self.names = [f["name"] for f in self.table["fields"]]
+
+    def test_every_control_column_is_present(self):
+        for name in FIELDS.control_columns():
+            self.assertIn(name, self.names)
+
+    def test_answer_columns_produce_a_valid_schema(self):
+        derived = derive_recipient_schema(answer_columns(self.table["fields"], FIELDS))
+        self.assertIn("reached_employer", derived.schema["properties"])
+        self.assertIn("employment_confirmed", derived.schema["properties"])
+
+    def test_number_source_offers_no_application_option(self):
+        field = next(f for f in self.table["fields"] if f["name"] == FIELDS.number_source)
+        choices = {c["name"] for c in field["options"]["choices"]}
+        self.assertEqual(choices, {s.value for s in NumberSource})
+        self.assertNotIn("application", choices)
+
+    def test_answer_columns_carry_their_instruction(self):
+        """The description is what the extraction model actually reads."""
+        for name in ("Reached employer", "Employment confirmed", "Title matches"):
+            field = next(f for f in self.table["fields"] if f["name"] == name)
+            self.assertTrue(field.get("description"), msg=name)
+
+    def test_a_bad_workspace_id_is_refused_before_any_request(self):
+        for bad in ("app123", "", "my workspace"):
+            with self.assertRaises(AirtableError, msg=bad):
+                create_base("pat_x", bad)
 
 
 if __name__ == "__main__":

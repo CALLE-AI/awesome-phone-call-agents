@@ -21,7 +21,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .airtable import FieldMap, FixtureAirtable, LiveAirtable
+from .airtable import (
+    CREATE_BASE_SCOPES,
+    AirtableError,
+    FieldMap,
+    FixtureAirtable,
+    LiveAirtable,
+    base_definition,
+    create_base,
+)
 from .audit import AuditLog
 from .config import load as load_config
 from .panel.server import Panel, serve
@@ -180,6 +188,46 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_init(args: argparse.Namespace) -> int:
+    """Create the Airtable base with the correct columns, in one call."""
+    # --dry-run creates nothing, so it must not demand a credential first.
+    if args.dry_run:
+        table = base_definition()["tables"][0]
+        print(f"\n  would create: {base_definition()['name']}")
+        print(f"  table: {table['name']}  ({len(table['fields'])} fields)\n")
+        for f in table["fields"]:
+            kind = f["type"]
+            if kind == "singleSelect":
+                kind += " (" + ", ".join(c["name"] for c in f["options"]["choices"]) + ")"
+            print(f"    {f['name']:<30} {kind}")
+        print("\n  Nothing was created. Re-run without --dry-run.\n")
+        return 0
+
+    token = os.environ.get("AIRTABLE_TOKEN", "") or load_config().airtable_token
+    if not token:
+        raise SystemExit(
+            "An Airtable token is needed. Create one at "
+            "https://airtable.com/create/tokens with scopes:\n  "
+            + "\n  ".join(CREATE_BASE_SCOPES)
+        )
+    if not args.workspace:
+        raise SystemExit(
+            "A workspace id is required: certa init --workspace wsp...\n"
+            "Open Airtable and copy the wsp… segment from the address bar."
+        )
+    try:
+        created = create_base(token, args.workspace)
+    except AirtableError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    base_id = created.get("id", "")
+    print(f"\n  Created base {base_id}\n")
+    print("  Next: open the console, choose Connections, and paste this base id.")
+    print("  Then create a view named 'Ready to verify' filtered to rows that")
+    print("  have a consent token and a sourced number.\n")
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Open the operator's control panel on loopback.
 
@@ -251,6 +299,14 @@ def build_parser() -> argparse.ArgumentParser:
     panel.add_argument("--base")
     panel.add_argument("--scenario")
     panel.set_defaults(func=cmd_serve)
+
+    init = sub.add_parser("init", help="create the Airtable base with the right columns")
+    init.add_argument("--workspace", help="Airtable workspace id (wsp...)")
+    init.add_argument(
+        "--dry-run", action="store_true",
+        help="print the table that would be created and stop",
+    )
+    init.set_defaults(func=cmd_init)
     return parser
 
 

@@ -147,10 +147,25 @@ Opens on **sample data**: three employers called, one contradiction routed to
 review, one employer never reached, one request skipped for having no
 independently sourced number. Everything is real except the phone calls.
 
-### 2. Connect your own base
+### 2. Create the Airtable base
 
-Import `examples/base-template.json` into a new Airtable base, then open
-**Setup** in the panel and paste:
+```bash
+python3 -m certa init --dry-run                    # show the table, create nothing
+python3 -m certa init --workspace wsp1234567890    # create it
+```
+
+Nineteen columns by hand, with one wrong field type failing confusingly much
+later, is the worst part of setting this up — so `init` builds the table in one
+call. It needs a token with `schema.bases:write`, and the workspace id is the
+`wsp…` segment of your Airtable address bar. `examples/base-template.json`
+documents the same structure if you would rather build it yourself.
+
+Then add a view called **Ready to verify**, filtered to rows that have a consent
+token and a sourced number.
+
+### 3. Connect
+
+Open **Connections** in the console and paste:
 
 | | |
 |---|---|
@@ -168,7 +183,7 @@ them, and the panel warns if the file's permissions are loose.
 With an Airtable token but no CALL-E key it runs **preview only** — reading
 your real table, unable to dial.
 
-### 3. Work
+### 4. Work
 
 The panel shows the rows in scope, the rows being skipped and why, how many
 the view's filter is hiding, the estimated spend, and **the verbatim script

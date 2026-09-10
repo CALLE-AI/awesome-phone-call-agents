@@ -320,3 +320,101 @@ def scope(client: AirtableClient, table: str, view: str) -> Scope:
         in_view=len(client.list_view(table, view)),
         in_table=client.count_table(table),
     )
+
+
+# ── base creation ─────────────────────────────────────────────────────────
+# Building nineteen columns by hand is the worst part of setting this up, and
+# getting one field type wrong produces a confusing failure much later. The
+# Create Base endpoint is available on every Airtable plan, so `certa init`
+# builds the table correctly in one call.
+
+CREATE_BASE_SCOPES = ("schema.bases:write", "data.records:read", "data.records:write")
+
+
+def base_definition(fields: FieldMap | None = None) -> dict[str, Any]:
+    """The table Certa expects, in Airtable's Create Base shape."""
+    fields = fields or FieldMap()
+
+    def text(name: str, kind: str = "singleLineText") -> dict[str, Any]:
+        return {"name": name, "type": kind}
+
+    def select(name: str, choices: list[str], description: str = "") -> dict[str, Any]:
+        entry: dict[str, Any] = {
+            "name": name,
+            "type": "singleSelect",
+            "options": {"choices": [{"name": c} for c in choices]},
+        }
+        if description:
+            entry["description"] = description
+        return entry
+
+    return {
+        "name": "Certa — Verification of Employment",
+        "tables": [
+            {
+                "name": "Verification Requests",
+                "description": (
+                    "One row per employment verification. Columns Certa does not "
+                    "own become the questions asked on the call."
+                ),
+                "fields": [
+                    text(fields.request_id),
+                    text(fields.applicant_ref),
+                    text(fields.applicant_name),
+                    text(fields.employer_name),
+                    text(fields.sourced_number),
+                    select(
+                        fields.number_source,
+                        [s.value for s in NumberSource],
+                        "Where this number came from. There is deliberately no "
+                        "option for the number written on the application.",
+                    ),
+                    text(fields.applicant_supplied_number),
+                    text(fields.consent_receipt_id),
+                    text(fields.consent_disclosure_version),
+                    text(fields.consent_signed_at),
+                    text(fields.consent_token),
+                    {"name": fields.cancelled, "type": "checkbox",
+                     "options": {"color": "grayBright", "icon": "check"}},
+                    text(fields.status),
+                    text(fields.reason, "multilineText"),
+                    text(fields.call_id),
+                    select(
+                        "Reached employer", ["Yes", "No"],
+                        "Use yes only if a person at the employer spoke about "
+                        "employment records. Use no if only an automated menu, a "
+                        "voicemail, or a wrong department was reached.",
+                    ),
+                    select(
+                        "Employment confirmed", ["Yes", "No"],
+                        "Use yes only when the employer states the person "
+                        "currently works there.",
+                    ),
+                    select(
+                        "Title matches", ["Yes", "No"],
+                        "Use yes when the stated job title matches the "
+                        "application. Use no when the employer names a different "
+                        "title. Use unknown if they would not say.",
+                    ),
+                    select(
+                        "Declined to answer", ["Yes", "No"],
+                        "Use yes when the employer refuses to confirm anything or "
+                        "asks for a written request.",
+                    ),
+                ],
+            }
+        ],
+    }
+
+
+def create_base(token: str, workspace_id: str, *, base_url: str = DEFAULT_BASE_URL,
+                fields: FieldMap | None = None) -> dict[str, Any]:
+    """Create the base and return Airtable's response, including its id."""
+    if not workspace_id.startswith("wsp"):
+        raise AirtableError(
+            f"{workspace_id!r} does not look like a workspace id. Open Airtable "
+            "and copy the wsp… segment from the address bar."
+        )
+    client = LiveAirtable(token, "unused", base_url=base_url)
+    payload = dict(base_definition(fields), workspaceId=workspace_id)
+    return client._request("POST", "/v0/meta/bases", body=payload)
