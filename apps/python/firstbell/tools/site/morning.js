@@ -120,6 +120,18 @@ async function mount(THREE) {
   const hint = document.querySelector('[data-mrn-hint]');
   if (hint) hint.hidden = false;
 
+  /* Mounting changed the page's height, so anything that measured it is now wrong.
+   *
+   * On the board's own page nothing did. On the evidence page the hero is sticky above
+   * 60rem and app.js writes its resting offset from the hero's height at boot, and this
+   * function runs after boot: the canvas replaces the still, the hint stops being hidden
+   * and the hero grows by the height of one line. Measured 2026-09-10: the hero rested
+   * at -1291px where -1320px was needed, and its last line was unreachable because
+   * nothing scrolls or resizes on a first screen nobody has touched yet.
+   *
+   * A resize is what actually happened to the layout, so it is what gets announced. */
+  dispatchEvent(new Event('resize'));
+
   /* Drag to turn, and that is the whole interaction. Pointer events rather than mouse
    * events so a touch drag works, and the pointer is captured so leaving the canvas
    * mid-drag does not strand the board halfway round. */

@@ -602,6 +602,20 @@ function wireScrubbed() {
   };
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onResize, { passive: true });
+  /* And once more when the real faces land.
+   *
+   * `rest()` reads the hero's height, and the hero is set in fallback metrics until the
+   * kit arrives, which it does out of the render path on purpose. One paragraph on the
+   * first screen reflowed from three lines to four when the swap happened, the hero grew
+   * 29px after its resting offset had already been written, and its last line sat 29px
+   * below the window with nothing able to reach it. Nothing scrolls, nothing resizes, so
+   * neither handler above ever fired: the page was simply wrong from the swap onwards.
+   *
+   * Fonts that never load leave this unresolved, and the offset written at boot stands,
+   * which is the same answer as before. */
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(onResize).catch(() => {});
+  }
   // A width change fires resize as well, so this is here for the other half of the query:
   // turning reduced motion on mid-session does not resize anything.
   CURTAIN_Q.addEventListener('change', onResize);
@@ -672,7 +686,7 @@ function wireCallscope() {
   const buttons = [...fig.querySelectorAll('[data-csc-play]')];
   if (!buttons.length) return;
 
-  /* Resolved once, by reading each group's own attribute, rather than by interpolating
+  /* Resolved once, by reading each card's own attribute, rather than by interpolating
    * the button's value into an attribute selector. These ids come from the evidence file
    * so the interpolated form read harmlessly, but it is the shape the escaping test
    * exists to refuse: a value carrying a quote closes the selector early and the match
@@ -681,33 +695,29 @@ function wireCallscope() {
    * The first attempt at this comment quoted the rejected form in full and failed the
    * same test, because that test reads the file as text and a comment is text. Describe
    * the shape, never spell it. */
-  const laneOf = new Map([...fig.querySelectorAll('[data-csc-lane]')]
+  const cardOf = new Map([...fig.querySelectorAll('[data-csc-lane]')]
     .map((g) => [g.getAttribute('data-csc-lane'), g]));
-
-  const head = fig.querySelector('.csc-head');
-  const span = Number(fig.dataset.cscSpan || 0);
-  const travel = Number(fig.dataset.cscTravel || 0);
-  if (!head || !span || !travel) return;
 
   const audio = new Audio();
   audio.preload = 'none';
   let current = null;
   let frame = 0;
 
-  /* The head is positioned in the SVG's own user units, and the viewBox scales those to
-   * whatever width the figure got. Setting the transform in user units means the sync
-   * holds at every width without reading a single laid-out pixel. */
-  const place = (t) => {
-    const x = Math.max(0, Math.min(1, t / span)) * travel;
-    head.setAttribute('transform', `translate(${x.toFixed(2)} 0)`);
+  /* Progress is a ratio on the card, not a pixel anywhere. The played rule is sized in
+   * CSS from that one custom property, so the sync holds at every width without this
+   * function reading a single laid-out value. */
+  const place = (card, t, len) => {
+    if (!card || !len) return;
+    card.style.setProperty('--csc-p', Math.max(0, Math.min(1, t / len)).toFixed(4));
   };
 
   const stop = (settle) => {
     cancelAnimationFrame(frame);
     audio.pause();
-    fig.classList.remove('csc-live');
-    head.removeAttribute('transform');
-    fig.querySelectorAll('[data-csc-on]').forEach((g) => g.removeAttribute('data-csc-on'));
+    fig.querySelectorAll('[data-csc-lane]').forEach((g) => {
+      g.removeAttribute('data-csc-on');
+      g.style.removeProperty('--csc-p');
+    });
     buttons.forEach((b) => {
       b.setAttribute('aria-pressed', 'false');
       const label = b.querySelector('[data-play-label]');
@@ -717,28 +727,27 @@ function wireCallscope() {
     current = settle ? null : current;
   };
 
-  const tick = () => {
-    place(audio.currentTime);
-    if (!audio.paused) frame = requestAnimationFrame(tick);
-  };
-
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.cscPlay;
       if (current === id && !audio.paused) { stop(true); return; }
       stop(true);
       current = id;
-      const lane = laneOf.get(id);
-      if (lane) lane.setAttribute('data-csc-on', '');
-      fig.classList.add('csc-live');
+      const card = cardOf.get(id);
+      const len = Number(btn.dataset.cscSeconds || 0);
+      if (card) card.setAttribute('data-csc-on', '');
       btn.setAttribute('aria-pressed', 'true');
       const label = btn.querySelector('[data-play-label]');
       if (label) label.textContent = btn.dataset.wordsPause;
       btn.setAttribute('aria-label', btn.dataset.wordsPause);
       audio.src = `${AUDIO}/${id}.m4a`;
-      place(0);
-      /* A blocked or missing recording must not leave the figure in the live state with a
-       * head parked at zero, which reads as a call that produced nothing. */
+      place(card, 0, len);
+      const tick = () => {
+        place(card, audio.currentTime, len);
+        if (!audio.paused) frame = requestAnimationFrame(tick);
+      };
+      /* A blocked or missing recording must not leave a card marked live with its rule
+       * parked at zero, which reads as a call that produced nothing. */
       audio.play().then(() => { frame = requestAnimationFrame(tick); })
            .catch(() => stop(true));
     });

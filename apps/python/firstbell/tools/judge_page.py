@@ -2391,6 +2391,26 @@ def callscope_figure(data: dict, lanes: list, headline: str) -> str:
                                    commit_turns, lanes, headline)
 
 
+_MORNING_CACHE: dict[str, object] = {}
+
+
+def morning_module():
+    """`tools/site/morning.py`, loaded once by path.
+
+    Two pages need it now: the board's own page, and act 00, where a compact copy of the
+    same board is the second thing on the first screen. Loading it twice would give two
+    module objects and two copies of a stylesheet whose bytes have to stay identical
+    across both pages, because the served policy hashes every style block and a hash the
+    two pages do not share is a second entry for the same rules.
+    """
+    if "m" not in _MORNING_CACHE:
+        spec = spec_from_file_location("morning", SITE / "morning.py")
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _MORNING_CACHE["m"] = module
+    return _MORNING_CACHE["m"]
+
+
 def morning_html() -> str:
     """`the-morning.html`, whole, in the same inks and typefaces as everything else.
 
@@ -2398,9 +2418,7 @@ def morning_html() -> str:
     geometry and the arithmetic behind it belong next to the comments that justify them,
     not inside this file.
     """
-    spec = spec_from_file_location("morning", SITE / "morning.py")
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = morning_module()
 
     cspec = spec_from_file_location("cutoff", SITE / "cutoff.py")
     cutoff = module_from_spec(cspec)
@@ -2572,6 +2590,10 @@ def build(has_audio: bool, repo_url: str | None = None,
     add(f'<link rel=stylesheet href="{TYPEKIT}" media=print onload="this.media=\'all\'">')
     add(f'<noscript><link rel=stylesheet href="{TYPEKIT}"></noscript>')
     add(f'<style>{css_for_serving(css)}</style>')
+    # Byte-identical to the block `the-morning.html` serves, so the derived policy carries
+    # one hash for the two pages rather than two. Not folded into `page_css`, because that
+    # is also the document pages' stylesheet and none of them holds a board.
+    add(f'<style>{morning_module().MORNING_CSS}</style>')
 
     # ---- rail
     add('<nav class=rail aria-label="Sections"><span class=rail-line aria-hidden=true>'
@@ -2680,10 +2702,18 @@ def build(has_audio: bool, repo_url: str | None = None,
             'Both came back schema-valid. Only one of them found the child.'),
         # The two links a judge needs are on the first screen, under the thing that
         # earned the click, rather than above it competing with the demonstration.
+        # The second object on the first screen, and the second thing a judge can put a
+        # hand on. The callscope above it is the call: sixty seconds of one morning, with
+        # the audio. This is the morning those two calls came out of, and it turns.
+        #
+        # Its own page still exists and still holds the arithmetic, the source and the two
+        # paragraphs of what the board does not claim. What moved here is the object. A
+        # link to a 3D board is a link, and the thing this entry has that the writing
+        # cannot carry is that the board answers a drag.
+        morning_module().morning_markup(_spelled(_recorded_call_total()), compact=True),
         '<div class=after-minute>',
         video_link_markup(video_url),
         repo_link_markup(repo_url),
-        '<a class=after-link href="the-morning.html">See a whole morning &#8594;</a>',
         '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
@@ -3258,6 +3288,11 @@ def build(has_audio: bool, repo_url: str | None = None,
     # and a policy that has to grow a hash for every small script is a policy somebody
     # eventually widens.
     add('<script type=module src="console.js"></script>')
+    # The board mounts itself off `[data-mrn-stage]`, the same way it does on its own
+    # page, and returns without touching the document when that element is absent. Last,
+    # after the player and the run block, because a WebGL context is the most expensive
+    # thing on this page and nothing above it waits on one.
+    add('<script type=module src="morning.js"></script>')
     # The animation and the script that decides whether to play it. Both are deferred and
     # both come after app.js, because the figure is nine screens down and nothing above it
     # waits on either. Served from this origin rather than a CDN, so the derived policy

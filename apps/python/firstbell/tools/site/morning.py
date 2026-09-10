@@ -85,8 +85,19 @@ def _static_svg(n: int, open_at: int) -> str:
             f'{"".join(cells)}</svg>')
 
 
-def morning_markup(placed: str) -> str:
-    """The whole board: the drawing, the arithmetic under it, and the one claim."""
+def morning_markup(placed: str, compact: bool = False) -> str:
+    """The whole board: the drawing, the arithmetic under it, and the one claim.
+
+    `compact` returns the same board with none of the writing around it, for the first
+    screen of the evidence page. A judge who never scrolls has to be able to turn it, and
+    a text link to another page is a link most of them will not follow. The arithmetic,
+    the source and the two paragraphs of what this does not claim stay on the full board,
+    one click away, because they are what somebody checking it needs and not what
+    somebody deciding in thirty seconds needs.
+
+    It carries no `<h1>`. Act 00 already has one and a second would give the page two
+    document titles.
+    """
     n = absences()
     cols, rows = grid()
     # Deterministic, and interior on both axes, so the open column reads as one of the
@@ -95,13 +106,28 @@ def morning_markup(placed: str) -> str:
     # arithmetic looked central and the picture had the whole argument standing on the
     # edge of the board. Pick the cell, not the index.
     open_at = (rows // 2) * cols + (cols // 2) - 1
-    return (
-        '<section class=morning '
+    shell = (
         f'data-mrn-count="{n}" data-mrn-cols="{cols}" data-mrn-rows="{rows}" '
         f'data-mrn-open="{open_at}">'
-        '<p class=eyebrow>One school morning, modelled</p>'
-        f'<h1>{n} absences. One of them is not a child who stayed home.</h1>'
-        '<p class=mrn-lede>Every tile is one family the office has to telephone before '
+    )
+    if compact:
+        return (
+            '<section class="morning morning-compact" ' + shell
+            + '<p class=eyebrow>One school morning, modelled</p>'
+            + f'<div class=mrn-stage data-mrn-stage>{_static_svg(n, open_at)}</div>'
+            + '<p class=mrn-hint data-mrn-hint hidden>Drag to turn it.</p>'
+            + f'<p class=mrn-say>{n} absences in one morning at a school of {PUPILS}, at '
+              'the national rate. Every tile is a family somebody has to telephone before '
+              'the register closes, and from the desk they are identical. One of them is '
+              'not a child who stayed home. '
+              '<a href="the-morning.html">Where the number comes from, and what happens '
+              'when the morning is longer than the cut-off &#8594;</a></p>'
+            + '</section>')
+    return (
+        '<section class=morning ' + shell
+        + '<p class=eyebrow>One school morning, modelled</p>'
+        + f'<h1>{n} absences. One of them is not a child who stayed home.</h1>'
+        + '<p class=mrn-lede>Every tile is one family the office has to telephone before '
         'the register closes. From a desk they are identical, and they stay identical '
         'after the calls are made, because a call that reached somebody and learned '
         'nothing files itself next to the ones that worked. The column is the one this '
@@ -146,6 +172,25 @@ MORNING_CSS = """
 .mrn-open .mrn-cap { fill: var(--brand); filter: brightness(1.12); }
 .mrn-hint { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
   margin: 0 0 var(--space-5); }
+
+/* ---- the same board, on the first screen ----------------------------------------------
+ * No page of its own, no width of its own, and no title: it sits in act 00's reading
+ * column directly under the two calls, so a judge meets both sensory objects before they
+ * meet a paragraph. Hear the calls, turn the morning.
+ *
+ * The height is capped here rather than in the script. `mount` sizes the canvas from the
+ * stage's own width and would give a 753px column a 391px board, which on a 900px screen
+ * pushes the thing under it off the fold. 300px keeps the board, its hint and the line
+ * under it inside one screen with the audio instrument above them. */
+.morning-compact { max-width: none; margin: 0; padding: 0; }
+.morning-compact .mrn-stage { margin-bottom: var(--space-2); height: 260px; }
+.morning-compact .mrn-stage canvas,
+.morning-compact .mrn-flat { height: 100%; width: 100%; object-fit: contain; }
+.morning-compact .eyebrow { margin-bottom: var(--space-2); }
+.morning-compact .mrn-hint { margin-bottom: var(--space-2); }
+.mrn-say { font-family: var(--ui); font-size: var(--size-2); line-height: 1.6;
+  color: var(--ink-3); max-width: 62ch; margin: 0 0 var(--space-4); }
+.mrn-say a { color: var(--ink-2); }
 .mrn-note { font-family: var(--ui); font-size: var(--size-2); line-height: 1.6;
   color: var(--ink-3); margin: 0 0 var(--space-3); }
 .mrn-back { font-family: var(--ui); font-size: var(--size-2);
