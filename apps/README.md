@@ -11,6 +11,7 @@ Current apps:
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`typescript/clarity`](typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
+| [`typescript/careloop-ai`](typescript/careloop-ai/) | TypeScript / Next.js | Catalog and reproducibility guide for consent-gated post-consultation CALL-E follow-ups, strict patient-reported results, verified webhook reconciliation, and human clinical review, with a no-call default. |
 | [`python/audition-agent`](python/audition-agent/) | Python / React | Catalog and setup guide for producer-reviewed CALL-E role-disclosure callbacks, with upstream source and no-call verification. |
 | [`typescript/e-mploye-for-calle`](typescript/e-mploye-for-calle/) | TypeScript | Human-approved virtual employee for appointment, lead follow-up, and shift coordination workflows, with a fake-only public mode and opt-in CALL-E SDK integration. |
 | [`typescript/asyncfounders`](typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |

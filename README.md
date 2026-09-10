@@ -156,6 +156,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
 - [OneReach service follow-up](apps/typescript/onereach-service-followup/) - Turns an authorized CALL-E service appointment conversation into a validated Operations handoff, with a no-call default and standalone public integration example.
 
+- [CareLoop AI](apps/typescript/careloop-ai/) - Consent-gated post-consultation CALL-E follow-ups that preserve uncertain patient reports and route concerning outcomes to human clinical review, with a no-call default.
+
 - [Audition Agent](apps/python/audition-agent/) - Producer-reviewed CALL-E role-disclosure calls that collect performer interest, callback availability, and unanswered questions, with a no-call verification path.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
@@ -169,6 +171,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
+| [`apps/typescript/careloop-ai`](apps/typescript/careloop-ai/) | TypeScript / Next.js | Catalog and reproducibility guide for consent-gated post-consultation CALL-E follow-ups, strict patient-reported results, verified webhook reconciliation, and human clinical review, with a no-call default. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
 | [`apps/typescript/sparescout`](apps/typescript/sparescout/) | TypeScript | Approval-gated multi-supplier vehicle-part sourcing with strict fitment schemas, durable evidence history, interruption-safe CALL-E monitoring, global market localization, and a no-call fixture default. |
