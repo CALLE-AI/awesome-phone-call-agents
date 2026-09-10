@@ -25,8 +25,8 @@ export default function Home() {
           remember important details and request simple actions through conversation.
         </p>
         <div className="notice" role="status">
-          <strong>Scaffold preview</strong>
-          <span>No call, message or recurring job can be created in this build.</span>
+          <strong>Local realtime harness available</strong>
+          <span>The protected developer test is at <a href="/realtime">/realtime</a>. No phone call, message or recurring job can be created.</span>
         </div>
       </section>
 

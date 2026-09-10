@@ -135,6 +135,72 @@ h2 {
 
 .boundaries > p { margin-top: 36px; }
 
+.harness-page { background: #e9efe9; }
+
+.harness-grid {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 54px 32px 96px;
+}
+
+.harness-card,
+.metrics-card {
+  background: var(--card);
+  border: 1px solid #cbd8cd;
+  border-radius: 24px;
+  box-shadow: 0 18px 45px rgba(23, 41, 31, .08);
+  padding: clamp(28px, 5vw, 56px);
+}
+
+.harness-card h1 { font-size: clamp(2.7rem, 6vw, 5.3rem); }
+.metrics-card h2 { font-size: clamp(2rem, 3vw, 3rem); }
+.metrics-card h3 { margin: 36px 0 12px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+
+button {
+  background: var(--green);
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 12px 20px;
+}
+
+button:hover:not(:disabled) { background: #194634; }
+button:focus-visible { outline: 4px solid rgba(214, 107, 61, .45); outline-offset: 2px; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+button.danger { background: #8b372a; }
+
+.session-state {
+  align-items: center;
+  background: #eff4ef;
+  border-radius: 14px;
+  display: flex;
+  gap: 10px;
+  margin-top: 30px;
+  padding: 14px 16px;
+  text-transform: capitalize;
+}
+
+.state-dot { background: #7a847d; border-radius: 50%; height: 12px; width: 12px; }
+.state-listening { background: #2f7d51; box-shadow: 0 0 0 5px rgba(47, 125, 81, .14); }
+.state-speaking { background: var(--orange); box-shadow: 0 0 0 5px rgba(214, 107, 61, .14); }
+.state-error { background: #aa3329; }
+.error-message { color: #8b2721; font-weight: 700; }
+
+.metrics-card dl { display: grid; gap: 0; margin: 28px 0 0; }
+.metrics-card dl div { border-top: 1px solid #d6ded7; display: flex; justify-content: space-between; padding: 13px 0; }
+.metrics-card dt { color: #53655a; }
+.metrics-card dd { font-weight: 800; margin: 0; text-align: right; }
+.latency-list { padding-left: 26px; }
+.fine-print { color: #53655a; font-size: .85rem; margin-top: 34px; }
+
 @media (max-width: 760px) {
   body { font-size: 17px; }
   nav, .hero, .journey, .boundaries { padding-left: 20px; padding-right: 20px; }
@@ -142,6 +208,7 @@ h2 {
   .journey ol { grid-template-columns: 1fr 1fr; }
   .boundaries { grid-template-columns: 1fr; gap: 12px; }
   .boundaries > p { margin-top: 0; }
+  .harness-grid { grid-template-columns: 1fr; padding-left: 20px; padding-right: 20px; }
 }
 
 @media (max-width: 440px) {

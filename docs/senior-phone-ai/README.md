@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **1/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **2/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-002](#spa-002). No active implementation ticket or reported blocker.
+Next ticket: [SPA-003](#spa-003), which is Ready after the local Realtime audio gate passed.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -52,8 +52,8 @@ The critical milestone is [SPA-004](#spa-004): prove that a real telephone calle
 | ID | Ticket | Milestone | Priority | Status | Depends on |
 |---|---|---|---|---|---|
 | [SPA-001](#spa-001) | Scaffold the fullstack Next.js TypeScript app | M1 | High | Done | None |
-| [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Ready | [SPA-001](#spa-001) |
-| [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Backlog | [SPA-002](#spa-002) |
+| [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Done | [SPA-001](#spa-001) |
+| [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Ready | [SPA-002](#spa-002) |
 | [SPA-004](#spa-004) | Connect inbound SIP calls and pass the live phone search gate | M1 | High | Backlog | [SPA-003](#spa-003) |
 | [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Backlog | [SPA-004](#spa-004) |
 | [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Backlog | [SPA-005](#spa-005) |
@@ -94,14 +94,14 @@ Implementation notes and verification: Added the Next.js 16 App Router scaffold 
 
 Build a developer-only microphone/audio harness using one OpenAI Realtime agent.
 Acceptance criteria:
-- [ ] Verify current official API/session requirements before implementation and document chosen transport/model.
-- [ ] User speech produces streaming spoken responses in the same session; interruptions and follow-up questions work.
-- [ ] Server credentials stay server-side; any client session credentials are short-lived.
-- [ ] Protect remotely reachable session creation before exposure; reject unauthorized spending requests and cross-origin browser mutations. Keep the harness private until protection is verified.
-- [ ] AI identity is disclosed and session end/disconnect releases resources.
-- [ ] Measure session establishment and response latency; report real results without invented targets.
+- [x] Verify current official API/session requirements before implementation and document chosen transport/model.
+- [x] User speech produces streaming spoken responses in the same session; interruptions and follow-up questions work.
+- [x] Server credentials stay server-side; any client session credentials are short-lived.
+- [x] Protect remotely reachable session creation before exposure; reject unauthorized spending requests and cross-origin browser mutations. Keep the harness private until protection is verified.
+- [x] AI identity is disclosed and session end/disconnect releases resources.
+- [x] Measure session establishment and response latency; report real results without invented targets.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a developer-only `/realtime` microphone harness using the official OpenAI Agents SDK, `gpt-realtime-2.1` and browser WebRTC. The server creates 60-second client secrets only in live mode after enforcing an exact same loopback origin and a developer rate limit; LAN and public hostnames are rejected, the development command binds to `127.0.0.1`, and the browser never receives the long-lived API key or displays a credential input. The SDK session uses semantic VAD, automatic interruption, AI identity/safety instructions, explicit mute/interrupt/end controls, unload cleanup, a 15-minute maximum and no transcript/audio persistence. A credentialed local browser test completed 10 conversation items over four measured spoken turns, including follow-up interaction, then ended and released the session. Observed request-to-connection latency was 3,665 ms. Observed speech-stop-to-first-audio latency was 610 ms, 690 ms, 1,050 ms and 691 ms; these are local observations, not targets. The user confirmed the live audio behavior worked. Eight offline tests, lint and typecheck passed after the final WebRTC measurement adjustment. No API key, audio or transcript was recorded in repository files.
 
 ### SPA-003
 
@@ -366,6 +366,8 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-002 | Passed the credentialed local Realtime audio gate, marked SPA-002 Done and made SPA-003 Ready. | User confirmed live audio worked. Browser recorded 3,665 ms establishment and four response measurements of 610–1,050 ms across 10 conversation items; session ended. Eight offline tests, lint and typecheck passed. |
+| 2026-09-10 | SPA-002 | Implemented the protected local OpenAI Realtime WebRTC microphone harness; blocked completion on credentialed browser audio verification. | App checks and production build passed; 7 offline tests passed; production endpoint returned 403 for absent/cross-origin requests and 401 for an invalid token. No live audio metrics were invented. |
 | 2026-09-10 | SPA-001 | Added the fullstack Next.js TypeScript scaffold with preview-only provider boundaries and marked SPA-002 Ready. | Clean install, app checks, production build/start, HTTP health/page checks, zero-vulnerability audit, repository validation and diff check passed. |
 | 2026-09-10 | SPA-001, SPA-002, SPA-004, SPA-005, SPA-010, SPA-013–SPA-015 | Reviewed four PR discussions and three official-repository app READMEs; documented sources, corrected app placement and strengthened acceptance criteria. Implementation remains unstarted. | `python scripts/validate_repository.py` passed. |
 | 2026-09-10 | SPA-001–SPA-019 | Established repository Markdown tracking with stable IDs, dependencies, milestone gates and acceptance checklists. SPA-001 is Ready; implementation has not started. | `python scripts/validate_repository.py` passed. |
