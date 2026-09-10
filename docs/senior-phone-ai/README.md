@@ -60,7 +60,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | In progress | [SPA-007](#spa-007) |
-| [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Backlog | [SPA-009](#spa-009), [SPA-010](#spa-010) |
+| [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | In progress | [SPA-009](#spa-009), [SPA-010](#spa-010) |
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Backlog | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Backlog | [SPA-013](#spa-013) |
@@ -134,7 +134,7 @@ Acceptance criteria:
 - [ ] Live checks require explicit consent and configured test numbers. Run this gate only after SPA-015 passes.
 - [ ] Keep CALL-E for outbound actions; do not assume CALL-E inbound live tool calling.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Each due item is claimed before its single provider request and reuses its durable idempotency key. The page checks due work while open and catches up on the next check after a restart. SPA-011 remains In progress until the Supabase multi-worker claim path, production scheduler authentication, SMS delivery, late-run policy and fake-provider race/failure tests are complete.
 
 ### SPA-005
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-011 foundation | Added one-time scheduled CALL-E controls, explicit review/confirmation, encrypted local persistence, due-work claiming, status display and pre-dispatch cancellation. SPA-011 moved to In progress. | Fifty-two offline tests, lint, typecheck, production build, repository validation and browser inspection passed; no live call was scheduled or placed. |
 | 2026-09-11 | SPA-010 | Added frontend destination and purpose configuration with masked review and explicit live-call confirmation. Removed the environment destination fallback; accepted calls register automatically for the monitoring table, while uncertain matching dispatches are held. SPA-010 moved to In progress. | Fifty offline tests, lint, typecheck, production build and repository validation passed. The form and existing one-call table were inspected without placing a new call; unconfirmed/invalid/cross-origin requests were denied. |
 | 2026-09-11 | SPA-010 foundation | Replaced manual call-ID entry with a bounded server-side registry and automatic table of monitored calls. Active calls poll every two seconds and display redacted transcript turns as CALL-E publishes them. SPA-010 remains Ready because call planning, confirmed execution and durable registration/reconciliation are still required. | The local registry returned one completed call with 10 transcript turns without printing their private content. Automated checks and responsive page inspection passed; no new call was placed. |
 | 2026-09-11 | SPA-013 foundation | Added an opt-in local conversation review panel to the developer Realtime page. Current caller/assistant text remains visible in memory; explicit saving retains at most 10 sessions in browser storage, excludes audio/tool payloads and provides a clear action. SPA-013 remains Backlog. | Forty-five offline tests, lint, typecheck and production build passed. The local page was inspected without starting a billable Realtime session. |
