@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **2/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **3/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-003](#spa-003), which is Ready after the local Realtime audio gate passed.
+Next ticket: [SPA-004](#spa-004), which is Ready after the browser same-session search gate passed.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -53,8 +53,8 @@ The critical milestone is [SPA-004](#spa-004): prove that a real telephone calle
 |---|---|---|---|---|---|
 | [SPA-001](#spa-001) | Scaffold the fullstack Next.js TypeScript app | M1 | High | Done | None |
 | [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Done | [SPA-001](#spa-001) |
-| [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Ready | [SPA-002](#spa-002) |
-| [SPA-004](#spa-004) | Connect inbound SIP calls and pass the live phone search gate | M1 | High | Backlog | [SPA-003](#spa-003) |
+| [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Done | [SPA-002](#spa-002) |
+| [SPA-004](#spa-004) | Connect inbound SIP calls and pass the live phone search gate | M1 | High | Ready | [SPA-003](#spa-003) |
 | [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Backlog | [SPA-004](#spa-004) |
 | [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Backlog | [SPA-005](#spa-005) |
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Backlog | [SPA-006](#spa-006) |
@@ -109,13 +109,15 @@ Implementation notes and verification: Added a developer-only `/realtime` microp
 
 Implement a typed searchWeb tool and dispatcher that returns results into the ongoing audio session.
 Acceptance criteria:
-- [ ] An unscripted spoken question triggers external search after the question; the answer is spoken before the session ends.
-- [ ] Return source URLs, retrieval times and bounded result text; keep retrieved content untrusted and prevent it from authorizing actions.
-- [ ] Validate tool arguments and correlate tool calls/results; handle timeout, failure and interruption honestly.
-- [ ] No pre-fetched news, hardcoded answers or post-call answers masquerading as realtime.
-- [ ] Fake-provider tests verify dispatch and result correlation; explicitly enabled live testing proves actual search.
+- [x] An unscripted spoken question triggers external search after the question; the answer is spoken before the session ends.
+- [x] Return source URLs, retrieval times and bounded result text; keep retrieved content untrusted and prevent it from authorizing actions.
+- [x] Validate tool arguments and correlate tool calls/results; handle timeout, failure and interruption honestly.
+- [x] No pre-fetched news, hardcoded answers or post-call answers masquerading as realtime.
+- [x] Fake-provider tests verify dispatch and result correlation; explicitly enabled live testing proves actual search.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a typed `search_web` function tool to the existing Realtime agent. It calls a loopback-only server backchannel after the caller's question, validates bounded input and a UUID v4 correlation ID, runs the OpenAI Responses web search tool with a 25-second provider timeout, and returns bounded plain text, retrieval time and up to five safe HTTP(S) sources. Final-answer URL citations take precedence over broader discovery URLs. Retrieved content is explicitly untrusted and cannot authorize actions. The browser displays searching/completed/failed state and returns an honest failure result to the ongoing voice session. Recoverable SDK errors preserve a connected session and expose only a bounded diagnostic code; disconnected sessions still release resources.
+
+The explicitly enabled live browser check passed with an unscripted spoken location/news question: search ran after speech, completed at 2026-09-10 19:45:18 Australia/Sydney under redacted correlation `f04c…d71d`, and returned an answer plus five source URLs into the same six-item conversation before the session ended. The server observed an 18.2-second search request, while the browser observed 4,007 ms session establishment and 429 ms from speech stop to first audio on the measured turn. A separate focused live request after the citation-priority fix completed in 14,086 ms with a matching correlation ID, five official City of Sydney URLs and a 73-character bounded answer. A live retry failure at 18,513 ms also exercised the honest 502 path without reusing prior data. Thirteen offline tests, lint and typecheck pass.
 
 ### SPA-004
 
@@ -366,6 +368,8 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-003 | Passed the same-session spoken search gate, corrected final-answer citation priority, marked SPA-003 Done and made SPA-004 Ready. | Live browser search completed under redacted correlation `f04c…d71d` with five sources in a six-item conversation; focused live citation verification returned five official URLs in 14,086 ms. Thirteen offline tests, lint and typecheck passed. |
+| 2026-09-10 | SPA-003 | Added the server-side live web search backchannel and Realtime function tool; moved SPA-003 to In progress pending a same-session spoken check. | Lint, typecheck and 12 offline tests passed, including four fake-provider search tests. No live search result is claimed yet. |
 | 2026-09-10 | SPA-002 | Passed the credentialed local Realtime audio gate, marked SPA-002 Done and made SPA-003 Ready. | User confirmed live audio worked. Browser recorded 3,665 ms establishment and four response measurements of 610–1,050 ms across 10 conversation items; session ended. Eight offline tests, lint and typecheck passed. |
 | 2026-09-10 | SPA-002 | Implemented the protected local OpenAI Realtime WebRTC microphone harness; blocked completion on credentialed browser audio verification. | App checks and production build passed; 7 offline tests passed; production endpoint returned 403 for absent/cross-origin requests and 401 for an invalid token. No live audio metrics were invented. |
 | 2026-09-10 | SPA-001 | Added the fullstack Next.js TypeScript scaffold with preview-only provider boundaries and marked SPA-002 Ready. | Clean install, app checks, production build/start, HTTP health/page checks, zero-vulnerability audit, repository validation and diff check passed. |

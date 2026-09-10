@@ -147,6 +147,7 @@ h2 {
 }
 
 .harness-card,
+.search-card,
 .metrics-card {
   background: var(--card);
   border: 1px solid #cbd8cd;
@@ -156,6 +157,8 @@ h2 {
 }
 
 .harness-card h1 { font-size: clamp(2.7rem, 6vw, 5.3rem); }
+.search-card { grid-column: 1; }
+.search-card h2 { font-size: clamp(2rem, 4vw, 3.4rem); }
 .metrics-card h2 { font-size: clamp(2rem, 3vw, 3rem); }
 .metrics-card h3 { margin: 36px 0 12px; }
 
@@ -201,6 +204,21 @@ button.danger { background: #8b372a; }
 .latency-list { padding-left: 26px; }
 .fine-print { color: #53655a; font-size: .85rem; margin-top: 34px; }
 
+.tool-status {
+  background: #eff4ef;
+  border-radius: 14px;
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+}
+
+.tool-status strong { color: var(--green); text-transform: capitalize; }
+.tool-status-failed strong { color: #8b2721; }
+.search-answer { white-space: pre-wrap; }
+.source-list { padding-left: 26px; }
+.source-list a { color: var(--green); overflow-wrap: anywhere; }
+.source-list a:focus-visible { outline: 3px solid rgba(214, 107, 61, .45); }
+
 @media (max-width: 760px) {
   body { font-size: 17px; }
   nav, .hero, .journey, .boundaries { padding-left: 20px; padding-right: 20px; }
@@ -209,6 +227,7 @@ button.danger { background: #8b372a; }
   .boundaries { grid-template-columns: 1fr; gap: 12px; }
   .boundaries > p { margin-top: 0; }
   .harness-grid { grid-template-columns: 1fr; padding-left: 20px; padding-right: 20px; }
+  .search-card { grid-column: auto; }
 }
 
 @media (max-width: 440px) {

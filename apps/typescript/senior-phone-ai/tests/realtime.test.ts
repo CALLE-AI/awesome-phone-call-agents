@@ -6,6 +6,7 @@ import {
   FixedWindowRateLimiter,
   readRealtimeAccessConfig,
 } from "../lib/realtime/access";
+import { describeRealtimeError } from "../lib/realtime/errors";
 import { RealtimeLatencyTracker } from "../lib/realtime/metrics";
 
 function headers(origin: string | null, host = "localhost:3000"): Headers {
@@ -72,4 +73,13 @@ test("latency tracker also supports audio deltas used by non-WebRTC transports",
   const tracker = new RealtimeLatencyTracker();
   tracker.recordTransportEvent("input_audio_buffer.speech_stopped", 200);
   assert.equal(tracker.recordTransportEvent("response.output_audio.delta", 550)?.milliseconds, 350);
+});
+
+test("realtime diagnostics expose only a bounded provider code", () => {
+  assert.deepEqual(
+    describeRealtimeError({ error: { code: "conversation_already_has_active_response", message: "private detail" } }),
+    { code: "conversation_already_has_active_response" },
+  );
+  assert.deepEqual(describeRealtimeError(new Error("private detail")), { code: "unknown" });
+  assert.equal(describeRealtimeError({ code: "x".repeat(200) }).code.length, 80);
 });

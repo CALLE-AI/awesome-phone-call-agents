@@ -2,7 +2,7 @@
 
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness. It does not yet connect a telephone provider, live search, SMS, Supabase or CALL-E.
+This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It does not yet connect a telephone provider, SMS, Supabase or CALL-E.
 
 ## Quick start
 
@@ -28,6 +28,8 @@ OPENAI_API_KEY=your-server-api-key
 
 Start the app, open <http://127.0.0.1:3000/realtime> and choose **Start live session**. The browser will ask for microphone permission. Starting a session makes a live OpenAI request and can incur usage. Test follow-up turns, speak while the assistant is talking to verify interruption, then choose **End session** and confirm the browser microphone indicator stops.
 
+Ask a changing question, such as the current time in a city. The Realtime agent calls the local `/api/tools/search-web` backchannel after the question, receives a bounded answer with sources and speaks the result in the same session. The page shows tool status, retrieval time, correlation ID and up to five source links. Retrieved pages are untrusted information and cannot authorize an action or change the agent's rules.
+
 ## Commands
 
 ```bash
@@ -48,7 +50,7 @@ Unknown runtime modes fail closed. The Realtime route requires live mode and an 
 
 ## Side effects and safety
 
-The Realtime harness can stream microphone audio only after explicit operator action. It cannot place calls, send SMS, search or schedule work. The other provider adapters return `previewed` without contacting a network.
+The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, send SMS or schedule work. Search failures are reported instead of guessed. The other provider adapters return `previewed` without contacting a network.
 
 Later live features must require explicit user intent, exact action-bound consent, strict E.164 validation, masked phone output, durable idempotency and reconciliation after uncertain dispatch. The assistant must identify itself as AI and must not act as a doctor, therapist, emergency service or substitute for family and carers.
 
@@ -76,7 +78,7 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 
 ## Current limitations
 
-- The Realtime browser flow still needs a credentialed manual microphone test; there is no inbound phone integration.
-- There is no live search, SMS delivery, persistence, reminder scheduling or dashboard.
+- There is no inbound phone integration.
+- There is no SMS delivery, persistence, reminder scheduling or dashboard.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
-- The live same-call search gate remains unverified.
+- The live browser search flow still needs a credentialed same-session manual check; it does not prove the live telephone gate.
