@@ -1,0 +1,24 @@
+# Research and citations
+
+## The problem, in numbers
+
+- The FAA/DOT-reported **full-year 2024 US flight cancellation rate was 1.4%**, up from 1.3% in 2023, with an on-time arrival rate of 78.10% — meaning roughly one in five flights arrives late and a meaningful, rising share are outright cancelled. ([BTS, Dec 2024 / full-year 2024 report](https://www.bts.gov/newsroom/air-travel-consumer-report-december-2024-full-year-2024-numbers))
+- At the individual-airport level, 2025 data on the 75 busiest US airports shows cancellation rates ranging from 0.47% (Boise) up to **3.83% at Washington Reagan National (DCA)** — more than 2.7x the national average — and delay rates as high as **27.34% of flights at DCA**. Disruption risk is heavily concentrated at Northeast hub airports with aging infrastructure and congested airspace, and mid-sized airports are seeing some of the sharpest year-over-year increases, meaning the problem is spreading beyond the usual major hubs. ([InsureMyTrip, 2025 airport statistics](https://www.insuremytrip.com/travel-advice/travel-planning/us-airport-statistics-flight-cancellation-data/))
+- Even a 1.4% national cancellation rate against roughly 600,000+ flights operated per month (627,365 in December 2024 alone, per BTS) works out to many thousands of cancelled flights a month, each carrying on the order of 100+ passengers who all need to be rebooked — the majority of them by opening an app or calling their airline themselves, well after the disruption already happened.
+
+## Direct precedent: a voice AI agent won building exactly this
+
+At a Sabre-backed Voice AI hackathon in the Bay Area in July 2026 — judged by representatives from American Airlines and PayPal, with roughly 400 developers competing from about 1,000 applicants — one of the three winning projects was **FixTrip**, which "consolidated forwarded itineraries into a single management screen and rebuilt disrupted trips," directly addressing flight disruption and rebooking. All demos ran against Sabre's certification sandbox with "fake checkout" functionality, never touching live booking systems — the same sandbox-first approach this build takes with Duffel's test mode. ([Skift, "Sabre Hackathon Highlights Travel's Developer Access Divide," July 21, 2026](https://skift.com/2026/07/21/sabre-hackathon-ai-agentic-voice/); [Sabre newsroom announcement](https://www.sabre.com/resources/newsroom/sabre-opens-travel-infrastructure-to-silicon-valley-developers-building-the-next-ai-agents-at-bay-area-hackathon/))
+
+Trip Rescue is a CALL-E-native adaptation of the same core idea — proactive, voice-first, on-the-call rebooking — built independently on Duffel rather than Sabre's sandbox, since CALL-E's hackathon runs on its own infrastructure. We're stating this precedent plainly rather than implying the idea is untested: the evidence that this specific mechanic resonates with judges in adjacent voice-AI hackathons is exactly why we picked it, and it's also the honest reason to expect a judge to ask "how is this different from FixTrip" — our answer is the CALL-E-specific voice interaction design (the closed decision schema, the reachable/consent gating in `orchestrator.py`) and the fact that it's a genuinely new build against a different, freely-available sandbox (Duffel), not a port of Sabre's code.
+
+## No overlap in the CALL-E hackathon repo
+
+Checked via `git clone --depth 1` of `CALLE-AI/awesome-phone-call-agents` and `grep -rliE` across every `skills/*/SKILL.md` and `apps/{python,typescript}/*/README.md` for flight/travel/airline/rebooking/PNR-related terms: zero matches. The repo's existing travel-adjacent entries are all logistics/delivery (DispatchPulse) or unrelated domains (healthcare, hiring, civic, permits) — nothing touches commercial air travel.
+
+## What we verified ourselves, live, before writing this up
+
+- Duffel's sandbox is real, free, and requires no business/company details to sign up — a test-mode access token is available within about a minute of creating an account.
+- A full LHR→JFK search against Duffel returns **243 real offers across 16 airlines** (American, British Airways, Lufthansa, Virgin Atlantic, etc.) plus the sandbox "Duffel Airways."
+- Booking, requesting a change, and confirming a rebooking onto a different date all work exactly as documented, end to end, run twice independently (booking references `LQKYWD` and `UUEGXU`) — see the main `README.md` for the specifics, including a real validation bug (rejected `+1555...` fictional phone numbers) caught by actually running the flow rather than trusting the docs.
+- No live, low-cost flight-disruption *detection* feed exists — FlightAware AeroAPI, Cirium, and direct airline feeds are all paid/enterprise products with onboarding timelines longer than this hackathon's remaining window. This is stated as a limitation in the main README rather than glossed over, and the demo substitutes a manual trigger for that one step only.

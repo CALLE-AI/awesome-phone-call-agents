@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trip Rescue &mdash; rebooking result</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23155e75'/%3E%3Ctext x='16' y='22' font-family='Helvetica,Arial,sans-serif' font-weight='700' font-size='16' fill='%23ffffff' text-anchor='middle'%3ETR%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    color-scheme: dark;
+    --ink:#eef3f6; --muted:#93a4ad; --dim:#5f7078;
+    --bg:#0b1416; --panel:#101c20; --panel-2:#0d181b; --line:#1e3037;
+    --teal:#2dd4bf; --teal-dim:#0f2e2b;
+    --amber:#f5b754;
+    --red:#ff8f7a; --red-dim:#3a1a17;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  }
+  a{color:var(--teal)}
+  header.topbar{
+    display:flex; justify-content:space-between; align-items:center; gap:16px;
+    max-width:1040px; margin:0 auto; padding:28px 20px 0;
+  }
+  .brand{display:flex; align-items:center; gap:10px}
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px; background:#155e75;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;
+    flex:none;
+  }
+  .brand-word{font-weight:750; font-size:16px; letter-spacing:-.01em}
+  .eyebrow{color:var(--teal); text-transform:uppercase; letter-spacing:.14em; font-size:11px; font-weight:700}
+  main{max-width:1040px; margin:0 auto; padding:16px 20px 60px}
+  .sample-banner{
+    margin:20px 0 0; padding:10px 14px; border-radius:10px;
+    background:#241c0d; border:1px solid #4a3a17; color:var(--amber);
+    font-size:13px; display:none;
+  }
+  h1{font-size:clamp(24px,3.4vw,34px); letter-spacing:-.02em; margin:14px 0 4px}
+  .subhead{color:var(--muted); margin:0 0 24px}
+  .status-row{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px}
+  .pill{
+    display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px;
+    font-size:12.5px; font-weight:650; border:1px solid var(--line); background:var(--panel-2); color:var(--muted);
+  }
+  .pill.good{background:var(--teal-dim); border-color:#1f5850; color:var(--teal)}
+  .pill.bad{background:var(--red-dim); border-color:#5c2b24; color:var(--red)}
+  .pill.neutral{background:#241f0d; border-color:#4a3f17; color:var(--amber)}
+  .grid{display:grid; grid-template-columns:1.05fr .95fr; gap:18px}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px;
+  }
+  .panel h2{margin:0 0 16px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:700}
+  .ticket{position:relative}
+  .route{display:flex; align-items:center; gap:14px; margin-bottom:6px}
+  .route .city{font-size:28px; font-weight:800; letter-spacing:-.02em}
+  .route .arrow{flex:1; height:1px; background:linear-gradient(90deg,transparent,var(--line) 20%,var(--line) 80%,transparent); position:relative}
+  .route .arrow::after{content:"\2708"; position:absolute; left:50%; top:50%; transform:translate(-50%,-55%); font-size:15px}
+  .route-sub{color:var(--muted); font-size:13px; margin-bottom:18px}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:7px 18px; font-size:13.5px}
+  .kv dt{color:var(--dim)}
+  .kv dd{margin:0; text-align:right; font-variant-numeric:tabular-nums}
+  .divider{height:1px; background:var(--line); margin:16px 0; border:0; border-top:1px dashed var(--line)}
+  .strike{text-decoration:line-through; color:var(--dim)}
+  .new-date{color:var(--teal); font-weight:700}
+  .options{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px}
+  .option{
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:var(--panel-2);
+  }
+  .option.chosen{border-color:#1f5850; background:var(--teal-dim)}
+  .option .num{
+    width:22px; height:22px; border-radius:999px; background:#1a2a2f; color:var(--muted);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex:none;
+  }
+  .option.chosen .num{background:var(--teal); color:#062522}
+  .option .times{font-weight:650; font-size:13.5px}
+  .option .fee{color:var(--muted); font-size:12px}
+  .option .price{font-weight:700; font-size:14px; white-space:nowrap}
+  .chosen-tag{font-size:11px; font-weight:700; color:var(--teal); text-transform:uppercase; letter-spacing:.06em}
+  .notes{
+    margin-top:14px; padding:12px 14px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--muted); font-size:13px; font-style:italic;
+  }
+  .footnote{color:var(--dim); font-size:12px; margin-top:26px; line-height:1.6}
+  code{background:#132025; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:12px}
+  @media (max-width:760px){
+    .grid{grid-template-columns:1fr}
+    .kv dd{text-align:left}
+    .kv{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">TR</span>
+    <span class="brand-word">Trip Rescue</span>
+  </div>
+  <span class="eyebrow">CALL-E &times; Duffel</span>
+</header>
+
+<main>
+  <div class="sample-banner" id="sample-banner">
+    Showing bundled sample data &mdash; run <code>python scripts/simulate_disruption.py</code> and reload this page to see your own run.
+  </div>
+
+  <h1 id="headline">Rebooking result</h1>
+  <p class="subhead" id="subhead">&nbsp;</p>
+
+  <div class="status-row" id="status-row"></div>
+
+  <div class="grid">
+    <section class="panel ticket">
+      <h2>Booking</h2>
+      <div id="ticket-body"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Options offered on the call</h2>
+      <ul class="options" id="options-list"></ul>
+      <div class="notes" id="notes" hidden></div>
+    </section>
+  </div>
+
+  <p class="footnote" id="footnote"></p>
+</main>
+
+<script src="data/last_run.js"></script>
+<script>
+// Bundled sample so this page renders something meaningful even before
+// anyone has run the script -- clearly labeled as sample data (see the
+// banner toggle below), not passed off as a live result.
+const SAMPLE_RUN = {
+  generated_at: "2026-08-30T09:12:00+00:00",
+  mode: "DRY RUN",
+  booking: {
+    order_id: "ord_dryrun0000000000000001",
+    booking_reference: "DRYRUN",
+    passenger_phone: "+442080160509",
+    passenger_name: "Jordan Traveler",
+    origin: "LHR",
+    destination: "JFK",
+    departing_at: "2026-10-15T10:50:00",
+    total_amount: "216.81",
+    total_currency: "USD"
+  },
+  disruption: { reason: "cancelled", detected_at: "2026-08-30T09:11:40+00:00" },
+  requested_new_departure_date: "2026-10-16",
+  outcome: {
+    call_id: null,
+    traveler_reachable: true,
+    confirmed: true,
+    new_departing_at: "2026-10-16T06:00:00",
+    new_booking_reference: "DRYRUN",
+    transcript_summary: "(dry run - no real call placed)",
+    chosen_option: {
+      change_offer_id: "oco_dryrun0000000000000001",
+      departing_at: "2026-10-16T06:00:00", arriving_at: "2026-10-16T14:20:00",
+      change_fee_amount: "125.00", change_fee_currency: "USD",
+      new_total_amount: "341.81", new_total_currency: "USD"
+    },
+    options_offered: [
+      { change_offer_id: "oco_dryrun0000000000000001", departing_at: "2026-10-16T06:00:00", arriving_at: "2026-10-16T14:20:00", change_fee_amount: "125.00", change_fee_currency: "USD", new_total_amount: "341.81", new_total_currency: "USD" },
+      { change_offer_id: "oco_dryrun0000000000000002", departing_at: "2026-10-16T13:30:00", arriving_at: "2026-10-16T21:55:00", change_fee_amount: "98.00", change_fee_currency: "USD", new_total_amount: "314.81", new_total_currency: "USD" },
+      { change_offer_id: "oco_dryrun0000000000000003", departing_at: "2026-10-17T10:50:00", arriving_at: "2026-10-17T19:15:00", change_fee_amount: "60.00", change_fee_currency: "USD", new_total_amount: "276.81", new_total_currency: "USD" }
+    ]
+  }
+};
+
+const isSample = !window.TRIP_RESCUE_RUN;
+const run = window.TRIP_RESCUE_RUN || SAMPLE_RUN;
+document.getElementById("sample-banner").style.display = isSample ? "block" : "none";
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+function fmtMoney(amount, currency) {
+  if (amount == null) return "—";
+  return `${currency ? currency + " " : ""}${amount}`;
+}
+function pill(text, kind) {
+  const span = document.createElement("span");
+  span.className = "pill" + (kind ? " " + kind : "");
+  span.textContent = text;
+  return span;
+}
+
+const { booking, disruption, outcome, requested_new_departure_date, mode } = run;
+
+// Headline + status row
+const headline = outcome.confirmed
+  ? "Rebooked on the call"
+  : outcome.traveler_reachable === false
+    ? "Traveler unreachable — order untouched"
+    : "No rebooking made — order untouched";
+document.getElementById("headline").textContent = headline;
+document.getElementById("subhead").textContent =
+  `${booking.passenger_name} · order ${booking.order_id} · ${mode === "LIVE" ? "live run" : "dry run"}`;
+
+const statusRow = document.getElementById("status-row");
+statusRow.appendChild(pill(disruption.reason === "cancelled" ? "Flight cancelled" : "Delayed / missed connection", "bad"));
+statusRow.appendChild(pill(outcome.traveler_reachable ? "Traveler reached" : "Traveler not reached", outcome.traveler_reachable ? "good" : "bad"));
+statusRow.appendChild(pill(outcome.confirmed ? "Rebooking confirmed" : "No change made", outcome.confirmed ? "good" : "neutral"));
+if (outcome.call_id) statusRow.appendChild(pill(`Call ${outcome.call_id}`));
+
+// Ticket panel
+const ticket = document.getElementById("ticket-body");
+const oldDate = booking.departing_at;
+const newDate = outcome.confirmed ? outcome.new_departing_at : null;
+ticket.innerHTML = `
+  <div class="route">
+    <span class="city">${booking.origin}</span>
+    <span class="arrow"></span>
+    <span class="city">${booking.destination}</span>
+  </div>
+  <div class="route-sub">${booking.passenger_name} &middot; ref <code>${booking.booking_reference}</code></div>
+  <dl class="kv">
+    <dt>Originally departing</dt>
+    <dd>${newDate ? `<span class="strike">${fmtDateTime(oldDate)}</span>` : fmtDateTime(oldDate)}</dd>
+    ${newDate ? `<dt>Now departing</dt><dd class="new-date">${fmtDateTime(newDate)}</dd>` : ""}
+    <dt>Disruption detected</dt>
+    <dd>${fmtDateTime(disruption.detected_at)}</dd>
+    <dt>Requested new date</dt>
+    <dd>${requested_new_departure_date || "—"}</dd>
+  </dl>
+  <hr class="divider">
+  <dl class="kv">
+    <dt>Original total</dt>
+    <dd>${fmtMoney(booking.total_amount, booking.total_currency)}</dd>
+    ${outcome.confirmed && outcome.chosen_option ? `<dt>New total</dt><dd>${fmtMoney(outcome.chosen_option.new_total_amount, outcome.chosen_option.new_total_currency)}</dd>` : ""}
+    ${outcome.confirmed && outcome.chosen_option ? `<dt>Change fee</dt><dd>${fmtMoney(outcome.chosen_option.change_fee_amount, outcome.chosen_option.change_fee_currency)}</dd>` : ""}
+    <dt>New booking ref</dt>
+    <dd>${outcome.new_booking_reference || "— (unchanged)"}</dd>
+  </dl>
+`;
+
+// Options panel
+const optionsList = document.getElementById("options-list");
+const options = outcome.options_offered || [];
+if (options.length === 0) {
+  optionsList.innerHTML = `<li class="option"><span>No rebooking options were available from Duffel for the requested date.</span></li>`;
+} else {
+  options.forEach((opt, i) => {
+    const isChosen = outcome.chosen_option && opt.change_offer_id === outcome.chosen_option.change_offer_id;
+    const li = document.createElement("li");
+    li.className = "option" + (isChosen ? " chosen" : "");
+    li.innerHTML = `
+      <span class="num">${i + 1}</span>
+      <span style="flex:1">
+        <div class="times">${fmtDateTime(opt.departing_at)} &rarr; ${opt.arriving_at ? fmtDateTime(opt.arriving_at) : "—"}</div>
+        <div class="fee">+${fmtMoney(opt.change_fee_amount, opt.change_fee_currency)} change fee</div>
+      </span>
+      <span style="text-align:right">
+        <div class="price">${fmtMoney(opt.new_total_amount, opt.new_total_currency)}</div>
+        ${isChosen ? '<div class="chosen-tag">Chosen</div>' : ""}
+      </span>
+    `;
+    optionsList.appendChild(li);
+  });
+}
+
+if (outcome.transcript_summary) {
+  const notes = document.getElementById("notes");
+  notes.hidden = false;
+  notes.textContent = "“" + outcome.transcript_summary + "”";
+}
+
+document.getElementById("footnote").innerHTML =
+  `Generated ${fmtDateTime(run.generated_at)} by <code>scripts/simulate_disruption.py</code>. ` +
+  `This page only ever displays a result that already happened &mdash; it has no way to place a call or touch a booking itself.`;
+</script>
+</body>
+</html>
