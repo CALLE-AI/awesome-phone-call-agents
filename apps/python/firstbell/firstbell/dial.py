@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python -m firstbell dial",
         description="Place one real attendance call to a number you consent for.")
     p.add_argument("number",
-                   help="The number to call, in E.164, for example +919000000000.")
+                   help="The number to call, in E.164, for example +915550000001.")
     p.add_argument("--i-consent", action="store_true",
                    help="Assert that you may lawfully call this number. Required. "
                         "Writes a dated consent record naming it, which the run then "
@@ -99,7 +99,7 @@ def main(argv: list[str]) -> int:
     if not E164.match(number):
         print(f"{args.number!r} is not an E.164 number.\n"
               "It needs a leading +, then a country code, then the number, with no "
-              "spaces or dashes: +919000000000.")
+              "spaces or dashes: +915550000001.")
         return 2
 
     if not args.i_consent:

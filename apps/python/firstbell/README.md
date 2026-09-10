@@ -921,6 +921,26 @@ python -m firstbell --work-file examples/absences.csv \
   --live --yes-i-mean-it --limit 1 --receipt run.json
 ```
 
+### One call, to your own number
+
+A work file is the right shape for a school and the wrong shape for somebody who wants to
+hear this work once. `dial` takes a single number instead.
+
+```bash
+python -m firstbell dial +915550000001 --i-consent
+```
+
+It does not skip the consent check to do that; it satisfies it. The command writes a
+dated consent record naming the number, scoped to voice and attendance and expiring the
+same day, and the run then checks that record with the same code that checks a district's
+register. The run's own summary says so: `on a record  1  dated, voice, attendance, not
+withdrawn`, where a work file with a `yes` column reports `on a boolean`. Without
+`--i-consent` it refuses and prints why. Add `--offline` to see the whole thing against
+the bundled double for nothing.
+
+Asserting consent is a claim about a number you are accountable for. Nothing in this
+repository makes a call lawful, here least of all: see `docs/consent-record.md`.
+
 `--live` without `--yes-i-mean-it` exits with an explanation instead of dialling. `--limit`
 exists so a first live run is one call.
 
