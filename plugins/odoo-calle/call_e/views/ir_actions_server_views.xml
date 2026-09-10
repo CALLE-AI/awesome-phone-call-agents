@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_server_action_form_inherit_calle" model="ir.ui.view">
+        <field name="name">ir.actions.server.view.form.inherit.calle</field>
+        <field name="model">ir.actions.server</field>
+        <field name="inherit_id" ref="base.view_server_action_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="model_name" invisible="1"/>
+                <group invisible="state != 'calle_call'">
+                    <field name="calle_phone_field_chain"
+                           widget="field_selector"
+                           options="{'model': 'model_name'}"
+                           required="state == 'calle_call'"/>
+                </group>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="CALL-E Sections" name="calle_task" invisible="state != 'calle_call'">
+                    <field name="calle_section_ids" widget="calle_sections_editor" class="w-100 d-block">
+                        <list>
+                            <field name="section_text"/>
+                            <field name="response_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="action_code"/>
+                                    <field name="child_section_ids">
+                                        <list>
+                                            <field name="section_text"/>
+                                            <field name="response_ids">
+                                                <list>
+                                                    <field name="name"/>
+                                                    <field name="action_code"/>
+                                                </list>
+                                            </field>
+                                        </list>
+                                    </field>
+                                </list>
+                            </field>
+                        </list>
+                    </field>
+                </page>
+                <page string="Generated Prompt" name="calle_prompt" invisible="state != 'calle_call'">
+                    <field name="calle_section_ids" widget="calle_prompt_preview" class="w-100 d-block"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

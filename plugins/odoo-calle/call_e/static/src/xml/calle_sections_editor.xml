@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="call_e.CalleSectionsEditor">
+        <div class="calle-sections-container w-100">
+            <div class="calle-sections-list w-100">
+                <t t-foreach="sections" t-as="section" t-key="section.id">
+                    <t t-call="call_e.CalleSectionCard">
+                        <t t-set="section" t-value="section"/>
+                        <t t-set="parentList" t-value="this.props.record.data[this.props.name]"/>
+                        <t t-set="isChild" t-value="false"/>
+                    </t>
+                </t>
+            </div>
+
+            <div class="calle-add-section-card w-100 mt-3" t-on-click="() => this.onAddSection()">
+                + Add Call Section
+            </div>
+        </div>
+    </t>
+
+    <t t-name="call_e.CallePromptPreview">
+        <div class="calle-preview-container w-100 p-3 bg-light rounded border">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="fa fa-terminal text-primary me-2"/>Rendered Call Instructions Prompt
+                </h6>
+                <span class="badge bg-info-subtle text-info border border-info-subtle small">Live Preview</span>
+            </div>
+            <p class="text-muted small mb-2">This is the complete prompt generated for the CALL-E AI phone agent based on your defined sections and follow-up flows.</p>
+            <pre class="p-3 bg-white border rounded font-monospace text-dark overflow-auto shadow-sm mb-0" style="min-height: 250px; max-height: 500px; white-space: pre-wrap;"><t t-esc="this.generatedPrompt"/></pre>
+        </div>
+    </t>
+
+    <t t-name="call_e.CalleSectionCard">
+        <div t-attf-class="calle-section-card w-100 #{isChild ? 'calle-child-section-card mt-2 border-start border-3 border-primary ps-2 bg-white shadow-sm' : ''}">
+            <div class="calle-card-header">
+                <div class="calle-text-group">
+                    <t t-if="isChild">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-1 align-self-start">Follow-up Section</span>
+                    </t>
+                    <label class="calle-label">Section Text</label>
+                    <textarea class="form-control calle-textarea"
+                              placeholder="e.g. Hello {{ record.partner_id.name or record.name }}, can you confirm your attendance for {{ record.display_name }}?"
+                              t-on-change="(ev) => this.onSectionTextChange(section, ev)"><t t-esc="section.data.section_text || ''"/></textarea>
+                </div>
+
+                <div class="calle-header-actions">
+                    <button type="button" class="btn calle-btn-delete" title="Delete section" t-on-click="() => this.onDeleteSection(section, parentList)">
+                        <i class="fa fa-trash-o fa-lg"/>
+                    </button>
+                </div>
+            </div>
+
+            <div class="calle-responses-wrapper w-100">
+                <div class="calle-responses-line"/>
+                <div class="calle-responses-content w-100">
+                    <label class="calle-label">Expected Responses (Optional)</label>
+
+                    <t t-if="section.data.response_ids &amp;&amp; section.data.response_ids.records.length > 0">
+                        <div class="calle-responses-list w-100 d-flex flex-column gap-2 mb-2">
+                            <t t-foreach="section.data.response_ids.records" t-as="resp" t-key="resp.id">
+                                <div class="calle-response-row w-100 p-2 border rounded bg-light">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fw-bold text-dark fs-6"><t t-esc="resp.data.name"/></span>
+                                            <t t-if="resp.data.action_code">
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle small ms-1">Has Python Code</span>
+                                            </t>
+                                        </div>
+
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button type="button"
+                                                    t-attf-class="btn btn-sm #{resp.data.action_code ? 'btn-outline-success' : 'btn-outline-primary'} py-0 px-2"
+                                                    title="Execute Python Code based on this answer"
+                                                    t-on-click="() => this.toggleCodeEditor(resp)">
+                                                <t t-if="this.state.openCodeResponseId === resp.id">Hide Code</t>
+                                                <t t-else="">Execute Code</t>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 border-0" title="Remove answer" t-on-click="() => this.onDeleteResponse(section, resp)">
+                                                <i class="fa fa-times"/>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div t-if="this.state.openCodeResponseId === resp.id" class="calle-code-editor-box mt-3 border rounded bg-white shadow-sm w-100 overflow-hidden">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom bg-light px-2 pt-1 pb-0">
+                                            <ul class="nav nav-tabs border-bottom-0 calle-code-tabs">
+                                                <li class="nav-item">
+                                                    <button type="button"
+                                                            t-attf-class="nav-link py-1 px-3 border-0 bg-transparent #{this.state.activeTab === 'code' ? 'active border-bottom border-primary border-2 fw-bold text-dark' : 'text-primary'}"
+                                                            t-on-click="() => this.setTab('code')">Code</button>
+                                                </li>
+                                                <li class="nav-item">
+                                                    <button type="button"
+                                                            t-attf-class="nav-link py-1 px-3 border-0 bg-transparent #{this.state.activeTab === 'help' ? 'active border-bottom border-primary border-2 fw-bold text-dark' : 'text-primary'}"
+                                                            t-on-click="() => this.setTab('help')">Help</button>
+                                                </li>
+                                            </ul>
+                                            <button type="button" class="btn btn-sm btn-link text-muted p-0 text-decoration-none me-2" t-on-click="() => this.toggleCodeEditor(resp)">Done</button>
+                                        </div>
+
+                                        <div t-if="this.state.activeTab === 'code'" class="p-2 position-relative" style="height: 180px; min-height: 180px;">
+                                            <CodeEditor t-props="this.getCodeEditorProps(resp)"/>
+                                        </div>
+
+                                        <div t-if="this.state.activeTab === 'help'" class="p-3 bg-light text-dark small" style="min-height: 180px;">
+                                            <div class="fw-bold mb-2">Available Python Context Variables:</div>
+                                            <ul class="mb-2 ps-3">
+                                                <li><code>record</code>: Record on which the action is triggered (e.g. <code>record.write({'state': 'confirmed'})</code>)</li>
+                                                <li><code>env</code>: Odoo Environment (e.g. <code>env['res.partner'].search(...)</code>)</li>
+                                                <li><code>logger</code>: Logger instance for logging messages (e.g. <code>logger.info('Call answered!')</code>)</li>
+                                            </ul>
+                                            <div class="fw-bold mb-1">Example Python Snippet:</div>
+                                            <pre class="bg-white p-2 border rounded font-monospace text-dark mb-0">record.write({'state': 'confirmed'})
+logger.info("Updated record state for %s", record.display_name)</pre>
+                                        </div>
+                                    </div>
+
+                                    <!-- Nested Follow-up Sections under this expected response -->
+                                    <div class="calle-child-sections-container mt-2 pt-2 border-top">
+                                        <t t-if="resp.data.child_section_ids &amp;&amp; resp.data.child_section_ids.records.length > 0">
+                                            <div class="text-muted small fw-bold mb-2">Follow-up Section if answer is "<t t-esc="resp.data.name"/>":</div>
+                                            <div class="d-flex flex-column gap-2 mb-2">
+                                                <t t-foreach="resp.data.child_section_ids.records" t-as="childSec" t-key="childSec.id">
+                                                    <t t-call="call_e.CalleSectionCard">
+                                                        <t t-set="section" t-value="childSec"/>
+                                                        <t t-set="parentList" t-value="resp.data.child_section_ids"/>
+                                                        <t t-set="isChild" t-value="true"/>
+                                                    </t>
+                                                </t>
+                                            </div>
+                                        </t>
+
+                                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-bold text-primary small" t-on-click="() => this.onAddChildSection(resp)">
+                                            + Add Follow-up Section for "<t t-esc="resp.data.name"/>"
+                                        </button>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
+                    <div class="mt-2">
+                        <t t-if="this.state.addingResponseSectionId === section.id">
+                            <div class="calle-inline-input-group d-flex align-items-center gap-2">
+                                <input type="text"
+                                       class="form-control form-control-sm calle-inline-input"
+                                       placeholder="e.g. Yes / Confirmed / Reschedule"
+                                       t-model="this.state.newResponseName"
+                                       t-on-keydown="(ev) => ev.key === 'Enter' &amp;&amp; this.confirmAddResponse(section)"/>
+                                <button type="button" class="btn btn-sm btn-primary py-1 px-3" t-on-click="() => this.confirmAddResponse(section)">Add</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" t-on-click="() => this.cancelAddResponse()">✕</button>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <button type="button" class="calle-btn-add-response btn btn-sm btn-link text-decoration-none p-0 fw-bold" t-on-click="() => this.startAddResponse(section)">
+                                + Add Expected Response
+                            </button>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
