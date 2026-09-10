@@ -2,7 +2,7 @@
 
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters only. It does not yet connect a telephone/SMS provider, Supabase or CALL-E.
+This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters and Supabase persistence with family-scoped row-level access controls. It does not yet connect a telephone/SMS provider or CALL-E.
 
 ## Quick start
 
@@ -37,6 +37,7 @@ npm run dev
 npm run lint
 npm run typecheck
 npm test
+npm run db:check
 npm run check
 npm run build
 npm start
@@ -44,7 +45,7 @@ npm start
 
 ## Configuration and credentials
 
-`.env.example` names planned server integrations and contains no usable credentials. Keep `.env.local` local; it is ignored. Values named `*_API_KEY`, `*_AUTH_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` are server-only and must never be exposed through `NEXT_PUBLIC_*`, client components, logs or committed fixtures.
+`.env.example` names planned server integrations and contains no usable credentials. Keep `.env.local` local; it is ignored. Values named `*_API_KEY`, `*_AUTH_TOKEN` and `SUPABASE_SECRET_KEY` are server-only and must never be exposed through `NEXT_PUBLIC_*`, client components, logs or committed fixtures. Supabase's URL and publishable key use the documented `NEXT_PUBLIC_SUPABASE_*` names; the publishable key identifies the project but RLS and verified user claims provide authorization.
 
 Unknown runtime modes fail closed. The Realtime route requires live mode and an exact same loopback origin before it creates a rate-limited, 60-second client secret. Requests addressed through a LAN or public hostname are rejected. The long-lived OpenAI key remains on the server and the browser has no credential input. This local-only harness is not end-user authentication and must not be deployed as a public route.
 
@@ -52,7 +53,7 @@ Unknown runtime modes fail closed. The Realtime route requires live mode and an 
 
 The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network; Twilio delivery remains deferred to SPA-004.
 
-The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. The current authorization store is intentionally process-local until SPA-007 adds durable authenticated persistence, so no live side-effect adapter is enabled yet.
+The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. Preview tests use process-local stores; Supabase-backed authorization and SMS stores provide durable production boundaries. No live side-effect adapter is enabled yet.
 
 The assistant identifies itself as AI, speaks plainly, respects refusal and must not impersonate family, clinicians, therapists, emergency services or professional advisers. It does not diagnose conditions, recommend medication changes, give personalized high-risk legal/financial advice or promise emergency help. Immediate danger is directed to local emergency services or a trusted person.
 
@@ -81,6 +82,6 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 ## Current limitations
 
 - There is no inbound phone integration.
-- There is no live SMS delivery, durable persistence, reminder scheduling or dashboard.
+- There is no live SMS delivery, reminder scheduling or dashboard.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
 - The verified live browser search flow does not prove the deferred Twilio telephone gate.

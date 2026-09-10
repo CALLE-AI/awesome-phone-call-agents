@@ -10,6 +10,7 @@ import { assessConversationBoundary, mayRunAutomatically } from "../lib/safety/p
 
 const request: ActionRequest = {
   principalId: "synthetic-senior",
+  seniorId: "20000000-0000-4000-8000-000000000001",
   action: "send_sms",
   destinationE164: "+12025550123",
   purpose: "Send the requested event details",

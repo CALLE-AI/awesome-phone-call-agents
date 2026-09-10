@@ -13,6 +13,7 @@ export type SideEffectAction = (typeof SIDE_EFFECT_ACTIONS)[number];
 
 export interface ActionRequest {
   readonly principalId: string;
+  readonly seniorId: string;
   readonly action: SideEffectAction;
   readonly destinationE164: string;
   readonly purpose: string;
@@ -46,9 +47,9 @@ interface StoredAuthorization {
 }
 
 export interface ActionAuthorizationStore {
-  propose(request: ActionRequest): PendingAction;
-  confirm(authorizationId: string, principalId: string, confirmed: boolean): AuthorizationDecision;
-  consume(authorizationId: string, request: ActionRequest): AuthorizationDecision;
+  propose(request: ActionRequest): PendingAction | Promise<PendingAction>;
+  confirm(authorizationId: string, principalId: string, confirmed: boolean): AuthorizationDecision | Promise<AuthorizationDecision>;
+  consume(authorizationId: string, request: ActionRequest): AuthorizationDecision | Promise<AuthorizationDecision>;
 }
 
 interface StoreOptions {
@@ -69,8 +70,9 @@ function requireBoundedField(name: string, value: string, maximum = MAX_FIELD_LE
   return value;
 }
 
-function validateRequest(request: ActionRequest): ActionRequest {
+export function validateActionRequest(request: ActionRequest): ActionRequest {
   requireBoundedField("principalId", request.principalId);
+  requireBoundedField("seniorId", request.seniorId);
   requireBoundedField("purpose", request.purpose);
   assertStrictE164(request.destinationE164);
   const details = request.details ?? {};
@@ -93,6 +95,7 @@ function fingerprint(request: ActionRequest): string {
   );
   return JSON.stringify([
     request.principalId,
+    request.seniorId,
     request.action,
     request.destinationE164,
     request.purpose,
@@ -116,7 +119,7 @@ export class InMemoryActionAuthorizationStore implements ActionAuthorizationStor
   }
 
   propose(request: ActionRequest): PendingAction {
-    const validated = validateRequest(request);
+    const validated = validateActionRequest(request);
     const authorizationId = this.createId();
     const expiresAtMs = this.now() + this.ttlMs;
     this.records.set(authorizationId, {
@@ -162,7 +165,7 @@ export class InMemoryActionAuthorizationStore implements ActionAuthorizationStor
   consume(authorizationId: string, request: ActionRequest): AuthorizationDecision {
     let validated: ActionRequest;
     try {
-      validated = validateRequest(request);
+      validated = validateActionRequest(request);
     } catch {
       return { allowed: false, reason: "mismatched" };
     }

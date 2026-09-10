@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **5/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **6/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-007](#spa-007), which is Ready after the provider-neutral SMS workflow passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-008](#spa-008), which is Ready after durable family-scoped persistence passed its Docker-free database checks. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -56,8 +56,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Done | [SPA-002](#spa-002) |
 | [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Done | [SPA-003](#spa-003) |
 | [SPA-006](#spa-006) | Prepare authorized information SMS during the call workflow | M2 | Medium | Done | [SPA-005](#spa-005) |
-| [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Ready | [SPA-006](#spa-006) |
-| [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Backlog | [SPA-007](#spa-007) |
+| [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Done | [SPA-006](#spa-006) |
+| [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Ready | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Backlog | [SPA-009](#spa-009), [SPA-010](#spa-010) |
@@ -173,14 +173,16 @@ Implementation notes and verification: Added a provider-neutral SMS service that
 
 Add Supabase PostgreSQL migrations and server data access for seniors, trusted contacts, preferences, calls, optional transcripts, summaries, tool activity, SMS, reminders and scheduled check-ins.
 Acceptance criteria:
-- [ ] Store timezone, approximate location and interests; use a synthetic Margaret fixture with no real phone number.
-- [ ] Family/carer authentication and membership authorization restrict each user's senior records; verify cross-account access denial and RLS.
-- [ ] Caller ID alone is not sufficient authorization to expose private data; define a low-friction safe enrollment/verification flow.
-- [ ] Persist SMS history and tool/call correlation without credentials; keep service credentials server-only.
-- [ ] Define senior-approved sharing, minimal collection, retention/deletion and optional recording/transcript consent before enabling storage.
-- [ ] Migrations and seeds run locally; document rollback and schema relationships.
+- [x] Store timezone, approximate location and interests; use a synthetic Margaret fixture with no real phone number.
+- [x] Family/carer authentication and membership authorization restrict each user's senior records; verify cross-account access denial and RLS.
+- [x] Caller ID alone is not sufficient authorization to expose private data; define a low-friction safe enrollment/verification flow.
+- [x] Persist SMS history and tool/call correlation without credentials; keep service credentials server-only.
+- [x] Define senior-approved sharing, minimal collection, retention/deletion and optional recording/transcript consent before enabling storage.
+- [x] Migrations and seeds run in embedded PostgreSQL without Docker; exercise RLS locally and document hosted deployment, rollback and schema relationships.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a Supabase PostgreSQL schema for senior profiles, active family/carer memberships, sharing preferences, trusted contacts, correlated calls/tools/SMS, one-time action authorization, delivery events, reminders and scheduled work. RLS allows only active members to read a senior and requires an additional content permission for calls, transcripts and tool activity. Supabase SSR clients derive identity from verified claims; caller ID and caller-supplied identifiers never authorize private access. Durable action/SMS adapters preserve exact-action authorization and idempotent callback handling, while the secret-key client is isolated to server-only modules. Transcript and summary storage default off and database triggers require current consent. A retention function deletes or clears time-limited sensitive content.
+
+The number-free Margaret seed stores only timezone, approximate location and interests. Enrollment is documented as a short-lived hashed invite accepted by a matching authenticated Supabase user after senior-approved sharing. A fresh in-memory PGlite PostgreSQL instance applied the migration and seed without Docker, enforced summary consent, allowed the synthetic family member, denied an unrelated account and verified restricted grants. Thirty-one offline tests, lint, typecheck, production build and repository validation passed. Hosted Supabase application and verification are assigned to SPA-015's deployment gate.
 
 ### SPA-008
 
@@ -298,7 +300,7 @@ Implementation notes and verification: Not started.
 
 Prepare operating documentation and a reproducible end-to-end demo.
 Acceptance criteria:
-- [ ] Document Next.js/Node hosting, Supabase migrations, scheduler, secrets and non-SIP provider configuration; leave Twilio/SIP setup for SPA-004.
+- [ ] Document Next.js/Node hosting, apply and verify migrations against the configured hosted Supabase project, scheduler, secrets and non-SIP provider configuration; leave Twilio/SIP setup for SPA-004.
 - [ ] Document side effects, consent, cancellation/disable behavior, rollback, retention and troubleshooting.
 - [ ] Demonstrate browser realtime conversation → arbitrary live news/search → current local event → requested SMS → confirmed reminder → CALL-E reminder delivery → dashboard state.
 - [ ] Use current retrieved events; no hardcoded demo answers. Clearly label offline fake mode.
@@ -369,6 +371,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-007 | Added Supabase persistence, verified-claims authentication, family RLS, consent/retention controls and durable action/SMS adapters; replaced the Docker workflow with embedded PostgreSQL validation; marked SPA-007 Done and SPA-008 Ready. | The migration and number-free seed applied in PGlite; family access, cross-account denial, consent triggers and restricted grants passed. Thirty-one offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-006 | Added the authorized, idempotent SMS workflow and storage/callback boundaries; kept all Twilio delivery work in final ticket SPA-004; marked SPA-006 Done and SPA-007 Ready. | Twenty-six offline tests, lint, typecheck and production build passed. Repository validation passed; no live message was sent. |
 | 2026-09-10 | SPA-005 | Added shared server-side action authorization, strict E.164 validation, phone redaction, tool permissions and structured conversation boundaries; marked SPA-005 Done and SPA-006 Ready. | Twenty offline tests, lint and typecheck passed. Production build and repository validation also passed. No live side effect was enabled. |
 | 2026-09-10 | SPA-004, SPA-005 | Deferred Twilio/inbound SIP to the final MVP gate without renumbering tickets; made SPA-005 Ready so safety and application work can continue. | The unfinished SIP implementation is preserved in the named local Git stash `defer twilio inbound sip spike`; no live carrier behavior is claimed. |

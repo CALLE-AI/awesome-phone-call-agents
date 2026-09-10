@@ -25,6 +25,7 @@ export interface AuthorizedSmsRequest extends SmsReservation {
 export function createSmsActionRequest(request: AuthorizedSmsRequest): ActionRequest {
   return {
     principalId: request.principalId,
+    seniorId: request.seniorId,
     action: "send_sms",
     destinationE164: request.destinationE164,
     purpose: request.purpose,
@@ -54,21 +55,23 @@ export class SmsService {
 
   async dispatch(request: AuthorizedSmsRequest) {
     validateSmsRequest(request);
-    const reservation = this.store.reserve({
+    const reservation = await this.store.reserve({
+      authorizationId: request.authorizationId,
       correlationId: request.correlationId,
       destinationE164: request.destinationE164,
       idempotencyKey: request.idempotencyKey,
       message: request.message,
       purpose: request.purpose,
+      seniorId: request.seniorId,
     });
     if (!reservation.created) return toSmsOperationalSummary(reservation.record);
 
-    const decision = this.authorizations.consume(
+    const decision = await this.authorizations.consume(
       request.authorizationId,
       createSmsActionRequest(request),
     );
     if (!decision.allowed) {
-      this.store.updateDispatch(request.idempotencyKey, "failed");
+      await this.store.updateDispatch(request.idempotencyKey, "failed");
       throw new Error(`SMS authorization ${decision.reason}`);
     }
 
@@ -80,10 +83,10 @@ export class SmsService {
         message: request.message,
       });
     } catch {
-      const unknown = this.store.updateDispatch(request.idempotencyKey, "unknown");
+      const unknown = await this.store.updateDispatch(request.idempotencyKey, "unknown");
       return toSmsOperationalSummary(unknown);
     }
-    const updated = this.store.updateDispatch(
+    const updated = await this.store.updateDispatch(
       request.idempotencyKey,
       result.status,
       result.providerMessageId,
@@ -91,13 +94,13 @@ export class SmsService {
     return toSmsOperationalSummary(updated);
   }
 
-  processCallback(
+  async processCallback(
     rawBody: string,
     headers: Readonly<Record<string, string>>,
     verifier: SmsDeliveryVerifier,
   ) {
     const event = verifier.verify(rawBody, headers);
-    const updated = this.store.applyDelivery(event);
+    const updated = await this.store.applyDelivery(event);
     return updated ? toSmsOperationalSummary(updated) : undefined;
   }
 }

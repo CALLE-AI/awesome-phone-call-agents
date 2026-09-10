@@ -19,6 +19,7 @@ const correlationId = "11111111-1111-4111-8111-111111111111";
 const baseRequest: AuthorizedSmsRequest = {
   authorizationId: "authorization-1",
   principalId: "synthetic-senior",
+  seniorId: "20000000-0000-4000-8000-000000000001",
   correlationId,
   destinationE164: "+12025550123",
   idempotencyKey: "sms:synthetic:request-1",
@@ -40,7 +41,9 @@ function authorizedService(adapter: SmsAdapter = new RecordingSmsAdapter()) {
     createId: () => baseRequest.authorizationId,
   });
   const pending = authorizations.propose(createSmsActionRequest(baseRequest));
-  authorizations.confirm(pending.authorizationId, baseRequest.principalId, true);
+  if (pending instanceof Promise) throw new Error("in-memory authorization must be synchronous");
+  const confirmation = authorizations.confirm(pending.authorizationId, baseRequest.principalId, true);
+  if (confirmation instanceof Promise) throw new Error("in-memory confirmation must be synchronous");
   return { adapter, service: new SmsService(adapter, authorizations, new InMemorySmsStore()) };
 }
 
@@ -132,9 +135,9 @@ test("verified delivery callbacks update status once and unsigned callbacks fail
     },
   };
 
-  assert.throws(() => service.processCallback("provider payload", {}, verifier));
-  const sent = service.processCallback("provider payload", { signature: "valid" }, verifier);
-  const duplicate = service.processCallback("provider payload", { signature: "valid" }, verifier);
+  await assert.rejects(service.processCallback("provider payload", {}, verifier));
+  const sent = await service.processCallback("provider payload", { signature: "valid" }, verifier);
+  const duplicate = await service.processCallback("provider payload", { signature: "valid" }, verifier);
   assert.equal(sent?.status, "sent");
   assert.equal(duplicate?.status, "sent");
   assert.equal(verified, 2);
@@ -155,6 +158,6 @@ test("older verified callback events do not regress delivery state", async () =>
       };
     },
   };
-  assert.equal(service.processCallback("newer", {}, verifier)?.status, "sent");
-  assert.equal(service.processCallback("older", {}, verifier)?.status, "sent");
+  assert.equal((await service.processCallback("newer", {}, verifier))?.status, "sent");
+  assert.equal((await service.processCallback("older", {}, verifier))?.status, "sent");
 });

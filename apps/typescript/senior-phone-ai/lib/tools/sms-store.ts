@@ -2,11 +2,13 @@ import { maskPhoneNumber } from "../safety/phone";
 import type { DeliveryStatus, SmsDeliveryEvent } from "./contracts";
 
 export interface SmsReservation {
+  readonly authorizationId: string;
   readonly correlationId: string;
   readonly destinationE164: string;
   readonly idempotencyKey: string;
   readonly message: string;
   readonly purpose: string;
+  readonly seniorId: string;
 }
 
 export interface SmsRecord extends SmsReservation {
@@ -23,13 +25,13 @@ export type SmsReservationResult =
   | Readonly<{ created: false; record: SmsRecord }>;
 
 export interface SmsStore {
-  reserve(reservation: SmsReservation): SmsReservationResult;
+  reserve(reservation: SmsReservation): SmsReservationResult | Promise<SmsReservationResult>;
   updateDispatch(
     idempotencyKey: string,
     status: DeliveryStatus,
     providerMessageId?: string,
-  ): SmsRecord;
-  applyDelivery(event: SmsDeliveryEvent): SmsRecord | undefined;
+  ): SmsRecord | Promise<SmsRecord>;
+  applyDelivery(event: SmsDeliveryEvent): SmsRecord | undefined | Promise<SmsRecord | undefined>;
 }
 
 interface StoreOptions {
@@ -38,10 +40,12 @@ interface StoreOptions {
 
 function sameReservation(left: SmsReservation, right: SmsReservation): boolean {
   return left.correlationId === right.correlationId
+    && left.authorizationId === right.authorizationId
     && left.destinationE164 === right.destinationE164
     && left.idempotencyKey === right.idempotencyKey
     && left.message === right.message
-    && left.purpose === right.purpose;
+    && left.purpose === right.purpose
+    && left.seniorId === right.seniorId;
 }
 
 export class InMemorySmsStore implements SmsStore {
