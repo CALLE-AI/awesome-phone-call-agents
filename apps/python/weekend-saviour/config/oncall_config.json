@@ -1,0 +1,13 @@
+{
+  "shift_name": "Sunday Night CDT Retail Data Platform On-Call Roster",
+  "date": "2026-09-06",
+  "timezone": "America/Chicago (CDT)",
+  "engineer": {
+    "name": "Santhosh",
+    "role": "Senior Retail Data Platform Engineer (Weekend On-Call)",
+    "phone": "+91 9003939495",
+    "email": "sandyinspires@icloud.com",
+    "calle_id": "user_santhosh_01",
+    "source": "local_config_file"
+  }
+}

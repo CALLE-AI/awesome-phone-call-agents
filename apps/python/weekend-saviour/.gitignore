@@ -1,0 +1,4 @@
+airflow.*
+*.generated
+project-requirements.txt
+*.db
