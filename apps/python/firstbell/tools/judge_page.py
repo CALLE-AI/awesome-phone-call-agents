@@ -491,44 +491,6 @@ def _conformance_figures() -> tuple[int, int, int]:
             len(record["missing_in_double"]))
 
 
-def exchange_markup(call: dict, call_id: str) -> str:
-    """The two turns that are the whole argument, on the screen a reviewer opens first.
-
-    A reader with thirty seconds used to meet this product as a claim: a standfirst saying
-    that a call which reached a parent and learned nothing is not a family contacted. The
-    call that demonstrates it was already on the page, at turn five of a seventeen-turn
-    scroller, nine screens down. A claim on the first screen with its proof on the tenth is
-    the wrong way round for a page whose whole argument is that assertions are cheap.
-
-    Both lines come off the same committed turns that act 02 prints and the register plays,
-    so the first screen cannot drift from the recording. When the receipts are not on this
-    machine the block renders as nothing, because a first screen built on a sentence no
-    reader can check is the one thing this page must never be.
-
-    The question is trimmed and the trim is marked. It is split across two turns by the
-    transcriber and it carries the scripted absence date, which is not the date the call was
-    placed and reads as an error to anybody checking one against the other. The answer is
-    whole. It is the reason this screen exists.
-    """
-    turns = _hero_exchange(call)
-    if turns is None:
-        return ""
-    asked, answered = turns
-    return (
-        '<figure class=exchange>'
-        '<blockquote>'
-        f'<p class=xc-ask><span class=xc-who>The call</span>{esc(asked)}</p>'
-        f'<p class=xc-say><span class=xc-who>Her guardian</span>{esc(answered)}</p>'
-        '</blockquote>'
-        f'<figcaption>Call {esc(call_id)}, placed through CALL-E and transcribed by it. The '
-        f'scenario is scripted, the pupil name is invented, and the number dialled was the '
-        f'author’s own line, with consent. What is real is the call, the transcript, and '
-        f'what the software did with it. '
-        f'<a href="#act-02">The whole conversation is in act 02</a>.</figcaption>'
-        '</figure>'
-    )
-
-
 def _typeset(said: str) -> str:
     """The transcriber’s apostrophes, made one shape.
 
@@ -1473,9 +1435,7 @@ def one_minute_markup(run: dict) -> str:
     ran, _skipped = _suite_pair()
     cards = (
         ("The problem", "Answered is not the same as answered usefully.",
-         "A call that connects and learns nothing looks exactly like a success. A system "
-         "with two buckets files it with the successes, and the dashboard reports full "
-         "coverage for a child nobody heard about.",
+         "A call that connects and learns nothing looks exactly like a success.",
          "#act-03", "The three endings", False),
         ("What this does", "Three endings, not two.",
          "resolved closes the case. failed is retried. undetermined never closes: the "
@@ -2727,7 +2687,6 @@ def build(has_audio: bool, repo_url: str | None = None,
         '</div>',
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
-        exchange_markup(calls[hero], hero),
         hero_turn_markup(calls[hero]),
         register_markup(data, rows, hero, has_audio),
         # Four rows, twelve calls, and the page used to say only the first number.
@@ -2879,10 +2838,8 @@ def build(has_audio: bool, repo_url: str | None = None,
     open_rows = c06["undetermined"] + c06["failed"]
     body = [
         marginalia("Undetermined",
-                   '<p>The third ending. A call that finished without an answer the office '
-                   'can act on, named in the run rather than filed as resolved. The '
-                   '<a href="#act-05">mutation table</a> holds the tests that keep the '
-                   'distinction from collapsing.</p>'),
+                   '<p>The <a href="#act-05">mutation table</a> holds the tests that keep '
+                   'this distinction from collapsing back into two.</p>'),
         '<div class=act-num>03</div><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
         three_endings_figure(),
         '<p class=eyebrow>The same call, filed three ways</p>',
@@ -3060,7 +3017,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         'aria-label="Every gate broken on purpose, with the number of tests that '
         'noticed. Scrolls sideways on a narrow screen.">'
         '<table class=mutations>'
-        '<caption class=visually-hidden>Each change made to working code on purpose, and how many tests noticed it.</caption>'
+        '<caption class=visually-hidden>The changes worth reading first, each made to working code on purpose, with the number of tests that noticed.</caption>'
         '<thead><tr><th scope=col>#</th><th scope=col>the change</th>'
         '<th scope=col>tests that failed</th></tr></thead><tbody>',
     ]
@@ -3075,7 +3032,7 @@ def build(has_audio: bool, repo_url: str | None = None,
     body.append(
         f'<details class=fold><summary>The other {len(rest)}, in the same shape</summary>'
         '<table class=mutations>'
-        '<caption class=visually-hidden>Each change made to working code on purpose, and how many tests noticed it.</caption>'
+        '<caption class=visually-hidden>The rest of the changes, in the same shape: what was altered, and how many tests noticed.</caption>'
         '<thead><tr><th scope=col>#</th><th scope=col>the change</th>'
         '<th scope=col>tests that failed</th></tr></thead><tbody>')
     for num, change, caught in rest:

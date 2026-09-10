@@ -385,7 +385,7 @@ def _endings() -> str:
     """
     x, w = CARD_C
     rows = (
-        ("resolved", "Reason given", "the call closes", "Closed"),
+        ("resolved", "Reason given", "the call closes here", ""),
         ("undetermined", "Nothing learned", "connected, still unexplained", ""),
         ("no-answer", "No answer", "retried, then queued", ""),
     )
