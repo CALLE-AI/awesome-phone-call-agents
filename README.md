@@ -245,6 +245,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
+| [`plugins/google-sheets-callguardian`](plugins/google-sheets-callguardian/) | Google Sheets | Apps Script menu that gates CALL-E behind consent, call-window, do-not-call, and attempt-cap checks plus live in-call opt-out detection, with every decision written to a tamper-evident, hash-chained audit log — run directly from a spreadsheet. |
 
 ### Safety patterns
 
