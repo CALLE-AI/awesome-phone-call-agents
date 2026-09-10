@@ -120,12 +120,21 @@ def _numbers(cells: list[str]) -> list[float]:
     return out
 
 
-def test_the_wide_reading_is_the_wider_bound_and_the_narrow_one_clears_the_crossover():
+def test_the_wide_reading_is_the_wider_bound_and_the_document_says_which_side_of_the_crossover_the_narrow_one_is():
     """The precondition, and the whole argument the money surfaces make.
 
-    Written as one test because the three facts are only worth anything together. A bound
-    below the crossover means nothing if it is a bound on the wrong quantity, and a bound
-    above the crossover means nothing if it is not the pessimistic one.
+    Written as one test because the facts are only worth anything together. A bound below
+    the crossover means nothing if it is a bound on the wrong quantity, and a bound above
+    the crossover means nothing if it is not the pessimistic one.
+
+    It used to assert flatly that the narrow bound clears the crossover, which was true of
+    every run this entry had ever published and stopped being true on 2026-09-11: widening
+    `safeguarding_escalation` holds two more of the twelve recorded calls open, which lowers
+    the desk time removed and raises the callback cost, and the crossover fell from 34.3 to
+    22.9 while the bound rose from 24 to 47. A gate written as one side of that comparison
+    fails when the data moves rather than when the prose is wrong, and the prose is the
+    thing worth gating. So it now asserts the comparison and requires the money document to
+    state whichever reading is true.
     """
     pooled = _pooled()
     for key in ("answered", "escalated", "net_new", "net_new_bound", "escalated_bound",
@@ -142,10 +151,30 @@ def test_the_wide_reading_is_the_wider_bound_and_the_narrow_one_clears_the_cross
     assert wide > narrow, (
         f"the escalation bound ({wide:.1f} per 100) is no longer wider than the net-new "
         f"bound ({narrow:.1f}), so calling it the widest reading of these calls is wrong")
-    assert narrow < crossover, (
-        f"the net-new bound is {narrow:.1f} per 100 and the saving stops at "
-        f"{crossover:.1f}, so the narrow reading no longer clears the crossover and every "
-        "surface saying there is room to spare is now overclaiming")
+    # Two comparisons, two sentences the document must carry, one exact phrase each. The
+    # count and the bound are on opposite sides of the crossover as of 2026-09-11, which is
+    # exactly the state a single sentence loses.
+    doc = DOC.read_text(encoding="utf-8")
+    measured_net_new = 100 * pooled["net_new"] / pooled["answered"]
+    for name, value, clears, fails in (
+            ("bound", narrow,
+             "**The bound sits inside it:**", "**The bound does not clear it at all:**"),
+            ("count", measured_net_new,
+             "**The count clears the crossover:**",
+             "**The count does not clear the crossover:**")):
+        said, unsaid = (clears, fails) if value < crossover else (fails, clears)
+        assert said in doc, (
+            f"the net-new {name} is {value:.1f} per 100 against a crossover of "
+            f"{crossover:.1f}, and the document does not carry the sentence that says so: "
+            f"{said!r}")
+        assert unsaid not in doc, (
+            f"the document still carries {unsaid!r} and the {name} is {value:.1f} per 100 "
+            f"against a crossover of {crossover:.1f}")
+
+    if narrow >= crossover:
+        assert pooled["worst_case_ceiling"] < 0, (
+            "the bound is past the crossover, so the worst case has to be a loss")
+
     assert wide > crossover and measured > crossover, (
         f"the escalation rate ({measured:.1f} per 100) and its bound ({wide:.1f}) no longer "
         f"sit above the {crossover:.1f} where the saving stops, so the card's sentence "
@@ -287,9 +316,24 @@ def test_the_card_names_which_figure_to_quote_and_never_promises_the_ceiling():
     assert f"${abs(every):,.2f}" in card, (
         f"the card does not name the cost the widest reading prices out to "
         f"(${abs(every):,.2f} a call), which is the figure a finance office plans against")
-    assert demo < pooled["net_ceiling"], (
-        "the figure the card tells a reader to quote is no longer the smaller of the two, "
-        "so the sentence saying it is the smaller one has gone false")
+    # Whichever of the two is smaller is the one the card must tell a reader to quote, and
+    # the card has to name it as the smaller one. This used to assert flatly that the demo
+    # run was smaller, which was true until the safeguarding rule widened on 2026-09-11 and
+    # the recorded calls' net ceiling fell below it. A gate asserting which figure wins
+    # fails when the data moves; a gate asserting that the card picked the winner fails when
+    # the card is wrong, which is the thing worth catching.
+    smaller = min(demo, pooled["net_ceiling"])
+    larger = max(demo, pooled["net_ceiling"])
+    picked = re.search(r"Quote the (?:demo run's )?\$([\d,.]+)", card)
+    assert picked, "the card no longer tells a reader which figure to quote"
+    assert float(picked.group(1).replace(",", "")) == round(smaller, 2), (
+        f"the card tells a reader to quote ${picked.group(1)} and the smaller of the two "
+        f"figures is ${smaller:,.2f}, so it is pointing at the more flattering one")
+    assert f"${larger:,.2f}" in card, (
+        f"the card names only the figure it recommends. The other one (${larger:,.2f}) has "
+        "to be on the card too, or a reader cannot see that a choice was made")
+    assert "the smaller of the two" in card, (
+        "the card no longer says why the figure it names is the one to quote")
 
 
 def test_the_card_foot_counts_the_rates_it_actually_prints():

@@ -15,8 +15,11 @@
  *
  * A second, independent axis rides alongside those three:
  *
- *   escalation    "safeguarding" when the parent did not confirm they already knew their
- *                 child was absent. It is not a fourth resolution. Making it one would mean
+ *   escalation    "safeguarding" unless the parent confirmed they already knew their
+ *                 child was absent and the call came away with a day the child returns.
+ *                 Both halves are needed: a parent telling this recipe their daughter
+ *                 boarded the school bus and never arrived is a confirmation, and it is
+ *                 not a closeable record. It is not a fourth resolution. Making it one would mean
  *                 a call could be counted in two buckets or in neither, and the three
  *                 outcomes above exist to be counted. A safeguarding call is still
  *                 `resolved`: the answer arrived and it was schema-valid. What changes is
@@ -192,20 +195,69 @@ function attemptCount(recipient) {
 export const SAFEGUARDING_CALLBACK_MINUTES = 30;
 
 /**
- * Did the parent confirm they already knew their child was not in school?
+ * `expected_return` values a school office can act on.
  *
- * Fails closed. Anything that is not an explicit "yes", including a missing field, an
- * "unknown", or a value nobody anticipated, escalates. The cost of escalating a call that
- * did not need it is a phone call. The cost of the other mistake is a child nobody looked
- * for, so the two errors are not worth trading against each other.
+ * The other two members of the enum are not dates: `longer` is a direction of travel, and
+ * `unknown` is the call failing to establish one.
+ */
+const RETURN_IS_A_DATE = new Set(["today", "tomorrow", "later_this_week"]);
+
+/**
+ * The categories that carry no account of where a child is.
+ *
+ * `transport` is what the platform returned for a parent describing the school bus their
+ * daughter boarded at 7:30 and never got off, `other` is what it returned for a parent
+ * describing a son who cycled off with friends and did not arrive, and `unknown` is the
+ * model declining to guess.
+ */
+const REASON_EXPLAINS_NOTHING = new Set(["transport", "other", "unknown"]);
+
+function lower(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+/**
+ * Is this answer safe to close without a person seeing it?
+ *
+ * Fails closed, and reads three fields rather than one. Anything that is not an explicit
+ * "yes" on `parent_confirmed_aware`, including a missing field, an "unknown", or a value
+ * nobody anticipated, escalates. So does a confirmed absence with no return date, and an
+ * absence whose category explains nothing and whose return was never named.
+ *
+ * The second half of that is not defensive tidying. On 2026-09-11 two live calls reached
+ * a parent who learned from the call that a child who had left for school was not in
+ * class, said exactly that, and asked the office to check the classroom. The platform read
+ * the parent accounting for the child's morning as an account of the absence and returned
+ * `parent_confirmed_aware: "yes"` with `reason_category` of `transport` and of `other`.
+ * A rule that reads only the confirmation closes both, and this recipe closed both.
+ * `expected_return` came back `unknown` on each, because there is no answer to "when is
+ * she back" for a child nobody can find.
+ *
+ * The cost of escalating a call that did not need it is a phone call. The cost of the
+ * other mistake is a child nobody looked for, so the two errors are not worth trading
+ * against each other.
  */
 export function safeguardingEscalation(result) {
-  const confirmed = isObject(result) ? result.parent_confirmed_aware : undefined;
-  return String(confirmed === undefined || confirmed === null ? "" : confirmed)
-    .trim()
-    .toLowerCase() === "yes"
-    ? "none"
-    : "safeguarding";
+  if (!isObject(result)) {
+    return "safeguarding";
+  }
+  if (lower(result.parent_confirmed_aware) !== "yes") {
+    return "safeguarding";
+  }
+  const back = lower(result.expected_return);
+  if (!RETURN_IS_A_DATE.has(back) && back !== "longer") {
+    // No return date at all: `unknown`, absent, a non-string, or a word this schema does
+    // not define. This is the branch both missing-child calls take.
+    return "safeguarding";
+  }
+  const reason = lower(result.reason_category) || "unknown";
+  if (REASON_EXPLAINS_NOTHING.has(reason) && !RETURN_IS_A_DATE.has(back)) {
+    // `longer` is enough for an illness, because "in bed for a fortnight, probably back
+    // Monday" is an account of where the child is. It is not enough for a category that
+    // explains nothing.
+    return "safeguarding";
+  }
+  return "none";
 }
 
 /**

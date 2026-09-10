@@ -58,8 +58,28 @@ RESULT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+# `expected_return` values a school office can act on. The other two members of the enum
+# are not dates: `longer` is a direction of travel, and `unknown` is the call failing to
+# establish one. An absence record whose return nobody could name is not a record the
+# office can close, and on 2026-09-11 it was also the field that told the truth about two
+# calls where the platform had already decided the parent was aware.
+RETURN_IS_A_DATE = frozenset({"today", "tomorrow", "later_this_week"})
+
+# The categories that carry no account of where a child is. `transport` is what the
+# platform returned for a parent describing the school bus their daughter boarded at 7:30
+# and never got off, `other` is what it returned for a parent describing a son who cycled
+# off with friends and did not arrive, and `unknown` is the model declining to guess.
+# Nothing in these three words explains an absence, so on their own they cannot close one.
+REASON_EXPLAINS_NOTHING = frozenset({"transport", "other", "unknown"})
+
+
 def safeguarding_escalation(result: dict[str, Any]) -> Escalation:
-    """Only an explicit `yes` closes an absence record without a person seeing it.
+    """What closes an absence record without a person seeing it, and what does not.
+
+    Three things have to hold together: a guardian was on the line, that guardian
+    explicitly confirmed they were aware, and the call came away with a date the office can
+    diary. Any one of them missing sends the record to a human. The third condition is the
+    one this rule did not have on the morning it filed two missing children.
 
     This is the rule the rest of this app is an argument for, and until it was written the
     app did not have it. `parent_confirmed_aware` was collected on every call, printed on
@@ -86,9 +106,78 @@ def safeguarding_escalation(result: dict[str, Any]) -> Escalation:
         # because the question of who said something comes before what they said.
         return Escalation.SAFEGUARDING
     confirmed = str(result.get("parent_confirmed_aware", "")).strip().lower()
-    if confirmed == "yes":
-        return Escalation.NONE
-    return Escalation.SAFEGUARDING
+    if confirmed != "yes":
+        return Escalation.SAFEGUARDING
+
+    # A confirmation is necessary and it is not sufficient, and the four calls placed on
+    # 2026-09-11 are why that sentence has two halves. On two of them a parent learned from
+    # the call that a child who had left for school was not in class, said exactly that,
+    # and asked the office to go and check the classroom. The platform read the parent
+    # accounting for the child's morning as an account of the absence and returned
+    # `parent_confirmed_aware: "yes"` with `reason_category` of `transport` and of `other`.
+    #
+    # Every gate here agreed. The answers were schema-valid, a guardian was on the line,
+    # and the confirmation field said yes, so both records closed and no person saw either.
+    # The rule written to catch a missing child filed two of them, because it asked whether
+    # somebody confirmed being aware and never asked what they were aware of.
+    #
+    # `expected_return` is the field that already knew. It came back `unknown` on both, and
+    # it does that because there is no answer to "when is she back" for a child nobody can
+    # find. So the confirmation is now read together with the two fields beside it.
+    back = result.get("expected_return")
+    back = back.strip().lower() if isinstance(back, str) else ""
+    if back not in RETURN_IS_A_DATE and back != "longer":
+        # No return date at all: `unknown`, absent, a non-string, or a word this schema
+        # does not define. None of those is a parent naming a day, whatever else the call
+        # established, and this is the branch both missing-child calls take.
+        return Escalation.SAFEGUARDING
+
+    reason = result.get("reason_category")
+    reason = reason.strip().lower() if isinstance(reason, str) else "unknown"
+    if reason in REASON_EXPLAINS_NOTHING and back not in RETURN_IS_A_DATE:
+        # `longer` is enough for an illness, because "in bed for a fortnight, probably back
+        # Monday" is an account of where the child is and S-3101 is that call. It is not
+        # enough for a category that explains nothing: an unexplained absence running past
+        # the week with no day named is the same missing record arriving more slowly.
+        return Escalation.SAFEGUARDING
+
+    return Escalation.NONE
+
+
+def why_escalated(result: dict[str, Any]) -> str:
+    """One sentence naming the branch `safeguarding_escalation` actually took.
+
+    It exists because the evidence page printed "The parent did not confirm they already
+    knew their child was absent" over every escalated row, which was the only reason a row
+    could escalate for until 2026-09-11. After the rule was widened it was false of exactly
+    the rows the widening was for: a parent who confirmed, and could not say when the child
+    would be back, is escalated *because* of the second half of that.
+
+    A wrong reason beside a right count is worse than no reason. A clerk reads the sentence,
+    not the enum, and a queue that tells them the parent did not confirm when the parent did
+    is sending them into the call with the wrong first question.
+
+    Returns the empty string for a record that closes, so a caller cannot print a reason for
+    a row that has none.
+    """
+    if safeguarding_escalation(result) is Escalation.NONE:
+        return ""
+    if answered_by_the_guardian(result) is False:
+        # Named in words a clerk would use. `spoke_with` is an enum and "The answer came
+        # from other_adult" is a sentence about a schema.
+        who = {"child": "a child", "other_adult": "another adult",
+               "voicemail": "an answering machine"}.get(
+                   str(result.get("spoke_with", "")).strip().lower(), "somebody else")
+        return f"The answer came from {who}, not from the child's guardian."
+    if str(result.get("parent_confirmed_aware", "")).strip().lower() != "yes":
+        return "The parent did not confirm they already knew their child was absent."
+    back = result.get("expected_return")
+    back = back.strip().lower() if isinstance(back, str) else ""
+    if back not in RETURN_IS_A_DATE and back != "longer":
+        return ("The parent confirmed they knew, and the call never established when the "
+                "child is coming back.")
+    return ("The parent confirmed they knew, and neither the reason given nor the return "
+            "date accounts for where the child is.")
 
 
 def answered_by_the_guardian(result: dict[str, Any]) -> bool | None:

@@ -2204,6 +2204,111 @@ async function gateRecordingReachable(browser, url) {
     return;
   }
 
+  /* The first screen's own controls, which this gate could not see.
+   *
+   * The instrument on the opening screen is a different component from the lanes below it:
+   * its cards carry `data-csc-lane` and its buttons `data-csc-play`, and every check above
+   * this point scans `[data-player]`. So on 2026-09-11, when the page was rebuilt to open
+   * on the call where a parent reported a child missing, the recording a judge is meant to
+   * press first was the one recording on the page that no gate touched. It answered 200 and
+   * it played, and nothing here would have said so if it had not.
+   *
+   * Checked the same three ways the lanes are: the file behind each control answers, the
+   * words on the control name what it plays, and pressing it flips them. */
+  const opening = await page.evaluate(() => {
+    const fig = document.querySelector(".callscope");
+    if (!fig) return [];
+    return [...fig.querySelectorAll("[data-csc-play]")].map((b) => ({
+      id: b.dataset.cscPlay,
+      words: (b.querySelector("[data-play-label]")?.textContent || "").trim(),
+      name: b.getAttribute("aria-label") || "",
+      seconds: Number(b.dataset.cscSeconds || 0),
+      card: Boolean(fig.querySelector(`[data-csc-lane="${CSS.escape(b.dataset.cscPlay)}"]`)),
+    }));
+  });
+
+  if (!opening.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      "the opening instrument offers no control to play a recording, so the first call a "
+      + "reader meets cannot be heard");
+    return;
+  }
+
+  /* The rule here is not the lanes' rule, and the first version of this check used theirs
+   * and failed on a correct page. A lane's visible words and its accessible name are the
+   * same string. These buttons deliberately differ: the visible label is short because the
+   * card is narrow, and the accessible name is the long form that says which call it is and
+   * what happened on it. So what has to hold is that both name the row, not that one
+   * contains the other. */
+  const orphan = opening.filter((o) => !o.card || !o.seconds || !o.words
+                                    || !o.words.includes(o.id) || !o.name.includes(o.id));
+  if (orphan.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `the opening control for ${orphan[0].id} is ${JSON.stringify(orphan[0].words)}, named `
+      + `${JSON.stringify(orphan[0].name)}, over ${orphan[0].seconds}s, card=${orphan[0].card}. `
+      + "A control on the first screen has to name its call in both the words on it and the "
+      + "name it gives assistive technology, know how long the recording is, and have a "
+      + "card to draw progress on");
+    return;
+  }
+
+  const openingClips = [];
+  for (const one of opening) {
+    const href = new URL(`audio/${one.id}.m4a`, url).href;
+    const res = await page.evaluate(async (u) => {
+      try {
+        const r = await fetch(u);
+        const b = await r.arrayBuffer();
+        return { status: r.status, bytes: b.byteLength };
+      } catch (e) { return { status: 0, bytes: 0 }; }
+    }, href);
+    openingClips.push({ id: one.id, href, ...res });
+  }
+
+  const openingBad = openingClips.filter((c) => c.status !== 200 || c.bytes < 1024);
+  if (openingBad.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `${openingBad[0].href} answered ${openingBad[0].status} with ${openingBad[0].bytes} `
+      + "byte(s). It is the recording behind a control on the first screen");
+    return;
+  }
+
+  const openingPressed = await page.evaluate(async () => {
+    const fig = document.querySelector(".callscope");
+    const out = [];
+    for (const b of fig.querySelectorAll("[data-csc-play]")) {
+      const before = (b.querySelector("[data-play-label]")?.textContent || "").trim();
+      b.click();
+      await new Promise((r) => setTimeout(r, 160));
+      const card = fig.querySelector(`[data-csc-lane="${CSS.escape(b.dataset.cscPlay)}"]`);
+      out.push({
+        id: b.dataset.cscPlay,
+        before,
+        after: (b.querySelector("[data-play-label]")?.textContent || "").trim(),
+        pressed: b.getAttribute("aria-pressed"),
+        live: card ? card.hasAttribute("data-csc-on") : false,
+      });
+      b.click();
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    return out;
+  });
+
+  const openingDead = openingPressed.filter(
+    (o) => o.after === o.before || o.pressed !== "true" || !o.live);
+  if (openingDead.length) {
+    await page.close();
+    record("the recording is reachable", "FAIL",
+      `pressing the opening control for ${openingDead[0].id} left it reading `
+      + `aria-pressed=${JSON.stringify(openingDead[0].pressed)}, words `
+      + `${JSON.stringify(openingDead[0].after)} and its card live=${openingDead[0].live}. `
+      + "The control a reader meets first is drawn and wired to nothing");
+    return;
+  }
+
   /* Press each one. A control that changes neither the state nor its own words is not
    * wired to anything, which is how the two lanes shipped. */
   const pressed = await page.evaluate(async () => {
@@ -2243,12 +2348,16 @@ async function gateRecordingReachable(browser, url) {
   }
 
   record("the recording is reachable", "PASS",
-    `${state.players.length} call(s) on the page, each with its own control naming what it `
-    + `plays (${state.players.map((p) => JSON.stringify(p.words)).join(", ")}), each `
-    + `answering 200 with ${Math.min(...state.clips.map((c) => c.bytes))} bytes or more, `
+    `${opening.length} call(s) on the first screen (${opening.map((o) => o.id).join(", ")}) `
+    + `and ${state.players.length} in the acts below, each with its own control naming what `
+    + `it plays (${state.players.map((p) => JSON.stringify(p.words)).join(", ")}), each `
+    + `answering 200 with `
+    + `${Math.min(...state.clips.concat(openingClips).map((c) => c.bytes))} bytes or more, `
     + `and each moving to playing with its words flipped when pressed. None of them shares `
     + `its words with the ${state.replays.length} silent replay control(s)`,
-    { calls: state.players.length, clips: state.clips.length });
+    { calls: state.players.length + opening.length,
+      clips: state.clips.length + openingClips.length,
+      opening: opening.map((o) => o.id) });
 }
 
 async function gateReplayControls(browser, url) {

@@ -23,7 +23,7 @@ The run did not finish. Six calls were placed, four connected, and the account t
 unable to place another (§4). Ten scenarios are outstanding.
 
 ```
-placed        6      $0.30 at the observed flat $0.05
+placed        6      252 credits ($2.52); the two that failed were not billed (§7)
 connected     4      illness, medical appointment, and two safeguarding scenarios
 failed        2      one SIP 500, one SIP 480, both zero duration
 rejected      10     HTTP 429, no call_id, never dialled, not billed
@@ -181,15 +181,19 @@ not support.
 
 The most consequential result, and it is about what CALL-E returned rather than how fast.
 
-Two scenarios described a child who had left home and not arrived: one who boarded a
-school bus, one who set off walking. In both, the parent stated plainly that they did not
-know where the child was and gave no return date. Both came back schema-valid and both
-were classified as ordinary absences:
+Two scenarios described a child who had left home and not arrived. In both, the parent
+stated plainly that they could not account for the child and gave no return date. Both came
+back schema-valid and both were classified as ordinary absences:
 
-| scenario | `reason_category` | `parent_confirmed_aware` | `expected_return` | turns |
+| what the parent said | `reason_category` | `parent_confirmed_aware` | `expected_return` | turns |
 |---|---|---|---|---|
-| "he got on the bus, I don't know where he is" | `transport` | **`yes`** | `unknown` | 14 |
-| "she left at eight to walk in" | `other` | **`yes`** | `unknown` | 33 |
+| "she caught the school bus at 7:30 this morning. Are you saying she never reached school?" | `transport` | **`yes`** | `unknown` | 14 |
+| "he left the house on his bike with his friends an hour ago. Something is wrong." | `other` | **`yes`** | `unknown` | 33 |
+
+Both rows are quoted from the transcript rather than from the scenario that was planned. The
+second call was scripted as a child walking to school and the parent described a bicycle,
+which is the sort of drift that makes a planned scenario a poor label for what a call
+contained.
 
 `parent_confirmed_aware=yes` is the field that decides whether a record closes. A parent
 reporting that they cannot account for their child is the opposite of a parent confirming
@@ -205,24 +209,121 @@ matters.
 On ours, firstbell trusted the field and closed both records. The rule that
 `expected_return=unknown` alongside a safeguarding-shaped call should block closure did
 not exist, because until tonight no real call had produced that combination. Four real
-undetermined calls in the previous corpus, and none of them this shape. That change is
-being made in the product, and it was found by placing real calls, which is the argument
-for placing them.
+undetermined calls in the previous corpus, and none of them this shape.
 
-## 7. Billing, unfinished
+That rule now exists. `safeguarding_escalation` reads three fields where it read one, and a
+record closes only when a guardian confirmed and the call came away with a day the child
+returns. The same rule is in the n8n recipe, because a school running that recipe would
+otherwise still close both of these. Re-filing the previous corpus under it moves two more
+of those twelve calls out of the closed pile, which lowers the desk time this project can
+claim to remove and is published in that direction rather than tuned away. It was found by
+placing real calls, which is the argument for placing them.
 
-`evidence/observed-price.json` records $0.05 flat over ten dashboard rows between 0m35s
-and 1m50s, and thirteen billed events against twelve published calls on 2026-09-04, one
-unreconciled.
+## 7. Billing: the flat price is gone, and the failures are not charged
 
-This run placed six calls. The dashboard has not been read since, so the reconciliation is
-outstanding. Two specific questions it should answer:
+The dashboard was read after this run, on 2026-09-11, which settles every question the
+previous version of this section left open and raises a larger one.
 
-- Do the two zero-duration failures appear as charges? If a `500` from CALL-E's own
-  infrastructure is billed to the customer, that is the 2026-09-04 discrepancy explained.
-- Do any of the ten `account_concurrency_exceeded` rejections appear? They returned no
-  `call_id` and placed no call, so they should not, and the earlier unreconciled charge
-  makes it worth checking rather than assuming.
+The account is denominated in credits, and the conversion is fixed by the top-up: **+$10.00
+bought 1,000 credits** on 2026-09-09, so one credit is one cent. That rate also reconciles
+the earlier period, which the panel showed in dollars: thirteen events at 5 credits is 65
+credits, and 65 credits is the $0.65 recorded in
+[`evidence/observed-price.json`](evidence/observed-price.json).
+
+```
+available balance      783 credits
+total period cost      317 credits   = 65 (2026-09-04) + 252 (this run)
+```
+
+The balance closes exactly against the earlier reading. The account held 1,035 credits after
+the 2026-09-09 top-up, this run settled 252, and 1,035 − 252 = 783. Nothing is unaccounted
+for, which is worth saying because the 2026-09-04 reconciliation was not able to say it.
+
+### The four connected calls, and what each one cost
+
+Credits are the dashboard's figure. Duration is measured from the recording CALL-E returned,
+not from the panel, because the API exposes no duration (§3) and the two are not necessarily
+the same window. Turns are counted from the transcript. The scenario id is this project's own
+label; the platform call ids that join these rows to the dashboard are held with the receipts
+outside this repository, for the reason `evidence/README.md` gives.
+
+| call | scenario id | credits | USD | recording | turns |
+|---|---|---|---|---|---|
+| illness | `S-3101` | 68 | $0.68 | 1m32s | 23 |
+| clinic appointment | `S-3102` | 68 | $0.68 | 1m36s | 25 |
+| missing child, school bus | `S-3103` | 41 | $0.41 | 0m53s | 14 |
+| missing child, bicycle | `S-3104` | 75 | $0.75 | 1m48s | 33 |
+| | **total** | **252** | **$2.52** | | |
+
+### Answers to the two questions this section previously left open
+
+Zero-duration drops cost zero credits: the platform absorbs its own network failures.
+
+**The zero-duration failures are not billed.** The SIP 500 and the SIP 480 (§5) appear
+nowhere in the ledger. The account was charged for four calls and it placed six. CALL-E
+absorbs a drop originating in its own infrastructure and a line it could not reach, which is
+the correct behaviour and it is now observed rather than assumed.
+
+**The ten `account_concurrency_exceeded` rejections are not billed either.** They returned no
+`call_id` and dialled nobody, and the ledger agrees (§2, §4). Another entry documented
+CALL-E consuming an allowance call on a planner-rejected request; whatever that was, it is
+not this, and an HTTP 429 on this account costs nothing.
+
+Both answers matter beyond this account. The 2026-09-04 discrepancy of thirteen billed
+events against twelve published calls was worth two readings, and one of them was "a server
+error is charged to the customer". That reading is now closed. The discrepancy remains
+unexplained, and it is one event, and it is not this.
+
+### The finding: the price is no longer flat, and it is no longer $0.05
+
+This is the part that changes what a buyer can plan against.
+
+`observed-price.json` recorded 5 credits a call, flat, across ten rows between 0m35s and
+1m50s, and it said in as many words that the reading it could not separate was a flat
+per-call price from a per-minute price rounded up to a two-minute minimum. It also said
+distinguishing them needed one call over two minutes, and that the account had none.
+
+Four calls under two minutes did it instead:
+
+- A flat per-call price bills 53 seconds and 108 seconds identically. These billed 41 and 75.
+- A per-minute price with a two-minute minimum also bills them identically, because all four
+  calls are under two minutes. These billed 41, 68, 68 and 75.
+
+Both readings are refuted by one run, and neither needed the long call. What replaces them is
+that the amount moves with something inside the call. Four calls cannot say what:
+
+- 1m32s over 23 turns and 1m36s over 25 turns both billed 68, so the granularity is coarser
+  than a second.
+- 1m48s over 33 turns billed 75, seven credits more than a call twelve seconds shorter with
+  eight fewer turns.
+
+Duration and turn count move together across these four calls and cannot be separated by
+them. Credits per second fall as the call runs longer (0.77, 0.74, 0.71, 0.69), which is
+consistent with a fixed component plus a metered one, and four points do not fit a model.
+
+**And the level changed by an order of magnitude.** The same account, the same software, the
+same destination country, one week apart:
+
+```
+2026-09-04    5 credits a call, flat, 13 events
+2026-09-11    41 to 75 credits a call, 4 events, mean 63
+```
+
+This report cannot say why. The candidates are a repricing, the end of a promotional or
+hackathon rate, or a tier change on the account, and the dashboard shows no rate card, no
+line-item breakdown and no effective date. CALL-E publishes no price at all, so there is
+nothing to compare either reading against. That absence is the feedback: **an account cannot
+plan against a price it can only discover by spending, and cannot detect a change in it
+except by reading a balance.** A per-call cost line in the call object, or a published rate
+card, would make both readings unnecessary.
+
+The consequence for a caller doing this is direct and it is not in CALL-E's favour. At 5
+credits a call the desk time firstbell removes was worth several times the call. At 41 to 75
+credits it is not: on the twelve recorded calls this project publishes, the desk time removed
+is worth $0.39 a call gross and $0.08 net of the safeguarding work the same run creates
+([`tools/money_across_runs.py`](tools/money_across_runs.py)), against a call that now costs
+$0.41 to $0.75. Whether a district can run this depends on a price the platform does not
+publish, and on 2026-09-11 that price moved the wrong way by roughly ten times.
 
 ## Method, and what would make these numbers better
 

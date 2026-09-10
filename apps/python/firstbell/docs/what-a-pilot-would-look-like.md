@@ -50,13 +50,22 @@ with the sentence it came from and the date it was read at source, and
 printed in them.
 
 For a district of 10,000 students that is roughly 277 calls on a school morning and 49,895 in
-a year. Against the $0.59 a call this software's own recorded calls support, about **$29,400
+a year. Against the $0.08 a call this software's own recorded calls support, about **$4,000
 a year of desk time removed**, and the calls themselves cost $0.05 each on the one month of
-billing this account has, so about **$26,900** once they are paid for. Against the $0.19 a
+billing this account has, so about **$1,500** once they are paid for. Against the $0.70 a
 call the widest reading of those same calls produces, where every escalated call is priced
-as a callback, about **$9,500 spent** rather than saved, and that figure already has the
+as a callback, about **$34,900 spent** rather than saved, and that figure already has the
 call cost inside it. A board paper should carry both ends, because which end a district
 lands on is the thing the pilot measures.
+
+Those were $29,400 and $26,900 until 2026-09-11, and the reason they are not is worth a
+sentence rather than a quiet edit. `safeguarding_escalation` was widened that day, after two
+live calls in which a parent reported a child missing and the platform returned a routine
+absence. Re-filing the twelve recorded calls under the wider rule moves two of them out of
+the closed pile, so the desk time removed falls and the callback cost rises, and the net
+per-call figure drops from $0.59 to $0.08. Nothing about the volume above changed. What
+changed is what this software refuses to close, and a district reading a saving needs to
+know it is reading the number after that refusal rather than before it.
 
 The $0.05 is subtracted here because the loss at the other end is stated net, and the two
 were not comparable: the saving was gross and the cost was not, which ran in this entry's
@@ -91,15 +100,20 @@ this entry said putting them there was worth more than any number currently publ
     277 calls on a morning, in a district of 10,000
     x 11 of 12 answered, the rate this software's own recorded calls came back at
     = about 254 answered calls
-    x 5 of 11 marked by the safeguarding rule, the rate those same calls came back at
-    = about 115 escalations on a morning
+    x 7 of 11 marked by the safeguarding rule, the rate those same calls came back at
+    = about 162 escalations on a morning
     x 30 minutes, the callback window this software prints beside every one of them
-    = about 58 staff-hours, every school morning
+    = about 81 staff-hours, every school morning
 
-**That is a department, not a rota.** Eight people doing nothing else, at a 7.5-hour day.
-Over a 180-day year it is about 20,800 escalations. A pilot sized on the calls and not on
+**That is a department, not a rota.** Eleven people doing nothing else, at a 7.5-hour day.
+Over a 180-day year it is about 29,100 escalations. A pilot sized on the calls and not on
 the callbacks will produce a queue no school can work, and the software will be blamed for
 the queue.
+
+It read 115 escalations and eight people until 2026-09-11. Widening the rule that morning
+took the marked rate from 5 of 11 to 7 of 11, and this is the line where that costs the
+most: three more staff-hours a morning per two extra escalations, and the whole projection
+moves with it. The rule was widened anyway, and the reason is two calls up the page.
 
 Three things about that arithmetic, because it is the most load-bearing projection in this
 entry and it is the least measured.
@@ -107,8 +121,8 @@ entry and it is the least measured.
 **It is a projection and not a result.** The volume is California's, at a state level, from
 a source with a URL. The two rates are this software's, from twelve calls. Twelve calls
 cannot support a rate to two significant figures, and the entry publishes the bound that
-says so: 73 escalations per 100 answered calls is what those eleven answered calls cannot
-rule out, which at this volume is 185 a morning rather than 115. A district's own first week
+says so: 86.5 escalations per 100 answered calls is what those eleven answered calls cannot
+rule out, which at this volume is 220 a morning rather than 162. A district's own first week
 is the only thing that narrows it.
 
 **The 30 minutes is this project's default and nobody has agreed to it.** It is in
@@ -116,13 +130,20 @@ is the only thing that narrows it.
 changes it, and the run says which of the two it used. A district that has agreed 15 minutes
 with its safeguarding lead halves this. One that has agreed an hour doubles it.
 
-**It is the argument for the escalation rate mattering, not against it.** Every one of those
-115 was going to a person anyway: on the twelve real calls, every call the rule marked had
-already connected and given nothing usable, so a person was ringing that family back
-whichever system placed the call. What the rule adds is the grade, and what the grade buys is
-knowing which of the 254 to work first. At 115 a morning that ordering is the difference
-between a queue and a triage list. It is also why the money section prices those escalations
-both ways and holds this entry to the pessimistic one.
+**Most of that queue existed before this software did, and some of it does not.** Five of
+the seven calls the rule marks had already connected and given nothing usable, so a person
+was ringing those families back whichever system placed the call; what the rule adds there is
+the grade of the person who rings and the order they ring in. The other two are new. They are
+records that satisfied the schema, came from a guardian who confirmed they were aware, and
+would have closed with nobody reading them, and holding them open is work this software
+creates rather than work it re-labels.
+
+That distinction used to be unnecessary here, because the count of new work was nought. It is
+not any more, and the honest version of this paragraph is that about 116 of the 162 are the
+queue a district already had and about 46 are the queue this rule builds. At 162 a morning the
+ordering is still the difference between a queue and a triage list. The 46 is the price, it is
+priced at the safeguarding lead's wage in the money section, and it is the reason that section
+now reports a bound that does not clear its own crossover.
 
 ## The baseline, measured before anything is switched on
 

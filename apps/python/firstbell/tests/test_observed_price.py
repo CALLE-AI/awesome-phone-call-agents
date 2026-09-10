@@ -181,7 +181,11 @@ def test_the_bound_past_the_crossover_is_published_rather_than_rounded_away():
     if bound > crossover:
         assert pooled["worst_case_ceiling"] < 0, (
             "the bound is past the crossover, so the worst case has to be a loss")
-        assert "so the bound is past it" in printed, (
+        # The tool's own sentence, verbatim. This branch had never executed before
+        # 2026-09-11, because the bound had always sat inside the crossover, and the phrase
+        # it waited for was not one the tool prints. A gate that has never run is a gate
+        # nobody has checked, and this one was wrong when it finally ran.
+        assert "so the bound is past the crossover" in printed, (
             "the tool no longer says the bound is past the crossover")
         assert "The bound is past the crossover" in README, (
             "the README no longer discloses that the bound is past the crossover")
@@ -325,11 +329,22 @@ def test_every_crossover_the_money_document_prints_is_one_the_tool_computes():
         measured = 100 * pooled["escalated"] / pooled["answered"]
         computed.add(round(measured, 1))
         computed.add(float(int(round(measured))))
-    # The offline run's own measured rate, which the table's first row states.
+    # The offline run's own measured rate, which the table's first row states. Derived from
+    # the two counts rather than read from a `net_new_per_100` key, because there is no such
+    # key on the row: this read `None` on every run, added nothing, and the 20.0 it was
+    # supposed to explain was being covered by the hardcoded allowance below instead.
     demo = next(r for r in money_across_runs.rows(None) if r["run"] == "the demo")
-    if demo.get("net_new_per_100") is not None:
-        computed.add(round(demo["net_new_per_100"], 1))
-    allowed = {0.0, 20.0, 100.0} | computed
+    if demo.get("net_new") is not None and demo.get("answered"):
+        computed.add(round(100 * demo["net_new"] / demo["answered"], 1))
+    # And the pooled run's own measured net-new rate, which the table's third row states.
+    # This was missing, and it did not show because the rate was 0 and 0.0 was sitting in
+    # the hardcoded allowance below next to the demo's 20.0. Both of those are derivable, so
+    # neither is hardcoded any more: an allowance that happens to contain the right answer
+    # is not a check, and on 2026-09-11 the rate moved to 18.2 and nothing had ever compared
+    # it to anything.
+    if pooled.get("net_new") is not None and pooled.get("answered"):
+        computed.add(round(100 * pooled["net_new"] / pooled["answered"], 1))
+    allowed = {100.0} | computed
 
     quoted = set()
     for line in doc.splitlines():
@@ -349,3 +364,125 @@ def test_every_crossover_the_money_document_prints_is_one_the_tool_computes():
         f"produce is either stale or belongs to a run the table does not name"
     )
 
+
+
+# ---------------------------------------------------------------------------
+# The second reading. On 2026-09-11 the same account, running the same
+# software to the same country, was billed between eight and fifteen times
+# what it had been billed a week earlier, and the amount moved from call to
+# call. The flat block above is still a true readout of the period it names,
+# so it stays, and this is checked beside it rather than instead of it.
+# ---------------------------------------------------------------------------
+
+METERED = PRICE["observed_metered"]
+
+
+def test_the_metered_rows_add_up_to_the_total_they_publish():
+    rows = METERED["calls"]
+    assert len(rows) == METERED["calls_billed"] == 4
+    assert sum(r["credits"] for r in rows) == METERED["billed_total_credits"] == 252
+    assert abs(sum(r["usd"] for r in rows) - METERED["billed_total_usd"]) < 0.005
+
+
+def test_every_metered_row_converts_at_the_rate_the_file_states():
+    rate = METERED["credit_to_usd"]
+    assert rate == 0.01
+    for row in METERED["calls"]:
+        assert abs(row["credits"] * rate - row["usd"]) < 0.005, (
+            f"{row['scenario_id']} is {row['credits']} credits and ${row['usd']}, which is "
+            "not the rate this file says the account converts at")
+
+
+def test_the_balance_the_dashboard_showed_reconciles():
+    """1,035 credits after the top-up, 252 settled, 783 left. The arithmetic is the point.
+
+    The 2026-09-04 reconciliation could not close: thirteen billed events against twelve
+    published calls, with no way to tell a double charge from a missing receipt. This one
+    closes exactly, and a balance that closes is the difference between a billing readout
+    and a billing anecdote.
+    """
+    assert METERED["balance_credits"] == 783
+    assert METERED["period_cost_credits"] == 317
+    legacy = PRICE["observed"]["billed_events"] * 5
+    assert legacy == 65, "the flat period is no longer 13 events at 5 credits"
+    assert legacy + METERED["billed_total_credits"] == METERED["period_cost_credits"], (
+        "the period cost is not the two runs added together, so one of them is misread")
+    assert 1035 - METERED["billed_total_credits"] == METERED["balance_credits"]
+
+
+def test_the_credit_rate_agrees_with_the_period_the_flat_block_records():
+    """The conversion is not asserted, it is derived twice and the two agree.
+
+    Once from the top-up, +$10.00 for 1,000 credits. Once from the earlier period, whose
+    panel was denominated in dollars: 65 credits of usage against a $0.65 total.
+    """
+    seen = PRICE["observed"]
+    assert abs(seen["billed_events"] * 5 * METERED["credit_to_usd"]
+               - seen["period_total_usd"]) < 0.005
+
+
+def test_the_metered_reading_refutes_both_flat_readings():
+    """Not a claim in prose. The two readings are computed from the published rows.
+
+    The flat block said in as many words that it could not separate a flat per-call price
+    from a per-minute price rounded up to a two-minute minimum, and that separating them
+    needed one call over two minutes. These four calls are all under two minutes, so both
+    of those readings predict four identical charges, and the charges are not identical.
+    That is what closes the question, and it closes it without the long call.
+    """
+    rows = METERED["calls"]
+    charges = {r["credits"] for r in rows}
+    assert len(charges) > 1, (
+        "every metered call billed the same, so this reading does not refute a flat price")
+    assert max(r["recording_seconds"] for r in rows) < 120, (
+        "one of these calls runs past two minutes, so the two-minute-minimum reading is no "
+        "longer refuted by the spread and this test is measuring something weaker")
+    assert max(charges) >= 1.5 * min(charges), (
+        "the spread is too narrow to be worth publishing as a refutation")
+
+
+def test_the_granularity_finding_is_the_rows_and_not_a_sentence():
+    """Two calls four seconds apart in length billed the same, so it is not per-second."""
+    by_id = {r["scenario_id"]: r for r in METERED["calls"]}
+    a, b = by_id["S-3101"], by_id["S-3102"]
+    assert a["credits"] == b["credits"], "the pair this finding rests on no longer matches"
+    assert 0 < abs(a["recording_seconds"] - b["recording_seconds"]) < 10, (
+        "these two calls are no longer close enough in length for their equal charge to say "
+        "anything about granularity")
+
+
+def test_neither_kind_of_failure_is_recorded_as_billed():
+    """Six placed, four charged. The gap is what CALL-E absorbed, and it is named."""
+    assert METERED["calls_placed"] - METERED["calls_billed"] == 2
+    absorbed = METERED["not_billed"]
+    assert set(absorbed) == {"zero_duration_failures", "concurrency_rejections"}
+    for key, text in absorbed.items():
+        assert len(text) > 60, f"{key} is recorded as absorbed with no account of what it was"
+
+
+def test_the_file_says_it_cannot_explain_the_change_in_level():
+    """The one thing four calls cannot do is say why, and the file has to admit it.
+
+    A readout that reported a tenfold change and offered a cause would be inventing the
+    cause: the dashboard shows no rate card, no line items and no effective date.
+    """
+    cannot = " ".join(PRICE["what_the_metered_reading_does_not_support"]).lower()
+    for phrase in ("rate card", "per-second", "promotional"):
+        assert phrase in cannot, f"the file no longer says it cannot settle {phrase}"
+
+
+def test_no_platform_call_id_reaches_this_file():
+    """The join key back to a recording of a real line stays out of the repository.
+
+    It was in here once, for one commit, because the billing table it came from is keyed on
+    it. `tests/test_privacy.py` catches this too; it is asserted here as well because this
+    is the file that keeps wanting them.
+    """
+    import re
+
+    body = (APP / "evidence" / "observed-price.json").read_text(encoding="utf-8")
+    assert not re.search(r"\b[0-9a-f]{32}\b", body), (
+        "a 32-hex platform call id is committed in the price file")
+    for row in METERED["calls"]:
+        assert row["scenario_id"].startswith("S-"), (
+            "the metered rows are labelled with something other than a scenario id")

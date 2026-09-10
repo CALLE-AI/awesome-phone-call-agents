@@ -4,17 +4,17 @@
   "de_duplicated_by": "call id, discarded before writing. Two receipts record the same two calls, because one of them is the replay that placed none.",
   "filed_under": "today's code, by tools/replay_escalation.py, and not by the resolution each receipt recorded. One call differs: S-3004 was written resolved by a version of this app that read a schema-valid result with every required field set to unknown and closed the record. Today it files as undetermined. The recorded numbers are kept beside the re-filed ones because that receipt is committed uncorrected and the difference between the two is the defect.",
   "placed_on": "2026-09-04",
-  "read_at": "2026-09-08",
+  "read_at": "2026-09-11",
   "regenerate_with": "python tools/pool_recorded_calls.py --receipts DIR",
   "counts": {
     "calls": 12,
     "attempts_billed": 12,
-    "attempts_removed": 6,
+    "attempts_removed": 4,
     "answered": 11,
-    "net_new_escalations": 0,
-    "escalated": 5,
-    "attempts_removed_as_recorded": 6,
-    "net_new_escalations_as_recorded": 1
+    "net_new_escalations": 2,
+    "escalated": 7,
+    "attempts_removed_as_recorded": 4,
+    "net_new_escalations_as_recorded": 3
   },
   "per_receipt": [
     {
@@ -72,10 +72,10 @@
       "calls": 7,
       "placed_by_this_run": 7,
       "attempts_billed": 7,
-      "attempts_removed": 3,
+      "attempts_removed": 1,
       "answered": 7,
-      "net_new_escalations": 0,
-      "escalated": 4
+      "net_new_escalations": 2,
+      "escalated": 6
     }
   ]
 }

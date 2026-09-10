@@ -354,3 +354,69 @@ def test_the_card_reads_the_measurement_and_not_the_sentence(tmp_path, monkeypat
         "with no measurement on disk the builder has to fall back to the published "
         "sentence rather than refusing, because a reviewer who has just cloned this and "
         "wants to look at the page has not run the tool that writes the file")
+
+
+def test_every_pull_quote_is_a_sentence_this_repository_states_somewhere():
+    """The rule `judge_page.pull` describes, which had never been a gate.
+
+    Its docstring said each pull quote is "lifted word for word out of the prose beside it"
+    and named `tests/test_claims.py` as the thing holding them. No such check existed, in
+    that file or any other, so the one rule governing the largest type on the page was a
+    sentence about itself.
+
+    The rule as written was also the wrong one. Setting a claim twice on one screen, once as
+    body prose and once at 2rem, is the repetition the queue's shared-reason band exists to
+    remove, and act 05 was doing exactly that with about nine hundred words in between.
+
+    So the rule is the weaker and truer one: a pull quote has to be a sentence this
+    repository states somewhere a reader can go and check, whether that is the page itself or
+    a document the page links to. A sharpened line invented for the lift still fails.
+    """
+    page = (APP / "out" / "index.html")
+    if not page.is_file():
+        pytest.skip("the page is not built, and this reads what the build produced")
+
+    import html as html_mod
+
+    built = html_mod.unescape(page.read_text(encoding="utf-8"))
+    quotes = re.findall(r"<p class=pull>(.*?)(?:<span class=pull-who>|</p>)", built, re.S)
+    assert quotes, "the page carries no pull quotes, so this gate is measuring nothing"
+
+    # Everything a reader can reach from the page EXCEPT the pull quotes themselves.
+    #
+    # The first version of this gate did not make that exception, and so it passed on a pull
+    # quote invented for the lift: the page's own visible text contains every pull quote,
+    # because a pull quote is visible text on the page. It was a gate that required what it
+    # produced, and it took a mutation to show it, which is the argument act 05 makes.
+    without_pulls = re.sub(r"<p class=pull>.*?</p>", " ", built, flags=re.S)
+    corpus = [_visible_text(without_pulls)]
+    for doc in sorted(APP.glob("**/*.md")):
+        if "node_modules" in doc.parts:
+            continue
+        corpus.append(_flat(doc.read_text(encoding="utf-8")))
+    haystack = " ".join(corpus)
+
+    missing = []
+    for quote in quotes:
+        said = _flat(html_mod.unescape(re.sub(r"<[^>]+>", "", quote)))
+        if said and said not in haystack:
+            missing.append(said)
+
+    assert not missing, (
+        "these pull quotes are not sentences this repository states anywhere a reader can "
+        "check them, so the largest type on the page is saying something nothing else does:"
+        "\n  " + "\n  ".join(missing))
+
+
+def _flat(text: str) -> str:
+    """Whitespace and typographic punctuation flattened, so a quote matches its source."""
+    text = (text.replace("’", "'").replace("‘", "'")
+                .replace("“", '"').replace("”", '"')
+                .replace(" ", " ").replace(" ", " "))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _visible_text(built: str) -> str:
+    body = re.sub(r"<script.*?</script>", " ", built, flags=re.S)
+    body = re.sub(r"<style.*?</style>", " ", body, flags=re.S)
+    return _flat(re.sub(r"<[^>]+>", " ", body))

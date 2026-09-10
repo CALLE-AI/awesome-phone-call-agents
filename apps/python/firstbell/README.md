@@ -350,7 +350,7 @@ the demo                         6      8       4   $0.59   $0.23   $0.35     50
 with consent records             3      3       2   $0.78   $0.62   $0.16     42.0%
 siblings on one number           2      2       1   $0.59   $0.00   $0.59     31.5%
 -----------------------------------------------------------------------------------
-all recorded calls              12     12       6   $0.59   $0.00   $0.59     34.3%
+all recorded calls              12     12       4   $0.39   $0.31   $0.08     22.9%
 ```
 
 Four of the ten rows that command prints. The six left out are one recorded run each,
@@ -372,14 +372,20 @@ called the numerator measured, and they were right to.
 The last row is the twelve calls that rang. Nobody chose that numerator, and it is the row
 to argue with:
 
-- Eleven of the twelve were answered, none of them became new work for the safeguarding
-  lead, and the net ceiling is **$0.59 a call**, higher than the demo run this entry leads
-  with.
-- Eleven answered calls cannot rule out 24 net-new escalations per 100, and the crossover is
-  34, so the bound sits inside it with about ten per hundred to spare. Even at the far end
-  the ceiling is $0.18 and the saving holds. A district running a higher alert rate, or
-  closing fewer records than this, walks into the loss, which is why the figure is printed
-  rather than waited for.
+- Eleven of the twelve were answered, two of them became new work for the safeguarding
+  lead, and the net ceiling is **$0.08 a call**, lower than the demo run this entry leads
+  with. It read $0.59 and no new work until 2026-09-11, when the safeguarding rule was
+  widened after two live calls reporting a missing child were closed automatically. Two of
+  these twelve are records the old rule closed and the new one holds open, so the desk time
+  this row can claim drops and the callback cost it carries rises. Both moves are against
+  this entry and both are published.
+- Eleven answered calls measured 18.2 net-new escalations per 100 against a crossover of
+  22.9, so the count clears the loss by 4.7 per hundred, and the same eleven calls cannot
+  rule out 47.0. **The bound is past the crossover.** At that end the ceiling is a **cost of
+  $0.41 a call**. This is the weakest the pooled row has ever read, and the reason is a rule
+  change made on purpose rather than a worse month of calls. A district running a higher
+  alert rate, or closing fewer records than this, is at the far end, which is why the figure
+  is printed rather than waited for.
 - Those counts are re-filed under today's code rather than read off each receipt, and one
   call differs. S-3004 is the call this entry is proudest of publishing: a parent said they
   were at work and could not talk, CALL-E returned a schema-valid result with every required
@@ -389,13 +395,13 @@ to argue with:
   ceiling computed from the recorded word would price a defect that has been fixed. Both
   numbers are in [`evidence/recorded-calls.json`](evidence/recorded-calls.json) and
   `python tools/replay_escalation.py --receipts DIR` re-files every call in front of you.
-- The safeguarding rule marked five of those eleven answered calls and none of the five
-  counts as new work, because every one connected and gave nothing usable, so a person was
-  ringing those families back whatever software placed the call. What the rule added there
-  is the grade of the person who rings and a thirty-minute clock, not the ringing. That
-  reading is ours, so here is the figure that holds if it is wrong in all five cases: price
-  every marked call as a callback and the ceiling becomes a **cost of $0.19 a call**. It
-  over-counts on purpose, and it is the number to hold this entry to.
+- The safeguarding rule marked seven of those eleven answered calls, and two of the seven
+  count as new work. The other five connected and gave nothing usable, so a person was
+  ringing those families back whatever software placed the call, and what the rule added
+  there is the grade of the person who rings and a thirty-minute clock rather than the
+  ringing. That reading is ours, so here is the figure that holds if it is wrong in all
+  seven cases: price every marked call as a callback and the ceiling becomes a **cost of
+  $0.70 a call**. It over-counts on purpose, and it is the number to hold this entry to.
 
 The entry leads with the smaller of the two figures because the demo run is the one anybody
 can reproduce, and the larger one is printed beside it so that choice is visible rather than
@@ -1210,25 +1216,24 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 808 tests collected
+python -m pytest tests/ -q          # 848 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**808 is the number collected, and two different pairs add up to it.** Some of these gates
-need something this repository cannot ship: the twelve call recordings, which are held
+**848 is the number collected, and two different pairs add up to it.** Some of these gates
+need something this repository cannot ship: the call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **771 passed, 37
-skipped**. The thirty-seven name what is missing rather than passing quietly:
-thirty-two want a built page, four of those thirty-two also wanting its
-Content-Security-Policy, three want a gate report, one wants the call receipts, which are
-not in this tree, and one is a run whose rows are all of one kind, so the ordering it would
-check proves nothing. Build the page and run the gates and
-the same suite reports **806 passed, 2 skipped**. Both pairs are measured, both add up to
-808, and the difference between them is what a reader has on their disk.
+A clean checkout of this commit into an empty directory reports **809 passed, 39
+skipped**. The thirty-nine name what is missing rather than passing quietly:
+thirty-five want a built page, four of those thirty-five also wanting its
+Content-Security-Policy, three want a gate report, and one is a run whose rows are all of
+one kind, so the ordering it would check proves nothing. Build the page and run the gates and
+the same suite reports **846 passed, 2 skipped**. Both pairs are measured, both add up to
+848, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 770 and 38.
+The very first run in a fresh clone reports one more skip and one fewer pass, 808 and 40.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on

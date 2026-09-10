@@ -221,9 +221,20 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
             f'<ul class=csc-verdicts>{verdicts}</ul>'
             '</div>')
 
+    # The dates come off the calls. This sentence said "on 2026-09-04" for both lanes, and
+    # on 2026-09-11 the second lane became a call placed a week later, so the caption was
+    # dating a call to a day it was not placed on. A caption that gets the date of its own
+    # evidence wrong is the kind of small false thing this page is an argument against.
+    placed = []
+    for call in picked:
+        day = call.get("placed_on")
+        if day and day not in placed:
+            placed.append(day)
+    when = ("on " + " and ".join(placed)) if placed else "against the production API"
+
     caption = (
         f'{lanes[0]["id"]} and {lanes[1]["id"]} are two calls this software placed '
-        'through CALL-E on 2026-09-04, to a consented line, on a scripted scenario with '
+        f'through CALL-E {when}, to a consented line, on a scripted scenario with '
         'an invented pupil name. Both came back with a structured result the schema '
         'accepts. The fields are what CALL-E returned, verbatim, and the durations are '
         'the recordings’ own. The two-bucket row is a counterfactual and is '

@@ -739,6 +739,12 @@ td.mono, .mono { font-family: var(--mono); font-size: var(--size-2); }
 .state-resolved { color: var(--resolved); }
 .state-failed { color: var(--failed); padding-left: 0.5rem; border-left: 2px dotted var(--line-strong); }
 .state-undetermined { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
+/* Escalation is a second axis and not a fourth resolution, so it does not get a fourth
+   colour. It is drawn exactly as `--undetermined` is, which is the same choice
+   `.q-safeguarding` already makes in the office queue below: both mean a person has to see
+   this. Reusing the token also means it inherits a contrast that has already been measured
+   as running text on paper rather than needing its own. */
+.state-escalated { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
 
 button[data-copy] {
   font: inherit; font-family: var(--mono); font-size: var(--size-2);
@@ -933,6 +939,17 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   max-width: var(--measure);
   text-wrap: balance;
 }
+/* A single-line statement the act stands behind, set between body prose and a pull quote.
+   Smaller than `.pull` on purpose: three of these in one act at pull size would be three
+   competing headlines, and the pull is the one sentence a reader leaves the act with. */
+.hard {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.15rem, 1rem + 0.5vw, 1.4rem);
+  line-height: 1.32; color: var(--ink);
+  margin: var(--space-4) 0; max-width: var(--measure);
+  text-wrap: balance;
+}
+
 .pull-who {
   display: block; font-family: var(--ui); font-size: var(--size-1);
   letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3);

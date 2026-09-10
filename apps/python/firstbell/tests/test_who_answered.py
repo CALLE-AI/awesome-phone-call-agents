@@ -65,44 +65,75 @@ def test_the_field_is_in_the_schema_and_is_not_required():
 
 
 # --- what closes and what does not ---------------------------------------------------
+#
+# Every case below starts from a record that closes, and changes one field.
+#
+# That is not tidiness. These tests were once written as the two fields they are about and
+# nothing else, and when `safeguarding_escalation` grew a third condition in September 2026
+# a bare `{"parent_confirmed_aware": "yes", "spoke_with": "child"}` started escalating for
+# a reason that has nothing to do with who answered: it carries no `expected_return`. Every
+# assertion in this block would have gone on passing with the guardian rule deleted from
+# the module. A test that cannot fail when the thing it names is removed is not testing it.
+
+
+def _closeable(**fields) -> dict:
+    """A record the live rule closes. Change one field and it should stop closing."""
+    base = {"reason_category": "illness", "expected_return": "tomorrow",
+            "parent_confirmed_aware": "yes", "spoke_with": "guardian"}
+    base.update(fields)
+    return base
+
+
+def test_the_base_case_this_block_varies_actually_closes():
+    """The guard on every assertion below. If this fails they are all measuring nothing."""
+    assert safeguarding_escalation(_closeable()) is Escalation.NONE
 
 
 def test_a_confirmation_from_a_guardian_closes_the_record():
-    assert safeguarding_escalation(
-        {"parent_confirmed_aware": "yes", "spoke_with": "guardian"}) is Escalation.NONE
+    assert safeguarding_escalation(_closeable(spoke_with="guardian")) is Escalation.NONE
 
 
 def test_a_confirmation_from_a_sibling_does_not_close_the_record():
     """"Yeah she's sick" from a brother is not a guardian accounting for a child."""
-    assert safeguarding_escalation(
-        {"parent_confirmed_aware": "yes", "spoke_with": "child"}
-    ) is Escalation.SAFEGUARDING
+    assert safeguarding_escalation(_closeable(spoke_with="child")) is Escalation.SAFEGUARDING
 
 
 def test_a_confirmation_from_another_adult_does_not_close_the_record():
     assert safeguarding_escalation(
-        {"parent_confirmed_aware": "yes", "spoke_with": "other_adult"}
-    ) is Escalation.SAFEGUARDING
+        _closeable(spoke_with="other_adult")) is Escalation.SAFEGUARDING
 
 
 def test_an_answering_machine_does_not_close_the_record():
     assert safeguarding_escalation(
-        {"parent_confirmed_aware": "yes", "spoke_with": "voicemail"}
-    ) is Escalation.SAFEGUARDING
+        _closeable(spoke_with="voicemail")) is Escalation.SAFEGUARDING
 
 
 def test_who_answered_is_checked_before_what_they_said():
     """A record answered by a child is held whatever the awareness field says."""
     for aware in ("yes", "no", "unknown"):
         assert safeguarding_escalation(
-            {"parent_confirmed_aware": aware, "spoke_with": "child"}
+            _closeable(parent_confirmed_aware=aware, spoke_with="child")
         ) is Escalation.SAFEGUARDING
 
 
-def test_the_old_behaviour_is_unchanged_when_the_call_did_not_say():
-    """Every call placed before this field existed still reads exactly as it did."""
-    assert safeguarding_escalation({"parent_confirmed_aware": "yes"}) is Escalation.NONE
-    assert safeguarding_escalation({"parent_confirmed_aware": "no"}) is Escalation.SAFEGUARDING
+def test_a_call_that_did_not_say_who_answered_is_not_read_as_a_refusal():
+    """`None` is not `False`, and this is the assertion that holds the difference.
+
+    A call that never recorded who spoke is counted and printed rather than escalated on
+    that basis alone, because folding "nobody wrote it down" into "not a guardian" would
+    invent a fact about a call. So a record with the field absent, and one with it set to
+    `unknown`, both close on the strength of the rest of the answer.
+    """
+    without = _closeable()
+    without.pop("spoke_with")
+    assert safeguarding_escalation(without) is Escalation.NONE
+    assert safeguarding_escalation(_closeable(spoke_with="unknown")) is Escalation.NONE
+    # And the confirmation is still doing its own job in both shapes.
+    without["parent_confirmed_aware"] = "no"
+    assert safeguarding_escalation(without) is Escalation.SAFEGUARDING
+    assert safeguarding_escalation(
+        _closeable(spoke_with="unknown", parent_confirmed_aware="no")
+    ) is Escalation.SAFEGUARDING
 
 
 # --- the run says what it closed on --------------------------------------------------

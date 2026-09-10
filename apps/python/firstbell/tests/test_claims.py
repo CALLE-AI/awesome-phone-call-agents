@@ -1023,6 +1023,15 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     "_run":
         "the office queue is drawn from a committed receipt, and the receipts are held "
         "outside this repository, so every test of that view goes quiet without them",
+    # Same reason, one file over. `test_money_block.py` reads two different receipts now,
+    # one for a run that holds records open and one for a run that holds none, so the
+    # loader takes the name as an argument and the skip lives in it.
+    "test_every_pull_quote_is_a_sentence_this_repository_states_somewhere":
+        "reads the pull quotes out of the built page, so it has nothing to check on a "
+        "checkout where out/index.html has not been built",
+    "_receipt":
+        "the money band is priced from committed receipts, and the receipts are held "
+        "outside this repository, so the band goes quiet without them",
     # These two carry a second skip of their own, on top of the helper's. Both are about the
     # shape of the committed run rather than the machine: a run where nothing escalates has
     # no marking to check, and a run where everything escalates has no order to check.

@@ -6,12 +6,22 @@ where the saving turns into a loss.
 ## The one line, if you only read one
 
 **Quote $0.35 a call.** It is the smallest of the figures here, it is the one a reader
-reproduces with one command, and it is the demo run's. **Plan against $0.19 a call as a
+reproduces with one command, and it is the demo run's. **Plan against $0.70 a call as a
 cost**, which is what the same arithmetic gives when every escalated call is priced as a
-callback rather than only the ones this software says it created. **The calls were billed at
-$0.05 each**, on the one month of usage one account has. Which of the first two a district is
-living in is what the first week of a pilot measures, and nothing published before that week
-can settle it.
+callback rather than only the ones this software says it created. Which of the two a district
+is living in is what the first week of a pilot measures, and nothing published before that
+week can settle it.
+
+**And the price side moved under all of it.** These calls were billed at $0.05 each across
+the month of usage one account had on 2026-09-04. Four calls placed on 2026-09-11 from the
+same account to the same country billed $0.41 to $0.75 each, metered rather than flat. Both
+readings are in [`evidence/observed-price.json`](../evidence/observed-price.json) with the
+three things neither can settle, and §7 of
+[`CALLE_FEEDBACK_REPORT.md`](../CALLE_FEEDBACK_REPORT.md) shows the balance closing on both.
+CALL-E publishes no price, so a district cannot look either up. Nothing below has been
+re-derived against the newer reading, because the ceilings are desk time and do not depend
+on what the call costs; what depends on it is whether the ceiling is worth paying, and on
+2026-09-11 the answer got worse by roughly ten times.
 
 That line is here because a district buyer read this entry and counted four per-call figures
 across three surfaces without being told which one it stands behind. Every one of them is
@@ -135,13 +145,25 @@ Put the three side by side, because this is the whole commercial question in one
 |---|---|---|
 | Measured on the committed offline run | 20.0 | offline, authored mix |
 | Where the saving becomes a loss on that run | 50.4 | offline, authored mix |
-| Measured on the calls that rang | 0 | 11 answered calls |
-| What those calls cannot rule out | 24 | 11 answered calls |
-| Where the saving becomes a loss on them | **34.3** | 11 answered calls |
+| Measured on the calls that rang | 18.2 | 11 answered calls |
+| What those calls cannot rule out | 47.0 | 11 answered calls |
+| Where the saving becomes a loss on them | **22.9** | 11 answered calls |
 
-Read the last three rows together and ignore the first two for this purpose. Twenty-four
-against 34.3 leaves about ten per hundred to spare, which is what the README and
-`tools/money_across_runs.py` both print.
+Read the last three rows together and ignore the first two for this purpose. They read
+worse than they did a week ago, and the reason is in this repository rather than in the
+data: `safeguarding_escalation` was widened on 2026-09-11 after two live calls reporting a
+missing child were closed automatically, and re-filing the twelve recorded calls under the
+wider rule moves two of them out of the closed pile. So the measured net-new rate went from
+0 to 18.2, the bound from 24 to 47.0, and the crossover down from 34.3 to 22.9, because a
+run that closes fewer records removes less desk time.
+
+**The count clears the crossover:** 18.2 measured against 22.9, by 4.7 per hundred.
+**The bound does not clear it at all:** 47.0 against the same 22.9. That is a materially
+weaker position than the 24 against
+34.3 this table published before, where both the count and its bound sat below the
+crossover. The point estimate still says this saves money on the calls that rang. The
+interval says eleven calls cannot rule out its costing $0.41 a call instead, and
+`tools/money_across_runs.py` prints that sentence rather than the flattering half of it.
 
 The pairing is the point, and it took a reader to find it. This table used to put 24
 straight above 50.4 and call it half the rate to spare, which compares a bound measured on
@@ -149,7 +171,7 @@ real calls against a crossover derived from an authored outcome mix. Both figure
 right. The comparison between them was not one, and a district following the link from the
 page, where the same bound is set against a third crossover for a single receipt, was left
 with three conclusions and nothing saying which to staff against. It is the one on the calls
-that rang: 34.3, because that denominator is the only one nobody chose.
+that rang: 22.9, because that denominator is the only one nobody chose.
 
 What a district should take from the table is that the sample is eleven answered calls, so
 the row that matters is the bound and not the count. Twelve were placed and one of them
@@ -159,28 +181,35 @@ sample, or closing fewer records than this run closes, walks into the loss witho
 software saying a word. So the software says it. A run that removes fewer attempts absorbs
 a lower rate, and the figure moves down with it.
 
-The table above bounds one rate, and it is worth saying which. Twenty-four per 100 is what
-these calls cannot rule out about the *net-new* rate, meaning the escalations this software
-says its own safeguarding rule created. It is not a bound on escalations in general. The
-escalation rate this run measured is already about twice it.
+The table above bounds one rate, and it is worth saying which. 47.0 per 100 is what these
+calls cannot rule out about the *net-new* rate, meaning the escalations this software says
+its own safeguarding rule created. It is not a bound on escalations in general. The
+escalation rate this run measured is more than three times the net-new one.
 
 | | Escalations per 100 answered calls | Which run |
 |---|---|---|
-| Measured on the calls that rang | 45.5 | 11 answered calls |
-| What those calls cannot rule out | 72.9 | 11 answered calls |
+| Measured on the calls that rang | 63.6 | 11 answered calls |
+| What those calls cannot rule out | 86.5 | 11 answered calls |
 
-A second table with its own header, because 45.5 and 24 are rates of different things, and
+A second table with its own header, because 63.6 and 47.0 are rates of different things, and
 putting two of those in one column is the mistake this document already made once with 24
 and 50.4.
 
-Both rows sit above 34.3. Pricing every escalated call as a callback, rather than only the
-ones this software says it created, is the assumption behind $0.19, which the reviewer page
-publishes as the number to hold this entry to. Under that assumption the crossover is
-already passed and the saving is a cost of about nineteen cents a call. The narrower
-reading, where only the net-new escalations are work the rule created, is the 24 against
-34.3 in the table above. Which of the two a district is living in is a question a pilot
-answers in week one. Neither figure is buried here to make the other look better, and the
-wider one is the one a finance office should plan against until a pilot narrows it.
+Both rows sit above 22.9. Pricing every escalated call as a callback, rather than only the
+ones this software says it created, is the assumption behind a cost of **$0.70 a call**,
+which the reviewer page publishes as the number to hold this entry to. Under that assumption
+the crossover is passed by a wide margin and the saving is a cost of about seventy cents a
+call. The narrower reading, where only the net-new escalations are work the rule created, is
+the 18.2 measured and 47.0 bounded against 22.9 in the table above, and on that reading the
+count clears the crossover and the bound does not. Which of the two a district is living in
+is a question a pilot answers in week one. Neither figure is buried here to make the other
+look better, and the wider one is the one a finance office should plan against until a pilot
+narrows it.
+
+Both of these got worse on 2026-09-11 and none of it was tuned. Seven of eleven answered
+calls now escalate where five did, because the rule reads three fields where it read one.
+That is the cost of not filing a missing child automatically, it is priced here at the
+safeguarding lead's wage, and it is published in the direction that hurts.
 
 A vendor would publish $0.35 and stop. The reason to publish 50.4 as well is that a school
 board is going to ask the question in the meeting, and the answer should already be in the

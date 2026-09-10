@@ -26,12 +26,16 @@ sys.path.insert(0, str(APP / "tools"))
 RECEIPT = "06-locale-matched-pairs.json"
 
 
-def _run() -> dict:
+def _receipt(name: str) -> dict:
     for base in (Path("D:/calle-workshop/receipts"), APP / "evidence" / "receipts"):
-        path = base / RECEIPT
+        path = base / name
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
     pytest.skip("the receipts are held outside this repository and are not on this machine")
+
+
+def _run() -> dict:
+    return _receipt(RECEIPT)
 
 
 def _figures() -> dict:
@@ -102,14 +106,48 @@ def test_the_band_prices_the_added_work_at_the_lead_grade():
             facts["net_new"] / facts["answered"]) * (lead.hourly / 60.0) * 3
 
 
+# The receipt this file is mostly about is the seven-call locale run. A zero count needs a
+# run where the count is actually zero, and after the safeguarding rule started reading
+# `expected_return` in September 2026 that stopped being this one: two of its seven answered
+# calls confirmed awareness and could not name a day the child returns, so they are now held
+# open. The property being tested has not changed, so it moved to a run that still has it
+# rather than being rewritten to expect two, which would have deleted it.
+ZERO_RECEIPT = "01-two-languages-one-command.json"
+
+
 def test_a_zero_count_still_carries_its_bound():
-    """Nothing moved on these calls, and seven calls cannot say the rate is nought."""
+    """Nothing moved on these two calls, and two calls cannot say the rate is nought."""
     import judge_page
-    facts = judge_page.money_facts(_run())
+    facts = judge_page.money_facts(_receipt(ZERO_RECEIPT))
     assert facts["net_new"] == 0
+    assert facts["answered"], "a bound on no answered calls is not the thing being checked"
     assert facts["bound"] > 0.3, (
-        "seven answered calls with no movement still allow a rate above 30 per 100, and "
-        "the band has to say so rather than reading zero as settled")
+        "answered calls with no movement still allow a rate well above 30 per 100, and the "
+        "band has to say so rather than reading zero as settled")
+
+
+def test_the_run_the_page_draws_holds_two_records_open_that_it_used_to_close():
+    """The other half of the same property: a count that is not zero is the measured one.
+
+    S-4102 came back `illness` and S-4103 `family_emergency`, both from a parent who
+    confirmed they already knew, and on both the call never established when the child
+    would be back. The rule closed them until the four live calls of 2026-09-11 showed what
+    a confirmed absence with no return date can be, and a run that reported nought new
+    escalations against a bound of 66 per 100 was reporting the bound honestly and the
+    count wrongly.
+    """
+    import judge_page
+    run = _run()
+    facts = judge_page.money_facts(run)
+    assert facts["net_new"] == 2, (
+        "the two records this rule was widened to hold open are closing again")
+    held = {item["id"] for item in run["items"]
+            if (item.get("structured_result") or {}).get("expected_return") == "unknown"
+            and (item.get("structured_result") or {}).get("parent_confirmed_aware") == "yes"}
+    assert held == {"S-4102", "S-4103"}, (
+        f"the run no longer contains the pair this counts, it contains {sorted(held)}")
+    assert facts["added_at_three"] > 0, (
+        "two held records cost a safeguarding lead time, and the band prices it at zero")
 
 
 def test_the_worst_case_is_not_clamped_to_a_flattering_zero():

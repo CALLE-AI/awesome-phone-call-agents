@@ -527,24 +527,50 @@ def _hero_exchange(call: dict) -> tuple[str, str] | None:
 def hero_turn_markup(call: dict) -> str:
     """What the office was left with, and what this software did about it.
 
-    `parent_confirmed_aware` is not in the schema required list and is not treated as one
-    here: the guardian saying no is an answer, and an alarming one. The two fields that
-    decide whether a record may close are `reason_category` and `expected_return`, and this
-    reads their values rather than restating them, so the sentence cannot outlive the data.
+    Every value in the sentence is read out of the call, including the verdict: the
+    escalation is asked of `safeguarding_escalation`, the same function the dispatcher calls,
+    so this paragraph cannot claim an outcome the program would not reach.
+
+    It used to open "The guardian was not aware of the absence", which was true of S-4105
+    and is the opposite of what the platform returned for the call this page now opens on.
+    On S-3103 `parent_confirmed_aware` came back `yes` about a parent asking the office to
+    go and look for their daughter, so the sentence branches on the field rather than
+    asserting one reading of it. The `yes` branch is the stronger argument and it could not
+    have been written before a real call produced it.
     """
+    from dispatch.models import Escalation
+    from firstbell.domain import safeguarding_escalation
+
     found = call.get("structured") or {}
     decisive = [found.get("reason_category"), found.get("expected_return")]
     if not all(isinstance(v, str) and v for v in decisive):
         return ""
     why, when = (esc(v) for v in decisive)
+    aware = str(found.get("parent_confirmed_aware", "")).strip().lower()
+    held = safeguarding_escalation(found) is not Escalation.NONE
+
+    if aware == "yes":
+        opening = (
+            'The platform recorded the guardian as <b>aware</b> of the absence. The '
+            'guardian had just asked the office to go and check a classroom. Both of those '
+            'are in the same call, and only one of them reached the record.')
+    else:
+        opening = (
+            'The guardian was not aware of the absence. That is the answer that matters, '
+            'and it is the only answer the call got.')
+
+    if held:
+        verdict = ('This one files it <span class="state state-escalated">escalated</span> '
+                   'and puts it on a safeguarding lead’s desk, inside thirty minutes.')
+    else:
+        verdict = ('This one closes it, which is what the automation is for when the answer '
+                   'is an answer.')
+
     return (
-        '<p class=hero-turn>The guardian was not aware of the absence. That is the answer '
-        'that matters, and it is the only answer the call got. Why the pupil was away came '
+        f'<p class=hero-turn>{opening} Why the pupil was away came '
         f'back <b>{why}</b>. When to expect her back came back <b>{when}</b>. Those two are '
         'what the office needs before it can act, so a system that counts contacts would '
-        'mark this “family contacted” and close it. This one files it '
-        '<span class="state state-undetermined">undetermined</span> and puts it on a named '
-        'person’s desk.</p>'
+        f'mark this “family contacted” and close it. {verdict}</p>'
     )
 
 
@@ -1337,8 +1363,16 @@ def pull(quote: str, who: str = "") -> str:
 
     The argument is the reason the exact string matters. A reader who takes the page from
     the pull-quotes alone has to end up with what the page actually claims, so every one of
-    these is lifted word for word out of the prose beside it rather than sharpened for the
-    lift. `tests/test_claims.py` holds the sentences these come from.
+    these is a sentence this repository states somewhere a reader can check it rather than
+    one sharpened for the lift.
+
+    That used to read "lifted word for word out of the prose beside it", and cited a gate in
+    `tests/test_claims.py` that has never existed. Two things were wrong with it. The rule as
+    written forced the same sentence twice onto one screen, which is the reading fatigue the
+    shared-reason band three hundred lines down was written to remove. And a docstring naming
+    a gate that is not there is the exact defect this page is about, sitting in the function
+    that renders the page's own claims. `tests/test_page_prose_counts.py` now holds the real
+    one: every pull quote has to be a sentence the page or a document it links to states.
     """
     tail = f'<span class=pull-who>{esc(who)}</span>' if who else ""
     return f'<p class=pull>{esc(quote)}{tail}</p>'
@@ -1728,11 +1762,30 @@ def _money_key_block(f: dict) -> str:
         billed = ("" if price is None else
                   f'The calls themselves were billed at ${price:,.2f} each on the one '
                   'month of usage this account has. ')
+        # Which figure to quote is "the smaller one", and until 2026-09-11 the smaller one
+        # was also the reproducible one, so a single clause could carry both reasons. That
+        # stopped being true when the safeguarding rule widened: the recorded calls now
+        # close fewer records, their net ceiling fell to a figure below the demo run's, and
+        # this sentence was telling a reader to quote the larger of the two while calling it
+        # the smaller. So the comparison is made here rather than asserted, and when the two
+        # virtues come apart the sentence says which one it is choosing.
+        pooled_net = pooled["net_ceiling"]
+        if pooled_net <= demo:
+            lead = (
+                f'Quote the ${pooled_net:,.2f} above rather than the demo run&#8217;s '
+                f'${demo:,.2f}: it is the smaller of the two, and its denominator is the '
+                'one on this page nobody chose. The demo run is the figure one command '
+                'reproduces, and it is the higher of the two, so it is not the one to '
+                'quote. ')
+        else:
+            lead = (
+                f'Quote the demo run&#8217;s ${demo:,.2f} rather than the ceiling above: '
+                'it is the smaller of the two and one command reproduces it. ')
         quote = (
-            f'Quote the demo run&#8217;s ${demo:,.2f} rather than the ceiling above: it is '
-            'the smaller of the two and one command reproduces it. Plan against the '
-            f'${abs(every):,.2f} a call this becomes if every escalated call is priced as '
-            'a callback, which is the reading this entry holds itself to. '
+            lead +
+            f'Plan against the ${abs(every):,.2f} a call this becomes if every escalated '
+            'call is priced as a callback, which is the reading this entry holds itself '
+            'to. '
             + billed +
             'Which of those two a district is living in is what the first week of a pilot '
             'measures, and nothing before that week can settle it. ')
@@ -2024,7 +2077,7 @@ def queue_markup(run: dict) -> str:
     if str(APP) not in sys.path:
         sys.path.insert(0, str(APP))
     from dispatch.models import Escalation
-    from firstbell.domain import safeguarding_escalation
+    from firstbell.domain import safeguarding_escalation, why_escalated
 
     # Escalation is asked of every row that came back with a structured result, whatever the
     # resolution was. The first version of this asked it only of `resolved` rows, on the
@@ -2058,7 +2111,13 @@ def queue_markup(run: dict) -> str:
 
     def _reason(escalated: bool, item: dict, resolution: str) -> tuple[str, str]:
         if escalated:
-            head = "The parent did not confirm they already knew their child was absent."
+            # Asked of the rule rather than written here. This line was one fixed sentence
+            # saying the parent had not confirmed, which was the only way a row could
+            # escalate until the rule was widened on 2026-09-11, and is false of the rows
+            # the widening was for: on those the parent did confirm and could not say when
+            # the child is back. A queue that gives a clerk the wrong reason sends them into
+            # the call with the wrong first question.
+            head = why_escalated(item.get("structured_result") or {})
             if resolution != "resolved":
                 head += " The call also ended without an answer the office can use."
             return head, "Speak to this family first."
@@ -2761,25 +2820,52 @@ def build(has_audio: bool, repo_url: str | None = None,
     # The rows are the English call of each committed scenario pair, in the order the
     # pairs were registered, so which four appear here is decided by the evidence file and
     # not by this template. The live one is the call where the parent had not been told.
-    hero = "S-4105"
+    # S-3103, placed 2026-09-11. It replaced S-4105 here, and the reason is the whole
+    # argument getting sharper. S-4105 was a parent who did not know, and the platform
+    # returned `parent_confirmed_aware: no`, so a reader could reasonably think the field
+    # works and this software is only being careful. On S-3103 the parent interrupts the
+    # robot to say their daughter boarded the school bus at half past seven and to ask the
+    # office to go and check the classroom, and the platform returned
+    # `parent_confirmed_aware: yes` with a routine `transport` absence. The field did not
+    # merely go unread. It said the opposite of what the call contained, and this page now
+    # opens on the call where it did.
+    # Which call the page opens on is the evidence file's decision, not this template's.
+    # It was `hero = "S-4105"` for months and the id sat here in the code, which meant the
+    # first thing a judge sees was chosen by whoever last edited the builder. It also broke
+    # the authored fixture the moment the choice changed, because a hardcoded id is a
+    # requirement the fixture had no way to know about.
+    #
+    # The fallback is the first call in the file rather than a second hardcoded id, so a
+    # transcripts file that names no hero still builds a page.
+    hero = data.get("hero") if data.get("hero") in calls else next(iter(calls))
     rows = [pair["en"] for pair in data["pairs"]]
-    cue = cue_for(calls[hero], "left for school")
+    # The phrase the cue rests five seconds before, also from the file. `cue_for` returns 0
+    # when it does not match, which is the right default: the player starts at the beginning.
+    cue = cue_for(calls[hero], data.get("heroCue", ""))
     # A reader met the first viewport and could not name the product. They were
     # right to be unable to: `firstbell` appeared in the visible text of this page exactly
     # twice, in the browser tab and in a shell command nine screens down. The best sentence
     # in the entry was in README.md and had never been on the page a judge opens first.
+    # The control is the first call in the file the live rule closes, and the hero is the
+    # call the file names. Both read out of the data for the same reason: a hardcoded pair
+    # is a pair somebody chose, and this page's whole argument is about not doing that.
+    from dispatch.models import Escalation as _Esc
+    from firstbell.domain import safeguarding_escalation as _escalates
+    control = next((cid for cid, one in calls.items()
+                    if cid != hero and _escalates(one.get("structured") or {}) is _Esc.NONE),
+                   next(cid for cid in calls if cid != hero))
     lanes_shown = [
         # The control, and it is the shorter of the two calls. It exists to say that this
         # software does not simply mark everything undetermined, which is one sentence.
-        {"id": "S-4101", "label": "the parent knew, and said why",
+        {"id": control, "label": "the parent knew, and said why",
          "two_bucket": "resolved", "two_bucket_note": "case closed",
          "ours": "resolved",
          "ours_note": "Three fields the office can act on."},
-        {"id": "S-4105", "label": "the parent did not know",
+        {"id": hero, "label": "the parent asked the school to go and look",
          "two_bucket": "resolved",
-         "two_bucket_note": "case closed. Reported as a family contacted.",
-         "ours": "undetermined",
-         "ours_note": "held open and escalated to a named person."},
+         "two_bucket_note": "case closed. Filed as a transport absence, parent aware.",
+         "ours": "escalated",
+         "ours_note": "held open and escalated to a safeguarding lead."},
     ]
     body = [
         # The instrument, directly under the one-minute lane it is the evidence for.
@@ -2870,7 +2956,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'never arrived anywhere.</p>',
         '<p>The call above is the second kind. At '
         f'{cue + 5} seconds a parent learns from a robot that their daughter is not at '
-        'school, having watched her leave for it that morning.</p>',
+        'school, having put her on the school bus at half past seven. They ask the '
+        'office to go and check the classroom. The platform filed the call as a '
+        'transport absence with the parent aware of it.</p>',
         # Not written for this page. This is what the program prints at the head of its
         # own escalation queue, and it was sitting nine screens below here, in terminal
         # text, as the last thing a reader met. A reader called it the strongest
@@ -2987,6 +3075,10 @@ def build(has_audio: bool, repo_url: str | None = None,
         # The pull moves above the fold and the note it quotes moves below it. It is the
         # one sentence in this act a reader has to leave with, and an act that ends on a
         # closed disclosure needs its last visible line to be that sentence.
+        '<p class=hard>An automated dialler with no safeguarding triage does not close '
+        'cases. It closes the only record that a case existed.</p>',
+        '<p class=hard>CALL-E filed a missing child as a routine transport absence. So did '
+        'this software, until 2026-09-11.</p>',
         pull("This app made the first mistake itself."),
         FOLD_OPEN,
         queue_markup(run),
@@ -3143,9 +3235,13 @@ def build(has_audio: bool, repo_url: str | None = None,
     body = [
         '<div class="split split-long"><div class=claim>',
         '<div class=act-num>05</div><h2 id=h-05>Every rule, broken on purpose.</h2>',
-        '<p>A test that has never been observed to fail has not been shown to test anything. '
-        'Each row is a change made to working code to check that a specific test notices. '
-        'Every one was reverted and the suite returned to green.</p>',
+        # The sentence this act rests on is set once, as the pull quote at the foot of it.
+        # It was here as well, in full, about nine hundred words above its own restatement,
+        # which is the single clearest case of the repetition a reader complained about: the
+        # same claim twice inside one act with the evidence for it in between.
+        '<p>Each row is a change made to working code to check that a specific test '
+        'notices. Every one was reverted and the suite returned to green. The number beside '
+        'a row is how many tests failed while the change was in.</p>',
         '<div class=note>Number 18 found a live defect rather than confirming a rule. '
         '<code>reached_production_api</code> was computed from the configured base URL alone, '
         'so a run whose every attempt died at the transport layer would still have published '
