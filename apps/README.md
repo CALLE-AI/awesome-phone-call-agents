@@ -53,6 +53,7 @@ Current apps:
 | [`python/muster`](python/muster/) | Python | Proof-of-life attestation for pension and benefit schemes: a freshness challenge minted per call that a recording cannot answer, knowledge prompts a housemate should not know, and turn-timing analysis that catches somebody in the room feeding the answers. A relative vouching for the subject is never a pass, no grade ever concludes a death, and nothing it returns can stop a payment. Scripted no-call demo by default. |
 
 - [OneReach service follow-up](typescript/onereach-service-followup/) - Standalone Node.js CALL-E appointment workflow with a no-call default, validated outcomes, and signed webhook handling.
+| [`python/otherend`](python/otherend/) | Python | Task pre-flight for a CALL-E task: CALL-E dials a programmable line you own that answers as a receptionist with a chosen adversity profile, or as a scripted person for tasks that call people, then a deterministic grader scores what CALL-E reported against what the line actually said. Replays nine synthetic rows (in-process simulation, no calls) with no keys by default, including another entry's task text run verbatim; one real call per row only behind `--yes` and an allow-list. |
 
 Suggested grouping:
 
