@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -46,6 +47,7 @@ class DuffelClient:
         dry_run: bool | None = None,
         base_url: str = DUFFEL_BASE_URL,
         timeout: float = 30.0,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("DUFFEL_API_KEY")
         self.dry_run = dry_run if dry_run is not None else os.environ.get("DRY_RUN", "true").lower() != "false"
@@ -62,6 +64,11 @@ class DuffelClient:
                     "Accept": "application/json",
                 },
                 timeout=timeout,
+                # None keeps httpx's real default transport; tests pass an
+                # httpx.MockTransport here to exercise the live-mode request
+                # paths (sorting, date-widening) without any real network
+                # access or credentials.
+                transport=transport,
             )
             if not self.dry_run
             else None
@@ -160,13 +167,41 @@ class DuffelClient:
 
     # -- Rebooking a disrupted trip -------------------------------------
 
-    def find_rebooking_options(self, booking: Booking, *, new_departure_date: str) -> list[RebookingOption]:
+    def find_rebooking_options(
+        self,
+        booking: Booking,
+        *,
+        new_departure_date: str,
+        search_window_days: int = 1,
+    ) -> list[RebookingOption]:
         """Ask Duffel what it would take to move this booking to a new date
-        on the same route. Returns the available order-change offers.
+        on the same route. Returns the available order-change offers,
+        soonest departure first.
+
+        Duffel does not guarantee ``order_change_offers`` come back in
+        departure order, but the traveler hears them read out "in order" on
+        the call and the orchestrator keeps only the first three -- so this
+        sorts by departure time before returning, in both live and dry-run
+        mode, rather than trusting whatever order the API (or the fixture)
+        happens to return them in.
+
+        If the exact requested date has no offers at all, this widens the
+        search to ``search_window_days`` days on either side (closest date
+        first) before giving up -- a same-day cancellation is often easiest
+        to resolve by looking at the day before or after, not just the exact
+        date first guessed. Pass ``search_window_days=0`` to disable this and
+        query only the exact date, matching the old behavior.
         """
         if self.dry_run:
-            return _FAKE_REBOOKING_OPTIONS
+            return sorted(_FAKE_REBOOKING_OPTIONS, key=lambda o: o.departing_at)
 
+        for candidate_date in _search_dates(new_departure_date, search_window_days):
+            options = self._request_rebooking_options(booking, candidate_date)
+            if options:
+                return sorted(options, key=lambda o: o.departing_at)
+        return []
+
+    def _request_rebooking_options(self, booking: Booking, departure_date: str) -> list[RebookingOption]:
         resp = self._request(
             "POST",
             "/air/order_change_requests",
@@ -179,7 +214,7 @@ class DuffelClient:
                             {
                                 "origin": booking.origin,
                                 "destination": booking.destination,
-                                "departure_date": new_departure_date,
+                                "departure_date": departure_date,
                                 "cabin_class": "economy",
                             }
                         ],
@@ -195,7 +230,7 @@ class DuffelClient:
             options.append(
                 RebookingOption(
                     change_offer_id=offer["id"],
-                    departing_at=segments[0]["departing_at"] if segments else new_departure_date,
+                    departing_at=segments[0]["departing_at"] if segments else departure_date,
                     arriving_at=segments[-1]["arriving_at"] if segments else None,
                     change_fee_amount=offer["change_total_amount"],
                     change_fee_currency=offer["change_total_currency"],
@@ -295,6 +330,19 @@ class DuffelClient:
         if response.status_code >= 400:
             raise DuffelError(response.status_code, payload)
         return payload
+
+
+def _search_dates(center: str, window_days: int) -> list[str]:
+    """Dates to try, closest to ``center`` first: center, then +1/-1, +2/-2,
+    and so on out to ``window_days``. Kept as a plain function (not a method)
+    so it's trivial to unit test the ordering on its own.
+    """
+    center_date = datetime.strptime(center, "%Y-%m-%d").date()
+    dates = [center_date]
+    for offset in range(1, window_days + 1):
+        dates.append(center_date + timedelta(days=offset))
+        dates.append(center_date - timedelta(days=offset))
+    return [d.isoformat() for d in dates]
 
 
 # Deterministic fixtures for dry-run mode and tests. Shaped like the real
