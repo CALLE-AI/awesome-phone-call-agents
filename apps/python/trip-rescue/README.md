@@ -69,6 +69,10 @@ export CALLE_API_KEY=calle_test_your_key_here
 python scripts/simulate_disruption.py --phone +1XXXXXXXXXX   # a real, reachable number
 ```
 
+### Viewing a run
+
+Every run of `simulate_disruption.py` — dry or live — writes its result to `web/data/last_run.js` and prints where. Open `web/index.html` in a browser afterward to see it rendered as a trip confirmation: original vs. new departure, the options Duffel offered on the call, which one (if any) was chosen, and whether the order was actually touched. No server or build step — it's a static page with no dependencies; just open the file. (The repo ships with sample data pre-populated so the page has something to show before you've run it yourself; it's clearly labeled as sample data until you do.)
+
 ## Tests
 
 ```bash
