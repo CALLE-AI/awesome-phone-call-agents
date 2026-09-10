@@ -11,8 +11,8 @@ import threading
 import unittest
 from pathlib import Path
 
-from nominee.audit import GENESIS, AuditError, AuditLog
-from nominee.types import mask
+from certa.audit import GENESIS, AuditError, AuditLog
+from certa.types import mask
 
 FICTIONAL = "+15550100471"
 
@@ -109,7 +109,7 @@ class Tampering(ChainBase):
         records[1]["detail"] = {"note": "quietly added"}
         # Recompute this record's own hash but leave the next record's
         # prev_hash pointing at the old value.
-        from nominee.audit import compute_hash
+        from certa.audit import compute_hash
 
         records[1]["hash"] = compute_hash(records[1]["prev_hash"], records[1])
         self.rewrite(records)

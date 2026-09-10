@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certa — employment verification, by phone</title>
+<meta name="description" content="Certa verifies employment by phone: it calls only employers the applicant consented to, never the number the applicant supplied, and returns a typed answer instead of a voicemail.">
+<style>
+:root {
+  --canvas:#fdfcfb; --surface:#f6f4f1; --raised:#ffffff; --hover:#efebe6;
+  --line:#e8e3dd; --hair:#f2eeea; --ink:#100f0e; --muted:#67615a; --faint:#9b938a;
+
+  /* Pastel wash. Only ever a background — never applied to text or controls. */
+  --wash-a:#e8ecff;  --wash-b:#ffeef0;  --wash-c:#e6f6ee;
+  --wash-d:#fff3e2;  --wash-e:#efe9fb;
+
+  --ok:#12694a; --ok-bg:#eef7f2; --ok-line:#cfe7dc;
+  --stop:#a32b21; --stop-bg:#fdf1f0; --stop-line:#f2d3d0;
+  --btn:#100f0e; --btn-fg:#fdfcfb; --btn-hov:#2d2925; --ring:rgba(16,15,14,.14);
+
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --text:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+
+  --r-tile:20px; --r-soft:14px; --r-pill:9999px;
+  --gap:16px;
+  --t:220ms cubic-bezier(.22,1,.36,1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --canvas:#0b0a09; --surface:#151312; --raised:#1a1816; --hover:#221f1c;
+    --line:#2b2724; --hair:#1f1c19; --ink:#faf8f6; --muted:#a9a199; --faint:#7a726a;
+    --wash-a:#141a2e; --wash-b:#2a1519; --wash-c:#0f2019; --wash-d:#2a1e0c; --wash-e:#1d1730;
+    --ok:#6ee7a8; --ok-bg:#0f2019; --ok-line:#1e3d2e;
+    --stop:#f08b83; --stop-bg:#241413; --stop-line:#452522;
+    --btn:#faf8f6; --btn-fg:#0b0a09; --btn-hov:#ffffff; --ring:rgba(250,248,246,.18);
+    color-scheme: dark;
+  }
+}
+html[data-theme="dark"] {
+  --canvas:#0b0a09; --surface:#151312; --raised:#1a1816; --hover:#221f1c;
+  --line:#2b2724; --hair:#1f1c19; --ink:#faf8f6; --muted:#a9a199; --faint:#7a726a;
+  --wash-a:#141a2e; --wash-b:#2a1519; --wash-c:#0f2019; --wash-d:#2a1e0c; --wash-e:#1d1730;
+  --ok:#6ee7a8; --ok-bg:#0f2019; --ok-line:#1e3d2e;
+  --stop:#f08b83; --stop-bg:#241413; --stop-line:#452522;
+  --btn:#faf8f6; --btn-fg:#0b0a09; --btn-hov:#ffffff; --ring:rgba(250,248,246,.18);
+  color-scheme: dark;
+}
+
+*,*::before,*::after { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+html, body { background:var(--canvas); }
+body {
+  margin:0; color:var(--ink);
+  font:400 16px/1.68 var(--text); letter-spacing:0.01em;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+h1,h2,h3 { font-family:var(--display); font-weight:300; letter-spacing:-0.024em; margin:0; }
+a { color:inherit; }
+code { font:400 .86em var(--mono); letter-spacing:0; }
+.wrap { max-width:1120px; margin:0 auto; padding:0 26px; }
+
+/* grain: a single tiled SVG turbulence, so gradients read tactile not plastic */
+.grain::after {
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.34'/%3E%3C/svg%3E");
+  mix-blend-mode:soft-light;
+}
+
+/* ── nav ──────────────────────────────────────────────────────────────── */
+nav { position:sticky; top:0; z-index:20; background:var(--canvas); border-bottom:1px solid var(--hair); }
+@supports (backdrop-filter: blur(1px)) {
+  nav { background:color-mix(in srgb, var(--canvas) 90%, transparent); backdrop-filter:blur(16px); }
+}
+nav .wrap { display:flex; align-items:center; gap:12px; padding-block:16px; }
+.brand { display:flex; align-items:center; gap:10px; margin-right:auto; text-decoration:none; }
+.brand svg { width:26px; height:26px; display:block; }
+.brand b { font:300 20px/1 var(--display); letter-spacing:-0.03em; }
+.navlink { font-size:14.5px; color:var(--muted); text-decoration:none; padding:9px 13px; border-radius:var(--r-pill); transition:color var(--t), background var(--t); }
+.navlink:hover { color:var(--ink); background:var(--surface); }
+
+.btn {
+  display:inline-flex; align-items:center; gap:9px;
+  font:500 15px/1 var(--text); letter-spacing:0.01em; text-decoration:none;
+  padding:14px 26px; border-radius:var(--r-pill);
+  border:1px solid var(--line); background:var(--raised); color:var(--ink);
+  cursor:pointer; transition:background var(--t), border-color var(--t), transform var(--t);
+}
+.btn:hover { background:var(--hover); border-color:var(--faint); }
+.btn:active { transform:scale(.98); }
+.btn.primary { background:var(--btn); color:var(--btn-fg); border-color:var(--btn); }
+.btn.primary:hover { background:var(--btn-hov); border-color:var(--btn-hov); }
+.btn.sm { padding:9px 16px; font-size:14px; }
+:focus-visible { outline:none; box-shadow:0 0 0 4px var(--ring); border-radius:var(--r-pill); }
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.hero { position:relative; isolation:isolate; padding:96px 0 76px; overflow:hidden; }
+.hero .wrap { position:relative; z-index:1; }
+.aurora {
+  position:absolute; inset:-30% -10% auto -10%; height:150%; z-index:0;
+  filter:blur(90px); opacity:.85; pointer-events:none;
+}
+.aurora span { position:absolute; border-radius:50%; display:block; }
+.aurora .a { width:46vw; height:46vw; left:-6%;  top:6%;  background:var(--wash-a); }
+.aurora .b { width:38vw; height:38vw; left:34%;  top:-8%; background:var(--wash-b); }
+.aurora .c { width:34vw; height:34vw; right:-4%; top:14%; background:var(--wash-c); }
+.aurora .d { width:26vw; height:26vw; left:56%;  top:38%; background:var(--wash-d); }
+h1 { font-size:clamp(40px,6.4vw,74px); line-height:1.02; max-width:17ch; }
+.lede { font-size:clamp(17px,1.9vw,20px); color:var(--muted); margin:30px 0 0; max-width:58ch; }
+.cta { display:flex; gap:13px; flex-wrap:wrap; margin-top:40px; align-items:center; }
+.cta .note { font-size:14px; color:var(--faint); }
+
+/* ── bento ────────────────────────────────────────────────────────────── */
+.bento {
+  display:grid; gap:var(--gap); margin-top:72px;
+  grid-template-columns:repeat(6,1fr); grid-auto-rows:minmax(126px,auto);
+}
+.tile {
+  position:relative; overflow:hidden;
+  border:1px solid var(--line); border-radius:var(--r-tile);
+  background:var(--raised); padding:26px 26px 28px;
+  transition:border-color var(--t), transform var(--t);
+}
+.tile:hover { border-color:var(--faint); }
+.tile.wash { background:linear-gradient(150deg, var(--w1), var(--w2)); }
+.tile h3 { font-size:19px; margin-bottom:9px; letter-spacing:-0.018em; }
+.tile p { margin:0; color:var(--muted); font-size:14.5px; }
+.tile .kicker {
+  font:400 12.5px/1 var(--mono); letter-spacing:0.02em; color:var(--faint);
+  text-transform:uppercase; margin-bottom:16px; display:block;
+}
+.tile .stat { font:300 clamp(38px,4.6vw,58px)/1 var(--display); letter-spacing:-0.035em; }
+.tile .stat small { font:400 15px/1 var(--text); color:var(--muted); letter-spacing:0.01em; margin-left:6px; }
+
+.t-quote { grid-column:span 4; }
+.t-quote blockquote { margin:0; font:300 clamp(21px,2.5vw,28px)/1.35 var(--display); letter-spacing:-0.022em; }
+.t-quote cite { display:block; font-style:normal; font-size:13.5px; color:var(--faint); margin-top:20px; }
+.t-quote cite a { color:var(--muted); text-underline-offset:3px; }
+.t-market  { grid-column:span 2; }
+.t-consent { grid-column:span 3; }
+.t-prov    { grid-column:span 3; }
+.t-gate    { grid-column:span 2; }
+.t-refuse  { grid-column:span 2; }
+.t-audit   { grid-column:span 2; }
+
+.snippet {
+  margin:18px 0 0; padding:15px 17px; border-radius:var(--r-soft);
+  background:color-mix(in srgb, var(--canvas) 62%, transparent);
+  border:1px solid var(--hair);
+  font:400 12.5px/1.7 var(--mono); letter-spacing:0; color:var(--muted);
+  overflow-x:auto; white-space:pre;
+}
+.chipline { display:flex; gap:8px; flex-wrap:wrap; margin-top:18px; }
+.tick {
+  display:inline-flex; align-items:center; gap:7px; font-size:13px; letter-spacing:0.01em;
+  padding:6px 13px 6px 10px; border-radius:var(--r-pill);
+  border:1px solid var(--ok-line); background:var(--ok-bg); color:var(--ok);
+}
+.tick::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tick.no { border-color:var(--stop-line); background:var(--stop-bg); color:var(--stop); }
+
+/* ── sections ─────────────────────────────────────────────────────────── */
+section.band { padding:104px 0 0; }
+h2 { font-size:clamp(29px,3.6vw,42px); line-height:1.12; max-width:21ch; }
+.sub { color:var(--muted); margin:20px 0 0; font-size:17px; max-width:60ch; }
+
+.flow { display:grid; gap:var(--gap); grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:46px; }
+.step { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:var(--r-tile); background:var(--raised); padding:30px 28px 32px; }
+.step .n {
+  display:inline-grid; place-items:center; width:31px; height:31px; border-radius:50%;
+  background:var(--btn); color:var(--btn-fg); font:400 13px/1 var(--mono); margin-bottom:19px;
+}
+.step h3 { font-size:20px; margin-bottom:11px; }
+.step p { margin:0; color:var(--muted); font-size:15px; }
+.step p + p { margin-top:11px; }
+
+.rows { margin-top:44px; border-top:1px solid var(--line); }
+.rowline { display:grid; grid-template-columns:230px 1fr; gap:28px; padding:24px 0; border-bottom:1px solid var(--hair); }
+.rowline dt { font-size:15px; font-weight:500; letter-spacing:0.01em; }
+.rowline dd { margin:0; color:var(--muted); font-size:15px; }
+
+.nots { display:flex; flex-wrap:wrap; gap:10px; margin-top:34px; }
+.not { font-size:14.5px; color:var(--muted); border:1px solid var(--line); border-radius:var(--r-pill); padding:9px 18px; background:var(--raised); }
+
+footer { border-top:1px solid var(--line); padding:60px 0 88px; margin-top:104px; }
+footer .wrap { display:flex; gap:26px; flex-wrap:wrap; justify-content:space-between; align-items:baseline; }
+footer p { margin:0; font-size:14px; color:var(--faint); max-width:50ch; }
+footer a { color:var(--muted); text-underline-offset:3px; }
+footer a:hover { color:var(--ink); }
+
+@media (max-width:980px) {
+  .bento { grid-template-columns:repeat(2,1fr); }
+  .t-quote,.t-market,.t-consent,.t-prov,.t-gate,.t-refuse,.t-audit { grid-column:span 2; }
+  .flow { grid-template-columns:1fr; }
+  .rowline { grid-template-columns:1fr; gap:8px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto; }
+  *,*::before,*::after { transition:none !important; animation:none !important; }
+  .reveal { opacity:1 !important; transform:none !important; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.6 6.6A8.6 8.6 0 1 0 18.6 17.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="19" cy="12" r="2.3" fill="currentColor"/>
+      </svg>
+      <b>Certa</b>
+    </a>
+    <a class="navlink" href="#how">How it works</a>
+    <a class="navlink" href="#boundaries">Boundaries</a>
+    <a class="navlink" href="https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/airtable-calle-certa">Source</a>
+    <button class="btn sm" id="theme">Auto</button>
+  </div>
+</nav>
+
+<header class="hero grain" id="top">
+  <div class="aurora" aria-hidden="true"><span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span></div>
+  <div class="wrap">
+    <h1 class="reveal">Employment verification that refuses the number on the form.</h1>
+    <p class="lede reveal">
+      Every mortgage needs it. When the payroll database has no record — which it
+      does for most small employers, and for every country without one — somebody
+      picks up a phone. Certa makes those calls, asks only what consent covers,
+      and writes a typed answer back into your table.
+    </p>
+    <div class="cta reveal">
+      <a class="btn primary" href="#how" id="console-link">See how it works</a>
+      <a class="btn" href="https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/airtable-calle-certa">Get the source</a>
+      <span class="note">Python 3.11+ · no install · no build step</span>
+    </div>
+
+    <div class="bento">
+      <article class="tile t-quote wash grain reveal" style="--w1:var(--wash-a); --w2:var(--wash-e)">
+        <span class="kicker">The gap</span>
+        <blockquote>“Takes days or weeks, and often fails entirely when the employer does not respond.”</blockquote>
+        <cite>How the industry describes the manual fallback used whenever the payroll database has no record — <a href="https://www.goodhire.com/resources/articles/the-work-number/">on The Work Number’s coverage gaps</a></cite>
+      </article>
+
+      <article class="tile t-market reveal">
+        <span class="kicker">Screening market</span>
+        <div class="stat" data-count="8">$0<small>bn — upper estimate, 2026</small></div>
+        <p style="margin-top:12px">Estimates for global employment screening run from $5.3bn to $8.0bn, heading to roughly $13.7bn by 2034. Employment verification is a core segment.</p>
+      </article>
+
+      <article class="tile t-consent wash grain reveal" style="--w1:var(--wash-c); --w2:var(--wash-a)">
+        <span class="kicker">Boundary one</span>
+        <h3>A filled-down cell is not consent</h3>
+        <p>Ticking one checkbox and dragging it down a column would authorise every row it touched. So consent is a hash of the row’s own content — a copied token was derived from a different number, and is refused.</p>
+        <pre class="snippet">sha256(request | phone | relationship
+       | spec_version | receipt_id)</pre>
+      </article>
+
+      <article class="tile t-prov wash grain reveal" style="--w1:var(--wash-b); --w2:var(--wash-d)">
+        <span class="kicker">Boundary two</span>
+        <h3>The applicant’s number is never dialled</h3>
+        <p>Fraudulent applications supply <em>working</em> numbers, with staffed call centres and directory listings. It is the one field an applicant fully controls, and the manual process calls it anyway.</p>
+        <div class="chipline">
+          <span class="tick">Independently sourced</span>
+          <span class="tick no">Written on the application</span>
+        </div>
+      </article>
+
+      <article class="tile t-gate reveal">
+        <span class="kicker">Evidence gate</span>
+        <h3>Nothing verified without contact</h3>
+        <p>A positive result requires extracted evidence that a person was actually reached — never a status field alone.</p>
+      </article>
+
+      <article class="tile t-refuse reveal">
+        <span class="kicker">Refusal</span>
+        <h3>“No” is a complete answer</h3>
+        <p>An employer declining to confirm has not failed. That outcome is terminal and never retried.</p>
+      </article>
+
+      <article class="tile t-audit wash grain reveal" style="--w1:var(--wash-e); --w2:var(--wash-c)">
+        <span class="kicker">Audit</span>
+        <h3>Hash-chained, tamper-evident</h3>
+        <p>Written and flushed to disk <em>before</em> the call it authorises can ring.</p>
+      </article>
+    </div>
+  </div>
+</header>
+
+<section class="band" id="how">
+  <div class="wrap">
+    <h2 class="reveal">Three steps, and none of them is a terminal.</h2>
+    <p class="sub reveal">Certa runs on the operator’s own machine and opens in their browser. The queue stays in the Airtable base they already use.</p>
+    <div class="flow">
+      <div class="step reveal">
+        <span class="n">1</span>
+        <h3>Open it</h3>
+        <p>Double-click <code>Certa.command</code> on macOS or <code>run.bat</code> on Windows. The console opens in your browser.</p>
+        <p>With no credentials it starts on sample data, so the first thing you see is the product working.</p>
+      </div>
+      <div class="step reveal">
+        <span class="n">2</span>
+        <h3>Connect your base</h3>
+        <p>Paste an Airtable token, your base, a CALL-E key and your organisation’s name. Stored in a local file only you can read.</p>
+        <p>Your answer columns become the extraction schema — a single select’s choices are the allowed answers, its description is the instruction.</p>
+      </div>
+      <div class="step reveal">
+        <span class="n">3</span>
+        <h3>Preview, then run</h3>
+        <p>You see every row in scope, every row skipped and why, how many the filter is hiding, the spend, and the <em>verbatim script</em> that will be spoken.</p>
+        <p>Results land back in your base as each call finishes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="boundaries">
+  <div class="wrap">
+    <h2 class="reveal">Enforced by construction, not by policy.</h2>
+    <p class="sub reveal">Types that cannot be built the wrong way, with tests that fail if that ever stops being true.</p>
+    <dl class="rows">
+      <div class="rowline reveal"><dt>Fails closed, always</dt><dd>Low confidence, a positive claim with no supporting evidence, or any internal contradiction all route to a human. No rule can promote a result.</dd></div>
+      <div class="rowline reveal"><dt>Nothing reachable from outside</dt><dd>The console binds loopback only and needs a one-off token the app generates for itself. Its run endpoint accepts a view name — never a destination — so no request can introduce a phone number.</dd></div>
+      <div class="rowline reveal"><dt>Numbers are never repaired</dt><dd>Strict E.164, with no inferred country code. A malformed number is a data problem for a person, not something to guess at.</dd></div>
+      <div class="rowline reveal"><dt>Masked everywhere</dt><dd>Last four digits only — console, logs and audit records alike. Consent tokens are stored as a prefix: enough to correlate, not enough to replay.</dd></div>
+      <div class="rowline reveal"><dt>Re-running never re-dials</dt><dd>The idempotency key binds the request, the exact number, the question set and the consent. Re-consenting after an edit correctly creates a new intent.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2 class="reveal">What it is not.</h2>
+    <p class="sub reveal">Saying so plainly is part of the design, not a disclaimer.</p>
+    <div class="nots reveal">
+      <span class="not">Not a collections tool</span>
+      <span class="not">Not a credit decision engine</span>
+      <span class="not">Not a background check</span>
+      <span class="not">Not a salary lookup</span>
+      <span class="not">Not a replacement for a payroll database</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Certa is a workflow plugin for <a href="https://github.com/CALLE-AI/awesome-phone-call-agents">awesome-phone-call-agents</a>, built on the <a href="https://docs.heycall-e.com/">CALL-E Developer API</a>. MIT licensed.</p>
+    <p>Sample numbers use ranges reserved for fiction. No real transcripts, recordings or screenshots appear anywhere in this project.</p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+/* theme ------------------------------------------------------------------ */
+const THEMES = ["Auto", "Light", "Dark"];
+const themeBtn = document.getElementById("theme");
+function applyTheme(next) {
+  const root = document.documentElement;
+  if (next === "Auto") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", next.toLowerCase());
+  themeBtn.textContent = next;
+  try { localStorage.setItem("certa-theme", next); } catch (e) { /* private window */ }
+}
+themeBtn.addEventListener("click", () =>
+  applyTheme(THEMES[(THEMES.indexOf(themeBtn.textContent.trim()) + 1) % THEMES.length]));
+(() => {
+  let saved = "Auto";
+  try { saved = localStorage.getItem("certa-theme") || "Auto"; } catch (e) { /* ignore */ }
+  applyTheme(THEMES.includes(saved) ? saved : "Auto");
+})();
+
+/* When served by the running app, the primary button opens the console with
+   an authorised token. Served from a static host that injection is absent and
+   the button simply scrolls to the explanation. */
+(() => {
+  const href = (window.__CERTA__ || {}).console;
+  if (!href) return;
+  const link = document.getElementById("console-link");
+  link.href = href;
+  link.textContent = "Open the console";
+})();
+
+/* motion ----------------------------------------------------------------- */
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reduced && window.gsap && window.ScrollTrigger) {
+  gsap.registerPlugin(ScrollTrigger);
+
+  // Hero: one orchestrated entrance rather than scattered effects.
+  const hero = gsap.timeline({ defaults: { ease: "power3.out" } })
+    .from(".hero h1", { y: 22, opacity: 0, duration: .8 })
+    .from(".hero .lede", { y: 16, opacity: 0, duration: .7 }, "-=.55")
+    .from(".hero .cta", { y: 14, opacity: 0, duration: .6 }, "-=.5")
+    .from(".bento .tile", { y: 26, opacity: 0, duration: .7, stagger: .07 }, "-=.4");
+
+  // Watchdog. A .from() tween holds its target at opacity 0 until it runs, so
+  // a throttled tab, a slow device or a background render could leave the hero
+  // blank indefinitely. Nothing meant to be read may depend on an animation
+  // completing, so force the end state if the entrance has not finished.
+  setTimeout(() => { if (hero.progress() < 1) hero.progress(1); }, 2600);
+
+  // Everything below the fold: stagger-on-enter, built top-to-bottom so an
+  // earlier trigger cannot shift the ones after it.
+  document.querySelectorAll("section.band").forEach((band) => {
+    const items = band.querySelectorAll(".reveal");
+    if (!items.length) return;
+    const tween = gsap.from(items, {
+      y: 20, opacity: 0, duration: .7, ease: "power3.out", stagger: .08,
+      scrollTrigger: { trigger: band, start: "top 78%", once: true },
+    });
+    // Same guarantee below the fold: if the trigger never fires, the section
+    // must still be readable.
+    setTimeout(() => { if (tween.progress() < 1) tween.progress(1); }, 6000);
+  });
+
+  // The market figure counts up once, when it is actually looked at.
+  const stat = document.querySelector("[data-count]");
+  if (stat) {
+    const target = parseFloat(stat.dataset.count);
+    const suffix = stat.querySelector("small").outerHTML;
+    const n = { v: 0 };
+    gsap.to(n, {
+      v: target, duration: 1.1, ease: "power2.out",
+      scrollTrigger: { trigger: stat, start: "top 88%", once: true },
+      onUpdate: () => { stat.innerHTML = "$" + n.v.toFixed(1) + suffix; },
+    });
+  }
+
+  // Aurora drifts slowly on scroll. Transform only, so it stays cheap.
+  gsap.to(".aurora", {
+    yPercent: 12, ease: "none",
+    scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: .6 },
+  });
+}
+</script>
+</body>
+</html>

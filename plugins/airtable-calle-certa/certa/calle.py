@@ -86,7 +86,7 @@ def idempotency_key(contacts: Sequence[ConsentedEmployerContact]) -> str:
         [contacts[0].request_id, contacts[0].task_spec_version]
         + sorted(f"{c.number.e164}:{c.consent_token}" for c in contacts)
     )
-    return f"nominee-{hashlib.sha256(material.encode()).hexdigest()[:32]}"
+    return f"certa-{hashlib.sha256(material.encode()).hexdigest()[:32]}"
 
 
 def build_call_payload(

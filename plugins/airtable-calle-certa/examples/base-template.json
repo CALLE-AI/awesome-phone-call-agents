@@ -1,5 +1,5 @@
 {
-  "$comment": "Structure for the Airtable base Nominee reads. Airtable has no public base-import format, so create the table by hand or with the metadata API and match these names and types. Field names are configurable via nominee.airtable.FieldMap if an existing base already uses others.",
+  "$comment": "Structure for the Airtable base Certa reads. Airtable has no public base-import format, so create the table by hand or with the metadata API and match these names and types. Field names are configurable via certa.airtable.FieldMap if an existing base already uses others.",
   "table": "Verification Requests",
   "views": {
     "Ready to verify": "Filter to rows with a consent token and a sourced number. `preview` reports how many rows the filter is hiding, because a run that silently called only what was visible would be a hazard."
@@ -138,7 +138,7 @@
     }
   ],
   "notes": [
-    "Answer fields are anything Nominee does not own. Adding a single select here adds a field to CALL-E's recipient_result_schema; its choices become the enum and its description becomes the instruction the extraction model reads.",
+    "Answer fields are anything Certa does not own. Adding a single select here adds a field to CALL-E's recipient_result_schema; its choices become the enum and its description becomes the instruction the extraction model reads.",
     "One answer field must map to `reached_employer`. Nothing is reported as verified without it, because CALL-E can return task_completed true when setup fails before dialing (CALL-E issue #341).",
     "`Number source` must be one of official_site, business_registry, directory, known_employer_record. There is deliberately no value for the number written on the application.",
     "`Number on application` is stored for the record and comparison only. No code path converts it into a dialable number."

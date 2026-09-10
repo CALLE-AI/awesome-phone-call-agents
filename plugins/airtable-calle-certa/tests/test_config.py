@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nominee import config as cfg
+from certa import config as cfg
 
 
 class Loading(unittest.TestCase):
@@ -50,7 +50,7 @@ class Loading(unittest.TestCase):
     def test_missing_lists_what_is_still_needed(self):
         config = cfg.Config(airtable_token="pat", airtable_base_id="app")
         self.assertIn("CALLE_API_KEY", config.missing())
-        self.assertIn("NOMINEE_REQUESTER_NAME", config.missing())
+        self.assertIn("CERTA_REQUESTER_NAME", config.missing())
         self.assertNotIn("AIRTABLE_TOKEN", config.missing())
 
     def test_calls_need_more_than_reading(self):

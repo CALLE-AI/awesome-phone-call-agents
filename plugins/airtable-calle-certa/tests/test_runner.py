@@ -9,14 +9,14 @@ import threading
 import unittest
 from pathlib import Path
 
-from nominee.airtable import FieldMap, FixtureAirtable
-from nominee.audit import AuditLog
-from nominee.calle import Disposition
-from nominee.consent import derive_token
-from nominee.runner import PRICE_PER_CALL_USD, RunError, execute, plan, reconcile
-from nominee.tasks import TASK_SPEC_VERSION
-from nominee.transport import FixtureTransport
-from nominee.types import Relationship
+from certa.airtable import FieldMap, FixtureAirtable
+from certa.audit import AuditLog
+from certa.calle import Disposition
+from certa.consent import derive_token
+from certa.runner import PRICE_PER_CALL_USD, RunError, execute, plan, reconcile
+from certa.tasks import TASK_SPEC_VERSION
+from certa.transport import FixtureTransport
+from certa.types import Relationship
 
 from tests.test_airtable import FIELDS, SCHEMA, ON_APPLICATION, SOURCED, record
 

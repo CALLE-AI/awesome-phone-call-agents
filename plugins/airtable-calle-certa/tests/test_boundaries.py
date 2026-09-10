@@ -6,8 +6,8 @@ require credentials, or place a call.
 
 import unittest
 
-from nominee.consent import authorize, derive_token
-from nominee.types import (
+from certa.consent import authorize, derive_token
+from certa.types import (
     ApplicantSuppliedNumber,
     BoundaryError,
     ConsentedEmployerContact,
@@ -102,7 +102,7 @@ class ProvenanceBoundary(unittest.TestCase):
         for name in dir(supplied):
             attr = getattr(supplied, name, None)
             self.assertNotIsInstance(attr, SourcedNumber)
-        import nominee.types as t
+        import certa.types as t
 
         for name in dir(t):
             obj = getattr(t, name)

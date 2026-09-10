@@ -6,7 +6,7 @@ cannot be promoted past a missing precondition.
 
 import unittest
 
-from nominee.calle import (
+from certa.calle import (
     CONTACT_GATE_KEY,
     DEFAULT_CONFIDENCE_FLOOR,
     CalleError,
@@ -15,16 +15,16 @@ from nominee.calle import (
     idempotency_key,
     interpret,
 )
-from nominee.consent import authorize, derive_token
-from nominee.schema import derive_recipient_schema
-from nominee.tasks import TASK_SPEC_VERSION
-from nominee.transport import (
+from certa.consent import authorize, derive_token
+from certa.schema import derive_recipient_schema
+from certa.tasks import TASK_SPEC_VERSION
+from certa.transport import (
     ALLOWED_CREDENTIAL_ORIGINS,
     FixtureTransport,
     LiveTransport,
     TransportError,
 )
-from nominee.types import (
+from certa.types import (
     ConsentReceipt,
     NumberSource,
     Relationship,

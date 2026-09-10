@@ -2,7 +2,7 @@
 
 import unittest
 
-from nominee.airtable import (
+from certa.airtable import (
     AIRTABLE_ORIGIN,
     AirtableError,
     FieldMap,
@@ -12,8 +12,8 @@ from nominee.airtable import (
     scope,
     to_row,
 )
-from nominee.schema import derive_recipient_schema
-from nominee.types import ApplicantSuppliedNumber, SourcedNumber
+from certa.schema import derive_recipient_schema
+from certa.types import ApplicantSuppliedNumber, SourcedNumber
 
 FIELDS = FieldMap()
 SOURCED = "+15550100471"

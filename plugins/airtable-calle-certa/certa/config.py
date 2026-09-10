@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SECRET_KEYS = ("AIRTABLE_TOKEN", "CALLE_API_KEY")
-PLAIN_KEYS = ("AIRTABLE_BASE_ID", "NOMINEE_REQUESTER_NAME")
+PLAIN_KEYS = ("AIRTABLE_BASE_ID", "CERTA_REQUESTER_NAME")
 ALL_KEYS = SECRET_KEYS + PLAIN_KEYS
 
 DEFAULT_ENV_PATH = Path(".env")
@@ -56,7 +56,7 @@ class Config:
         if not self.airtable_base_id:
             gaps.append("AIRTABLE_BASE_ID")
         if not self.requester_name:
-            gaps.append("NOMINEE_REQUESTER_NAME")
+            gaps.append("CERTA_REQUESTER_NAME")
         if not self.calle_api_key:
             gaps.append("CALLE_API_KEY")
         return gaps
@@ -108,7 +108,7 @@ def load(env_path: Path | str = DEFAULT_ENV_PATH) -> Config:
         airtable_token=get("AIRTABLE_TOKEN"),
         airtable_base_id=get("AIRTABLE_BASE_ID"),
         calle_api_key=get("CALLE_API_KEY"),
-        requester_name=get("NOMINEE_REQUESTER_NAME"),
+        requester_name=get("CERTA_REQUESTER_NAME"),
     )
 
 
@@ -121,7 +121,7 @@ def save(config: Config, env_path: Path | str = DEFAULT_ENV_PATH) -> Path:
             "AIRTABLE_TOKEN": config.airtable_token,
             "AIRTABLE_BASE_ID": config.airtable_base_id,
             "CALLE_API_KEY": config.calle_api_key,
-            "NOMINEE_REQUESTER_NAME": config.requester_name,
+            "CERTA_REQUESTER_NAME": config.requester_name,
         }
     )
     body = "\n".join(f"{k}={v}" for k, v in existing.items() if v) + "\n"

@@ -2,7 +2,7 @@
 
 import unittest
 
-from nominee.schema import (
+from certa.schema import (
     CONTACT_GATE_KEY,
     RESERVED_KEYS,
     UNKNOWN,

@@ -1,4 +1,4 @@
-"""Command line for Nominee.
+"""Command line for Certa.
 
 Four commands, in order of how much they can do to the world:
 
@@ -202,7 +202,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="nominee",
+        prog="certa",
         description="Consent-bound Verification of Employment, run from a table.",
     )
     sub = parser.add_subparsers(dest="command", required=True)

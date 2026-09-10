@@ -40,8 +40,10 @@ from ..transport import FixtureTransport, LiveTransport, TransportError
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 PANEL_DIR = Path(__file__).resolve().parent
-INDEX = PANEL_DIR / "index.html"
-FIXTURES = PANEL_DIR.parent.parent / "examples" / "fixtures"
+PLUGIN_DIR = PANEL_DIR.parent.parent
+CONSOLE = PANEL_DIR / "index.html"
+LANDING = PLUGIN_DIR / "site" / "index.html"
+FIXTURES = PLUGIN_DIR / "examples" / "fixtures"
 
 # Modes, in order of how much they can do to the world.
 FIXTURES_MODE = "fixtures"
@@ -281,7 +283,7 @@ class Panel:
 
 def make_handler(panel: Panel):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "nominee-panel"
+        server_version = "certa-panel"
 
         def log_message(self, fmt: str, *args: Any) -> None:  # quieter console
             return
@@ -302,16 +304,35 @@ def make_handler(panel: Panel):
 
         def _authorized(self, query: dict[str, list[str]]) -> bool:
             presented = (
-                self.headers.get("X-Nominee-Token") or (query.get("token") or [""])[0]
+                self.headers.get("X-Certa-Token") or (query.get("token") or [""])[0]
             )
             return secrets.compare_digest(presented or "", panel.token)
 
         def do_GET(self) -> None:  # noqa: N802 - stdlib naming
             parts = urlsplit(self.path)
             query = parse_qs(parts.query)
-            if parts.path == "/":
+
+            # `/` is the landing page. It needs no token to read, because it
+            # explains the product and contains nothing operable.
+            #
+            # The console link is injected ONLY when the request already
+            # carried the token, so a request that does not have it is never
+            # handed one. The startup line prints /?token=... , which is why
+            # opening that link gives a working button while a bare GET /
+            # does not.
+            if parts.path == "/" and LANDING.exists():
+                html = LANDING.read_text(encoding="utf-8")
+                if self._authorized(query):
+                    injected = (
+                        "<script>window.__CERTA__="
+                        + json.dumps({"console": f"/app?token={panel.token}"})
+                        + ";</script></head>"
+                    )
+                    html = html.replace("</head>", injected, 1)
+                return self._send(200, html, "text/html; charset=utf-8")
+            if parts.path in ("/", "/app"):
                 return self._send(
-                    200, INDEX.read_text(encoding="utf-8"), "text/html; charset=utf-8"
+                    200, CONSOLE.read_text(encoding="utf-8"), "text/html; charset=utf-8"
                 )
             if not self._authorized(query):
                 return self._send(401, {"error": "token required"})
@@ -409,6 +430,7 @@ def serve(
 
     server = ThreadingHTTPServer((host, port), make_handler(panel))
     url = f"http://{host}:{port}/?token={panel.token}"
+    console = f"http://{host}:{port}/app?token={panel.token}"
     mode_line = {
         FIXTURES_MODE: "sample data — places no calls",
         PREVIEW_MODE: "your table, preview only — no CALL-E key yet",
@@ -416,7 +438,8 @@ def serve(
     }[panel.mode]
     # flush: the operator cannot reach the panel without this line, and stdout
     # is block-buffered whenever it is redirected or piped.
-    print(f"\n  Nominee is running.\n\n  {url}\n", flush=True)
+    print(f"\n  Certa is running.\n\n  {url}\n", flush=True)
+    print(f"  console  {console}\n", flush=True)
     print(f"  mode: {mode_line}\n", flush=True)
     warning = cfg.permission_warning(panel.env_path)
     if warning:

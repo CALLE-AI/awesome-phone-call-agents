@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Nominee. No arguments, no environment variables, no install.
+# Start Certa. No arguments, no environment variables, no install.
 #
 # With no credentials it opens on bundled sample data and places no calls, so
 # the first thing you see is the product working. Enter your Airtable and
@@ -15,10 +15,10 @@ for candidate in python3.13 python3.12 python3.11 python3; do
 done
 
 if [ -z "$PY" ]; then
-  echo "Nominee needs Python 3.11 or newer." >&2
+  echo "Certa needs Python 3.11 or newer." >&2
   echo "macOS:  brew install python@3.12" >&2
   echo "Ubuntu: sudo apt install python3.12" >&2
   exit 1
 fi
 
-exec "$PY" -u -m nominee serve --open "$@"
+exec "$PY" -u -m certa serve --open "$@"

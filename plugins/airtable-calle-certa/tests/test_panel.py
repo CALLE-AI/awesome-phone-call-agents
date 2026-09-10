@@ -14,8 +14,8 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from nominee.audit import AuditLog
-from nominee.panel.server import (
+from certa.audit import AuditLog
+from certa.panel.server import (
     FIXTURES_MODE,
     LOOPBACK,
     Panel,
@@ -80,7 +80,7 @@ class PanelServer(unittest.TestCase):
             self.url(path),
             data=json.dumps(body).encode(),
             method="POST",
-            headers={"Content-Type": "application/json", "X-Nominee-Token": token},
+            headers={"Content-Type": "application/json", "X-Certa-Token": token},
         )
         with urllib.request.urlopen(request, timeout=5) as r:
             return r.status, json.loads(r.read())
@@ -126,14 +126,26 @@ class PanelServer(unittest.TestCase):
 
     # -- surface -------------------------------------------------------
 
-    def test_index_is_served_without_a_token(self):
+    def test_landing_is_served_without_a_token(self):
         status, body = self.get("/")
         self.assertEqual(status, 200)
-        self.assertIn("<title>Nominee</title>", body)
+        self.assertIn("Certa", body)
 
-    def test_index_contains_no_secret(self):
-        _, body = self.get("/")
-        self.assertNotIn("test-token", body)
+    def test_console_shell_is_served_at_app(self):
+        status, body = self.get("/app")
+        self.assertEqual(status, 200)
+        self.assertIn("<title>Certa</title>", body)
+
+    def test_unauthenticated_landing_never_carries_the_token(self):
+        """A request without the token must never be handed one."""
+        for path in ("/", "/app", "/?token=wrong"):
+            _, body = self.get(path)
+            self.assertNotIn("test-token", body, msg=path)
+
+    def test_authorised_landing_gets_a_console_link(self):
+        _, body = self.get("/?token=test-token")
+        self.assertIn("__CERTA__", body)
+        self.assertIn("/app?token=test-token", body)
 
     def test_unknown_paths_are_not_found(self):
         self.expect_error(404, self.get, "/api/anything?token=test-token")
@@ -156,7 +168,7 @@ class PanelServer(unittest.TestCase):
         self.assertEqual(json.loads(self.get("/api/plan?token=test-token")[1])["call_count"], 3)
 
     def test_config_never_returns_a_secret(self):
-        from nominee import config as cfg
+        from certa import config as cfg
 
         cfg.save(
             cfg.Config(

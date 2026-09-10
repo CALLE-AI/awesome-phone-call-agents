@@ -38,7 +38,7 @@ from .types import (
 
 AIRTABLE_ORIGIN = "api.airtable.com"
 DEFAULT_BASE_URL = f"https://{AIRTABLE_ORIGIN}"
-USER_AGENT = "nominee/0.1 (+awesome-phone-call-agents)"
+USER_AGENT = "certa/0.1 (+awesome-phone-call-agents)"
 
 # Airtable accepts at most 10 records per write.
 MAX_WRITE_BATCH = 10
@@ -218,7 +218,7 @@ class LiveAirtable:
 
 
 class FixtureAirtable:
-    """An in-memory base. Used by every test and by `nominee replay`."""
+    """An in-memory base. Used by every test and by `certa replay`."""
 
     def __init__(self, schema: list[dict[str, Any]], records: list[dict[str, Any]],
                  *, view_records: list[dict[str, Any]] | None = None) -> None:

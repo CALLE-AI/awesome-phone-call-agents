@@ -237,7 +237,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
-| [`plugins/airtable-calle-nominee`](plugins/airtable-calle-nominee/) | Airtable | Consent-bound Verification of Employment from a table: the recipient result schema is derived from the base's own column definitions, consent is a per-row hash that a filled-down cell cannot forge, and the number supplied on the application is never dialed. |
+| [`plugins/airtable-calle-certa`](plugins/airtable-calle-certa/) | Airtable | Consent-bound Verification of Employment from a table: the recipient result schema is derived from the base's own column definitions, consent is a per-row hash that a filled-down cell cannot forge, and the number supplied on the application is never dialed. |
 
 ### Safety patterns
 

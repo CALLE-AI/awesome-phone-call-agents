@@ -1,10 +1,10 @@
-# Nominee — consent-bound Verification of Employment
+# Certa — consent-bound Verification of Employment
 
-**Nominee verifies someone's employment by phone: calling only employers the applicant consented to, never the phone number the applicant supplied, and returning a typed answer instead of a voicemail.**
+**Certa verifies someone's employment by phone: calling only employers the applicant consented to, never the phone number the applicant supplied, and returning a typed answer instead of a voicemail.**
 
 A workflow plugin for Airtable, built on the CALL-E Developer API. Submitted to the **Workflow Plugins** contribution area for *CALL-E: Your Code Is Calling*, targeting **Most Practical Use Case**.
 
-**macOS** — double-click `Nominee.command`
+**macOS** — double-click `Certa.command`
 **Windows** — double-click `run.bat`
 **Anywhere** — `./run.sh`
 
@@ -81,7 +81,7 @@ The dialer's only parameter type is a `ConsentedEmployerContact`, which carries 
 
 If no independent source exists, the request fails closed as **employer unverifiable** — itself a Fannie Mae red flag, not an error.
 
-> A payroll database cannot detect a fake employer, because a fake employer is by construction not in it. The manual process calls the number on the form. Nominee structurally cannot. **This is a control neither existing method performs.**
+> A payroll database cannot detect a fake employer, because a fake employer is by construction not in it. The manual process calls the number on the form. Certa structurally cannot. **This is a control neither existing method performs.**
 
 Tests: `tests/test_boundaries.py` asserts direct construction fails, that no function anywhere accepts an `ApplicantSuppliedNumber`, and that filling a consent token down a column is refused.
 
@@ -131,7 +131,7 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 - **CALL-E has no cancel-in-flight operation.** `POST /v1/calls`, `GET /v1/calls/{id}` and `GET /v1/calls/{id}/events` are the whole surface. Cancelling a request guarantees **nothing further is dispatched**; a call already dialing runs to completion.
 - **Spend is estimated, not authoritative.** CALL-E exposes no balance endpoint (issue **#183**), so caps are enforced locally against a published $0.05 per call.
 - **Airtable free plan: 1,000 API calls per workspace per month**, 5 requests/second. This plugin uses the Web API rather than an extension or scripted automation precisely so it runs on free, where neither is available.
-- **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Nominee does not itself source numbers.
+- **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Certa does not itself source numbers.
 
 ---
 
@@ -139,7 +139,7 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 
 ### 1. Start it
 
-Double-click `Nominee.command` on macOS or `run.bat` on Windows. From a shell,
+Double-click `Certa.command` on macOS or `run.bat` on Windows. From a shell,
 `./run.sh`. All three do the same thing: find a suitable Python, start the
 panel, open your browser.
 
@@ -189,10 +189,10 @@ blocked for the opposite:
 ### For scripting and CI
 
 ```bash
-python3 -m nominee replay      # whole pipeline on fixtures, no credentials
-python3 -m nominee preview     # your table; writes nothing, dials nothing
-python3 -m nominee run --confirm-consent
-python3 -m nominee verify      # walk the audit chain
+python3 -m certa replay      # whole pipeline on fixtures, no credentials
+python3 -m certa preview     # your table; writes nothing, dials nothing
+python3 -m certa run --confirm-consent
+python3 -m certa verify      # walk the audit chain
 ```
 
 ---

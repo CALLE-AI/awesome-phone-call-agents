@@ -26,7 +26,7 @@ DEFAULT_BASE_URL = "https://api.heycall-e.com"
 # allowed for a local fake server, but then no Authorization header is sent.
 ALLOWED_CREDENTIAL_ORIGINS = frozenset({"api.heycall-e.com"})
 
-USER_AGENT = "nominee/0.1 (+awesome-phone-call-agents)"
+USER_AGENT = "certa/0.1 (+awesome-phone-call-agents)"
 
 
 class TransportError(Exception):

@@ -1,4 +1,4 @@
-"""Core types for Nominee.
+"""Core types for Certa.
 
 Two boundaries live here, and both are enforced by construction rather than by
 policy a caller can forget:
@@ -175,7 +175,7 @@ class VerificationRequest:
 class ConsentedEmployerContact:
     """The only type the dialer accepts.
 
-    Build through `nominee.consent.authorize()`. Holding one of these is proof
+    Build through `certa.consent.authorize()`. Holding one of these is proof
     that a consent receipt existed, that its token verified against this row's
     own content, and that the number carries independent provenance.
     """
@@ -195,7 +195,7 @@ class ConsentedEmployerContact:
         if self._guard is not _GUARD:
             raise BoundaryError(
                 "ConsentedEmployerContact must be built through "
-                "nominee.consent.authorize(); direct construction would bypass "
+                "certa.consent.authorize(); direct construction would bypass "
                 "the consent boundary"
             )
 
@@ -204,5 +204,5 @@ class ConsentedEmployerContact:
 
 
 def _build_consented_contact(**kwargs: Any) -> ConsentedEmployerContact:
-    """Private factory. Imported only by `nominee.consent`."""
+    """Private factory. Imported only by `certa.consent`."""
     return ConsentedEmployerContact(**kwargs, _guard=_GUARD)

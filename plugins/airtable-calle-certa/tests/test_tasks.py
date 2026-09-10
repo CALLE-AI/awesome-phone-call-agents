@@ -7,9 +7,9 @@ dropped during an edit.
 
 import unittest
 
-from nominee.consent import authorize, derive_token
-from nominee.schema import CONTACT_GATE_KEY
-from nominee.tasks import (
+from certa.consent import authorize, derive_token
+from certa.schema import CONTACT_GATE_KEY
+from certa.tasks import (
     PERMITTED_QUESTIONS,
     PROHIBITIONS,
     TASK_SPEC_VERSION,
@@ -17,7 +17,7 @@ from nominee.tasks import (
     build_task,
     prohibitions_present,
 )
-from nominee.types import (
+from certa.types import (
     ConsentReceipt,
     NumberSource,
     Relationship,
