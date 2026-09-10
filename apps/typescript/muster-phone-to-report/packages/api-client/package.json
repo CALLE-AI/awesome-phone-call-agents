@@ -1,0 +1,29 @@
+{
+  "name": "@muster/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./simulator-demo": {
+      "types": "./dist/simulator-demo-projection.d.ts",
+      "import": "./dist/simulator-demo-projection.js"
+    },
+    "./simulator-live": {
+      "types": "./dist/simulator-live-client.d.ts",
+      "import": "./dist/simulator-live-client.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && vite build"
+  },
+  "devDependencies": {
+    "@muster/testing": "0.0.0",
+    "vite": "8.2.0"
+  }
+}

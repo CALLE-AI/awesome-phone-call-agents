@@ -1,0 +1,33 @@
+{
+  "name": "@muster/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node --import @muster/observability/register dist/main.js"
+  },
+  "dependencies": {
+    "@muster/application": "0.0.0",
+    "@muster/contracts": "0.0.0",
+    "@muster/infrastructure-jobs": "0.0.0",
+    "@muster/infrastructure-postgres": "0.0.0",
+    "@muster/observability": "0.0.0",
+    "@nestjs/common": "11.1.28",
+    "@nestjs/core": "11.1.28",
+    "@nestjs/platform-fastify": "11.1.28",
+    "pg": "8.22.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@muster/testing": "0.0.0"
+  }
+}
