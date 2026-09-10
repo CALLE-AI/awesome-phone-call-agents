@@ -176,19 +176,25 @@ def test_patient_read_masks_phones_and_omits_diagnosis() -> None:
     assert "+15555550999" not in text
 
 
-def test_call_read_omits_transcript_and_summary() -> None:
+def test_call_read_omits_clinical_fields_and_transcript() -> None:
     call = Call(
         id=7,
         patient_id=1,
         status="completed",
         transcript="Patient reported chest pain. Reach them at +15555550100.",
         summary="Clinical summary of emergency symptoms",
+        risk_score=97.0,
+        risk_level="critical",
         is_emergency=True,
         dry_run=False,
     )
     dumped = CallRead.model_validate(call).model_dump()
     assert "transcript" not in dumped
     assert "summary" not in dumped
+    assert "risk_score" not in dumped
+    assert "risk_level" not in dumped
+    assert "is_emergency" not in dumped
+    assert "symptoms" not in dumped
     text = json.dumps(dumped)
     assert "chest pain" not in text
     assert "Clinical summary" not in text

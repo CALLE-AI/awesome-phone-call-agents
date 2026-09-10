@@ -138,7 +138,51 @@ def test_live_dispatch_rejects_mismatched_destination() -> None:
         )
 
 
-def test_live_dispatch_exact_match_sends() -> None:
+def test_live_dispatch_accepted_sms_does_not_place_warning() -> None:
+    sms, warning = _pending_rows()
+    service = _service(sms, warning)
+    with (
+        patch(
+            "app.services.notification_service.twilio_client.send_sms",
+            return_value="SM1",
+        ) as mock_sms,
+        patch("app.services.notification_service.place_warning_call") as mock_warn,
+    ):
+        service.dispatch_emergency(
+            patient=_patient(),
+            call=_call(),
+            dry_run=False,
+            authorized_destination=DOCTOR_PHONE,
+        )
+    mock_sms.assert_called_once()
+    mock_warn.assert_not_called()
+    assert sms.status == "accepted"
+    assert warning.status == "pending"
+
+
+def test_live_dispatch_unknown_sms_does_not_place_warning() -> None:
+    sms, warning = _pending_rows()
+    service = _service(sms, warning)
+    with (
+        patch(
+            "app.services.notification_service.twilio_client.send_sms",
+            side_effect=TimeoutError("twilio timeout"),
+        ) as mock_sms,
+        patch("app.services.notification_service.place_warning_call") as mock_warn,
+    ):
+        service.dispatch_emergency(
+            patient=_patient(),
+            call=_call(),
+            dry_run=False,
+            authorized_destination=DOCTOR_PHONE,
+        )
+    mock_sms.assert_called_once()
+    mock_warn.assert_not_called()
+    assert sms.status == "outcome_unknown"
+    assert warning.status == "pending"
+
+
+def test_live_dispatch_failed_sms_places_warning() -> None:
     sms, warning = _pending_rows()
     service = _service(sms, warning)
     result = CallEResult(
@@ -149,7 +193,7 @@ def test_live_dispatch_exact_match_sends() -> None:
     with (
         patch(
             "app.services.notification_service.twilio_client.send_sms",
-            return_value="SM1",
+            return_value=None,
         ) as mock_sms,
         patch(
             "app.services.notification_service.place_warning_call",
@@ -166,7 +210,35 @@ def test_live_dispatch_exact_match_sends() -> None:
     mock_warn.assert_called_once()
     assert mock_warn.call_args.kwargs["dry_run"] is False
     assert mock_warn.call_args.kwargs["doctor_phone"] == DOCTOR_PHONE
-    assert sms.status == "sent"
+    assert sms.status == "failed"
+    assert warning.status == "queued"
+
+
+def test_second_dispatch_after_accepted_sms_places_warning() -> None:
+    sms, warning = _pending_rows()
+    sms.status = "accepted"
+    sms.provider_id = "SM1"
+    service = _service(sms, warning)
+    result = CallEResult(
+        provider_call_id="calle_doc_1",
+        status="queued",
+        dry_run=False,
+    )
+    with (
+        patch("app.services.notification_service.twilio_client.send_sms") as mock_sms,
+        patch(
+            "app.services.notification_service.place_warning_call",
+            return_value=result,
+        ) as mock_warn,
+    ):
+        service.dispatch_emergency(
+            patient=_patient(),
+            call=_call(),
+            dry_run=False,
+            authorized_destination=DOCTOR_PHONE,
+        )
+    mock_sms.assert_not_called()
+    mock_warn.assert_called_once()
     assert warning.status == "queued"
 
 

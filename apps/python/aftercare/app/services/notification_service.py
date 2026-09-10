@@ -78,13 +78,30 @@ class NotificationService:
 
         body = _alert_body(patient, call)
         sms, warning = self._ensure_rows(patient, call)
+        sms_was_open = sms.status not in {"sent", "accepted", "dry_run", "skipped"}
         self._send_sms(sms, to_number=to_number, body=body, dry_run=dry_run)
+        if dry_run:
+            self._place_warning_call(
+                warning,
+                patient=patient,
+                call=call,
+                to_number=to_number,
+                dry_run=True,
+            )
+            return sms, warning
+        if sms_was_open and sms.status in {"accepted", "outcome_unknown"}:
+            logger.info(
+                "Stopped doctor warning call for follow-up %s after SMS status=%s",
+                call.id,
+                sms.status,
+            )
+            return sms, warning
         self._place_warning_call(
             warning,
             patient=patient,
             call=call,
             to_number=to_number,
-            dry_run=dry_run,
+            dry_run=False,
         )
         return sms, warning
 
@@ -154,7 +171,7 @@ class NotificationService:
         body: str,
         dry_run: bool,
     ) -> None:
-        if row.status in {"sent", "dry_run", "skipped"}:
+        if row.status in {"sent", "accepted", "dry_run", "skipped"}:
             return
 
         row.attempt_count += 1
@@ -175,14 +192,14 @@ class NotificationService:
                 row.status = "failed"
                 row.last_error = "Twilio credentials not configured"
             else:
-                row.status = "sent"
+                row.status = "accepted"
                 row.provider_id = sid
                 row.sent_at = utc_now_naive()
                 row.last_error = None
             self.notifications.save(row)
         except Exception as exc:
-            logger.exception("Emergency SMS failed for call %s", row.call_id)
-            row.status = "failed"
+            logger.exception("Emergency SMS outcome unknown for call %s", row.call_id)
+            row.status = "outcome_unknown"
             row.last_error = str(exc)[:4000]
             self.notifications.save(row)
 

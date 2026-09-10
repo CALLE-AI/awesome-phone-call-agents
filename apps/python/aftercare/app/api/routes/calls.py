@@ -76,7 +76,6 @@ def alert_doctor(
         raise_http_from_doctor_alert_error(exc)
     return DoctorAlertRead(
         call_id=call.id,
-        is_emergency=call.is_emergency,
         channels=[
             DoctorAlertChannelRead(
                 channel=sms.channel,

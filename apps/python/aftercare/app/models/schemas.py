@@ -371,16 +371,7 @@ class DoctorAlertChannelRead(BaseModel):
 
 class DoctorAlertRead(BaseModel):
     call_id: int
-    is_emergency: bool
     channels: list[DoctorAlertChannelRead]
-
-
-class SymptomRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int | None = None
-    name: str = Field(..., max_length=255)
-    severity: str | None = Field(default=None, max_length=50)
 
 
 class CallRead(BaseModel):
@@ -391,11 +382,9 @@ class CallRead(BaseModel):
     followup_id: int | None = None
     calle_call_id: str | None = None
     status: str
-    risk_score: float | None = None
-    risk_level: RiskLevelLiteral | str | None = None
-    is_emergency: bool
     dry_run: bool
-    symptoms: list[SymptomRead] = []
+    call_start: datetime | None = None
+    call_end: datetime | None = None
 
 
 class TranscriptTurn(BaseModel):

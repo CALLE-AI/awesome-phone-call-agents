@@ -143,7 +143,7 @@ erDiagram
 
 - **Protocol** is the clinical contract for a call: what to ask, what to watch for, what structured fields CALL-E must return.
 - **FollowUp** is the work queue (`pending` → `in_progress` → `completed` / `failed`), with `attempt_count` / `max_attempts` (default 3). An ambiguous provider create leaves the follow-up `in_progress` for reconciliation.
-- **Call** stores provider id, transcript, summary, `risk_score`, `risk_level`, `is_emergency`.
+- **Call** stores provider id, transcript, summary, `risk_score`, `risk_level`, `is_emergency`. HTTP `CallRead` returns metadata only (no risk, emergency, or symptoms).
 - **WebhookEvent** unique on `event_id` so CALL-E retries do not double-score or double-alert.
 - Patient `current_risk_level` only **ratchets up** (low → critical), never down from a later quieter call.
 
@@ -278,9 +278,9 @@ All tests run with `DRY_RUN_DEFAULT=true` and a patched CALL-E client. They do n
 ## Side effects and safety
 
 - **Dry-run / no-call default:** `DRY_RUN_DEFAULT=true`. The app writes `Call` rows and skips the CALL-E client. Twilio SMS is also skipped in dry-run.
-- **Live side effects:** live patient calls are only `POST /calls/trigger` with `dry_run=false` and `authorized_destination` equal to the patient phone. Emergency scoring queues a pending doctor alert and does not SMS or call. Live doctor SMS / CALL-E warning calls are only `POST /calls/{id}/alert-doctor` with `dry_run=false` and `authorized_destination` equal to on-file `doctor_contact`.
+- **Live side effects:** live patient calls are only `POST /calls/trigger` with `dry_run=false` and `authorized_destination` equal to the patient phone. Emergency scoring queues a pending doctor alert and does not SMS or call. Live doctor SMS / CALL-E warning calls are only `POST /calls/{id}/alert-doctor` with `dry_run=false` and `authorized_destination` equal to on-file `doctor_contact`. A Twilio SID is recorded as `accepted`; a transport exception is `outcome_unknown`. Neither outcome places a doctor warning call in the same dispatch.
 - **Consent:** live patient calls require `consent_on_file`. Missing consent raises an error before CALL-E is contacted.
-- **Phones:** store ASCII E.164 only (`+` and digits `[0-9]`). Samples use the reserved fictional number `+15555550100`. Logs and the assistant mask phones, transcripts, and clinical text. HTTP reads return `phone_masked` / `doctor_contact_masked` and omit raw transcripts and diagnosis text. Do not commit real numbers or PHI.
+- **Phones:** store ASCII E.164 only (`+` and digits `[0-9]`). Samples use the reserved fictional number `+15555550100`. Logs and the assistant mask phones, transcripts, and clinical text. HTTP reads return `phone_masked` / `doctor_contact_masked` and omit raw transcripts and diagnosis text. `/calls` HTTP responses return call metadata only — not risk, emergency, or symptoms. Do not commit real numbers or PHI.
 - **Credentials:** `CALLE_API_KEY`, `JWT_SECRET`, `REGISTER_SECRET`, Twilio, and LLM keys live in `.env` only (gitignored). Never put tokens in source or README. Live CALL-E credentials are sent only to `https://api.heycall-e.com`; any other `CALLE_BASE_URL` is refused.
 - **Scheduler (recurring jobs):** APScheduler polls due follow-ups every `SCHEDULER_INTERVAL_MINUTES` (default 1) and **always dry-runs**. This is not a hidden live job: set `ENABLE_SCHEDULER=false` to disable it, or stop uvicorn. Live outreach requires an explicit trigger with `authorized_destination`. Failed terminal live calls reopen `pending` until `max_attempts` (default 3). An ambiguous CALL-E create (`timeout`, missing id, 5xx) stores the call as `outcome_unknown` and leaves the follow-up `in_progress` for human reconciliation — it is not auto-retried.
 - **Idempotency:** inbound CALL-E webhooks claim a unique `event_id` so retries do not double-score. Doctor warning calls are a separate `purpose=doctor_warning` path and require a second authorized dispatch.
