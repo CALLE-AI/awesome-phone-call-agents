@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **7/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **8/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-009](#spa-009), which is Ready after current news and local-event discovery passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-010](#spa-010), which is Ready after the confirmed one-time reminder workflow passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -58,8 +58,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-006](#spa-006) | Prepare authorized information SMS during the call workflow | M2 | Medium | Done | [SPA-005](#spa-005) |
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Done | [SPA-006](#spa-006) |
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Done | [SPA-007](#spa-007) |
-| [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Ready | [SPA-007](#spa-007) |
-| [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Backlog | [SPA-007](#spa-007) |
+| [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Done | [SPA-007](#spa-007) |
+| [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Ready | [SPA-007](#spa-007) |
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Backlog | [SPA-009](#spa-009), [SPA-010](#spa-010) |
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Backlog | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
@@ -207,14 +207,16 @@ Updated the search route to the current lower-cost `gpt-5.6-luna` model with web
 
 Implement createReminder, listReminders and cancelReminder with durable state.
 Acceptance criteria:
-- [ ] Resolve natural-language dates in the senior's IANA timezone; clarify ambiguous 'Friday at 10', AM/PM and DST cases.
-- [ ] Confirm exact date/time, message and SMS/call channel before saving.
-- [ ] Persist consent, action identity and lifecycle state; repeated tool execution does not create duplicates.
-- [ ] Allow authorized listing/cancellation and explain whether a delivery has already started.
-- [ ] One-time reminders are the MVP; recurrence must never be silently inferred.
-- [ ] Test ambiguous dates, past dates, DST, repeated requests and cancellation races.
+- [x] Resolve natural-language dates in the senior's IANA timezone; clarify ambiguous 'Friday at 10', AM/PM and DST cases.
+- [x] Confirm exact date/time, message and SMS/call channel before saving.
+- [x] Persist consent, action identity and lifecycle state; repeated tool execution does not create duplicates.
+- [x] Allow authorized listing/cancellation and explain whether a delivery has already started.
+- [x] One-time reminders are the MVP; recurrence must never be silently inferred.
+- [x] Test ambiguous dates, past dates, DST, repeated requests and cancellation races.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a deterministic reminder-time resolver for weekday and explicit local date/time phrases. It uses the senior's IANA timezone, asks for AM/PM for ambiguous 1–12 hour values, advances elapsed same-day weekday requests to the following week, rejects past instants, and detects both nonexistent and duplicated daylight-saving local times without guessing. The reminder service consumes the exact one-time SPA-005 authorization bound to senior, principal, strict E.164 destination, message, resolved UTC instant, timezone and SMS/call channel. It reserves durable idempotency before consumption so repeated tool execution returns the original row.
+
+Added in-memory and Supabase reminder stores with authorized list/cancel operations. The Supabase adapter requires an active membership with reminder-management permission. Cancellation atomically changes only pending rows; queued, in-progress or completed work reports `already_started`, while repeated cancellation reports `not_found`. The schema persists action identity, principal, destination, lifecycle status and cancellation time. Recurrence and delivery are intentionally left to SPA-011. Forty-three offline tests, lint, typecheck, production build and repository validation passed.
 
 ### SPA-010
 
@@ -373,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-009 | Added confirmed, idempotent one-time reminder creation plus authorized listing/cancellation and timezone/DST clarification; marked SPA-009 Done and SPA-010 Ready. | Forty-three offline tests covered ambiguous/past/DST times, authorization, duplication, access denial and cancellation races. Lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-008 | Added current news and local-event tools with confirmed context, concrete date windows, official-source guidance and requested SMS previews; moved web search to the current lower-cost supported model; marked SPA-008 Done and SPA-009 Ready. | Live news and event searches completed with five sources under redacted correlations `4600…0006` and `4c00…000c`; event output contained three dated options and availability caveats. Thirty-six offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-007 | Added Supabase persistence, verified-claims authentication, family RLS, consent/retention controls and durable action/SMS adapters; replaced the Docker workflow with embedded PostgreSQL validation; marked SPA-007 Done and SPA-008 Ready. | The migration and number-free seed applied in PGlite; family access, cross-account denial, consent triggers and restricted grants passed. Thirty-one offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-006 | Added the authorized, idempotent SMS workflow and storage/callback boundaries; kept all Twilio delivery work in final ticket SPA-004; marked SPA-006 Done and SPA-007 Ready. | Twenty-six offline tests, lint, typecheck and production build passed. Repository validation passed; no live message was sent. |

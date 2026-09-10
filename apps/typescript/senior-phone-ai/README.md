@@ -59,6 +59,12 @@ The shared safety layer permits read-only tools to run automatically and require
 
 The assistant identifies itself as AI, speaks plainly, respects refusal and must not impersonate family, clinicians, therapists, emergency services or professional advisers. It does not diagnose conditions, recommend medication changes, give personalized high-risk legal/financial advice or promise emergency help. Immediate danger is directed to local emergency services or a trusted person.
 
+## Reminder workflow
+
+One-time reminders resolve a weekday or explicit local date/time in the senior's confirmed IANA timezone. Times from 1 through 12 require AM or PM. Past times, nonexistent spring-forward times and duplicated fall-back times return a clarification instead of guessing. Creation consumes a one-time authorization bound to the exact senior, destination, message, instant, timezone and SMS/call channel. A durable idempotency key prevents repeated tool execution from creating another reminder.
+
+Authorized family members with reminder permission can list and cancel reminders. Cancellation changes only a pending reminder; once delivery is queued or in progress, the workflow reports that it has already started. Recurrence and actual delivery remain disabled until the host scheduler work in SPA-011.
+
 ## Cancellation and rollback
 
 Choose **End session**, close the page or stop the server to close a local Realtime session. The SDK owns the harness microphone stream and stops its tracks on close. Removing the app directory removes only local source and build output.
