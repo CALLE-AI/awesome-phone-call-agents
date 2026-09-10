@@ -50,6 +50,7 @@ from .models import (
     redact,
 )
 from .validation import assert_supported, problems
+from . import trace
 
 log = logging.getLogger("dispatch")
 
@@ -160,6 +161,8 @@ class WaveDispatcher:
 
         self._cancel = threading.Event()
         self._lock = threading.Lock()
+        # Status history, which the API does not keep. Inert unless traced.
+        self._seen_status = trace.Transitions()
         self._dispatched = 0
         self._in_flight: set[str] = set()
         self._fatal: str | None = None
@@ -549,6 +552,12 @@ class WaveDispatcher:
             # not_be_recalled` fails if this changes.
             try:
                 call = self._client.calls.get(call_id)
+                # Which statuses this call was seen in, and when. Nothing the API
+                # reports: a call object carries a status but no history of the ones it
+                # held before. Off unless FIRSTBELL_TRACE is set.
+                self._seen_status.saw(call_id, getattr(call, "status", None)
+                                      or (call.get("status") if isinstance(call, dict)
+                                          else None))
             except Exception as exc:  # noqa: BLE001 - the call exists; do not lose it
                 # A fatal code stops the run here, not after three tries.
                 #

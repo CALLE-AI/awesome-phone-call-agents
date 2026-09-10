@@ -190,6 +190,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--concurrency", type=int, default=3,
                         help="Maximum calls in flight at once. This is the only brake "
                              "CALL-E offers, so it is a safety setting (default: 3).")
+    parser.add_argument("--poll-seconds", type=float, default=None,
+                        help="How often a live run asks whether a call has finished "
+                             "(default: the dispatcher's own 2.0). Lower it only to "
+                             "measure: the interval is the error bar on every status "
+                             "timing, and a faster poll is more requests for the same "
+                             "call. Ignored offline, where nothing waits.")
     parser.add_argument("--live", action="store_true",
                         help="Place real calls against the real API. Costs credits.")
     parser.add_argument("--yes-i-mean-it", action="store_true",
@@ -407,6 +413,16 @@ def _client_and_mode(args: argparse.Namespace):
             "  export CALLE_API_KEY=iams_test_anything\n"
             f"To call for real, unset CALLE_BASE_URL or set it to {TRUSTED_ORIGIN}."
         )
+    # An instrumented transport when a trace is asked for, the SDK's own default
+    # otherwise. `CalleClient` takes an `httpx.Client`, so the timing this API does not
+    # report can be measured without patching or vendoring the library. Inert unless
+    # FIRSTBELL_TRACE names a file: see dispatch/trace.py for what is and is not recorded.
+    from dispatch import trace
+    if trace.enabled():
+        return (CalleClient(api_key=api_key, base_url=base_url,
+                            http_client=trace.http_client(base_url=base_url,
+                                                          api_key=api_key, timeout=30.0)),
+                RunMode(True, base_url), None)
     return CalleClient(api_key=api_key, base_url=base_url), RunMode(True, base_url), None
 
 
@@ -719,7 +735,11 @@ def main(argv: list[str] | None = None) -> int:
         idempotency_key=default_idempotency_key(
             "attendance" if args.again is None else f"attendance-{_key_label(args.again)}",
             date.today().isoformat()),
-        poll_interval_seconds=2.0 if mode.live else 0.0,
+        # The default lives on `WaveDispatcher.__init__`, and `tools/throughput.py`
+        # reads it off that signature so the published arithmetic cannot drift from
+        # the code that waits. Overriding it here changes this run only.
+        poll_interval_seconds=((args.poll_seconds if args.poll_seconds is not None
+                                else 2.0) if mode.live else 0.0),
         webhook_url=args.webhook_url,
     )
     report = dispatcher.run(items)
