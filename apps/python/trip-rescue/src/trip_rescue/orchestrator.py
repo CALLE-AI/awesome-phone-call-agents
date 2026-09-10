@@ -15,6 +15,7 @@ import logging
 from trip_rescue.calle_client import CallOutcome, TripRescueCaller
 from trip_rescue.duffel_client import DuffelClient
 from trip_rescue.models import Booking, DisruptionEvent, RebookingOutcome
+from trip_rescue.store import RunStore
 
 logger = logging.getLogger("trip_rescue.orchestrator")
 
@@ -32,6 +33,7 @@ def handle_disruption(
     duffel: DuffelClient,
     caller: TripRescueCaller,
     new_departure_date: str,
+    store: RunStore | None = None,
 ) -> RebookingOutcome:
     """Run the full Trip Rescue flow for one disrupted booking.
 
@@ -41,12 +43,19 @@ def handle_disruption(
     4. If they decline, or can't be reached, or ask for a human, return that
        outcome without touching the order -- no silent, unconfirmed change
        is ever made.
+
+    ``store`` is optional (see ``store.py``): when given, the disruption is
+    recorded *before* the call is placed and the outcome is recorded once it
+    resolves, so a crash mid-call still leaves a row proving a call was
+    attempted -- addressing the "no persistence layer" limitation called out
+    in the README. Omitting it (the default) reproduces the exact prior
+    behavior, so existing callers and tests are unaffected.
     """
     options = duffel.find_rebooking_options(booking, new_departure_date=new_departure_date)[:3]
     logger.info("order=%s found %d rebooking option(s) for %s", booking.order_id, len(options), new_departure_date)
 
     if not options:
-        return RebookingOutcome(
+        outcome = RebookingOutcome(
             order_id=booking.order_id,
             call_id=None,
             traveler_reachable=False,
@@ -57,6 +66,12 @@ def handle_disruption(
             transcript_summary="No rebooking options were available from Duffel for the requested date.",
             options_offered=[],
         )
+        if store is not None:
+            store.record_outcome(disruption, outcome)
+        return outcome
+
+    if store is not None:
+        store.record_disruption(booking, disruption)
 
     call_outcome: CallOutcome = caller.call_traveler_with_options(booking=booking, disruption=disruption, options=options)
     logger.info(
@@ -69,7 +84,7 @@ def handle_disruption(
 
     index = _DECISION_TO_INDEX.get(call_outcome.decision)
     if not call_outcome.reachable or index is None or index >= len(options):
-        return RebookingOutcome(
+        outcome = RebookingOutcome(
             order_id=booking.order_id,
             call_id=call_outcome.call_id,
             traveler_reachable=call_outcome.reachable,
@@ -80,12 +95,15 @@ def handle_disruption(
             transcript_summary=call_outcome.traveler_notes or call_outcome.decision,
             options_offered=options,
         )
+        if store is not None:
+            store.record_outcome(disruption, outcome)
+        return outcome
 
     chosen = options[index]
     updated_booking = duffel.confirm_rebooking(chosen)
     logger.info("order=%s confirmed rebooking to %s (ref=%s)", booking.order_id, updated_booking.departing_at, updated_booking.booking_reference)
 
-    return RebookingOutcome(
+    outcome = RebookingOutcome(
         order_id=booking.order_id,
         call_id=call_outcome.call_id,
         traveler_reachable=True,
@@ -96,3 +114,6 @@ def handle_disruption(
         transcript_summary=call_outcome.traveler_notes,
         options_offered=options,
     )
+    if store is not None:
+        store.record_outcome(disruption, outcome)
+    return outcome
