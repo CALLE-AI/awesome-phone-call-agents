@@ -193,6 +193,26 @@ def seed_first_step(
     return ledger.reserve_intent(intent)
 
 
+def _open_work_order(
+    ledger: "Ledger",
+    event: Event,
+    contact_id: str,
+    reason_code: str,
+    *,
+    now: datetime,
+) -> None:
+    """Prepare a field visit. It is not dispatched until a person approves it."""
+    ledger.create_work_order(
+        WorkOrder(
+            work_order_id=f"wo:{event.event_id}:{contact_id}",
+            contact_id=contact_id,
+            event_id=event.event_id,
+            reason_code=reason_code,
+            created_at=now,
+        )
+    )
+
+
 def _open_field_visit(
     ledger: "Ledger",
     event: Event,
@@ -201,16 +221,7 @@ def _open_field_visit(
     *,
     now: datetime,
 ) -> None:
-    """Prepare a field visit. It is not dispatched until a person approves it."""
-    ledger.create_work_order(
-        WorkOrder(
-            work_order_id=f"wo:{event.event_id}:{intent.contact_id}",
-            contact_id=intent.contact_id,
-            event_id=event.event_id,
-            reason_code=reason_code,
-            created_at=now,
-        )
-    )
+    _open_work_order(ledger, event, intent.contact_id, reason_code, now=now)
 
 
 def advance_after_disposition(
@@ -351,41 +362,105 @@ def _cutoff(
     return state
 
 
-def sweep_cutoff(ledger: "Ledger", event: Event, policy: Policy, *, now: datetime) -> list[str]:
-    """Convert anything still open at the field-visit cutoff into a pending field visit.
+CUTOFF_REASON = "field_visit_cutoff_reached_while_open"
 
-    This is what keeps `NEEDS_HUMAN` on the clock: an unresolved review item becomes a
-    truck roll at the deadline whether or not a person got to it.
+# A contact in any of these needs nothing further from the sweep: confirmed, closed by an
+# operator, or already in the field-visit queue.
+SETTLED_STATES = frozenset(
+    {
+        IntentState.CONFIRMED,
+        IntentState.CLOSED_REFUSED,
+        IntentState.FIELD_VISIT_PENDING,
+        IntentState.FIELD_VISIT_ISSUED,
+    }
+)
+
+
+def sweep_cutoff(ledger: "Ledger", event: Event, policy: Policy, *, now: datetime) -> list[str]:
+    """At the field-visit cutoff, prepare a visit for every contact still unconfirmed.
+
+    The duty is about the **contact**, not about any one call: if positive contact cannot
+    be confirmed before the shutoff, somebody goes to the door. So this sweeps per contact
+    rather than per intent. Sweeping per intent used to let three kinds of contact fall out
+    of the queue silently:
+
+    - one whose submission outcome was never resolved (`SUBMISSION_UNKNOWN`),
+    - one whose next step was reserved but never dispatched, because the process was down,
+    - one who was never dialable at all, such as an unsupported locale whose bilingual
+      callback did not happen in time.
+
+    Each of those is precisely a contact nobody has reached, which is the case the truck
+    exists for.
+
+    Returns the contact ids that were queued.
     """
     if now < event.field_visit_cutoff:
         return []
-    moved: list[str] = []
-    open_states = [IntentState.NEEDS_HUMAN, IntentState.UNCONFIRMED_WAITING]
-    for intent in ledger.list_intents(event.event_id, open_states):
-        # A contact whose later ladder step is already running is not stranded.
-        if _has_live_successor(ledger, intent):
+    queued: list[str] = []
+    ordered = {order.contact_id for order in ledger.list_work_orders(event.event_id)}
+
+    for contact in ledger.list_contacts(event.event_id):
+        if contact.contact_id in ordered:
             continue
+        intents = ledger.list_intents_for_contact(contact.contact_id)
+        states = {
+            intent.intent_id: ledger.reconstruct(intent.intent_id) for intent in intents
+        }
+        if any(state in SETTLED_STATES for state in states.values()):
+            continue
+
+        if not intents:
+            # Never dialled. An unsupported locale whose bilingual callback did not happen
+            # before the deadline is still a customer nobody has reached.
+            reason = "never_dialled_and_unconfirmed_at_cutoff"
+        else:
+            latest = max(intents, key=lambda item: (item.ladder_step, item.created_at))
+            reason = _drive_to_field_visit(ledger, latest, states[latest.intent_id], now=now)
+
+        _open_work_order(ledger, event, contact.contact_id, reason, now=now)
+        ordered.add(contact.contact_id)
+        queued.append(contact.contact_id)
+    return queued
+
+
+def _drive_to_field_visit(
+    ledger: "Ledger", intent: Intent, state: IntentState, *, now: datetime
+) -> str:
+    """Move one unresolved intent to `FIELD_VISIT_PENDING` along edges the diagram allows.
+
+    Returns the reason code for the work order.
+    """
+    if state in (IntentState.UNCONFIRMED_WAITING, IntentState.NEEDS_HUMAN):
+        apply(ledger, intent, LadderEvent.CUTOFF_REACHED, CUTOFF_REASON, at=now)
+        return CUTOFF_REASON
+
+    if state is IntentState.SUBMISSION_UNKNOWN:
         apply(
-            ledger,
-            intent,
-            LadderEvent.CUTOFF_REACHED,
-            "field_visit_cutoff_reached_while_open",
-            at=now,
+            ledger, intent, LadderEvent.RECONCILE_FAILED,
+            "unresolved_submission_at_cutoff", at=now,
         )
-        _open_field_visit(
-            ledger, event, intent, "field_visit_cutoff_reached_while_open", now=now
+        apply(ledger, intent, LadderEvent.CUTOFF_REACHED, CUTOFF_REASON, at=now)
+        return "unresolved_submission_at_cutoff"
+
+    if state is IntentState.RESERVED:
+        # Reserved but never dialled. From the ladder's point of view this step has no
+        # known outcome, which is the same position an ambiguous submission leaves us in.
+        apply(
+            ledger, intent, LadderEvent.SUBMISSION_AMBIGUOUS,
+            "not_dispatched_before_cutoff", at=now,
         )
-        moved.append(intent.intent_id)
-    return moved
+        apply(
+            ledger, intent, LadderEvent.RECONCILE_FAILED,
+            "not_dispatched_before_cutoff", at=now,
+        )
+        apply(ledger, intent, LadderEvent.CUTOFF_REACHED, CUTOFF_REASON, at=now)
+        return "not_dispatched_before_cutoff"
 
-
-def _has_live_successor(ledger: "Ledger", intent: Intent) -> bool:
-    for candidate in ledger.list_intents_for_contact(intent.contact_id):
-        if candidate.ladder_step > intent.ladder_step and candidate.state not in {
-            IntentState.UNCONFIRMED_WAITING,
-        }:
-            return True
-    return False
+    # SUBMITTED, TERMINAL_UNVERIFIED, ADJUDICATED: a call is genuinely still in flight or
+    # mid-adjudication. Fabricating a terminal observation to force the state would put a
+    # lie in the audit trail, so the intent keeps its true state and the visit is prepared
+    # anyway. The call may still land and confirm; the crew can be stood down by a person.
+    return "cutoff_reached_while_call_in_flight"
 
 
 # -- operator actions -------------------------------------------------------------

@@ -593,7 +593,11 @@ class Ledger:
         `"quarantined"` when the same event id arrives with a different payload.
         """
         stamp = to_iso(at or utcnow())
+        # The digest is taken over what arrived, so a conflicting redelivery is still
+        # detected, but only the redacted body is stored. A webhook payload is a full
+        # call task and carries the dialled number.
         digest = _digest(payload)
+        stored = redact_snapshot(payload)
         existing = self.conn.execute(
             "SELECT payload_digest, quarantined FROM inbox WHERE event_uid = ?", (event_uid,)
         ).fetchone()
@@ -611,7 +615,7 @@ class Ledger:
                 "INSERT INTO inbox (event_uid, call_id, received_at, payload_json, "
                 "payload_digest, processed_at, quarantined, quarantine_reason) "
                 "VALUES (?,?,?,?,?,NULL,0,NULL)",
-                (event_uid, call_id, stamp, json.dumps(payload), digest),
+                (event_uid, call_id, stamp, json.dumps(stored), digest),
             )
         return "inserted"
 
@@ -622,12 +626,26 @@ class Ledger:
         """Store a rejected delivery so it is visible rather than dropped."""
         stamp = to_iso(at or utcnow())
         with self.tx() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO inbox (event_uid, call_id, received_at, payload_json, "
-                "payload_digest, processed_at, quarantined, quarantine_reason) "
-                "VALUES (?,?,?,?,?,NULL,1,?)",
-                (event_uid, call_id, stamp, json.dumps(payload), _digest(payload), reason),
-            )
+            # Never REPLACE. The event id on a quarantined delivery is attacker-supplied
+            # and unauthenticated; an INSERT OR REPLACE here let a forged request delete a
+            # real inbox row and reset its `processed_at`, which would make an
+            # already-handled terminal event look unhandled. An existing row is marked
+            # quarantined in place and its first payload is kept.
+            updated = conn.execute(
+                "UPDATE inbox SET quarantined = 1, quarantine_reason = ? "
+                "WHERE event_uid = ? AND quarantined = 0",
+                (reason, event_uid),
+            ).rowcount
+            if updated == 0:
+                conn.execute(
+                    "INSERT OR IGNORE INTO inbox (event_uid, call_id, received_at, "
+                    "payload_json, payload_digest, processed_at, quarantined, "
+                    "quarantine_reason) VALUES (?,?,?,?,?,NULL,1,?)",
+                    (
+                        event_uid, call_id, stamp,
+                        json.dumps(redact_snapshot(payload)), _digest(payload), reason,
+                    ),
+                )
 
     def claim_unprocessed_webhooks(self) -> list[dict]:
         rows = self.conn.execute(

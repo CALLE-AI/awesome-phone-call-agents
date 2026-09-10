@@ -49,8 +49,9 @@ class Settings:
         return self.mode is RunMode.LIVE
 
 
-def _env_flag(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+def _env_flag(name: str, env: dict[str, str] | None = None) -> bool:
+    source = os.environ if env is None else env
+    return source.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings(
@@ -104,7 +105,7 @@ def load_settings(
         base_url=base_url,
         max_calls=max_calls,
         live_confirmed=live_confirmed,
-        judge_c_enabled=_env_flag("PC_ENABLE_JUDGE_C"),
+        judge_c_enabled=_env_flag("PC_ENABLE_JUDGE_C", environ),
         webhook_url=environ.get("PC_WEBHOOK_URL") or None,
         transcript_retention_days=int(environ.get("PC_TRANSCRIPT_RETENTION_DAYS", "30")),
     )

@@ -28,6 +28,22 @@ _EMAIL_RE = re.compile(
 
 DIGITS_REMOVED = "[digits removed]"
 EMAIL_REMOVED = "[email removed]"
+MEDICAL_REMOVED = "[medical detail removed]"
+
+# Schemas and models carry no field for a health fact, but a person on the call can still
+# say one out loud, and an extraction model can still copy it into `notes_for_human`. That
+# note is durable and is rendered on the operator dashboard, so the words are stripped on
+# the way in. This is a backstop for the schema description and the call script, not a
+# replacement for either.
+_MEDICAL_TERMS = (
+    "oxygen", "concentrator", "dialysis", "ventilator", "respirator", "nebuli[sz]er",
+    "cpap", "bipap", "apn(?:o|oe)a", "insulin", "diabet(?:es|ic)", "catheter",
+    "feeding tube", "chemotherapy", "chemo", "cancer", "pacemaker", "defibrillator",
+    "seizure", "epilep(?:sy|tic)", "asthma", "copd", "emphysema", "infusion pump",
+    "wheelchair", "hospice", "stroke", "dementia", "alzheimer", "paraly[sz]ed",
+    "life support", "medication", "prescription", "diagnos(?:is|ed)", "immunocompromised",
+)
+_MEDICAL_RE = re.compile(r"\b(?:" + "|".join(_MEDICAL_TERMS) + r")\b", re.IGNORECASE)
 
 
 def mask_e164(value: str | None) -> str:
@@ -39,9 +55,9 @@ def mask_e164(value: str | None) -> str:
         return "(no number)"
     if len(value) >= 10:
         return f"{value[:5]}{MASK_DOTS}{value[-4:]}"
-    if len(value) >= 7:
-        return f"{value[:2]}{MASK_DOTS}{value[-2:]}"
-    return MASK_DOTS
+    # Shorter numbers keep strictly less, never more. Applying the long-number rule to an
+    # eight-character number would reveal every character of it.
+    return f"{MASK_DOTS}{value[-2:]}"
 
 
 def mask_numbers_in_text(text: str) -> str:
@@ -51,18 +67,29 @@ def mask_numbers_in_text(text: str) -> str:
     return _E164_IN_TEXT_RE.sub(lambda match: mask_e164(match.group(0)), text)
 
 
+def redact_health_terms(text: str) -> str:
+    """Strip health facts from text that will be stored or shown to an operator."""
+    return _MEDICAL_RE.sub(MEDICAL_REMOVED, text)
+
+
 def redact_free_text(text: str | None) -> str | None:
     """Conservatively redact operator-visible free text.
 
     Applied to `notes_for_human` and to any transcript text stored or displayed outside
-    the ledger's raw snapshot. Masks E.164 numbers, then removes remaining digit runs of
-    seven or more and any email address.
+    the ledger's raw snapshot. Masks E.164 numbers, removes remaining digit runs of seven
+    or more and any email address, and strips health terms.
+
+    The health pass exists because "no PHI" cannot be enforced by schema alone: a customer
+    can volunteer a condition on the call, and the extraction model can copy it into the
+    free-text note. The note outlives the call and is rendered on the dashboard, so the
+    words come out here.
     """
     if text is None:
         return None
     redacted = mask_numbers_in_text(text)
     redacted = _EMAIL_RE.sub(EMAIL_REMOVED, redacted)
     redacted = _LONG_DIGIT_RUN_RE.sub(DIGITS_REMOVED, redacted)
+    redacted = redact_health_terms(redacted)
     return redacted
 
 

@@ -42,18 +42,34 @@ def _phrases(*items: str) -> tuple[re.Pattern[str], ...]:
 
 
 # A `speaker=user` turn matching one of these is an answering machine, not a person.
+#
+# This lexicon is load-bearing: a greeting that slips through it can be read as a live
+# person, and if the greeting happens to contain a word from the acknowledgement lexicon
+# ("Hi, yes, this is the Smith family, we're not home") the machine's own greeting gets
+# recorded as the acknowledgement. So it covers the imperative "leave a message" family,
+# the "not home" family, and the callback-promise family, not just the literal word
+# voicemail.
 VOICEMAIL_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "en-US": _phrases(
-        r"\bleave a (?:brief )?message\b",
+        r"\bleave (?:a|your|us|me)\b",
+        r"\bleave (?:a )?(?:brief |short |detailed )?message\b",
         r"\bafter the (?:tone|beep)\b",
-        r"\bat the (?:tone|beep)\b",
-        r"\byou(?:'ve| have) reached\b",
+        r"\bat the (?:tone|beep|sound of)\b",
+        r"\byou(?:'ve|’ve| have) reached\b",
         r"\bis (?:not|un)available\b",
-        r"\bcan'?t (?:come to|get to) the phone\b",
+        r"\b(?:no one|no-one|nobody) is (?:here|home|available|in)\b",
+        r"\b(?:we|i|they)(?:'re|’re| are|'m|’m| am)? ?not (?:home|here|in|available)\b",
+        r"\bcan(?:'|’)?t (?:come to|get to) the phone\b",
+        r"\bunable to (?:take|answer) your call\b",
+        r"\bnot able to take your call\b",
         r"\bplease record\b",
+        r"\brecord your (?:message|name)\b",
         r"\bvoice ?mail\b",
         r"\bmailbox\b",
-        r"\bnot able to take your call\b",
+        r"\bget back to you\b",
+        r"\breturn your call as soon as\b",
+        r"\b(?:please )?try (?:again|back|us) later\b",
+        r"\bthe (?:person|number) you (?:are|'re|’re) (?:trying to reach|calling)\b",
     ),
 }
 
@@ -75,20 +91,29 @@ ACKNOWLEDGEMENT_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     ),
 }
 
-# Checked first. A turn matching one of these is not an acknowledgement, whatever else it
-# contains, so "no, I did not hear that" is never read as a yes.
+# A turn matching one of these is not an acknowledgement, so "no, I did not hear that" is
+# never read as a yes.
+#
+# The contraction pattern requires a literal apostrophe (`n't`, never bare `nt`) so that
+# ordinary words ending in "nt" - want, went, meant, important - are not read as denials.
+# An earlier version wrote it as `\bn'?t\b`, which cannot match inside "didn't" at all:
+# the character before the "n" is a word character, so there is no boundary there. That
+# made every contracted denial invisible to Judge B, and "I couldn't hear a word.
+# Correct?" adjudicated as CONFIRMED with the denial itself stored as the evidence span.
 NEGATION_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "en-US": _phrases(
         r"\bno\b",
         r"\bnot\b",
-        r"\bn'?t\b",
+        r"n['’]t\b",
+        r"\bcannot\b",
         r"\bnever\b",
         r"\bnothing\b",
-        r"\bwhat(?:'s| is) (?:this|that)\b",
-        r"\bi don'?t (?:know|understand)\b",
+        r"\bwhat(?:'s|’s| is) (?:this|that)\b",
+        r"\bi don['’]?t (?:know|understand)\b",
         r"\bsay (?:that )?again\b",
         r"\bpardon\b",
         r"\brepeat\b",
+        r"\bhuh\b",
     ),
 }
 

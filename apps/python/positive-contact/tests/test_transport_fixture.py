@@ -134,8 +134,15 @@ def test_replay_declares_its_provenance():
 
 
 def test_replay_reports_whether_anything_came_from_a_live_call():
+    """Assert the actual state of the shipped fixtures, not that a bool is a bool.
+
+    Nothing in `fixtures/recorded/` was captured from a real call yet, so replay mode must
+    say so rather than let a contract-shaped run be reported as a live verification. When
+    `pc record` adds a real payload this flips, and the provenance line changes with it.
+    """
     transport = ReplayTransport(RECORDED)
-    assert isinstance(transport.has_live_recordings, bool)
+    assert transport.has_live_recordings is False
+    assert "not captured" in transport.provenance_line()
 
 
 def test_replay_serves_a_payload_through_the_same_interface():
@@ -145,6 +152,26 @@ def test_replay_serves_a_payload_through_the_same_interface():
     snapshot = transport.read(result.call_id)
     assert snapshot.recipient_result is not None
     assert snapshot.metadata["pc_contact_id"] == "pc-001"
+
+
+def test_replay_payloads_adjudicate_to_the_expected_dispositions():
+    """The point of replay mode is proving the adjudicator against payloads it did not
+    author. Asserting only an exit code left that unproven."""
+    from positive_contact.adjudicate import adjudicate
+    from positive_contact.models import DispositionKind
+
+    transport = ReplayTransport(RECORDED)
+    expected = {
+        "pc-001": (DispositionKind.CONFIRMED, "live_human_acknowledged_with_transcript_evidence"),
+        "pc-006": (DispositionKind.UNCONFIRMED, "voicemail_notice_left_not_confirmation"),
+        "pc-009": (DispositionKind.NEEDS_HUMAN, "medical_question_priority_review"),
+    }
+    for contact_id, (kind, reason) in expected.items():
+        result = submit(transport, contact_id=contact_id)
+        assert result.kind == "accepted", contact_id
+        disposition = adjudicate(transport.read(result.call_id), intent_id=f"int:{contact_id}")
+        assert disposition.disposition is kind, contact_id
+        assert disposition.reason_code == reason, contact_id
 
 
 def test_a_recording_without_a_declared_source_is_refused(tmp_path):
@@ -170,13 +197,56 @@ def test_an_empty_recording_directory_is_refused(tmp_path):
 
 
 def test_recorded_payloads_carry_no_raw_number():
+    """Every payload captured from a live call must be redacted on disk.
+
+    This used to filter to `live-redacted` recordings and then assert nothing, because
+    every shipped recording is synthetic. It now asserts something in both cases: a
+    captured payload carries no phone-shaped run at all, and a synthetic one may only use
+    fictional 555-01XX numbers.
+    """
     from positive_contact.redact import find_raw_e164
 
+    checked = 0
     for path in sorted(RECORDED.glob("*.json")):
         document = json.loads(path.read_text(encoding="utf-8"))
-        if document["source"] != LIVE_REDACTED:
-            continue
-        assert find_raw_e164(json.dumps(document)) == []
+        rendered = json.dumps(document)
+        if document["source"] == LIVE_REDACTED:
+            assert find_raw_e164(rendered) == [], path.name
+        else:
+            for number in find_raw_e164(rendered):
+                assert number.startswith("+1415555") and "5550" in number, (path.name, number)
+        checked += 1
+    assert checked >= 3
+
+
+def test_the_record_command_redacts_before_it_writes():
+    """`pc record` is what produces a `live-redacted` payload, so its redaction is the
+    thing that has to hold. Exercised directly rather than inferred from the fixtures."""
+    from positive_contact.redact import find_raw_e164, redact_snapshot
+
+    live_shaped = {
+        "id": "call_real_1",
+        "status": "completed",
+        "recipients": [
+            {
+                "phones": ["+14155550101"],
+                "structured_result": {"contact_type": "live_person"},
+                "attempts": [
+                    {
+                        "phone": "+14155550101",
+                        "transcript_turns": [
+                            {"speaker": "user", "text": "Call me back on +14155550199.",
+                             "offset_seconds": 4}
+                        ],
+                    }
+                ],
+            }
+        ],
+        "summary": "Reached +14155550101 successfully.",
+    }
+    redacted = redact_snapshot(live_shaped)
+    assert find_raw_e164(json.dumps(redacted)) == []
+    assert redacted["recipients"][0]["phones"] == ["+1415•••0101"]
 
 
 # -- the shared parser -------------------------------------------------------------

@@ -211,15 +211,13 @@ def run_preflight(
             result.blocking.append(Issue(contact_id, "invalid_e164", str(exc)))
             continue
 
-        key = derive_idempotency_key(event.event_id, contact_id, 1, LadderTarget.PRIMARY)
-        if len(key) > IDEMPOTENCY_KEY_MAX_LENGTH:
-            result.blocking.append(
-                Issue(
-                    contact_id,
-                    "idempotency_key_too_long",
-                    f"derived key is {len(key)} characters, over the CALL-E limit",
-                )
-            )
+        try:
+            # `derive_idempotency_key` raises rather than returning an over-long key, so
+            # this has to be caught. Letting it propagate turned a roster defect into a
+            # traceback and made the blocking-issue branch below unreachable.
+            derive_idempotency_key(event.event_id, contact_id, 1, LadderTarget.PRIMARY)
+        except ValueError as exc:
+            result.blocking.append(Issue(contact_id, "idempotency_key_too_long", str(exc)))
             continue
 
         try:

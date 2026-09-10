@@ -43,9 +43,18 @@ If the result is missing, null, or fails the strict local validator, Judge A ret
 Three things, in order.
 
 **1. Machine greeting beats everything.** A `speaker=user` turn matching an answering
-machine pattern (`leave a message`, `after the tone`, `you have reached`, `is not
-available`, `mailbox`, and the rest) marks the call as voicemail regardless of what Judge A
-says. A recording cannot acknowledge anything, so no later turn can rescue it.
+machine pattern marks the call as voicemail regardless of what Judge A says. A recording
+cannot acknowledge anything, so no later turn can rescue it.
+
+This lexicon is load-bearing, and an early version was too narrow. It covered `leave a
+message`, `after the tone`, `you have reached` and a few more, which let a common greeting
+through: "Hi, yes, this is the Smith family. We're not home right now. Please leave your
+name and number." Judge B saw a live person, found "yes" in the greeting, agreed with a
+structured result that also said live person, and the call was confirmed with the machine's
+own greeting stored as the acknowledgement evidence. The lexicon now covers three families
+rather than one: the imperative ("leave a/your", "record your message"), the absence family
+("we're not home", "no one is available", "is unavailable"), and the callback promise
+("get back to you", "try again later").
 
 **2. The acknowledgement must come after the notice.** Judge B locates the notice turn:
 the last `speaker=bot` turn matching a notice marker (`power ... turned off`, `public
@@ -67,6 +76,16 @@ earliest negation match.
 
 Ordering by position rather than simple presence is what keeps a hedged yes from being
 thrown away and a plain no from being read as a yes.
+
+The negation lexicon has to match contractions, and getting that wrong is silent. It was
+written as `\bn'?t\b`, which looks like it catches "didn't" and cannot: the character
+before the "n" is a word character, so there is no word boundary there for `\b` to match.
+Every contracted denial was invisible. "I couldn't hear a word. Correct?" found "correct"
+in the acknowledgement lexicon, saw no negation, and confirmed the contact, quoting the
+denial as the evidence. The pattern is now `n['\u2019]t\b`, which requires a literal
+apostrophe so that ordinary words ending in "nt" - want, went, meant - are not read as
+denials. `tests/test_regressions.py` asserts that a contraction and its expansion always
+reach the same disposition.
 
 When no candidate acknowledges and at least one denies, Judge B returns `live_person/no`
 with the denial as evidence. When there are user turns but nothing conclusive, it returns

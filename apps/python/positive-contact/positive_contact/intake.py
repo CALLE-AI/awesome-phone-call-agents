@@ -167,6 +167,12 @@ def handle_terminal_call(
     except TransportError as exc:
         return IntakeOutcome(intent.intent_id, "unreadable", str(exc))
 
+    if not snapshot.is_terminal:
+        # The call went terminal between the two reads and back again, or the provider is
+        # still finalising. Adjudicating a running call would turn a live conversation
+        # into a NEEDS_HUMAN item. Wait for the next wake-up instead.
+        return IntakeOutcome(intent.intent_id, "still_running", snapshot.status)
+
     if snapshot.call_id != attempt.call_id:
         apply(
             ledger, intent, LadderEvent.BINDING_MISMATCH,
@@ -241,11 +247,15 @@ def process_inbox(
             )
             outcomes.append(IntakeOutcome("-", "quarantined", row["call_id"]))
             continue
-        outcomes.append(
-            handle_terminal_call(
-                ledger, transport, event, policy, intent, now=moment, judge_c=judge_c
-            )
+        outcome = handle_terminal_call(
+            ledger, transport, event, policy, intent, now=moment, judge_c=judge_c
         )
+        outcomes.append(outcome)
+        if outcome.action in {"still_running", "unreadable"}:
+            # Leave the row unprocessed. Marking it here would consume the only wake-up
+            # this call gets and leave the intent stuck in SUBMITTED until the poller
+            # happened to run.
+            continue
         ledger.mark_webhook_processed(row["event_uid"], at=moment)
     return outcomes
 

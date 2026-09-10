@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from positive_contact.cli import execute_run, seed_ledger
 from positive_contact.escalate import approve_field_visit
+from positive_contact.models import IntentState
 from positive_contact.preflight import render_preview
 from positive_contact.redact import (
     DIGITS_REMOVED,
@@ -153,6 +154,25 @@ def test_the_stored_provider_snapshots_are_redacted(ledger, ran, event):
         if attempt is None or attempt.raw_snapshot_redacted is None:
             continue
         assert find_raw_e164(json.dumps(attempt.raw_snapshot_redacted)) == []
+
+
+def test_the_review_queue_leaks_nothing_while_it_has_rows(
+    ledger, demo_preflight, event, policy, now
+):
+    """The other dashboard test runs the clock to the cutoff, which empties the review
+    queue, so review-row masking went unchecked. This stops before the cutoff."""
+    transport = FixtureTransport(SCENARIOS)
+    seed_ledger(ledger, demo_preflight)
+    execute_run(ledger, transport, demo_preflight, now=now, simulated_clock=False)
+    open_items = ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])
+    assert open_items, "the review queue must have rows for this test to mean anything"
+
+    client = TestClient(create_app(ledger.db_path, event, policy))
+    text = client.get("/review").text
+    assert "medical_question_priority_review" in text  # rows really rendered
+    assert find_raw_e164(text) == []
+    for number in roster_numbers():
+        assert number not in text
 
 
 def test_every_dashboard_page_leaks_nothing(ledger, ran, event, policy, tmp_path, now):

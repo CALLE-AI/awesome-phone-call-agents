@@ -63,6 +63,8 @@ evidence.
 | A re-read that is not ours | Binding checks compare the returned call id and the echoed `metadata` (event, contact, intent, step, target, task version, schema version) against the stored intent. Any mismatch routes to a human and writes no disposition |
 | Unknown event type | Quarantined rather than guessed at |
 | Malformed envelope | 400, no row written |
+| Forged event id used to overwrite a handled row | The quarantine path marks an existing row in place and never replaces it. It used to use `INSERT OR REPLACE`, which let unauthenticated input delete a real row and reset its `processed_at`, making a handled terminal event look unhandled |
+| A wake-up consumed without being acted on | An inbox row is only marked processed when the re-read actually produced a decision. Marking it after a non-terminal read used to burn the only wake-up a call gets |
 
 The receiver's whole job is: validate the envelope, insert one row, commit, return 200. A
 2xx tells CALL-E the delivery landed; it does not tell it we agreed with anything.
@@ -80,6 +82,8 @@ sensitive part, and the phone number is the identifier that makes it actionable.
 | A report or a work-order export | Masked, both CSV and JSON, checked in tests |
 | The audit trail | Transitions carry the contact id and reason codes, never a number |
 | A stored provider snapshot | Passed through `redact_snapshot` before it is written |
+| A webhook body in the `inbox` table | Also passed through `redact_snapshot`. A webhook body is a full call task and carries the dialled number; it used to be stored verbatim, which put a raw number outside `contacts` |
+| Provider error text in the audit trail | Redacted before it is appended. `transitions` is append-only, so anything unredacted written there is unredactable later |
 | Free text coming back from a call | `notes_for_human` is redacted: phone shapes masked, digit runs of 7+ removed, emails removed |
 | A recorded replay payload | `pc record` redacts before writing, and a test asserts no `live-redacted` recording carries a raw number |
 | An error message | The E.164 validation message deliberately contains no example number, because the leak guard cannot tell a documentation example from a customer |
@@ -97,6 +101,11 @@ flag; anything beyond that is out of bounds.
 - The result schema instructs the extraction model, in the field description, not to record
   medical detail in `notes_for_human`.
 - The call script instructs the agent to give no advice and to record no medical detail.
+- A redactor strips device, condition, and treatment terms from `notes_for_human` and from
+  evidence spans before either is stored. The schema and the script are instructions, and
+  instructions can be ignored by the thing following them; this is the part that holds when
+  they are. A customer volunteering "I have an oxygen concentrator" used to have that
+  sentence stored durably and rendered on the operator dashboard.
 - `tests/test_no_phi.py` scans the pydantic models, the transmitted schema, the SQLite
   columns, every shipped file for a PHI-shaped field declaration, and every fixture
   recursively for a PHI-shaped key. It also asserts the medical-question fixture's note
@@ -172,3 +181,6 @@ call id rather than submit a new one.
   published contract. It is why the re-read exists.
 - **Retention enforcement.** The retention window is configured and documented; the sweep
   job that enforces it is not built.
+- **Health-term redaction is a word list.** It catches the vocabulary of the equipment this
+  programme is about, not every possible way of describing a condition. It is a backstop
+  behind the schema shape and the call script, not a classifier.

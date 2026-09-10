@@ -22,8 +22,8 @@ from datetime import datetime
 from .escalate import apply
 from .ledger import Ledger
 from .models import Attempt, Event, Intent, IntentState, LadderEvent
-from .policy import Policy
-from .redact import mask_e164
+from .policy import Policy, step_can_finish_before_cutoff
+from .redact import mask_e164, redact_free_text
 from .script import (
     RECIPIENT_RESULT_SCHEMA,
     SCHEMA_VERSION,
@@ -98,7 +98,7 @@ def dispatch_intent(
     state = ledger.reconstruct(intent.intent_id)
     if state is IntentState.SUBMISSION_UNKNOWN:
         return reconcile_unknown_submission(
-            ledger, transport, event, intent, now=now, budget=budget, log=log
+            ledger, transport, event, intent, policy=policy, now=now, budget=budget, log=log
         )
     if state is not IntentState.RESERVED:
         return DispatchOutcome(intent.intent_id, "skipped", detail=f"already {state.value}")
@@ -115,6 +115,14 @@ def dispatch_intent(
             at=now,
         )
         return DispatchOutcome(intent.intent_id, "skipped", existing.call_id, "binding recovered")
+
+    if not step_can_finish_before_cutoff(now, event.field_visit_cutoff, policy):
+        # The step was scheduled inside the window but the process only got here after the
+        # deadline. Placing the call now would spend a slot on a result that arrives too
+        # late to stop a truck, so leave it for `sweep_cutoff` to queue.
+        return DispatchOutcome(
+            intent.intent_id, "skipped", detail="past the field-visit cutoff; not dialled"
+        )
 
     contact = ledger.get_contact(intent.contact_id)
     if contact is None:
@@ -182,7 +190,10 @@ def dispatch_intent(
             intent,
             LadderEvent.SUBMISSION_AMBIGUOUS,
             f"submission_unknown:{result.error_code or 'no_code'}",
-            evidence_refs={"reason": result.reason, "idempotency_key": intent.idempotency_key},
+            evidence_refs={
+                "reason": redact_free_text(result.reason),
+                "idempotency_key": intent.idempotency_key,
+            },
             at=now,
         )
         return DispatchOutcome(intent.intent_id, "unknown", detail=result.reason)
@@ -200,12 +211,15 @@ def _fail_to_human(
     ledger: Ledger, intent: Intent, reason_code: str, detail: str, *, now: datetime
 ) -> DispatchOutcome:
     """Close out a submission that will never become a call, via the ambiguity path."""
+    # Provider error text is free text from outside the trust boundary, and the audit
+    # trail is append-only, so anything unredacted written here is unredactable later.
+    safe = redact_free_text(detail)
     apply(
         ledger,
         intent,
         LadderEvent.SUBMISSION_AMBIGUOUS,
         reason_code,
-        evidence_refs={"detail": detail},
+        evidence_refs={"detail": safe},
         at=now,
     )
     apply(
@@ -213,7 +227,7 @@ def _fail_to_human(
         intent,
         LadderEvent.RECONCILE_FAILED,
         "submission_cannot_become_a_call",
-        evidence_refs={"detail": detail},
+        evidence_refs={"detail": safe},
         at=now,
     )
     return DispatchOutcome(intent.intent_id, "rejected", detail=detail)
@@ -225,6 +239,7 @@ def reconcile_unknown_submission(
     event: Event,
     intent: Intent,
     *,
+    policy: Policy,
     now: datetime,
     budget: LiveCallBudget | None = None,
     log: list[str] | None = None,
@@ -248,6 +263,13 @@ def reconcile_unknown_submission(
             ledger, intent, LadderEvent.RECONCILE_FAILED, "no_number_for_target", at=now
         )
         return DispatchOutcome(intent.intent_id, "rejected", detail="no number for target")
+
+    if not step_can_finish_before_cutoff(now, event.field_visit_cutoff, policy):
+        # Replaying the key can create the call if the original never landed, so this path
+        # dials for real and needs the same past-cutoff guard as a first submission.
+        return DispatchOutcome(
+            intent.intent_id, "skipped", detail="past the field-visit cutoff; not dialled"
+        )
 
     if budget is not None:
         budget.reserve()
@@ -299,7 +321,7 @@ def reconcile_unknown_submission(
         intent,
         LadderEvent.RECONCILE_FAILED,
         f"reconcile_failed:{result.error_code or 'no_code'}",
-        evidence_refs={"reason": result.reason},
+        evidence_refs={"reason": redact_free_text(result.reason)},
         at=now,
     )
     return DispatchOutcome(intent.intent_id, "rejected", detail=result.reason)

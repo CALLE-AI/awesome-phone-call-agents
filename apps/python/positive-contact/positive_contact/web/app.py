@@ -9,6 +9,9 @@ operator surface and the terminal-event endpoint.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,13 +24,21 @@ from ..escalate import (
     approve_field_visit,
     operator_confirm,
     operator_refuse,
+    sweep_cutoff,
 )
-from ..intake import WebhookReceiver, build_router
-from ..ledger import Ledger
+from ..intake import WebhookReceiver, build_router, poll_pending, process_inbox
+from ..ledger import Ledger, LedgerError
 from ..models import Event, IntentState
 from ..policy import Policy
 from ..redact import mask_e164
 from ..report import build_report, work_orders_csv
+
+LOG = logging.getLogger("positive_contact.web")
+DEFAULT_WORKER_INTERVAL_SECONDS = 10
+
+# Errors an operator action can raise from a stale form: the intent moved on between the
+# page render and the click, so the state machine refuses the edge.
+OPERATOR_ERRORS = (OperatorError, LedgerError, RuntimeError, ValueError)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -122,11 +133,53 @@ def _review_rows(ledger: Ledger, event: Event) -> list[dict]:
     return rows
 
 
-def create_app(db_path: Path | str, event: Event, policy: Policy) -> FastAPI:
+def create_app(
+    db_path: Path | str,
+    event: Event,
+    policy: Policy,
+    *,
+    transport=None,
+    judge_c=None,
+    worker_interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS,
+) -> FastAPI:
+    """Build the operator dashboard, the webhook receiver, and the worker that drains it.
+
+    Without the worker this process would accept terminal webhooks, write them to the
+    inbox, and never look at them again: the ladder would not advance and the cutoff sweep
+    would never run. The receiver is deliberately inert, so something has to do the work,
+    and in a deployment that something is this loop.
+
+    `transport` is optional so tests can build the pages without a provider. No transport
+    means no worker.
+    """
     app = FastAPI(title="PositiveContact", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     ledger = Ledger(db_path)
     app.include_router(build_router(WebhookReceiver(ledger)))
+
+    async def worker() -> None:
+        while True:
+            try:
+                await asyncio.to_thread(_drain_once, ledger, transport, event, policy, judge_c)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # keep the loop alive; one bad cycle must not stop intake
+                LOG.exception("intake worker cycle failed")
+            await asyncio.sleep(worker_interval_seconds)
+
+    @app.on_event("startup")
+    async def _start_worker() -> None:
+        if transport is None:
+            return
+        app.state.worker = asyncio.create_task(worker())
+
+    @app.on_event("shutdown")
+    async def _stop_worker() -> None:
+        task = getattr(app.state, "worker", None)
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
     def context(request: Request, **extra) -> dict:
         base = {
@@ -188,7 +241,8 @@ def create_app(db_path: Path | str, event: Event, policy: Policy) -> FastAPI:
                 evidence_text=evidence,
                 now=datetime.now(timezone.utc),
             )
-        except OperatorError as exc:
+        except OPERATOR_ERRORS as exc:
+            # A stale or double-submitted form must not 500 the dashboard mid-event.
             return RedirectResponse(f"/review?message={exc}", status_code=303)
         return RedirectResponse(
             f"/review?message=confirmed+{intent.contact_id}", status_code=303
@@ -209,9 +263,9 @@ def create_app(db_path: Path | str, event: Event, policy: Policy) -> FastAPI:
                 evidence_text=evidence,
                 now=datetime.now(timezone.utc),
             )
-        except OperatorError as exc:
+        except OPERATOR_ERRORS as exc:
             return RedirectResponse(f"/review?message={exc}", status_code=303)
-        return RedirectResponse(f"/review?message=refusal+recorded", status_code=303)
+        return RedirectResponse("/review?message=refusal+recorded", status_code=303)
 
     @app.get("/reports", response_class=HTMLResponse)
     async def reports(request: Request) -> HTMLResponse:
@@ -246,8 +300,16 @@ def create_app(db_path: Path | str, event: Event, policy: Policy) -> FastAPI:
         try:
             approve_field_visit(ledger, event, work_order_id, actor=actor, now=now)
             ledger.mark_work_order_exported(work_order_id, at=now)
-        except OperatorError as exc:
+        except OPERATOR_ERRORS as exc:
             return RedirectResponse(f"/reports?message={exc}", status_code=303)
         return RedirectResponse("/reports", status_code=303)
 
     return app
+
+
+def _drain_once(ledger: Ledger, transport, event: Event, policy: Policy, judge_c) -> None:
+    """One worker cycle: drain the inbox, poll anything still open, sweep the cutoff."""
+    now = datetime.now(timezone.utc)
+    process_inbox(ledger, transport, event, policy, now=now, judge_c=judge_c)
+    poll_pending(ledger, transport, event, policy, now=now, judge_c=judge_c)
+    sweep_cutoff(ledger, event, policy, now=now)

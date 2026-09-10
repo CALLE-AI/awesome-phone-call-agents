@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .adjudicate import DisabledJudgeC, judge_c_enabled
+from .adjudicate import JUDGE_C_ENV_VAR, DisabledJudgeC
 from .config import (
     FIXTURES_DIR,
     LIVE_CONFIRMATION_FLAG,
@@ -24,7 +24,7 @@ from .config import (
     load_settings,
 )
 from .dispatch import BudgetExceeded, LiveCallBudget, dispatch_intent
-from .escalate import approve_field_visit, seed_first_step, sweep_cutoff
+from .escalate import SETTLED_STATES, approve_field_visit, seed_first_step, sweep_cutoff
 from .intake import poll_pending
 from .ledger import Ledger
 from .models import Event, IntentState
@@ -175,9 +175,15 @@ def execute_run(
             for intent in ledger.list_intents(event.event_id, [IntentState.RESERVED])
             if intent.not_before > clock
         ]
-        open_items = ledger.list_intents(
-            event.event_id, [IntentState.NEEDS_HUMAN, IntentState.UNCONFIRMED_WAITING]
-        )
+        # Anything not in a settled state still needs the cutoff sweep. Listing only
+        # NEEDS_HUMAN and UNCONFIRMED_WAITING here used to strand a contact whose only
+        # intent sat in SUBMISSION_UNKNOWN: the clock never reached the cutoff, the sweep
+        # never ran, and nobody was sent to the door.
+        open_items = [
+            intent
+            for intent in ledger.list_intents(event.event_id)
+            if ledger.reconstruct(intent.intent_id) not in SETTLED_STATES
+        ]
         if upcoming:
             next_time = min(upcoming)
             if open_items and event.field_visit_cutoff < next_time:
@@ -199,7 +205,7 @@ def execute_run(
 def cmd_preflight(args: argparse.Namespace) -> int:
     event, policy = load_event(args.event)
     rows = load_roster_rows(args.roster)
-    now = _resolve_now(args, event)
+    now = _resolve_now(RunMode.FIXTURE, args, event)
     result = run_preflight(event, policy, rows, now=now)
     print(render_preview(result, now=now))
     if result.blocking:
@@ -221,7 +227,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     event, policy = load_event(args.event)
     rows = load_roster_rows(args.roster)
-    now = _resolve_now(args, event)
+    now = _resolve_now(settings.mode, args, event)
     result = run_preflight(event, policy, rows, now=now)
     print(render_preview(result, now=now))
     if not result.ok:
@@ -233,11 +239,13 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"\nMODE: LIVE. Up to {settings.max_calls} real call(s) will be placed to the "
             f"{len(result.callable_contacts)} contact(s) above."
         )
-        if not args.yes:
-            typed = input("Type the word PLACE to continue, anything else to abort: ")
-            if typed.strip() != "PLACE":
-                print("aborted; no call was placed")
-                return 1
+        # `--yes` deliberately does NOT apply here. It exists for the offline modes; a
+        # live run always asks a person, because that typed word is the last gate before
+        # somebody's phone rings.
+        typed = input("Type the word PLACE to continue, anything else to abort: ")
+        if typed.strip() != "PLACE":
+            print("aborted; no call was placed")
+            return 1
 
     transport = _make_transport(settings, args)
     if settings.mode is RunMode.REPLAY:
@@ -252,7 +260,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     try:
         seed_ledger(ledger, result)
         budget = LiveCallBudget(settings.max_calls) if settings.mode is RunMode.LIVE else None
-        judge_c = DisabledJudgeC() if not judge_c_enabled() else DisabledJudgeC()
+        judge_c = _load_judge_c(settings)
         outcome = execute_run(
             ledger,
             transport,
@@ -343,8 +351,19 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     settings = load_settings(mode=args.mode, db_path=args.db)
     event, policy = load_event(args.event)
-    app = create_app(settings.db_path, event, policy)
+    transport = _make_transport(settings, args)
+    app = create_app(
+        settings.db_path,
+        event,
+        policy,
+        transport=transport,
+        judge_c=_load_judge_c(settings),
+    )
     print(f"dashboard on http://{args.host}:{args.port}  (mode {settings.mode.value})")
+    print(
+        "intake worker running: draining the webhook inbox, polling open calls, and "
+        "sweeping the field-visit cutoff"
+    )
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
@@ -375,6 +394,26 @@ def cmd_record(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_judge_c(settings: Settings):
+    """Return the third judge. Disabled unless `PC_ENABLE_JUDGE_C` is explicitly set.
+
+    Fixture and replay mode never consult a model, so this only ever returns something
+    live in a live run whose operator asked for it.
+    """
+    if not settings.judge_c_enabled:
+        return DisabledJudgeC()
+    if settings.mode is not RunMode.LIVE:
+        print(
+            f"note: {JUDGE_C_ENV_VAR} is set but the run is offline; "
+            "Judge C stays disabled so fixture and replay results remain deterministic"
+        )
+        return DisabledJudgeC()
+    raise ConfigError(
+        f"{JUDGE_C_ENV_VAR} is set, but no Judge C implementation is configured in this "
+        "build. Unset it, or wire a Judge into _load_judge_c before enabling it."
+    )
+
+
 def _write_report_files(args: argparse.Namespace, report) -> None:
     out = getattr(args, "report_out", None)
     if not out:
@@ -387,18 +426,33 @@ def _write_report_files(args: argparse.Namespace, report) -> None:
     print(f"wrote {base.with_suffix('.md')}, {base.with_suffix('.csv')}, {base.with_suffix('.json')}")
 
 
-def _resolve_now(args: argparse.Namespace, event: Event) -> datetime:
+def _resolve_now(mode: RunMode, args: argparse.Namespace, event: Event) -> datetime:
+    """The clock a run works from.
+
+    `mode` is the **resolved** run mode, not the CLI flag. Keying this off `args.mode`
+    was a live-safety bug: `PC_MODE=live` is a documented way to select live mode, and it
+    leaves `args.mode` as None, so a live run took the fixture branch and dialled real
+    people on a clock rewound by up to four hours. Quiet hours were then evaluated at the
+    wrong local time and every audit row was stamped with a fabricated timestamp.
+    """
     override = getattr(args, "now", None)
     if override:
-        return datetime.fromisoformat(override)
+        parsed = datetime.fromisoformat(override)
+        if parsed.tzinfo is None:
+            raise ConfigError(
+                "--now must carry a UTC offset, for example 2026-09-11T08:00:00-07:00; "
+                "PositiveContact will not assume a timezone"
+            )
+        if mode is RunMode.LIVE:
+            raise ConfigError("--now cannot be used in live mode; real calls use the real clock")
+        return parsed
+    if mode is RunMode.LIVE:
+        return datetime.now(timezone.utc)
+    # Offline modes only: keep the demo reproducible by starting the simulated clock far
+    # enough ahead of the cutoff that the whole ladder has room to run.
     real_now = datetime.now(timezone.utc)
-    if getattr(args, "mode", None) in (None, RunMode.FIXTURE.value, RunMode.REPLAY.value):
-        # Keep the demo reproducible: start the simulated clock far enough ahead of the
-        # cutoff that the whole ladder has room to run.
-        latest_start = event.field_visit_cutoff - timedelta(hours=4)
-        if real_now > latest_start:
-            return latest_start
-    return real_now
+    latest_start = event.field_visit_cutoff - timedelta(hours=4)
+    return latest_start if real_now > latest_start else real_now
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -434,7 +488,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="required for live mode, alongside PC_MODE=live and --max-calls",
     )
-    run.add_argument("--yes", action="store_true", help="skip the typed live confirmation")
+    run.add_argument(
+        "--yes",
+        action="store_true",
+        help="skip prompts in the offline modes; it does not skip the live confirmation",
+    )
     run.add_argument("--report-out", default=None, help="write the report next to this path")
     run.set_defaults(func=cmd_run)
 

@@ -21,7 +21,7 @@ python3 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
 
 The fixture run finishes in under a second and prints the whole event: seven contacts
 confirmed, one contact who only ever reached voicemail, a medical question that a person
-now owns, and four field visits waiting for somebody to approve them.
+now owns, and five field visits waiting for somebody to approve them.
 
 ## The problem
 
@@ -136,6 +136,12 @@ Two rules that are easy to lose and are tested explicitly:
 - **A contact under human review is still on the clock.** If nobody resolves it before the
   field-visit cutoff, it becomes a pending field visit automatically. Review pauses the
   automation, never the deadline.
+- **The cutoff sweep runs per contact, not per call.** The duty is about the customer, so
+  at the deadline every contact who is not confirmed gets a visit prepared. Sweeping per
+  call used to drop three kinds of person silently: one whose submission outcome was never
+  resolved, one whose next step was reserved but never dispatched, and one who was never
+  dialable at all, such as an unsupported locale whose bilingual callback did not happen
+  in time. Each of those is exactly a customer nobody reached.
 - **Wrong numbers and refusals never redial.** A language barrier never redials
   automatically, and never in a different language.
 
@@ -176,7 +182,7 @@ has a named test for each of them.
 | Wrong number                                      | 1     | of 11 attempted                    |
 | Refused                                           | 1     | of 9 live reached                  |
 | Language not supported, bilingual callback opened | 1     | of 12 in scope, never dialled      |
-| Field visits pending approval / issued            | 4 / 0 | -                                  |
+| Field visits pending approval / issued            | 5 / 0 | -                                  |
 | Calls placed                                      | 16    | -                                  |
 ```
 
@@ -208,7 +214,12 @@ non-zero on any blocking issue.
 `run --mode fixture` walks every contact's ladder against scripted CALL-E responses on a
 simulated clock, then prints the report. No network, no credentials, about a second.
 
-`serve` opens the dashboard: a ladder board coloured by state, a review queue showing the
+`serve` opens the dashboard and the webhook receiver on one process, and runs the intake
+worker that drains the inbox, polls calls that are still open, and sweeps the field-visit
+cutoff. The receiver is deliberately inert, so without that worker a deployment would
+accept terminal webhooks and never act on them.
+
+The dashboard has three pages: a ladder board coloured by state, a review queue showing the
 evidence spans behind each decision, and the report with a field-visit approval button.
 
 To exercise the adjudicator against stored payloads instead of scripted ones:
@@ -324,9 +335,20 @@ justification for a decision, are kept longer.
 - **No repaired numbers, no inferred timezones.** Both are refusals.
 - **Quiet hours** are computed in the contact's own IANA timezone. The emergency override
   exists, is off by default, and is printed in the preflight preview.
+- **Health words are stripped from durable text.** No field carries PHI, but a customer can
+  say a condition out loud and extraction can copy it into the free-text note. That note is
+  stored and shown to operators, so a redactor removes device, condition, and treatment
+  terms from it and from evidence spans on the way in.
 
 `docs/threat-model.md` works through what an attacker or a bad payload could try, and what
 stops it.
+
+These are claims that were tested adversarially rather than asserted. A review pass over
+this build found, among other things, a contracted denial ("I couldn't hear a word") being
+recorded as a confirmation, an answering-machine greeting being confirmed with its own
+greeting quoted as the evidence, a live run reusing the fixture demo clock, and webhook
+bodies being stored with the raw number in them. Each is fixed, and each has a named test
+in `tests/test_regressions.py` that fails if it comes back.
 
 ## Run modes
 
@@ -368,13 +390,13 @@ positive_contact/
   web/            FastAPI, Jinja2, HTMX. Three pages, no build step
 fixtures/         event, two rosters, 15 scenarios, 3 replay payloads
 docs/             adapter-notes.md, adjudication.md, threat-model.md
-tests/            343 tests, offline
+tests/            425 tests, offline
 ```
 
 ## Tests
 
 ```bash
-./.venv/bin/pytest        # 343 tests, about 5 seconds, no network
+./.venv/bin/pytest        # 425 tests, about 6 seconds, no network
 ```
 
 The suite is organised around the invariants rather than the modules:
@@ -395,6 +417,8 @@ The suite is organised around the invariants rather than the modules:
 | `test_masking.py` | No raw E.164 in any log, preview, report, export, audit row, snapshot, or dashboard page |
 | `test_no_phi.py` | No PHI-shaped field in any model, schema, column, fixture, or shipped file |
 | `test_cli_and_web.py` | The three live gates, and all three dashboard pages |
+| `test_calle_transport.py` | The live client's wire behaviour against a stub: the `Idempotency-Key` header, the request body against the contract, and which error codes mean "unknown" rather than "rejected" |
+| `test_regressions.py` | Every defect adversarial review turned up, each with the case that used to fail |
 
 A session fixture patches `socket.connect`, so a test that reaches the network fails
 instead of quietly costing money.
@@ -431,8 +455,13 @@ design disagreed. The load-bearing ones:
 - **No telephony, STT, or TTS.** CALL-E does the call.
 - **No live recordings yet.** `pc record` is implemented and `replay` works, but the three
   payloads in `fixtures/recorded/` are written against the published contract rather than
-  captured, and they say so in a `source` field the loader requires. Replacing them needs
-  an API key and consenting people to call.
+  captured, and they say so in a `source` field the loader requires. A replay run over them
+  prints "not captured", so it can never be reported as a live verification. Replacing them
+  needs an API key and consenting people to call.
+- **No Judge C implementation.** The interface, the disagreement-only call site, and the
+  off-by-default switch are all there, but no model is wired behind it. Setting
+  `PC_ENABLE_JUDGE_C` without wiring one fails loudly rather than pretending a third
+  opinion was consulted.
 - **No auto-dispatch of field visits.** The system prepares a work order; a named person
   approves it. Sending a crew to somebody's door is not a decision to automate.
 - **No multi-locale scripts.** Adding one means adding an acknowledgement lexicon and a

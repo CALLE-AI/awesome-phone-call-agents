@@ -104,7 +104,7 @@ def test_reconciliation_replays_the_same_key_and_recovers_the_call(
     dispatch_intent(ledger, transport, event, policy, intent, now=now)
     assert ledger.reconstruct(intent.intent_id) is IntentState.SUBMISSION_UNKNOWN
 
-    outcome = reconcile_unknown_submission(ledger, transport, event, intent, now=now)
+    outcome = reconcile_unknown_submission(ledger, transport, event, intent, policy=policy, now=now)
     assert outcome.action == "reconciled"
     assert ledger.reconstruct(intent.intent_id) is IntentState.SUBMITTED
     assert ledger.get_attempt(intent.intent_id).call_id == "call_recovered_1"
@@ -117,7 +117,7 @@ def test_reconciliation_sends_a_byte_identical_body(ledger, event, policy, now):
     intent = seed(ledger, event, now)
     transport = RecoveringTransport()
     dispatch_intent(ledger, transport, event, policy, intent, now=now)
-    reconcile_unknown_submission(ledger, transport, event, intent, now=now)
+    reconcile_unknown_submission(ledger, transport, event, intent, policy=policy, now=now)
     first, second = transport.submits
     for field in ("task_text", "phone_e164", "locale", "region", "metadata",
                   "recipient_result_schema"):
@@ -128,7 +128,7 @@ def test_a_reconciliation_that_still_fails_routes_to_a_human(ledger, event, poli
     intent = seed(ledger, event, now)
     dispatch_intent(ledger, UnknownTransport(), event, policy, intent, now=now)
     outcome = reconcile_unknown_submission(
-        ledger, RejectingTransport(), event, intent, now=now
+        ledger, RejectingTransport(), event, intent, policy=policy, now=now
     )
     assert outcome.action == "rejected"
     assert ledger.reconstruct(intent.intent_id) is IntentState.NEEDS_HUMAN
@@ -138,7 +138,7 @@ def test_a_reconciliation_that_stays_unknown_holds_the_state(ledger, event, poli
     intent = seed(ledger, event, now)
     transport = UnknownTransport()
     dispatch_intent(ledger, transport, event, policy, intent, now=now)
-    outcome = reconcile_unknown_submission(ledger, transport, event, intent, now=now)
+    outcome = reconcile_unknown_submission(ledger, transport, event, intent, policy=policy, now=now)
     assert outcome.action == "unknown"
     assert ledger.reconstruct(intent.intent_id) is IntentState.SUBMISSION_UNKNOWN
 

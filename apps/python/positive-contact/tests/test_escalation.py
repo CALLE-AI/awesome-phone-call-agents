@@ -132,12 +132,55 @@ def test_scenario_contradiction_opens_human_review(edge_run, ledger):
     }
 
 
-def test_scenario_unknown_submission_stops_and_places_no_second_call(edge_run, ledger):
-    _outcome, transport = edge_run
+def test_scenario_unknown_submission_stops_and_places_no_second_call(
+    ledger, edge_preflight, event, now
+):
+    """Before the cutoff: the ladder holds, and nothing dials again."""
+    transport = FixtureTransport(SCENARIOS)
+    seed_ledger(ledger, edge_preflight)
+    execute_run(ledger, transport, edge_preflight, now=now, simulated_clock=False)
     assert ledger.count_calls_for_contact("pc-103") == 0
     intents = ledger.list_intents_for_contact("pc-103")
     assert len(intents) == 1
     assert ledger.reconstruct(intents[0].intent_id) is IntentState.SUBMISSION_UNKNOWN
+
+
+def test_an_unresolved_submission_still_gets_a_field_visit_at_the_cutoff(edge_run, ledger,
+                                                                        event):
+    """The gap this closes: a contact whose submission never resolved must not drop out of
+    the queue. Nobody reached them, which is exactly what the truck is for."""
+    _outcome, _transport = edge_run
+    assert ledger.count_calls_for_contact("pc-103") == 0
+    assert final_state(ledger, "pc-103") is IntentState.FIELD_VISIT_PENDING
+    orders = {order.contact_id: order for order in ledger.list_work_orders(event.event_id)}
+    assert "pc-103" in orders
+    assert orders["pc-103"].reason_code == "unresolved_submission_at_cutoff"
+
+
+def test_a_contact_who_was_never_dialable_still_gets_a_field_visit(demo_run, ledger, event):
+    """The unsupported-locale contact was never called. If the bilingual callback did not
+    happen before the deadline, they are still unconfirmed."""
+    _outcome, _transport = demo_run
+    assert ledger.list_intents_for_contact("pc-012") == []
+    orders = {order.contact_id: order for order in ledger.list_work_orders(event.event_id)}
+    assert "pc-012" in orders
+    assert orders["pc-012"].reason_code == "never_dialled_and_unconfirmed_at_cutoff"
+
+
+def test_a_confirmed_contact_never_gets_a_field_visit(demo_run, ledger, event):
+    _outcome, _transport = demo_run
+    ordered = {order.contact_id for order in ledger.list_work_orders(event.event_id)}
+    for contact_id in ("pc-001", "pc-002", "pc-003", "pc-004", "pc-005", "pc-006", "pc-007"):
+        assert final_state(ledger, contact_id) is IntentState.CONFIRMED
+        assert contact_id not in ordered, contact_id
+
+
+def test_the_sweep_is_idempotent(demo_run, ledger, event, policy):
+    _outcome, _transport = demo_run
+    before = len(ledger.list_work_orders(event.event_id))
+    again = sweep_cutoff(ledger, event, policy, now=event.field_visit_cutoff + timedelta(hours=3))
+    assert again == []
+    assert len(ledger.list_work_orders(event.event_id)) == before
 
 
 def test_scenario_language_barrier_opens_a_bilingual_callback_and_never_redials(
@@ -179,8 +222,11 @@ def test_human_review_pauses_automation_but_not_the_deadline(
     open_before = ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])
     assert open_before, "the demo should leave review items open before the cutoff"
 
-    moved = sweep_cutoff(ledger, event, policy, now=event.field_visit_cutoff)
-    assert set(moved) >= {intent.intent_id for intent in open_before}
+    # The sweep queues by contact, because the duty is about the contact and not the call.
+    queued = sweep_cutoff(ledger, event, policy, now=event.field_visit_cutoff)
+    assert set(queued) >= {intent.contact_id for intent in open_before}
+    for intent in open_before:
+        assert ledger.reconstruct(intent.intent_id) is IntentState.FIELD_VISIT_PENDING
 
 
 def test_a_work_order_is_created_once_per_contact(demo_run, ledger, event):
@@ -270,11 +316,24 @@ def test_approving_an_unknown_field_visit_raises(demo_run, ledger, event, now):
 
 
 def test_the_whole_demo_ladder_terminates(demo_run, ledger):
+    """Every contact ends somewhere the ladder actually stops.
+
+    Asserting the state is a member of the state enum proved nothing: it is true of any
+    state, including the mid-flight ones that would mean the run gave up early.
+    """
     outcome, _transport = demo_run
     assert outcome.iterations < 400
+    resting = {
+        IntentState.CONFIRMED,
+        IntentState.FIELD_VISIT_PENDING,
+        IntentState.FIELD_VISIT_ISSUED,
+        IntentState.CLOSED_REFUSED,
+        IntentState.UNCONFIRMED_WAITING,  # a superseded earlier step
+    }
     for contact in ledger.list_contacts("psps-demo-2026-09"):
         for intent in ledger.list_intents_for_contact(contact.contact_id):
-            assert ledger.reconstruct(intent.intent_id) in set(IntentState)
+            state = ledger.reconstruct(intent.intent_id)
+            assert state in resting, f"{intent.intent_id} stopped at {state.value}"
 
 
 def test_every_intent_has_a_reconstructible_audit_trail(demo_run, ledger):
