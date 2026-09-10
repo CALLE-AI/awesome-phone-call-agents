@@ -14,7 +14,7 @@ The hackathon requires a PR against the official repo as part of submission. Thi
 ## What to double check before opening the PR
 
 - [ ] `.env` is not committed (it's git-ignored; only `.env.example` should be tracked).
-- [ ] `python -m pytest tests/ -v` passes clean (17/17 as of this build).
+- [ ] `python -m pytest tests/ -v` passes clean (28/28 as of this build).
 - [ ] `python scripts/simulate_disruption.py` runs in dry-run with no environment variables set.
 - [ ] The README's live-mode instructions are accurate for whatever CALL-E/Duffel account you submit under (the email tied to your CALL-E account is a required submission field).
 
