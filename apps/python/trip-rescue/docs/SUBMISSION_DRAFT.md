@@ -28,7 +28,7 @@ The two paid dependencies a "real" version of this would need — a live flight-
 
 ## What's next
 
-Widening the rebooking search to nearby airports and dates and other cabins, adding persistence so a crash mid-call doesn't lose the record of what was offered, and — if this moves past a hackathon build — a real disruption feed and a partnership with an OTA or travel management company that already holds PNRs across multiple airlines, rather than going airline-by-airline.
+Since the initial submission, the rebooking search now widens to nearby dates automatically and every disruption/call/outcome is persisted to SQLite instead of living only in process memory — both were on this list and are now in the codebase (28 tests, up from 17). What's still ahead: widening the search further to nearby airports and other cabin classes, a real crash-recovery sweep over unresolved rows in the store, and — if this moves past a hackathon build — a real disruption feed and a partnership with an OTA or travel management company that already holds PNRs across multiple airlines, rather than going airline-by-airline.
 
 ## Built with
 
