@@ -38,6 +38,25 @@ DFE_URL = ("https://explore-education-statistics.service.gov.uk/find-statistics/
 
 COLS = 8
 
+# The calling window, and the only premise on this board that is not measured or derived
+# from something measured. An English secondary takes the register at first bell and closes
+# it mid-morning; the office works the absence list in between. The two numbers are printed
+# under the drawing, and every time a tile reports when it is hovered is read off them, so
+# a reader who disagrees with the window can see exactly which times move.
+#
+# They are stated as a premise rather than dressed up as a measurement because the board
+# already refuses to project an outcome split it did not measure, and a fabricated clock
+# would be the same mistake wearing a smaller hat.
+WINDOW_START = "08:30"
+WINDOW_MINUTES = 50
+
+
+def window_end() -> str:
+    """The far end of the calling window, so the note and the tiles cannot disagree."""
+    h, m = (int(p) for p in WINDOW_START.split(":"))
+    total = h * 60 + m + WINDOW_MINUTES
+    return f"{total // 60:02d}:{total % 60:02d}"
+
 
 def absences() -> int:
     """How many children are absent on an average morning at that school."""
@@ -108,14 +127,19 @@ def morning_markup(placed: str, compact: bool = False) -> str:
     open_at = (rows // 2) * cols + (cols // 2) - 1
     shell = (
         f'data-mrn-count="{n}" data-mrn-cols="{cols}" data-mrn-rows="{rows}" '
-        f'data-mrn-open="{open_at}">'
+        f'data-mrn-open="{open_at}" '
+        # Two numbers rather than forty-one timestamps. The scene spaces the calls across
+        # the window itself, so the times cannot drift from the premise that produced them
+        # and the markup does not carry a list a reader would have to check line by line.
+        f'data-mrn-start="{WINDOW_START}" data-mrn-span="{WINDOW_MINUTES}">'
     )
     if compact:
         return (
             '<section class="morning morning-compact" ' + shell
             + '<p class=eyebrow>One school morning, modelled</p>'
             + f'<div class=mrn-stage data-mrn-stage>{_static_svg(n, open_at)}</div>'
-            + '<p class=mrn-hint data-mrn-hint hidden>Drag to turn it.</p>'
+            + '<p class=mrn-hint data-mrn-hint hidden>Drag to turn it. Point at '
+              'a tile for its slot in the morning.</p>'
             + f'<p class=mrn-say>{n} absences in one morning at a school of {PUPILS}, at '
               'the national rate. Every tile is a family somebody has to telephone before '
               'the register closes, and from the desk they are identical. One of them is '
@@ -133,7 +157,8 @@ def morning_markup(placed: str, compact: bool = False) -> str:
         'nothing files itself next to the ones that worked. The column is the one this '
         'software refuses to lay flat.</p>'
         f'<div class=mrn-stage data-mrn-stage>{_static_svg(n, open_at)}</div>'
-        '<p class=mrn-hint data-mrn-hint hidden>Drag to turn it.</p>'
+        '<p class=mrn-hint data-mrn-hint hidden>Drag to turn it. Point at a tile '
+        'for its slot in the morning.</p>'
         '<p class=mrn-note>'
         f'<b>Where {n} comes from.</b> {PUPILS} pupils at an absence rate of '
         f'{ABSENCE_RATE * 100:.1f} per cent is {PUPILS} &#215; {ABSENCE_RATE} = '
@@ -141,10 +166,16 @@ def morning_markup(placed: str, compact: bool = False) -> str:
         'Education&#8217;s measured figure for every school in England across the full '
         f'2024/25 academic year (<a href="{DFE_URL}">Pupil attendance in schools</a>). '
         'The school size is a premise, not a measurement, and it is printed here so it '
-        'can be argued with.'
+        'can be argued with. So is the window: the board lays the '
+        f'{n} calls evenly across an office morning from {WINDOW_START} to '
+        f'{window_end()}, which is where the time on each tile comes from when you '
+        'point at it.'
         '</p>'
         '<p class=mrn-note>'
-        '<b>What this board does not claim.</b> It puts no outcome on any tile but one. '
+        '<b>What this board does not claim.</b> It puts no measured outcome on any tile. '
+        'The only thing it says about a call is the split it draws, forty that close and '
+        'one that does not, and the clock face a tile reports is its slot in the window '
+        'above and not a time anybody dialled. '
         'This software has placed ' + placed + ' real calls, and the recording and the '
         'transcript of every one of them are on the evidence page. A run built out of '
         'matched hard cases is not a sample of a real morning, and multiplying its '
@@ -168,8 +199,19 @@ MORNING_CSS = """
 .mrn-stage canvas { display: block; width: 100%; height: auto; }
 .mrn-flat { display: block; width: 100%; height: auto; overflow: visible; }
 .mrn-tile { fill: var(--ink); opacity: 0.13; }
-.mrn-open path { fill: var(--brand); }
-.mrn-open .mrn-cap { fill: var(--brand); filter: brightness(1.12); }
+/* --live-mark, not --brand. This page defines no property called --brand; the only brand
+ * name in page.css is --brand-field. An undefined custom property does not fall back, it
+ * makes the declaration invalid at computed-value time, and `fill` then inherits -- so
+ * `fill: var(--brand)` painted the one gold object on this board pure black, on a board
+ * whose other forty tiles are #201e1a at 0.13. Measured with JavaScript off on
+ * 2026-09-10: rgb(0, 0, 0) for both the shaft and the cap. It looked deliberate and it
+ * was a name that does not exist.
+ *
+ * --live-mark is the right name by page.css's own rule: it is the saturated grade of the
+ * yellow and it "only ever appears on a call object". A call nobody closed is a call
+ * object. It measures 3.41 against the paper, which clears the 3:1 a graphic needs. */
+.mrn-open path { fill: var(--live-mark); }
+.mrn-open .mrn-cap { fill: var(--live-mark); filter: brightness(1.16); }
 .mrn-hint { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
   margin: 0 0 var(--space-5); }
 
@@ -195,5 +237,34 @@ MORNING_CSS = """
   color: var(--ink-3); margin: 0 0 var(--space-3); }
 .mrn-back { font-family: var(--ui); font-size: var(--size-2);
   margin: var(--space-5) 0 0; }
+/* ---- the hover read-out ----------------------------------------------------------------
+ * A plain block, absolutely positioned against .mrn-stage, which is the only positioned
+ * ancestor it has. Not a popover, not a portal, and not appended to the body: a tooltip
+ * parented anywhere above the stage is a new element in the document's flow at the exact
+ * moment the reader is looking somewhere else.
+ *
+ * The width rule is the load-bearing one. `max-width: calc(100% - 16px)` with a nowrap
+ * line and a clipped overflow means the box can never be wider than the stage minus its
+ * own inset, whatever text is put in it, so the clamp the script applies to `left` always
+ * has somewhere legal to land. At 390px the stage is 342px wide and an unclamped box of
+ * this text would reach past the right edge of the document, which widens the document,
+ * which is a horizontal scrollbar on every page the board appears on. The overflow gate
+ * checks six widths across ten pages and this is the element most able to fail it.
+ *
+ * --paper on --ink is 13.64, so it clears AA by a wide margin if it is ever measured with
+ * a reader on it. The script does not create the element until the first hover, so a gate
+ * that never points at the board never sees it at all. */
+.mrn-tip { position: absolute; left: 0; top: 0; display: none; z-index: 2;
+  pointer-events: none; box-sizing: border-box; max-width: calc(100% - 16px);
+  padding: 5px 9px; border-radius: 3px;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 20%); }
+.mrn-tip[data-open] { display: block; }
+.mrn-tip b { font-family: var(--mono); font-weight: 500; }
+.mrn-tip i { font-style: normal; opacity: 0.7; padding-left: 6px; }
+.mrn-tip[data-flag] i { color: var(--brand-field); opacity: 1; }
+
 @media (prefers-reduced-motion: reduce) { .mrn-hint { display: none; } }
 """

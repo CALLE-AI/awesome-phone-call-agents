@@ -76,13 +76,25 @@ def _bars_svg(data: dict) -> str:
                f'x2="{W - PAD + 8}" y2="{y_cut:.1f}"/>')
     out.append(f'<text class=cut-plane-t x="{PAD - 8}" y="{y_cut - 6:.1f}">'
                f'the register closes, {cutoff} minutes</text>')
+    # The setting the sentence above the drawing recommends. Marked in the flat figure as
+    # well as in the scene, because a reader with no WebGL was previously given nine bars
+    # of which two were different and no indication of which one to choose.
+    low = data.get("lowest_that_fits")
     for i, r in enumerate(rows):
         h = r["minutes"] * scale
         x = PAD + i * step + step * 0.18
         w = step * 0.64
-        cls = "cut-bar cut-miss" if r["minutes"] > cutoff else "cut-bar"
+        if r["minutes"] > cutoff:
+            cls = "cut-bar cut-miss"
+        elif r["concurrency"] == low:
+            cls = "cut-bar cut-fits"
+        else:
+            cls = "cut-bar"
         out.append(f'<rect class="{cls}" x="{x:.1f}" y="{H - PAD - h:.1f}" '
                    f'width="{w:.1f}" height="{h:.1f}"/>')
+        if r["concurrency"] == low:
+            out.append(f'<line class=cut-fits-rule x1="{x - 3:.1f}" y1="{H - PAD + 3:.1f}" '
+                       f'x2="{x + w + 3:.1f}" y2="{H - PAD + 3:.1f}"/>')
         out.append(f'<text class=cut-x x="{x + w / 2:.1f}" y="{H - PAD + 14:.1f}">'
                    f'{r["concurrency"]}</text>')
     return (f'<svg class=cut-flat viewBox="0 0 {W:.0f} {H:.0f}" role=img '
@@ -100,7 +112,16 @@ def cutoff_markup(data: dict) -> str:
     return (
         '<section class=cutoff '
         f'data-cut-rows="{",".join(f"{r['concurrency']}:{r['minutes']}" for r in data["rows"])}" '
-        f'data-cut-line="{data["cutoff_minutes"]}">'
+        f'data-cut-line="{data["cutoff_minutes"]}" '
+        # The one bar the page is recommending. Derived here, beside the sentence that
+        # names it, rather than in the scene: two places deciding which setting fits is
+        # two places that can disagree, and the prose and the drawing would then be
+        # pointing at different bars with nothing to catch it. `curve()` already computes
+        # it; this just carries it across.
+        f'data-cut-fits="{low if low else ""}" '
+        # The window, so a marker can sit at the exact height the bars are cut at without
+        # the scene recomputing the scale from the row list.
+        f'data-cut-pupils="{data["pupils"]}">'
         '<p class=eyebrow>Whether the morning finishes before the register closes</p>'
         f'<h2>At the default setting, it does not.</h2>'
         '<p class=mrn-lede>A cutoff is a wall, not a target. Every bar that goes through '
@@ -155,7 +176,16 @@ CUTOFF_CSS = """
 .cut-stage canvas { display: block; width: 100%; height: auto; }
 .cut-flat { display: block; width: 100%; height: auto; }
 .cut-bar { fill: var(--ink); opacity: 0.22; }
-.cut-miss { fill: var(--brand); opacity: 1; }
+/* --live-mark, not --brand: page.css defines no --brand, and an undefined custom property
+ * makes the declaration invalid at computed-value time rather than falling back, so
+ * `fill` inherited and these bars painted rgb(0, 0, 0). Measured with JavaScript off on
+ * 2026-09-10. The bars that miss the cutoff were separated from the ones that fit by
+ * opacity alone, which is the one distinction this figure cannot afford to lose. */
+.cut-miss { fill: var(--live-mark); opacity: 1; }
+/* The bar the sentence recommends, in the flat drawing as well as in the scene. A reader
+ * with no WebGL should be able to find the answer in the picture, not only in the prose. */
+.cut-fits { fill: var(--ink); opacity: 0.55; }
+.cut-fits-rule { stroke: var(--live-mark); stroke-width: 1.5; opacity: 0.9; }
 .cut-plane { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.5; }
 .cut-plane-t, .cut-x { font-family: var(--mono); font-size: 10px; fill: var(--ink-3); }
 .cut-x { text-anchor: middle; }
