@@ -92,6 +92,14 @@ def test_the_poll_interval_is_read_off_the_scheduler_rather_than_written_down():
     ), "the tool's poll interval is not the one the dispatcher waits"
 
 
+_CAP_WORDS = {3: "Three", 4: "Four", 6: "Six", 8: "Eight", 10: "Ten", 12: "Twelve",
+              16: "Sixteen", 20: "Twenty", 25: "Twenty-five"}
+
+
+def _spelled_cap(n: int) -> str:
+    """The README sets a cap that opens a sentence as a word, so match either form."""
+    return f"(?:{n}|{_CAP_WORDS.get(n, n)})"
+
 def test_the_readme_block_is_what_the_tool_prints_now():
     """The published figures, against the tool run on the receipts that produced them.
 
@@ -108,9 +116,20 @@ def test_the_readme_block_is_what_the_tool_prints_now():
         pytest.skip(f"no receipts under {receipts}, so the published block cannot be "
                     "compared against a measurement")
 
+    # The same ladder the README prints, not the tool's default one.
+    #
+    # This asked for the default ladder and then asserted the README named its lowest
+    # fitting cap, which was 12 only because the default list skips 6, 8 and 10. The
+    # evidence page walks the wider ladder and recommended 6, so the two judge-facing
+    # surfaces disagreed about the answer while this test held the README to the wrong
+    # one. Reading the ladder out of the block under test means the check is that the
+    # prose matches the table beside it, whatever ladder that table is built from.
+    caps = sorted({int(c) for c in re.findall(r"concurrency\s+(\d+)\s+[\d.]+ min",
+                                              (APP / "README.md").read_text(encoding="utf-8"))})
+    assert caps, "the README publishes no concurrency rows to check against"
     out = subprocess.run(
         [sys.executable, "tools/throughput.py", "--receipts", str(receipts),
-         "--pupils", "500", "--json"],
+         "--pupils", "500", "--concurrency", *[str(c) for c in caps], "--json"],
         cwd=APP, capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     now = json.loads(out.stdout)
@@ -129,6 +148,6 @@ def test_the_readme_block_is_what_the_tool_prints_now():
             f"the README's row for concurrency {cap} is not {mins:.1f} min"
         )
     fits = now["lowest_concurrency_that_fits"]
-    assert fits is not None and f"to {fits} fits the window" in block, (
+    assert fits is not None and re.search(rf"\b{_spelled_cap(fits)} fits the window", block), (
         f"the README does not name {fits} as the lowest cap that fits"
     )

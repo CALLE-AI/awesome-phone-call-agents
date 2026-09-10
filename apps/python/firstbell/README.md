@@ -663,7 +663,7 @@ the numerator is the only quantity nobody gets to choose: how long a call to a p
 takes. Eleven real calls answer it, out of their own turn offsets rather than a stopwatch.
 
 ```
-python tools/throughput.py --receipts <dir> --pupils 500
+python tools/throughput.py --receipts <dir> --pupils 500   --concurrency 3 4 6 8 12 25
 ```
 
 ```
@@ -674,9 +674,16 @@ python tools/throughput.py --receipts <dir> --pupils 500
 500 absences in one morning, against a 75-minute window:
   concurrency   3    147.5 min   MISSES THE CUTOFF
   concurrency   4    110.4 min   MISSES THE CUTOFF
+  concurrency   6     74.2 min   fits
+  concurrency   8     55.6 min   fits
   concurrency  12     37.1 min   fits
   concurrency  25     17.7 min   fits
 ```
+
+The ladder is passed explicitly because the default one skips 6, 8 and 10, and the answer
+to this question is the lowest cap that fits rather than the lowest cap in whatever list
+was printed. The board on the evidence page walks the same wider ladder, so the two
+surfaces cannot recommend different numbers.
 
 The default cap of three misses a nine-fifteen cutoff for a large secondary school, by an
 hour and a quarter, and the number is printed here rather than discovered in week two.
@@ -684,10 +691,10 @@ hour and a quarter, and the number is printed here rather than discovered in wee
 The interesting part is which half of that is the poll loop: two seconds a call against a
 fifty-one second call, so about four per cent of the morning. The cost is the concurrency
 cap, and the cap exists because CALL-E cannot recall a call it has accepted, so the cap is
-the only brake there is. Raising it to 12 fits the window and is one flag. What a
-district is agreeing to when it sets that flag is twelve families dialled at once with no
-way to stop any of them, which is a sentence that belongs in the decision rather than in a
-default.
+the only brake there is. Six fits the window, with forty-eight seconds to spare, and is
+one flag. What a district is agreeing to when it sets that flag is six families dialled at
+once with no way to stop any of them, which is a sentence that belongs in the decision
+rather than in a default.
 
 
 </details>
