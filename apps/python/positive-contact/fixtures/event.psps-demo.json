@@ -1,0 +1,58 @@
+{
+  "event_id": "psps-demo-2026-09",
+  "utility_name": "Northbay Power",
+  "window_start": "2026-09-11T18:00:00-07:00",
+  "window_end": "2026-09-12T20:00:00-07:00",
+  "default_tz": "America/Los_Angeles",
+  "crc_info": {
+    "location": "the Glen Ellen Community Hall, 100 block of Warm Springs Rd",
+    "hours": "8:00 AM to 8:00 PM daily while the shutoff is active"
+  },
+  "policy": {
+    "ladder": [
+      {
+        "step": 1,
+        "target": "primary",
+        "delay_minutes": 0
+      },
+      {
+        "step": 2,
+        "target": "primary",
+        "delay_minutes": 45,
+        "only_if": [
+          "no_answer",
+          "busy",
+          "voicemail"
+        ]
+      },
+      {
+        "step": 3,
+        "target": "alternate",
+        "delay_minutes": 0,
+        "only_if_alt_present": true
+      },
+      {
+        "step": 4,
+        "target": "primary",
+        "delay_minutes": 180,
+        "only_if": [
+          "no_answer",
+          "busy",
+          "voicemail"
+        ]
+      }
+    ],
+    "max_calls_per_contact": 4,
+    "quiet_hours_local": {
+      "start": "21:00",
+      "end": "08:00"
+    },
+    "quiet_hours_emergency_override": false,
+    "field_visit_cutoff_hours_before_window_start": 6,
+    "confidence_threshold": 0.8,
+    "supported_locales": [
+      "en-US"
+    ],
+    "unsupported_locale_action": "needs_human_bilingual_callback"
+  }
+}

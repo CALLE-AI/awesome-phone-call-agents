@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Ladder board</h2>
+<p class="sub">One row per enrolled contact. Numbers are masked; the raw number never leaves the contact record.</p>
+<div hx-get="/board/rows" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_board_rows.html" %}
+</div>
+{% endblock %}

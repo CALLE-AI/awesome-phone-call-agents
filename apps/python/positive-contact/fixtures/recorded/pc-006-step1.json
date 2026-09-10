@@ -1,0 +1,81 @@
+{
+  "source": "synthetic-contract-shape",
+  "note": "answering machine greeting on a user turn. Written against CALL-E Developer API 0.7.0. Replace with a payload captured by `pc record` after the first live call.",
+  "match": {
+    "contact_id": "pc-006",
+    "ladder_step": 1
+  },
+  "call_task": {
+    "id": "call_fx_pc-006_1",
+    "object": "call_task",
+    "status": "completed",
+    "task": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Confirm the customer heard the notice.",
+    "recipients": [
+      {
+        "id": "rcp_1",
+        "phones": [
+          "+14155550106"
+        ],
+        "locale": "en-US",
+        "region": "US",
+        "status": "completed",
+        "structured_result": {
+          "contact_type": "voicemail",
+          "acknowledged": "unknown",
+          "spoke_with": "unknown",
+          "needs_assistance": "unknown",
+          "callback_window": "",
+          "preferred_language": "",
+          "notify_alternate_contact": "unknown",
+          "notes_for_human": ""
+        },
+        "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+        "attempts": [
+          {
+            "id": "att_1",
+            "phone": "+14155550106",
+            "status": "completed",
+            "started_at": "2026-09-11T15:00:05Z",
+            "completed_at": "2026-09-11T15:01:12Z",
+            "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Am I speaking with Dolores or someone in the household?"
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "You have reached the voicemail of this number. Please leave a message after the tone."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "This is an automated safety notification from Northbay Power. Power in your area may be turned off starting Friday September 11 at 6:00 PM PDT to reduce wildfire risk. Please call us back or visit a Community Resource Center. Thank you."
+              }
+            ],
+            "provider_call_id": "provider_call_fx_pc-006_1",
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": null,
+    "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+    "task_completed": false,
+    "completion_confidence": {
+      "score": 0.88,
+      "label": "high"
+    },
+    "evidence": [
+      "Answering machine. Notice left, nobody confirmed hearing it."
+    ],
+    "metadata": {},
+    "failure_code": null,
+    "failure_message": null,
+    "created_at": "2026-09-11T15:00:00Z",
+    "completed_at": "2026-09-11T15:01:12Z"
+  }
+}

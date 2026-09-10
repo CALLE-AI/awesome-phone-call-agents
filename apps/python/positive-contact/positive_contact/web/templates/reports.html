@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Report</h2>
+<p class="sub">Every count carries the denominator it was measured against. Confirmed comes from a
+CONFIRMED disposition or an operator confirmation with evidence, never from a completed call.</p>
+<div hx-get="/reports/table" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_report_table.html" %}
+</div>
+
+<h2 style="margin-top:26px">Field visits</h2>
+<p class="sub">The system prepares a work order. A person dispatches it.</p>
+{% if not work_orders %}
+  <p class="empty">No field visit has been prepared.</p>
+{% endif %}
+{% for order in work_orders %}
+<div class="card">
+  <h3>{{ order.contact_id }}
+    {% if order.approved_at %}<span class="pill good">issued</span>
+    {% else %}<span class="pill truck">pending approval</span>{% endif %}
+  </h3>
+  <p class="note">
+    {{ contacts[order.contact_id].first_name if order.contact_id in contacts }} &middot;
+    <code>{{ mask(contacts[order.contact_id].phone_e164) if order.contact_id in contacts }}</code> &middot;
+    {{ contacts[order.contact_id].service_address_short if order.contact_id in contacts }}<br>
+    reason <code>{{ order.reason_code }}</code> &middot; prepared {{ order.created_at.isoformat() }}
+    {% if order.approved_by %} &middot; approved by {{ order.approved_by }}{% endif %}
+  </p>
+  {% if not order.approved_at %}
+  <form class="inline" method="post" action="/field-visits/{{ order.work_order_id }}/approve">
+    <input type="text" name="actor" placeholder="your operator id" required>
+    <button type="submit">Approve this field visit</button>
+  </form>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if export.strip().count('\n') > 0 %}
+<h2 style="margin-top:26px">Approved export</h2>
+<p class="sub">Masked numbers and contact ids only.</p>
+<pre>{{ export }}</pre>
+{% endif %}
+
+{% if report.notes %}
+<h2 style="margin-top:26px">Notes</h2>
+<ul class="note">{% for note in report.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

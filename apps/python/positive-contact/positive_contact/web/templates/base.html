@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PositiveContact - {{ event.event_id }}</title>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+<style>
+  :root { color-scheme: light dark; --ink:#16191d; --paper:#fbfbfa; --line:#d9d7d2;
+          --muted:#63676d; --good:#1c6b3e; --goodbg:#e6f3ea; --wait:#5a4a12; --waitbg:#fbf3d8;
+          --attn:#8a2f1c; --attnbg:#fbe8e4; --truck:#1f4d78; --truckbg:#e4eef8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e8e6e3; --paper:#16181b; --line:#33373d; --muted:#a0a4aa;
+            --good:#7fd3a1; --goodbg:#16301f; --wait:#ddc46a; --waitbg:#332c12;
+            --attn:#f0a08c; --attnbg:#3a1d16; --truck:#8fbde8; --truckbg:#152836; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.5 ui-sans-serif,
+         system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { border-bottom:1px solid var(--line); padding:14px 20px; display:flex;
+           flex-wrap:wrap; gap:14px 24px; align-items:baseline; }
+  header h1 { font-size:16px; margin:0; letter-spacing:-0.01em; }
+  header .meta { color:var(--muted); font-size:12.5px; }
+  nav { display:flex; gap:4px; padding:0 20px; border-bottom:1px solid var(--line); }
+  nav a { padding:9px 14px; text-decoration:none; color:var(--muted); border-bottom:2px solid transparent; }
+  nav a.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+  main { padding:20px; max-width:1180px; }
+  h2 { font-size:15px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:12.5px; margin:0 0 16px; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11.5px;
+          font-weight:600; white-space:nowrap; }
+  .good { background:var(--goodbg); color:var(--good); }
+  .waiting { background:var(--waitbg); color:var(--wait); }
+  .attention { background:var(--attnbg); color:var(--attn); }
+  .truck { background:var(--truckbg); color:var(--truck); }
+  .closed { background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .card { border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:14px; }
+  .card h3 { margin:0 0 2px; font-size:14px; }
+  .spans { margin:10px 0; }
+  .span { border-left:3px solid var(--line); padding:4px 10px; margin:5px 0; }
+  .span .who { color:var(--muted); font-size:11.5px; }
+  form.inline { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+  input[type=text] { padding:6px 8px; border:1px solid var(--line); border-radius:5px;
+                     background:var(--paper); color:var(--ink); }
+  input.grow { flex:1 1 260px; }
+  button { padding:6px 12px; border:1px solid var(--line); border-radius:5px; cursor:pointer;
+           background:var(--ink); color:var(--paper); font-weight:600; }
+  button.ghost { background:transparent; color:var(--ink); }
+  .banner { border:1px solid var(--line); border-radius:6px; padding:9px 12px; margin-bottom:14px;
+            background:var(--waitbg); color:var(--wait); }
+  .note { color:var(--muted); font-size:12.5px; }
+  code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { overflow-x:auto; border:1px solid var(--line); border-radius:6px; padding:10px;
+        font:12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .empty { color:var(--muted); padding:18px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PositiveContact</h1>
+  <span class="meta">{{ event.utility_name }} &middot; event <code>{{ event.event_id }}</code></span>
+  <span class="meta">shutoff {{ event.window_start.isoformat() }}</span>
+  <span class="meta">field-visit cutoff {{ event.field_visit_cutoff.isoformat() }}</span>
+</header>
+<nav>
+  <a href="/board" class="{{ 'on' if page == 'board' }}">Ladder board</a>
+  <a href="/review" class="{{ 'on' if page == 'review' }}">Review queue</a>
+  <a href="/reports" class="{{ 'on' if page == 'reports' }}">Reports</a>
+</nav>
+<main>
+{% block body %}{% endblock %}
+</main>
+</body>
+</html>

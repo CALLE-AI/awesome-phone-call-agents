@@ -1,0 +1,38 @@
+{% if not rows %}
+  <p class="empty">Nothing is waiting for a person right now.</p>
+{% endif %}
+{% for row in rows %}
+<div class="card">
+  <h3>{{ row.first_name }} <code>{{ row.contact_id }}</code> &middot; step {{ row.step }} &middot; <code>{{ row.phone }}</code></h3>
+  <p class="sub">
+    <span class="pill attention">{{ row.reason }}</span>
+    contact_type <strong>{{ row.contact_type }}</strong> &middot;
+    acknowledged <strong>{{ row.acknowledged }}</strong> &middot;
+    needs_assistance <strong>{{ row.needs_assistance }}</strong> &middot;
+    confidence {{ row.confidence }} &middot;
+    judges {{ 'agree' if row.judges_agree else 'disagree' }}
+  </p>
+  <p class="note">Judge A <code>{{ row.judge_a }}</code> &middot; Judge B <code>{{ row.judge_b }}</code></p>
+  {% if row.notes %}<p class="note">Note for the team: {{ row.notes }}</p>{% endif %}
+  <div class="spans">
+    {% for span in row.spans %}
+      <div class="span">
+        <div class="who">{{ span.source }}{% if span.speaker %} &middot; {{ span.speaker }}{% endif %}{% if span.offset_seconds is not none %} &middot; +{{ span.offset_seconds }}s{% endif %}</div>
+        <div>{{ span.text }}</div>
+      </div>
+    {% else %}
+      <p class="note">No evidence span was recorded for this outcome.</p>
+    {% endfor %}
+  </div>
+  <form class="inline" method="post" action="/review/{{ row.intent_id }}/confirm">
+    <input type="text" name="actor" placeholder="your operator id" required>
+    <input class="grow" type="text" name="evidence" placeholder="paste the span you relied on, or type why" required>
+    <button type="submit">Confirm contact</button>
+  </form>
+  <form class="inline" method="post" action="/review/{{ row.intent_id }}/refuse">
+    <input type="text" name="actor" placeholder="your operator id" required>
+    <input class="grow" type="text" name="evidence" placeholder="what the customer said" required>
+    <button class="ghost" type="submit">Record a refusal</button>
+  </form>
+</div>
+{% endfor %}
