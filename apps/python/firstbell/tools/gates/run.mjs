@@ -71,6 +71,26 @@ const MIME = {
 
 const results = [];
 
+/* Open every disclosure on the page, and wait for the layout that follows.
+ *
+ * A closed `<details>` has no geometry: its contents are in the document, they have a
+ * colour and a width, and every rect they report is zero. The contrast gate learned that
+ * the hard way when the mutation table was folded, and it opens the folds itself for
+ * exactly this reason. Four more acts fold now, so three more gates need the same thing
+ * or the fold becomes a way to exempt content from being checked: the overflow gate skips
+ * zero-size elements by design, and Puppeteer cannot click a control it cannot see.
+ *
+ * Opening rather than skipping is the honest direction. What is measured is the page a
+ * reader can actually put on screen, not the part of it that happened to be open. */
+async function openFolds(page) {
+  const opened = await page.$$eval("details:not([open])", (els) => {
+    els.forEach((el) => { el.open = true; });
+    return els.length;
+  }).catch(() => 0);
+  if (opened) await new Promise((r) => setTimeout(r, 250));
+  return opened;
+}
+
 function record(name, status, detail, measured = {}) {
   results.push({ name, status, detail, ...measured });
   const tag = { PASS: "PASS", FAIL: "FAIL", "COULD-NOT-MEASURE": "CNM " }[status];
@@ -1490,6 +1510,7 @@ async function gateOverflow(browser, url, alsoUrls = []) {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
     await page.goto(target, { waitUntil: "networkidle0" });
+    await openFolds(page);
     await new Promise((r) => setTimeout(r, 300));
 
     const seen = await page.evaluate(() => {
@@ -1889,6 +1910,10 @@ async function gateRunConsole(browser, url) {
   });
 
   await page.goto(url, { waitUntil: "load" });
+  /* The run block folds now, and a control inside a closed disclosure cannot be clicked.
+   * The text below is read with `textContent`, which does not care either way, so this
+   * changes nothing about what is compared and only makes the two clicks reachable. */
+  await openFolds(page);
 
   const found = await page.evaluate(() => {
     const box = document.querySelector("[data-run]");

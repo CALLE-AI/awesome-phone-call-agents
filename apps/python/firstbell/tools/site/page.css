@@ -1803,6 +1803,32 @@ footer .source-link { margin-top: var(--space-3); }
 .fold > summary:hover { color: var(--ink); }
 .fold > p { margin-top: 0; }
 
+/* ---- an act's fold -------------------------------------------------------------------
+ * The same element, doing a heavier job. `.fold` hides a receipt under a claim that has
+ * already been made; `.act-fold` holds most of an act, so its summary has to read as the
+ * way in rather than as a footnote, and it needs a rule under the act it belongs to so a
+ * reader can see where the act ends without opening anything.
+ *
+ * Measured 2026-09-10: acts 04, 05, 07 and 08 were 9,356px of the 21,164px document, and
+ * a reader deciding in thirty seconds scrolled every pixel of it before reaching the end.
+ * Nothing is deleted. The bytes are all still served, which is what keeps the
+ * no-JavaScript gate, an in-page find, and the contrast census whole. */
+.act-fold {
+  margin: var(--space-5) 0 0;
+  border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line);
+}
+.act-fold > summary {
+  padding: var(--space-4) 0;
+  font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
+  font-weight: 500;
+}
+.act-fold[open] > summary { color: var(--ink); border-bottom: 1px solid var(--line); }
+.act-fold > .fold-body { padding-top: var(--space-4); }
+/* The disclosure is a block in the reading column, and the bands and splits inside it
+ * were written expecting to be direct children of `.inner`. Nothing about their width
+ * changes here; only their top margin, which would otherwise double the first gap. */
+.act-fold > .fold-body > :first-child { margin-top: 0; }
+
 /* ---- three endings, act 3 --------------------------------------------------------------
  *
  * One finished call and the three ways it can be filed. Two of the three are wrong, and the

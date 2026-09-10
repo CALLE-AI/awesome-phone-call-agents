@@ -85,7 +85,7 @@ def _static_svg(n: int, open_at: int) -> str:
             f'{"".join(cells)}</svg>')
 
 
-def morning_markup() -> str:
+def morning_markup(placed: str) -> str:
     """The whole board: the drawing, the arithmetic under it, and the one claim."""
     n = absences()
     cols, rows = grid()
@@ -119,11 +119,11 @@ def morning_markup() -> str:
         '</p>'
         '<p class=mrn-note>'
         '<b>What this board does not claim.</b> It puts no outcome on any tile but one. '
-        'This software has placed twelve real calls and the endings of those twelve are '
-        'published with their receipts on the evidence page; a run built out of matched '
-        'hard cases is not a sample of a real morning, and multiplying its proportions '
-        'up to a school would state something nobody measured. The single open column is '
-        'the shape of the problem, not a rate.'
+        'This software has placed ' + placed + ' real calls, and the recording and the '
+        'transcript of every one of them are on the evidence page. A run built out of '
+        'matched hard cases is not a sample of a real morning, and multiplying its '
+        'proportions up to a school would state something nobody measured. The single '
+        'open column is the shape of the problem, not a rate.'
         '</p>'
         '<p class=mrn-back><a href="index.html">Back to the two calls, and the '
         'recordings</a></p>'

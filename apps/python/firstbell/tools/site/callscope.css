@@ -149,3 +149,7 @@
  * attribute saying it. One source, and a screen reader and the icon cannot disagree. */
 .csc-hear[aria-pressed="false"] .i-pause,
 .csc-hear[aria-pressed="true"] .i-play { display: none; }
+
+/* The control lane's one row. Set in the mono the identifiers use, because it is
+ * reporting a value the two systems agreed on rather than describing anything. */
+.csc-agree { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }

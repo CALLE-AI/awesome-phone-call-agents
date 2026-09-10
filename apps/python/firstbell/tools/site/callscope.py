@@ -51,6 +51,7 @@ SWEEP_S = 14.0       # one pass of the read-head, in wall-clock seconds
 BARS = 168           # waveform bars across the full span
 
 LANE_H = 196
+COMPACT_H = 52       # a control lane: one row, no envelope and no rails
 TOP = 34
 WAVE_H = 34
 RAIL_GAP = 22
@@ -118,11 +119,10 @@ def _keyframes(name: str, stops: list) -> str:
     return f"@keyframes {name}{{{body}}}"
 
 
-def _ticks(span: float, lanes: int) -> str:
+def _ticks(span: float, bottom: float) -> str:
     step = 10 if span <= 80 else 20
     out = []
     t = 0
-    bottom = TOP + lanes * LANE_H - 30
     while t <= span + 0.1:
         x = _x(t, span)
         out.append(f'<line class=csc-tick x1="{x:.1f}" y1="{TOP - 16:.1f}" '
@@ -140,8 +140,22 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
     css = []
     rows = []
 
+    # Measured on the built page: 361 marks in this one figure, and 13 of its 37 labels
+    # were duplicates. Both lanes carried the same three field names, the same two system
+    # names and the word `resolved` three times, because both were drawn at full weight.
+    # No two rects overlapped and nothing was clipped, which is why the geometry probes
+    # all came back clean; what the eye reads as clutter here is repetition, not
+    # collision, and a probe that only looks for collisions will never find it.
+    #
+    # The call where the systems agree is a control. Its job is one sentence, that this
+    # software does not simply mark everything undetermined, and it was spending half the
+    # frame to say it. It is now a single row, and the call where they disagree keeps the
+    # whole instrument. Honesty is unchanged and the argument is louder.
+    y = TOP
     for n, (lane, call) in enumerate(zip(lanes, picked)):
-        y0 = TOP + n * LANE_H
+        compact = bool(lane.get("compact"))
+        y0 = y
+        y += COMPACT_H if compact else LANE_H
         wave_mid = y0 + 22 + WAVE_H / 2
         end_x = _x(call["seconds"], span)
         commits = _commit_seconds(call, fields, commit_turns(call, fields))
@@ -161,6 +175,27 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
             f'<text class=csc-lane-meta x="62" y="{y0 + 10:.1f}">'
             f'{call["locale"]} &#183; {_fmt(call["seconds"])}s &#183; '
             f'{answered} of {len(fields)} fields answered</text>')
+
+        if compact:
+            # One row: who the call was, and that both systems closed it. The verdicts
+            # are spelled rather than drawn, because with no rails under them there is
+            # no geometry left for them to line up with.
+            both = lane["two_bucket"] if lane["two_bucket"] == lane["ours"] else None
+            # The label, the id and the meta were already appended above this, for
+            # every lane, so only the verdict is added here. Re-emitting them was the
+            # first version of this branch and it printed the control's name, id and
+            # meta twice: removing a duplication by adding one.
+            rows.append(
+                # Its own line rather than beside the meta. Set at PLOT_L on the same
+                # baseline it measured 99px into `en-IN . 34.58s . 3 of 3 fields
+                # answered`, because that string is as long as the inset and a lane
+                # label is not a fixed width.
+                f'<text class=csc-agree x="{PLOT_L}" y="{y0 + 30:.1f}">'
+                + (f'both systems say {both}. {lane["ours_note"]}'
+                   if both else f'{lane["two_bucket"]} / {lane["ours"]}')
+                + '</text>')
+            rows.append('</g>')
+            continue
 
         bars = []
         for bt, amp in _envelope(call["peaks"], call["seconds"], span):
@@ -257,7 +292,10 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
 
         rows.append('</g>')
 
-    height = TOP + len(lanes) * LANE_H + 4
+    # From the running y, because lanes are no longer all the same height. A
+    # count times LANE_H would leave a compact lane's share of empty frame below
+    # the figure and put the tick rules through it.
+    height = y + 4
     travel = PLOT_R - PLOT_L
 
     # One schedule for every moving mark in the frame, declared once.
@@ -296,12 +334,14 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
     # drawing shows. An earlier version led with the two durations, which described the
     # picture accurately and left the reader to work out why it mattered.
     caption = (
-        f'Two calls this software placed, on one axis of real seconds, each shown under '
-        f'both systems. Both calls came back schema-valid, so a system with two buckets '
-        f'closes both. {lanes[1]["id"]} ran {longer:.0f} per cent longer than '
-        f'{lanes[0]["id"]} and came back with two of its three fields empty: it reached a '
-        f'parent and left the office knowing nothing it can act on. Closing that is how a '
-        f'dashboard reports full contact for a child nobody spoke to about the absence. '
+        f'Two calls this software placed, on one axis of real seconds. '
+        f'{lanes[0]["id"]} is the control and is drawn as one row, because both systems '
+        f'close it and there is nothing in it to compare. {lanes[1]["id"]} gets the '
+        f'instrument: it ran {longer:.0f} per cent longer than {lanes[0]["id"]}, came '
+        f'back schema-valid like it, and came back with two of its three fields empty. '
+        f'It reached a parent and left the office knowing nothing it can act on. Closing '
+        f'that is how a dashboard reports full contact for a child nobody spoke to about '
+        f'the absence. '
         f'The envelope and the turn marks are the transcriber&#8217;s; the instant a '
         f'field is marked answered is this page&#8217;s own reading of the transcript, '
         f'taken as the first family turn after the question that asks for it, and the '
@@ -346,7 +386,7 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
         '<stop offset="0%" stop-color="currentColor" stop-opacity="0"/>'
         '<stop offset="100%" stop-color="currentColor" stop-opacity="0.05"/>'
         '</linearGradient></defs>'
-        f'<g class=csc-ticks>{_ticks(span, len(lanes))}</g>'
+        f'<g class=csc-ticks>{_ticks(span, height - 26)}</g>'
         f'{"".join(rows)}'
         '<g class=csc-head>'
         f'<rect class=csc-swept x="{PLOT_L - travel}" y="{TOP + 4}" '

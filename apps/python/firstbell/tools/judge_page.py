@@ -1829,6 +1829,8 @@ def money_markup(run: dict) -> str:
         # ceiling and the crossover, the only two they came for, in the middle of
         # it. Nothing was cut to pay for this. Every number in the paragraph answers
         # a different objection, and a reader who needs three can now stop at three.
+        '<details class="fold act-fold money-fold"><summary>Where each of those '
+        'figures comes from, and what would move it</summary><div class=fold-body>',
         _money_key_block(f),
 
         # Three sentences of caveat, in the order a buyer would object in. The first
@@ -1909,6 +1911,7 @@ def money_markup(run: dict) -> str:
         # The act ends by saying a pilot settles which end of the bound a district is on,
         # and then offered no way to read what a pilot would be. Two buyers found that
         # document at the foot of the page or not at all.
+        '</div></details>',
         '<p class=money-next><a href="docs/what-a-pilot-would-look-like.html">'
         'What a pilot would look like</a>: two schools, six weeks, and the four numbers '
         'measured before this software telephones anybody.</p>',
@@ -2250,10 +2253,13 @@ def further_markup() -> str:
         '<p class=further-k>Where to go next</p>'
         '<h2 class=further-lead id=h-further>Everything this rests on, and how to leave '
         'this page to check it.</h2>'
+        + '<details class="fold act-fold"><summary>Every document, and every outside '
+          'figure with its publisher</summary><div class=fold-body>'
         + doc_pages.index_markup()
         + takeaway_markup()
         + '<p class=further-k>The outside figures, and who published them</p>'
         + sources_markup()
+        + '</div></details>'
         + '</section>'
     )
 
@@ -2337,6 +2343,44 @@ def act(num: str, title: str, body: str, classes: str = "", margin: bool = False
             f'aria-labelledby="h-{num}"><div class="{inner}"{reveal}>{body}</div></section>')
 
 
+# Two markers a body list can carry to say where its fold opens and where it shuts.
+# Indices would do the same job and break the first time a line is added above them, which
+# is how the last three edits to this file went. A marker moves with the thing it marks.
+FOLD_OPEN = "fold-open"
+FOLD_SHUT = "fold-shut"
+
+
+def folded(parts: list, summary: str) -> str:
+    """Join an act body, putting everything between the two markers behind a disclosure.
+
+    The page is read by someone who has thirty seconds before they decide, and by someone
+    who has an hour because they intend to check it. Those two want opposite things from
+    the same document: the first wants the claim, the second wants the fourteen rows under
+    it. A fold serves both without shipping two pages, and it costs no script.
+
+    Everything stays in the served HTML, so the no-JavaScript gate still sees it, a find
+    on the page still reaches it in Chrome and Firefox, and the contrast gate opens every
+    disclosure before it measures anything. What changes is how far a reader scrolls past
+    what they did not ask for.
+
+    `FOLD_SHUT` is optional. Without it the fold runs to the end of the body, which is what
+    an act that closes on its own artifact wants; with it the act can shut the fold and
+    then close the elements that were open around it.
+    """
+    i = parts.index(FOLD_OPEN)
+    parts = [x for x in parts]
+    parts.pop(i)
+    try:
+        j = parts.index(FOLD_SHUT)
+        parts.pop(j)
+    except ValueError:
+        j = len(parts)
+    return ("".join(parts[:i])
+            + '<details class="fold act-fold"><summary>' + summary + '</summary>'
+            + '<div class=fold-body>' + "".join(parts[i:j]) + '</div></details>'
+            + "".join(parts[j:]))
+
+
 def showcase_figure() -> str:
     """The four-stage figure, loaded from the asset directory by path.
 
@@ -2417,7 +2461,7 @@ def morning_html() -> str:
         f"<style>{module.MORNING_CSS}</style>"
         f"<style>{cutoff.CUTOFF_CSS}</style>"
         "<main>"
-        f"{module.morning_markup()}"
+        f"{module.morning_markup(_spelled(_recorded_call_total()))}"
         f"{cutoff.cutoff_markup(cut)}"
         "</main>"
         '<script type=module src="morning.js"></script>'
@@ -2655,10 +2699,15 @@ def build(has_audio: bool, repo_url: str | None = None,
             # applied to these receipts. Both of these calls came back schema-valid, so it
             # closes both, and the row where the two systems disagree is the product.
             [
+                # The control, and it is drawn as one row rather than a second full
+                # lane. It exists to say that this software does not simply mark
+                # everything undetermined, which is one sentence, and at full weight it
+                # was repeating every field name and both system names to say it.
                 {"id": "S-4101", "label": "the parent knew, and said why",
+                 "compact": True,
                  "two_bucket": "resolved", "two_bucket_note": "case closed",
                  "ours": "resolved",
-                 "ours_note": "case closed. Three fields the office can act on."},
+                 "ours_note": "Three fields the office can act on."},
                 {"id": "S-4105", "label": "the parent did not know",
                  "two_bucket": "resolved",
                  "two_bucket_note": "case closed. Reported as a family contacted.",
@@ -2714,6 +2763,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         topline_markup(next((d for name, d in recs if name.startswith("06-")), {})),
         one_minute_markup(next((d for name, d in recs if name.startswith("06-")), {})),
         path_markup(),
+        FOLD_OPEN,
         '<div class=split><div class=claim>',
         '<div class=act-num>01</div><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
         '<p>An unanswered absence message is not information. It is an absence of '
@@ -2765,7 +2815,10 @@ def build(has_audio: bool, repo_url: str | None = None,
                     f'<div class=num>{esc(num)}</div>'
                     f'<div class=lbl>{label}</div></div>')
     body.append('</div></div></div>')
-    add(act("01", "What the school knew", "".join(body), margin=True))
+    add(act("01", "What the school knew",
+            folded(body, 'Why an unanswered message is not information, and what the '
+                         'run prints about this one'),
+            margin=True))
 
     # ---- Act 2: the same call, both languages
     #
@@ -2834,6 +2887,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         three_endings_figure(),
         '<p class=eyebrow>The same call, filed three ways</p>',
         endings_markup(data, en, run),
+        # The pull moves above the fold and the note it quotes moves below it. It is the
+        # one sentence in this act a reader has to leave with, and an act that ends on a
+        # closed disclosure needs its last visible line to be that sentence.
+        pull("This app made the first mistake itself."),
+        FOLD_OPEN,
         queue_markup(run),
         '<p class=note>This app made the first mistake itself. A parent refused to talk, '
         'CALL-E returned a schema-valid result with every required field set to '
@@ -2841,8 +2899,6 @@ def build(has_audio: bool, repo_url: str | None = None,
         'it was written, uncorrected, because a corrected copy would record a run that '
         'never happened. What changed is the code, and a test now fails if the distinction '
         'collapses again.</p>',
-        # The opening sentence of the note above, word for word.
-        pull("This app made the first mistake itself."),
         # It sent a reader to the evidence page for a receipt not published there. That
         # page carries the recordings and the transcripts of these calls, and no receipt.
         f'<p class=dim>Counts read from one recorded run of {placed} calls, '
@@ -2852,7 +2908,10 @@ def build(has_audio: bool, repo_url: str | None = None,
         f'{open_rows} of {placed} rows are still open and every one of them is named. The '
         'rate is resolved over attempted, so an open row can only ever pull it down.</p>',
     ]
-    add(act("03", "Three endings", "".join(body), "act-3", margin=True))
+    add(act("03", "Three endings",
+            folded(body, 'The queue that comes out of it, named, with what each line '
+                         'costs'),
+            "act-3", margin=True))
 
     # ---- Act 4: check us
     have = sum(1 for _c, pv, _r, _s, _f in call_rows if pv)
@@ -2891,6 +2950,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         # the only act a buyer opens the page for and it used to be the part they reached
         # last.
         money_markup(run),
+        FOLD_OPEN,
         '<div class=band>',
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every call in this run, with its identifiers and fields. '
@@ -2978,7 +3038,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'recordings live here, the reasoning lives there, and '
         '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>')
     body.append('</div>')
-    add(act("04", "Check us against your billing", "".join(body)))
+    add(act("04", "Check us against your billing",
+            folded(body, f'Every one of the {_spelled(len(call_rows))} calls, with both '
+                         'identifiers, and what is held where')))
 
     # ---- Act 5: mutations
     body = [
@@ -2993,6 +3055,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         'that it reached production.</div>',
         mutation_distribution(muts),
         '</div><div class=artifact>',
+        FOLD_OPEN,
         '<div class=scrollbox tabindex=0 role=region '
         'aria-label="Every gate broken on purpose, with the number of tests that '
         'noticed. Scrolls sideways on a narrow screen.">'
@@ -3018,13 +3081,17 @@ def build(has_audio: bool, repo_url: str | None = None,
     for num, change, caught in rest:
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
-    body.append('</tbody></table></details></div></div></div>')
+    body.append('</tbody></table></details>')
+    body.append(FOLD_SHUT)
+    body.append('</div></div></div>')
     # The first sentence of the claim above, word for word. It closes the act at full width
     # rather than sitting in the 26rem claim column, where the display face would break one
     # sentence over six lines.
     body.append(pull("A test that has never been observed to fail has not been shown to "
                      "test anything."))
-    add(act("05", "Every rule, broken", "".join(body), "act-2"))
+    add(act("05", "Every rule, broken",
+            folded(body, f'All {len(muts)} changes, and the tests that caught each one'),
+            "act-2"))
 
     # ---- Act 6: take-aways
     # "Three outcomes, not two" used to be the first of these. Act 3 now plays it, and a
@@ -3130,7 +3197,7 @@ def build(has_audio: bool, repo_url: str | None = None,
             'close it. Three of them are the platform’s and are reported here without '
             'complaint, because a limit you can read is worth more than a claim you '
             'cannot check.</p>',
-            '</div><div class=artifact><ul class=limits>']
+            '</div><div class=artifact>', FOLD_OPEN, '<ul class=limits>']
     # `esc_code` and not `esc`. These two strings carry commands a reader is meant to run,
     # and under plain `esc` the markup around them was escaped, so act 07 shipped a literal
     # ``python -m firstbell ...`` on the page the page itself labels read this one
@@ -3139,8 +3206,13 @@ def build(has_audio: bool, repo_url: str | None = None,
     for limit, closes in limits:
         body.append(f'<li><p class=limit>{esc_code(limit)}</p>'
                     f'<p class=closes>{esc_code(closes)}</p></li>')
-    body.append('</ul></div></div>')
-    add(act("07", "What is not true", "".join(body), "act-deep", margin=True))
+    body.append('</ul>')
+    body.append(FOLD_SHUT)
+    body.append('</div></div>')
+    add(act("07", "What is not true",
+            folded(body, f'{_spelled(len(limits)).capitalize()} limits, and what would '
+                         'close each one'),
+            "act-deep", margin=True))
 
     # ---- Act 8: close
     body = [
@@ -3168,6 +3240,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         # The instruction used to name a button that no longer exists, and before that it
         # was the only thing telling a reader why the block below was empty. The block
         # ships whole now, so the instruction is about the optional part.
+        FOLD_OPEN,
         '<p class=dim>Produced by running exactly that when this page was built, and it '
         'is all below. Watch it run to see the rows land one at a time.</p>',
         # The interactive surface, and the evidence, are one element. `console.js` reads
@@ -3190,11 +3263,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         'screen.">' + esc(offline_run()) + '</pre>',
         '<div class=runlegend data-run-legend></div>',
         '</div>',
+        FOLD_SHUT,
         # Where to get it, for a reader who has just been told twice to run it. This is
         # empty on a build that carries both links, because then the masthead has them.
         where_it_lives(repo_url, video_url),
     ]
-    add(act("08", "Run it yourself", "".join(body), margin=True))
+    add(act("08", "Run it yourself",
+            folded(body, 'Watch that exact command run, line by line'),
+            margin=True))
 
     add(further_markup())
     add('</main>')
