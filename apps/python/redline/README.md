@@ -29,8 +29,9 @@ example currently closes all 21 attacks without losing any of its 10 ordinary
 calls; a future change that trades one failure for another cannot hide behind
 the headline number.
 
-No account. No API key. No network. No phone rings. That run takes under a
-second, and you can reproduce it from a clean checkout in three commands.
+The static evaluation needs no account, API key or network and places no call.
+Follow the installation and example commands below from a clean checkout;
+downloading the source and dependencies does require network access.
 
 ---
 
