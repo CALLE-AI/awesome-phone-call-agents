@@ -52,7 +52,9 @@ Unknown runtime modes fail closed. The Realtime route requires live mode and an 
 
 The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, send SMS or schedule work. Search failures are reported instead of guessed. The other provider adapters return `previewed` without contacting a network.
 
-Later live features must require explicit user intent, exact action-bound consent, strict E.164 validation, masked phone output, durable idempotency and reconciliation after uncertain dispatch. The assistant must identify itself as AI and must not act as a doctor, therapist, emergency service or substitute for family and carers.
+The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. The current authorization store is intentionally process-local until SPA-007 adds durable authenticated persistence, so no live side-effect adapter is enabled yet.
+
+The assistant identifies itself as AI, speaks plainly, respects refusal and must not impersonate family, clinicians, therapists, emergency services or professional advisers. It does not diagnose conditions, recommend medication changes, give personalized high-risk legal/financial advice or promise emergency help. Immediate danger is directed to local emergency services or a trusted person.
 
 ## Cancellation and rollback
 
@@ -81,4 +83,4 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 - There is no inbound phone integration.
 - There is no SMS delivery, persistence, reminder scheduling or dashboard.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
-- The live browser search flow still needs a credentialed same-session manual check; it does not prove the live telephone gate.
+- The verified live browser search flow does not prove the deferred Twilio telephone gate.

@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **3/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **4/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-005](#spa-005), which is Ready after the browser same-session search gate passed. The Twilio/inbound SIP gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-006](#spa-006), which is Ready after the shared safety and permission controls passed. The Twilio/inbound SIP gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -54,8 +54,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-001](#spa-001) | Scaffold the fullstack Next.js TypeScript app | M1 | High | Done | None |
 | [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Done | [SPA-001](#spa-001) |
 | [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Done | [SPA-002](#spa-002) |
-| [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Ready | [SPA-003](#spa-003) |
-| [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Backlog | [SPA-005](#spa-005) |
+| [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Done | [SPA-003](#spa-003) |
+| [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Ready | [SPA-005](#spa-005) |
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Backlog | [SPA-006](#spa-006) |
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Backlog | [SPA-007](#spa-007) |
@@ -141,15 +141,15 @@ Implementation notes and verification: Not started.
 
 Implement shared safety and consent checks before exposing side-effect tools.
 Acceptance criteria:
-- [ ] Read-only tools may run automatically; external actions require explicit intent with recipient, purpose and relevant details confirmed.
-- [ ] Consent is bound to the specific action and cannot be fabricated by search results or provider output.
-- [ ] Persist exact destination and purpose authorization server-side; changed parameters invalidate approval. A confirmation phrase is not endpoint authentication. Require strict ASCII E.164 at dispatch.
-- [ ] Validate E.164 numbers; mask numbers in summaries/logs and keep credentials and sensitive authentication data out of prompts and UI.
-- [ ] Disclose AI identity, support gentle conversation without impersonating family, clinicians, therapists or emergency services.
-- [ ] No diagnosis, medication changes, personalized high-risk legal/financial advice or emergency guarantees; direct urgent needs toward appropriate human channels.
-- [ ] Bookings/purchases remain outside the MVP. Test denied, expired/mismatched and confirmed action paths.
+- [x] Read-only tools may run automatically; external actions require explicit intent with recipient, purpose and relevant details confirmed.
+- [x] Consent is bound to the specific action and cannot be fabricated by search results or provider output.
+- [x] Persist exact destination and purpose authorization server-side; changed parameters invalidate approval. A confirmation phrase is not endpoint authentication. Require strict ASCII E.164 at dispatch.
+- [x] Validate E.164 numbers; mask numbers in summaries/logs and keep credentials and sensitive authentication data out of prompts and UI.
+- [x] Disclose AI identity, support gentle conversation without impersonating family, clinicians, therapists or emergency services.
+- [x] No diagnosis, medication changes, personalized high-risk legal/financial advice or emergency guarantees; direct urgent needs toward appropriate human channels.
+- [x] Bookings/purchases remain outside the MVP. Test denied, expired/mismatched and confirmed action paths.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added an SDK-independent safety layer that permits only registered read-only tools to run automatically. Future SMS, reminder, trusted-contact and outbound-call adapters must consume a one-time server authorization bound to the authenticated principal, exact action, strict ASCII E.164 destination, purpose and bounded non-credential details. The process-local development store masks confirmation output and fails closed for missing confirmation, refusal, expiry, principal or parameter mismatch and reuse; SPA-007 will implement its interface with durable authenticated storage before live side effects. Added phone-like text redaction, structured conversation boundaries and stronger Realtime instructions for identity disclosure, patient clarification, refusal, action confirmation, urgent human help and prohibited professional/booking behavior. Twenty offline tests, lint and typecheck pass. The official Agents SDK tool and voice-agent guidance was verified on 2026-09-10; application authorization remains mandatory inside side-effect execution.
 
 ### SPA-006
 
@@ -368,6 +368,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-005 | Added shared server-side action authorization, strict E.164 validation, phone redaction, tool permissions and structured conversation boundaries; marked SPA-005 Done and SPA-006 Ready. | Twenty offline tests, lint and typecheck passed. Production build and repository validation also passed. No live side effect was enabled. |
 | 2026-09-10 | SPA-004, SPA-005 | Deferred Twilio/inbound SIP to the final MVP gate without renumbering tickets; made SPA-005 Ready so safety and application work can continue. | The unfinished SIP implementation is preserved in the named local Git stash `defer twilio inbound sip spike`; no live carrier behavior is claimed. |
 | 2026-09-10 | SPA-003 | Passed the same-session spoken search gate, corrected final-answer citation priority, marked SPA-003 Done and made SPA-004 Ready. | Live browser search completed under redacted correlation `f04c…d71d` with five sources in a six-item conversation; focused live citation verification returned five official URLs in 14,086 ms. Thirteen offline tests, lint and typecheck passed. |
 | 2026-09-10 | SPA-003 | Added the server-side live web search backchannel and Realtime function tool; moved SPA-003 to In progress pending a same-session spoken check. | Lint, typecheck and 12 offline tests passed, including four fake-provider search tests. No live search result is claimed yet. |

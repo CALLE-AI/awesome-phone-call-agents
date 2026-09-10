@@ -22,3 +22,5 @@ Official references verified on 2026-09-10:
 - [Web search guide](https://developers.openai.com/api/docs/guides/tools-web-search)
 - [Agents SDK function tools](https://openai.github.io/openai-agents-js/guides/tools/)
 - [Agents SDK voice agents](https://openai.github.io/openai-agents-js/guides/voice-agents/build/)
+
+The safety layer follows the SDK's documented authorization boundary: conditional tool availability does not replace argument- or resource-level authorization. Future side-effect tools must perform the checks in `lib/safety/` during execution. Realtime output guardrails may later help interrupt unsafe spoken output, but asynchronous transcript checks do not replace deterministic action authorization.
