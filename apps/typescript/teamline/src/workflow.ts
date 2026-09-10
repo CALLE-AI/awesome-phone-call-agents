@@ -1,21 +1,27 @@
+import { createHash, randomUUID } from "node:crypto";
 import { facilityObjective, facilityResultSchema, parentObjective, parentResultSchema, type Role } from "./contracts.js";
-import type { CallProvider, ProviderResult } from "./provider.js";
+import { CallCreateError, type CallProvider, type ProviderResult, type StartRequest } from "./provider.js";
 
-type AttemptStatus = "in_progress" | "completed" | "no_answer" | "failed";
+type AttemptStatus = "dispatching" | "create_uncertain" | "in_progress" | "completed" | "no_answer" | "failed";
 
 interface Attempt {
-  providerCallId: string;
+  intentKey: string;
+  phoneFingerprint: string;
+  providerCallId?: string;
   phoneLastFour: string;
   status: AttemptStatus;
   previousNoAnswerAttempts: number;
+  previousAttempt?: Attempt;
   result?: Readonly<Record<string, unknown>>;
 }
+
+type PublicAttempt = Omit<Attempt, "intentKey" | "phoneFingerprint" | "providerCallId" | "previousAttempt">;
 
 export interface PublicState {
   mode: "sandbox" | "live";
   decision: "locked" | "awaiting_coach" | "approved";
-  facility?: Omit<Attempt, "providerCallId">;
-  parent?: Omit<Attempt, "providerCallId">;
+  facility?: PublicAttempt;
+  parent?: PublicAttempt;
 }
 
 const noConversationCodes = new Set(["no_answer", "not_answered", "voicemail", "voicemail_detected", "answering_machine", "answering_machine_detected", "no_conversation"]);
@@ -27,7 +33,11 @@ export class TeamLineWorkflow {
   private readonly active = new Set<string>();
   private readonly lastStart = new Map<Role, number>();
 
-  constructor(private readonly provider: CallProvider, private readonly now: () => number = Date.now) {}
+  constructor(
+    private readonly provider: CallProvider,
+    private readonly now: () => number = Date.now,
+    private readonly createIntentId: () => string = randomUUID,
+  ) {}
 
   state(): PublicState {
     return {
@@ -46,6 +56,10 @@ export class TeamLineWorkflow {
     return this.launch("facility", input, true);
   }
 
+  reconcileFacility(input: LaunchInput): Promise<PublicState> {
+    return this.reconcile("facility", input);
+  }
+
   launchParent(input: LaunchInput): Promise<PublicState> {
     return this.launch("parent", input, false);
   }
@@ -54,9 +68,15 @@ export class TeamLineWorkflow {
     return this.launch("parent", input, true);
   }
 
+  reconcileParent(input: LaunchInput): Promise<PublicState> {
+    return this.reconcile("parent", input);
+  }
+
   async check(role: Role): Promise<PublicState> {
     const attempt = this.attempt(role);
+    if (attempt.status === "create_uncertain") throw new Error("Reconcile the existing call intent before checking a result.");
     if (attempt.status !== "in_progress") return this.state();
+    if (!attempt.providerCallId) throw new Error("The existing call intent has no provider result to check.");
     const reservation = `check:${role}`;
     if (this.active.has(reservation)) throw new Error("That result is already being checked.");
     this.active.add(reservation);
@@ -78,36 +98,84 @@ export class TeamLineWorkflow {
   private async launch(role: Role, input: LaunchInput, retry: boolean): Promise<PublicState> {
     requireConsent(input.consent);
     const phone = normalizePhone(input.phone);
-    if (!/^[A-Za-z0-9-]{8,100}$/.test(input.idempotencyKey)) throw new Error("A stable idempotency key is required.");
     const current = role === "facility" ? this.facility : this.parent;
+    const reservation = `start:${role}`;
+    if (this.active.has(reservation)) throw new Error("That call is already being submitted.");
     if (role === "parent" && this.decision !== "approved") throw new Error("The parent call is locked until the coach approves the facility result.");
     if (retry && current?.status !== "no_answer") throw new Error("Only a provider-confirmed no-answer call can be retried.");
     if (!retry && current) throw new Error("This call already exists. Check its result instead of starting another call.");
-    const reservation = `start:${role}`;
-    if (this.active.has(reservation)) throw new Error("That call is already being submitted.");
     const previousStart = this.lastStart.get(role);
     if (previousStart !== undefined && this.now() - previousStart < 10_000) throw new Error("Wait 10 seconds before starting another attempt.");
     this.active.add(reservation);
     this.lastStart.set(role, this.now());
+    const attempt: Attempt = {
+      intentKey: `teamline-${role}-${this.createIntentId()}`,
+      phoneFingerprint: fingerprint(phone),
+      phoneLastFour: phone.slice(-4),
+      status: "dispatching",
+      previousNoAnswerAttempts: retry ? current!.previousNoAnswerAttempts + 1 : 0,
+      ...(retry ? { previousAttempt: current } : {}),
+    };
+    this.setAttempt(role, attempt);
     try {
-      const request = role === "facility" ? {
-        role, phone, objective: facilityObjective, resultSchema: facilityResultSchema, idempotencyKey: input.idempotencyKey,
-      } : {
-        role, phone, objective: parentObjective(this.approvedChange()), resultSchema: parentResultSchema, idempotencyKey: input.idempotencyKey,
-      };
-      const started = await this.provider.start(request);
-      const attempt: Attempt = {
-        providerCallId: started.id,
-        phoneLastFour: phone.slice(-4),
-        status: "in_progress",
-        previousNoAnswerAttempts: retry ? current!.previousNoAnswerAttempts + 1 : 0,
-      };
-      if (role === "facility") this.facility = attempt;
-      else this.parent = attempt;
+      await this.dispatch(role, phone, attempt);
       return this.state();
+    } catch (error) {
+      if (error instanceof CallCreateError && error.outcome === "not_created") {
+        this.setAttempt(role, current);
+        throw error;
+      }
+      attempt.status = "create_uncertain";
+      throw new Error("CALL-E may have accepted this call, but TeamLine did not receive a definitive response. Reconcile this same call intent; do not start a new call.");
     } finally {
       this.active.delete(reservation);
     }
+  }
+
+  private async reconcile(role: Role, input: LaunchInput): Promise<PublicState> {
+    requireConsent(input.consent);
+    const phone = normalizePhone(input.phone);
+    const attempt = this.attempt(role);
+    if (attempt.status !== "create_uncertain") throw new Error("Only an unresolved call-creation intent can be reconciled.");
+    if (attempt.phoneFingerprint !== fingerprint(phone)) throw new Error("Re-enter the same authorized phone number to reconcile this call intent.");
+    const reservation = `start:${role}`;
+    if (this.active.has(reservation)) throw new Error("That call intent is already being reconciled.");
+    this.active.add(reservation);
+    attempt.status = "dispatching";
+    try {
+      await this.dispatch(role, phone, attempt);
+      return this.state();
+    } catch (error) {
+      if (error instanceof CallCreateError && error.outcome === "not_created") {
+        this.setAttempt(role, attempt.previousAttempt);
+        throw error;
+      }
+      attempt.status = "create_uncertain";
+      throw new Error("The same CALL-E call intent remains unresolved. TeamLine will not create a new logical call or redial automatically.");
+    } finally {
+      this.active.delete(reservation);
+    }
+  }
+
+  private async dispatch(role: Role, phone: string, attempt: Attempt): Promise<void> {
+    const started = await this.provider.start(this.startRequest(role, phone, attempt.intentKey));
+    if (!started?.id) throw new CallCreateError("ambiguous", "The provider returned an ambiguous create response.");
+    attempt.providerCallId = started.id;
+    attempt.status = "in_progress";
+    delete attempt.previousAttempt;
+  }
+
+  private startRequest(role: Role, phone: string, intentKey: string): StartRequest {
+    return role === "facility" ? {
+      role, phone, objective: facilityObjective, resultSchema: facilityResultSchema, idempotencyKey: intentKey,
+    } : {
+      role, phone, objective: parentObjective(this.approvedChange()), resultSchema: parentResultSchema, idempotencyKey: intentKey,
+    };
+  }
+
+  private setAttempt(role: Role, attempt: Attempt | undefined): void {
+    if (role === "facility") this.facility = attempt;
+    else this.parent = attempt;
   }
 
   private applyResult(role: Role, attempt: Attempt, providerResult: ProviderResult): void {
@@ -147,7 +215,6 @@ export class TeamLineWorkflow {
 export interface LaunchInput {
   phone: string;
   consent: boolean;
-  idempotencyKey: string;
 }
 
 export function normalizePhone(value: string): string {
@@ -161,9 +228,19 @@ function requireConsent(value: boolean): void {
   if (value !== true) throw new Error("Explicit consent is required before a call attempt.");
 }
 
-function publicAttempt(attempt: Attempt): Omit<Attempt, "providerCallId"> {
-  const { providerCallId: _providerCallId, ...safe } = attempt;
+function publicAttempt(attempt: Attempt): PublicAttempt {
+  const {
+    providerCallId: _providerCallId,
+    intentKey: _intentKey,
+    phoneFingerprint: _phoneFingerprint,
+    previousAttempt: _previousAttempt,
+    ...safe
+  } = attempt;
   return structuredClone(safe);
+}
+
+function fingerprint(phone: string): string {
+  return createHash("sha256").update(phone).digest("hex");
 }
 
 function sanitizeResult(role: Role, value: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {

@@ -53,13 +53,15 @@ The server accepts only the official `https://api.heycall-e.com` endpoint. The k
 ## Call and result behavior
 
 - A call occurs only after the user enters a US number, confirms consent, and selects that role's explicit call button.
-- The full number exists in page memory, request-scope server validation, and the provider launch request only. Server workflow state retains only the final four digits; public state never returns the full number or provider call identifier.
+- The full number exists in page memory, request-scope server validation, and the provider launch request only. Server workflow state retains the final four digits and a non-public one-way fingerprint used to require the same number for reconciliation; public state never returns the full number, fingerprint, intent key, or provider call identifier.
 - The Athletic Director result schema separates confirmed facility facts, unresolved questions, and requests requiring coach review.
 - TeamLine cannot reschedule, spend, arrange transportation, or promise staff, equipment, or another commitment.
 - The Parent call stays locked until the coach explicitly approves a complete facility result.
 - The Parent result independently records attendance, transportation need, and whether coach follow-up is required.
 - `Check existing call result` retrieves the same provider call. It never creates or restarts a call, and there is no automatic polling.
-- Provider or retrieval errors never trigger an automatic retry.
+- TeamLine assigns and records a server-owned logical intent before provider dispatch. If create times out or returns an ambiguous response, TeamLine treats the intent as potentially accepted and blocks every new start for that role.
+- `Reconcile existing call intent` resubmits only that unresolved intent with its original idempotency key. A timeout is never treated as permission to redial or create a fresh intent.
+- Provider or retrieval errors never trigger an automatic retry. Reconciliation is a separate, explicit user action and requires the same authorized phone number to be re-entered if it is no longer in page memory.
 - `Try the call again` appears only after CALL-E explicitly returns no-answer, voicemail/answering-machine, or no-conversation evidence. It creates one new call only after another explicit confirmation and the 10-second cooldown.
 - Duplicate and concurrent starts or result checks are rejected.
 - Closing or restarting the local server clears its in-memory demo state. It does not cancel a call already accepted by CALL-E; use the CALL-E dashboard for provider-side call administration.
@@ -73,7 +75,7 @@ The server does not log the phone number, API key, request payload, or authoriza
 
 ## Tests
 
-`npm test` uses only injected fake providers and the deterministic sandbox. Tests verify the complete no-call flow, consent and phone validation, coach authority, separate result schemas, no automatic redial, explicit no-answer retry, cooldown, duplicate protection, same-call result retrieval, and privacy-minimized public state.
+`npm test` uses only injected fake providers and the deterministic sandbox. Tests verify the complete no-call flow, consent and phone validation, coach authority, separate result schemas, no automatic redial, stable server-owned intent reconciliation after ambiguous creation, explicit no-answer retry, cooldown, duplicate protection, same-call result retrieval, and privacy-minimized public state.
 
 No test requires CALL-E credentials or network access, and no test places a telephone call.
 

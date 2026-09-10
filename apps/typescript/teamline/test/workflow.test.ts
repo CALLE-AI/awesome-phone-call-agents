@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CallProvider, ProviderResult, StartRequest } from "../src/provider.js";
-import { SandboxProvider } from "../src/provider.js";
+import { CallCreateError, SandboxProvider } from "../src/provider.js";
 import { TeamLineWorkflow } from "../src/workflow.js";
 
 const phone = "+12025550142";
@@ -12,12 +12,15 @@ class FakeProvider implements CallProvider {
   readonly gets: string[] = [];
   result: ProviderResult = { status: "in_progress" };
   startGate?: Promise<void>;
+  startError?: Error;
+  startId?: string;
   getGate?: Promise<void>;
   getError?: Error;
   async start(request: StartRequest) {
     this.starts.push(structuredClone(request));
     if (this.startGate) await this.startGate;
-    return { id: `call-${this.starts.length}` };
+    if (this.startError) throw this.startError;
+    return { id: this.startId ?? `call-${this.starts.length}` };
   }
   async get(id: string) {
     this.gets.push(id);
@@ -27,7 +30,7 @@ class FakeProvider implements CallProvider {
   }
 }
 
-const input = (key: string) => ({ phone, consent: true, idempotencyKey: key });
+const input = (_label: string) => ({ phone, consent: true });
 
 test("sandbox completes the two-call workflow without credentials or telephone calls", async () => {
   const provider = new SandboxProvider();
@@ -66,6 +69,88 @@ test("result retrieval failure stays unresolved and checks the same call without
   assert.equal(provider.starts.length, 1);
 });
 
+test("an accepted create whose response times out persists one unresolved server-owned intent", async () => {
+  const provider = new FakeProvider();
+  provider.startError = new Error("network timeout after provider acceptance");
+  const workflow = new TeamLineWorkflow(provider, Date.now, () => "stable-intent");
+
+  await assert.rejects(() => workflow.launchFacility(input("browser-key-is-not-used")), /may have accepted/i);
+  assert.equal(provider.starts.length, 1);
+  assert.equal(provider.starts[0]!.idempotencyKey, "teamline-facility-stable-intent");
+  assert.equal(workflow.state().facility?.status, "create_uncertain");
+
+  await assert.rejects(() => workflow.launchFacility(input("fresh-browser-attempt-1")), /already exists/i);
+  await assert.rejects(() => workflow.launchFacility(input("fresh-browser-attempt-2")), /already exists/i);
+  assert.equal(provider.starts.length, 1, "repeated starts must not dispatch another provider create");
+
+  const publicState = JSON.stringify(workflow.state());
+  assert.doesNotMatch(publicState, /stable-intent|idempotency|fingerprint|providerCallId|call-1/);
+  assert.doesNotMatch(publicState, new RegExp(phone.replace("+", "\\+")));
+});
+
+test("explicit reconciliation reuses the unresolved intent and normal result checks never create", async () => {
+  const provider = new FakeProvider();
+  provider.startError = new Error("ambiguous connection loss");
+  const workflow = new TeamLineWorkflow(provider, Date.now, () => "reconcile-me");
+
+  await assert.rejects(() => workflow.launchFacility(input("initial")), /may have accepted/i);
+  delete provider.startError;
+  await workflow.reconcileFacility(input("same-number"));
+
+  assert.equal(provider.starts.length, 2, "reconciliation may resubmit only the existing logical intent");
+  assert.equal(provider.starts[0]!.idempotencyKey, provider.starts[1]!.idempotencyKey);
+  assert.equal(workflow.state().facility?.status, "in_progress");
+  provider.result = confirmedFacility();
+  await workflow.check("facility");
+  assert.equal(provider.starts.length, 2, "checking the reconciled call must not dispatch create");
+  assert.deepEqual(provider.gets, ["call-2"]);
+});
+
+test("reconciliation requires the same authorized number and retains uncertainty on another timeout", async () => {
+  const provider = new FakeProvider();
+  provider.startError = new Error("ambiguous timeout");
+  const workflow = new TeamLineWorkflow(provider, Date.now, () => "same-intent");
+
+  await assert.rejects(() => workflow.launchFacility(input("initial")), /may have accepted/i);
+  await assert.rejects(
+    () => workflow.reconcileFacility({ phone: "+12025550143", consent: true }),
+    /same authorized phone number/i,
+  );
+  assert.equal(provider.starts.length, 1);
+  await assert.rejects(() => workflow.reconcileFacility(input("reconcile")), /remains unresolved/i);
+  assert.equal(provider.starts.length, 2);
+  assert.equal(provider.starts[0]!.idempotencyKey, provider.starts[1]!.idempotencyKey);
+  assert.equal(workflow.state().facility?.status, "create_uncertain");
+});
+
+test("a malformed create response without an identifier remains an unresolved intent", async () => {
+  const provider = new FakeProvider();
+  provider.startId = "";
+  const workflow = new TeamLineWorkflow(provider, Date.now, () => "malformed-response");
+
+  await assert.rejects(() => workflow.launchFacility(input("malformed")), /may have accepted/i);
+  assert.equal(workflow.state().facility?.status, "create_uncertain");
+  await assert.rejects(() => workflow.launchFacility(input("again")), /already exists/i);
+  assert.equal(provider.starts.length, 1);
+});
+
+test("definitive rejection while reconciling a retry restores the provider-confirmed no-answer", async () => {
+  let now = 0;
+  const provider = new FakeProvider();
+  const workflow = new TeamLineWorkflow(provider, () => now, () => `intent-${provider.starts.length + 1}`);
+  await workflow.launchFacility(input("first"));
+  provider.result = { status: "failed", failureCode: "no_answer" };
+  await workflow.check("facility");
+  now = 10_000;
+  provider.startError = new Error("ambiguous retry response");
+  await assert.rejects(() => workflow.retryFacility(input("retry")), /may have accepted/i);
+  provider.startError = new CallCreateError("not_created", "Provider explicitly rejected creation.");
+  await assert.rejects(() => workflow.reconcileFacility(input("reconcile")), /explicitly rejected/i);
+
+  assert.equal(workflow.state().facility?.status, "no_answer");
+  assert.equal(workflow.state().facility?.previousNoAnswerAttempts, 0);
+});
+
 test("provider-confirmed no answer enables one explicit retry after cooldown", async () => {
   let now = 0;
   const provider = new FakeProvider();
@@ -78,6 +163,7 @@ test("provider-confirmed no answer enables one explicit retry after cooldown", a
   now = 10_000;
   await workflow.retryFacility(input("facility-second"));
   assert.equal(provider.starts.length, 2);
+  assert.notEqual(provider.starts[0]!.idempotencyKey, provider.starts[1]!.idempotencyKey);
   assert.equal(workflow.state().facility?.previousNoAnswerAttempts, 1);
 });
 
