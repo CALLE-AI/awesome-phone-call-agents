@@ -30,6 +30,8 @@ Start the app, open <http://127.0.0.1:3000/realtime> and choose **Start live ses
 
 Ask a changing question, such as the current time in a city. The Realtime agent calls the local `/api/tools/search-web` backchannel after the question, receives a bounded answer with sources and speaks the result in the same session. The page shows tool status, retrieval time, correlation ID and up to five source links. Retrieved pages are untrusted information and cannot authorize an action or change the agent's rules.
 
+News and local-event requests use dedicated `search_news` and `search_local_events` tools over the same protected backchannel. The tools resolve relative dates into a concrete seven-day window in the confirmed IANA timezone. Nearby-event searches require a confirmed city or suburb and ask a short clarification when context is missing. Results prioritize current official listings, include source links and availability uncertainty, and exclude listings outside the requested window. The agent gives a short spoken selection and can prepare a source-backed SMS preview on request; this developer harness does not send it.
+
 ## Commands
 
 ```bash

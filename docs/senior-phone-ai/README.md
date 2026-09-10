@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **6/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **7/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-008](#spa-008), which is Ready after durable family-scoped persistence passed its Docker-free database checks. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-009](#spa-009), which is Ready after current news and local-event discovery passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -57,8 +57,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Done | [SPA-003](#spa-003) |
 | [SPA-006](#spa-006) | Prepare authorized information SMS during the call workflow | M2 | Medium | Done | [SPA-005](#spa-005) |
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Done | [SPA-006](#spa-006) |
-| [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Ready | [SPA-007](#spa-007) |
-| [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Backlog | [SPA-007](#spa-007) |
+| [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Done | [SPA-007](#spa-007) |
+| [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Ready | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Backlog | [SPA-009](#spa-009), [SPA-010](#spa-010) |
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Backlog | [SPA-007](#spa-007), [SPA-009](#spa-009) |
@@ -190,14 +190,16 @@ The number-free Margaret seed stores only timezone, approximate location and int
 
 Implement searchNews and searchLocalEvents with the existing live tool dispatcher.
 Acceptance criteria:
-- [ ] Search after each live request; prioritize useful current sources, local councils, libraries and community listings.
-- [ ] Resolve 'this week' and 'nearby' using confirmed location and timezone; ask when location is missing.
-- [ ] Return event dates, venue, address, availability uncertainty and sources, filtering stale/irrelevant results.
-- [ ] Give short spoken answers and offer requested SMS through the existing tool.
-- [ ] Never present the sample gardening workshop as a verified real event.
-- [ ] Cover empty results, stale listings, tool errors and follow-up questions.
+- [x] Search after each live request; prioritize useful current sources, local councils, libraries and community listings.
+- [x] Resolve 'this week' and 'nearby' using confirmed location and timezone; ask when location is missing.
+- [x] Return event dates, venue, address, availability uncertainty and sources, filtering stale/irrelevant results.
+- [x] Give short spoken answers and offer requested SMS through the existing tool.
+- [x] Never present the sample gardening workshop as a verified real event.
+- [x] Cover empty results, stale listings, tool errors and follow-up questions.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added dedicated Realtime `search_news` and `search_local_events` tools over the protected SPA-003 search backchannel. A deterministic discovery layer validates bounded queries and IANA timezones, requires confirmed city/suburb context for nearby events, resolves relative requests into an explicit local seven-day window, and instructs live retrieval to prefer current official council, library, venue and community sources. Event results request no more than three useful options with dates, venue, address, source and honest availability uncertainty; missing context returns a one-question clarification. The existing information-SMS composer is exposed as a requested preview only and cannot send or bypass authenticated destination confirmation.
+
+Updated the search route to the current lower-cost `gpt-5.6-luna` model with web search support, no reasoning allocation and enough output space for complete event details. Incomplete or empty responses fail honestly, and diagnostics retain only a bounded error code. A live news request completed at 2026-09-10T12:35:57Z under redacted correlation `4600…0006` with five sources. A live Sydney event request completed at 2026-09-10T12:40:44Z under redacted correlation `4c00…000c`, returning three dated official-source options with venue/address and confirmation caveats. Earlier provider failures exercised the 502 path without reusing results. Thirty-six offline tests, lint, typecheck, production build and repository validation passed.
 
 ### SPA-009
 
@@ -371,6 +373,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-008 | Added current news and local-event tools with confirmed context, concrete date windows, official-source guidance and requested SMS previews; moved web search to the current lower-cost supported model; marked SPA-008 Done and SPA-009 Ready. | Live news and event searches completed with five sources under redacted correlations `4600…0006` and `4c00…000c`; event output contained three dated options and availability caveats. Thirty-six offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-007 | Added Supabase persistence, verified-claims authentication, family RLS, consent/retention controls and durable action/SMS adapters; replaced the Docker workflow with embedded PostgreSQL validation; marked SPA-007 Done and SPA-008 Ready. | The migration and number-free seed applied in PGlite; family access, cross-account denial, consent triggers and restricted grants passed. Thirty-one offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-006 | Added the authorized, idempotent SMS workflow and storage/callback boundaries; kept all Twilio delivery work in final ticket SPA-004; marked SPA-006 Done and SPA-007 Ready. | Twenty-six offline tests, lint, typecheck and production build passed. Repository validation passed; no live message was sent. |
 | 2026-09-10 | SPA-005 | Added shared server-side action authorization, strict E.164 validation, phone redaction, tool permissions and structured conversation boundaries; marked SPA-005 Done and SPA-006 Ready. | Twenty offline tests, lint and typecheck passed. Production build and repository validation also passed. No live side effect was enabled. |

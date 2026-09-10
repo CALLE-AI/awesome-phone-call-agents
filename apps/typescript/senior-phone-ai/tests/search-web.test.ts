@@ -4,11 +4,19 @@ import test from "node:test";
 import { requestWebSearch } from "../lib/tools/search-web-client";
 import {
   createWebSearchResult,
+  describeWebSearchProviderError,
   extractWebSearchSources,
   parseSearchRequest,
 } from "../lib/tools/search-web";
 
 const correlationId = "11111111-1111-4111-8111-111111111111";
+
+test("provider diagnostics expose only bounded codes", () => {
+  assert.equal(describeWebSearchProviderError({ status: 429, message: "secret detail" }), "provider_http_429");
+  assert.equal(describeWebSearchProviderError({ code: "search_timeout", message: "secret detail" }), "search_timeout");
+  assert.equal(describeWebSearchProviderError({ name: "TimeoutError", message: "secret detail" }), "provider_timeouterror");
+  assert.equal(describeWebSearchProviderError({ code: "unsafe value with spaces" }), "provider_object");
+});
 
 test("search requests require a bounded query and UUID v4 correlation ID", () => {
   assert.deepEqual(parseSearchRequest({ correlationId, query: "  current Sydney time  " }), {
@@ -17,7 +25,7 @@ test("search requests require a bounded query and UUID v4 correlation ID", () =>
   });
   assert.throws(() => parseSearchRequest({ correlationId: "request-1", query: "current Sydney time" }));
   assert.throws(() => parseSearchRequest({ correlationId, query: "x" }));
-  assert.throws(() => parseSearchRequest({ correlationId, query: "x".repeat(301) }));
+  assert.throws(() => parseSearchRequest({ correlationId, query: "x".repeat(801) }));
 });
 
 test("search results bound text and retain at most five safe source URLs", () => {
@@ -41,17 +49,24 @@ test("search results bound text and retain at most five safe source URLs", () =>
     ],
   });
   const result = createWebSearchResult({
-    answer: ` Answer ${"a".repeat(2_100)} `,
+    answer: ` Answer ${"a".repeat(4_100)} `,
     correlationId,
     query: "example",
     retrievedAt: "2026-09-10T00:00:00.000Z",
     sources,
   });
 
-  assert.equal(result.answer.length, 2_000);
+  assert.ok(result.answer.length <= 4_000);
+  assert.match(result.answer, /…$/u);
   assert.equal(result.sources.length, 5);
   assert.equal(result.sources[0]?.url, "https://example.com/cited");
   assert.ok(result.sources.every((source) => source.url.startsWith("https://")));
+  assert.throws(() => createWebSearchResult({
+    answer: "   ",
+    correlationId,
+    query: "empty search",
+    sources: [],
+  }), /no answer/);
 });
 
 test("browser tool sends and correlates a fake provider result", async () => {

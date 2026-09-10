@@ -5,6 +5,7 @@ import { getRuntimeMode } from "@/lib/config/server";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter, readRealtimeAccessConfig } from "@/lib/realtime/access";
 import {
   createWebSearchResult,
+  describeWebSearchProviderError,
   extractWebSearchSources,
   parseSearchRequest,
   WEB_SEARCH_MODEL,
@@ -53,9 +54,13 @@ export async function POST(request: Request) {
       tools: [{ type: "web_search", search_context_size: "low" }],
       tool_choice: "required",
       include: ["web_search_call.action.sources"],
-      max_output_tokens: 700,
+      max_output_tokens: 1_200,
+      reasoning: { effort: "none" },
       store: false,
     });
+    if (response.status !== "completed") {
+      throw new Error("provider response was incomplete");
+    }
     const result = createWebSearchResult({
       answer: response.output_text,
       correlationId: input.correlationId,
@@ -63,7 +68,10 @@ export async function POST(request: Request) {
       sources: extractWebSearchSources(response.output),
     });
     return NextResponse.json(result, { headers: noStoreHeaders });
-  } catch {
+  } catch (error) {
+    console.error("Live web search provider failure", {
+      code: describeWebSearchProviderError(error),
+    });
     return NextResponse.json({ error: "Live web search did not complete" }, { status: 502, headers: noStoreHeaders });
   }
 }
