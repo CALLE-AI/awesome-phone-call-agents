@@ -21,11 +21,11 @@ Last updated: 2026-09-10
 
 Implementation is in progress. MVP: **3/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-004](#spa-004), which is Ready after the browser same-session search gate passed.
+Next ticket: [SPA-005](#spa-005), which is Ready after the browser same-session search gate passed. The Twilio/inbound SIP gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
-The critical milestone is [SPA-004](#spa-004): prove that a real telephone caller can ask an unscripted question, trigger external search, and hear the retrieved answer in the same call. Complete this before deeper dashboard work.
+The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after the application, safety, resilience and deployment work is ready, then prove that a real telephone caller can ask an unscripted question, trigger external search, and hear the retrieved answer in the same call.
 
 ## How to maintain this tracker
 
@@ -42,9 +42,9 @@ The critical milestone is [SPA-004](#spa-004): prove that a real telephone calle
 
 | Milestone | Tickets | Completion condition |
 |---|---|---|
-| M1: Prove realtime phone tool calling | SPA-001–SPA-004 | Real telephone search gate passes with redacted evidence |
+| M1: Prove realtime browser tool calling | SPA-001–SPA-003 | Realtime browser search gate passes with redacted evidence |
 | M2: Build the core MVP | SPA-005–SPA-013 | SMS, persistence, reminders, CALL-E and authorized dashboard work end to end |
-| M3: Verify and demonstrate the MVP | SPA-014–SPA-015 | Required checks and the authorized live demo pass; operations are documented |
+| M3: Verify, demonstrate and connect the MVP | SPA-014–SPA-015, then SPA-004 | Required checks, the browser demo and the authorized live telephone gate pass; operations are documented |
 | M4: Optional extensions | SPA-016–SPA-019 | Selected extensions meet their own acceptance criteria after the MVP |
 
 ## Ticket board
@@ -54,8 +54,7 @@ The critical milestone is [SPA-004](#spa-004): prove that a real telephone calle
 | [SPA-001](#spa-001) | Scaffold the fullstack Next.js TypeScript app | M1 | High | Done | None |
 | [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Done | [SPA-001](#spa-001) |
 | [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Done | [SPA-002](#spa-002) |
-| [SPA-004](#spa-004) | Connect inbound SIP calls and pass the live phone search gate | M1 | High | Ready | [SPA-003](#spa-003) |
-| [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Backlog | [SPA-004](#spa-004) |
+| [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Ready | [SPA-003](#spa-003) |
 | [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Backlog | [SPA-005](#spa-005) |
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Backlog | [SPA-006](#spa-006) |
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Backlog | [SPA-007](#spa-007) |
@@ -66,10 +65,11 @@ The critical milestone is [SPA-004](#spa-004): prove that a real telephone calle
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Backlog | [SPA-013](#spa-013) |
 | [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Backlog | [SPA-014](#spa-014) |
-| [SPA-016](#spa-016) | Optional: call a venue on the senior's behalf and return the result | M4 | Low | Backlog | [SPA-015](#spa-015) |
-| [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-015](#spa-015) |
-| [SPA-018](#spa-018) | Optional: add weather and government-information tools | M4 | Low | Backlog | [SPA-015](#spa-015) |
-| [SPA-019](#spa-019) | Optional: add explicitly scheduled recurring check-ins | M4 | Low | Backlog | [SPA-015](#spa-015) |
+| [SPA-004](#spa-004) | Connect Twilio inbound SIP calls and pass the live phone search gate | M3 | High | Backlog | [SPA-015](#spa-015) |
+| [SPA-016](#spa-016) | Optional: call a venue on the senior's behalf and return the result | M4 | Low | Backlog | [SPA-004](#spa-004) |
+| [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-004](#spa-004) |
+| [SPA-018](#spa-018) | Optional: add weather and government-information tools | M4 | Low | Backlog | [SPA-004](#spa-004) |
+| [SPA-019](#spa-019) | Optional: add explicitly scheduled recurring check-ins | M4 | Low | Backlog | [SPA-004](#spa-004) |
 
 ## Ticket details
 
@@ -121,16 +121,16 @@ The explicitly enabled live browser check passed with an unscripted spoken locat
 
 ### SPA-004
 
-**Connect inbound SIP calls and pass the live phone search gate**
+**Connect Twilio inbound SIP calls and pass the live phone search gate**
 
-Connect a normal telephone number through a suitable SIP/telephony provider to the realtime agent.
+Connect a normal telephone number through Twilio SIP trunking to the realtime agent as the final MVP ticket.
 Acceptance criteria:
 - [ ] Verify supported provider/OpenAI integration and hosting requirements against current official documentation; record capability gaps.
 - [ ] Authenticate inbound events, deduplicate delivery, manage call/session teardown and secure the server-side tool-control channel.
 - [ ] Verify authentication against the actual transport contract. Public call/log/transcript routes are forbidden; an unsigned notification is never trusted as an authoritative result.
 - [ ] A real caller asks a previously unknown question, external search starts afterward, and the retrieved answer is heard during that same phone call.
 - [ ] Record redacted timestamps/correlation evidence and observed latency; exercise follow-up and interruption.
-- [ ] Live checks require explicit consent and configured test numbers. Do not proceed deeply into dashboard implementation until this gate passes.
+- [ ] Live checks require explicit consent and configured test numbers. Run this gate only after SPA-015 passes.
 - [ ] Keep CALL-E for outbound actions; do not assume CALL-E inbound live tool calling.
 
 Implementation notes and verification: Not started.
@@ -297,11 +297,11 @@ Implementation notes and verification: Not started.
 
 Prepare operating documentation and a reproducible end-to-end demo.
 Acceptance criteria:
-- [ ] Document Next.js/Node hosting requirements proven by the spike, SIP setup, Supabase migrations, scheduler, secrets and provider configuration.
+- [ ] Document Next.js/Node hosting, Supabase migrations, scheduler, secrets and non-SIP provider configuration; leave Twilio/SIP setup for SPA-004.
 - [ ] Document side effects, consent, cancellation/disable behavior, rollback, retention and troubleshooting.
-- [ ] Demonstrate phone call → arbitrary live news/search → current local event → requested SMS → confirmed reminder → CALL-E reminder delivery → dashboard state.
+- [ ] Demonstrate browser realtime conversation → arbitrary live news/search → current local event → requested SMS → confirmed reminder → CALL-E reminder delivery → dashboard state.
 - [ ] Use current retrieved events; no hardcoded demo answers. Clearly label offline fake mode.
-- [ ] Run live calls/SMS only with explicit test consent and configured recipients; collect redacted evidence of same-call search.
+- [ ] Run live SMS only with explicit test consent and configured recipients; collect redacted evidence of same-session browser search. The live telephone proof belongs to SPA-004.
 - [ ] Keep optional call-on-behalf outside the required MVP acceptance.
 - [ ] Prepare repository-facing documentation in English under apps/typescript/senior-phone-ai/ and docs/ as appropriate.
 - [ ] Review the full PR diff, relevant history, screenshots, video and linked public artifacts for credentials and personal data. Use number-free synthetic fixtures where possible; any full example number must be verified reserved fiction and rejected by live dispatch.
@@ -368,6 +368,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-004, SPA-005 | Deferred Twilio/inbound SIP to the final MVP gate without renumbering tickets; made SPA-005 Ready so safety and application work can continue. | The unfinished SIP implementation is preserved in the named local Git stash `defer twilio inbound sip spike`; no live carrier behavior is claimed. |
 | 2026-09-10 | SPA-003 | Passed the same-session spoken search gate, corrected final-answer citation priority, marked SPA-003 Done and made SPA-004 Ready. | Live browser search completed under redacted correlation `f04c…d71d` with five sources in a six-item conversation; focused live citation verification returned five official URLs in 14,086 ms. Thirteen offline tests, lint and typecheck passed. |
 | 2026-09-10 | SPA-003 | Added the server-side live web search backchannel and Realtime function tool; moved SPA-003 to In progress pending a same-session spoken check. | Lint, typecheck and 12 offline tests passed, including four fake-provider search tests. No live search result is claimed yet. |
 | 2026-09-10 | SPA-002 | Passed the credentialed local Realtime audio gate, marked SPA-002 Done and made SPA-003 Ready. | User confirmed live audio worked. Browser recorded 3,665 ms establishment and four response measurements of 610–1,050 ms across 10 conversation items; session ended. Eight offline tests, lint and typecheck passed. |
