@@ -82,7 +82,7 @@ function summary(record: ScheduledCallRecord, secret: string): ScheduledCallSumm
     createdAt: record.createdAt,
     scheduledFor: record.scheduledFor,
     destinationSummary: record.destinationSummary,
-    purpose: request.purpose,
+    purpose: request.purpose || "No specific purpose",
     status: record.status,
     callReference: record.callId ? `${record.callId.slice(0, 14)}…` : undefined,
   };

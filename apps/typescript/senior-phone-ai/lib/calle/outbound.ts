@@ -12,8 +12,8 @@ const PROHIBITED_PURPOSE = /\b(?:diagnos(?:e|is)|medication change|emergency|leg
 export function validateOutboundCallRequest(request: OutboundCallRequest): OutboundCallRequest {
   assertStrictE164(request.destinationE164);
   if (!IDEMPOTENCY_KEY.test(request.idempotencyKey)) throw new Error("invalid idempotency key");
-  if (request.purpose.trim() !== request.purpose || request.purpose.length < 1 || request.purpose.length > 300) {
-    throw new Error("call purpose must be non-empty, bounded, and trimmed");
+  if (request.purpose.trim() !== request.purpose || request.purpose.length > 300) {
+    throw new Error("call purpose must be empty or a bounded, trimmed value");
   }
   if (redactPhoneNumbers(request.purpose) !== request.purpose) {
     throw new Error("put only the confirmed destination in the phone field");
@@ -28,6 +28,6 @@ export function outboundCallPreview(request: OutboundCallRequest) {
   const validated = validateOutboundCallRequest(request);
   return {
     destinationSummary: maskPhoneNumber(validated.destinationE164),
-    purpose: validated.purpose,
+    purpose: validated.purpose || "No specific purpose",
   };
 }

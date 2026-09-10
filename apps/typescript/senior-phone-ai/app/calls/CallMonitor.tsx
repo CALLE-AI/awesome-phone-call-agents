@@ -58,8 +58,8 @@ export function CallMonitor() {
       setError("Enter the destination in E.164 format, such as +614XXXXXXXX.");
       return;
     }
-    if (!callPurpose || callPurpose.length > 300) {
-      setError("Describe the call purpose in 1 to 300 characters.");
+    if (callPurpose.length > 300) {
+      setError("Keep the optional call purpose within 300 characters.");
       return;
     }
     let scheduledFor: string | undefined;
@@ -200,12 +200,12 @@ export function CallMonitor() {
             value={destinationE164}
           />
           <small>Use E.164 format: country code with a leading + and no spaces. Do not put this number in `.env.local`.</small>
-          <label htmlFor="purpose">Purpose of the call</label>
+          <label htmlFor="purpose">Purpose of the call <span className="optional-label">(optional)</span></label>
           <textarea
             id="purpose"
             maxLength={300}
             onChange={(event) => { setPurpose(event.target.value); setReview(undefined); }}
-            placeholder="For example: Ask whether they can hear clearly and thank them."
+            placeholder="Optional: Ask whether they can hear clearly and thank them."
             rows={3}
             value={purpose}
           />
@@ -226,7 +226,7 @@ export function CallMonitor() {
           <div className="call-confirmation" role="group" aria-label="Confirm outbound call">
             <h2>Confirm this phone call</h2>
             <p><strong>Destination:</strong> {review.destinationSummary}</p>
-            <p><strong>Purpose:</strong> {review.purpose}</p>
+            <p><strong>Purpose:</strong> {review.purpose || "No specific purpose"}</p>
             <p><strong>When:</strong> {review.scheduledFor ? new Date(review.scheduledFor).toLocaleString() : "Now"}</p>
             <p className="fine-print">
               Confirm that you have permission to call this number. A scheduled call can be canceled

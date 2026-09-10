@@ -22,7 +22,9 @@ export async function createCalleCall(
         "Idempotency-Key": validated.idempotencyKey,
       },
       body: JSON.stringify({
-        task: `Identify yourself as Senior Phone AI. ${validated.purpose}`,
+        task: validated.purpose
+          ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
+          : "Identify yourself as Senior Phone AI and have a general conversation with the recipient.",
         recipients: [{ phones: [validated.destinationE164] }],
         metadata: { application: "senior-phone-ai" },
       }),
