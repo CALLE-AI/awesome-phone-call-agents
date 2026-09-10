@@ -253,6 +253,22 @@ button.danger { background: #8b372a; }
   padding: 14px 16px;
 }
 .monitor-form button { justify-self: start; margin-top: 4px; }
+.call-form { display: grid; gap: 10px; margin-top: 30px; max-width: 700px; }
+.call-form label { font-weight: 800; margin-top: 8px; }
+.call-form input,
+.call-form textarea {
+  background: #fff;
+  border: 1px solid #9eafa1;
+  border-radius: 12px;
+  color: var(--ink);
+  font: inherit;
+  padding: 14px 16px;
+}
+.call-form button { justify-self: start; margin-top: 8px; }
+.call-confirmation { background: #edf3ed; border-radius: 18px; margin-top: 28px; padding: 22px; }
+.call-confirmation h2 { font-size: 1.6rem; }
+.table-actions { margin-top: 28px; }
+.success { background: #edf3ed; border-radius: 12px; color: #19593d; margin-top: 18px; padding: 14px 16px; }
 .monitor-status-row { align-items: start; display: flex; gap: 20px; justify-content: space-between; }
 .status-pill { background: #edf3ed; border-radius: 999px; padding: 8px 14px; text-transform: capitalize; }
 .conversation-note small { display: block; margin-top: 4px; opacity: .7; }

@@ -1,8 +1,41 @@
 import "server-only";
 
 import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } from "./status";
+import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
+
+export async function createCalleCall(
+  request: OutboundCallRequest,
+  apiKey: string,
+  fetcher: typeof fetch = fetch,
+): Promise<CalleCallSnapshot> {
+  const validated = validateOutboundCallRequest(request);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": validated.idempotencyKey,
+      },
+      body: JSON.stringify({
+        task: `Identify yourself as Senior Phone AI. ${validated.purpose}`,
+        recipients: [{ phones: [validated.destinationE164] }],
+        metadata: { application: "senior-phone-ai" },
+      }),
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
+    if (!response.ok) throw new Error(`CALL-E create status ${response.status}`);
+    return parseCalleCallSnapshot(await response.json());
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function getCalleCallSnapshot(
   callId: string,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCalleCallSnapshots } from "@/lib/calle/client";
-import { parseCalleCallIds } from "@/lib/calle/status";
+import { listRegisteredCallIds } from "@/lib/calle/registry";
 import { getRuntimeMode, requireSecret } from "@/lib/config/server";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter } from "@/lib/realtime/access";
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
   let callIds: string[];
   try {
-    callIds = parseCalleCallIds(process.env.CALLE_MONITORED_CALL_IDS);
+    callIds = await listRegisteredCallIds(process.env.CALLE_MONITORED_CALL_IDS);
   } catch {
     return NextResponse.json({ error: "The monitored call registry is invalid" }, {
       status: 503,

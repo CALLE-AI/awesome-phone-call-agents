@@ -2,7 +2,7 @@
 
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters and Supabase persistence with family-scoped row-level access controls. It does not yet connect a telephone/SMS provider or CALL-E.
+This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters, Supabase persistence with family-scoped row-level access controls, and a local-only explicitly confirmed CALL-E outbound-call harness. It does not yet connect an inbound telephone or live SMS provider.
 
 ## Quick start
 
@@ -38,6 +38,8 @@ News and local-event requests use dedicated `search_news` and `search_local_even
 
 Open <http://127.0.0.1:3000/calls> in live mode. The page automatically loads the calls registered in the server-only `CALLE_MONITORED_CALL_IDS` setting and presents them in a table. Active calls refresh every two seconds, showing lifecycle status and each caller/assistant transcript turn that the provider has published. The [CALL-E Calls API](https://docs.heycall-e.com/api-reference/calls) has no list-all-calls operation, so each successful application dispatch must add its returned call ID to the durable call registry as part of SPA-010. The API documents transcript turns on an individual call response but does not promise that they are available before the terminal result.
 
+To place a call, enter the destination directly on `/calls` in strict E.164 format and describe the bounded purpose. **Review call** performs no provider request and displays a masked confirmation. Only **Confirm and place call** dispatches to CALL-E. The destination is never read from an environment fallback. A local ignored registry writes an intent fingerprint before dispatch, stores an accepted provider ID, and blocks automatic retries after an uncertain result. It does not retain the full destination or purpose. Calls accepted by CALL-E cannot be canceled by closing the page.
+
 The monitor is a local developer tool. Both `CALLE_API_KEY` and full registered call IDs stay on the server; the table shows only a shortened call identifier. The server contacts only the fixed `https://api.heycall-e.com` origin, rejects redirects, and excludes recipient numbers, task instructions, provider call IDs and raw errors from its response. Phone-like text inside transcripts and summaries is masked. Transcript text stays in browser memory and is discarded when the page closes. An authenticated shared operator view remains part of SPA-013.
 
 ## Commands
@@ -59,13 +61,13 @@ npm start
 
 Unknown runtime modes fail closed. The Realtime route requires live mode and an exact same loopback origin before it creates a rate-limited, 60-second client secret. Requests addressed through a LAN or public hostname are rejected. The long-lived OpenAI key remains on the server and the browser has no credential input. This local-only harness is not end-user authentication and must not be deployed as a public route.
 
-The CALL-E monitor uses the same exact loopback-origin rule and a separate rate limit. It reads provider state only and cannot create, retry or cancel a call.
+The CALL-E page uses the same exact loopback-origin rule and separate rate limits. It can create a call only after the on-page review and explicit confirmation. It never automatically retries or cancels a call.
 
 ## Side effects and safety
 
-The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network; Twilio delivery remains deferred to SPA-004.
+The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. The separate local CALL-E page can place an outbound call after an operator enters the exact destination and purpose, reviews a masked preview and explicitly confirms. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network; Twilio delivery remains deferred to SPA-004.
 
-The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. Preview tests use process-local stores; Supabase-backed authorization and SMS stores provide durable production boundaries. No live side-effect adapter is enabled yet.
+The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. Preview tests use process-local stores; Supabase-backed authorization and SMS stores provide durable production boundaries. The CALL-E harness is restricted to the exact local loopback origin and is not an authenticated production endpoint.
 
 The assistant identifies itself as AI, speaks plainly, respects refusal and must not impersonate family, clinicians, therapists, emergency services or professional advisers. It does not diagnose conditions, recommend medication changes, give personalized high-risk legal/financial advice or promise emergency help. Immediate danger is directed to local emergency services or a trusted person.
 
@@ -78,6 +80,8 @@ Authorized family members with reminder permission can list and cancel reminders
 ## Cancellation and rollback
 
 Choose **End session**, close the page or stop the server to close a local Realtime session. The SDK owns the harness microphone stream and stops its tracks on close. Choose **Clear saved notes** to remove conversation text retained by this browser. Removing the app directory removes only local source and build output; browser storage must be cleared separately.
+
+Closing `/calls` stops status polling but does not cancel a call accepted by CALL-E. Remove the ignored `data/calle-call-registry.json` file to clear the local call registry after any in-flight outcome has been reconciled.
 
 Future provider actions must document their own cancellation limits. In particular, closing the browser or stopping this server must never be described as canceling a call already accepted by a provider. The host scheduler will own recurrence and must support disabling future runs.
 

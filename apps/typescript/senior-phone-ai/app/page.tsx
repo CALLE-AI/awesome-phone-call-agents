@@ -27,8 +27,8 @@ export default function Home() {
         <div className="notice" role="status">
           <strong>Local realtime harness available</strong>
           <span>
-            Test browser audio at <a href="/realtime">/realtime</a> or monitor a CALL-E call at{" "}
-            <a href="/calls">/calls</a>. No phone call, message or recurring job can be created here.
+            Test browser audio at <a href="/realtime">/realtime</a>, or review and explicitly confirm a
+            CALL-E destination at <a href="/calls">/calls</a>. Messages and recurring jobs remain disabled.
           </span>
         </div>
       </section>
