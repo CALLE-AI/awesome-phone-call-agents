@@ -62,8 +62,8 @@ const MAX_FIELD_LENGTH = 200;
 const MAX_DETAIL_FIELDS = 12;
 const SENSITIVE_DETAIL_KEY = /(?:api[-_]?key|authorization|credential|password|secret|token)/i;
 
-function requireBoundedField(name: string, value: string): string {
-  if (value.length < 1 || value.length > MAX_FIELD_LENGTH || value.trim() !== value) {
+function requireBoundedField(name: string, value: string, maximum = MAX_FIELD_LENGTH): string {
+  if (value.length < 1 || value.length > maximum || value.trim() !== value) {
     throw new Error(`${name} must be non-empty, bounded, and trimmed`);
   }
   return value;
@@ -78,8 +78,8 @@ function validateRequest(request: ActionRequest): ActionRequest {
     throw new Error("action details contain too many fields");
   }
   for (const [key, value] of Object.entries(details)) {
-    requireBoundedField("detail key", key);
-    requireBoundedField("detail value", value);
+    requireBoundedField("detail key", key, 64);
+    requireBoundedField("detail value", value, 500);
     if (SENSITIVE_DETAIL_KEY.test(key)) {
       throw new Error("authentication data is not allowed in action details");
     }

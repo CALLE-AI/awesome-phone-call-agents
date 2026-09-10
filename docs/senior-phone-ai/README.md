@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **4/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **5/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-006](#spa-006), which is Ready after the shared safety and permission controls passed. The Twilio/inbound SIP gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-007](#spa-007), which is Ready after the provider-neutral SMS workflow passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -55,8 +55,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-002](#spa-002) | Prove local realtime audio conversation and session lifecycle | M1 | High | Done | [SPA-001](#spa-001) |
 | [SPA-003](#spa-003) | Add live web search to the ongoing realtime conversation | M1 | High | Done | [SPA-002](#spa-002) |
 | [SPA-005](#spa-005) | Enforce tool permissions and senior conversation safety | M2 | Medium | Done | [SPA-003](#spa-003) |
-| [SPA-006](#spa-006) | Send requested information by SMS during the call | M2 | Medium | Ready | [SPA-005](#spa-005) |
-| [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Backlog | [SPA-006](#spa-006) |
+| [SPA-006](#spa-006) | Prepare authorized information SMS during the call workflow | M2 | Medium | Done | [SPA-005](#spa-005) |
+| [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Ready | [SPA-006](#spa-006) |
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Backlog | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Backlog | [SPA-007](#spa-007) |
@@ -65,7 +65,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Backlog | [SPA-013](#spa-013) |
 | [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Backlog | [SPA-014](#spa-014) |
-| [SPA-004](#spa-004) | Connect Twilio inbound SIP calls and pass the live phone search gate | M3 | High | Backlog | [SPA-015](#spa-015) |
+| [SPA-004](#spa-004) | Connect Twilio inbound SIP and SMS and pass the live phone gate | M3 | High | Backlog | [SPA-015](#spa-015) |
 | [SPA-016](#spa-016) | Optional: call a venue on the senior's behalf and return the result | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-018](#spa-018) | Optional: add weather and government-information tools | M4 | Low | Backlog | [SPA-004](#spa-004) |
@@ -121,14 +121,15 @@ The explicitly enabled live browser check passed with an unscripted spoken locat
 
 ### SPA-004
 
-**Connect Twilio inbound SIP calls and pass the live phone search gate**
+**Connect Twilio inbound SIP and SMS and pass the live phone gate**
 
-Connect a normal telephone number through Twilio SIP trunking to the realtime agent as the final MVP ticket.
+Connect a normal telephone number through Twilio SIP trunking and add the live Twilio SMS adapter as the final MVP ticket.
 Acceptance criteria:
 - [ ] Verify supported provider/OpenAI integration and hosting requirements against current official documentation; record capability gaps.
 - [ ] Authenticate inbound events, deduplicate delivery, manage call/session teardown and secure the server-side tool-control channel.
 - [ ] Verify authentication against the actual transport contract. Public call/log/transcript routes are forbidden; an unsigned notification is never trusted as an authoritative result.
 - [ ] A real caller asks a previously unknown question, external search starts afterward, and the retrieved answer is heard during that same phone call.
+- [ ] A confirmed information message is delivered by Twilio during the call; authenticate and deduplicate its delivery callback.
 - [ ] Record redacted timestamps/correlation evidence and observed latency; exercise follow-up and interruption.
 - [ ] Live checks require explicit consent and configured test numbers. Run this gate only after SPA-015 passes.
 - [ ] Keep CALL-E for outbound actions; do not assume CALL-E inbound live tool calling.
@@ -153,18 +154,18 @@ Implementation notes and verification: Added an SDK-independent safety layer tha
 
 ### SPA-006
 
-**Send requested information by SMS during the call**
+**Prepare authorized information SMS during the call workflow**
 
-Implement sendSms behind a provider adapter (for example Twilio, subject to verified integration).
+Implement the provider-neutral sendSms workflow with preview and fake adapters. Live Twilio delivery remains in SPA-004.
 Acceptance criteria:
-- [ ] A request such as 'send me the details' sends a concise, scannable message during the active call to a confirmed destination.
-- [ ] Information includes relevant event time/address/source link without invented details.
-- [ ] Third-party recipients require explicit confirmation; validate E.164 and mask numbers in operational output.
-- [ ] Return queued/sent/failed states accurately, verify delivery callbacks and deduplicate sends.
-- [ ] Include dry-run preview and fake-provider tests; live delivery is explicitly enabled.
-- [ ] Provide a storage interface that the Supabase persistence ticket will implement.
+- [x] A request such as 'send me the details' prepares a concise, scannable message for a confirmed destination during the active workflow.
+- [x] Information includes relevant event time/address/source link without invented details.
+- [x] Third-party recipients require explicit confirmation; validate E.164 and mask numbers in operational output.
+- [x] Return previewed/queued/sent/failed/unknown states accurately, require verified delivery callbacks and deduplicate sends.
+- [x] Include dry-run preview and fake-provider tests; no provider request is made by default. Live Twilio delivery is deferred to SPA-004.
+- [x] Provide a storage interface that the Supabase persistence ticket will implement.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a provider-neutral SMS service that composes bounded source-backed event messages, consumes the exact one-time SPA-005 authorization and reserves an idempotency key before adapter dispatch. Operational results expose only a safe correlation ID, masked destination and honest previewed/queued/sent/failed/unknown state. Exact duplicate requests reuse the stored result; changed requests fail closed, and uncertain provider results remain unknown without automatic retry. The storage interface accepts verified delivery events, deduplicates event IDs and prevents older callbacks from regressing newer state. Preview and fake adapters make no network request. Twenty-six offline tests, lint, typecheck and the production build pass. Live Twilio sending and provider-specific signature verification remain explicitly assigned to final ticket SPA-004.
 
 ### SPA-007
 
@@ -368,6 +369,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-10 | SPA-006 | Added the authorized, idempotent SMS workflow and storage/callback boundaries; kept all Twilio delivery work in final ticket SPA-004; marked SPA-006 Done and SPA-007 Ready. | Twenty-six offline tests, lint, typecheck and production build passed. Repository validation passed; no live message was sent. |
 | 2026-09-10 | SPA-005 | Added shared server-side action authorization, strict E.164 validation, phone redaction, tool permissions and structured conversation boundaries; marked SPA-005 Done and SPA-006 Ready. | Twenty offline tests, lint and typecheck passed. Production build and repository validation also passed. No live side effect was enabled. |
 | 2026-09-10 | SPA-004, SPA-005 | Deferred Twilio/inbound SIP to the final MVP gate without renumbering tickets; made SPA-005 Ready so safety and application work can continue. | The unfinished SIP implementation is preserved in the named local Git stash `defer twilio inbound sip spike`; no live carrier behavior is claimed. |
 | 2026-09-10 | SPA-003 | Passed the same-session spoken search gate, corrected final-answer citation priority, marked SPA-003 Done and made SPA-004 Ready. | Live browser search completed under redacted correlation `f04c…d71d` with five sources in a six-item conversation; focused live citation verification returned five official URLs in 14,086 ms. Thirteen offline tests, lint and typecheck passed. |

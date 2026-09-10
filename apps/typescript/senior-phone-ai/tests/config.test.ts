@@ -22,6 +22,7 @@ test("server secrets reject empty and placeholder-length values", () => {
 test("preview adapters report previews without provider identifiers", async () => {
   const sms = await new PreviewSmsAdapter().send({
     destinationE164: "+12025550123",
+    idempotencyKey: "preview-sms-1",
     message: "Synthetic preview",
   });
   const call = await new PreviewOutboundCallAdapter().plan({

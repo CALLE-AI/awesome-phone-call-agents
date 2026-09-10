@@ -2,7 +2,7 @@
 
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It does not yet connect a telephone provider, SMS, Supabase or CALL-E.
+This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters only. It does not yet connect a telephone/SMS provider, Supabase or CALL-E.
 
 ## Quick start
 
@@ -50,7 +50,7 @@ Unknown runtime modes fail closed. The Realtime route requires live mode and an 
 
 ## Side effects and safety
 
-The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, send SMS or schedule work. Search failures are reported instead of guessed. The other provider adapters return `previewed` without contacting a network.
+The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network; Twilio delivery remains deferred to SPA-004.
 
 The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. The current authorization store is intentionally process-local until SPA-007 adds durable authenticated persistence, so no live side-effect adapter is enabled yet.
 
@@ -81,6 +81,6 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 ## Current limitations
 
 - There is no inbound phone integration.
-- There is no SMS delivery, persistence, reminder scheduling or dashboard.
+- There is no live SMS delivery, durable persistence, reminder scheduling or dashboard.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
 - The verified live browser search flow does not prove the deferred Twilio telephone gate.
