@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PowerBack CALL-E Call Result",
+  "type": "object",
+  "required": ["case_id", "result_code", "task_completed", "completion_confidence", "structured_result", "assessment_basis", "evidence", "needs_human"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": { "type": "string" },
+    "result_code": {
+      "type": "string",
+      "enum": [
+        "answered_ok",
+        "answered_needs_help",
+        "declined",
+        "no_answer",
+        "voicemail",
+        "wrong_person",
+        "advisory_needs_review",
+        "insufficient_data",
+        "halted_safe"
+      ],
+      "description": "Distinct terminal codes. 'declined' means the person refused to talk and is never counted as evidence; 'voicemail' and 'wrong_person' are separate terminal states; 'advisory_needs_review' carries a keyword-derived summary that a human must confirm and never dispatches on its own; 'halted_safe' is the fail-closed catch-all."
+    },
+    "task_completed": { "type": "boolean" },
+    "completion_confidence": {
+      "type": "object",
+      "required": ["score", "label"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "label": { "type": "string", "enum": ["high", "medium", "low"] }
+      }
+    },
+    "structured_result": {
+      "description": "Confidence gate: must be null when confidence is below threshold or the call was declined.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["is_safe", "has_power"],
+          "additionalProperties": false,
+          "properties": {
+            "is_safe": { "type": "string", "enum": ["yes", "no", "unknown"] },
+            "has_power": { "type": "string", "enum": ["yes", "no", "unknown"] },
+            "battery_hours_left": { "type": ["number", "null"], "minimum": 0 },
+            "needs": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["generator", "oxygen_refill", "evacuation", "medical", "none"] }
+            }
+          }
+        }
+      ]
+    },
+    "assessment_basis": {
+      "type": "string",
+      "enum": ["model_structured", "heuristic_advisory", "none"],
+      "description": "Where structured_result came from. 'model_structured' is bound to the declared result schema and may drive routing. 'heuristic_advisory' is keyword matching over the transcript summary: advisory only, always needs_human, never dispatched automatically. 'none' when there is no structured result."
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Per-utterance evidence. 'declined' and 'no_answer' must not produce content-bearing evidence."
+    },
+    "needs_human": { "type": "boolean" },
+    "handoff_context": {
+      "type": "object",
+      "description": "Contains only the fields allowlisted in input.handoff_context.",
+      "additionalProperties": true
+    }
+  }
+}
