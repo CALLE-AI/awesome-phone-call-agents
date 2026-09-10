@@ -36,34 +36,43 @@ def _page() -> str:
     return PAGE.read_text(encoding="utf-8")
 
 
-def test_the_hero_counts_the_calls_the_register_actually_shows():
-    """"Four rows here, one per call" is a claim about a table.
+def test_the_hero_counts_the_calls_the_first_screen_actually_plays():
+    """"Two calls above, played from their own recordings" is a claim about the cards.
 
-    A fifth receipt arriving makes the register five rows and the sentence under it wrong,
-    and nothing in the build would notice. The sentence is checked against the ids the
-    register rendered rather than against a number recorded somewhere else, because the ids
-    are what a reader counts when they check it.
+    It used to be a claim about a register of four rows, and the register came off the
+    first screen because it printed a transcript act 02 prints again. The claim moved
+    with it and so does this gate: a third card arriving, or one being dropped, makes the
+    sentence wrong and nothing else in the build would notice.
+
+    Counted from the ids the cards rendered rather than from a number recorded somewhere
+    else, because the ids are what a reader counts when they check it.
     """
     page = _page()
 
-    start = page.index("The attendance register")
-    end = page.index("hero-foot", start)
-    shown = sorted(set(re.findall(r"S-\d{4}", page[start:end])))
+    # Not sliced between two class names. Both of them appear in the stylesheet in the
+    # head, before any markup, so a slice from one to the other is a slice of CSS and
+    # matches nothing. The attribute is only ever written on a card.
+    ids = re.findall(r'data-csc-lane="(S-\d{4})"', page)
+    shown = sorted(set(ids))
 
-    claim = re.search(r"class=hero-foot>(\w+) rows here, one per call", page)
+    claim = re.search(r"class=hero-foot>(\w+) calls above", page)
     assert claim, (
-        "the sentence under the register has been reworded, so this gate is checking "
+        "the sentence under the cards has been reworded, so this gate is checking "
         "nothing; point it at whatever states the count now"
     )
 
     spelled = claim.group(1).lower()
     assert spelled in WORD, (
-        f"the register count is written as {claim.group(1)!r}, which this gate cannot turn "
+        f"the card count is written as {claim.group(1)!r}, which this gate cannot turn "
         "into a number; widen the table rather than leaving the count unchecked"
     )
     assert WORD[spelled] == len(shown), (
-        f"the page says {claim.group(1)} rows and the register renders {len(shown)}: "
-        f"{shown}"
+        f"the page says {claim.group(1)} calls and the first screen renders "
+        f"{len(shown)}: {shown}"
+    )
+
+    assert len(ids) == len(shown), (
+        f"two cards on the first screen carry the same call id: {ids}"
     )
 
 

@@ -958,19 +958,34 @@ def test_the_page_builder_masks_every_identifier_and_drops_no_result(tmp_path):
         short = mask_id_from_tools()(fixture_page.api_id(letter))
         assert short in html, f"{sid} has no masked call id on the page"
 
-    # The register carries one row per matched pair, on the English side, so the answers to
-    # check for are the ones on that side. Each value is written with its own `data-field`,
-    # which is what this reads: a build that dropped a column would still put every id on the
-    # page, and slicing on the order of spans would be guessing at a structure that is
-    # already labelled.
+    # Act 04's table carries one row per call placed, with every published field in its
+    # own `data-field` cell. It used to be the first screen's register that was read
+    # here; that register came off the page because it printed a transcript act 02 prints
+    # again, and this walk moved to the surface that still renders every call rather than
+    # to the two the first screen now plays. Act 04 is the wider surface of the two, so
+    # the check got stronger by moving.
+    #
+    # Its rows are keyed on the shortened call id rather than on the student, because that
+    # is the identifier the table is built around, and it is the one this test is about:
+    # a build that stopped masking would fail on the lookup itself.
+    letter_of = {sid: letter for sid, _l, letter, _a, _r, _e in fixture_page.CALLS}
     answers = {sid: aware for sid, _l, _c, aware, _r, _e in fixture_page.CALLS}
 
+    # `<wbr>` comes out first. The table inserts one after the `call_` prefix so a long
+    # identifier breaks where a reader would break it, which means the id in the markup
+    # is not the id the masker produced and a literal search for it finds nothing. The
+    # element adds nothing to the text a copy or a screen reader takes, so removing it
+    # here compares what a reader actually sees.
+    rows = html.replace("<wbr>", "").split("<tr")
+
     def row_of(student: str) -> str:
-        marker = f'data-row="{student}"'
-        assert marker in html, f"{student} has no row in the register"
-        after = html.split(marker, 1)[1]
-        nxt = after.find("data-row=")
-        return after if nxt == -1 else after[:nxt]
+        short = mask_id_from_tools()(fixture_page.api_id(letter_of[student]))
+        found = [r for r in rows if short in r and "data-field=" in r]
+        assert len(found) == 1, (
+            f"{student} has {len(found)} rows carrying its masked call id {short!r} in "
+            "the table of every call placed, and this walk needs exactly one"
+        )
+        return found[0]
 
     counted_on_page = 0
     for _label, en, _ta, _agree, _of in fixture_page.PAIRS:

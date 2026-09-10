@@ -1176,6 +1176,56 @@ def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
     return "".join(out)
 
 
+def nav_markup(repo_url: str | None, video_url: str | None) -> str:
+    """The three places a reviewer wants to go, on the bar, before anything else.
+
+    The masthead was 250px of black at the top of the screen carrying a word and a
+    sentence, and the two objects a judge can actually touch started below it. A bar does
+    the same job in 64px and can hold the destinations as well, which is the other half
+    of what those pixels should have been buying.
+
+    Two of the three destinations are build inputs and the third is not. The film and the
+    pull request are linked when `--video-url` and `--repo-url` are given and are absent
+    from the bar otherwise, on the rule the rest of this file already follows: a link to
+    an unpushed branch or an unpublished video is worse than no link, and a dead button
+    is worse than both. `nav_note_markup` says where they are in the meantime rather than
+    leaving a reader to guess why a page about checkable claims has nothing to click.
+
+    The plugin is different. It is in this repository today and it is described on this
+    page today, so it is an anchor and it is always there.
+    """
+    out = []
+    if video_url:
+        out.append(f'<a class=nav-act href="{html.escape(video_url, quote=True)}" '
+                   f'rel="noopener">Demo video, {_film_running_time()}</a>')
+    if repo_url:
+        out.append(f'<a class=nav-act href="{html.escape(repo_url, quote=True)}" '
+                   'rel="noopener">The pull request</a>')
+    out.append('<a class=nav-act href="#plugin">The n8n plugin</a>')
+    return '<nav class=nav-acts aria-label="Where to go">' + "".join(out) + '</nav>'
+
+
+def nav_note_markup(repo_url: str | None, video_url: str | None) -> str:
+    """What the bar cannot link to yet, named rather than left blank.
+
+    A buyer who read the old masthead went looking for the code and reported that the
+    word GitHub appeared nowhere on the page. The fact is true on every build even when
+    the URL is not, so the fact ships and the button replaces it on the build that has
+    the URL.
+    """
+    missing = []
+    if not video_url:
+        missing.append(f'the demo film, {_film_running_time()}')
+    if not repo_url:
+        missing.append('the pull request into CALL-E’s own repository')
+    if not missing:
+        return ""
+    return ('<p class=nav-note>Not linked here yet: '
+            + ' and '.join(missing)
+            + '. Both are in the submission form, because a link to an unpublished file '
+              'is worse than no link.</p>')
+
+
 def video_link_markup(video_url: str | None) -> str:
     """The demo, or nothing.
 
@@ -2213,10 +2263,13 @@ def further_markup() -> str:
         '<p class=further-k>Where to go next</p>'
         '<h2 class=further-lead id=h-further>Everything this rests on, and how to leave '
         'this page to check it.</h2>'
+        # Out of the fold, because the bar links to it. What ships as an importable
+        # workflow rather than as this app is the reusable half of the entry, and a
+        # button pointing at a closed disclosure is a button that answers nothing.
+        + '<div id=plugin>' + takeaway_markup() + '</div>'
         + '<details class="fold act-fold"><summary>Every document, and every outside '
           'figure with its publisher</summary><div class=fold-body>'
         + doc_pages.index_markup()
-        + takeaway_markup()
         + '<p class=further-k>The outside figures, and who published them</p>'
         + sources_markup()
         + '</div></details>'
@@ -2630,9 +2683,23 @@ def build(has_audio: bool, repo_url: str | None = None,
     # right to be unable to: `firstbell` appeared in the visible text of this page exactly
     # twice, in the browser tab and in a shell command nine screens down. The best sentence
     # in the entry was in README.md and had never been on the page a judge opens first.
+    lanes_shown = [
+        # The control, and it is the shorter of the two calls. It exists to say that this
+        # software does not simply mark everything undetermined, which is one sentence.
+        {"id": "S-4101", "label": "the parent knew, and said why",
+         "two_bucket": "resolved", "two_bucket_note": "case closed",
+         "ours": "resolved",
+         "ours_note": "Three fields the office can act on."},
+        {"id": "S-4105", "label": "the parent did not know",
+         "two_bucket": "resolved",
+         "two_bucket_note": "case closed. Reported as a family contacted.",
+         "ours": "undetermined",
+         "ours_note": "held open and escalated to a named person."},
+    ]
     body = [
         '<div class=masthead>',
         '<p class=wordmark>firstbell</p>',
+        nav_markup(repo_url, video_url),
         # The first sentence a buyer reads. It used to promise language access, and a
         # director of student services put it plainly: taken to a board, "in the language
         # that family speaks" is a claim a trustee can disprove by reading one page of
@@ -2673,32 +2740,8 @@ def build(has_audio: bool, repo_url: str | None = None,
         # The cards stay. They are the same four claims in words, above the drawing that
         # shows them, for a reader who would rather read and for one whose browser drew
         # nothing.
-        '<p class=eyebrow>Two real calls. Both reached a parent. Press play on either.</p>',
         callscope_figure(
-            data,
-            # The verdicts, decided here rather than in the drawing. The two-bucket column
-            # is the rule act 03 states -- close anything that came back schema-valid --
-            # applied to these receipts. Both of these calls came back schema-valid, so it
-            # closes both, and the row where the two systems disagree is the product.
-            [
-                # The control, and it is drawn as one row rather than a second full
-                # lane. It exists to say that this software does not simply mark
-                # everything undetermined, which is one sentence, and at full weight it
-                # was repeating every field name and both system names to say it.
-                {"id": "S-4101", "label": "the parent knew, and said why",
-                 "compact": True,
-                 "two_bucket": "resolved", "two_bucket_note": "case closed",
-                 "ours": "resolved",
-                 "ours_note": "Three fields the office can act on."},
-                {"id": "S-4105", "label": "the parent did not know",
-                 "two_bucket": "resolved",
-                 "two_bucket_note": "case closed. Reported as a family contacted.",
-                 "ours": "undetermined",
-                 "ours_note": "held open and escalated to a named person."},
-            ],
-            # Three lines of prose sat here saying what the drawing underneath says, on
-            # the screen where the word budget is tightest. One line, and the instrument
-            # does the rest.
+            data, lanes_shown,
             'Both came back schema-valid. Only one of them found the child.'),
         # The two links a judge needs are on the first screen, under the thing that
         # earned the click, rather than above it competing with the demonstration.
@@ -2718,7 +2761,6 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
         '<h1 id=h-00>One child is not in the register.</h1>',
         hero_turn_markup(calls[hero]),
-        register_markup(data, rows, hero, has_audio),
         # Four rows, twelve calls, and the page used to say only the first number.
         # Everything else in the entry says twelve, so the first screen was the one place
         # a reader could find the two numbers disagreeing.
@@ -2732,14 +2774,19 @@ def build(has_audio: bool, repo_url: str | None = None,
         # Two tests read this sentence by regular expression, for the count of rows and
         # for the total, so both phrasings are load-bearing and neither may be tidied:
         # see `tests/test_page_prose_counts.py`.
-        f'<p class=hero-foot>{_spelled(len(rows)).capitalize()} rows here, one per call. '
-        'This '
-        f'software has placed {_recorded_call_total()} calls against CALL-E in total, and '
-        'these four are the ones with a transcript on the page; the money is computed '
-        'over all of them. The recordings are held outside this repository. Every call '
-        'went to the author’s own line, scripted and consented, and the pupil names are '
-        'fictional. <a href="#act-01">Act 01</a> says what the region ceiling costs, and '
+        f'<p class=hero-foot>{_spelled(len(lanes_shown)).capitalize()} calls above, '
+        'played from their own recordings. This '
+        f'software has placed {_recorded_call_total()} calls against CALL-E in total and '
+        'the money is computed over all of them; '
+        f'<a href="#act-02">act 02</a> holds both conversations in full. The recordings '
+        'are held outside this repository. Every call went to the author’s own line, '
+        'scripted and consented, and the pupil names are fictional. '
+        '<a href="#act-01">Act 01</a> says what the region ceiling costs, and '
         '<a href="#act-07">act 07</a> is the run that shows it.</p>',
+        # What the bar could not link to, at the foot of the act rather than between the
+        # bar and the two calls. It is a disclosure, and a disclosure above the thing it
+        # discloses about is the page apologising before it has shown anything.
+        nav_note_markup(repo_url, video_url),
     ]
     add(act("00", "The call", "".join(body), "hero"))
 

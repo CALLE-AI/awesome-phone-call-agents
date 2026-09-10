@@ -183,7 +183,7 @@ MORNING_CSS = """
  * pushes the thing under it off the fold. 300px keeps the board, its hint and the line
  * under it inside one screen with the audio instrument above them. */
 .morning-compact { max-width: none; margin: 0; padding: 0; }
-.morning-compact .mrn-stage { margin-bottom: var(--space-2); height: 260px; }
+.morning-compact .mrn-stage { margin-bottom: var(--space-1); height: 232px; }
 .morning-compact .mrn-stage canvas,
 .morning-compact .mrn-flat { height: 100%; width: 100%; object-fit: contain; }
 .morning-compact .eyebrow { margin-bottom: var(--space-2); }
