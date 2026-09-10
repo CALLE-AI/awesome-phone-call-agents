@@ -1,0 +1,18 @@
+[
+  {
+    "_id": "demo_lead_001",
+    "business": "demo_business_001",
+    "name": "Rahul Sharma",
+    "phone": "+911234500002", 
+    "notes": "Looking for a 2BHK, budget 55-60L",
+    "source": "chatbot"
+  },
+  {
+    "_id": "demo_lead_002",
+    "business": "demo_business_001",
+    "name": "Priya Nair",
+    "phone": "+911234500002",
+    "notes": "Looking for a 3BHK, budget 80L-1Cr",
+    "source": "chatbot"
+  }
+]
