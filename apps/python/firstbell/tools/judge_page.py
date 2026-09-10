@@ -1177,32 +1177,51 @@ def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
 
 
 def nav_markup(repo_url: str | None, video_url: str | None) -> str:
-    """The three places a reviewer wants to go, on the bar, before anything else.
+    """Four places on this page, and the one place off it, on the bar.
 
-    The masthead was 250px of black at the top of the screen carrying a word and a
-    sentence, and the two objects a judge can actually touch started below it. A bar does
-    the same job in 64px and can hold the destinations as well, which is the other half
-    of what those pixels should have been buying.
+    The masthead was 250px of black carrying a word and a sentence, and both objects a
+    reviewer can touch started under it. A bar does that job in 56px and holds the
+    destinations as well, which is the other half of what those pixels should have been
+    buying.
 
-    Two of the three destinations are build inputs and the third is not. The film and the
-    pull request are linked when `--video-url` and `--repo-url` are given and are absent
-    from the bar otherwise, on the rule the rest of this file already follows: a link to
-    an unpushed branch or an unpublished video is worse than no link, and a dead button
-    is worse than both. `nav_note_markup` says where they are in the meantime rather than
-    leaving a reader to guess why a page about checkable claims has nothing to click.
+    Every anchor here resolves to an element on this page, so the bar is never a row of
+    dead affordances. The pull request is the exception and it is a build input: linked
+    when `--repo-url` is given and absent otherwise, on the rule the rest of this file
+    follows, which is that a link to an unpushed branch is worse than no link.
+    """
+    out = [
+        '<a class=nav-link href="#act-01">The problem</a>',
+        '<a class=nav-link href="#calls">Live audio</a>',
+        '<a class=nav-link href="#simulator">3D simulator</a>',
+        '<a class=nav-link href="#verify">Proof</a>',
+    ]
+    if repo_url:
+        out.append(f'<a class="nav-link nav-cta" href="{html.escape(repo_url, quote=True)}" '
+                   'rel="noopener">GitHub PR</a>')
+    return '<nav class=nav-acts aria-label="Sections of this page">' + "".join(out) + '</nav>'
 
-    The plugin is different. It is in this repository today and it is described on this
-    page today, so it is an anchor and it is always there.
+
+def play_bar_markup(repo_url: str | None, video_url: str | None) -> str:
+    """The row of actions directly under the two objects.
+
+    Three of these are true on every build: the offline run, the whole morning, and the
+    workflow that ships without this app. The film and the pull request join them on the
+    build that carries their URLs and are absent otherwise, so the row never offers a
+    button that goes nowhere.
     """
     out = []
     if video_url:
-        out.append(f'<a class=nav-act href="{html.escape(video_url, quote=True)}" '
-                   f'rel="noopener">Demo video, {_film_running_time()}</a>')
+        out.append(f'<a class="play-act play-act--lead" '
+                   f'href="{html.escape(video_url, quote=True)}" rel="noopener">'
+                   f'Watch the demo, {_film_running_time()}</a>')
     if repo_url:
-        out.append(f'<a class=nav-act href="{html.escape(repo_url, quote=True)}" '
-                   'rel="noopener">The pull request</a>')
-    out.append('<a class=nav-act href="#plugin">The n8n plugin</a>')
-    return '<nav class=nav-acts aria-label="Where to go">' + "".join(out) + '</nav>'
+        out.append(f'<a class="play-act play-act--lead" '
+                   f'href="{html.escape(repo_url, quote=True)}" rel="noopener">'
+                   'The pull request</a>')
+    out.append('<a class=play-act href="#act-08">Run it yourself, no account</a>')
+    out.append('<a class=play-act href="the-morning.html">A whole morning, in 3D</a>')
+    out.append('<a class=play-act href="#plugin">The n8n plugin</a>')
+    return '<div class=play-bar>' + "".join(out) + '</div>'
 
 
 def nav_note_markup(repo_url: str | None, video_url: str | None) -> str:
@@ -2740,26 +2759,24 @@ def build(has_audio: bool, repo_url: str | None = None,
         # The cards stay. They are the same four claims in words, above the drawing that
         # shows them, for a reader who would rather read and for one whose browser drew
         # nothing.
-        callscope_figure(
-            data, lanes_shown,
-            'Both came back schema-valid. Only one of them found the child.'),
-        # The two links a judge needs are on the first screen, under the thing that
-        # earned the click, rather than above it competing with the demonstration.
-        # The second object on the first screen, and the second thing a judge can put a
-        # hand on. The callscope above it is the call: sixty seconds of one morning, with
-        # the audio. This is the morning those two calls came out of, and it turns.
-        #
-        # Its own page still exists and still holds the arithmetic, the source and the two
-        # paragraphs of what the board does not claim. What moved here is the object. A
-        # link to a 3D board is a link, and the thing this entry has that the writing
-        # cannot carry is that the board answers a drag.
-        morning_module().morning_markup(_spelled(_recorded_call_total()), compact=True),
-        '<div class=after-minute>',
-        video_link_markup(video_url),
-        repo_link_markup(repo_url),
+        # The sentence the figure used to carry as its own headline. It is the page's
+        # one-line argument, so it is the document's heading rather than a caption inside
+        # a figure, and the figure stops repeating it.
+        '<h1 id=h-00>Both came back schema-valid. Only one of them found the child.</h1>',
+        '<div class=playground>',
+        '<div class=play-calls id=calls>',
+        callscope_figure(data, lanes_shown, ''),
         '</div>',
-        '<p class=eyebrow>The attendance register, and the calls it is waiting on</p>',
-        '<h1 id=h-00>One child is not in the register.</h1>',
+        '<div class=play-board id=simulator>',
+        morning_module().morning_markup(_spelled(_recorded_call_total()), compact=True),
+        '</div>',
+        '</div>',
+        play_bar_markup(repo_url, video_url),
+        # Everything a reader needs only if they are checking, behind one summary. The
+        # first screen is two objects and a row of actions; this is the writing that used
+        # to sit between them.
+        '<details class="fold act-fold"><summary>What these calls are, who consented, '
+        'and how the two systems differ</summary><div class=fold-body>',
         hero_turn_markup(calls[hero]),
         # Four rows, twelve calls, and the page used to say only the first number.
         # Everything else in the entry says twelve, so the first screen was the one place
@@ -2787,8 +2804,19 @@ def build(has_audio: bool, repo_url: str | None = None,
         # bar and the two calls. It is a disclosure, and a disclosure above the thing it
         # discloses about is the page apologising before it has shown anything.
         nav_note_markup(repo_url, video_url),
+        '</div></details>',
     ]
     add(act("00", "The call", "".join(body), "hero"))
+    # The line between the demonstration and the receipts. Above it, two objects and a
+    # row of actions; below it, nine acts whose bodies are all folded. A reader who has
+    # decided stops here, and one who has not knows exactly what the rest is for.
+    add('<div class=verify id=verify>'
+        '<h2 class=verify-lead>Technical verification and audit trail</h2>'
+        '<p class=verify-say>Nine acts, every one of them folded. Open any of them for '
+        'the receipts behind the two calls above: the money against CALL-E&#8217;s own '
+        'billing, every rule broken on purpose with the test that caught it, the limits '
+        'this entry does not clear, and the whole run on one command.</p>'
+        '</div>')
 
     # ---- Act 1: the residue
     body = [

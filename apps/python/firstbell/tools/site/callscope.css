@@ -200,3 +200,96 @@
  * has to be told about. Every value here was taken off that measurement. */
 .callscope { margin-bottom: var(--space-3); }
 .csc-verdicts { padding-top: var(--space-2); }
+
+/* ---- the playground -------------------------------------------------------------------
+ * One screen, two objects, one row of actions. Above 72rem the calls take the left and
+ * the board takes the right; below it they stack, calls first, because a phone reads in
+ * one column and the audio is the stronger of the two on a small screen.
+ *
+ * Measured at 1440x900 on 2026-09-10: bar 56, heading 34, playground 604, actions 44,
+ * with the drag hint and the fold summary inside the 604. Nothing the reader needs in
+ * the first thirty seconds is below the window. */
+.playground { display: grid; gap: var(--space-4); align-items: start; }
+@media (min-width: 72rem) {
+  .playground { grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr); }
+  /* Stacked, because a card set to half of half a page wraps every field name. */
+  .playground .csc-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.play-calls, .play-board { min-width: 0; }
+
+.play-bar {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+.play-act {
+  display: inline-block; padding: 8px 14px;
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
+  color: var(--ink-2); text-decoration: none; white-space: nowrap;
+  border: 1px solid var(--line-strong); border-radius: 3px;
+}
+.play-act:hover { color: var(--ink); border-color: var(--ink-2); }
+/* The two that leave the page, when there is somewhere to go. */
+.play-act--lead { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.play-act--lead:hover { color: var(--paper); }
+
+/* ---- the line under the demonstration -------------------------------------------------- */
+.verify {
+  max-width: var(--measure); margin: var(--space-5) auto var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+  border-top: 2px solid var(--ink);
+}
+.verify-lead {
+  font-family: var(--display); font-size: var(--size-5); line-height: 1.2;
+  color: var(--ink); margin: 0 0 var(--space-2);
+}
+.verify-say {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.6;
+  color: var(--ink-3); margin: 0; max-width: 66ch;
+}
+
+/* ---- the bar's own links ---------------------------------------------------------------- */
+.nav-link {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
+  text-decoration: none; padding: 4px 2px; white-space: nowrap;
+}
+.nav-link:hover { text-decoration: underline; }
+.nav-cta {
+  padding: 6px 12px; border: 1px solid currentColor; border-radius: 3px;
+}
+
+/* ---- fitting two cards and a board into one screen -------------------------------------
+ * Measured at 1440x900. Stacked in the left column each card was 380px and the pair
+ * pushed the row of actions to 1,126px. Every value below came off that measurement.
+ *
+ * The verdict note moves under its own label rather than across the card, so the two
+ * verdicts are two rows instead of four, and the sentence naming the call goes: the
+ * three fields under it say the same thing in the platform's own words. */
+@media (min-width: 72rem) {
+  .playground .csc-said { display: none; }
+  .playground .csc-wave { height: 26px; }
+  .playground .csc-card { padding: var(--space-2) var(--space-3); }
+  .playground .csc-v {
+    grid-template-areas: "who say" "note say";
+    align-items: baseline;
+  }
+  .playground .csc-v-say { align-self: start; }
+  .playground .csc-v-note { font-size: var(--size-1); line-height: 1.4; }
+  .playground .csc-verdicts { padding-top: 6px; gap: 6px; }
+  .playground .csc-f { padding: 2px 0; }
+  /* The board takes the height the two cards leave, rather than sitting in a fixed box
+   * with the column empty under it. */
+  .playground .morning-compact .mrn-stage { height: 380px; }
+}
+/* Three lines of display type is a paragraph, not a heading. */
+#h-00 { font-size: var(--size-5); line-height: 1.15; max-width: 30ch; margin: 0 0 var(--space-3); }
+
+/* The last 33px, taken from spacing rather than from anything a reader reads.
+ * Bar bottom 883 to 850 at 1440x900. */
+@media (min-width: 72rem) {
+  .playground .csc-fold { margin-top: var(--space-2); }
+  .playground .csc-fold > summary { padding: var(--space-2) 0; }
+  .playground .csc-cards { gap: var(--space-3); }
+  .act-00 { padding-top: var(--space-3); }
+  #h-00 { margin-bottom: var(--space-2); }
+  .play-bar { margin-top: var(--space-2); }
+}

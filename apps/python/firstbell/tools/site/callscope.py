@@ -232,8 +232,8 @@ def callscope_markup(calls: dict, fields: list, commit_turns, lanes: list,
 
     return (
         '<figure class=callscope>'
-        f'<p class=csc-headline>{headline}</p>'
-        f'<div class=csc-cards>{"".join(cards)}</div>'
+        + (f'<p class=csc-headline>{headline}</p>' if headline else '')
+        + f'<div class=csc-cards>{"".join(cards)}</div>'
         '<details class="fold csc-fold"><summary>What these two calls are, and what the '
         'two-bucket row is not</summary>'
         f'<figcaption>{caption}</figcaption>'
