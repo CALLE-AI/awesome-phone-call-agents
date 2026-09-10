@@ -116,8 +116,13 @@ At 18:59:48 a call terminated with attempt code `480`. The client saw the task r
 minutes, through waits of 4, 30, 45 and 120 seconds and two deliberate 150-second pauses.
 None of them placed a call and none was billed.
 
-The account was still refusing new calls when this was written. There is no way to
-investigate or clear it from the API:
+The account was still refusing new calls **sixty-five minutes later**, across nine
+further probes spaced from thirty seconds to five minutes apart. Every one returned the
+same 429. No call was placed and nothing was billed by any of them, so the block is not
+a budget: the platform believes a call is running that the client watched finish at
+18:59:48.
+
+There is no way to investigate or clear it from the API:
 
 ```
 GET /v1/calls                    405 Method Not Allowed
