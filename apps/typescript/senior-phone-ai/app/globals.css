@@ -258,6 +258,16 @@ button.danger { background: #8b372a; }
 .conversation-note small { display: block; margin-top: 4px; opacity: .7; }
 .empty-transcript { margin-top: 30px; }
 .call-summary { border-top: 1px solid #d6ded7; margin-top: 30px; padding-top: 20px; }
+.call-table-wrap { margin-top: 28px; overflow-x: auto; }
+.call-table { border-collapse: collapse; min-width: 900px; width: 100%; }
+.call-table th,
+.call-table td { border-bottom: 1px solid #d6ded7; padding: 16px 12px; text-align: left; vertical-align: top; }
+.call-table th { color: #526156; font-size: .82rem; text-transform: uppercase; }
+.call-table td:nth-child(1) { min-width: 180px; }
+.call-table td:nth-child(4) { min-width: 300px; }
+.call-table details summary { cursor: pointer; font-weight: 800; }
+.table-conversation { margin-top: 12px; max-height: 320px; overflow-y: auto; }
+.table-conversation p { border-left: 3px solid #d6ded7; margin: 10px 0; padding-left: 10px; }
 
 @media (max-width: 760px) {
   body { font-size: 17px; }

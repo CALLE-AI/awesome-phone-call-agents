@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertCalleCallId, parseCalleCallSnapshot } from "../lib/calle/status";
+import { assertCalleCallId, parseCalleCallIds, parseCalleCallSnapshot } from "../lib/calle/status";
 
 test("CALL-E snapshots expose bounded conversation turns without provider identifiers", () => {
   const snapshot = parseCalleCallSnapshot({
@@ -34,4 +34,10 @@ test("CALL-E snapshots expose bounded conversation turns without provider identi
 test("CALL-E call IDs are validated before provider requests", () => {
   assert.equal(assertCalleCallId("call_abc-123"), "call_abc-123");
   assert.throws(() => assertCalleCallId("../calls"), /invalid CALL-E call ID/);
+});
+
+test("configured CALL-E call IDs are deduplicated and bounded", () => {
+  assert.deepEqual(parseCalleCallIds("call_first, call_second,call_first"), ["call_first", "call_second"]);
+  assert.deepEqual(parseCalleCallIds(undefined), []);
+  assert.throws(() => parseCalleCallIds("call_safe,not-a-call"), /invalid CALL-E call ID/);
 });

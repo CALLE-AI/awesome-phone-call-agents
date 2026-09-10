@@ -20,6 +20,7 @@ export interface CalleTranscriptTurn {
 export interface CalleCallSnapshot {
   readonly callId: string;
   readonly status: CalleCallStatus;
+  readonly createdAt?: string;
   readonly summary?: string;
   readonly taskCompleted?: boolean;
   readonly transcript: CalleTranscriptTurn[];
@@ -32,6 +33,11 @@ const MAX_TEXT_LENGTH = 2_000;
 export function assertCalleCallId(value: string): string {
   if (!CALL_ID.test(value)) throw new Error("invalid CALL-E call ID");
   return value;
+}
+
+export function parseCalleCallIds(value: string | undefined, maximum = 20): string[] {
+  if (!value?.trim()) return [];
+  return [...new Set(value.split(",").map((item) => assertCalleCallId(item.trim())))].slice(0, maximum);
 }
 
 function boundedText(value: unknown): string | undefined {
@@ -88,6 +94,9 @@ export function parseCalleCallSnapshot(value: unknown, now = Date.now): CalleCal
   return {
     callId,
     status,
+    createdAt: typeof root.created_at === "string" && Number.isFinite(Date.parse(root.created_at))
+      ? root.created_at
+      : undefined,
     summary: boundedText(root.summary),
     taskCompleted: typeof root.task_completed === "boolean" ? root.task_completed : undefined,
     transcript,

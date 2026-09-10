@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getCalleCallSnapshot } from "@/lib/calle/client";
-import { assertCalleCallId } from "@/lib/calle/status";
+import { getCalleCallSnapshots } from "@/lib/calle/client";
+import { parseCalleCallIds } from "@/lib/calle/status";
 import { getRuntimeMode, requireSecret } from "@/lib/config/server";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter } from "@/lib/realtime/access";
 
@@ -29,20 +29,26 @@ export async function POST(request: Request) {
     });
   }
 
-  let callId: string;
+  let callIds: string[];
   try {
-    const body = await request.json() as { callId?: unknown };
-    callId = assertCalleCallId(typeof body.callId === "string" ? body.callId : "");
+    callIds = parseCalleCallIds(process.env.CALLE_MONITORED_CALL_IDS);
   } catch {
-    return NextResponse.json({ error: "A valid CALL-E call ID is required" }, {
-      status: 400,
+    return NextResponse.json({ error: "The monitored call registry is invalid" }, {
+      status: 503,
       headers: noStoreHeaders,
     });
   }
 
+  if (!callIds.length) {
+    return NextResponse.json({ calls: [], unavailableCount: 0 }, { headers: noStoreHeaders });
+  }
+
   try {
-    const snapshot = await getCalleCallSnapshot(callId, requireSecret("CALLE_API_KEY"));
-    return NextResponse.json(snapshot, { headers: noStoreHeaders });
+    const snapshot = await getCalleCallSnapshots(callIds, requireSecret("CALLE_API_KEY"));
+    return NextResponse.json({
+      ...snapshot,
+      calls: snapshot.calls.map((call) => ({ ...call, callId: `${call.callId.slice(0, 14)}…` })),
+    }, { headers: noStoreHeaders });
   } catch {
     return NextResponse.json({ error: "Call status is unavailable" }, { status: 502, headers: noStoreHeaders });
   }

@@ -29,3 +29,13 @@ export async function getCalleCallSnapshot(
     clearTimeout(timeout);
   }
 }
+
+export async function getCalleCallSnapshots(
+  callIds: string[],
+  apiKey: string,
+): Promise<{ calls: CalleCallSnapshot[]; unavailableCount: number }> {
+  const results = await Promise.allSettled(callIds.map((callId) => getCalleCallSnapshot(callId, apiKey)));
+  const calls = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+  calls.sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
+  return { calls, unavailableCount: results.length - calls.length };
+}

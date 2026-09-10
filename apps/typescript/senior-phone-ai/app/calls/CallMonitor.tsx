@@ -1,34 +1,39 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { assertCalleCallId, type CalleCallSnapshot } from "@/lib/calle/status";
+import type { CalleCallSnapshot } from "@/lib/calle/status";
 
 const POLL_INTERVAL_MS = 2_000;
 
-async function loadSnapshot(callId: string, signal: AbortSignal): Promise<CalleCallSnapshot> {
+interface CallListResponse {
+  readonly calls: CalleCallSnapshot[];
+  readonly unavailableCount: number;
+}
+
+async function loadCalls(signal: AbortSignal): Promise<CallListResponse> {
   const response = await fetch("/api/calls/status", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ callId }),
+    body: "{}",
     cache: "no-store",
     signal,
   });
   if (!response.ok) throw new Error("Call status is unavailable");
-  return response.json() as Promise<CalleCallSnapshot>;
+  return response.json() as Promise<CallListResponse>;
 }
 
 export function CallMonitor() {
-  const [callId, setCallId] = useState("");
-  const [monitoredCallId, setMonitoredCallId] = useState<string>();
-  const [monitorVersion, setMonitorVersion] = useState(0);
-  const [snapshot, setSnapshot] = useState<CalleCallSnapshot>();
+  const [calls, setCalls] = useState<CalleCallSnapshot[]>([]);
+  const [unavailableCount, setUnavailableCount] = useState(0);
   const [error, setError] = useState<string>();
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const requestRef = useRef<AbortController | undefined>(undefined);
 
+  const refresh = useCallback(() => setRefreshVersion((version) => version + 1), []);
+
   useEffect(() => {
-    if (!monitoredCallId) return;
     let active = true;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -38,12 +43,13 @@ export function CallMonitor() {
       const controller = new AbortController();
       requestRef.current = controller;
       try {
-        const next = await loadSnapshot(monitoredCallId, controller.signal);
+        const result = await loadCalls(controller.signal);
         if (!active) return;
         failures = 0;
-        setSnapshot(next);
+        setCalls(result.calls);
+        setUnavailableCount(result.unavailableCount);
         setError(undefined);
-        if (next.status === "queued" || next.status === "in_progress" || next.status === "unknown") {
+        if (result.calls.some((call) => ["queued", "in_progress", "unknown"].includes(call.status))) {
           timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch (cause) {
@@ -59,19 +65,7 @@ export function CallMonitor() {
       if (timer) clearTimeout(timer);
       requestRef.current?.abort();
     };
-  }, [monitoredCallId, monitorVersion]);
-
-  const startMonitoring = () => {
-    try {
-      const validated = assertCalleCallId(callId.trim());
-      setSnapshot(undefined);
-      setError(undefined);
-      setMonitoredCallId(validated);
-      setMonitorVersion((version) => version + 1);
-    } catch {
-      setError("Enter the CALL-E ID returned when the call was created.");
-    }
-  };
+  }, [refreshVersion]);
 
   return (
     <main className="monitor-page">
@@ -81,55 +75,63 @@ export function CallMonitor() {
       </nav>
       <section className="monitor-card" aria-labelledby="monitor-heading">
         <p className="eyebrow">Live call visibility</p>
-        <h1 id="monitor-heading">Phone conversation monitor</h1>
+        <h1 id="monitor-heading">Phone conversations</h1>
         <p className="lede">
-          Enter the CALL-E call ID to follow its status and display transcript turns as the provider
-          publishes them. CALL-E may withhold transcript text until the call has finished.
+          Calls registered by this application appear automatically. Active rows refresh every two
+          seconds and show transcript turns as CALL-E publishes them.
         </p>
-        <div className="monitor-form">
-          <label htmlFor="call-id">CALL-E call ID</label>
-          <input
-            autoComplete="off"
-            id="call-id"
-            onChange={(event) => setCallId(event.target.value)}
-            placeholder="call_…"
-            spellCheck={false}
-            value={callId}
-          />
-          <button onClick={startMonitoring} type="button">Monitor call</button>
-        </div>
+        <button onClick={refresh} type="button">Refresh table</button>
         {error ? <p className="error" role="alert">{error}</p> : null}
+        {unavailableCount ? (
+          <p className="error" role="status">{unavailableCount} registered call could not be refreshed.</p>
+        ) : null}
       </section>
 
       <section className="notes-card monitor-transcript" aria-labelledby="phone-transcript-heading">
         <div className="monitor-status-row">
           <div>
             <p className="eyebrow">Operator review</p>
-            <h2 id="phone-transcript-heading">Live phone transcript</h2>
+            <h2 id="phone-transcript-heading">All monitored calls</h2>
           </div>
-          <strong className="status-pill" aria-live="polite">{snapshot?.status ?? "not monitoring"}</strong>
+          <strong className="status-pill" aria-live="polite">{calls.length} calls</strong>
         </div>
-        {snapshot?.transcript.length ? (
-          <div className="conversation-list" aria-live="polite">
-            {snapshot.transcript.map((turn) => (
-              <article className={`conversation-note note-${turn.speaker}`} key={turn.id}>
-                <strong>{turn.speaker === "caller" ? "Caller" : "Senior Phone AI"}</strong>
-                <small>{turn.offsetSeconds}s</small>
-                <p>{turn.text}</p>
-              </article>
-            ))}
+        {calls.length ? (
+          <div className="call-table-wrap">
+            <table className="call-table">
+              <thead>
+                <tr><th>Started</th><th>Call</th><th>Status</th><th>Conversation</th><th>Summary</th></tr>
+              </thead>
+              <tbody>
+                {calls.map((call) => (
+                  <tr key={call.callId}>
+                    <td>{call.createdAt ? new Date(call.createdAt).toLocaleString() : "Pending"}</td>
+                    <td><code>{call.callId}</code></td>
+                    <td><strong className="status-pill">{call.status}</strong></td>
+                    <td>
+                      {call.transcript.length ? (
+                        <details>
+                          <summary>{call.transcript.length} transcript turns</summary>
+                          <div className="table-conversation">
+                            {call.transcript.map((turn) => (
+                              <p key={turn.id}>
+                                <strong>{turn.speaker === "caller" ? "Caller" : "Senior Phone AI"}:</strong>{" "}
+                                {turn.text}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      ) : "Waiting for provider"}
+                    </td>
+                    <td>{call.summary ?? "Not available"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <p className="empty-transcript">
-            {monitoredCallId
-              ? "Waiting for CALL-E to publish conversation text. Call status will continue updating."
-              : "No call is being monitored."}
-          </p>
-        )}
-        {snapshot?.summary ? <p className="call-summary"><strong>Provider summary:</strong> {snapshot.summary}</p> : null}
+        ) : <p className="empty-transcript">No calls have been registered by this application.</p>}
         <p className="fine-print">
-          This local view keeps transcript text in memory only, masks phone-like text, and never
-          exposes the CALL-E API key to the browser.
+          CALL-E may withhold transcript text until a call finishes. This local view keeps transcript
+          text in memory only, masks phone-like text, and never exposes the API key to the browser.
         </p>
       </section>
     </main>
