@@ -1,0 +1,169 @@
+{
+  "note": "SYNTHETIC. Hand-authored Cloud Support Engineer run so the UI can be built, demoed and iterated on without spending CALL-E credits. `?debug=1` always renders this file; replay mode prefers fixtures/golden-run.json when a real capture exists. The call asks about the PRIMARY clarification only — clarifications[0] — which is why the structured result carries one key while the session carries three claims.",
+  "synthetic": true,
+  "clarifications": [
+    {
+      "id": "c1",
+      "claim": "Maintained 98% CSAT",
+      "topic": "98% CSAT",
+      "need": "Was 98% Devan's own score or the team's?",
+      "source": "resume",
+      "whyItMatters": "The role weights numbers that are yours rather than your queue's, and one satisfaction figure reads identically whether it describes this person or the six people around them.",
+      "question": "You mentioned 98% CSAT. Was that your own score or the team's?",
+      "probes": [
+        "What was your own figure, if it differed from the queue's?",
+        "Across how many surveyed cases?",
+        "Over what period was it measured?"
+      ],
+      "extract": [
+        "whose number it is",
+        "their own figure",
+        "sample size"
+      ]
+    },
+    {
+      "id": "c2",
+      "claim": "Resolved critical production incidents for enterprise customers",
+      "topic": "Production incidents",
+      "need": "What did Devan diagnose personally, and what did others?",
+      "source": "resume",
+      "whyItMatters": "The role is hands-on diagnosis rather than case routing, so what this person read and concluded themselves is exactly what the written claim leaves open.",
+      "question": "You wrote that you resolved critical production incidents. On the most recent one, what did you personally diagnose before anyone else was involved?",
+      "probes": [
+        "Which logs or consoles did you open yourself, and what did they tell you?",
+        "What turned out to be the root cause, and who found it?",
+        "At what point did you hand it to a service team, and what did you give them?"
+      ],
+      "extract": [
+        "what they diagnosed personally",
+        "which tools and logs they used",
+        "the root cause and who identified it"
+      ]
+    },
+    {
+      "id": "c3",
+      "claim": "Handled Sev-1 incidents",
+      "topic": "Sev-1 incidents",
+      "need": "Did Devan run the bridge, or answer questions on it?",
+      "source": "resume",
+      "whyItMatters": "The role asks for a clear account of your own incident role, and \"handled\" covers everything from driving the bridge to answering one question on it.",
+      "question": "You wrote that you handled Sev-1 incidents. On the last one, what was your role on the bridge?",
+      "probes": [
+        "Were you the person driving the call, or one of the responders on it?",
+        "Who owned the updates going out to the customer during it?",
+        "How many Sev-1 bridges have you been on in the last year?"
+      ],
+      "extract": [
+        "role on the bridge",
+        "who ran the call",
+        "who owned customer updates"
+      ]
+    }
+  ],
+  "call": {
+    "id": "call_demo_cloud_support",
+    "object": "call_task",
+    "status": "completed",
+    "task": "(see lib/calle.ts buildTask)",
+    "structuredResult": {
+      "c1": {
+        "corrected": "96% personal",
+        "correction": "98% was the team metric",
+        "basis": "45 surveys",
+        "headline": "98% is the six-person pod's queue average; their own is 96%",
+        "answer": "The 98% on the resume is the queue average for the six-person enterprise pod they sit in. Their own per-engineer score was 96%, across about forty-five surveys that came back.",
+        "specifics": "Whose number: the pod's, not theirs — six engineers on the enterprise queue. Their own figure: 96%. Sample: about forty-five returned surveys.",
+        "still_unclear": "What period the 96% covers, and whether it is measured the same way as the pod figure.",
+        "open_question": "What period does the 96% cover?",
+        "quote": "Ninety-six percent. That was across about forty-five surveys that came back.",
+        "confidence": "high"
+      }
+    },
+    "summary": "Reached the candidate, who consented to the call. Established that the 98% CSAT on the resume is the six-person pod's queue average, and that the candidate's own per-engineer figure over the same stretch was 96% across roughly forty-five returned surveys. The measurement period for the personal figure was not asked for.",
+    "taskCompleted": true,
+    "completionConfidence": {
+      "score": 0.94,
+      "label": "high"
+    },
+    "evidence": [
+      "Candidate stated the 98% CSAT is the six-person pod's queue average, not their own.",
+      "Candidate gave their own per-engineer figure as 96% across about forty-five returned surveys."
+    ],
+    "metadata": {
+      "app": "clarity",
+      "synthetic": true
+    },
+    "failureCode": null,
+    "failureMessage": null,
+    "createdAt": "2026-09-05T10:14:02.000Z",
+    "completedAt": "2026-09-05T10:15:04.000Z",
+    "recipients": [
+      {
+        "id": "rcp_demo",
+        "phones": [
+          "+15555550100"
+        ],
+        "locale": "en-US",
+        "region": "US",
+        "status": "completed",
+        "structuredResult": null,
+        "summary": "Candidate answered and completed the call.",
+        "attempts": [
+          {
+            "id": "att_demo",
+            "phone": "+15555550100",
+            "status": "completed",
+            "startedAt": "2026-09-05T10:14:06.000Z",
+            "completedAt": "2026-09-05T10:15:04.000Z",
+            "summary": "One-minute call. One claim asked about, one adaptive follow-up, fully pinned down.",
+            "providerCallId": "prov_demo",
+            "failureCode": null,
+            "failureMessage": null,
+            "transcriptTurns": [
+              {
+                "offset_seconds": 2,
+                "speaker": "bot",
+                "text": "Hi, I'm an AI assistant calling on behalf of the hiring team with a few follow-up questions about your application. Is now a good time for a brief call?"
+              },
+              {
+                "offset_seconds": 11,
+                "speaker": "user",
+                "text": "Yeah, now's fine. Go ahead."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "Thank you. Just one thing from your application. You mentioned 98% CSAT. Was that your own score or the team's?"
+              },
+              {
+                "offset_seconds": 26,
+                "speaker": "user",
+                "text": "That was the team's score. The pod's, really — there are six of us on the enterprise queue."
+              },
+              {
+                "offset_seconds": 36,
+                "speaker": "bot",
+                "text": "Got it. What was your own score?"
+              },
+              {
+                "offset_seconds": 40,
+                "speaker": "user",
+                "text": "Ninety-six percent. That was across about forty-five surveys that came back."
+              },
+              {
+                "offset_seconds": 51,
+                "speaker": "bot",
+                "text": "Thanks, that's all I needed. Someone from the hiring team will be in touch."
+              },
+              {
+                "offset_seconds": 56,
+                "speaker": "user",
+                "text": "No problem. Thanks."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

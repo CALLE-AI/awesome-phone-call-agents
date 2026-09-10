@@ -20,7 +20,7 @@ $ redline verify
 
   benign      10/10 ordinary calls still handled
 
-  Every attack in this run is now closed.
+  All modelled findings are closed in this static run.
 ```
 
 The two numbers are the point. `verify` reruns the attacks and a separate benign
@@ -87,13 +87,14 @@ Or against your own:
 ```console
 $ cd my-calle-agent
 $ redline init          # writes redline.yaml, a scenario, a CI workflow
-$ redline run           # 21 scenarios, 0 calls, exits 1 on a finding
+$ redline run           # starter scenario, 0 calls, exits 1 on a finding
 $ redline explain voice-prompt-injection
 $ redline fix --apply   # writes the hardening into your goal and schema
 $ redline verify        # replays every attack and reports the diff
 ```
 
-Only `--live` needs a CALL-E account. When you have a key:
+Live calls and authenticated planner preflight need a CALL-E account; the
+static path does not. When you have a key:
 
 ```console
 $ cp .env.example .env      # then paste the key after REDLINE_CALLE_API_KEY=
@@ -486,7 +487,7 @@ From this directory:
 
 ```console
 $ pip install -e ".[dev]"
-$ pytest -q                       # 732 tests, no network
+$ pytest -q                       # 746 tests, no network
 $ ruff check . && ruff format --check .
 $ mypy
 ```
@@ -500,21 +501,21 @@ The catalogue is the part of this project other people are meant to extend, and
 [`tests/test_catalogue.py`](tests/test_catalogue.py) enforces its rules so a
 reviewer does not have to.
 
-## After the hackathon
+## Delivery limits and next steps
 
-The three things worth building next, in order:
+The current deliverable is the authored-contract gate. Planner preflight can
+report defense differences, but this package does not implement a blocking
+Plan Firewall, `planned` evidence provenance or `--verify-effective`.
 
-1. **Live-mode validation of the offline model.** Several modelling
-   assumptions — chiefly what `task_completed` reports after a successful
-   defence — are documented as assumptions and need a real call to settle. They
-   remain explicitly labelled as assumptions until an authorised live run
-   settles them.
-2. **A published audit of the CALL-E catalogue.** The repository holds dozens
-   of public agents with visible goals and schemas. Running REDLINE across them
-   would turn "agents fail this way" into a measurement, anonymised, with fixes
-   offered upstream rather than findings published.
-3. **A second platform adapter.** The transport and adapter boundaries already
-   assume one will arrive.
+The wheel contains the runtime and starter template. The full 21-scenario
+catalogue, benign suite and appointment example live in this source directory;
+keep the checkout to reproduce the complete bundled demonstration.
+
+Before extending the product, reconcile the contribution and demonstrate the
+existing CALL-E integration with explicitly authorized runtime evidence.
+Static verification alone does not establish the hackathon's actual-runtime-use
+criterion. A future Plan Firewall needs a separate implementation and proof;
+it is not part of the current product promise.
 
 ## Licence
 

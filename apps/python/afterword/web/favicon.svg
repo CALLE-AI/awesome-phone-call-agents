@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Afterword">
+  <rect width="32" height="32" rx="5" fill="#fcfaf7"/>
+  <rect x="6" y="24.5" width="20" height="1.2" fill="#cdc4b6"/>
+  <text x="16" y="22" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="#3f5b73">A</text>
+</svg>
