@@ -30,6 +30,7 @@ import { extname, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 import { measureCsp } from "./csp-check.mjs";
+import { listenSafely } from "./safe-port.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, "..", "..");
@@ -152,10 +153,9 @@ function serve(root) {
       res.writeHead(404).end("not found");
     }
   });
-  return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
-  });
+  return listenSafely(server);
 }
+
 
 function findChrome() {
   return CHROME_CANDIDATES.find((p) => p && existsSync(p)) || null;
@@ -2490,6 +2490,252 @@ async function gateDocs(browser, base, slugs) {
       worst: Number(worst.toFixed(2)), refused: refused.length });
 }
 
+/* ---- the scroll walk -------------------------------------------------------------------
+ *
+ * Everything above tests the page in a handful of states: at the top, past the curtain,
+ * at the foot, at six widths. None of them tests the page a reader actually produces,
+ * which is every scroll position in between with an arbitrary set of disclosures open.
+ * Ten folds is a thousand and twenty-four layouts, and the two defects found by hand
+ * this week both lived in one of them: a hero whose resting offset was written before a
+ * canvas mounted, and a rail that pointed at the wrong act after a fold opened.
+ *
+ * So this walks. Fifty pixels at a time, twice: once with everything shut and once with
+ * every disclosure clicked open, asking the same two questions at every stop.
+ *
+ * The first is whether two pieces of text are on top of each other. Only leaf text is
+ * compared, because a paragraph always intersects the section containing it and a gate
+ * that reports containment reports nothing. Sticky and fixed elements are left out of
+ * that comparison on purpose: text passing under a sticky bar is what a sticky bar IS,
+ * and reporting it would bury the real defects in noise.
+ *
+ * The second is whether anything is stranded under the bar. Every in-page anchor is
+ * visited and the element it names has to come to rest with its top at or below the
+ * bar's bottom edge. That is the failure a sticky header actually causes, and no amount
+ * of rect comparison finds it, because at the moment of the collision the page looks
+ * exactly like a page mid-scroll.
+ *
+ * Written with puppeteer-core against the system Chrome, which is what every other gate
+ * in this file uses. Playwright would mean a second browser driver and a browser
+ * download in a repository whose quick-start is two commands, to do a job the installed
+ * one already does.
+ */
+const WALK_STEP = 50;
+
+const WALK_PROBE = () => {
+  const leaves = [];
+  let sticky = 0;
+  for (const el of document.querySelectorAll("body *")) {
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none") continue;
+    const box = el.getBoundingClientRect();
+    if (box.width < 2 || box.height < 2) continue;
+    // Off screen at this stop, so not a collision a reader can see here.
+    if (box.bottom < 0 || box.top > window.innerHeight) continue;
+    /* The bar's own words, and anything else riding on a pinned ancestor.
+     *
+     * Checking the element's own `position` is not enough: the bar is sticky and the
+     * wordmark and the standfirst inside it are static, so they were compared against
+     * the page scrolling underneath and reported a collision at every stop. Text passing
+     * under a sticky bar is what a sticky bar is; whether anything is stranded under one
+     * is asked separately, below, by visiting every anchor. */
+    if (el.closest("[data-pinned]")) { sticky += 1; continue; }
+    if (cs.position === "fixed" || cs.position === "sticky") { sticky += 1; continue; }
+    /* Nothing scrolled out of the box that holds it.
+     *
+     * The transcript lists are `max-height: 22rem; overflow-y: auto`, and a turn below
+     * that fold still reports its own rect, hundreds of pixels down the page, on top of
+     * whatever is actually painted there. The first run of this check reported 229 of
+     * those against a page where nothing overlaps. Same shape as the disclosure case
+     * below: a box that exists in layout and is not painted where it says it is.
+     *
+     * Partly visible still counts. Only a leaf entirely outside the clip is dropped. */
+    let clip = el.parentElement && el.parentElement.closest("[data-clip]");
+    let hidden = false;
+    while (clip && !hidden) {
+      const c = clip.getBoundingClientRect();
+      hidden = box.bottom <= c.top + 1 || box.top >= c.bottom - 1
+        || box.right <= c.left + 1 || box.left >= c.right - 1;
+      clip = clip.parentElement && clip.parentElement.closest("[data-clip]");
+    }
+    if (hidden) continue;
+
+    /* Nothing inside a shut disclosure.
+     *
+     * Chrome renders a closed `<details>`'s contents under `content-visibility: hidden`,
+     * and an element in such a subtree does not report a zero rect: it reports a box
+     * borrowed from the skipped container. Every one of them therefore lands on the same
+     * few pixels and on everything nearby. The first run of this gate reported 1,111
+     * collisions on a page where the same probe, run by hand with the folds open, found
+     * none, and every one of the 1,111 was a pair of elements a reader cannot see.
+     *
+     * The second pass opens every disclosure and walks again, so nothing is exempted by
+     * this line; it is checked in the state where its geometry is real. */
+    if (el.closest("details:not([open])")) continue;
+    // Leaf text only. An element carrying its own text and no element children is the
+    // smallest thing a reader reads, and two of those overlapping is a real defect.
+    const own = [...el.childNodes]
+      .filter((nd) => nd.nodeType === 3 && nd.textContent.trim()).length;
+    if (!own || el.children.length) continue;
+    /* Line boxes, not the union of them.
+     *
+     * `getBoundingClientRect()` on an inline element that wraps returns one box covering
+     * every line it touches, including the empty end of the last one. Two inline
+     * siblings in the same flowing paragraph therefore report overlapping boxes as a
+     * matter of course: `<b>$13.89 a student a year.</b>` and the source link after it
+     * were counted as a collision at every stop that showed the money card, 116 of them,
+     * on text that reads perfectly. `getClientRects()` returns the line boxes
+     * themselves, and two fragments on one line abut without overlapping while two on
+     * different lines are simply apart. A block element returns exactly one rect, so
+     * nothing changes for the elements this gate was catching real defects in. */
+    const name = el.tagName.toLowerCase()
+      + (typeof el.className === "string" && el.className
+        ? "." + el.className.trim().split(/\s+/)[0] : "");
+    const text = el.textContent.trim().slice(0, 40);
+    for (const line of el.getClientRects()) {
+      if (line.width < 2 || line.height < 2) continue;
+      if (line.bottom < 0 || line.top > window.innerHeight) continue;
+      leaves.push({ box: line, name, text });
+    }
+  }
+  const hits = [];
+  for (let i = 0; i < leaves.length; i += 1) {
+    for (let j = i + 1; j < leaves.length; j += 1) {
+      const a = leaves[i].box;
+      const b = leaves[j].box;
+      const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      // Two pixels of slack. Adjacent baselines share a fractional pixel at some zoom
+      // levels, and a rule that fires on that reports noise for the rest of its life.
+      if (ox > 2 && oy > 2) {
+        hits.push(leaves[i].name + " " + JSON.stringify(leaves[i].text)
+          + " over " + leaves[j].name + " " + JSON.stringify(leaves[j].text)
+          + " by " + Math.round(ox) + "x" + Math.round(oy) + "px");
+      }
+    }
+  }
+  return { hits, leaves: leaves.length, sticky };
+};
+
+async function gateScrollWalk(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.goto(url, { waitUntil: "networkidle0" });
+  await page.evaluate(() => document.fonts.ready).catch(() => {});
+  await new Promise((r) => setTimeout(r, 500));
+
+  /* Tagged once rather than recomputed for every element at every stop. A walk of a
+   * hundred stops over sixty leaves is six thousand `getComputedStyle` calls per stop
+   * otherwise, and the gate took longer than the suite it belongs to. */
+  const pinned = await page.evaluate(() => {
+    let n = 0;
+    for (const el of document.querySelectorAll("body *")) {
+      const cs = getComputedStyle(el);
+      if (cs.position === "fixed" || cs.position === "sticky") { el.dataset.pinned = ""; n += 1; }
+      // Anything that clips. Tagged here so the probe can walk to it with `closest`
+      // rather than calling getComputedStyle on every ancestor of every leaf at every
+      // one of a hundred stops.
+      if (cs.overflow !== "visible" || cs.overflowX !== "visible"
+          || cs.overflowY !== "visible") el.dataset.clip = "";
+    }
+    return n;
+  });
+
+  const passes = [];
+  for (const openAll of [false, true]) {
+    const opened = openAll
+      ? await page.$$eval("details:not([open])", (els) => {
+        // Clicked rather than assigned, because a click is what a reader does and it is
+        // the path that fires the toggle listener the page recomputes its layout in.
+        els.forEach((el) => {
+          const s = el.querySelector("summary");
+          if (s) s.click();
+        });
+        return els.length;
+      })
+      : 0;
+    if (opened) await new Promise((r) => setTimeout(r, 500));
+
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    const view = await page.evaluate(() => window.innerHeight);
+    const stops = [];
+    for (let y = 0; y <= Math.max(0, height - view); y += WALK_STEP) stops.push(y);
+    stops.push(Math.max(0, height - view));
+
+    const found = [];
+    for (const y of stops) {
+      await page.evaluate((to) => window.scrollTo(0, to), y);
+      await new Promise((r) => setTimeout(r, 25));
+      const seen = await page.evaluate(WALK_PROBE);
+      if (seen.hits.length) found.push("at " + y + "px: " + seen.hits[0]);
+    }
+    passes.push({ openAll, opened, stops: stops.length, height, found });
+  }
+
+  /* Every in-page anchor, and where it lands. This is the failure a sticky bar causes. */
+  const anchors = await page.$$eval("a[href^='#']", (els) =>
+    [...new Set(els.map((el) => el.getAttribute("href")).filter((h) => h.length > 1))]);
+  const stranded = [];
+  for (const href of anchors) {
+    const landed = await page.evaluate((target) => {
+      const el = document.getElementById(target);
+      if (!el) return { missing: true };
+      /* Two kinds of target this question cannot be asked of.
+       *
+       * A sticky element is not where the scroll put it: act 00 rests against the bottom
+       * of the window under the curtain, so its top is hundreds of pixels above the
+       * viewport by design and reporting that as stranded would be reporting the design.
+       *
+       * A target taller than the window cannot have its top below the bar and still show
+       * its foot, and the browser scrolls it to the top for that reason. What matters for
+       * one of those is that its first line is readable, which the walk above covers. */
+      const cs = getComputedStyle(el);
+      if (cs.position === "sticky" || cs.position === "fixed") return { skip: true };
+      // And anything riding on one. `#calls` is a static block inside act 00, which is
+      // the sticky one, so it reported -445px: the position act 00 holds it at, not a
+      // position any scroll produced.
+      if (el.closest("[data-pinned]")) return { skip: true };
+      if (el.getBoundingClientRect().height > window.innerHeight) return { skip: true };
+      el.scrollIntoView();
+      const bar = document.querySelector(".topbar");
+      return {
+        top: el.getBoundingClientRect().top,
+        barBottom: bar ? bar.getBoundingClientRect().bottom : 0,
+      };
+    }, href.slice(1));
+    await new Promise((r) => setTimeout(r, 40));
+    if (landed.missing || landed.skip) continue;
+    if (landed.top < landed.barBottom - 1) {
+      stranded.push(href + " lands at " + Math.round(landed.top)
+        + "px with the bar reaching " + Math.round(landed.barBottom) + "px");
+    }
+  }
+
+  await page.close();
+
+  const collisions = passes.flatMap((p) => p.found);
+  if (collisions.length || stranded.length) {
+    record("the scroll walk", "FAIL",
+      [collisions.length
+        ? collisions.length + " text-on-text collision(s), first " + collisions[0]
+        : "",
+        stranded.length
+          ? stranded.length + " anchor(s) land under the bar, first " + stranded[0]
+          : ""].filter(Boolean).join(". "),
+      { collisions: collisions.length, stranded: stranded.length });
+    return;
+  }
+
+  const totalStops = passes.reduce((sum, p) => sum + p.stops, 0);
+  record("the scroll walk", "PASS",
+    totalStops + " stops of " + WALK_STEP + "px across two passes, shut and with all "
+    + passes[1].opened + " disclosure(s) clicked open, and no two pieces of text overlap "
+    + "at any of them. All " + anchors.length + " in-page anchor(s) come to rest below "
+    + "the bar",
+    { stops: totalStops, opened: passes[1].opened, anchors: anchors.length, pinned,
+      shutHeight: passes[0].height, openHeight: passes[1].height });
+}
+
+
 async function main() {
   if (!existsSync(OUT)) {
     console.error(`No built page at ${OUT}.\nRun: python tools/judge_page.py`);
@@ -2541,6 +2787,7 @@ async function main() {
     await runGate("every link on every page resolves",
       () => gateLinks(browser, base, docSlugs));
     await runGate("animated figure", () => gateFigure(browser, url));
+    await runGate("the scroll walk", () => gateScrollWalk(browser, url));
     await runGate("screenshots", () => shoot(browser, url));
   } finally {
     await browser.close();

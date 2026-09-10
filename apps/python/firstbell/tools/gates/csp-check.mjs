@@ -28,6 +28,7 @@ import { existsSync } from "node:fs";
 import { extname, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
+import { listenSafely } from "./safe-port.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "..", "..", "out");
@@ -76,9 +77,7 @@ function serve(root, headers) {
       res.writeHead(404).end("not found");
     }
   });
-  return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
-  });
+  return listenSafely(server);
 }
 
 /**
