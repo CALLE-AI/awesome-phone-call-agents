@@ -118,14 +118,25 @@ function placeCallsForSelectedRows() {
   forEachSelectedRow_((sheet, header, r, rowValues) => {
     const account = rowToAccount_(header, rowValues);
     const statusCol = columnIndex_(header, "Status") + 1;
+    const reasonsCol = columnIndex_(header, "Reasons") + 1;
     const outcomeCol = columnIndex_(header, "Call Outcome") + 1;
     const hashCol = columnIndex_(header, "Audit Hash") + 1;
     const suppressedCol = columnIndex_(header, "Suppressed") + 1;
 
     const { ok, code, body } = callApi_("/api/gate/place-call-external", account);
     if (!ok) {
+      // A 409 carries the same {status, reasons: [{code, message}, ...]} shape
+      // checkSelectedRows already renders cleanly — reuse that instead of dumping raw
+      // JSON into the row. Any other error code is genuinely unexpected, so that one
+      // does fall back to the raw body for debugging.
+      const decision = body.detail;
       sheet.getRange(r, statusCol).setValue(code === 409 ? "BLOCKED" : "ERROR");
-      sheet.getRange(r, outcomeCol).setValue(JSON.stringify(body.detail || body));
+      if (code === 409 && decision && decision.reasons) {
+        sheet.getRange(r, reasonsCol).setValue(decision.reasons.map(x => x.code).join(", "));
+        sheet.getRange(r, outcomeCol).setValue("not called — blocked by the gate");
+      } else {
+        sheet.getRange(r, outcomeCol).setValue(JSON.stringify(body));
+      }
       return;
     }
     sheet.getRange(r, statusCol).setValue("CLEARED");
