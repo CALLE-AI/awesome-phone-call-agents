@@ -12,6 +12,13 @@ import {
 import { describeRealtimeError } from "@/lib/realtime/errors";
 import { RealtimeLatencyTracker, type TurnLatency } from "@/lib/realtime/metrics";
 import {
+  extractConversationNotes,
+  readSavedConversations,
+  saveConversation,
+  type ConversationNote,
+  type SavedConversation,
+} from "@/lib/realtime/conversation-notes";
+import {
   buildDiscoveryQuery,
   discoveryClarification,
   type DiscoveryKind,
@@ -34,6 +41,8 @@ type SearchActivity =
   | (WebSearchResult & Readonly<{ status: "completed" }>)
   | Readonly<{ correlationId: string; query: string; status: "failed" }>;
 
+const CONVERSATION_STORAGE_KEY = "senior-phone-ai.conversation-notes.v1";
+
 async function requestCredential(): Promise<CredentialResponse> {
   const response = await fetch("/api/realtime/client-secret", {
     method: "POST",
@@ -50,6 +59,8 @@ export function RealtimeHarness() {
   const sessionRef = useRef<RealtimeSession | null>(null);
   const sessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latencyTrackerRef = useRef(new RealtimeLatencyTracker());
+  const saveNotesRef = useRef(false);
+  const sessionIdRef = useRef(crypto.randomUUID());
   const [state, setState] = useState<SessionState>("idle");
   const [active, setActive] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -58,6 +69,9 @@ export function RealtimeHarness() {
   const [interruptions, setInterruptions] = useState(0);
   const [conversationItems, setConversationItems] = useState(0);
   const [searchActivity, setSearchActivity] = useState<SearchActivity>({ status: "idle" });
+  const [conversationNotes, setConversationNotes] = useState<ConversationNote[]>([]);
+  const [saveNotes, setSaveNotes] = useState(false);
+  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>([]);
   const [error, setError] = useState<string>();
 
   const endSession = () => {
@@ -72,10 +86,14 @@ export function RealtimeHarness() {
   };
 
   useEffect(() => {
+    const hydrationTimer = window.setTimeout(() => {
+      setSavedConversations(readSavedConversations(localStorage.getItem(CONVERSATION_STORAGE_KEY)));
+    }, 0);
     const close = () => sessionRef.current?.close();
     window.addEventListener("beforeunload", close);
     return () => {
       window.removeEventListener("beforeunload", close);
+      window.clearTimeout(hydrationTimer);
       if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
       close();
     };
@@ -90,6 +108,8 @@ export function RealtimeHarness() {
     setInterruptions(0);
     setConversationItems(0);
     setSearchActivity({ status: "idle" });
+    setConversationNotes([]);
+    sessionIdRef.current = crypto.randomUUID();
     setState("authorizing");
 
     try {
@@ -214,7 +234,19 @@ export function RealtimeHarness() {
         setInterruptions((count) => count + 1);
         setState("listening");
       });
-      session.on("history_updated", (history) => setConversationItems(history.length));
+      session.on("history_updated", (history) => {
+        setConversationItems(history.length);
+        const notes = extractConversationNotes(history);
+        setConversationNotes(notes);
+        if (saveNotesRef.current && notes.length) {
+          const updated = saveConversation(
+            readSavedConversations(localStorage.getItem(CONVERSATION_STORAGE_KEY)),
+            { id: sessionIdRef.current, notes, savedAt: new Date().toISOString() },
+          );
+          localStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(updated));
+          setSavedConversations(updated);
+        }
+      });
       session.on("error", (event) => {
         const diagnostic = describeRealtimeError(event.error);
         if (session.transport.status === "connected") {
@@ -263,6 +295,28 @@ export function RealtimeHarness() {
   const interrupt = () => {
     sessionRef.current?.interrupt();
     setState("listening");
+  };
+
+  const toggleNoteSaving = () => {
+    const enabled = !saveNotes;
+    saveNotesRef.current = enabled;
+    setSaveNotes(enabled);
+    if (enabled && conversationNotes.length) {
+      const updated = saveConversation(savedConversations, {
+        id: sessionIdRef.current,
+        notes: conversationNotes,
+        savedAt: new Date().toISOString(),
+      });
+      localStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(updated));
+      setSavedConversations(updated);
+    }
+  };
+
+  const clearSavedNotes = () => {
+    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    setSavedConversations([]);
+    saveNotesRef.current = false;
+    setSaveNotes(false);
   };
 
   return (
@@ -335,6 +389,48 @@ export function RealtimeHarness() {
         )}
       </section>
 
+      <section className="notes-card" aria-labelledby="notes-heading">
+        <p className="eyebrow">Operator review</p>
+        <h2 id="notes-heading">Conversation notes</h2>
+        <p>
+          Live transcript text appears here for this session. Saving is off by default. When enabled,
+          text is stored only in this browser on this device; audio and tool payloads are excluded.
+        </p>
+        <div className="controls">
+          <button aria-pressed={saveNotes} onClick={toggleNoteSaving} type="button">
+            {saveNotes ? "Stop saving notes" : "Save notes on this device"}
+          </button>
+          <button className="danger" disabled={!savedConversations.length} onClick={clearSavedNotes} type="button">
+            Clear saved notes
+          </button>
+        </div>
+        <p className="fine-print" aria-live="polite">
+          {saveNotes ? "Saving is enabled for the current session." : "Saving is disabled."}
+          {" "}{savedConversations.length} saved session{savedConversations.length === 1 ? "" : "s"} retained (maximum 10).
+        </p>
+        <div className="conversation-list" aria-live="polite">
+          {conversationNotes.length ? conversationNotes.map((note) => (
+            <article className={`conversation-note note-${note.role}`} key={note.id}>
+              <strong>{note.role === "caller" ? "Caller" : "Senior Phone AI"}</strong>
+              <p>{note.text}</p>
+            </article>
+          )) : <p>No conversation text is available yet.</p>}
+        </div>
+        {savedConversations.length ? (
+          <details className="saved-notes">
+            <summary>Review previously saved sessions</summary>
+            {savedConversations.map((conversation) => (
+              <section key={conversation.id}>
+                <h3>{new Date(conversation.savedAt).toLocaleString()}</h3>
+                {conversation.notes.map((note) => (
+                  <p key={note.id}><strong>{note.role === "caller" ? "Caller" : "Senior Phone AI"}:</strong> {note.text}</p>
+                ))}
+              </section>
+            ))}
+          </details>
+        ) : null}
+      </section>
+
       <aside className="metrics-card" aria-labelledby="metrics-heading">
         <p className="eyebrow">Observed in this browser</p>
         <h2 id="metrics-heading">Session measurements</h2>
@@ -358,8 +454,8 @@ export function RealtimeHarness() {
           </ol>
         )}
         <p className="fine-print">
-          Measurements are local observations, not service guarantees. This page does not persist
-          audio or transcripts.
+          Measurements are local observations, not service guarantees. Audio is never saved. Text
+          is retained only when the operator enables conversation-note saving above.
         </p>
       </aside>
     </div>

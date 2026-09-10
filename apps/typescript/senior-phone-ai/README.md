@@ -30,6 +30,8 @@ Start the app, open <http://127.0.0.1:3000/realtime> and choose **Start live ses
 
 Ask a changing question, such as the current time in a city. The Realtime agent calls the local `/api/tools/search-web` backchannel after the question, receives a bounded answer with sources and speaks the result in the same session. The page shows tool status, retrieval time, correlation ID and up to five source links. Retrieved pages are untrusted information and cannot authorize an action or change the agent's rules.
 
+The page also shows caller and assistant transcript text in **Conversation notes** for operator review. Saving is off by default. Choose **Save notes on this device** to retain up to 10 sessions in that browser's local storage, or **Clear saved notes** to remove them. Saved notes exclude audio, system instructions and tool payloads. This local developer feature is not shared with other operators and is not a substitute for the authenticated, access-controlled dashboard planned in SPA-013.
+
 News and local-event requests use dedicated `search_news` and `search_local_events` tools over the same protected backchannel. The tools resolve relative dates into a concrete seven-day window in the confirmed IANA timezone. Nearby-event searches require a confirmed city or suburb and ask a short clarification when context is missing. Results prioritize current official listings, include source links and availability uncertainty, and exclude listings outside the requested window. The agent gives a short spoken selection and can prepare a source-backed SMS preview on request; this developer harness does not send it.
 
 ## Commands
@@ -67,7 +69,7 @@ Authorized family members with reminder permission can list and cancel reminders
 
 ## Cancellation and rollback
 
-Choose **End session**, close the page or stop the server to close a local Realtime session. The SDK owns the harness microphone stream and stops its tracks on close. Removing the app directory removes only local source and build output.
+Choose **End session**, close the page or stop the server to close a local Realtime session. The SDK owns the harness microphone stream and stops its tracks on close. Choose **Clear saved notes** to remove conversation text retained by this browser. Removing the app directory removes only local source and build output; browser storage must be cleared separately.
 
 Future provider actions must document their own cancellation limits. In particular, closing the browser or stopping this server must never be described as canceling a call already accepted by a provider. The host scheduler will own recurrence and must support disabling future runs.
 
@@ -91,5 +93,6 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 
 - There is no inbound phone integration.
 - There is no live SMS delivery, reminder scheduling or dashboard.
+- Conversation notes are stored only in one browser and have no authentication or multi-user access controls.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
 - The verified live browser search flow does not prove the deferred Twilio telephone gate.

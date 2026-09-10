@@ -280,7 +280,7 @@ Acceptance criteria:
 - [ ] Verify cross-account access denial through both pages and server endpoints.
 - [ ] Render provider-controlled results/errors as text and redact nested phone/contact/transcript content before public output; cover formatted and local-number forms as well as E.164.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: A local developer-harness foundation now shows caller and assistant transcript text and lets the operator explicitly retain up to 10 sessions in browser storage. It excludes audio and tool payloads and supports clearing saved notes. The authenticated routes, shared persistence and cross-account checks in this ticket remain unstarted.
 
 ### SPA-014
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-013 foundation | Added an opt-in local conversation review panel to the developer Realtime page. Current caller/assistant text remains visible in memory; explicit saving retains at most 10 sessions in browser storage, excludes audio/tool payloads and provides a clear action. SPA-013 remains Backlog. | Forty-five offline tests, lint, typecheck and production build passed. The local page was inspected without starting a billable Realtime session. |
 | 2026-09-11 | SPA-009 | Added confirmed, idempotent one-time reminder creation plus authorized listing/cancellation and timezone/DST clarification; marked SPA-009 Done and SPA-010 Ready. | Forty-three offline tests covered ambiguous/past/DST times, authorization, duplication, access denial and cancellation races. Lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-008 | Added current news and local-event tools with confirmed context, concrete date windows, official-source guidance and requested SMS previews; moved web search to the current lower-cost supported model; marked SPA-008 Done and SPA-009 Ready. | Live news and event searches completed with five sources under redacted correlations `4600…0006` and `4c00…000c`; event output contained three dated options and availability caveats. Thirty-six offline tests, lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-007 | Added Supabase persistence, verified-claims authentication, family RLS, consent/retention controls and durable action/SMS adapters; replaced the Docker workflow with embedded PostgreSQL validation; marked SPA-007 Done and SPA-008 Ready. | The migration and number-free seed applied in PGlite; family access, cross-account denial, consent triggers and restricted grants passed. Thirty-one offline tests, lint, typecheck, production build and repository validation passed. |
