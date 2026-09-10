@@ -163,6 +163,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`pharmacy-cash-price`](skills/pharmacy-cash-price/) - Asks one retail pharmacy for a cash price with no insurance and returns a structured quote, a refusal, or an explicit unknown, with the disclosure and the medical boundary written into the call.
 - [`logistics-exception`](skills/logistics-exception/) - Resolves a missed dock window by calling the driver and receiving dock concurrently with one strict CALL-E result schema, reconciling terminal results by event id and re-fetch, combining only reached-contact facts into a recovery card, and gating any dock-changing follow-up call behind explicit human approval.
 - [`otherend-task-test`](skills/otherend-task-test/) - Rehearses a CALL-E task text and result schema against a programmable receptionist line the operator owns, reads the deterministic grade (manifest, self-report, fabrication, disclosure, confidence calibration), and turns each failing check into a task-text edit before the task reaches real people.
+- [`positive-contact-call`](skills/positive-contact-call/) - Disclosed critical-notice call that confirms a live human acknowledged the message, treats voicemail as unconfirmed, and returns a fail-closed disposition for an escalation ladder.
 
 ### Apps
 
@@ -283,6 +284,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/otherend`](apps/python/otherend/) | Python | Task pre-flight for a CALL-E task: CALL-E dials a programmable line you own that answers as a receptionist with a chosen adversity profile, or as a scripted person for tasks that call people, then a deterministic grader scores what CALL-E reported (`task_completed`, `structured_result`, confidence, AI disclosure) against what the line actually said. Replays nine synthetic rows (in-process simulation, no calls) with no keys by default, including another entry's task text run verbatim; one real call per row only behind `--yes` and an allow-list. |
 
 - [VERIFY](https://github.com/DivineDomokuma10/verifyam) - Disclosed listing-verification app that calls the agent or landlord behind a rental ad and returns a schema-validated transcript-backed claim (Verified/Warning/Inconclusive) with transcript evidence and an optional mock mode. Verdicts represent transcript-supported assessments, not independent authority verification.
+| [`apps/python/positive-contact`](apps/python/positive-contact/) | Python | PSPS Medical Baseline live-contact confirmation: disclosed CALL-E calls, transcript-evidenced confirmation with a judge ensemble, retry and alternate-contact ladder, approval-gated field-visit work orders, and a denominator-honest regulatory report. Fixture mode by default. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
