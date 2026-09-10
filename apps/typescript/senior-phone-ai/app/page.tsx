@@ -26,7 +26,10 @@ export default function Home() {
         </p>
         <div className="notice" role="status">
           <strong>Local realtime harness available</strong>
-          <span>The protected developer test is at <a href="/realtime">/realtime</a>. No phone call, message or recurring job can be created.</span>
+          <span>
+            Test browser audio at <a href="/realtime">/realtime</a> or monitor a CALL-E call at{" "}
+            <a href="/calls">/calls</a>. No phone call, message or recurring job can be created here.
+          </span>
         </div>
       </section>
 

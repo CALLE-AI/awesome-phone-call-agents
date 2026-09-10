@@ -34,6 +34,12 @@ The page also shows caller and assistant transcript text in **Conversation notes
 
 News and local-event requests use dedicated `search_news` and `search_local_events` tools over the same protected backchannel. The tools resolve relative dates into a concrete seven-day window in the confirmed IANA timezone. Nearby-event searches require a confirmed city or suburb and ask a short clarification when context is missing. Results prioritize current official listings, include source links and availability uncertainty, and exclude listings outside the requested window. The agent gives a short spoken selection and can prepare a source-backed SMS preview on request; this developer harness does not send it.
 
+### Local CALL-E conversation monitor
+
+Open <http://127.0.0.1:3000/calls> in live mode and enter the `call_…` identifier returned by CALL-E. The page polls the local server every two seconds while the call is queued or in progress, showing lifecycle status and each caller/assistant transcript turn that the provider has published. The [CALL-E Calls API](https://docs.heycall-e.com/api-reference/calls) documents transcript turns on its call response but does not promise that they are available before the terminal result, so the status can update during a call while the transcript remains empty until the call finishes.
+
+The monitor is a local developer tool. The browser never receives `CALLE_API_KEY`, the server contacts only the fixed `https://api.heycall-e.com` origin and rejects redirects, and its response excludes recipient numbers, task instructions, provider call IDs and raw errors. Phone-like text inside transcripts and summaries is masked. Transcript text stays in browser memory and is discarded when the page closes. An authenticated shared operator view remains part of SPA-013.
+
 ## Commands
 
 ```bash
@@ -52,6 +58,8 @@ npm start
 `.env.example` names planned server integrations and contains no usable credentials. Keep `.env.local` local; it is ignored. Values named `*_API_KEY`, `*_AUTH_TOKEN` and `SUPABASE_SECRET_KEY` are server-only and must never be exposed through `NEXT_PUBLIC_*`, client components, logs or committed fixtures. Supabase's URL and publishable key use the documented `NEXT_PUBLIC_SUPABASE_*` names; the publishable key identifies the project but RLS and verified user claims provide authorization.
 
 Unknown runtime modes fail closed. The Realtime route requires live mode and an exact same loopback origin before it creates a rate-limited, 60-second client secret. Requests addressed through a LAN or public hostname are rejected. The long-lived OpenAI key remains on the server and the browser has no credential input. This local-only harness is not end-user authentication and must not be deployed as a public route.
+
+The CALL-E monitor uses the same exact loopback-origin rule and a separate rate limit. It reads provider state only and cannot create, retry or cancel a call.
 
 ## Side effects and safety
 
@@ -94,5 +102,6 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 - There is no inbound phone integration.
 - There is no live SMS delivery, reminder scheduling or dashboard.
 - Conversation notes are stored only in one browser and have no authentication or multi-user access controls.
+- CALL-E transcript turns may not appear until a call reaches a terminal state.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
 - The verified live browser search flow does not prove the deferred Twilio telephone gate.

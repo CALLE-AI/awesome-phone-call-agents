@@ -234,7 +234,7 @@ Acceptance criteria:
 - [ ] Explain cancellation limits honestly, particularly once a call is in flight.
 - [ ] Include a local fake server/dry-run adapter; no default real outbound calls.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Foundation added for result monitoring: a local-only `/calls` operator page polls a provider-authenticated server proxy for a validated `call_…` ID and renders status plus redacted transcript turns as plain React text. The proxy contacts only the fixed CALL-E API origin, rejects redirects, keeps the API key server-side and returns a schema-selected response without recipient numbers, task instructions, provider call IDs or raw errors. CALL-E documents transcript turns on the call response but does not guarantee that they are published before terminal status, so the UI reports this limitation. Planning, authorized execution, durable reservation/reconciliation and outcome handling remain unstarted; SPA-010 stays Ready.
 
 ### SPA-011
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-010 foundation | Added a local CALL-E conversation monitor that polls status every two seconds and displays redacted transcript turns as the provider publishes them. SPA-010 remains Ready because call planning, confirmed execution and durable reconciliation are still required. | Forty-seven offline tests, lint, typecheck and production build passed. The responsive `/calls` page was inspected without retrieving the previous private call transcript or placing another call. |
 | 2026-09-11 | SPA-013 foundation | Added an opt-in local conversation review panel to the developer Realtime page. Current caller/assistant text remains visible in memory; explicit saving retains at most 10 sessions in browser storage, excludes audio/tool payloads and provides a clear action. SPA-013 remains Backlog. | Forty-five offline tests, lint, typecheck and production build passed. The local page was inspected without starting a billable Realtime session. |
 | 2026-09-11 | SPA-009 | Added confirmed, idempotent one-time reminder creation plus authorized listing/cancellation and timezone/DST clarification; marked SPA-009 Done and SPA-010 Ready. | Forty-three offline tests covered ambiguous/past/DST times, authorization, duplication, access denial and cancellation races. Lint, typecheck, production build and repository validation passed. |
 | 2026-09-10 | SPA-008 | Added current news and local-event tools with confirmed context, concrete date windows, official-source guidance and requested SMS previews; moved web search to the current lower-cost supported model; marked SPA-008 Done and SPA-009 Ready. | Live news and event searches completed with five sources under redacted correlations `4600…0006` and `4c00…000c`; event output contained three dated options and availability caveats. Thirty-six offline tests, lint, typecheck, production build and repository validation passed. |
