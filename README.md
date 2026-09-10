@@ -152,6 +152,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [ReturnReady](apps/python/returnready/) - Local return-enquiry review workbench that compares recipient quotations and later corrections with written instructions, with no-call examples and explicit approval before CALL-E requests.
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
 - [OneReach service follow-up](apps/typescript/onereach-service-followup/) - Turns an authorized CALL-E service appointment conversation into a validated Operations handoff, with a no-call default and standalone public integration example.
 
