@@ -27,7 +27,11 @@ The call is where the model does the least amount of interpretation possible: it
 DisruptionEvent (order_id, reason)
         |
         v
-DuffelClient.find_rebooking_options()  --> real order_change_offers from Duffel
+DuffelClient.find_rebooking_options()  --> real order_change_offers from Duffel,
+        |                                    sorted soonest-first, widening to
+        |                                    nearby dates if the exact date is empty
+        v
+RunStore.record_disruption()  --> logged to SQLite before the call is placed
         |
         v
 TripRescueCaller.call_traveler_with_options()  --> CALL-E places the call,
@@ -37,6 +41,9 @@ orchestrator.handle_disruption()  --> plain code decides: confirm, or don't
         |
         v
 DuffelClient.confirm_rebooking()  --> real order_change + confirm on Duffel
+        |
+        v
+RunStore.record_outcome()  --> logged to SQLite once resolved
 ```
 
 ## Verified live, not just in docs
@@ -73,13 +80,15 @@ python scripts/simulate_disruption.py --phone +1XXXXXXXXXX   # a real, reachable
 
 Every run of `simulate_disruption.py` — dry or live — writes its result to `web/data/last_run.js` and prints where. Open `web/index.html` in a browser afterward to see it rendered as a trip confirmation: original vs. new departure, the options Duffel offered on the call, which one (if any) was chosen, and whether the order was actually touched. No server or build step — it's a static page with no dependencies; just open the file. (The repo ships with sample data pre-populated so the page has something to show before you've run it yourself; it's clearly labeled as sample data until you do.)
 
+Every run is also appended to a local SQLite file (`trip_rescue_runs.sqlite3` by default, override with `--db-path`) via `trip_rescue/store.py`, independent of the web viewer — see **Known limitations** for what this is and isn't.
+
 ## Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-17 tests, all offline: dry-run fixtures for the Duffel and CALL-E clients, and orchestrator tests that assert on the decision logic specifically — accepted option 2 confirms option 2 (not just the first one), declined/unreachable/human-requested/no-options all leave the order untouched, at most 3 options are ever offered even if Duffel returns more, and an unrecognized decision value fails safe rather than guessing.
+28 tests, all offline: dry-run fixtures for the Duffel and CALL-E clients, orchestrator tests that assert on the decision logic specifically — accepted option 2 confirms option 2 (not just the first one), declined/unreachable/human-requested/no-options all leave the order untouched, at most 3 options are ever offered even if Duffel returns more, and an unrecognized decision value fails safe rather than guessing — plus tests for the persistence store (`store.py`) and, using `httpx.MockTransport` to fake Duffel's live responses without any real network access, tests that the live-mode rebooking search actually sorts by departure time and actually widens to nearby dates, not just the already-sorted dry-run fixture.
 
 ## Side effects
 
@@ -91,9 +100,9 @@ python -m pytest tests/ -v
 ## Known limitations (stated directly, not hidden)
 
 - **Disruption detection is simulated, not live.** A real-time flight-status feed that pushes a cancellation the instant it happens (FlightAware AeroAPI, Cirium, or a direct airline feed) is a paid/enterprise product in every case we found, and none of that was obtainable inside a 4-day hackathon build. `scripts/simulate_disruption.py` stands in for that trigger. Everything downstream — asking Duffel for options, calling the traveler, confirming the change — is real and identical either way; only the "how do we learn a flight was cancelled" step is a stand-in. See `docs/RESEARCH.md`.
-- **Rebooking options come from a single route/date query, not a full search across cabin classes or nearby airports.** A production version would widen the search (nearby dates, nearby airports, other cabins) before calling.
+- **Rebooking options still come from a single route and a single cabin class.** `find_rebooking_options` now widens the date search automatically (the requested date, then ±1 day by default, closest first, via `search_window_days`) when the exact date has nothing available, and always returns options sorted soonest-first regardless of what order Duffel's API happens to return them in — but nearby airports and other cabin classes are still out of scope for this build.
 - **Only the CALL-E `create_and_wait` one-shot call API is used**, not a published Goal — this build's task/result-schema pairing changes per disruption (different flight, different options), which fits the one-shot API more directly than a fixed Goal template.
-- **No persistence layer.** A production deployment would store the disruption -> call -> outcome record (SQLite at minimum, matching the pattern other apps in this repo use) so a crash mid-call doesn't lose the fact that a call was placed. This build runs one disruption per process invocation.
+- **Persistence is now a single local SQLite file (`trip_rescue/store.py`), not a real datastore.** Every disruption is recorded before the call is placed and the outcome is recorded once it resolves — matching the pattern other apps in this repo use — so a crash mid-call now leaves a row proving a call was attempted, instead of losing that fact entirely. A production deployment would still want a real database, retention policy, and an actual crash-recovery sweep over unresolved rows, none of which this build does.
 - **Passenger contact phone doubles as the Duffel booking contact number**, which is realistic (it's usually the same number) but means a live demo needs a real, reachable phone from the start, not a placeholder.
 
 ## Go-to-market
