@@ -1,7 +1,10 @@
 # calle-conformance
 
-A corpus of real CALL-E API responses, and a checker that tells you which of them
-your code has never been tested against.
+The API can report a call as completed, `taskCompleted` true, confidence 0.95,
+when the person it says confirmed had not said the word yet, and when nobody was
+on the line at all. This keeps the responses where that happened, serves them so
+your code can meet them before production does, and tells you which of them your
+code has never been tested against.
 
 Three minute walkthrough, opening on the captured call it started from:
 https://youtu.be/tAwQ147nacg
@@ -46,6 +49,18 @@ documented shape, and the only way to find out is to have seen one. So this keep
 them. The full transcript is in `fixtures/calls/`, and the walkthrough above opens
 on the audio.
 
+### Who pays when that field is wrong
+
+Not the person reading it. Merged alongside this project in this same repository
+are an agent that confirms cash-on-delivery orders before they ship, a follow-up
+board that calls older patients after a GP visit, and an escalation that phones
+on-call engineers until somebody commits to an incident. Each one has to decide,
+from a response shaped like the one above, whether a person actually answered.
+
+Read it the documented way and the order ships to a customer who never confirmed,
+the patient is marked as followed up, and the incident is recorded as owned. The
+call that produced the transcript above would have passed all three.
+
 ## Run it first
 
 ```bash
@@ -55,6 +70,14 @@ node src/replay.ts ../../..
 That is the whole setup. No `npm install`, no API key, no network, nothing
 dialled. Node 22 runs the TypeScript directly, and the only dependency in
 `package.json` is needed by the optional probes, not by this.
+
+Any path works, so `node src/replay.ts ../your-app` scores your own checkout. The
+run below scores this repository because that is the checkout at hand, and the
+rows are coverage of recorded test data. What a dot does not mean is directly
+under the table, and it matters more than the table.
+
+If your project has no fixtures yet, there is nothing here to score. Start at
+"The server" instead and develop against the responses themselves.
 
 ```
 corpus: 15 real responses, 8 behaviours declared as predicates.
