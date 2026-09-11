@@ -36,6 +36,11 @@ Customer preferences are supported only by recipient-speaker quotes. AI explanat
 
 The generated report **prepares a handoff**. A person must deliver or act on it. It does not claim assignment to a CRM or a promised callback time.
 
+Phone-like text is masked in normalized results before storage, normal status output,
+and reviewed exports. Quote provenance is matched before masking. This is limited
+phone-output minimization, not a guarantee to redact names or all personal details;
+keep reports private. Existing local records are masked when displayed, not rewritten.
+
 ## Side effects, duplicate prevention and cancellation
 
 Preview only stores a ten-minute local plan. Start atomically claims it and obtains a per-recipient SQLite mutex before network dispatch. The idempotency key stays bound to the immutable payload. There are no recurring schedules, automatic redials, hidden jobs, refunds or paid top-ups. Provider-side dial-attempt behavior is not independently verified.

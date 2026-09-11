@@ -1,5 +1,6 @@
 import {restaurant} from './knowledge.ts';
 import {assess, type Turn} from './domain.ts';
+import {maskPhones} from './privacy.ts';
 export const terminal=(s:string)=>['completed','failed','canceled'].includes(s);
 export async function requestCall(key:string,payload:unknown,idempotencyKey:string){return request(key,'/calls',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify(payload)},45000)}
 export async function fetchCall(key:string,id:string){if(!/^call_[A-Za-z0-9_-]+$/.test(id))throw new Error('Invalid provider call identifier');const data=await request(key,'/calls/'+id);if(data.id!==id)throw new Error('Provider response identifier mismatch');return data}
@@ -19,5 +20,5 @@ export function normalizeProvider(data:any,venue:string,knowledge:typeof restaur
  }
  const result=assess('live role-play',venue,data.status,recipient?.structured_result,turns,knowledge);
  if(attempts.length>1)result.issues.push('Multiple provider attempts exist. Review the complete context for corrections and conflicting answers.');
- return result;
+ return maskPhones(result);
 }

@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {DatabaseSync} from 'node:sqlite';
+import {sample} from '../lib/fixtures.ts';
 
 test('CLI default and preview are offline; consent and expiry fail before claim',()=>{
  const isolated=mkdtempSync(join(tmpdir(),'before-we-go-cli-'));
@@ -22,7 +23,7 @@ test('CLI default and preview are offline; consent and expiry fail before claim'
   assert.equal(JSON.parse(initial.stdout).mode,'synthetic example');
   assert.equal(existsSync(join(isolated,'.local')),false,'default sample creates no state');
 
-  const preview=run('preview','Can you explain the step-free route?');
+  const preview=run('preview','Can you explain the step-free route? Contact '+testEnv.TEST_RECIPIENT);
   assert.equal(preview.status,0,preview.stderr);
   assert.ok(!preview.stdout.includes(testEnv.TEST_RECIPIENT),'preview masks the full phone');
   const plan=JSON.parse(preview.stdout);assert.equal(plan.recipient,'ending 0123');
@@ -42,6 +43,12 @@ test('CLI default and preview are offline; consent and expiry fail before claim'
    assert.equal(read().state,'prepared');
    assert.equal((database.prepare('SELECT COUNT(*) AS n FROM locks').get() as {n:number}).n,0);
    for(const output of [initial,preview,noConsent,expired])assert.ok(!output.stderr.includes('TEST_NETWORK_FORBIDDEN'));
+
+   const oldResult=sample('barrier');oldResult.openQuestions.push('Contact '+testEnv.TEST_RECIPIENT);
+   database.prepare('UPDATE jobs SET result=? WHERE id=?').run(JSON.stringify(oldResult),plan.id);
+   for(const output of [run('status',plan.id),run('report',plan.id,'--reviewed')]){
+    assert.equal(output.status,0,output.stderr);assert.ok(!output.stdout.includes(testEnv.TEST_RECIPIENT),'legacy result output masks phones');
+   }
   }finally{database.close()}
  }finally{rmSync(isolated,{recursive:true,force:true})}
 });
