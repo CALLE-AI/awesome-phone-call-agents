@@ -6,6 +6,13 @@ FieldClose is a web application concept for small commercial HVAC contractors. I
 
 ## Project status
 
+Deployment and private validation statements in this README and the linked
+project documents are author-reported snapshots, not independently verified
+deployment or production-readiness guarantees. Historical submission checklists
+may describe different snapshots. This contribution can be evaluated using the
+fake-only workflow; live-call evidence and a public deployment are not required
+for inclusion in this reference collection.
+
 FieldClose has completed product definition, safety design, architecture,
 technology selection, the durable PostgreSQL workflow through human-task
 creation, credential and email-code authentication, authenticated workspaces,
@@ -17,9 +24,9 @@ protected-workspace provisioning with immutable administration evidence, and
 the durable, role-gated human-disposition closure through its browser and audit
 evidence.
 
-The fake-only judge environment is deployed at
+The author reports a fake-only judge environment at
 <https://fieldclose.dramaforge.icu/>. A separate protected staging environment
-is deployed for controlled integration evidence. The staging environment has
+is reported for controlled integration evidence. The reported staging environment has
 CALL-E and SMTP configuration, but live calls remain paused until an operator
 explicitly authorizes the exact recipient and call brief. No authorized live
 CALL-E result, end-to-end authentication-email delivery, GitHub OAuth, or
@@ -207,8 +214,8 @@ credentials. All deployed authentication modes require a high-entropy
 The human-owned functional loop is complete: an authorized operator can persist
 a bounded disposition, resolve or cancel the human task, produce the final
 FieldClose case state, and audit the decision without mutating an external work
-order. The fake-only judge environment and protected staging are deployed.
-Remaining submission gates are one authorized live CALL-E evidence set, a
+order. Deployment status is author-reported as described above.
+The author's remaining competition goals include one authorized live CALL-E evidence set, a
 stable three-minute golden path, and the upstream contribution under
 `apps/web/fieldclose/`. See the
 [Hackathon submission plan](docs/hackathon-submission-plan.md) for status and
