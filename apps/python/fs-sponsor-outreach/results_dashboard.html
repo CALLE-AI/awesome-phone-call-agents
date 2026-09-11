@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sponsor Outreach — Timing Tower</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --panel: #12161F;
+    --panel-border: #1F2530;
+    --text: #E8ECF2;
+    --text-dim: #7C8494;
+    --interested: #B026FF;
+    --callback: #FFB800;
+    --not-interested: #E63950;
+    --no-answer: #5C6270;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding: 32px 24px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: 0.5px;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  h1 span { color: var(--text-dim); font-weight: 500; }
+  .upload-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .upload-btn:hover { color: var(--text); border-color: var(--text-dim); }
+  #file-input { display: none; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .stat .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .stat .label {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .stat.interested .num { color: var(--interested); }
+  .stat.callback .num { color: var(--callback); }
+  .stat.conversion .num { color: var(--text); }
+
+  .tower-head {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    padding: 0 16px 8px;
+    display: grid;
+    grid-template-columns: 28px 1fr 130px 200px 90px;
+    gap: 12px;
+  }
+
+  .row {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 28px 1fr 130px 200px 90px;
+    gap: 12px;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .row:hover { border-color: var(--text-dim); }
+
+  .pos {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .name-block .name { font-weight: 500; }
+  .name-block .phone {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: inline-block;
+    width: fit-content;
+  }
+  .badge.interested { color: var(--interested); background: rgba(176,38,255,0.12); }
+  .badge.callback_requested { color: var(--callback); background: rgba(255,184,0,0.12); }
+  .badge.not_interested { color: var(--not-interested); background: rgba(230,57,80,0.12); }
+  .badge.unclear, .badge.no_answer, .badge.failed { color: var(--no-answer); background: rgba(92,98,112,0.15); }
+
+  .sector-track {
+    display: flex;
+    gap: 3px;
+    height: 6px;
+  }
+  .sector-track div {
+    flex: 1;
+    border-radius: 2px;
+    background: var(--panel-border);
+  }
+  .sector-track div.done { background: var(--text-dim); }
+  .sector-track div.final.interested { background: var(--interested); }
+  .sector-track div.final.callback_requested { background: var(--callback); }
+  .sector-track div.final.not_interested { background: var(--not-interested); }
+  .sector-track div.final.unclear,
+  .sector-track div.final.no_answer,
+  .sector-track div.final.failed { background: var(--no-answer); }
+
+  .contact-method {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .detail {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--panel-border);
+    margin-top: 12px;
+    padding-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    display: none;
+    line-height: 1.5;
+  }
+  .row.open .detail { display: block; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sponsor Outreach <span>/ Timing Tower</span></h1>
+    <label class="upload-btn" for="file-input">LOAD RESULTS.CSV</label>
+    <input id="file-input" type="file" accept=".csv" />
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tower-head">
+    <span>#</span><span>Contact</span><span>Outcome</span><span>Sectors</span><span>Method</span>
+  </div>
+  <div id="tower"></div>
+</div>
+
+<script>
+// Sample data — replace by loading a real results.csv via the button above.
+// Expected columns match fs_sponsor_outreach.py's output:
+// name, phone, run_id, status, interest_level, best_contact_method, best_contact_time, notes, summary
+const SAMPLE_DATA = [
+  { name: "Alex Rennwerk", phone: "+49XXXXXXXXX", status: "COMPLETED", interest_level: "interested", best_contact_method: "email", best_contact_time: "next week", notes: "Asked for a sponsorship pack and team stats.", summary: "Positive call, requested written proposal." },
+  { name: "Jordan Speedline", phone: "+1XXXXXXXXXX", status: "COMPLETED", interest_level: "callback_requested", best_contact_method: "phone", best_contact_time: "Thursday afternoon", notes: "Busy this week, open to a follow-up call.", summary: "Interested but timing was bad." },
+  { name: "Sam Torque", phone: "+44XXXXXXXXXX", status: "COMPLETED", interest_level: "not_interested", best_contact_method: "-", best_contact_time: "-", notes: "Sponsorship budget already committed for the year.", summary: "Polite decline." },
+  { name: "Robin Chassis", phone: "+1XXXXXXXXXX", status: "NO ANSWER", interest_level: "unclear", best_contact_method: "-", best_contact_time: "-", notes: "No pickup, no voicemail left.", summary: "Unreached." },
+];
+
+const STAGES = ["dialing", "connected", "pitch", "outcome"];
+const STAGE_LABELS = ["Dial", "Connect", "Pitch", "Outcome"];
+
+function computeStats(data) {
+  const total = data.length;
+  const interested = data.filter(d => d.interest_level === "interested").length;
+  const callback = data.filter(d => d.interest_level === "callback_requested").length;
+  const conversion = total ? Math.round(((interested + callback) / total) * 100) : 0;
+  return { total, interested, callback, conversion };
+}
+
+function renderStats(data) {
+  const s = computeStats(data);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${s.total}</div><div class="label">Contacts Called</div></div>
+    <div class="stat interested"><div class="num">${s.interested}</div><div class="label">Interested</div></div>
+    <div class="stat callback"><div class="num">${s.callback}</div><div class="label">Callback Requested</div></div>
+    <div class="stat conversion"><div class="num">${s.conversion}%</div><div class="label">Positive Rate</div></div>
+  `;
+}
+
+function sectorTrack(level) {
+  const reached = level === "unclear" || level === "no_answer" || level === "failed" ? 1 : 4;
+  return STAGES.map((_, i) => {
+    const isDone = i < reached;
+    const isFinal = i === reached - 1;
+    const cls = ['done', isDone ? 'done' : '', isFinal ? `final ${level}` : ''].filter(Boolean).join(' ');
+    return `<div class="${isDone ? 'done' : ''} ${isFinal ? 'final ' + level : ''}"></div>`;
+  }).join('');
+}
+
+function renderTower(data) {
+  const tower = document.getElementById('tower');
+  if (!data.length) {
+    tower.innerHTML = `<div class="empty-state">No calls yet — load a results.csv to see the timing tower.</div>`;
+    return;
+  }
+  const order = { interested: 0, callback_requested: 1, unclear: 2, not_interested: 3, no_answer: 2, failed: 2 };
+  const sorted = [...data].sort((a, b) => (order[a.interest_level] ?? 9) - (order[b.interest_level] ?? 9));
+
+  tower.innerHTML = sorted.map((d, i) => `
+    <div class="row" onclick="this.classList.toggle('open')">
+      <div class="pos">${String(i + 1).padStart(2, '0')}</div>
+      <div class="name-block">
+        <div class="name">${d.name}</div>
+        <div class="phone">${d.phone || ''}</div>
+      </div>
+      <div class="badge ${d.interest_level}">${(d.interest_level || 'unclear').replace('_', ' ')}</div>
+      <div class="sector-track">${sectorTrack(d.interest_level)}</div>
+      <div class="contact-method">${d.best_contact_method || '—'}</div>
+      <div class="detail">
+        <strong>Status:</strong> ${d.status || '—'}<br>
+        <strong>Best time:</strong> ${d.best_contact_time || '—'}<br>
+        <strong>Notes:</strong> ${d.notes || '—'}<br>
+        <strong>Summary:</strong> ${d.summary || '—'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    // naive split — fine for CALL-E's output (no embedded commas expected in these fields)
+    const cells = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (cells[i] || '').trim());
+    return obj;
+  });
+}
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const data = parseCSV(evt.target.result);
+    renderStats(data);
+    renderTower(data);
+  };
+  reader.readAsText(file);
+});
+
+renderStats(SAMPLE_DATA);
+renderTower(SAMPLE_DATA);
+</script>
+</body>
+</html>
