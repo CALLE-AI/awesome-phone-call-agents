@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>call-e-brain</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300b4ff'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v6l5.25 3.15L17 12.23l-4-2.37V7z'/></svg>" />
+</head>
+<body>
+
+  <!-- ===== DASHBOARD ÚNICO (sem login) ===== -->
+  <div id="app">
+    <!-- Logotipo centralizado grande -->
+    <div class="hero">
+      <img src="/callebrainlogo.jpeg" alt="call-e-brain logo" class="main-logo" draggable="false" />
+      <h1>call-e-brain</h1>
+      <p class="subtitle">Voice Agent Command Center</p>
+    </div>
+
+    <!-- Conteúdo principal -->
+    <div class="container">
+      <!-- Navegação por abas -->
+      <div class="tabs">
+        <button class="tab-btn active" data-section="section-plans">📋 Create Plan</button>
+        <button class="tab-btn" data-section="section-history">📜 History</button>
+        <button class="tab-btn" data-section="section-settings">⚙️ Settings</button>
+      </div>
+
+      <!-- Secções -->
+      <div id="section-plans" class="section active">
+        <h2>Create a New Plan</h2>
+        <form id="plan-form">
+          <input type="text" id="plan-name" placeholder="Plan name (e.g. Follow-up)" required />
+          <input type="tel" id="plan-phone" placeholder="Phone number (e.g. +14155550100)" required />
+          <textarea id="plan-task" placeholder="What should the agent say?" rows="4" required></textarea>
+          <button type="submit" class="btn-primary">💾 Save Plan</button>
+        </form>
+        <hr />
+        <h3>Saved Plans</h3>
+        <ul id="saved-plans" class="plan-list"></ul>
+      </div>
+
+      <div id="section-history" class="section">
+        <h2>Call History</h2>
+        <ul id="call-history" class="history-list"></ul>
+      </div>
+
+      <div id="section-settings" class="section">
+        <h2>Settings</h2>
+        <div class="setting-item">
+          <label>Notifications</label>
+          <input type="checkbox" id="notif-toggle" checked />
+          <span>Enabled</span>
+        </div>
+        <button id="clear-history-btn" class="btn-secondary">🗑️ Clear History</button>
+      </div>
+    </div>
+
+    <!-- ===== RODAPÉ ===== -->
+    <footer class="app-footer">
+      Created by Yannick de Matos – Luanda, Angola – HamirStudios – For CALL-E Hackaton Challenge
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

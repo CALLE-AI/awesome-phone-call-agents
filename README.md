@@ -85,7 +85,7 @@ apps/
     └── app-name/
 ```
 
-Every app that can place a call or create a recurring job must document setup, side effects, cancellation, credential handling, and dry-run or preview behavior.
+- [call-e-brain](apps/typescript/call-e-brain) - Voice Agent Command Center: create, save, and execute phone call plans with full history, transcripts, and summaries.
 
 ### Plugin directory template
 

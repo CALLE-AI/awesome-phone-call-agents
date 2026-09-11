@@ -28,3 +28,4 @@ skills-lock.json
 **/.call-locks/
 docs/codex-implementation-plan.md
 docs/superpowers/
+database.sqlite
