@@ -64,7 +64,7 @@ Leave that Terminal window running, but keep it outside the recorded area.
 
 Put them in this order:
 
-1. `https://positive-contact-demo.onrender.com/board#live-verification`
+1. `https://positive-contact-demo.onrender.com/board`
 2. `http://127.0.0.1:8000/review`
 3. `http://127.0.0.1:8000/support`
 4. `http://127.0.0.1:8000/reports`
