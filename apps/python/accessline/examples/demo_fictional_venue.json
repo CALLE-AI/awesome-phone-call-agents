@@ -1,0 +1,25 @@
+{
+  "fixture_id": "accessline_demo_fictional_venue_001",
+  "fixture_kind": "FICTIONAL_TEST_DATA",
+  "synthetic": true,
+  "live_call": false,
+  "mode": "MOCK",
+  "real_call_performed": false,
+  "input": {
+    "venue_name": "Fictional Lakeside Community Center",
+    "phone_number": "+15555550100",
+    "visit_date": "2026-09-10",
+    "consent_confirmed": true
+  },
+  "mock_transcript": "MOCK ONLY — not a real call. Staff: Main entrance has one step at the door. Restroom on first floor is accessible. Use the side ramp if the front door is busy.",
+  "mock_response": {
+    "venue_name": "Fictional Lakeside Community Center",
+    "called_at": "2026-09-01T23:30:00+00:00",
+    "step_free_entrance": "no",
+    "accessible_restroom": "yes",
+    "access_instructions": "Side ramp available on the east side; front door has one step.",
+    "uncertainty_notes": "MOCK transcript only; staff did not confirm ramp slope or door width.",
+    "source_type": "phone_call",
+    "completion_status": "complete"
+  }
+}

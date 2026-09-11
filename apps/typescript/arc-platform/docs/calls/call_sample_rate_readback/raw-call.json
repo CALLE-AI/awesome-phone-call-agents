@@ -1,0 +1,114 @@
+{
+ "_note": "SYNTHETIC SAMPLE. This is not a record of a real call. The station, the people, the conversation, the identifiers and the timestamps are all invented. The number is on ITU country code +99, which is unassigned and cannot be dialled. Real archives of real calls are kept privately and are not published, because the person on the other end of a cold call did not agree to be quoted.",
+ "id": "call_sample_rate_readback",
+ "object": "call",
+ "status": "completed",
+ "task": "<task text omitted from the sample>",
+ "recipients": [
+  {
+   "phones": [
+    "+99000000000"
+   ],
+   "region": "ZZ",
+   "locale": "en-US",
+   "status": "completed"
+  }
+ ],
+ "structuredResult": {
+  "availability": "yes",
+  "rate_per_spot": 8000,
+  "rate_confirmed": true,
+  "spot_length_seconds": 30
+ },
+ "summary": "Rate confirmed by read-back.",
+ "taskCompleted": true,
+ "completionConfidence": 0.9,
+ "evidence": [
+  "The rate was read back digit by digit and agreed."
+ ],
+ "metadata": {
+  "targetName": "Radio Meridian 92.4",
+  "targetType": "station"
+ },
+ "failureCode": null,
+ "failureMessage": null,
+ "createdAt": "2026-01-05T10:00:00Z",
+ "completedAt": "2026-01-05T10:04:00Z",
+ "turns": [
+  {
+   "at": 0,
+   "speaker": "bot",
+   "text": "Hello, this is Arc, an AI assistant calling on behalf of Bright Foods."
+  },
+  {
+   "at": 5,
+   "speaker": "bot",
+   "text": "This is about radio advertising - is this the ad sales desk?"
+  },
+  {
+   "at": 10,
+   "speaker": "user",
+   "text": "Yes, speaking."
+  },
+  {
+   "at": 12,
+   "speaker": "bot",
+   "text": "This is only an availability and pricing enquiry. Do you have advertising availability from the nineteenth to the twenty-fifth of next month?"
+  },
+  {
+   "at": 23,
+   "speaker": "user",
+   "text": "Yes, we have space that week."
+  },
+  {
+   "at": 25,
+   "speaker": "bot",
+   "text": "Do you have a per-spot rate for that window?"
+  },
+  {
+   "at": 28,
+   "speaker": "user",
+   "text": "Eight thousand per spot."
+  },
+  {
+   "at": 30,
+   "speaker": "bot",
+   "text": "Could you give that rate as digits, one by one, and then confirm it?"
+  },
+  {
+   "at": 35,
+   "speaker": "user",
+   "text": "Eight zero zero zero. Eight thousand."
+  },
+  {
+   "at": 38,
+   "speaker": "bot",
+   "text": "Just to confirm, is that 8 0 0 0 rupees per spot?"
+  },
+  {
+   "at": 42,
+   "speaker": "user",
+   "text": "Yes, eight thousand."
+  },
+  {
+   "at": 44,
+   "speaker": "bot",
+   "text": "Thank you. Is that for a thirty second spot?"
+  },
+  {
+   "at": 47,
+   "speaker": "user",
+   "text": "Thirty seconds, yes. Eight thousand."
+  },
+  {
+   "at": 50,
+   "speaker": "bot",
+   "text": "Understood. I have no authority to book anything today - a person will follow up. Thank you for your time."
+  },
+  {
+   "at": 58,
+   "speaker": "user",
+   "text": "No problem."
+  }
+ ]
+}

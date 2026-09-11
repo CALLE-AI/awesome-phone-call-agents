@@ -1,0 +1,5 @@
+{"target_id": "R-001", "status": "CANCELLED", "new_slot": null, "notes": "guest cannot make it tonight"}
+{"target_id": "R-002", "status": "CONFIRMED", "new_slot": null, "notes": "see you then"}
+{"target_id": "W-001", "status": "DECLINED", "new_slot": null, "notes": "already booked elsewhere"}
+{"target_id": "W-003", "status": "ACCEPTED", "new_slot": null, "notes": "we will take the table"}
+{"target_id": "DEFAULT", "status": "NO_ANSWER", "new_slot": null, "notes": "nobody picked up"}

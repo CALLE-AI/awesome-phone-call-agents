@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanverse Human API</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">KANVERSE</p>
+      <h1>Human API</h1>
+      <p class="subtitle">Turn a real-world goal into structured phone-call results.</p>
+    </section>
+
+    <section class="panel">
+      <div class="mode-bar">
+        <div>
+          <span class="mode-label">Execution mode</span>
+          <strong id="modeTitle">Dry Run</strong>
+          <small id="modeDescription">Safe simulation. No CALL-E call credits are used.</small>
+        </div>
+        <label class="mode-switch" for="modeToggle">
+          <input id="modeToggle" type="checkbox" />
+          <span class="mode-slider" aria-hidden="true"></span>
+          <span id="modeSwitchText">DRY RUN</span>
+        </label>
+      </div>
+
+      <h2>1. Define the goal</h2>
+      <label for="goal">Goal</label>
+      <textarea id="goal" rows="4" placeholder="Example: Find a repair shop that can replace my phone screen tomorrow for under £80."></textarea>
+
+      <label for="phones">Phone numbers</label>
+      <textarea id="phones" rows="4" placeholder="One number per line, including country code"></textarea>
+
+      <div class="actions">
+        <button id="previewBtn" type="button">Preview Mission</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2>2. Mission dashboard</h2>
+        <span id="statusBadge" class="badge idle">IDLE</span>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <h3>Goal</h3>
+          <p id="goalPreview">No goal yet.</p>
+        </article>
+        <article class="card">
+          <h3>Targets</h3>
+          <p id="targetCount">0 phone numbers</p>
+        </article>
+        <article class="card">
+          <h3>Decision</h3>
+          <p id="decisionText">Waiting for a mission.</p>
+        </article>
+      </div>
+
+      <section id="planCard" class="plan-card hidden" aria-live="polite">
+        <div>
+          <p class="eyebrow">CALL-E PLAN</p>
+          <h3 id="planTitle">Ready to call</h3>
+          <p id="planGoal"></p>
+          <p id="planTarget" class="muted"></p>
+          <p id="planSummary" class="muted"></p>
+        </div>
+        <div class="plan-actions">
+          <button id="confirmCallBtn" type="button" class="danger-btn">Confirm & Call</button>
+          <button id="cancelPlanBtn" type="button" class="secondary-btn">Cancel</button>
+        </div>
+      </section>
+
+      <section class="history-section">
+        <div class="section-heading compact">
+          <h3>CallChain history</h3>
+          <span id="historyCount" class="history-count">0 results</span>
+        </div>
+        <div id="historyList" class="history-list">
+          <div class="history-empty">No targets evaluated yet.</div>
+        </div>
+      </section>
+
+      <div class="timeline">
+        <div class="timeline-item active">Goal received</div>
+        <div class="timeline-item">Plan call</div>
+        <div class="timeline-item">Run CALL-E</div>
+        <div class="timeline-item">Evaluate outcome</div>
+        <div class="timeline-item">Continue or stop</div>
+      </div>
+    </section>
+
+    <section class="panel warning-panel">
+      <h2>Safety</h2>
+      <p id="safetyText">Dry-run mode is enabled by default. Simulated calls use no CALL-E call credits. Live mode must be enabled deliberately, and each real call still requires explicit confirmation.</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
