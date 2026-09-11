@@ -1,0 +1,12 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+scripts/residents.json
+
+data/call_log.json
+public/call_log.json
