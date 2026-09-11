@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "platform-failure",
+    "status": "timed_out"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 1,
+    "summary": "In this fictional failure case, the sanitized evidence would satisfy every assertion, but the terminal platform status overrides it. The workflow under test is not blamed.",
+    "evidence": {
+      "mentions": ["attendance confirmed for thursday", "a cancellation fee applies if you cancel within 24 hours"]
+    }
+  }
+}
