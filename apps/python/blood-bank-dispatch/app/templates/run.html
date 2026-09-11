@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Run — {{ run.units_needed }} unit(s) {{ run.blood_group }} {{ run.rhesus }}</h1>
+<p class="muted">Requested by {{ run.requester or '—' }} · run status {{ run.status }}</p>
+<div hx-get="/runs/{{ run.id }}/cards" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+{% endblock %}

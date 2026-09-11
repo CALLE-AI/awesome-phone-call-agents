@@ -203,7 +203,14 @@ Authenticated bounded polling is the only result path. While the workbench is ac
 7. Route invalid results, mismatched identifiers, and unresolved 600-second attempts to `needs_attention` with one reconciliation task.
 8. Present the normalized result or explicit reconciliation state to the operator.
 
-Correctness must not depend on an in-memory timer. If scheduled reconciliation becomes necessary, due work is persisted in PostgreSQL and invoked by a hosted scheduler.
+The current MVP has no service worker, background poller, or hosted scheduler
+for accepted calls. The mounted case view schedules the first refresh after
+about five seconds and clears that timer when the view unmounts. Reopening the
+case reloads the persisted attempt and resumes the same bounded lookup loop when
+the attempt is still nonterminal. Correctness therefore depends on PostgreSQL
+state, the stored provider call ID, and `acceptedAt`, not on continuity of the
+browser timer. If unattended scheduled reconciliation is added later, its due
+work must be persisted in PostgreSQL and invoked by a hosted scheduler.
 
 ## Human disposition sequence
 
@@ -329,11 +336,47 @@ Do not place raw phone numbers, secrets, full transcripts, or unrestricted work-
 
 ## Deployment topology
 
-- The current hackathon deployment uses one Aliyun ECS host with isolated public-demo and protected-staging application environments behind Caddy HTTPS.
-- PostgreSQL is reachable only on the server network; it is not exposed publicly.
-- The public environment contains no CALL-E credentials and forces isolated fake-provider workspaces.
-- The protected environment permits only allow-listed operators and contains the live secrets.
-- The protected server retrieves CALL-E status through authenticated bounded polling and processes terminal results idempotently.
+The public URL and browser-visible fake-only boundary can be reviewed directly.
+The server, database, account, credential-presence, and protected-workspace
+details below are maintainer-reported private operational observations. They do
+not identify a publicly verifiable deployment revision and are not source or
+build provenance; the public source of truth is this repository tree and its
+visible pull-request history.
+
+- The current Aliyun ECS host serves the public demo and a separate
+  `fieldclose-staging` hostname behind Caddy HTTPS. The staging perimeter uses
+  HTTP Basic authentication; its DNS, valid hostname certificate, TLS 1.3
+  handshake, Caddy response, and `401` unauthenticated boundary were rechecked
+  on 2026-08-20.
+- A private 2026-08-04 preflight record identifies the protected release,
+  protected CALL-E workspace, recognized provider credential, and paused
+  durable kill switch that existed at that time.
+- The public application contains no CALL-E credentials and forces isolated
+  fake-provider workspaces.
+- A 2026-08-20 read-only server inspection verified distinct systemd services,
+  loopback ports, root-owned `0600` environment files, database URLs, Better
+  Auth secrets, field-encryption keys, and lookup keys. CALL-E credentials and
+  the protected-operator allowlist exist only in staging. The durable global
+  live-call switch was present and paused, and staging contained zero live
+  attempts.
+- The same-host PostgreSQL deployment uses distinct database names and roles,
+  aliases pinned to `127.0.0.1`, a loopback-only listener, and database-specific
+  host rules restricted to `127.0.0.1/32`. This is the documented equivalent to
+  certificate-verified transport for the current same-host topology; any
+  off-host database must use `sslmode=verify-full`.
+- On 2026-08-20 the Basic-auth credential was rotated and its bcrypt material
+  moved to a `root:caddy 0640` Caddy import. A dedicated protected access log
+  now removes IP, URI, and header fields and applies bounded rotation and
+  retention.
+- Public and staging share the same-owner QQ SMTP identity as an explicit,
+  documented operator-approved exception. On 2026-08-24 the unique verified
+  non-owner account received the existing protected workspace's `operator`
+  membership without changing the environment allowlist or live-call gates.
+  The operator then signed in and observed the protected workspace; the latest
+  bounded staging session row confirmed the verified non-owner operator role
+  and exact eight-hour duration. This completed W4 application-access evidence.
+- The protected server is designed to retrieve CALL-E status through
+  authenticated bounded polling and process terminal results idempotently.
 - Vercel and Neon remain a supported managed-hosting alternative.
 - `FIELDCLOSE_LIVE_CALLS_ENABLED` and a database-backed kill switch must both permit creation.
 - All timestamps are stored in UTC; each case retains its explicit IANA timezone.
@@ -395,7 +438,8 @@ The selected architecture remains subject to concrete implementation evidence. C
 - [x] Durable human disposition, task resolution, final case transition, and
   browser evidence
 - [x] An authorized asynchronous CALL-E creation smoke test, completed locally
-  with a contact exception and redacted evidence
+  with successful participant contact, a separately documented structured-result
+  discrepancy, and redacted evidence
 - [x] CALL-E lookup throttling, reconciliation, and late-recovery tests
 
 Failure of a spike may reopen the affected technology choice. It does not relax the product or safety invariants.

@@ -7,24 +7,21 @@ import { authClient } from "@/auth-client";
 
 export type AuthView = "sign-in" | "sign-up";
 type SignInMethod = "password" | "email-code";
-type SignupField = "name" | "username" | "email" | "password";
+type SignupField = "name" | "email" | "password";
 type SignupFieldErrors = Partial<Record<SignupField, string>>;
 const pendingVerificationEmailKey = "fieldclose.pending-verification-email";
 const signupFieldOrder: SignupField[] = [
   "name",
-  "username",
   "email",
   "password",
 ];
 const signupFieldLabels: Record<SignupField, string> = {
   name: "Your name",
-  username: "Username",
   email: "Work email",
   password: "Password",
 };
 const signupFieldIds: Record<SignupField, string> = {
   name: "signup-name",
-  username: "signup-username",
   email: "signup-email",
   password: "signup-password",
 };
@@ -49,7 +46,6 @@ export function SignInScreen({
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [verificationEmail, setVerificationEmail] = useState<string | null>(
@@ -231,10 +227,8 @@ export function SignInScreen({
 
     const normalizedName = name.trim();
     const normalizedEmail = signupEmail.trim();
-    const normalizedUsername = username.trim();
     const fieldErrors = validateSignupFields({
       name: normalizedName,
-      username: normalizedUsername,
       email: normalizedEmail,
       password: signupPassword,
     });
@@ -249,14 +243,15 @@ export function SignInScreen({
     setSignupFieldErrors({});
     setBusy(true);
     rememberVerificationEmail(normalizedEmail);
+    const generatedUsername = createGeneratedUsername(normalizedEmail);
 
     try {
       const response = await authClient.signUp.email({
         name: normalizedName,
         email: normalizedEmail,
         password: signupPassword,
-        username: normalizedUsername,
-        displayUsername: normalizedUsername,
+        username: generatedUsername,
+        displayUsername: generatedUsername,
         callbackURL: returnTo,
       });
 
@@ -386,7 +381,7 @@ export function SignInScreen({
           <span className="mode-label">
             <i aria-hidden="true" /> Public demo · fake only
           </span>
-          <p>Account access</p>
+          <p>Workspace access</p>
         </div>
         <Link
           aria-label="Close account access"
@@ -438,7 +433,7 @@ export function SignInScreen({
                 tabIndex={view === "sign-up" ? 0 : -1}
                 type="button"
               >
-                Create account
+                Create workspace
               </button>
             </div>
 
@@ -519,6 +514,7 @@ export function SignInScreen({
                       <span>Keep me signed in on this device</span>
                     </label>
                     <button
+                      aria-busy={busy}
                       className="primary-button full-width"
                       disabled={busy}
                       type="submit"
@@ -546,6 +542,7 @@ export function SignInScreen({
                       />
                     </AuthField>
                     <button
+                      aria-busy={busy}
                       className="primary-button full-width"
                       disabled={busy}
                       type="submit"
@@ -577,6 +574,7 @@ export function SignInScreen({
                       />
                     </AuthField>
                     <button
+                      aria-busy={busy}
                       className="primary-button full-width"
                       disabled={busy}
                       type="submit"
@@ -588,7 +586,6 @@ export function SignInScreen({
                 </>
               ) : (
                 <form className="auth-form" noValidate onSubmit={createAccount}>
-                <div className="auth-form-row">
                   <AuthField
                     error={signupFieldErrors.name}
                     label="Your name"
@@ -618,37 +615,6 @@ export function SignInScreen({
                       value={name}
                     />
                   </AuthField>
-                  <AuthField
-                    error={signupFieldErrors.username}
-                    label="Username"
-                    htmlFor="signup-username"
-                  >
-                    <input
-                      aria-describedby={
-                        signupFieldErrors.username
-                          ? "signup-username-error"
-                          : undefined
-                      }
-                      aria-invalid={
-                        signupFieldErrors.username ? "true" : undefined
-                      }
-                      autoComplete="username"
-                      id="signup-username"
-                      maxLength={30}
-                      minLength={3}
-                      onChange={(event) =>
-                        updateSignupField(
-                          "username",
-                          event.target.value,
-                          setUsername,
-                        )
-                      }
-                      pattern="[A-Za-z0-9_.]+"
-                      required
-                      value={username}
-                    />
-                  </AuthField>
-                </div>
                 <AuthField
                   error={signupFieldErrors.email}
                   label="Work email"
@@ -706,33 +672,61 @@ export function SignInScreen({
                     type="password"
                     value={signupPassword}
                   />
-                  {signupFieldErrors.password ? null : (
-                    <small id="signup-password-help">
-                      Use 8–128 characters. Do not reuse a work-system password.
-                    </small>
-                  )}
+                  <ul
+                    aria-label="Password requirements"
+                    className="password-requirements"
+                    id="signup-password-help"
+                  >
+                    <li
+                      aria-live="polite"
+                      data-met={
+                        signupPassword.length >= 8 &&
+                        signupPassword.length <= 128
+                      }
+                    >
+                      <span aria-hidden="true">✓</span>
+                      8–128 characters
+                    </li>
+                    <li>
+                      <span aria-hidden="true">•</span>
+                      Do not reuse a work-system password
+                    </li>
+                  </ul>
                 </AuthField>
                 <button
+                  aria-busy={busy}
                   className="primary-button full-width"
                   disabled={busy}
                   type="submit"
                 >
-                  {busy ? "Creating account…" : "Create account"}
+                  {busy ? "Creating workspace…" : "Create demo workspace"}
                 </button>
+                <p className="auth-trust-note">
+                  <span aria-hidden="true" />
+                  Simulation only. No real customer data or calls.
+                </p>
                 </form>
               )}
 
               <div
-                aria-live="polite"
                 className="auth-feedback"
                 data-visible={Boolean(error || notice)}
               >
                 {error ? (
-                  <p className="signin-error" role="alert">
+                  <p
+                    className="signin-error"
+                    role={
+                      Object.keys(signupFieldErrors).length > 0
+                        ? undefined
+                        : "alert"
+                    }
+                  >
                     {error}
                   </p>
                 ) : notice ? (
-                  <p className="signin-notice">{notice}</p>
+                  <p className="signin-notice" role="status">
+                    {notice}
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -783,6 +777,7 @@ function VerificationForm({
         />
       </AuthField>
       <button
+        aria-busy={busy}
         className="primary-button full-width"
         disabled={busy}
         type="submit"
@@ -827,7 +822,11 @@ function AuthField({
       <label htmlFor={htmlFor}>{label}</label>
       {children}
       {error ? (
-        <small className="auth-field-error" id={`${htmlFor}-error`}>
+        <small
+          className="auth-field-error"
+          id={`${htmlFor}-error`}
+          role="alert"
+        >
           {error}
         </small>
       ) : null}
@@ -837,12 +836,10 @@ function AuthField({
 
 function validateSignupFields({
   name,
-  username,
   email,
   password,
 }: {
   name: string;
-  username: string;
   email: string;
   password: string;
 }): SignupFieldErrors {
@@ -850,15 +847,6 @@ function validateSignupFields({
 
   if (name.length < 2 || name.length > 80) {
     errors.name = "Enter your name using 2–80 characters.";
-  }
-
-  if (
-    username.length < 3 ||
-    username.length > 30 ||
-    !/^[A-Za-z0-9_.]+$/u.test(username)
-  ) {
-    errors.username =
-      "Use 3–30 letters, numbers, dots, or underscores.";
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) {
@@ -883,12 +871,15 @@ function signupErrorDetails(error: {
 
   switch (error.code) {
     case "USERNAME_IS_ALREADY_TAKEN":
-      fields.username = "This username is already in use. Choose another.";
+      fields.email =
+        "An account identifier for this email is unavailable. Use another email.";
       break;
     case "INVALID_USERNAME":
-      fields.username =
-        "Use 3–30 letters, numbers, dots, or underscores.";
-      break;
+      return {
+        fields,
+        summary:
+          "The account service could not generate an account identifier. Try again in a moment.",
+      };
     case "INVALID_EMAIL":
       fields.email = "Enter a valid email address.";
       break;
@@ -930,7 +921,7 @@ function signupErrorSummary(errors: SignupFieldErrors) {
       ? `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}`
       : labels.length === 2
         ? `${labels[0]} and ${labels[1]}`
-      : labels[0];
+        : labels[0];
 
   return `Fix the highlighted ${
     labels.length === 1 ? "field" : "fields"
@@ -947,6 +938,23 @@ function focusFirstSignupError(errors: SignupFieldErrors) {
   queueMicrotask(() => {
     document.getElementById(signupFieldIds[firstInvalidField])?.focus();
   });
+}
+
+function createGeneratedUsername(email: string) {
+  const [localPart = "demo"] = email.toLowerCase().split("@");
+  const stem =
+    localPart
+      .replace(/[^a-z0-9_.]+/gu, "_")
+      .replace(/^[._]+|[._]+$/gu, "")
+      .slice(0, 20) || "demo";
+  let hash = 2166136261;
+
+  for (const character of email.toLowerCase()) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `${stem}.${(hash >>> 0).toString(36)}`.slice(0, 30);
 }
 
 function authErrorMessage(

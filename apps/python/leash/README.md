@@ -99,7 +99,7 @@ Order matters, and a test asserts the count is exactly twelve. All twelve are re
 | 8 | `readback_confirmed` | A misheard decision word. See regression A: the caller's decision word was mis-transcribed as a different single word |
 | 9 | `spoke_with_person` | The platform's own read on whether a human was on the line. |
 | 10 | `live_human_evidence_in_transcript` | **Voicemail arriving as `status: "completed"`.** This condition counts user turns and characters of speech instead of trusting the status field. |
-| 11 | `evidence_supports_decision` | A structured field that contradicts the platform's own `evidence[]`. See regression B. |
+| 11 | `evidence_supports_decision` | A decision the platform's own `evidence[]` does not corroborate. Defence in depth, not a response to a known platform defect — see behaviour B. |
 | 12 | `reason_does_not_contradict_decision` | A person whose stated reason means the opposite of their stated choice. See regression C. |
 
 ---
@@ -119,12 +119,24 @@ things were visible on that call: the agent reordered the script, asking "why" b
 so nothing in the checker may assume a position in the script; and a single mis-transcribed token is
 enough to change a decision if nothing corroborates it.
 
-**B — A structured field contradicted its own transcript and evidence, at high confidence.** On a
-call with `status: completed`, `task_completed: true` and confidence 0.93 labelled `high`, the
-caller answered in the affirmative, `evidence[]` recorded that they had, and the corresponding
-enum in `structured_result` came back with the opposite value. Everything else about the call
-reported success. This is why condition 11 cross-checks the decision against `evidence[]` instead of
-reading one field, and why the confidence score alone is not treated as a safety signal.
+**B — A field description is a prompt, and mine was ambiguous.** On a call with `status: completed`
+and a high confidence score, the caller answered an awareness question affirmatively and then, asked
+directly whether they would take the task on, declined. The field I had described as "yes only if
+the person confirmed they will handle it" came back `no`. I read that as extraction contradicting
+its own transcript, and reported it as a platform defect.
+
+It was not. CALL-E reconciled it against the call records and the extraction was correct against my
+own description: `evidence[]` recorded that the caller acknowledged the reassignment, which is a
+different question from whether they would take it over. They also corrected a second misreading of
+mine — `completion_confidence` describes whether the *task* completed, not the accuracy of any
+individual custom field, so a high score alongside an unexpected field value is not a contradiction.
+
+Two things survive the correction, which is why this is still written down. A structured field means
+exactly what its description says, so an ambiguous description is a bug in the caller's code rather
+than in the platform. And a system acting on one field alone is trusting a sentence it wrote itself.
+Condition 11 cross-checks the decision against `evidence[]` for the second reason. It is defence in
+depth, not a workaround for a platform defect, and it should not be read as one.
+
 
 **C — A caller's stated reason contradicted their stated choice.** On a call with confidence 0.92,
 the caller chose continue, confirmed the read-back, and then gave a one-sentence reason that plainly

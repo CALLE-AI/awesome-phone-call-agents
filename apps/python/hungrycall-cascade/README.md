@@ -116,4 +116,8 @@ untouched, and no full number reaching any output.
 
 This is a focused, self-contained proof of the orchestration. The complete application —
 restaurant lookup, a second branch for table reservations, ordering chains, web interface
-and the live CALL-E transport — lives at <https://github.com/ellmos-ai/hungrycall>.
+and the live CALL-E transport — lives at <https://github.com/ellmos-ai/hungrycall>. It has
+since been field-tested twice against the real CALL-E service (2026-08-11 and 2026-08-22),
+each call played out live by a human on the other end of the phone; its README carries a
+"How We Tested" section describing what was run, what broke, and what got fixed, and its
+test suite currently stands at 407 passing.

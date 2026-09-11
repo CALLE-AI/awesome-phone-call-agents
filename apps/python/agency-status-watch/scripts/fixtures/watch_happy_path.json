@@ -1,0 +1,49 @@
+{
+  "check_plan": {
+    "ok": true,
+    "tool_name": "plan_call",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"plan_id\":\"plan_asw_6621\",\"ready_to_run\":true,\"confirm_token\":\"ctok_asw_9d41\"}"
+        }
+      ],
+      "structuredContent": {
+        "plan_id": "plan_asw_6621",
+        "ready_to_run": true,
+        "confirm_token": "ctok_asw_9d41"
+      }
+    }
+  },
+  "check_run": {
+    "ok": true,
+    "call_started": true,
+    "run_id": "run_asw_7719",
+    "status_result": {
+      "structuredContent": {
+        "run_id": "run_asw_7719",
+        "status": "RUNNING"
+      }
+    }
+  },
+  "check_status": {
+    "ok": true,
+    "tool_name": "get_call_run",
+    "result": {
+      "structuredContent": {
+        "run_id": "run_asw_7719",
+        "status": "COMPLETED",
+        "structured_output": {
+          "status_category": "in_process",
+          "ivr_reached": true,
+          "spoke_with": "Immigration Information Desk",
+          "next_action": "none",
+          "next_action_deadline": "",
+          "confidence": 0.9,
+          "notes": "Your application is still being processed; no action is needed."
+        }
+      }
+    }
+  }
+}
