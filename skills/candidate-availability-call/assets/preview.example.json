@@ -1,0 +1,50 @@
+{
+  "dry_run": true,
+  "would_place_call": false,
+  "request_id": "req-2026-10-06-001",
+  "candidate_name": "Jordan Lee",
+  "masked_to_phone": "+15******337",
+  "call_goal": "You are an AI phone assistant calling on behalf of Example Robotics. Disclose that immediately and say that Avery Chen authorized this one scheduling-coordination call.\n\nPurpose: ask Jordan Lee about availability for Product Engineer technical interview. This call is only for scheduling coordination. Do not interview, screen, discuss compensation, make employment promises, or confirm that an interview is booked.\n\nIf the configured CALL-E workflow records or transcribes calls, disclose that before asking scheduling questions and say the transcript is used only to create a scheduling note for human review.\n\nAuthorized contact reason: Jordan opted into phone coordination for this interview loop.\nInterview duration: 45 minutes.\nTimezone to use: America/New_York.\nCoordinator-supported windows:\n1. 2026-10-06T14:00:00-04:00 to 2026-10-06T17:00:00-04:00\n2. 2026-10-07T10:00:00-04:00 to 2026-10-07T12:00:00-04:00\n\nAsk:\n1. Which of these windows, if any, work for the candidate?\n2. What timezone should the coordinator use?\n3. Are there scheduling constraints the coordinator should know?\n4. Which allowed follow-up channel does the candidate prefer: email, sms?\n5. Does the candidate consent to a follow-up through that channel about this interview scheduling request?\n\nDo not discuss:\n- compensation\n- immigration\n- protected characteristics\n- technical screening\n\nIf voicemail answers, leave only this approved message: \"This is an AI phone assistant calling for Example Robotics about interview scheduling. Please reply to Avery's email with your availability.\"\n\nIf the candidate declines, is uncertain, or asks a question outside scheduling, thank them and mark the result for human review.\n\nReturn a structured result with disposition, availability_windows, timezone_confirmed, constraints, preferred_followup_channel, consent_to_followup, voicemail_left, needs_human_review, and evidence. Do not infer availability or consent from silence.",
+  "calle_cli_plan_command_preview": "calle call plan --to-phone '<E164_PHONE>' --goal 'You are an AI phone assistant calling on behalf of Example Robotics. Disclose that immediately and say that Avery Chen authorized this one scheduling-coordination call.\n\nPurpose: ask Jordan Lee about availability for Product Engineer technical interview. This call is only for scheduling coordination. Do not interview, screen, discuss compensation, make employment promises, or confirm that an interview is booked.\n\nIf the configured CALL-E workflow records or transcribes calls, disclose that before asking scheduling questions and say the transcript is used only to create a scheduling note for human review.\n\nAuthorized contact reason: Jordan opted into phone coordination for this interview loop.\nInterview duration: 45 minutes.\nTimezone to use: America/New_York.\nCoordinator-supported windows:\n1. 2026-10-06T14:00:00-04:00 to 2026-10-06T17:00:00-04:00\n2. 2026-10-07T10:00:00-04:00 to 2026-10-07T12:00:00-04:00\n\nAsk:\n1. Which of these windows, if any, work for the candidate?\n2. What timezone should the coordinator use?\n3. Are there scheduling constraints the coordinator should know?\n4. Which allowed follow-up channel does the candidate prefer: email, sms?\n5. Does the candidate consent to a follow-up through that channel about this interview scheduling request?\n\nDo not discuss:\n- compensation\n- immigration\n- protected characteristics\n- technical screening\n\nIf voicemail answers, leave only this approved message: \"This is an AI phone assistant calling for Example Robotics about interview scheduling. Please reply to Avery'\"'\"'s email with your availability.\"\n\nIf the candidate declines, is uncertain, or asks a question outside scheduling, thank them and mark the result for human review.\n\nReturn a structured result with disposition, availability_windows, timezone_confirmed, constraints, preferred_followup_channel, consent_to_followup, voicemail_left, needs_human_review, and evidence. Do not infer availability or consent from silence.' --timezone America/New_York --language English --region US",
+  "sensitive_command_note": "Dry-run output intentionally redacts --to-phone. Insert the reviewed E.164 number only at live planning time after explicit user authorization.",
+  "disposition_options": [
+    "available",
+    "unavailable",
+    "voicemail",
+    "no_answer",
+    "wrong_number",
+    "declined",
+    "needs_human_review"
+  ],
+  "expected_result_schema": {
+    "disposition": "available | unavailable | voicemail | no_answer | wrong_number | declined | needs_human_review",
+    "request_id": "string",
+    "candidate_name": "string",
+    "availability_windows": [
+      {
+        "start": "string",
+        "end": "string",
+        "timezone": "string",
+        "evidence": "string"
+      }
+    ],
+    "timezone_confirmed": "string",
+    "constraints": [
+      "string"
+    ],
+    "preferred_followup_channel": "phone | sms | email | none | unknown",
+    "consent_to_followup": "boolean; true only when the candidate explicitly consents",
+    "voicemail_left": false,
+    "needs_human_review": true,
+    "evidence": [
+      {
+        "claim": "string",
+        "transcript_span": "string"
+      }
+    ],
+    "do_not_rely_on": [
+      "string"
+    ],
+    "notes": "string"
+  }
+}

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@call-e/calle':
-        specifier: ^0.2.2
-        version: 0.2.2
+        specifier: ^0.7.0
+        version: 0.7.0
       '@gsap/react':
         specifier: ^2.1.2
         version: 2.1.2(gsap@3.15.0)(react@19.2.8)
@@ -84,8 +84,8 @@ packages:
   '@bytecodealliance/preview2-shim@0.17.6':
     resolution: {integrity: sha512-n3cM88gTen5980UOBAD6xDcNNL3ocTK8keab21bpx1ONdA+ARj7uD1qoFxOWCyKlkpSi195FH+GeAut7Oc6zZw==}
 
-  '@call-e/calle@0.2.2':
-    resolution: {integrity: sha512-o1cDf/mASU92luUbdiUj1E7AFtXK+mm4ikGwB3x+G9RaEZCezs7/vYKDMEydnRmM1b8FEzzQB+Z+ehoE5kKvGw==}
+  '@call-e/calle@0.7.0':
+    resolution: {integrity: sha512-SUOm42SaVvzboBbXlv7d8uGmbpPuQwZIX5rU9nWo5tr+JOgP36P8rfe1AI7ZVbMpLuX88XIxASm2BQ3qfAKyPg==}
     hasBin: true
 
   '@edge-runtime/format@2.2.1':
@@ -1702,7 +1702,7 @@ snapshots:
 
   '@bytecodealliance/preview2-shim@0.17.6': {}
 
-  '@call-e/calle@0.2.2':
+  '@call-e/calle@0.7.0':
     dependencies:
       openapi-fetch: 0.14.1
 

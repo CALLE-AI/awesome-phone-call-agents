@@ -1,0 +1,24 @@
+{
+  "runId": "demo-2026-08-21-margaret",
+  "participantId": "participant-demo-01",
+  "participantPhone": "+12025550147",
+  "participantName": "Margaret",
+  "locale": "en-GB",
+  "region": "GB",
+  "scheduledWindow": "Friday afternoon",
+  "conversationThreads": [
+    "The tomatoes on the balcony",
+    "Grandson Leo's school play"
+  ],
+  "eventOptions": [
+    {
+      "id": "event-library-2026-08-25",
+      "title": "Tea and local history",
+      "when": "Tuesday at 2:00 PM",
+      "place": "Riverside Library"
+    }
+  ],
+  "contactConsentRecorded": true,
+  "aiDisclosureApproved": true,
+  "confirmOneCall": true
+}

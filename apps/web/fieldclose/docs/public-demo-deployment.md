@@ -4,12 +4,18 @@
 - Audience: Maintainers and hackathon reviewers
 - Target: A judge-accessible FieldClose deployment that cannot place a phone call
 
+The URL and its browser-visible fake-only behavior can be reviewed directly.
+Server configuration and deployment operations are maintainer-reported private
+observations; this document does not cite an inaccessible revision as public
+source, build, or validation provenance.
+
 ## Deployment boundary
 
-The P0A human-disposition workflow has passed unit, PostgreSQL integration,
-browser, and full repository validation. The P0B release must use that validated
-closure and demonstrate the complete case lifecycle, not stop at a displayed
-recommendation.
+The maintainer reports that the P0A human-disposition workflow passed unit,
+PostgreSQL integration, browser, and full local validation. Those private logs
+are not public provenance; the pull request exposes the repository-level check.
+The P0B release must preserve that closure and demonstrate the complete case
+lifecycle, not stop at a displayed recommendation.
 
 The public deployment is a standalone Next.js application backed by its own
 PostgreSQL database. It supports password, email-code, and account-registration
@@ -162,3 +168,10 @@ chat. Enter them directly in the selected service's secret manager.
 - [Vercel project configuration](https://vercel.com/docs/project-configuration/vercel-json)
 - [Vercel build configuration](https://vercel.com/docs/builds/configure-a-build)
 - [Neon connection pooling](https://neon.com/docs/connect/connection-pooling)
+
+## Latest smoke evidence
+
+The August 13, 2026 signed-out desktop and 375px public checks, isolated mobile
+fake-provider regression, and remaining authenticated-deployment gaps are
+recorded in
+[Public Demo Smoke Record](public-demo-smoke-2026-08-13.md).

@@ -1,0 +1,3 @@
+{"entry_id": "W-001", "name": "Fictional Waitlist One", "phone": "+15550111", "party_size": 4, "window_start": "2026-09-10T18:00:00+07:00", "window_end": "2026-09-10T21:00:00+07:00", "priority": 1, "consent": true, "status": "WAITING"}
+{"entry_id": "W-002", "name": "Fictional Waitlist Two", "phone": "+15550112", "party_size": 2, "window_start": "2026-09-10T18:00:00+07:00", "window_end": "2026-09-10T21:00:00+07:00", "priority": 2, "consent": true, "status": "WAITING"}
+{"entry_id": "W-003", "name": "Fictional Waitlist Three", "phone": "+15550113", "party_size": 4, "window_start": "2026-09-10T18:00:00+07:00", "window_end": "2026-09-10T21:00:00+07:00", "priority": 3, "consent": true, "status": "WAITING"}

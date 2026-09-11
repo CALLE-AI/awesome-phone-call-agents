@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+/**
+ * The palette is CALL-E's own, read off their site rather than eyeballed.
+ *
+ * --signal is their #FFD733, --violet their #7A78FF, --sage their #EBECDC,
+ * and --ground is built from their own dark token #2F1B1D. Keeping their
+ * values means this sits next to their product without looking like a
+ * different company built it.
+ */
+:root {
+  --ground: #1a1012;
+  --ground-2: #2f1b1d;
+  --ground-3: #3b2427;
+  --paper: #f9f9f0;
+  --paper-dim: #c6bcb5;
+  --paper-faint: #8f8079;
+  --rule: #43292d;
+
+  --signal: #ffd733;
+  --signal-dim: #ffeb99;
+  --violet: #7a78ff;
+  --sage: #ebecdc;
+
+  /* One accent per basis, and they stay the only status colours. */
+  --quoted: #6ee7a8;
+  --derived: var(--signal);
+  --absent: #8f8079;
+  --alarm: #ff6b5d;
+
+  --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-paper: var(--paper);
+  --color-signal: var(--signal);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--ground);
+  color: var(--paper);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+}
+
+::selection {
+  background: var(--signal);
+  color: var(--ground);
+}
+
+textarea {
+  field-sizing: content;
+}
+
+.payload::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.payload::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 999px;
+}
+.payload::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- motion ------------------------------------------------------------ */
+
+/* The ring. Concentric polygons pushing outward, the way a call goes out. */
+@keyframes ring-out {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* The waveform under the hero, borrowed from their own calling button. */
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    transform: translateY(-18px) rotate(180deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
+.callring {
+  animation: ring-out 3.6s var(--ease-smooth) infinite;
+}
+.wavebar {
+  transform-origin: center;
+  animation: wave 1.05s var(--ease-smooth) infinite;
+}
+.glyph {
+  animation: drift 9s var(--ease-smooth) infinite alternate;
+}
+.rise {
+  animation: rise 0.7s var(--ease-smooth) both;
+}
+.sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 51, 0.16), transparent);
+  animation: sweep 2.6s var(--ease-smooth) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .callring,
+  .wavebar,
+  .glyph,
+  .rise,
+  .sweep::after {
+    animation: none;
+  }
+  .rise {
+    opacity: 1;
+    transform: none;
+  }
+}

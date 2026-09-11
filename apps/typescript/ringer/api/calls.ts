@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result_schema: body.result_schema ?? undefined,
         recipient_result_schema: body.recipient_result_schema ?? undefined,
         metadata: body.metadata,
-        webhook_url: body.webhook_url ?? deriveWebhookUrl(req.headers.host),
+        webhook_url: body.webhook_url ?? deriveWebhookUrl(),
       },
       idempotencyKey,
     )

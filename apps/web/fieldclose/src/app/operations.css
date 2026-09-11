@@ -451,40 +451,65 @@ textarea {
   text-transform: none;
 }
 
+.rail-empty,
 .rail-empty-clear {
   display: grid;
-  min-height: calc(36rem - 4.35rem);
   grid-template-areas:
     "mark copy"
     ". action";
-  grid-template-columns: 5.25rem minmax(18rem, 31rem);
   align-content: center;
   justify-content: center;
+  gap: 1.1rem 1.5rem;
+}
+
+.rail-empty {
+  min-height: calc(36rem - 4.35rem);
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  padding: clamp(2.25rem, 5vw, 3.5rem) 1.5rem;
+}
+
+.rail-empty-clear {
+  min-height: calc(36rem - 4.35rem);
+  grid-template-columns: 5.25rem minmax(18rem, 31rem);
   gap: 1.3rem 2rem;
   padding: clamp(3.5rem, 7vw, 6.5rem);
 }
 
+.rail-empty .rail-empty-mark,
 .rail-empty-clear .rail-empty-mark {
   display: grid;
-  width: 5.25rem;
-  height: 5.25rem;
   grid-area: mark;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--safe) 38%, var(--line));
   border-radius: 50%;
   background: color-mix(in srgb, var(--safe) 8%, var(--paper));
   color: var(--safe);
-  box-shadow: 0 0 0 0.65rem color-mix(in srgb, var(--safe) 4%, transparent);
   animation: rail-empty-mark-enter 280ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
 }
 
+.rail-empty .rail-empty-mark {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+
+.rail-empty-clear .rail-empty-mark {
+  width: 5.25rem;
+  height: 5.25rem;
+  box-shadow: 0 0 0 0.65rem color-mix(in srgb, var(--safe) 4%, transparent);
+}
+
 .rail-empty-mark svg {
-  width: 2rem;
-  height: 2rem;
+  width: 1.7rem;
+  height: 1.7rem;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.7;
+}
+
+.rail-empty-clear .rail-empty-mark svg {
+  width: 2rem;
+  height: 2rem;
 }
 
 .rail-empty-copy {
@@ -513,7 +538,7 @@ textarea {
   text-wrap: balance;
 }
 
-.rail-empty-clear .rail-empty-copy p {
+.rail-empty-copy p {
   max-width: 30rem;
   margin: 0.8rem 0 0;
   color: var(--muted);
@@ -762,10 +787,16 @@ textarea {
 
 .route-list .empty-workspace {
   min-height: 26rem;
-  align-content: start;
+  padding: 1.2rem;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--safe) 3%, var(--paper)), var(--paper));
-  padding: 1.2rem;
+}
+
+.route-list .empty-state {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  margin: 0;
 }
 
 .route-list .empty-workspace .empty-index {
@@ -781,6 +812,17 @@ textarea {
   margin-top: 1.25rem;
   font-size: 1.35rem;
   line-height: 1.15;
+}
+
+.route-list .empty-state .empty-state-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.route-list .empty-state .empty-state-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .route-list .empty-workspace p {
@@ -1131,6 +1173,7 @@ textarea {
 
 .notice-strip {
   min-height: 3.5rem;
+  align-items: center;
   border-bottom-color: var(--line);
   background: color-mix(in srgb, var(--safe) 4%, var(--paper));
   padding: 0.75rem 1.25rem;
@@ -1142,7 +1185,30 @@ textarea {
 }
 
 .notice-mark {
-  border-radius: 0.4rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--safe) 30%, var(--line));
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--safe) 10%, var(--paper));
+  color: var(--safe);
+}
+
+.notice-mark svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.notice-strip-live .notice-mark {
+  border-color: color-mix(in srgb, var(--attention) 34%, var(--line));
+  background: color-mix(in srgb, var(--attention) 12%, var(--paper));
+  color: var(--attention);
 }
 
 .form-progress {
@@ -1164,14 +1230,33 @@ textarea {
   padding: 0.6rem 0.8rem;
 }
 
+.form-progress li[aria-current="step"] {
+  background: color-mix(in srgb, var(--safe) 7%, var(--paper));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .form-progress li:last-child {
   border-right: 0;
 }
 
 .form-progress span {
+  display: grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.35rem;
+  background: var(--paper);
   color: var(--accent-dark);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.56rem;
+  font-size: 0.54rem;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.form-progress li[aria-current="step"] span {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 .form-progress strong {
@@ -1187,11 +1272,12 @@ textarea {
 }
 
 .form-section legend {
+  position: relative;
   width: 100%;
   margin: 0;
   border-bottom: 1px solid var(--line);
   background: #f5f7fa;
-  padding: 0.7rem 0.9rem;
+  padding: 0.7rem 0.9rem 0.7rem 1rem;
   font-family: var(--display);
   font-size: 0.72rem;
   font-weight: 760;
@@ -1199,11 +1285,28 @@ textarea {
   text-transform: none;
 }
 
+.form-section legend::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--accent);
+  content: "";
+}
+
 .form-section legend span {
-  margin-right: 0.45rem;
+  display: inline-grid;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.55rem;
+  place-items: center;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
   color: var(--accent-dark);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.58rem;
+  font-size: 0.56rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .form-grid {
@@ -1257,6 +1360,9 @@ textarea {
   border-right: 1px solid var(--line);
   border-radius: 0;
   padding: 0.9rem;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .question-option:last-child {
@@ -1265,6 +1371,11 @@ textarea {
 
 .question-option:hover {
   background: color-mix(in srgb, var(--paper-deep) 50%, transparent);
+}
+
+.question-option:has(input:checked) {
+  background: color-mix(in srgb, var(--safe) 7%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--safe) 30%, var(--line));
 }
 
 .question-option strong {
@@ -1279,14 +1390,15 @@ textarea {
 
 .form-actions {
   position: sticky;
-  z-index: 5;
+  z-index: 6;
   bottom: 0;
   justify-content: flex-end;
   gap: 0.65rem;
   margin-top: 1rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-dark);
   background: color-mix(in srgb, var(--paper) 96%, transparent);
   padding: 0.85rem 1rem;
+  box-shadow: 0 -0.6rem 1.2rem color-mix(in srgb, var(--ink) 6%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -1662,6 +1774,7 @@ textarea {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .rail-empty,
   .rail-empty-clear {
     min-height: 24rem;
     grid-template-areas:
@@ -1675,6 +1788,7 @@ textarea {
     padding: 2.5rem 1.25rem;
   }
 
+  .rail-empty .rail-empty-mark,
   .rail-empty-clear .rail-empty-mark {
     width: 4.25rem;
     height: 4.25rem;
@@ -1896,7 +2010,9 @@ textarea {
     .audit-timeline p,
     .audit-timeline time,
     .task-list p,
-    .result-timestamp
+    .result-timestamp,
+    .empty-state-eyebrow,
+    .empty-state .empty-copy
   ) {
   font-size: var(--text-caption);
 }

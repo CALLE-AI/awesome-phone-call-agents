@@ -1,0 +1,5 @@
+# Dev / CI tools for the offline test + security-scan pass (no API keys needed)
+-r requirements.txt
+pytest>=8.0
+bandit>=1.7
+ruff>=0.6

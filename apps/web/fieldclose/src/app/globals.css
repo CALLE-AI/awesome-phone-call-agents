@@ -498,20 +498,8 @@ button {
 }
 
 .rail-empty {
-  padding: 3rem 2rem 3rem 0;
+  padding: 0;
   color: var(--muted);
-}
-
-.rail-empty > span {
-  color: var(--line-dark);
-  font-family: var(--display);
-  font-size: 3rem;
-  font-weight: 750;
-}
-
-.rail-empty p {
-  margin: 0.5rem 0 1rem;
-  font-size: 0.84rem;
 }
 
 .workspace-panel {
@@ -764,6 +752,7 @@ button {
 .simulation-hero > p,
 .result-state > p,
 .empty-copy {
+  max-width: 30rem;
   color: var(--muted);
   font-size: 0.76rem;
   line-height: 1.6;
@@ -789,6 +778,14 @@ button {
   padding: 0.85rem 0;
   font-size: 0.71rem;
   line-height: 1.45;
+  transition:
+    padding 150ms ease,
+    background-color 150ms ease;
+}
+
+.attestation-list label:has(input:checked) {
+  padding-left: 0.6rem;
+  background: color-mix(in srgb, var(--safe) 6%, transparent);
 }
 
 input[type="checkbox"] {
@@ -801,7 +798,11 @@ input[type="checkbox"] {
 .primary-button,
 .secondary-button,
 .signin-button {
+  display: inline-flex;
   min-height: 2.8rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
   border: 1px solid var(--ink);
   border-radius: 0.1rem;
   padding: 0.75rem 1rem;
@@ -842,6 +843,17 @@ input[type="checkbox"] {
 .signin-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.primary-button[aria-busy="true"]::before {
+  width: 0.82rem;
+  height: 0.82rem;
+  flex: 0 0 auto;
+  border: 2px solid color-mix(in srgb, currentColor 34%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: auth-button-spin 650ms linear infinite;
+  content: "";
 }
 
 .full-width {
@@ -1109,7 +1121,43 @@ textarea.field-control {
   padding-top: 1rem;
 }
 
+.disposition-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.disposition-mark {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-dark) 28%, var(--line));
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--accent) 9%, var(--paper));
+  color: var(--accent-dark);
+}
+
+.disposition-mark svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .disposition-panel > span {
+  font-family: var(--display);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.disposition-panel-header > span {
+  display: block;
   font-family: var(--display);
   font-size: 0.68rem;
   font-weight: 750;
@@ -1147,7 +1195,7 @@ textarea.field-control {
   margin: 0;
   border-left: 1px solid var(--accent);
   padding-left: 0.8rem;
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.5;
 }
@@ -1219,12 +1267,26 @@ textarea.field-control {
 .notice-strip {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--safe) 8%, var(--paper));
   padding: 0.8rem 2rem;
   color: color-mix(in srgb, var(--safe) 82%, #143b2a);
   font-size: 0.7rem;
+}
+
+.notice-strip-copy {
+  min-width: min(100%, 24rem);
+  flex: 1 1 24rem;
+  line-height: 1.45;
+}
+
+.notice-strip-action {
+  margin-left: auto;
+  color: currentColor;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .notice-strip-live {
@@ -1443,11 +1505,86 @@ textarea.field-control {
   position: absolute;
   right: -1rem;
   bottom: -1.5rem;
-  color: var(--paper-deep);
+  color: color-mix(in srgb, var(--paper-deep) 72%, var(--line));
   font-family: var(--display);
   font-size: clamp(5rem, 13vw, 12rem);
   font-weight: 850;
   letter-spacing: -0.07em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Shared empty-state recipe: every workspace no-data surface uses the same
+   icon / kicker / heading / copy / action stack so the states read as one
+   system. Tones keep unavailable states distinct from the brand accent. */
+.empty-state {
+  display: grid;
+  max-width: 34rem;
+  align-content: center;
+  justify-items: start;
+  gap: 0.9rem;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.empty-state-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--empty-tone) 32%, var(--line));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--empty-tone) 9%, var(--paper));
+  color: var(--empty-tone);
+  box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--empty-tone) 5%, transparent);
+  margin-bottom: 0.45rem;
+}
+
+.empty-state-icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.empty-state-eyebrow {
+  margin: 0;
+  color: var(--empty-tone);
+  font-family: var(--display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.empty-state h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 3vw, 2.7rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.empty-state .empty-copy {
+  max-width: 30rem;
+}
+
+.empty-state--neutral {
+  --empty-tone: var(--accent-dark);
+}
+
+.empty-state--safe {
+  --empty-tone: var(--safe);
+}
+
+.empty-state--attention {
+  --empty-tone: var(--attention);
 }
 
 .workspace-loading,
@@ -2059,6 +2196,55 @@ textarea.field-control {
   font-weight: 650;
 }
 
+.password-requirements {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.63rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  list-style: none;
+}
+
+.password-requirements li {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.password-requirements li > span {
+  display: inline-grid;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line-dark);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 0.55rem;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.password-requirements li:not([data-met]) > span {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.password-requirements li[data-met="true"] {
+  color: var(--safe);
+}
+
+.password-requirements li[data-met="true"] > span {
+  border-color: var(--safe);
+  background: var(--safe);
+  color: #ffffff;
+}
+
 .auth-remember {
   display: flex;
   align-items: center;
@@ -2270,7 +2456,7 @@ textarea.field-control {
 
 .public-brand small {
   color: color-mix(in srgb, var(--canvas) 66%, transparent);
-  font-size: 0.61rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -2299,7 +2485,7 @@ textarea.field-control {
   border-bottom: 2px solid transparent;
   color: color-mix(in srgb, var(--canvas) 72%, transparent);
   padding: 0 1.15rem;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   font-weight: 750;
   letter-spacing: 0.055em;
   text-decoration: none;
@@ -2324,7 +2510,7 @@ textarea.field-control {
 .public-signin-link,
 .public-secondary-link {
   color: inherit;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 800;
   text-underline-offset: 0.3rem;
 }
@@ -2349,7 +2535,7 @@ textarea.field-control {
   background: var(--accent);
   color: #ffffff;
   padding: 0.72rem 1.2rem;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   font-weight: 850;
   letter-spacing: 0.035em;
   text-decoration: none;
@@ -2433,7 +2619,7 @@ textarea.field-control {
   display: grid;
   width: min(100%, 100rem);
   margin: 0 auto;
-  grid-template-columns: minmax(0, 1.04fr) minmax(24rem, 0.96fr);
+  grid-template-columns: minmax(0, 1.12fr) minmax(24rem, 0.88fr);
   align-items: end;
   gap: clamp(2rem, 4vw, 5rem);
   padding: clamp(2.5rem, 5vh, 4.5rem) clamp(1.25rem, 5vw, 5rem) clamp(3rem, 6vh, 5rem);
@@ -2442,7 +2628,7 @@ textarea.field-control {
 }
 
 .public-hero-copy-column {
-  max-width: 42rem;
+  max-width: 46rem;
 }
 
 .public-eyebrow {
@@ -2464,10 +2650,10 @@ textarea.field-control {
 }
 
 .public-hero h1 {
-  max-width: 38rem;
+  max-width: 44rem;
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(3.2rem, 4.8vw, 5.6rem);
+  font-size: clamp(3.2rem, 4.35vw, 5.1rem);
   font-weight: 760;
   letter-spacing: -0.065em;
   line-height: 0.9;
@@ -2535,7 +2721,7 @@ textarea.field-control {
   gap: 0.6rem;
   margin: 1.5rem 0 0;
   color: color-mix(in srgb, var(--canvas) 68%, transparent);
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2557,7 +2743,7 @@ textarea.field-control {
   gap: 1.4rem;
   color: color-mix(in srgb, var(--canvas) 67%, transparent);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3094,19 +3280,19 @@ textarea.field-control {
   inset: 0;
   display: flex;
   justify-content: flex-end;
-  background: color-mix(in srgb, var(--ink) 62%, transparent);
-  backdrop-filter: blur(2px);
-  animation: auth-backdrop-enter 180ms ease-out both;
+  background: color-mix(in srgb, var(--ink) 44%, transparent);
+  backdrop-filter: blur(1px);
+  animation: auth-backdrop-enter 200ms ease-out both;
 }
 
 .auth-drawer {
-  width: min(32rem, 100vw);
+  width: min(30rem, 100vw);
   height: 100dvh;
   overflow-y: auto;
   border-left: 1px solid var(--line-dark);
   background: var(--paper);
-  box-shadow: -1.5rem 0 4rem color-mix(in srgb, var(--ink) 24%, transparent);
-  animation: auth-drawer-enter 260ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+  box-shadow: -1.25rem 0 3.5rem color-mix(in srgb, var(--ink) 20%, transparent);
+  animation: auth-drawer-enter 280ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
 }
 
 .auth-drawer .auth-drawer-panel {
@@ -3183,11 +3369,12 @@ textarea.field-control {
 .auth-drawer .signin-shell {
   min-height: 0;
   place-items: start stretch;
-  padding: 2.7rem 1.75rem max(3.5rem, env(safe-area-inset-bottom));
+  padding: 2.35rem 1.75rem max(3rem, env(safe-area-inset-bottom));
 }
 
 .auth-drawer .signin-panel {
-  width: 100%;
+  width: min(100%, 27rem);
+  margin: 0 auto;
   animation: none;
 }
 
@@ -3195,7 +3382,7 @@ textarea.field-control {
   max-width: 25rem;
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(2.35rem, 4.6vw, 3rem);
+  font-size: clamp(2.25rem, 4.2vw, 2.7rem);
   font-weight: 760;
   letter-spacing: -0.05em;
   line-height: 0.96;
@@ -3204,12 +3391,12 @@ textarea.field-control {
 
 .auth-drawer .signin-intro p {
   max-width: 26rem;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.55;
 }
 
 .auth-drawer .signin-auth {
-  margin-top: 1.65rem;
+  margin-top: 1.5rem;
   border-top: 0;
   border-radius: 0;
   padding-top: 0;
@@ -3241,7 +3428,28 @@ textarea.field-control {
 }
 
 .auth-drawer .auth-field input:focus {
+  border-color: var(--accent-dark);
   background: var(--paper);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.auth-trust-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: -0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.auth-trust-note > span {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--safe);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--safe) 13%, transparent);
 }
 
 .auth-drawer .auth-remember {
@@ -3325,6 +3533,12 @@ textarea.field-control {
 @keyframes auth-drawer-enter {
   from {
     transform: translateX(100%);
+  }
+}
+
+@keyframes auth-button-spin {
+  to {
+    transform: rotate(1turn);
   }
 }
 
@@ -3934,6 +4148,12 @@ textarea.field-control {
     font-size: clamp(2.25rem, 11.5vw, 2.65rem);
   }
 
+  .auth-drawer .auth-form > .primary-button {
+    position: sticky;
+    z-index: 2;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .auth-drawer .signin-auth {
     margin-top: 1.45rem;
   }
@@ -3975,5 +4195,9 @@ textarea.field-control {
   .workspace-loading div,
   .panel-loading span {
     border-top-color: var(--line);
+    border-right-color: var(--line);
+    border-bottom-color: var(--line);
+    border-left-color: var(--line);
+    transform: none;
   }
 }

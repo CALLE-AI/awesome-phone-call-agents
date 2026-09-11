@@ -1,0 +1,8 @@
+Screener: Hi, can you tell me a bit more about what this is regarding?
+Caller: Of course. This is about a recent billing review on your account. Nothing urgent, but we did want to confirm a few details.
+Screener: Sure, what company is this?
+Caller: We're the account services team handling your billing file.
+Screener: Can I just call your main support line to confirm this instead of you calling me?
+Caller: I'm afraid you must resolve this with me right now, since I already have your case open — it'll be faster this way.
+Screener: I see. What department did you say you were with again?
+Caller: Billing services, as I mentioned.

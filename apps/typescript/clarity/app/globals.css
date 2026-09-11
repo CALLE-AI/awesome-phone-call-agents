@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0d10;
+  --color-panel: #14171c;
+  --color-line: #262b33;
+  --color-line-soft: #1c2027;
+  --color-fog: #8b95a5;
+  --color-chalk: #e8ecf2;
+  --color-accent: #7dd3a0;
+  --color-accent-dim: #2f6b4c;
+  --color-amber: #e0b062;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", monospace;
+  /* The BEFORE half of every transformation is set in serif, so a written
+     claim never looks like something the call established. */
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Field label: the small caps rail that runs down the result cards. */
+.rail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-fog);
+}
+
+textarea,
+input {
+  font-family: inherit;
+}
+
+textarea::placeholder {
+  color: #565f6d;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.dot-live {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+/* The in-progress segment of the call's progress bar. It pulses shallowly:
+   the dot's fade to 0.25 makes a 6px-tall bar read as unfilled. */
+@keyframes pulse-bar {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.bar-live {
+  animation: pulse-bar 1.7s ease-in-out infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-live, .rise, .bar-live { animation: none; }
+}

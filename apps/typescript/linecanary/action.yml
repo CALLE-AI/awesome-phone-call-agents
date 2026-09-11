@@ -1,0 +1,48 @@
+name: "LineCanary"
+description: "Synthetic monitoring and CI regression checks for phone lines and voice agents. Dry-run by default; pass live: true to place real calls."
+branding:
+  icon: "phone-call"
+  color: "yellow"
+inputs:
+  config:
+    description: "Path to linecanary.config.json"
+    required: false
+    default: "linecanary.config.json"
+  live:
+    description: "Set to 'true' to place real calls. Anything else stays dry-run."
+    required: false
+    default: "false"
+  only:
+    description: "Comma-separated check ids to run (empty runs all)"
+    required: false
+    default: ""
+  calle-api-key:
+    description: "CALL-E API key. Pass secrets.CALLE_API_KEY; required when live is 'true'."
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    - name: Install LineCanary dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --silent
+    - name: Run checks
+      shell: bash
+      # Inputs reach the script only through env vars: interpolating ${{ }}
+      # straight into `run:` would let a crafted input inject shell code.
+      env:
+        CALLE_API_KEY: ${{ inputs.calle-api-key }}
+        LINECANARY_CONFIG: ${{ inputs.config }}
+        LINECANARY_LIVE: ${{ inputs.live }}
+        LINECANARY_ONLY: ${{ inputs.only }}
+        LINECANARY_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        ARGS=(run --config "$LINECANARY_CONFIG")
+        if [ "$LINECANARY_LIVE" = "true" ]; then ARGS+=(--live); fi
+        if [ -n "$LINECANARY_ONLY" ]; then ARGS+=(--only "$LINECANARY_ONLY"); fi
+        npx --prefix "$LINECANARY_ACTION_PATH" tsx "$LINECANARY_ACTION_PATH/src/cli.ts" "${ARGS[@]}"

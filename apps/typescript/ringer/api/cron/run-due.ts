@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const creds = serverCreds()
   if (!creds) return res.status(200).json({ ok: true, note: 'no server CALL-E key', fired: 0 })
 
-  const webhookUrl = deriveWebhookUrl(req.headers.host)
+  const webhookUrl = deriveWebhookUrl()
   const due = await dueJobs(Date.now())
 
   let fired = 0

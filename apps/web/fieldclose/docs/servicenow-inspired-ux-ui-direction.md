@@ -15,7 +15,7 @@ human-approved commercial HVAC work-order closeout application.
 
 ### Visual thesis
 
-A calm, high-contrast operational workspace with deep blue-green navigation,
+A calm, high-contrast operational workspace — deep blue-green navigation,
 quiet light work surfaces, one vivid action accent, strong typography, and
 minimal decorative chrome.
 

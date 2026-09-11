@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Operator access disabled</h1>
+<p class="muted">
+  This app can place real phone calls and store call results, so it refuses to
+  run open. Set the <code>APP_PASSWORD</code> environment variable to enable
+  the operator UI, then restart.
+</p>
+{% endblock %}
