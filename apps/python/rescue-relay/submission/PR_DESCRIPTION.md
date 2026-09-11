@@ -6,7 +6,7 @@ Adds Rescue Relay, a Python/FastAPI application for coordinating trusted animal-
 Contribution area: `apps/python/rescue-relay/`.
 
 ## CALL-E role
-The live REST transport creates one call to an approved saved contact, stores the call ID/idempotency key, polls the provider and reads actual recipient transcript turns. Availability inquiries and selected-helper confirmation callbacks are separate. Uncertain provider status pauses rather than automatically redialling.
+The live REST transport creates one call to an approved saved contact, stores the call ID/idempotency key, polls the provider and reads actual recipient transcript turns. Availability inquiries and selected-helper confirmation callbacks are separate. Every unconfirmed create outcome halts after one POST for reconciliation; a known Call ID is checked with GET only.
 
 ## Run the product test path without credentials
 
@@ -23,15 +23,20 @@ Open http://127.0.0.1:8000 and choose **Try the demo**. Use the example budget o
 ## Credentials and side effects
 No keys are required for the fictional product test path. Live mode requires a CALL-E API key, an explicitly enabled live configuration and consenting saved contacts. It is local-only. Public demonstrations must remain isolated fictional sandboxes with no secrets or personal data. One server worker is required.
 
+Remote model calls are restricted to `https://api.openai.com/v1`. Other remote or insecure origins are rejected before a client is created. Credential-free loopback `/v1` development is allowed, but loopback requests never receive the environment `LLM_API_KEY`. Model calls remain backend-only.
+
 Opening, reviewing or selecting a plan does not authorise a confirmation callback. Stop prevents subsequent work, but does not promise to terminate a provider call already in progress. There is no automatic redial.
 
 ## Verification
-See `docs/VERIFICATION_5_6.md` for current results and limits. The v5.6 product demonstration uses the real UI and an isolated fictional API so no private contact data appears in the recording. The live transport follows CALL-E's documented Calls API contract: bearer authentication, stable idempotency, top-level Call ID persistence, GET-only polling, terminal status handling and nested recipient transcript turns.
+`python scripts/validate_repository.py` passes against the corrected contribution branch. The offline suites report **655 Python tests passed** and **77 JavaScript tests passed**. The history was rewritten from current upstream `main`; all full-number fixtures now use the reserved `202-555-01xx` range. See `docs/VERIFICATION_5_6.md` for results and limits.
+
+The live transport follows CALL-E's documented Calls API contract: bearer authentication, stable idempotency, top-level Call ID persistence, GET-only polling, terminal status handling and nested recipient transcript turns. Redacted, bounded `error.message` and `error.details.questions` guidance is retained without exposing the private provider body.
 
 ## Product demonstration
 Public video: https://www.youtube.com/watch?v=GcaoplYcIh0
 
+Public mock-only product test: https://rescue-relay.onrender.com
+
 The 2:55 v5.6 product demonstration uses the running application, fictional test contacts and prices in USD. The complete app folder includes the chapter player, guide and both rendered MP4s; `scripts/record_tutorial.py` reproduces the current short cut. The longer tutorial is retained as historical supplementary material. Media may be moved to public release assets if maintainers prefer, provided the player links are updated together.
 
-## Review before posting
-Run the repository’s own `python3 scripts/validate_repository.py` in the fork. Review licensing, the diff and secrets. Include only your authorised original code and public-safe assets. Update live verification status only after a genuine consented test.
+The Render service uses the $0 Free plan, fictional shared data, `CALL_MODE=mock`, `ENABLE_LIVE_CALLS=false`, and no CALL-E or LLM credentials.

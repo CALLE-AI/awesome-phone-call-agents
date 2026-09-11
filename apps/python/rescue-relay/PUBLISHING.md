@@ -60,6 +60,8 @@ Proofread the live-verification status, team details and any optional-model desc
 
 ## Optional public demo hosting
 
+The mock-only public product test is deployed on Render Free at https://rescue-relay.onrender.com. Its `/health` endpoint reports v5.6.0. No CALL-E or LLM credential is configured.
+
 **Do not deploy a live-key-enabled server publicly.** This app has no account system, workspace isolation or public-abuse controls. A public demo is a shared fictional sandbox; visitors can edit the same contacts and reports. It is not a private incident-reporting service.
 
 Use a separate installation with a disposable database and exactly these settings:

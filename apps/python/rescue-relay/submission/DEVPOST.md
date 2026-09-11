@@ -50,6 +50,8 @@ Python · FastAPI · SQLite · CALL-E REST API · HTTPX · JavaScript · HTML ·
 ## Product demonstration and verification
 Public video: https://www.youtube.com/watch?v=GcaoplYcIh0
 
+Public mock-only product test: https://rescue-relay.onrender.com
+
 The public video is a 2:55 product demonstration of the running v5.6 application. It uses fictional test contacts, scenarios and USD prices to protect privacy while showing the complete working workflow. Live CALL-E transport is implemented in the submitted source through the documented Calls API.
 
 ---
