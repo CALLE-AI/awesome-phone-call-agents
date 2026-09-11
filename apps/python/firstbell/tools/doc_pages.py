@@ -17,6 +17,7 @@ a public site because somebody saved a file there.
 from __future__ import annotations
 
 import html
+import json
 import posixpath
 import re
 from pathlib import Path
@@ -34,6 +35,20 @@ if REPO / APP_IN_REPO != APP:  # pragma: no cover - a moved application, caught 
         f"doc_pages expects this app at {APP_IN_REPO} inside the repository and found it "
         f"at {APP}. Every link in every published document resolves through that path, so "
         "the constant has to move with the directory.")
+
+# How many recorded production responses the offline CALL-E is checked against, read out
+# of the record that does the checking. This card typed "eleven" while the page it links to
+# says 11 one screen down and `evidence/api-shape.json` counts them, which is three places
+# for one number and only one of them able to notice a twelfth response arriving. Nothing is
+# printed when the record cannot be read: a card that has lost its evidence should describe
+# the checking rather than quantify it.
+_SHAPE = APP / "evidence" / "api-shape.json"
+try:
+    RESPONSES_COMPARED: int | str = int(
+        json.loads(_SHAPE.read_text(encoding="utf-8"))["responses_compared"])
+except (OSError, ValueError, TypeError, KeyError):  # pragma: no cover - a missing record
+    RESPONSES_COMPARED = "the"
+
 
 # slug, the title a reader sees in the list, and why they would open it. The order is the
 # order a reader meets the questions in: what it costs to try, what it costs to feed,
@@ -92,8 +107,8 @@ PUBLISHED: list[tuple[str, str, str, str]] = [
      "calle_double/README.md",
      "The offline CALL-E, and how to take it",
      "A CALL-E that dials nobody, written from the published API and checked against "
-     "eleven recorded production responses. Two ways to mount it, and the three things "
-     "about it that are not true."),
+     f"{RESPONSES_COMPARED} recorded production responses. Two ways to mount it, and the "
+     "three things about it that are not true."),
 ]
 
 # A document under `docs/` that is deliberately not on the site, and the reason. The list

@@ -93,6 +93,14 @@
   --cs-rest-s2: 232px;
   --cs-esc-rest-x: 110px;
 
+  /* How far each card stands off the ground. Derived in showcase.py, which also
+   * asserts that the deepest of them clears the legend rule and the viewBox, and
+   * asserted equal to these four by the same test that guards every offset above. */
+  --cs-lift-a: 6px;
+  --cs-lift-b: 9px;
+  --cs-lift-c: 14px;
+  --cs-lift-d: 10px;
+
   /* The three-endings figure's route, same rule: derived in endings.py. */
   --en-x-in: 62px;
   --en-y-1: 54px;
@@ -147,6 +155,45 @@
    * rather than proportional. One declaration, and 21 stops looking like prose. */
   font-variant-numeric: lining-nums tabular-nums;
 }
+
+/* ---- The board, and the one place a 3D transform is real -----------------
+ *
+ * The four cards stand at four heights on a board turned three degrees away from the
+ * reader. The heights are drawn, in showcase.py. The turn is here, and it is declared
+ * on the `<svg>` box with the perspective on the `<figure>` around it, because that
+ * pair is the only arrangement inside this figure where a 3D transform does anything.
+ *
+ * Measured in this Chrome before a line of this was written, rather than assumed from
+ * the spec. `perspective: 600px` and `transform-style: preserve-3d` set on an SVG
+ * ancestor are read back by getComputedStyle as 600px and preserve-3d, and a child
+ * group declaring `translateZ(40px)` under them reported 786.45 x 379.10 at the same
+ * origin as the same group with no transform at all: identical to the hundredth of a
+ * pixel. The child's own computed transform-style comes back `flat` whatever its
+ * ancestors say. An SVG element does not establish a 3D rendering context, so the
+ * properties parse, inherit, inspect correctly and paint nothing.
+ *
+ * The `perspective()` transform function is a different matter: it does apply to an
+ * SVG group, and `perspective(600px) rotateY(30deg)` measured 408.80 x 456.12 against
+ * the flattened 238.24 x 379.10, which is a real projection. It is still not used here.
+ * The same probe found the reported rect and the composed matrix disagreeing about what
+ * that projection does, and the scroll-walk gate decides whether two runs of text
+ * overlap by reading rects. A depth effect the gate cannot measure correctly is worse
+ * than no depth effect, because it fails silently and it fails green.
+ *
+ * Three degrees and one, with the perspective at 1600px. The numbers are small on
+ * purpose: the near edge of the board grows about eight pixels and the far edge loses
+ * about two per cent of its vertical gaps, which is a sixth of a pixel between two
+ * stacked labels. The figure's padding is 24px at this column, so the growth is
+ * absorbed and the scroll box it sits in gains no range it did not have. A tilt of
+ * fifteen degrees would look like a screenshot of a presentation and would push the
+ * far-side labels into each other.
+ *
+ * `cs-deck` rather than `.calle-showcase`, because act 03's three-endings figure
+ * carries that class too and shares this file. It is authored at the width of its own
+ * column with no margin to grow into. */
+.cs-deck { perspective: 1600px; perspective-origin: 50% 38%; }
+
+.cs-deck > .calle-showcase__svg { transform: rotateX(1deg) rotateY(3deg); }
 
 .calle-showcase__caption {
   max-width: 46em;
@@ -242,14 +289,34 @@
 /* ---- Surfaces -----------------------------------------------------------
  *
  * Three levels, and every one of them is a fill and a hairline. No shadow appears
- * in this file. A shadow is how a flat design pretends to have hierarchy it did not
- * build, and it is the first thing that dates a diagram. */
+ * in this file, and the depth added below did not put one here either. A shadow is
+ * how a flat design pretends to have hierarchy it did not build, and it is the first
+ * thing that dates a diagram. What each card has instead is a plate: its own outline,
+ * one layer down, standing a stated distance out from under it. */
 
 .calle-showcase .cs-card {
   fill: var(--cs-card);
   stroke: var(--cs-line);
   stroke-width: 1.5;
 }
+
+/* The plate, and the whole of the figure's depth.
+ *
+ * It is drawn at the card's own rect and pushed out along the oblique from here, which
+ * is what gives the depth an off switch: with `transform: none` a plate is exactly
+ * covered by an opaque card and the figure is the flat drawing it was before. That is
+ * one rule for reduced motion, one for print and one for the pause control, rather
+ * than a second set of shapes for each.
+ *
+ * --cs-line-strong rather than an ink. The plate is a surface catching less light, not
+ * a mark, and three connectors cross it on their way out of a card: at 0.80 lightness
+ * a 0.52 stroke still reads across it, and at ink-3 the line would vanish into it. */
+.calle-showcase .cs-riser { fill: var(--cs-line-strong); }
+
+.calle-showcase .cs-riser--a { transform: translate(var(--cs-lift-a), var(--cs-lift-a)); }
+.calle-showcase .cs-riser--b { transform: translate(var(--cs-lift-b), var(--cs-lift-b)); }
+.calle-showcase .cs-riser--c { transform: translate(var(--cs-lift-c), var(--cs-lift-c)); }
+.calle-showcase .cs-riser--d { transform: translate(var(--cs-lift-d), var(--cs-lift-d)); }
 
 /* Four units of --ink-3, not three of --line-strong. The figure renders about 1040px
  * wide in this column, so a stripe is three and a half pixels: at 0.8 lightness that is
@@ -324,6 +391,71 @@
 /* Nothing of its own. It is built from the shared row, glyph and type rules above,
  * which is the point: the queue and the endings are one picture, so they are one
  * set of parts. */
+
+/* ---- The status tag on each stage ---------------------------------------
+ *
+ * A plate with light behind it, riding the right end of the header rule. Three of the
+ * four say what the stage is holding, in ink on card white. The fourth says `1 open`
+ * and it is amber, because that is the ending a two-bucket pipeline files with the
+ * successes and this figure has exactly one thing to say. Amber on four tags would
+ * make the accent a palette.
+ *
+ * The light is a radial gradient on one ellipse, not a blur filter. A filter re-rasters
+ * its whole region every time anything inside it is touched, and this page is measured
+ * for long tasks over ten loads with a 50ms ceiling. A gradient is painted once. */
+
+.calle-showcase .cs-chip__plate {
+  fill: var(--cs-card);
+  stroke: var(--cs-line-strong);
+  stroke-width: 1.25;
+}
+
+.calle-showcase .cs-chip--lit .cs-chip__plate {
+  fill: var(--cs-lit);
+  stroke: var(--cs-accent);
+  stroke-width: 1.5;
+}
+
+/* Ink on both tags, never amber on the amber one. Two reasons, and the second is the
+ * one that decided it. --cs-accent is 0.48 lightness, which measures about 4.4 on this
+ * figure's ground, and the tag is set under 18px so the bar is 4.5. And the gate reads
+ * a run's CSS `color` against the nearest opaque HTML background, which for anything
+ * inside this SVG is the figure's own paper and never the plate the words sit on. So
+ * the ink has to clear the ground as well as the plate, and only the ink does both. */
+.calle-showcase .cs-chip__label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-anchor: middle;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-chip__glow { fill: url(#cs-glow-quiet); }
+
+/* The one tag that breathes. Opacity only, on the bloom only: the plate and its words
+ * hold still, so nothing a reader is trying to read changes weight, and the figure's
+ * rule that only transform and opacity animate is kept. */
+.calle-showcase .cs-chip--lit .cs-chip__glow {
+  fill: url(#cs-glow-lit);
+  animation: cs-chip-breathe var(--cs-loop) ease-in-out infinite;
+}
+
+@keyframes cs-chip-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* The gradient stops. Colour belongs in this file, so the stops in the markup carry a
+ * class each and no value, and the two blooms are the same three stops in two inks. */
+.calle-showcase .cs-glow--lit .cs-glow__core { stop-color: var(--cs-accent); stop-opacity: 0.40; }
+.calle-showcase .cs-glow--lit .cs-glow__mid { stop-color: var(--cs-accent); stop-opacity: 0.30; }
+.calle-showcase .cs-glow--lit .cs-glow__edge { stop-color: var(--cs-accent); stop-opacity: 0; }
+
+.calle-showcase .cs-glow--quiet .cs-glow__core { stop-color: var(--cs-ink-3); stop-opacity: 0.26; }
+.calle-showcase .cs-glow--quiet .cs-glow__mid { stop-color: var(--cs-ink-3); stop-opacity: 0.18; }
+.calle-showcase .cs-glow--quiet .cs-glow__edge { stop-color: var(--cs-ink-3); stop-opacity: 0; }
 
 /* ---- The endings, as shapes --------------------------------------------- */
 
@@ -515,6 +647,12 @@
  * nothing is lost by holding still. Printing gets the same figure, and so does a
  * reader who ticks the pause control above the figure, which is one rule in
  * page.css pointing at these same two properties. */
+/* The board lies flat here as well, and it has to be said in this block rather than
+ * left to the page's global one. That block turns durations off. A turn and a set of
+ * offset plates are not durations: they are resting states, and a resting state that
+ * is never reset is a permanent three-degree skew on a diagram for the reader who
+ * asked for less motion. `transform: none` on the plates returns them to under their
+ * own cards, which is the flat figure, exactly. */
 @media (prefers-reduced-motion: reduce) {
   .calle-showcase .cs-run__x,
   .calle-showcase .cs-run__y,
@@ -528,6 +666,10 @@
   .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
   .calle-showcase .cs-esc__x { transform: translateX(var(--cs-esc-rest-x)); }
   .calle-showcase .cs-esc__y { transform: translateY(0); }
+
+  .cs-deck > .calle-showcase__svg,
+  .calle-showcase .cs-riser { transform: none; }
+  .calle-showcase .cs-chip--lit .cs-chip__glow { animation: none; opacity: 1; }
 }
 
 @media print {
@@ -543,6 +685,34 @@
   .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
   .calle-showcase .cs-esc__x { transform: translateX(var(--cs-esc-rest-x)); }
   .calle-showcase .cs-esc__y { transform: translateY(0); }
+
+  /* Print gets the flat figure too. A tilt costs a diagram its straight edges on
+   * paper, and a plate under every card is four bands of 0.80 grey a printer renders
+   * as four bands of dots for no argument at all. */
+  .cs-deck > .calle-showcase__svg,
+  .calle-showcase .cs-riser { transform: none; }
+  .calle-showcase .cs-chip--lit .cs-chip__glow { animation: none; opacity: 1; }
+}
+
+/* ---- Paused ---------------------------------------------------------------- */
+
+/* The control above the figure rests every mark, and these three rules are what make
+ * it rest the board with them. They are here rather than in page.css because they are
+ * about this figure's depth, and page.css holds the control.
+ *
+ * Ticking the box and asking for reduced motion now produce the same picture, which is
+ * the property this figure has always had and the reason it is worth keeping: the
+ * paused figure is a composed drawing rather than a loop caught mid-stride, and there
+ * is one such drawing rather than two that drift.
+ *
+ * A general sibling combinator, because the control, its label and the figure are
+ * emitted as three siblings. */
+.cs-motion:checked ~ .cs-deck > .calle-showcase__svg,
+.cs-motion:checked ~ .cs-deck .cs-riser { transform: none; }
+
+.cs-motion:checked ~ .cs-deck .cs-chip--lit .cs-chip__glow {
+  animation: none;
+  opacity: 1;
 }
 
 /* ---- Narrow viewports ------------------------------------------------------ */
@@ -564,6 +734,10 @@
   .calle-showcase .cs-tag,
   .calle-showcase .cs-rail-label,
   .calle-showcase .cs-rank { font-size: 18px; }
+  /* Two units behind the eyebrow, not level with it. The tag's plate is sized in
+   * showcase.py from a 14-unit advance, so 17 is the largest this label can grow to
+   * and stay inside its own plate with the padding the layout states. */
+  .calle-showcase .cs-chip__label { font-size: 17px; }
 }
 
 /* Under about 34rem the type stops being the problem and the scale is.
@@ -580,6 +754,21 @@
 @media (max-width: 34rem) {
   .calle-showcase { -webkit-overflow-scrolling: touch; }
   .calle-showcase__svg { min-width: 30rem; }
+
+  /* Flat below here, and no tags.
+   *
+   * The figure is a pan region at this width, and turning a drawing a reader is
+   * already dragging sideways makes the drag harder to follow for nothing: the tilt
+   * reads at 1040px and is invisible at 480.
+   *
+   * The tags go because there is no longer room for them. The type ramp grows to keep
+   * a 480px figure legible, and at 22 units the sublabel above the header rule runs
+   * within a few units of where the plate sits. A tag that either paints at six pixels
+   * or touches the label above it is one a phone is better off without; the plates
+   * still carry the depth, and the caption still says all four stages in words. */
+  .cs-deck > .calle-showcase__svg { transform: none; }
+  .calle-showcase .cs-chip { display: none; }
+
   .calle-showcase .cs-title { font-size: 33px; }
   .calle-showcase .cs-figure { font-size: 44px; }
   .calle-showcase .cs-end-title { font-size: 28px; }
@@ -618,10 +807,22 @@
   .calle-showcase .cs-end-row,
   .calle-showcase .cs-wl-row,
   .calle-showcase .cs-glyph--no-answer,
-  .calle-showcase .cs-esc__mark {
+  .calle-showcase .cs-esc__mark,
+  .calle-showcase .cs-chip__plate {
     fill: Canvas;
     stroke: CanvasText;
   }
+
+  .calle-showcase .cs-chip__label { fill: CanvasText; color: CanvasText; }
+
+  /* A high-contrast theme has two colours and a plate standing off a card cannot be
+   * drawn in them: filled with Canvas it is invisible, outlined in CanvasText it is a
+   * second rectangle behind every card, which reads as a rendering fault rather than
+   * as depth. So the depth goes and the figure falls back on what it was built to
+   * survive on, which is its shapes. The bloom goes for the same reason: a gradient
+   * is not a colour the theme can substitute. */
+  .calle-showcase .cs-riser,
+  .calle-showcase .cs-chip__glow { fill: Canvas; }
 
   .calle-showcase .cs-rule,
   .calle-showcase .cs-hair,

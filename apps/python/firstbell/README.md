@@ -47,6 +47,12 @@ so what travels with the code is the arithmetic they produced:
 [`evidence/recorded-calls.json`](evidence/recorded-calls.json) names all six receipt files
 and holds the counts behind every money figure here.
 
+Twenty live calls are published in this entry: those eight, and twelve more placed on
+2026-09-11 and written up in
+[`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). Every money figure below is still
+computed on the twelve of 2026-09-04, which are the calls with committed receipts, and the
+later ones are not folded into it.
+
 <details>
 <summary><b>If you have twenty minutes</b></summary>
 
@@ -59,7 +65,7 @@ makes, and each one can be checked without an API key.
 | --- | --- | --- | --- |
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
-| 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
+| 3 | [`evidence/README.md`](evidence/README.md) | What the twelve real calls of 2026-09-04 settled, why the recordings are on the linked page while the receipt files are on neither surface, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Three hundred and fifty-eight gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 | 6 | [`docs/the-legal-surface.md`](docs/the-legal-surface.md) | The seven questions a district's counsel asks first, including the four this software does not answer and the one that would stop a pilot | 3 min |
@@ -221,10 +227,10 @@ English. The OneRoster run in the table above prints that refusal in the platfor
 words, out of a region table transcribed from CALL-E's published one, so a reader can produce
 it without an account and without dialling anybody.
 
-No real call has been placed in Spanish. The twelve that were placed went to Indian numbers,
-where Tamil and Hindi are offered, and
+No real call has been placed in Spanish. Every real call this entry has placed went to
+Indian numbers, where Tamil and Hindi are offered, and
 [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) is the two-language
-experiment those calls produced, including the comparisons that did not match.
+experiment the 2026-09-04 set produced, including the comparisons that did not match.
 
 That ceiling binds only while CALL-E is the thing placing the call, which is why
 [the input path above](#over-whichever-dialler-a-district-already-owns) matters more than it
@@ -369,7 +375,8 @@ of the arithmetic and not as a measurement of how families behave. Somebody read
 entry as a district buyer put that file next to an earlier version of this paragraph, which
 called the numerator measured, and they were right to.
 
-The last row is the twelve calls that rang. Nobody chose that numerator, and it is the row
+The last row is the twelve calls of 2026-09-04 that rang. Nobody chose that numerator, and
+it is the row
 to argue with:
 
 - Eleven of the twelve were answered, two of them became new work for the safeguarding
@@ -590,7 +597,8 @@ grade.
 the demo run, and above it the callbacks cost a district more than the attempts removed. It
 is not a constant: set the two totals equal, give a callback the three minutes a manual
 attempt gets so the minutes cancel, and divide by the answered calls a rota is staffed
-against. On the twelve recorded calls the crossover is 34 and eleven answered calls cannot
+against. On the twelve recorded calls of 2026-09-04 the crossover is 34 and eleven answered
+calls cannot
 rule out 24, so the bound sits inside it with about ten per hundred to spare.
 
 | | Net-new per 100 answered calls |
@@ -765,8 +773,8 @@ moves the case to a person inside a stated window, which is the only thing softw
 be doing with that question.
 
 **And it moved nothing in production, which is worth saying plainly.** Eleven of the twelve
-real calls came back with a structured result. Five of those eleven did not confirm the
-parent already knew, and every one of the five was already going to a person, because every
+real calls of 2026-09-04 came back with a structured result. Five of those eleven did not
+confirm the parent already knew, and every one of the five was already going to a person, because every
 required field had come back uninformative and the older rule reached it first. Nothing
 was filed differently.
 

@@ -176,7 +176,9 @@ def counts(receipts_dir: Path) -> dict:
 def document(receipts_dir: Path, read_at: str) -> dict:
     return {
         "what_this_is": (
-            "Counts over every distinct call this software placed against "
+            "Counts over the twelve calls pooled from the receipts this file names, "
+            "which is not every call this software has placed: the evidence page publishes "
+            "twenty, and twelve of those were placed after this pool was taken. Against "
             "api.heycall-e.com. No conversation, no telephone number, no call id, no "
             "field value: the same line evidence/api-shape.json draws, for the same "
             "reason, which is that the receipts themselves are not committed and "

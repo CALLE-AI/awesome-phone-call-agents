@@ -33,11 +33,15 @@ a case is actually taking.
 How it is drawn, and the four rules that hold it together.
 
     Cards, not shapes.   Each stage is a card: a fill, a hairline, a four-unit stripe
-                         down the left edge, and a header of eyebrow over title over
-                         sublabel. Depth comes from borders and from two paper levels,
-                         never from a shadow. The four widths differ, because four equal
-                         boxes is the layout a template picks and it flattens the fact
-                         that stage three carries most of the argument.
+                         down the left edge, a header of eyebrow over title over
+                         sublabel, and a status tag riding the header rule. Under each
+                         one is a plate carrying its own silhouette, offset along a
+                         single oblique, so a card stands off the ground by a stated
+                         distance rather than floating over a blur. Depth is geometry
+                         here and there is still no shadow in the file. The four widths
+                         differ, because four equal boxes is the layout a template picks
+                         and it flattens the fact that stage three carries most of the
+                         argument.
     Orthogonal only.     Every connector runs on one axis. The single corner, where the
                          safeguarding rail turns down into the worklist, is a quarter arc
                          of radius 8. There is no diagonal line in the figure.
@@ -48,6 +52,22 @@ How it is drawn, and the four rules that hold it together.
                          told apart with the colour removed, which is what keeps them
                          readable in greyscale, under every kind of colour blindness and
                          in a forced-colours theme.
+
+Why the figure is tilted, and why the tilt is not in here.
+
+The four cards stand at four heights on a board that is turned a few degrees away from
+the reader. Half of that is drawn in this file and half of it cannot be. An SVG element
+does not establish a 3D rendering context in Chrome: `perspective` and
+`transform-style: preserve-3d` set on an SVG ancestor are reported back by
+`getComputedStyle` and change nothing, and a `translateZ` under one was measured at the
+same rect to the hundredth of a pixel as one with no perspective anywhere. So the
+projection is declared on the one HTML box inside this figure, the `<svg>` itself, whose
+parent `<figure>` carries the perspective. Everything below that box is drawn depth: a
+plate per card, offset on both axes at once, which is a transform SVG does support and a
+measurement can see. That last part matters more than it sounds. The scroll-walk gate
+decides whether two pieces of text overlap by reading their client rects, so a depth
+effect whose painted result and reported rect disagree would be a defect that gate is
+structurally unable to find.
 
 Geometry lives in this file as plain numbers in the 1240 by 660 user-unit grid. Colour,
 motion and type live in `showcase.css`. The two are kept apart so a colour change never
@@ -138,6 +158,16 @@ END_TITLE_DY = -6
 END_SUB_DY = 20
 END_TAG_X = 876
 
+# The three rows, and which of them is the one that does not close. They are up here
+# rather than inside `_endings()` so the stage's status tag can count them instead of
+# carrying a number somebody typed next to them.
+FOCAL_ENDING = "undetermined"
+END_ROWS = (
+    ("resolved", "Reason given", "the call closes here", ""),
+    (FOCAL_ENDING, "Nothing learned", "connected, still unexplained", ""),
+    ("no-answer", "No answer", "retried, then queued", ""),
+)
+
 # ---- Stage four: the worklist ----------------------------------------------
 WL_X = 972
 WL_W = 208              # 972 .. 1180
@@ -148,6 +178,15 @@ WL_RANK_X = 984
 WL_GLYPH_X = 1014
 WL_GLYPH_R = 9
 WL_TEXT_X = 1034
+
+# The queue, worst first, and up here for the same reason the endings are: the tag on
+# this card says how many rows are waiting and there is one list to read that off.
+WL_ROWS = (
+    ("safeguarding", "Safeguarding"),
+    ("no-answer", "3rd no answer"),
+    ("no-answer", "No answer"),
+    (FOCAL_ENDING, "Nothing learned"),
+)
 
 # Where the two open endings and the safeguarding rail enter the worklist. Three attach
 # points on one edge, none of them shared, all of them more than twelve units apart.
@@ -167,6 +206,71 @@ LEGEND = (
     (670, "safeguarding", "Safeguarding"),
     (880, "call", "Call in progress"),
 )
+
+# ---- How far each card stands off the ground -------------------------------
+#
+# One number per stage, in user units, applied to x and to y at once. Equal on both
+# axes is the whole point: every plate in the figure is offset along the same
+# forty-five degree oblique, so four cards read as one projection rather than as four
+# unrelated drop shadows. Stage three stands highest because it carries the argument,
+# and stage one lowest because a register is a record that has not moved yet.
+#
+# The plate is drawn at the card's own rect and pushed out from under it by
+# `showcase.css`, so with transforms off it sits exactly beneath an opaque card and
+# the figure is the flat drawing it has always been. That is why the depth is a
+# transform rather than a second rectangle at an offset: it has an off switch.
+#
+# Both clearances are asserted below rather than promised in a sentence. Neither one
+# is text and neither one pushes the page sideways, so no browser gate can see a plate
+# that has slid under the legend rule or off the edge of the viewBox.
+LIFT = {"a": 6, "b": 9, "c": 14, "d": 10}
+
+assert CARD_BOT + max(LIFT.values()) < LEG_RULE_Y - 12, (
+    "the deepest plate reaches the legend rule: a card's extrusion would print "
+    "under the key that explains the figure"
+)
+assert CARD_D[0] + CARD_D[1] + LIFT["d"] < VIEW_W - MARGIN // 2, (
+    "the worklist's plate runs off the right of the viewBox, which the figure's own "
+    "scroll box will clip rather than reveal"
+)
+
+# ---- The status tag on each stage ------------------------------------------
+#
+# A plate, a bloom behind it, and two or three words. It rides the header rule at the
+# right end of each card, which is the one band inside a card that carries nothing at
+# any width: the eyebrow, the title and the sublabel are left-aligned and short, the
+# rail's dashed stubs stop six units above the card, and the first row of content
+# starts eighteen units below the rule.
+#
+# Every count in a tag is read off the figure rather than typed into it, because a tag
+# that says three while four rows are drawn beside it is worse than no tag at all.
+# The plate is sized from the label's length, because nothing here can measure a
+# glyph. The advance below is the widest the tag's own type ramp gets, not the width it
+# has at this column, so the plate is roomy on a desktop and still holds its words at
+# the breakpoint where the label grows. The alternative, sizing it at the desktop
+# width, puts the ink outside its plate on a tablet, and with a fallback face in play
+# rather than the page's own it does it on a desktop too.
+CHIP_H = 22
+CHIP_R = 4
+CHIP_PAD = 10           # ink to plate edge, each side
+CHIP_ADV = 14           # one tracked capital at the tag's largest size
+CHIP_TEXT_DY = 5        # cap height is not symmetrical about a baseline
+
+# How far the light reaches past its plate, and the two numbers that were cut.
+#
+# Sideways, it stops two units inside the card rather than at the plate plus whatever
+# looked good: twenty-two put an amber smudge across the card's own edge and onto the
+# plate below it, on all four cards, which reads as a printing fault.
+#
+# Upwards it stops below the sublabel's descenders, and that one is not a taste
+# decision. The contrast gate reads a run's colour against the nearest opaque HTML
+# background, and every run in here is SVG, so what it measures is the figure's paper
+# and never the amber sitting on top of it. A bloom reaching nine units into "one of
+# them does not close" takes that label from 4.9 to about 4.0 against what a reader
+# actually sees, and reports 4.9. There is no gate on this page that can catch it, so
+# the geometry has to.
+CHIP_GLOW_X = 18
+CHIP_GLOW_Y = 5
 
 # ---------------------------------------------------------------------------
 # The route. One mark's journey, as offsets from where its group is placed.
@@ -204,6 +308,15 @@ ROUTE = {
     "--cs-rest-s1": 166,
     "--cs-rest-s2": 232,
     "--cs-esc-rest-x": 110,
+
+    # How far each card's plate is pushed out from under it. These are here for the
+    # same reason every offset above is: the transform that moves them is a keyframe's
+    # neighbour in showcase.css, a keyframe cannot read Python, and a depth that went
+    # stale would go on parsing and go on painting at the wrong distance.
+    "--cs-lift-a": LIFT["a"],
+    "--cs-lift-b": LIFT["b"],
+    "--cs-lift-c": LIFT["c"],
+    "--cs-lift-d": LIFT["d"],
 }
 
 
@@ -244,6 +357,56 @@ def _card(key: str, x: int, w: int) -> str:
         f'<rect class="cs-card" x="{x}" y="{CARD_TOP}" width="{w}" '
         f'height="{CARD_H}" rx="{CARD_R}"/>'
         + _stripe(key, x, CARD_TOP, CARD_H)
+    )
+
+
+def _riser(key: str, x: int, w: int) -> str:
+    """The card's own silhouette, one layer down, and the depth the figure reads by.
+
+    It is drawn at the card's rect, not at an offset, and `showcase.css` slides it out
+    along the oblique. Two things follow from that and both of them matter. With
+    transforms off it is exactly covered by an opaque card, so reduced motion, print
+    and the pause control all get the flat figure back without a second drawing. And
+    the card itself never moves, which is what keeps the nine travelling marks on the
+    lines they are meant to be holding: lift a card and the queue it is wired to would
+    have to lift with it.
+
+    The same rounded rect rather than an extruded prism with proper side faces. A
+    prism needs the two tangent lines where the corner arcs meet, and getting those
+    wrong by a unit leaves a notch at the top right of every card. The offset copy is
+    exact by construction, and at this radius the two are the same drawing.
+    """
+    return (
+        f'<rect class="cs-riser cs-riser--{key}" x="{x}" y="{CARD_TOP}" width="{w}" '
+        f'height="{CARD_H}" rx="{CARD_R}"/>'
+    )
+
+
+def _chip(x: int, w: int, label: str, lit: bool = False) -> str:
+    """The stage's status, as a plate with light behind it.
+
+    A bloom, a plate and a label, riding the right end of the header rule. The bloom
+    is a radial gradient on one ellipse rather than a blur filter: a filter re-rasters
+    its whole region on every frame it is touched, and this figure is measured for long
+    tasks over ten loads. Drawn light costs one paint and never costs a second.
+
+    Only one tag is lit. Amber in this figure means the case that does not close and
+    the escalation that catches it, so the tag on stage three is amber and the other
+    three glow in ink. An accent on four things is a palette, not an argument.
+    """
+    cw = 2 * CHIP_PAD + CHIP_ADV * len(label)
+    left = x + w - PAD - cw
+    cx = left + cw // 2
+    cls = "cs-chip" + (" cs-chip--lit" if lit else "")
+    return (
+        f'<g class="{cls}">'
+        f'<ellipse class="cs-chip__glow" cx="{cx}" cy="{HEAD_RULE_Y}" '
+        f'rx="{cw // 2 + CHIP_GLOW_X}" ry="{CHIP_H // 2 + CHIP_GLOW_Y}"/>'
+        f'<rect class="cs-chip__plate" x="{left}" y="{HEAD_RULE_Y - CHIP_H // 2}" '
+        f'width="{cw}" height="{CHIP_H}" rx="{CHIP_R}"/>'
+        f'<text class="cs-chip__label" x="{cx}" '
+        f'y="{HEAD_RULE_Y + CHIP_TEXT_DY}">{label}</text>'
+        "</g>"
     )
 
 
@@ -326,7 +489,7 @@ def _register() -> str:
     """
     x, w = CARD_A
     out = [_card("a", x, w), _head(x, "01", "The register", "no reason given"),
-           _head_rule(x, w)]
+           _head_rule(x, w), _chip(x, w, "logged")]
     for i in range(REG_ROWS):
         cy = REG_ROW_Y0 + i * REG_ROW_STEP
         half = REG_MARK // 2
@@ -358,7 +521,7 @@ def _lines() -> str:
     """
     x, w = CARD_B
     out = [_card("b", x, w), _head(x, "02", "Calls placed", "three at once, rest wait"),
-           _head_rule(x, w)]
+           _head_rule(x, w), _chip(x, w, f"{len(TRACK)} live")]
     for i, cy in enumerate(TRACK, start=1):
         out.append(
             f'<text class="cs-micro" x="{SLOT_X}" y="{cy - SLOT_LABEL_LIFT}">'
@@ -384,16 +547,13 @@ def _endings() -> str:
     arrows leaving them say where they go.
     """
     x, w = CARD_C
-    rows = (
-        ("resolved", "Reason given", "the call closes here", ""),
-        ("undetermined", "Nothing learned", "connected, still unexplained", ""),
-        ("no-answer", "No answer", "retried, then queued", ""),
-    )
+    open_endings = sum(1 for row in END_ROWS if row[0] == FOCAL_ENDING)
     out = [_card("c", x, w),
            _head(x, "03", "Three endings", "one of them does not close"),
-           _head_rule(x, w)]
-    for (kind, title, sub, tag), cy in zip(rows, TRACK):
-        focal = kind == "undetermined"
+           _head_rule(x, w),
+           _chip(x, w, f"{open_endings} open", lit=True)]
+    for (kind, title, sub, tag), cy in zip(END_ROWS, TRACK):
+        focal = kind == FOCAL_ENDING
         cls = "cs-end-row" + (" cs-end-row--focal" if focal else "")
         top = cy - END_H // 2
         out.append(
@@ -423,15 +583,9 @@ def _worklist() -> str:
     smallest type, because the order is the argument and the numbers are only its index.
     """
     x, w = CARD_D
-    rows = (
-        ("safeguarding", "Safeguarding"),
-        ("no-answer", "3rd no answer"),
-        ("no-answer", "No answer"),
-        ("undetermined", "Nothing learned"),
-    )
     out = [_card("d", x, w), _head(x, "04", "Worst first", "the queue a person opens"),
-           _head_rule(x, w)]
-    for i, (kind, label) in enumerate(rows):
+           _head_rule(x, w), _chip(x, w, f"{len(WL_ROWS)} queued")]
+    for i, (kind, label) in enumerate(WL_ROWS):
         top = WL_Y0 + i * WL_STEP
         cy = top + WL_H // 2
         focal = kind == "safeguarding"
@@ -554,8 +708,30 @@ def _runner(n: int) -> str:
     )
 
 
+def _glow(key: str) -> str:
+    """The light behind one kind of status tag.
+
+    Three stops and no colour. Every stop carries a class and `showcase.css` sets its
+    `stop-color` and `stop-opacity`, which is the same rule the rest of this file
+    follows: a hex in here is a colour that cannot follow the page when the palette is
+    re-cut, and this figure has been through that once already.
+
+    The middle stop is at 0.62 rather than halfway. The plate covers the inner three
+    quarters of its own bloom, so a falloff that starts at the midpoint leaves only the
+    tail of the gradient showing and the tag reads as having no light behind it at all,
+    which is what the first cut of this looked like.
+    """
+    return (
+        f'<radialGradient id="cs-glow-{key}" class="cs-glow cs-glow--{key}">'
+        '<stop class="cs-glow__core" offset="0"/>'
+        '<stop class="cs-glow__mid" offset="0.62"/>'
+        '<stop class="cs-glow__edge" offset="1"/>'
+        "</radialGradient>"
+    )
+
+
 def _defs() -> str:
-    """Every clip path the stripes are cut against, in one block."""
+    """Every clip path the stripes are cut against, and the two blooms, in one block."""
     return (
         "<defs>"
         + "".join(
@@ -563,6 +739,7 @@ def _defs() -> str:
             for key, (x, w) in (("a", CARD_A), ("b", CARD_B),
                                 ("c", CARD_C), ("d", CARD_D))
         )
+        + _glow("lit") + _glow("quiet")
         + "</defs>"
     )
 
@@ -582,6 +759,10 @@ DESCRIPTION = (
     "that call ends. "
     "Stage four, a worklist ordered worst first, holding every case that did not close, "
     "each row repeating the glyph of the ending that put it there. "
+    "Each of the four cards stands on its own plate, offset down and to the right, so "
+    "the four stand at four heights on one board. Each carries a status tag on its "
+    "header rule: twenty-one logged, three live, one open, four queued. The tag on "
+    "stage three is the only lit one, because one open is the figure's argument. "
     "Running above all four stages on its own rail is the safeguarding axis, with dashed "
     "stubs onto the first three cards and one solid segment turning down into the head "
     "of the worklist. It sits above the stages rather than among them because a case can "
@@ -611,7 +792,11 @@ def showcase_markup() -> str:
         # shrinking the figure to the point where a label paints at seven pixels. A region
         # a pointer can pan and a keyboard cannot is a region half the readers cannot use,
         # and one with no name is one a screen reader announces as nothing.
-        '<figure class="calle-showcase" tabindex="0" role="group" '
+        # `cs-deck` as well as `calle-showcase`, because the three-endings figure in act
+        # 03 carries `calle-showcase` too and shares this whole stylesheet. The
+        # perspective belongs to the four-stage board and to nothing else, so it hangs
+        # off a class only this figure has rather than off a `:not()` naming the other.
+        '<figure class="calle-showcase cs-deck" tabindex="0" role="group" '
         'aria-label="How one morning’s absence follow-up runs, in four stages. '
         'Scrolls sideways on a narrow screen; the caption underneath says the same in '
         'words.">'
@@ -622,6 +807,15 @@ def showcase_markup() -> str:
         f'<title id="calle-showcase-title">{TITLE}</title>'
         f'<desc id="calle-showcase-desc">{DESCRIPTION}</desc>'
         + _defs()
+
+        # The four plates first, under everything. They are the bottom layer rather
+        # than the layer immediately behind their own card because three connectors
+        # leave a card's right edge, and a plate drawn over one of those would open a
+        # gap between the card and the line that leaves it. A wire crossing the front
+        # of a solid is what a wire crossing the front of a solid looks like; a route
+        # that stops six units short of its own card is a defect.
+        + "".join(_riser(key, x, w) for key, (x, w) in
+                  (("a", CARD_A), ("b", CARD_B), ("c", CARD_C), ("d", CARD_D)))
 
         # Connectors before cards, so the route passes behind every plate and no line
         # crosses a label. The rail is the exception it looks like: it runs above the

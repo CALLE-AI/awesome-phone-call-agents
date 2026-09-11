@@ -61,9 +61,9 @@ lands on is the thing the pilot measures.
 Those were $29,400 and $26,900 until 2026-09-11, and the reason they are not is worth a
 sentence rather than a quiet edit. `safeguarding_escalation` was widened that day, after two
 live calls in which a parent reported a child missing and the platform returned a routine
-absence. Re-filing the twelve recorded calls under the wider rule moves two of them out of
-the closed pile, so the desk time removed falls and the callback cost rises, and the net
-per-call figure drops from $0.59 to $0.08. Nothing about the volume above changed. What
+absence. Re-filing the twelve calls recorded on 2026-09-04 under the wider rule moves two
+of them out of the closed pile, so the desk time removed falls and the callback cost rises,
+and the net per-call figure drops from $0.59 to $0.08. Nothing about the volume above changed. What
 changed is what this software refuses to close, and a district reading a saving needs to
 know it is reading the number after that refusal rather than before it.
 
@@ -119,9 +119,10 @@ Three things about that arithmetic, because it is the most load-bearing projecti
 entry and it is the least measured.
 
 **It is a projection and not a result.** The volume is California's, at a state level, from
-a source with a URL. The two rates are this software's, from twelve calls. Twelve calls
-cannot support a rate to two significant figures, and the entry publishes the bound that
-says so: 86.5 escalations per 100 answered calls is what those eleven answered calls cannot
+a source with a URL. The two rates are this software's, from the twelve calls recorded on
+2026-09-04, which are the calls the pooled counts cover. Twenty live calls are published in
+the entry now and the rates have not been re-derived over them. Twelve calls cannot support
+a rate to two significant figures, and the entry publishes the bound that says so: 86.5 escalations per 100 answered calls is what those eleven answered calls cannot
 rule out, which at this volume is 220 a morning rather than 162. A district's own first week
 is the only thing that narrows it.
 

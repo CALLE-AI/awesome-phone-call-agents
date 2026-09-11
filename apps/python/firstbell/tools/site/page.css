@@ -272,6 +272,30 @@
   --space-6: 4rem;       /* 64px  between an object and the next argument                  */
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
 
+  /* ---- the inset, and the stroke that marks an object --------------------------------
+   *
+   * One number for the distance from an object's outer edge to the text inside it, and one
+   * width for every left stroke that marks an object as live or unresolved.
+   *
+   * Measured before this existed: 258 block elements sat on 33 distinct left edges at 1440
+   * and 26 at 1024, and prose in the first column alone started on twelve of them (256,
+   * 276, 293, 294.2, 295.4, 297.6, 300, 301, 302, 320, 320.4 and 323.4). The cause was two
+   * ladders nobody had reconciled. Five component insets: 16px on `.fold` and `.lane`,
+   * 17.6 on `.minute-card`, 18.4 across the whole queue and money family, 24 on `.act-fold`
+   * and `.path`, 44 on `.plate-royal`. Four stroke widths that each shove their own content
+   * sideways: 1px hairlines, 2px on a lane, 3px on a queue row, 4px on a minute card. They
+   * add in combination, which is where 17, 18.2, 19.4, 21.6, 25, 26, 44.4 and 47.4 came
+   * from. Twelve edges within 30px of each other do not read as twelve decisions. They read
+   * as a page nobody squared up.
+   *
+   * So every rule below states the inset as this token minus whatever sits to the left of
+   * its own content. A component's text edge is then the same whether the component has a
+   * hairline, a marker stroke or no border at all, and nesting one component inside another
+   * steps the text by exactly one inset rather than by an accident. Three edges, at 0, 24
+   * and 48. */
+  --inset: var(--space-4);   /* 24px, from an object's outer edge to the text inside it */
+  --marker: 3px;             /* every left stroke that marks a row or a lane             */
+
   /* ---- the motion scale ----
    *
    * This time they govern. The block that used to sit at the foot of this file declared
@@ -429,7 +453,37 @@ h3 {
   text-wrap: balance;
 }
 
-p { margin: 0 0 1.1rem; max-width: var(--measure); }
+/* Ragged right, and no stranded last words. One declaration, after a justified version of
+ * this rule was built and measured and thrown away.
+ *
+ * `text-align: justify` was tried here with `text-justify: inter-word`, `text-align-last`
+ * and hyphenation, and every one of those came back out. Justification opened holes: the
+ * worst single gap was 97.9px, 28 times the natural space, and 28 of the 42 paragraph
+ * classes on the page ran past 3 times it. What the per-line dump showed is that the cause
+ * is not the measure, so no measure-based guard fixes it. A justified line is stretched to
+ * the full box however few words are on it, and the lines that broke early broke against
+ * the identifiers this page is about: `parent_confirmed_aware yes,` with `reason_category`
+ * next, and `m firstbell --work-file` with `examples/absences-oneroster.` next. Those
+ * tokens cannot be hyphenated and must not be broken, because the argument is that the
+ * exact field name is the thing that matters. The argument prose itself, plain `p`, ran at
+ * 16.9 times the natural space at 390 and 7.1 at 1440. A page whose prose quotes code
+ * cannot be justified, and the only classes that came in under 3 times were captions and
+ * one-liners, so justifying those alone would have left the page more mixed than before.
+ *
+ * `text-wrap: pretty` is the half of the idea that survived, and it is the half that was
+ * actually wanted: it is what stops a paragraph ending on one stranded word. Measured on
+ * ragged text it changes line geometry in 11 of 106 paragraphs at 1440 and 19 of 106 at
+ * 390, so it is doing work here and not just declared.
+ *
+ * Hyphenation is gone rather than kept as decoration. `hyphens: auto` needs a hyphenation
+ * dictionary in the reader's own Chrome profile; with one present it moved 2 of 29 wide
+ * paragraphs at 390, and on the fresh profile every gate run and most first-time readers
+ * get, it moved none. */
+p {
+  margin: 0 0 1.1rem;
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
 p.lede {
   font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.4rem);
   line-height: 1.45;
@@ -696,6 +750,11 @@ canvas[data-waveform] {
   font-size: var(--size-0); letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--ink-3); padding-top: 0.3em;
 }
+/* A `<span>` in source, but a grid item of `.turns li`, so it blockifies and this applies:
+ * measured `display: block`. The turn column is what is left of a 36.02em box after a 3rem
+ * and a 4.5rem track, narrow enough that a one-word last line is common, and this is the
+ * one property that fixes that. */
+.turn-text { text-wrap: pretty; }
 .turn-text:lang(ta-IN), [lang="ta-IN"] { font-family: var(--tamil); line-height: 1.72; }
 .turn-gloss {
   grid-column: 3; font-size: var(--size-3); color: var(--ink-3); font-style: italic;
@@ -855,7 +914,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   background: var(--sage);
   box-shadow: inset 0 0 0 1px var(--sage-line);
   border-radius: 3px;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--inset);
   margin: var(--space-4) 0;
   color: var(--ink-2);
   /* The padding is added back, so the line inside a panel is the same 62 characters it is
@@ -875,8 +934,12 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
  * marked by its indent and its measure. It does not also need a hue, and borrowing the
  * warning colour for it said "attention" on blocks that were only asides. */
 .note {
-  border-left: 3px solid var(--line-strong);
-  max-width: calc(var(--measure) + var(--space-4) * 2 + 3px);
+  border-left: var(--marker) solid var(--line-strong);
+  /* The stroke is part of the inset rather than added to it, so a note's first character
+   * sits on the same edge as the text of every other object. Measured before: +51 against
+   * the +48 everything else in that column was on. */
+  padding-left: calc(var(--inset) - var(--marker));
+  max-width: calc(var(--measure) + var(--inset) * 2);
 }
 .panel > :last-child, .note > :last-child { margin-bottom: 0; }
 .panel-k, .path-k {
@@ -893,7 +956,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
 .path {
   background: var(--brand-field);
   border-radius: 3px;
-  padding: var(--space-4);
+  padding: var(--inset);
   margin: 0 0 var(--space-5);
   --ink-3: var(--lit-ink-3);
 }
@@ -933,10 +996,10 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   font-size: clamp(1.45rem, 1.1rem + 1.3vw, 2rem);
   line-height: 1.18; letter-spacing: -0.014em;
   color: var(--ink);
-  margin: var(--space-5) 0;
+  margin: var(--space-5) auto;
   padding-top: var(--space-3);
-  border-top: 3px solid var(--live-mark);
-  max-width: var(--measure);
+  border-top: var(--marker) solid var(--live-mark);
+  max-width: min(var(--measure), 68rem);
   text-wrap: balance;
 }
 /* A single-line statement the act stands behind, set between body prose and a pull quote.
@@ -972,7 +1035,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   background: var(--royal);
   color: var(--royal-ink);
   border-radius: 4px;
-  padding: clamp(1.5rem, 4vw, 2.75rem);
+  padding: clamp(1.5rem, 4vw, 2.75rem) var(--inset);
   --ink:         var(--royal-ink);
   --ink-2:       var(--royal-ink-2);
   --ink-3:       var(--royal-ink-3);
@@ -1226,6 +1289,11 @@ footer .source-link { margin-top: var(--space-3); }
    * uppercase UI that is 451px, and this label is longer than that, so it was breaking one
    * line of small caps across two. A label is one line or it is not a label. */
   max-width: none;
+  /* This label is marked up as a `<p>`, so it inherits `text-wrap: pretty` from the rule
+   * that sets the prose, and `pretty` is the wrong style for a label that has to survive
+   * wrapping on a phone. `balance` is what the other four labels on this page are set to,
+   * and this is the only one of the five that needed saying twice. */
+  text-wrap: balance;
 }
 /* The whole screen has one sentence on it. Everything else up here is a label on a real
  * object, and the object is the argument.
@@ -1714,17 +1782,78 @@ footer .source-link { margin-top: var(--space-3); }
  * What IS aligned is the row the three fields sit on, because that is the comparison. The
  * fields are pinned to the bottom of each lane by the grid, so a reader scanning across
  * reads three values against three values with nothing between them. */
+/* The duet in space.
+ *
+ * Two calls side by side is a comparison a reader has to assemble. Two panels angled
+ * towards each other, with the active one coming forward, is a comparison they can see: the
+ * one you are listening to is the one nearest you, and the other is still there, turned
+ * slightly away, waiting.
+ *
+ * CSS 3D and not WebGL, for a reason that is about this repository and not about taste.
+ * Headless Chromium here cannot composite a GL canvas, so a WebGL scene screenshots blank
+ * and `tools/gates/run.mjs` could not see whether it drew anything. A transformed DOM tree
+ * is measured by `getBoundingClientRect` and captured by the screenshot gate exactly as a
+ * reader sees it, so all twenty gates keep their grip on it.
+ *
+ * The numbers are chosen against those gates rather than for effect. Perspective is 1600px
+ * and the furthest translation is 20px, so the projection scales an element by at most
+ * 1600/(1600-20) = 1.013: a 420px panel grows by five pixels, inside a 40px gutter. The
+ * scroll walk checks that no two pieces of text overlap at 1,127 stops and it reads the
+ * projected boxes, so a rotation big enough to look dramatic is a rotation that fails the
+ * page. Four degrees is what survives, and four degrees is enough. */
 .duet { display: grid; gap: var(--space-4); }
 @media (min-width: 52rem) {
-  .duet { grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  .duet {
+    grid-template-columns: 1fr 1fr; gap: var(--space-5);
+    perspective: 1600px;
+    perspective-origin: 50% 35%;
+    transform-style: preserve-3d;
+  }
+  /* Angled in, and lifted when it is the one being played. `:focus-within` is in the list
+   * because a reader on a keyboard tabbing into a lane's transcript is reading that lane,
+   * and the panel should come to them the same way it does for a mouse. */
+  .duet > .lane:first-child { transform: rotateY(4deg) translateZ(-20px); }
+  .duet > .lane:last-child  { transform: rotateY(-4deg) translateZ(-20px); }
+  .duet > .lane {
+    transform-style: preserve-3d;
+    transition: transform var(--dur-enter) var(--ease-out),
+                box-shadow var(--dur-enter) var(--ease-out);
+  }
+  .duet > .lane:hover,
+  .duet > .lane:focus-within,
+  .duet > .lane[data-live="on"] {
+    transform: rotateY(0deg) translateZ(0);
+    box-shadow: -1px 0 0 0 var(--line-strong), 16px 18px 40px -24px rgba(0, 0, 0, 0.28);
+  }
+  /* The head and the field row sit off the face of the panel, which is what makes the tilt
+   * read as depth rather than as a skewed image. The transcript stays flat on the panel:
+   * it is the one part a reader has to read a paragraph of, and text on a plane tilted
+   * towards the eye is text with a near edge and a far edge. */
+  .duet > .lane > .lane-head { transform: translateZ(18px); }
+  .duet > .lane > .lane-fields { transform: translateZ(10px); }
+  .duet > .lane > canvas[data-waveform] { transform: translateZ(6px); }
+}
+/* Flat for anybody who asked for less motion. The global reduced-motion block above kills
+ * durations, which stops the movement but leaves the panels sitting at an angle for ever,
+ * and a permanent 4-degree rotation is not a reduced version of a transition: it is the
+ * end state with the animation removed. This puts them back on the page. */
+@media (prefers-reduced-motion: reduce) {
+  .duet, .duet > .lane, .duet > .lane > * { transform: none !important; perspective: none; }
 }
 .lane {
   display: grid;
   grid-template-rows: auto auto auto 1fr;   /* head, wave, fields, transcript takes the rest */
   gap: var(--space-2);
   min-width: 0;
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--line);
+  /* The one component that does not take the shared inset, and it was measured the hard
+   * way. `.lane-k` is `white-space: nowrap` and the comment below already records that
+   * `parent_confirmed_aware` needs half a lane, so the 6px the shared inset takes off this
+   * content box is 6px the fields do not have: it put `expected_return` over the transcript
+   * underneath it, 19 text-on-text collisions on the scroll walk. The stroke is the
+   * converged width and the padding hands back exactly what the wider stroke took, so the
+   * content box is the one the four fields were fitted to. */
+  padding-left: calc(var(--space-3) - 1px);
+  border-left: var(--marker) solid var(--line);
 }
 /* The same rule the register uses, for the same reason: while this lane's call is running,
  * the mark ties the waveform to the language label above it. It is a stroke and never a
@@ -1744,8 +1873,13 @@ footer .source-link { margin-top: var(--space-3); }
 /* The comparison itself. Three values under each waveform, in the same order both sides,
  * so the answer to "did the Tamil call get the same result" is read across and not worked
  * out. `·` is what a field says before it has been answered. */
+/* Two columns and it was three. `fieldOrder` carries four fields since `spoke_with` was
+ * published, and four in a three-column grid leaves the fourth alone on a second row. The
+ * comment below already said `parent_confirmed_aware` does not fit in a third of a lane and
+ * broke mid-word; half a lane is the first width it fits in, and 2x2 is what four fields
+ * want anyway. */
 .lane-fields {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--line);
@@ -1776,6 +1910,39 @@ footer .source-link { margin-top: var(--space-3); }
 /* Waiting, not empty. A dotted rule under the mark says a value is expected here, which an
  * empty cell does not. --live-mark is a stroke and carries no word, so it stays legal. */
 .lane-v[data-at="pending"] { color: var(--lit-ink-3); border-bottom: 1px dotted var(--live-mark); }
+
+/* A node per field, so the four of them read as a row of states rather than four words.
+ *
+ * It is drawn on the value and not on the label, because the value is the element carrying
+ * `data-at` and the alternative is `:has()` on the parent for no gain. Hollow while the
+ * field is waiting, filled and lit once the call has answered it.
+ *
+ * The glow is a `box-shadow` on a 6px dot and never anything on the text. A shadow behind a
+ * glyph is how a page loses a contrast gate: it lifts the local background under the
+ * smallest type on the screen, the ratio drops below 4.5, and nothing about the CSS looks
+ * wrong. The dot has no word in it, so 3:1 is the bar it has to clear and it clears it as a
+ * filled mark in --live-mark. */
+.lane-v { position: relative; padding-left: 0.95em; }
+.lane-v::before {
+  content: ""; position: absolute; left: 0; top: 0.52em;
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 1px solid var(--ink-3); background: transparent;
+  transition: background var(--dur-tick) var(--ease-out),
+              box-shadow var(--dur-tick) var(--ease-out),
+              border-color var(--dur-tick) var(--ease-out);
+}
+.lane-v[data-at="committed"]::before { background: var(--ink-3); border-color: var(--ink-3); }
+.lane-fields[data-live="on"] .lane-v[data-at="committed"]::before {
+  background: var(--live-mark); border-color: var(--live-mark);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--live-mark) 22%, transparent),
+              0 0 10px 1px color-mix(in oklch, var(--live-mark) 45%, transparent);
+}
+.lane-fields[data-live="on"] .lane-v[data-at="pending"]::before {
+  border-color: var(--live-mark); background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane-v::before { transition: none; }
+}
 .lane-fields[data-live="on"] .lane-v[data-at="committed"] {
   animation: field-commit var(--dur-tick) var(--ease-out);
 }
@@ -1827,7 +1994,7 @@ footer .source-link { margin-top: var(--space-3); }
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in oklch, var(--ink) 2%, transparent);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) calc(var(--inset) - 1px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .fold[open] {
@@ -1876,7 +2043,7 @@ footer .source-link { margin-top: var(--space-3); }
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in oklch, var(--ink) 2%, transparent);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) calc(var(--inset) - 1px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .act-fold[open] {
@@ -2148,10 +2315,11 @@ button[data-copy][data-copied]::after {
   font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.65rem);
   line-height: 1.2; letter-spacing: -0.01em;
   color: var(--ink); text-wrap: balance;
-  border-left: 3px solid var(--undetermined); padding-left: 0.9rem;
+  border-left: var(--marker) solid var(--undetermined);
+  padding-left: calc(var(--inset) - var(--marker));
 }
 .stakes-src {
-  margin: 0 0 1.1rem; padding-left: calc(0.9rem + 3px);
+  margin: 0 0 1.1rem; padding-left: var(--inset);
   max-width: var(--measure);
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
 }
@@ -2222,7 +2390,7 @@ button[data-copy][data-copied]::after {
 }
 .queue-head {
   display: flex; align-items: baseline; gap: 0.6rem;
-  padding: 1rem 1.15rem 0.85rem;
+  padding: var(--space-3) calc(var(--inset) - 1px) 0.85rem;
   border-bottom: 1px solid var(--line);
 }
 .queue-n {
@@ -2235,7 +2403,7 @@ button[data-copy][data-copied]::after {
  * carry its own copy, and in a run where every case is the same case that set the same two
  * sentences four times in a 46ch column. */
 .queue-why {
-  margin: 0; padding: 0.85rem 1.15rem;
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px);
   border-bottom: 1px solid var(--line);
   font-size: var(--size-3); color: var(--ink); max-width: var(--measure); text-wrap: pretty;
 }
@@ -2253,9 +2421,10 @@ button[data-copy][data-copied]::after {
   display: grid;
   grid-template-columns: 6rem minmax(0, 1fr) 8.5rem 7rem;
   gap: 0.9rem; align-items: start;
-  padding: 0.85rem 1.15rem;
+  padding: 0.85rem calc(var(--inset) - 1px)
+           0.85rem calc(var(--inset) - 1px - var(--marker));
   border-top: 1px solid var(--line);
-  border-left: 3px solid transparent;
+  border-left: var(--marker) solid transparent;
 }
 .queue-row:first-child { border-top: 0; }
 .q-safeguarding { border-left-color: var(--undetermined); background: var(--paper-2); }
@@ -2290,7 +2459,7 @@ button[data-copy][data-copied]::after {
  * set in. */
 .money { border: 1px solid var(--line); border-radius: 2px; margin: var(--space-3) 0 0; }
 .money-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.money-cell { padding: 1.05rem 1.15rem; border-left: 1px solid var(--line); }
+.money-cell { padding: 1.05rem calc(var(--inset) - 1px); border-left: 1px solid var(--line); }
 .money-cell:first-child { border-left: 0; }
 .money-n {
   margin: 0; font-family: var(--display); font-size: var(--size-7);
@@ -2307,7 +2476,7 @@ button[data-copy][data-copied]::after {
 .money-why b { font-weight: 400; color: var(--ink); }
 .money-src { color: var(--ink-3); }
 .money-foot {
-  margin: 0; padding: 0.85rem 1.15rem; border-top: 1px solid var(--line);
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px); border-top: 1px solid var(--line);
   background: var(--paper); font-family: var(--ui); font-size: var(--size-2);
   color: var(--ink-3); max-width: none; text-wrap: pretty;
 }
@@ -2378,19 +2547,19 @@ button[data-copy][data-copied]::after {
 }
 
 .money-next {
-  margin: 0; padding: 0.85rem 1.15rem; border-top: 1px solid var(--line-strong);
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px); border-top: 1px solid var(--line-strong);
   background: var(--paper-deep); font-family: var(--ui); font-size: var(--size-2);
   color: var(--ink-2); max-width: none; text-wrap: pretty;
 }
 .money-next a { font-weight: 600; }
 .queue-clockless {
-  margin: 0; padding: 0.7rem 1.15rem;
+  margin: 0; padding: 0.7rem calc(var(--inset) - 1px);
   border-bottom: 1px solid var(--line);
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
   max-width: var(--measure-ui); text-wrap: pretty;
 }
 .queue-foot {
-  margin: 0; padding: 0.8rem 1.15rem;
+  margin: 0; padding: 0.8rem calc(var(--inset) - 1px);
   border-top: 1px solid var(--line); background: var(--paper);
   font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
   max-width: none;
@@ -2830,7 +2999,7 @@ button, .replay, [data-copy] {
   border-top: 1px solid var(--line);
   /* The same inset the cells above use, so the notes and the numbers share one left edge.
    * Without it the notes sat flush against the band's own border. */
-  padding: var(--space-4) 1.15rem;
+  padding: var(--inset) calc(var(--inset) - 1px);
   display: grid; gap: var(--space-3);
 }
 .money-whys .money-why { margin: 0; max-width: var(--measure-ui); }
@@ -2946,10 +3115,11 @@ button, .replay, [data-copy] {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  padding: 1rem 1.1rem 1.05rem;
+  padding: var(--space-3) calc(var(--inset) - 1px)
+           var(--space-3) calc(var(--inset) - var(--marker));
   background: var(--card);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--line-strong);
+  border-left: var(--marker) solid var(--line-strong);
   border-radius: 6px;
 }
 

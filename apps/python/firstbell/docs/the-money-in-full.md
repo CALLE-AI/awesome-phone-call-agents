@@ -16,7 +16,7 @@ week can settle it.
 the month of usage one account had on 2026-09-04. Four calls placed on 2026-09-11 from the
 same account to the same country billed $0.41 to $0.75 each, metered rather than flat. Both
 readings are in [`evidence/observed-price.json`](../evidence/observed-price.json) with the
-three things neither can settle, and §7 of
+three things neither can settle, and §10 of
 [`CALLE_FEEDBACK_REPORT.md`](../CALLE_FEEDBACK_REPORT.md) shows the balance closing on both.
 CALL-E publishes no price, so a district cannot look either up. Nothing below has been
 re-derived against the newer reading, because the ceilings are desk time and do not depend
@@ -152,10 +152,14 @@ Put the three side by side, because this is the whole commercial question in one
 Read the last three rows together and ignore the first two for this purpose. They read
 worse than they did a week ago, and the reason is in this repository rather than in the
 data: `safeguarding_escalation` was widened on 2026-09-11 after two live calls reporting a
-missing child were closed automatically, and re-filing the twelve recorded calls under the
-wider rule moves two of them out of the closed pile. So the measured net-new rate went from
-0 to 18.2, the bound from 24 to 47.0, and the crossover down from 34.3 to 22.9, because a
+missing child were closed automatically, and re-filing the twelve calls recorded on
+2026-09-04 under the wider rule moves two of them out of the closed pile. So the measured
+net-new rate went from 0 to 18.2, the bound from 24 to 47.0, and the crossover down from 34.3 to 22.9, because a
 run that closes fewer records removes less desk time.
+
+Twenty live calls are published in this entry now, twelve of them placed on 2026-09-11, and
+none of those twelve is in this table. Every count here is over the 2026-09-04 set, which
+is the one with committed receipts, and the later calls are not folded in.
 
 **The count clears the crossover:** 18.2 measured against 22.9, by 4.7 per hundred.
 **The bound does not clear it at all:** 47.0 against the same 22.9. That is a materially
@@ -174,8 +178,8 @@ with three conclusions and nothing saying which to staff against. It is the one 
 that rang: 22.9, because that denominator is the only one nobody chose.
 
 What a district should take from the table is that the sample is eleven answered calls, so
-the row that matters is the bound and not the count. Twelve were placed and one of them
-reached nobody, and an escalation cannot happen on a call nobody answered, so eleven is the
+the row that matters is the bound and not the count. Twelve were placed on 2026-09-04 and
+one of them reached nobody, and an escalation cannot happen on a call nobody answered, so eleven is the
 denominator every figure in those three rows is over. A district running at a higher alert rate than the
 sample, or closing fewer records than this run closes, walks into the loss without the
 software saying a word. So the software says it. A run that removes fewer attempts absorbs

@@ -297,8 +297,26 @@
    * with the column empty under it. */
   .playground .morning-compact .mrn-stage { height: 380px; }
 }
-/* Three lines of display type is a paragraph, not a heading. */
-#h-00 { font-size: var(--size-5); line-height: 1.15; max-width: 30ch; margin: 0 0 var(--space-3); }
+/* Three lines of display type is a paragraph, not a heading, which is why this was cut to
+ * body size. Body size was too far the other way: the one sentence carrying the argument
+ * rendered at 17px in a 224px box, indistinguishable from the prose under it, on the screen
+ * that decides whether anybody reads the rest.
+ *
+ * The height this costs is bought with width rather than with the fit. The sentence was
+ * wrapping inside 224px of a 553px column, so widening the measure to the column and
+ * raising the type keeps it at two lines. Measured at 1440x900: 39px of headline became
+ * 71px, and the first screen still ends above the fold. The clamp keeps it off the fit at
+ * narrow widths, where the column is the viewport and a third line would cost a whole
+ * line box. */
+#h-00 {
+  font-size: clamp(1.0625rem, 2.05vw, 1.95rem);
+  line-height: 1.12; max-width: 30ch; margin: 0 0 var(--space-3);
+}
+/* em, never ch. `ch` is the advance width of a zero in whatever face is rendering, and
+ * page.css records the same trap costing a whole line box on this headline. 21ch resolved
+ * to 273px against the display face and put the sentence on three lines; 15em holds it on
+ * two at every width above 60rem, measured. */
+@media (min-width: 60rem) { #h-00 { max-width: 15em; } }
 
 /* The last 33px, taken from spacing rather than from anything a reader reads.
  * Bar bottom 883 to 850 at 1440x900. */
@@ -336,6 +354,14 @@
 
 /* An anchor that lands under the bar is an anchor that went to the wrong place. Every
  * target on this page reserves the bar's height plus a line of air. */
+/* `[id]` deliberately reaches acts too, and it ties with page.css's `.act
+ * { scroll-margin-top: 0 }` on specificity and wins on source order. That is a real
+ * conflict between two documented intentions and it is left as it was found: this value
+ * is what makes a native anchor jump clear the 74px bar, measured, and scoping it off
+ * `.act` drops three acts to 0px and under the bar. The 0.75rem is load-bearing; without
+ * it `--bar-h` alone computes 64px and does not clear. page.css's comment records the
+ * cost, which is that stopping short of an act's top edge shows the pinned first screen
+ * through the gap between acts. Clearing the bar was judged the lesser problem. */
 :target, [id] { scroll-margin-top: calc(var(--bar-h) + 0.75rem); }
 
 /* Act 00 sticks to the bottom of the window under the curtain, so what sits behind the

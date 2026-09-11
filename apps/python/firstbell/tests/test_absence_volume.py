@@ -287,7 +287,8 @@ def test_the_rota_projection_is_the_product_of_the_two_figures_it_names():
         "district changing it with --safeguarding-minutes changes this answer")
 
     # To the nearest hundred, which is how the document states it, because a projection
-    # off twelve calls printed as 20,775 claims a precision it does not have. The rounding
+    # off the twelve calls of 2026-09-04 printed as 20,775 claims a precision it does not
+    # have. The rounding
     # is computed rather than trusted, so the figure still moves if either source does.
     annual = round(escalations * 180 / 100) * 100
     assert f"{annual:,}" in prose, (
@@ -303,7 +304,7 @@ def test_the_rota_projection_is_the_product_of_the_two_figures_it_names():
         "rate to two significant figures and every other surface in this entry says so")
     assert "projection and not a result" in prose, (
         "the paragraph no longer says it is a projection, and it multiplies a state-level "
-        "volume by two rates measured on twelve calls")
+        "volume by two rates measured on the twelve calls of 2026-09-04")
 
 
 def test_the_annual_saving_is_stated_after_the_calls_are_paid_for():

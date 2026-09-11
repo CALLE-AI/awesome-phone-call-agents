@@ -160,6 +160,22 @@ def esc_code(value: object) -> str:
 
 # ---- reading the evidence ---------------------------------------------------------------
 
+# The first live session's four recordings say a real school name out loud, on two of them
+# while a parent reports a child missing. The transcripts ship with the name redacted and
+# the redaction recorded in `_provenance`. The audio cannot be redacted, because raw call
+# audio is never altered here: a clip is published whole or it is not published. These four
+# are not. The scenarios were re-dialled against the fictional "Oakridge High" as S-3116
+# and later, and those re-dials are what the page plays.
+#
+# Nothing on the page links these four clips, so the only way to reach one was to guess the
+# filename. That is still publishing it.
+WITHHELD_AUDIO = frozenset({"S-3101", "S-3102", "S-3103", "S-3104"})
+
+# Row ids whose recording this build copied. Read off the directory rather than off the
+# transcripts, because the two can disagree and the directory is what a browser asks for.
+CLIPS: frozenset[str] = frozenset()
+
+
 def _receipts_dir() -> Path:
     if RECEIPTS is None:
         raise SystemExit("internal: main() must set RECEIPTS before building the page")
@@ -268,6 +284,16 @@ def test_count() -> int:
     return int(match.group(1)) if match else 0
 
 
+def _published_call_total() -> int:
+    """How many calls the evidence page publishes, read off the receipts.
+
+    Deliberately not `_recorded_call_total()`. That one reads the money denominator, frozen
+    at the twelve calls the cost model was computed on, and a board claiming twelve while
+    the page plays twenty is the page contradicting its own audio player.
+    """
+    return len(transcripts()["calls"])
+
+
 def cue_for(call: dict, marker: str) -> int:
     """Where the hero player rests before first play.
 
@@ -278,6 +304,42 @@ def cue_for(call: dict, marker: str) -> int:
         if turn["speaker"] == "user" and marker.lower() in turn["text"].lower():
             return max(0, turn["offset_seconds"] - 5)
     return 0
+
+
+def hero_id(data: dict) -> str:
+    """Which call the page opens on, decided by the evidence file and not by this template.
+
+    Two surfaces need the answer: act 00, which plays the call, and the path list one act
+    below it, which describes it. They read it here rather than each resolving it, because
+    the two of them disagreeing about which call the page opens on is exactly the class of
+    defect the fallback below was written to avoid.
+
+    The fallback is the first call in the file rather than a second hardcoded id, so a
+    transcripts file that names no hero still builds a page.
+    """
+    calls = data["calls"]
+    named = data.get("hero")
+    return named if named in calls else next(iter(calls))
+
+
+def pair_agreement(data: dict, pair: dict) -> tuple[int, int]:
+    """How many enumerated fields the two calls of one pair returned alike, out of how many.
+
+    Counted here over `fieldOrder` rather than read out of the `agree` and `of` numbers the
+    receipt carries beside each pair. Those two numbers said three of three while the file's
+    own field list had grown to four, so act 02 printed a denominator one short of the
+    fields rendered directly underneath it, and the fold above the table multiplied the
+    same wrong number by four scenarios.
+
+    The pre-registration claim survives the change and is the reason for it. What was
+    committed before the calls were placed is the family being compared, which is the field
+    list in the evidence file. Which of them matched is a measurement, and a measurement
+    belongs to the results.
+    """
+    fields = data["fieldOrder"]
+    en = data["calls"][pair["en"]].get("structured") or {}
+    ta = data["calls"][pair["ta"]].get("structured") or {}
+    return sum(1 for f in fields if en.get(f) == ta.get(f)), len(fields)
 
 
 # ---- fragments --------------------------------------------------------------------------
@@ -339,9 +401,17 @@ def commit_turns(call: dict, fields: list[str]) -> list[int]:
 
 
 def _spelled(n: int) -> str:
-    """A small count in words. The hero read "Four of the 4 rows here" for a morning."""
+    """A small count in words. The hero read "Four of the 4 rows here" for a morning.
+
+    The table stops at sixteen because that is the largest count on the page written as a
+    word: four scenarios by the four enumerated fields act 02 compares. It stopped at twelve
+    while the field list held three, and the digit this returned past the end of the table
+    would have read "All 16 comparisons" in a sentence whose other numbers are words.
+    """
     return {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
-            8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}.get(n, str(n))
+            8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+            13: "thirteen", 14: "fourteen", 15: "fifteen",
+            16: "sixteen"}.get(n, str(n))
 
 
 def _closed_on_nothing_mark(resolution: str, fields: dict, order: list[str]) -> str:
@@ -387,7 +457,25 @@ def _stakes_sentence() -> str:
 
 
 def _recorded_call_total() -> int:
-    """How many calls this software has placed against the production API, from one file.
+    """How many calls the cost model is pooled over, from one file.
+
+    Not the number of calls placed, which is the reading that put a false sentence on the
+    first screen for a week. This is `counts.calls` out of `evidence/recorded-calls.json`,
+    the frozen money denominator, and twelve more calls were placed after that pool was
+    written. `_published_call_total()` is the other quantity.
+
+    Neither is the total. Counting by the platform's own call identifier, which is the
+    only identifier space the receipts and `transcripts.json` share, the pool holds twelve
+    and the transcripts hold twenty, and they overlap on eight: twenty-four distinct calls
+    have been placed. Twenty-four is not derivable from anything committed, because this
+    file carries no identifiers and no published count and the receipts are held outside
+    this repository, so no surface here states a total.
+
+    The identifier is described rather than named, here and in `build()`. `test_privacy.py`
+    greps this file from `def build(` onward for a read of either embedded id field with no
+    `mask_id` on the same line, and a grep cannot tell a comment from code. This docstring
+    sits above `build()` so it is outside that slice today, which is a position and not a
+    property: naming the field here would leave a trap for whoever reorders the file.
 
     Typed into the first screen, it was four, because four is how many rows the register
     shows and nobody noticed that the sentence had gone on to claim a total. Every other
@@ -534,10 +622,18 @@ def hero_turn_markup(call: dict) -> str:
 
     It used to open "The guardian was not aware of the absence", which was true of S-4105
     and is the opposite of what the platform returned for the call this page now opens on.
-    On S-3103 `parent_confirmed_aware` came back `yes` about a parent asking the office to
-    go and look for their daughter, so the sentence branches on the field rather than
-    asserting one reading of it. The `yes` branch is the stronger argument and it could not
-    have been written before a real call produced it.
+    On S-3127 `parent_confirmed_aware` came back `yes` about a parent saying their son had
+    left home on his bike and something was wrong, so the sentence branches on the field
+    rather than asserting one reading of it. The `yes` branch is the stronger argument and
+    it could not have been written before a real call produced it.
+
+    What the guardian actually said is not repeated here. The card above this paragraph
+    carries it, on the same screen, and the account of it in this branch was S-3103's for
+    as long as S-3103 was the hero. One statement of a human fact, in the place that reads
+    it out of the call, is the only version that cannot go stale behind the other.
+
+    Nothing in it names the pupil's sex either. There is no field for it, so a pronoun here
+    is a fact about one call typed next to values read out of whichever call the file names.
     """
     from dispatch.models import Escalation
     from firstbell.domain import safeguarding_escalation
@@ -552,9 +648,9 @@ def hero_turn_markup(call: dict) -> str:
 
     if aware == "yes":
         opening = (
-            'The platform recorded the guardian as <b>aware</b> of the absence. The '
-            'guardian had just asked the office to go and check a classroom. Both of those '
-            'are in the same call, and only one of them reached the record.')
+            'The platform recorded the guardian as <b>aware</b> of the absence. The card '
+            'above says what the guardian had just told it. Both of those are in the same '
+            'call, and only one of them reached the record.')
     else:
         opening = (
             'The guardian was not aware of the absence. That is the answer that matters, '
@@ -569,7 +665,7 @@ def hero_turn_markup(call: dict) -> str:
 
     return (
         f'<p class=hero-turn>{opening} Why the pupil was away came '
-        f'back <b>{why}</b>. When to expect her back came back <b>{when}</b>. Those two are '
+        f'back <b>{why}</b>. When to expect them back came back <b>{when}</b>. Those two are '
         'what the office needs before it can act, so a system that counts contacts would '
         f'mark this “family contacted” and close it. {verdict}</p>'
     )
@@ -840,7 +936,7 @@ def turns_markup(call: dict) -> str:
 
 
 def lane_markup(data: dict, cid: str, label: str, has_audio: bool) -> str:
-    """One side of the duet: a call, its clock, its three fields and its transcript.
+    """One side of the duet: a call, its clock, every field it returned and its transcript.
 
     Everything is served at the value CALL-E returned, exactly as the register is, so a
     reader with no script or with reduced motion asked for gets both results in full. The
@@ -946,7 +1042,7 @@ def endings_markup(data: dict, cid: str, run: dict) -> str:
     out = ['<div class=endings data-endings>']
     out.append('<div class=subject>')
     out.append(f'<span class=subject-id>{esc(cid)}</span>')
-    out.append('<span class=subject-say>the call from the first screen, finished</span>')
+    out.append(f'<span class=subject-say>call {esc(cid)}, filed three ways</span>')
     out.append('<span class=subject-fields>')
     for f in fields:
         value = call["structured"].get(f, "·")
@@ -988,6 +1084,57 @@ def endings_markup(data: dict, cid: str, run: dict) -> str:
     out.append('</div>')
     out.append('</div>')
     return "".join(out)
+
+
+# What the receipts file substitutes for the school the scripted scenarios name. Its
+# `_provenance.redaction` records why: the name reads like a real school, and a named school
+# in a published transcript about a missing child is a third party who never agreed to
+# appear in one.
+REDACTION_MARK = "[school name redacted]"
+
+
+def filed_markup(calls: dict) -> str:
+    """The call CALL-E filed as a routine absence, found by what it returned.
+
+    This is one of the entry's headline claims and it had come loose from its evidence. It
+    sat above a panel rendering S-4105, whose result is `no` and `unknown`, while the filing
+    it describes belongs to a call that appears in no lane on the page.
+
+    Found by the condition rather than by an id, the way the mark on a closed-on-nothing row
+    is: a result where the platform recorded the guardian as aware and still filed
+    `transport` is the defect itself, so the same result on a different call would be named
+    here without anybody remembering to edit a string.
+
+    What a reader can reach of that call is stated too, because it is not obvious and it is
+    not the same for the two calls of 2026-09-11. The transcript travels in this page's own
+    call data with the school replaced. The recording has no control anywhere on the page,
+    which is the honest thing to say: the school it names is audible in it, and the
+    substitution in the transcript does not touch the audio.
+    """
+    found = ""
+    for cid, call in calls.items():
+        result = call.get("structured") or {}
+        if (str(result.get("parent_confirmed_aware", "")).strip().lower() == "yes"
+                and str(result.get("reason_category", "")).strip().lower() == "transport"):
+            found = cid
+            break
+
+    claim = "CALL-E filed a missing child as a routine transport absence."
+    tail = "So did this software, until 2026-09-11."
+    if not found:
+        # Nothing in the file carries that filing any more. The sentence is an account of
+        # what happened rather than a reading of a value, so it keeps its place, and what
+        # it drops is the part that would be pointing at nothing.
+        return f'<p class=hard>{claim} {tail}</p>'
+
+    redacted = any(REDACTION_MARK in (turn.get("text") or "")
+                   for turn in (calls[found].get("turns") or []))
+    said = (f'That call is {esc(found)}. Its transcript travels with this page, with the '
+            f'school it names replaced by <code>{esc(REDACTION_MARK)}</code>; its '
+            'recording is not played here.') if redacted else (
+            f'That call is {esc(found)}. Its transcript travels with this page and its '
+            'recording is not played here.')
+    return f'<p class=hard>{claim} {said} {tail}</p>'
 
 
 # The response headers the deployed page is served with. Everything below that names an
@@ -1190,16 +1337,17 @@ def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
         out.append(
             '<p>Source, tests and receipts: a pull request into '
             '<code>CALLE-AI/awesome-phone-call-agents</code>, under '
-            '<code>apps/python/firstbell</code>. This build carries no link to it because '
-            'the branch was not pushed when the page was built, so the pull request is in '
-            'the submission form instead.</p>')
+            '<code>apps/python/firstbell</code>. The branch was not pushed when this page '
+            'was built, so the pull request is in the submission form rather than linked '
+            'here.</p>')
     if not video_url:
         out.append(
+            # The two paragraphs shared a 22-word closing clause, word for word. Each
+            # keeps the fact it is about; the shared one is said once and pointed at.
             f'<p>A demo film runs {_film_running_time()} and is measured in '
             '<code>evidence/film.json</code>, which records its length, its shot count, how '
-            'much of it carries sound and the digest of the file. This build carries no link '
-            'to it because it was not uploaded when the page was built, so the link is in '
-            'the submission form instead.</p>')
+            'much of it carries sound and the digest of the file. It was not uploaded when '
+            'this page was built, so its link is in the submission form too.</p>')
     return "".join(out)
 
 
@@ -1841,7 +1989,15 @@ def _money_key_block(f: dict) -> str:
         '<dl class=money-key>'
         + "".join(rows)
         + '</dl>'
-        '<p class=money-key-foot>The sample is every call this software has placed, which '
+        # "every call this software has placed" until 2026-09-11, when twelve more were
+        # placed and the pool was not recomputed, because the cost model is frozen on the
+        # twelve. The pool is still the one denominator nobody chose; it is no longer
+        # everything, so it says which file it is instead of claiming a total. No number
+        # goes in this clause: the rates beside it are per answered call, and a bare count
+        # in the same sentence as a rate is what `test_real_call_denominator.py` exists to
+        # catch.
+        '<p class=money-key-foot>The sample is every call pooled in '
+        '<code>evidence/recorded-calls.json</code>, which '
         f'is the one denominator on this page nobody chose, and these {how_many} rates '
         'are per answered call, because one of those calls reached nobody. '
         + widest +
@@ -1867,18 +2023,16 @@ def money_markup(run: dict) -> str:
         return (f'<a class=money-src href="{esc(figure["url"])}">'
                 f'{esc(figure["publisher"].split(",")[0])}</a>')
 
-    # The provenance is set under the band, not inside the cells.
+    # The provenance is not inside the cells, for a reason measured at 1440: a band of
+    # three cells is as tall as its longest cell, and the third one carries 140 words
+    # about how CALL-E's usage panel was read. The band ran 430px while the first two
+    # cells finished after 170, so two thirds of it was empty ruled ground beside a wall
+    # of small print, in the act a buyer opens the page for. It also put the least
+    # skimmable prose on the page in the same object as its three most skimmable numbers.
     #
-    # A band of three cells is as tall as its longest cell, and the third one carries 140
-    # words about how CALL-E's usage panel was read. Measured at 1440: the band ran 430px
-    # while the first two cells finished after 170, so two thirds of it was empty ruled
-    # ground beside a wall of small print, in the act a buyer opens the page for. It also
-    # put the least skimmable prose on the page in the same object as its three most
-    # skimmable numbers.
-    #
-    # Nothing is hidden and nothing is cut. Each note keeps its figure at the front of it,
-    # so a reader still knows which number it is about, and the notes are set at the UI
-    # measure below the band, which is where every other provenance note on this page is.
+    # They are placed below, inside the fold, rather than loose under the band. Nothing is
+    # cut. Each note keeps its figure at the front of it, so a reader still knows which
+    # number it is about.
     whys = []
 
     def why(figure: str, body: str) -> str:
@@ -1911,8 +2065,12 @@ def money_markup(run: dict) -> str:
 
         '<div class=money-cell>',
         f'<p class=money-n>${f["price"]["per_call_usd"]:,.2f}</p>',
-        f'<p class=money-what>a call, billed. The desk time one call removes is worth '
-        f'${f["demo"]["net_ceiling"]:,.2f}</p>',
+        # The qualification travels with the number now. The derivation behind it moved
+        # behind the disclosure below, and a figure that reads as a saving with its
+        # "ceiling" one click away is the defect `_money_key_block` was written about: a
+        # reviewer read the label and not the qualification eighty lines under it.
+        f'<p class=money-what>a call, billed. The desk time one call removes is worth at '
+        f'most ${f["demo"]["net_ceiling"]:,.2f}: a ceiling, not a saving</p>',
         # Three endings here as well, and the third one is why this is a branch rather
         # than a format string. A run that placed calls and answered none has no
         # escalation rate: the denominator is zero, so `bound` and `worst_at_three` are
@@ -1926,12 +2084,12 @@ def money_markup(run: dict) -> str:
         # printed the thirteen as though it had been counted, which is an inference
         # dressed as an observation on the surface a judge reads first.
         why(f'${f["price"]["per_call_usd"]:,.2f} a call',
-            f'CALL-E publishes no price, so the left figure is what it '
+            f'CALL-E publishes no price. The left figure is what it '
             f'billed this account: {f["price"]["call_rows_read"]} rows on the usage panel, '
-        f'every one at ${f["price"]["per_call_usd"]:,.2f}, and a period total of '
-        f'${f["price"]["period_total_usd"]:,.2f} over one month that divides by it '
-        f'exactly, so {f["price"]["billed_events"]} events were priced the same. That '
-        f'last number is a division and not a row count. The right figure is '
+        f'every one at ${f["price"]["per_call_usd"]:,.2f}. The one month of usage totals '
+        f'${f["price"]["period_total_usd"]:,.2f}, which divides by that exactly, so '
+        f'{f["price"]["billed_events"]} events were priced the same. That '
+        f'count is a division, not a row count. The right figure is '
         f'the demo run: {f["demo"]["attempts_removed"]} of '
         f'{f["demo"]["attempts_billed"]} attempts came off a desk at '
         f'${f["desk"].hourly:,.2f} an hour at three minutes each, less the safeguarding '
@@ -1940,17 +2098,13 @@ def money_markup(run: dict) -> str:
         # the same sentence as "somebody chose this numerator". A reader who found
         # firstbell/scenario.py after reading this figure would be entitled to think the
         # page had hidden it.
-        'And not a measurement: that run answers against a test double whose outcome mix '
-        'is written down in <code>firstbell/scenario.py</code>, which is what lets anybody '
-        'reproduce it with one command and also means somebody chose it. The measured '
-        'figure is further down this paragraph, over every call this software has '
-        'placed.'),
+        'And not a measurement. That run answers against a test double, and its outcome '
+        'mix is written down in <code>firstbell/scenario.py</code>: anybody can reproduce '
+        'it with one command, and somebody chose it. The measured figure is below, over '
+        'every call pooled in <code>evidence/recorded-calls.json</code>.'),
 
         '</div>',
         '</div>',
-        # The three notes, under the band, in the order of the cells above them.
-        f'<div class=money-whys>{"".join(whys)}</div>',
-
         # The numbers a school board asks for, out of the paragraph below.
         #
         # Two readers with the buyer's job named that paragraph as the thing that
@@ -1960,6 +2114,19 @@ def money_markup(run: dict) -> str:
         # a different objection, and a reader who needs three can now stop at three.
         '<details class="fold act-fold money-fold"><summary>Where each of those '
         'figures comes from, and what would move it</summary><div class=fold-body>',
+        # The three provenance notes, in the order of the cells above them, behind the
+        # disclosure that was already promising them.
+        #
+        # They are not in the cells for a measured reason that still holds: a band of
+        # three cells is as tall as its longest cell, and the third note runs 140 words,
+        # so at 1440 the band ran 430px while the first two cells finished after 170. But
+        # under the band they were 250 words of provenance standing between a buyer and
+        # the three figures they came for, on the one screen this act exists for. The
+        # summary above says "where each of those figures comes from", which is what these
+        # are, so nothing is hidden that a reader was not already being offered. Each note
+        # keeps its own figure at the front of it, and the gates open every fold before
+        # they measure, so folding exempts nothing from a check.
+        f'<div class=money-whys>{"".join(whys)}</div>',
         _money_key_block(f),
 
         # Three sentences of caveat, in the order a buyer would object in. The first
@@ -2355,7 +2522,7 @@ def takeaway_markup() -> str:
          None,
          "The three-outcome classifier is not locked inside a Python CLI. It ships as an "
          "importable n8n workflow, generated from the tested module by a committed script "
-         "so the two cannot drift, inactive on import with a dry run that places no calls "
+         "so the two cannot drift. It imports inactive, and its dry run places no calls "
          "and needs no API key.",
          "cd plugins/firstbell-absence-calls && node --test "
          "examples/classify.test.mjs examples/workflow-shape.test.mjs",
@@ -2402,13 +2569,19 @@ def further_markup() -> str:
     )
 
 
-def path_markup() -> str:
+def path_markup(data: dict) -> str:
     """The stated way in, once, at the top.
 
-    This page is 4,283 words and every one of them is held by a test, so the answer to a
-    reader with two minutes cannot be to cut. It is to say where to spend them. Five
+    This page is thousands of words and every one of them is held by a test, so the answer
+    to a reader with two minutes cannot be to cut. It is to say where to spend them. Six
     destinations, in the order they answer the question a judge is actually asking, each an
-    ordinary anchor so it works with no script and lands on a keyboard.
+    ordinary anchor so it works with no script and lands on a keyboard. The lead sentence
+    counts them off `steps` rather than naming them, so adding one cannot make it wrong.
+
+    It takes the evidence file because two of the five descriptions were describing calls
+    and instruments that had moved underneath them. A menu whose first entry gets the first
+    screen wrong is worse than no menu, so the entries that can read a value read one: the
+    hero's own id and field, and the number of fields act 02 lays out.
 
     The last one is the run itself. A reviewer with three minutes would rather press
     something than read about it, and the only honest version of that this page can offer
@@ -2419,12 +2592,22 @@ def path_markup() -> str:
     one object on it and both are the argument; a menu above the register would be the page
     explaining itself instead of showing itself, on the one screen where showing works.
     """
+    # The hero's own answer to the field this entry is about, and the count of fields the
+    # duet lays out. Both were typed here once: the first entry said "a parent who had not
+    # been told", which was S-4105's result and is the opposite of what the platform
+    # returned for the call the page now opens on, and it named a register that act 00 has
+    # not held since the two cards replaced it.
+    found = data["calls"][hero_id(data)].get("structured") or {}
+    aware = str(found.get("parent_confirmed_aware", "unknown"))
+    why = str(found.get("reason_category", "unknown"))
+    lanes = _spelled(len(data["fieldOrder"]))
     steps = [
         ("act-00", "Watch a row fill in",
-         "A real call to a parent who had not been told, playing in the register it "
-         "belongs to."),
-        ("act-02", "The same call in Tamil",
-         "Two conversations of different lengths, and the three fields underneath them."),
+         f"A real call, and what CALL-E returned for it: parent_confirmed_aware {aware}, "
+         f"reason_category {why}. The fields fill in from the recording as it plays."),
+        ("act-02", "One scenario, English and Tamil",
+         f"A different pair of calls from the one above: two conversations of different "
+         f"lengths, and the {lanes} fields underneath each of them."),
         ("act-03", "Three endings, not two",
          "What this software does with a call it could not get an answer to."),
         # Added because a district administrator reading this page as a buyer could not
@@ -2452,10 +2635,14 @@ def path_markup() -> str:
     ]
     out = ['<div class=path>',
            '<p class=path-k>The two-minute path</p>',
-           '<p class=path-lead>Three things, in the order they answer the question, a '
-           'fourth if you are the person who has to pay for it, one you can press, and '
-           'the document a district would decide on. Everything else here is the evidence '
-           'behind them.</p>',
+           # Counted off the list, and no positional claims. It read "Three things ... a
+           # fourth if you are the person who has to pay for it, one you can press, and
+           # the document a district would decide on", which was 41 words describing six
+           # cards that each describe themselves, and every ordinal in it went stale the
+           # moment a destination was inserted above it.
+           f'<p class=path-lead>{_spelled(len(steps)).capitalize()} destinations, in the '
+           'order they answer the question a judge is actually asking. Everything else on '
+           'this page is the evidence behind them.</p>',
            '<ol class=path-steps>']
     for i, (anchor, title, why) in enumerate(steps, 1):
         href = anchor if "/" in anchor else f"#{anchor}"
@@ -2617,7 +2804,7 @@ def morning_html() -> str:
         f"<style>{css_for_serving(module.MORNING_CSS)}</style>"
         f"<style>{css_for_serving(cutoff.CUTOFF_CSS)}</style>"
         "<main>"
-        f"{module.morning_markup(_spelled(_recorded_call_total()))}"
+        f"{module.morning_markup(_spelled(_published_call_total()))}"
         f"{cutoff.cutoff_markup(cut)}"
         "</main>"
         '<script type=module src="morning.js"></script>'
@@ -2691,8 +2878,15 @@ def css_for_serving(css: str) -> str:
 # ---- the page ---------------------------------------------------------------------------
 
 def build(has_audio: bool, repo_url: str | None = None,
-          video_url: str | None = None) -> str:
+          video_url: str | None = None,
+          clip_ids: list[str] | None = None) -> str:
     data = transcripts()
+    if clip_ids is not None:
+        data["clips"] = list(clip_ids)
+    elif has_audio:
+        audio_dir = APP / "out" / "audio"
+        if audio_dir.is_dir():
+            data["clips"] = sorted([p.stem for p in audio_dir.glob("*.m4a")])
     # Masked here rather than at each use, so a new surface that reads a call cannot
     # reintroduce a whole identifier by reading the field the old ones read.
     _calls = data.get("calls", {})
@@ -2725,8 +2919,11 @@ def build(has_audio: bool, repo_url: str | None = None,
                               item.get("resolution"), name,
                               item.get("structured_result") or {}))
     live = [(n, d) for n, d in recs if d.get("reached_production_api")]
-    agree = sum(p["agree"] for p in data["pairs"])
-    total = sum(p["of"] for p in data["pairs"])
+    # Summed from the results over the committed field list, not from the `agree` and `of`
+    # numbers beside each pair. See `pair_agreement`: those two stopped at three fields and
+    # the file's field list did not.
+    agree = sum(pair_agreement(data, q)[0] for q in data["pairs"])
+    total = sum(pair_agreement(data, q)[1] for q in data["pairs"])
 
     css = page_css()
     p: list[str] = []
@@ -2818,28 +3015,23 @@ def build(has_audio: bool, repo_url: str | None = None,
     # running. A judge who reads nothing watches a row fill in and has been told the whole
     # thing.
     #
-    # The rows are the English call of each committed scenario pair, in the order the
-    # pairs were registered, so which four appear here is decided by the evidence file and
-    # not by this template. The live one is the call where the parent had not been told.
-    # S-3103, placed 2026-09-11. It replaced S-4105 here, and the reason is the whole
-    # argument getting sharper. S-4105 was a parent who did not know, and the platform
-    # returned `parent_confirmed_aware: no`, so a reader could reasonably think the field
-    # works and this software is only being careful. On S-3103 the parent interrupts the
-    # robot to say their daughter boarded the school bus at half past seven and to ask the
-    # office to go and check the classroom, and the platform returned
-    # `parent_confirmed_aware: yes` with a routine `transport` absence. The field did not
+    # The hero is the call the file names, and the reason the file names one is the whole
+    # argument getting sharper. S-4105 was a parent who did not
+    # know, and the platform returned `parent_confirmed_aware: no`, so a reader could
+    # reasonably think the field works and this software is only being careful. On the
+    # calls of 2026-09-11 the platform returned `parent_confirmed_aware: yes` to a parent
+    # reporting that a child had left home and was not accounted for. The field did not
     # merely go unread. It said the opposite of what the call contained, and this page now
-    # opens on the call where it did.
-    # Which call the page opens on is the evidence file's decision, not this template's.
-    # It was `hero = "S-4105"` for months and the id sat here in the code, which meant the
-    # first thing a judge sees was chosen by whoever last edited the builder. It also broke
-    # the authored fixture the moment the choice changed, because a hardcoded id is a
-    # requirement the fixture had no way to know about.
+    # opens on a call where it did.
     #
-    # The fallback is the first call in the file rather than a second hardcoded id, so a
-    # transcripts file that names no hero still builds a page.
-    hero = data.get("hero") if data.get("hero") in calls else next(iter(calls))
-    rows = [pair["en"] for pair in data["pairs"]]
+    # Which call that is stays out of this comment as well as out of the code. It was
+    # `hero = "S-4105"` for months and the id sat here in the builder, which meant the
+    # first thing a judge sees was chosen by whoever last edited this file. It also broke
+    # the authored fixture the moment the choice changed, because a hardcoded id is a
+    # requirement the fixture had no way to know about. Then the file moved the hero from
+    # S-3103 to S-3127 and every sentence naming S-3103 on this screen became a
+    # description of a call the page no longer shows.
+    hero = hero_id(data)
     # The phrase the cue rests five seconds before, also from the file. `cue_for` returns 0
     # when it does not match, which is the right default: the player starts at the beginning.
     cue = cue_for(calls[hero], data.get("heroCue", ""))
@@ -2855,16 +3047,39 @@ def build(has_audio: bool, repo_url: str | None = None,
     control = next((cid for cid, one in calls.items()
                     if cid != hero and _escalates(one.get("structured") or {}) is _Esc.NONE),
                    next(cid for cid in calls if cid != hero))
+    # Everything either card says about a result is counted or quoted, because every
+    # sentence here was once typed beside a value the card renders and then the values
+    # moved. The control's note said three fields while the card drew four rows. The
+    # hero's note said a `transport` filing, which is what the platform returned for
+    # S-3103 and not for the call that took its place, three lines under a row reading
+    # `reason_category unknown`.
+    hero_found = calls[hero].get("structured") or {}
+    hero_why = esc(str(hero_found.get("reason_category", "unknown")))
+    hero_aware = esc(str(hero_found.get("parent_confirmed_aware", "unknown")))
+
+    def _acted_on(cid: str) -> int:
+        """Fields a school office could do something with, counted the way the card lights them."""
+        got = calls[cid].get("structured") or {}
+        return sum(1 for f in data["fieldOrder"]
+                   if str(got.get(f) or "").strip().lower() not in ("", "unknown"))
+
+    # The label is CALL-E's own one-sentence account of the call, committed with the
+    # receipt, rather than this page's summary of it. It is also the card's accessible
+    # name, so the visible caption and the name a screen reader announces are one string,
+    # and neither can describe a call the lane is not playing.
+    hero_said = esc(str(calls[hero].get("note") or "").strip().rstrip("."))
     lanes_shown = [
         # The control, and it is the shorter of the two calls. It exists to say that this
         # software does not simply mark everything undetermined, which is one sentence.
         {"id": control, "label": "the parent knew, and said why",
          "two_bucket": "resolved", "two_bucket_note": "case closed",
          "ours": "resolved",
-         "ours_note": "Three fields the office can act on."},
-        {"id": hero, "label": "the parent asked the school to go and look",
+         "ours_note": f"{_spelled(_acted_on(control)).capitalize()} fields the office can "
+                      "act on."},
+        {"id": hero, "label": hero_said or "the parent reported a child unaccounted for",
          "two_bucket": "resolved",
-         "two_bucket_note": "case closed. Filed as a transport absence, parent aware.",
+         "two_bucket_note": f"case closed. Filed as reason_category {hero_why}, "
+                            f"parent_confirmed_aware {hero_aware}.",
          "ours": "escalated",
          "ours_note": "held open and escalated to a safeguarding lead."},
     ]
@@ -2890,7 +3105,7 @@ def build(has_audio: bool, repo_url: str | None = None,
         callscope_figure(data, lanes_shown, ''),
         '</div>',
         '<div class=play-board id=simulator>',
-        morning_module().morning_markup(_spelled(_recorded_call_total()), compact=True),
+        morning_module().morning_markup(_spelled(_published_call_total()), compact=True),
         '</div>',
         '</div>',
         play_bar_markup(repo_url, video_url),
@@ -2900,9 +3115,6 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<details class="fold act-fold"><summary>What these calls are, who consented, '
         'and how the two systems differ</summary><div class=fold-body>',
         hero_turn_markup(calls[hero]),
-        # Four rows, twelve calls, and the page used to say only the first number.
-        # Everything else in the entry says twelve, so the first screen was the one place
-        # a reader could find the two numbers disagreeing.
         # Six sentences of footnote, about 180 words, on the screen with the tightest
         # word budget on the page. Three of them explained things the acts below explain
         # again with room to do it properly: what CALL-E is, what the three columns are,
@@ -2910,13 +3122,39 @@ def build(has_audio: bool, repo_url: str | None = None,
         # would otherwise find contradicting each other nine screens apart, and the
         # consent disclosure, which is not a footnote anywhere.
         #
+        # Two quantities, named separately, because they are two different sets and this
+        # sentence spent a week asserting they were one.
+        #
+        # It read "has placed 12 calls against CALL-E in total and the money is computed
+        # over all of them". Twelve is `counts.calls` out of `recorded-calls.json`, which
+        # is the money denominator and is frozen. It was also the total on 2026-09-04, and
+        # twelve more calls were placed on 2026-09-11, so "in total" went false and
+        # nothing noticed: the gate on this sentence asserted the total EQUALS the money
+        # denominator, which is the one relationship that had stopped holding. A green
+        # gate enforcing the falsehood it was written to prevent.
+        #
+        # Neither figure here is the number of calls placed: the two sets overlap on
+        # eight, so twenty-four distinct calls have been placed, and `_recorded_call_total`
+        # works that out where the reconciliation belongs. Twenty-four is not derivable
+        # from anything committed, so the sentence claims no total at all. It names what
+        # each figure counts, and both are derived.
+        #
+        # The reconciliation is in that docstring and not here on purpose. It turns on
+        # which identifier the two sources share, and `test_privacy.py` greps this
+        # function from `def build(` onward for a read of either embedded id field with no
+        # `mask_id` on the same line, to prove no whole identifier reaches the page. A grep
+        # cannot tell a comment from code, so an earlier draft of this comment named the
+        # field and failed that gate. It was right to: the cheap check is the one that
+        # ships, and the field is described in words everywhere near this sentence.
+        #
         # Two tests read this sentence by regular expression, for the count of rows and
-        # for the total, so both phrasings are load-bearing and neither may be tidied:
-        # see `tests/test_page_prose_counts.py`.
+        # for the two figures, so all three phrasings are load-bearing and none may be
+        # tidied: see `tests/test_page_prose_counts.py`.
         f'<p class=hero-foot>{_spelled(len(lanes_shown)).capitalize()} calls above, '
-        'played from their own recordings. This '
-        f'software has placed {_recorded_call_total()} calls against CALL-E in total and '
-        'the money is computed over all of them; '
+        'played from their own recordings. This page publishes '
+        f'{_published_call_total()} calls, each with its transcript, and the money is '
+        f'computed over the {_recorded_call_total()} pooled in '
+        '<code>evidence/recorded-calls.json</code>; '
         f'<a href="#act-02">act 02</a> holds both conversations in full. The recordings '
         'are held outside this repository. Every call went to the author’s own line, '
         'scripted and consented, and the pupil names are fictional. '
@@ -2948,18 +3186,23 @@ def build(has_audio: bool, repo_url: str | None = None,
         # than been handed it before the argument.
         topline_markup(next((d for name, d in recs if name.startswith("06-")), {})),
         one_minute_markup(next((d for name, d in recs if name.startswith("06-")), {})),
-        path_markup(),
+        path_markup(data),
         FOLD_OPEN,
         '<div class=split><div class=claim>',
         '<div class=act-num>01</div><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
         '<p>An unanswered absence message is not information. It is an absence of '
         'information, and it looks identical whether the child is at home with a fever or '
         'never arrived anywhere.</p>',
+        # Every value in this paragraph is read out of the call the page opened on. It was
+        # written for S-3103, and it kept that call's daughter, her school bus and the
+        # classroom her parent asked the office to check for as long as S-3127 had been the
+        # hero, one screen under a card playing a different conversation.
         '<p>The call above is the second kind. At '
-        f'{cue + 5} seconds a parent learns from a robot that their daughter is not at '
-        'school, having put her on the school bus at half past seven. They ask the '
-        'office to go and check the classroom. The platform filed the call as a '
-        'transport absence with the parent aware of it.</p>',
+        f'{cue + 5} seconds a parent tells a robot that their son left the house on his '
+        'bike with a friend, and that something is wrong. They had just asked it whether he '
+        'was missing from the class, and been told that he was. The reason for the absence '
+        f'came back <b>{hero_why}</b>, and <code>parent_confirmed_aware</code> came back '
+        f'<b>{hero_aware}</b>.</p>',
         # Not written for this page. This is what the program prints at the head of its
         # own escalation queue, and it was sitting nine screens below here, in terminal
         # text, as the last thing a reader met. A reader called it the strongest
@@ -3010,15 +3253,24 @@ def build(has_audio: bool, repo_url: str | None = None,
 
     # ---- Act 2: the same call, both languages
     #
-    # Scene 2. The hero call again, beside its own Tamil twin, both running from the same
-    # moment. The English one is 59.54 seconds and the Tamil one is 109.98, so the two
-    # waveforms are visibly different lengths and settle at different times, which is the
-    # argument: the conversation is not the same, and the three fields underneath it are.
+    # Scene 2. One scenario performed twice, once in each language, both lanes running from
+    # the same moment. It is not the call act 00 opened on: that call has no Tamil twin,
+    # because it was placed a week after the locale experiment. The English one is 59.54
+    # seconds and the Tamil one is 109.98, so the two waveforms are visibly different
+    # lengths and settle at different times, which is the argument: the conversation is not
+    # the same, and the fields underneath it are.
     en, ta = "S-4105", "S-4106"
     pair = next(q for q in data["pairs"] if q["en"] == en)
+    same_here, of_here = pair_agreement(data, pair)
     body = [
         '<div class=act-num>02</div><h2 id=h-02>Same call. Whichever language the family speaks.</h2>',
-        '<p class=eyebrow>The call from the first screen, beside the same call in Tamil</p>',
+        # What the act establishes, before the figure and the two lanes that establish it.
+        # It carries no count: the line under the lanes states the field agreement and the
+        # fold below states the comparison family, so a number here would be the third
+        # statement of one of them. The eyebrow under this is the figure's own label.
+        '<p class=lede>One scenario, performed once in English and once in Tamil. The two '
+        'conversations are not the same; what the platform returned for them is.</p>',
+        '<p class=eyebrow>The missing-child scenario, in English beside Tamil</p>',
         # ---- SHOWCASE INSERTION POINT ------------------------------------------------
         # The figure below is owned by tools/site/showcase.py and tools/site/showcase.css.
         # This file loads it and places it; it does not know how it is drawn. The seam is
@@ -3026,18 +3278,23 @@ def build(has_audio: bool, repo_url: str | None = None,
         # ------------------------------------------------------------------------------
         showcase_figure(),
         duet_markup(data, en, ta, has_audio),
+        # Counted over the committed field list rather than read off the pair, which said
+        # three of three while the lanes directly above this sentence drew four rows.
         f'<p class=duet-line>Different words, different lengths, '
-        f'<b>{pair["agree"]} of {pair["of"]}</b> fields identical.</p>',
+        f'<b>{same_here} of {of_here}</b> fields identical.</p>',
+        # One statement of this, not two. The same sentence was the paragraph below and the
+        # pull-quote beside it, four lines apart, so a reader met it twice on one screen
+        # and the page looked like it was insisting.
         '<p class=dim>There is no Tamil-specific code in this app. Language is one column '
         'in the work file and one string in the request.</p>',
-        # Lifted from the sentence directly above it, word for word.
-        pull("There is no Tamil-specific code in this app."),
-        '<details class=fold><summary>All twelve comparisons, counted before the phone '
-        f'rang: {agree} of {total} matched</summary>',
-        '<p>Four scenarios, each performed twice, three enumerated fields per pair. The '
-        'count was committed before any call was placed, so it could not be chosen '
-        'afterwards. All three mismatches are the speaker saying different things in the '
-        'two calls, which a person recalling their own script from memory will do.</p>',
+        f'<details class=fold><summary>All {_spelled(total)} comparisons, counted before '
+        f'the phone rang: {agree} of {total} matched</summary>',
+        f'<p>{_spelled(len(data["pairs"])).capitalize()} scenarios, each performed twice, '
+        f'{_spelled(len(data["fieldOrder"]))} enumerated fields per pair. The family was '
+        'committed before any call was placed, so which comparisons get reported could not '
+        f'be chosen afterwards. All {_spelled(total - agree)} mismatches are the speaker '
+        'saying different things in the two calls, which a person recalling their own '
+        'script from memory will do.</p>',
         '<table class=pairs>'
         '<caption class=visually-hidden>Each scenario performed once in English and once in Tamil, with whether the two calls agreed on every enumerated field.</caption>'
         '<thead><tr><th scope=col>scenario</th><th scope=col>en-IN</th>'
@@ -3048,11 +3305,12 @@ def build(has_audio: bool, repo_url: str | None = None,
     # list's append, and then joined the last pair's keys instead: a 16 byte index.html
     # that raised nothing.
     for row in data["pairs"]:
-        cls = "ok" if row["agree"] == row["of"] else "part"
+        same, of_row = pair_agreement(data, row)
+        cls = "ok" if same == of_row else "part"
         body.append(f'<tr><td>{esc(row["label"])}</td>'
                     f'<td class=mono>{esc(row["en"])}</td>'
                     f'<td class=mono>{esc(row["ta"])}</td>'
-                    f'<td class="agree {cls}">{row["agree"]}/{row["of"]}</td></tr>')
+                    f'<td class="agree {cls}">{same}/{of_row}</td></tr>')
     body.append('</tbody></table></details>')
     add(act("02", "Both languages", "".join(body), "act-2"))
 
@@ -3071,15 +3329,20 @@ def build(has_audio: bool, repo_url: str | None = None,
                    'this distinction from collapsing back into two.</p>'),
         '<div class=act-num>03</div><h2 id=h-03>The third ending is the one everyone gets wrong.</h2>',
         three_endings_figure(),
-        '<p class=eyebrow>The same call, filed three ways</p>',
+        '<p class=eyebrow>One call. Three filings. Three different coverage numbers.</p>',
         endings_markup(data, en, run),
         # The pull moves above the fold and the note it quotes moves below it. It is the
         # one sentence in this act a reader has to leave with, and an act that ends on a
         # closed disclosure needs its last visible line to be that sentence.
         '<p class=hard>An automated dialler with no safeguarding triage does not close '
         'cases. It closes the only record that a case existed.</p>',
-        '<p class=hard>CALL-E filed a missing child as a routine transport absence. So did '
-        'this software, until 2026-09-11.</p>',
+        # One of this entry's headline claims, and it had drifted off the call that earns
+        # it. The panel above renders S-4105, whose fields are `no` and `unknown`, and the
+        # filing this sentence describes belongs to S-3103. So the sentence names it, reads
+        # the category out of its record, and says what a reader can and cannot reach of
+        # it: the transcript is in this page's own call data with the school it names
+        # replaced, and no control on this page plays the recording.
+        filed_markup(calls),
         pull("This app made the first mistake itself."),
         FOLD_OPEN,
         queue_markup(run),
@@ -3129,12 +3392,17 @@ def build(has_audio: bool, repo_url: str | None = None,
         # separate comments about that table's min-content width fighting a 616px column.
         '<div class=band>',
         '<div class=act-num>04</div><h2 id=h-04>Check us against CALL-E&#8217;s own billing.</h2>',
-        '<p class=lede>The API returns one identifier and the dashboard is keyed on another. Both are '
-        'here, shortened at both ends, alongside the structured answer each call brought '
-        'back, so CALL-E can match any row to their own records, which is a source with no '
-        'stake in these claims. A reader who is not CALL-E can check the count rather than '
-        'the rows: it is committed in <code>evidence/recorded-calls.json</code>, and the '
-        'note below says why the identifiers are cut.</p>',
+        # Leads with what the act establishes rather than with the mechanics of it. A
+        # buyer opening this act wants to know the figures can be checked against somebody
+        # with no stake in them; how the two identifiers differ is the second question,
+        # and it was the first three lines of a 35-word sentence.
+        '<p class=lede>CALL-E can match every row here against their own records, and '
+        'they have no stake in these claims. The API returns one call identifier and the '
+        'billing dashboard is keyed on another, so both are here, shortened at both ends, '
+        'beside the structured answer each call brought back. A reader who is not CALL-E '
+        'can check the count instead: it is committed in '
+        '<code>evidence/recorded-calls.json</code>, and a note below says why the '
+        'identifiers are cut.</p>',
         '</div>',
         # The numbers second, directly under the headline that invites the check. This is
         # the only act a buyer opens the page for and it used to be the part they reached
@@ -3244,9 +3512,9 @@ def build(has_audio: bool, repo_url: str | None = None,
         'notices. Every one was reverted and the suite returned to green. The number beside '
         'a row is how many tests failed while the change was in.</p>',
         '<div class=note>Number 18 found a live defect rather than confirming a rule. '
-        '<code>reached_production_api</code> was computed from the configured base URL alone, '
-        'so a run whose every attempt died at the transport layer would still have published '
-        'that it reached production.</div>',
+        '<code>reached_production_api</code> was computed from the configured base URL '
+        'alone. A run whose every attempt died at the transport layer would still have '
+        'published that it reached production.</div>',
         mutation_distribution(muts),
         '</div><div class=artifact>',
         FOLD_OPEN,
@@ -3325,9 +3593,14 @@ def build(has_audio: bool, repo_url: str | None = None,
         # Counted, like the card below it and the counter three acts above it. This margin
         # note was the third place on one page that stated the size of the same table, and
         # the only one still saying eighteen.
+        # The pointer, and nothing else. It used to read "{len(_muts)} deliberate changes
+        # and the tests that caught each one", which is the first sentence of the card
+        # beside it. Below 72rem the margin falls into flow directly above that card, so a
+        # reader met the same sentence twice in two lines. The count stays, because a
+        # margin note stating a table's size is the cross-reference; the description of
+        # what the rows are goes once, on the card.
         marginalia("Shown in act 05",
-                   f'<p>The <a href="#act-05">mutation table</a> is {len(_muts)} deliberate '
-                   f'changes and the tests that caught each one.</p>'),
+                   f'<p>The table is <a href="#act-05">act 05</a>, {len(_muts)} rows.</p>'),
         '<div class=act-num>06</div><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
         '<div class=plate-royal><div class=takes>',
     ]
@@ -3346,8 +3619,8 @@ def build(has_audio: bool, repo_url: str | None = None,
         # `calle_double/regions.py` before finding it here stops trusting the other four.
         ("CALL-E offers English and no other language in the United States. Every figure "
          "priced on this page is American, and the language column cannot be delivered to "
-         "a United States number today. The twelve real calls went to Indian numbers, "
-         "where Tamil and Hindi are available.",
+         "a United States number today. Every call this project has placed went to an "
+         "Indian number, where Tamil and Hindi are available.",
          "Nothing in this app changes it. Run "
          "`python -m firstbell --work-file examples/absences-oneroster.csv` and "
          "the second row prints the refusal in the platform's own words. Until it changes, "
@@ -3387,10 +3660,13 @@ def build(has_audio: bool, repo_url: str | None = None,
                        'three of these belong to the platform.</p>'),
             '<div class="split split-long"><div class=claim>',
             '<div class=act-num>07</div><h2 id=h-07>What is not true.</h2>',
+            # Both halves of the second sentence were already in the margin note two
+            # lines above: "three of these belong to the platform" and, as the note's
+            # first sentence, the argument for reporting them at all. Below 72rem the
+            # note falls into flow directly above this paragraph, so the act opened by
+            # making one point twice. What is left is what only this line says.
             f'<p>{_spelled(len(limits)).capitalize()} limits, each with what would '
-            'close it. Three of them are the platform’s and are reported here without '
-            'complaint, because a limit you can read is worth more than a claim you '
-            'cannot check.</p>',
+            'close it, reported here without complaint.</p>',
             '</div><div class=artifact>', FOLD_OPEN, '<ul class=limits>']
     # `esc_code` and not `esc`. These two strings carry commands a reader is meant to run,
     # and under plain `esc` the markup around them was escaped, so act 07 shipped a literal
@@ -3410,14 +3686,19 @@ def build(has_audio: bool, repo_url: str | None = None,
 
     # ---- Act 8: close
     body = [
+        # The note carries the conclusion and the paragraph carries the mechanism. They
+        # used to carry both, in the same order, two lines apart: "the local double is an
+        # httpx transport, so the offline path runs the same SDK code the live one does"
+        # and "the local double is mounted as an httpx transport underneath a real
+        # CalleClient, so the offline path exercises the same SDK code as the live one".
+        # One claim, stated twice, at the top of the act asking a reader to run something.
         marginalia("No account needed",
-                   '<p>The local double is an <code>httpx</code> transport, so the offline '
-                   'path runs the same SDK code the live one does. Nothing here places a '
-                   'telephone call.</p>'),
+                   '<p>The offline path runs the same SDK code the live one does. Nothing '
+                   'here places a telephone call.</p>'),
         '<div class=act-num>08</div><h2 id=h-08>Run the whole thing with no account.</h2>',
-        '<p>No API key, no signup, no telephone call. The local double is mounted as an '
-        '<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so '
-        'the offline path exercises the same SDK code as the live one.</p>',
+        '<p>No API key, no signup. The local double is mounted as an '
+        '<code>httpx</code> transport underneath a real '
+        '<code>calle.CalleClient</code>.</p>',
         # The directory, because neither line runs from the root of a fresh clone and
         # the page said nothing about where to be. The same defect the take-away card had,
         # on the command this act is named after.
@@ -3474,14 +3755,21 @@ def build(has_audio: bool, repo_url: str | None = None,
     # above it ends on rather than 144px past it.
     add('<footer><div class="inner inner-margin"><div class=plate-royal>'
         f'<p>Built from <code>{build_commit()}</code> on {build_date()} by '
+        # "rather than being told" was in two consecutive sentences. The second one is the
+        # restatement: a reader who can compare the commit to the branch tip is already
+        # not being told.
         '<code>tools/judge_page.py</code>, which reads the numbers rather than being told '
         'them. If that commit is not the tip of the branch, this page is behind it, and '
-        'you can see that for yourself rather than being told. Contrast is measured by '
-        '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
-        'so that an unmeasured pair cannot read as a pass.</p>'
+        'you can check that yourself. Contrast is measured by '
+        '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure, '
+        'so an unmeasured pair cannot read as a pass.</p>'
         + video_link_markup(video_url) + repo_link_markup(repo_url)
         + '</div></div></footer>')
 
+    # `app.js` reads this to decide per call whether a recording exists. Audio presence used
+    # to be one flag for the whole page, which cannot express four transcripts shipping
+    # without their audio.
+    data = dict(data, clips=sorted(CLIPS))
     add(f'<script id=call-data type=application/json>{script_json(data)}</script>')
     add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
         f'crossorigin=anonymous defer></script>')
@@ -3535,7 +3823,7 @@ def main() -> int:
     # something with the real-call sections quietly missing would put a page in front of a
     # reader that looks complete and is not, which is the failure this whole project is
     # about. So it says what is missing and stops.
-    global RECEIPTS
+    global RECEIPTS, CLIPS
     if not args.receipts:
         print(TROUBLE)
         return 3
@@ -3552,6 +3840,12 @@ def main() -> int:
 
     audio = Path(args.audio_dir).resolve() if args.audio_dir else None
     clips: list[Path] = sorted(audio.glob("*.m4a")) if audio and audio.is_dir() else []
+    withheld = sorted(c.stem for c in clips if c.stem in WITHHELD_AUDIO)
+    clips = [c for c in clips if c.stem not in WITHHELD_AUDIO]
+    CLIPS = frozenset(c.stem for c in clips)
+    if withheld:
+        print(f"audio withheld: {len(withheld)} clips ({', '.join(withheld)}), "
+              "transcripts still published")
     if audio and not clips:
         print(f"--audio-dir {audio} holds no .m4a files; building the no-audio page")
     has_audio = bool(clips)
@@ -3561,6 +3855,14 @@ def main() -> int:
         dest.mkdir(exist_ok=True)
         for clip in clips:
             shutil.copy2(clip, dest / clip.name)
+        # An earlier build of this page copied every clip it found, so a withheld one can
+        # already be sitting in the output directory waiting to be uploaded again. Skipping
+        # the copy is not enough; the file has to go.
+        for stem in WITHHELD_AUDIO:
+            stale = dest / f"{stem}.m4a"
+            if stale.exists():
+                stale.unlink()
+                print(f"audio removed from a previous build: {stale.name}")
 
     # There is no video input, on purpose. A recorded screen capture is the same clip that
     # sits on a video platform, and reposting it here would make this page a second place to
@@ -3587,7 +3889,7 @@ def main() -> int:
         pass
 
     page = out / "index.html"
-    markup = build(has_audio, args.repo_url, args.video_url)
+    markup = build(has_audio, args.repo_url, args.video_url, [c.stem for c in clips] if clips else None)
     page.write_text(markup, encoding="utf-8", newline="\n")
 
     # Every document in `doc_pages.PUBLISHED`, rendered rather than retyped, in the page's

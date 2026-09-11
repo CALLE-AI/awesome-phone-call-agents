@@ -3,7 +3,7 @@
 Act 07 shows CALL-E refusing Spanish, and the refusal comes from `calle_double`, which
 raises `unsupported_language` out of the region table transcribed from CALL-E's own
 published "Supported regions and languages" list. A reader reproduces it offline with no
-account. The twelve real calls went to Indian numbers, in English and Tamil.
+account. Every real call this entry has placed went to Indian numbers, in English and Tamil.
 
 This gate exists because the sentence "act 07 shows the platform refusing Spanish on a real
 run" was proposed by a reviewer, accepted, written into the page and the README, and only
@@ -132,5 +132,6 @@ def test_nothing_claims_a_real_call_was_placed_in_spanish():
         + "\n  ".join(claiming)
         + "\n\nThe refusal in act 07 is produced by calle_double from the region table "
         "transcribed out of CALL-E's published list, which is why a reader can reproduce it "
-        "with no account. The twelve real calls went to Indian numbers. Say what the run "
+        "with no account. Every real call this entry has placed went to Indian numbers. Say "
+        "what the run "
         "does, or place the call.")

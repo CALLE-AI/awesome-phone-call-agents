@@ -640,7 +640,7 @@ async function mount(THREE) {
     const forHeight = size.y / 2 / Math.tan(vFov / 2);
     const forWidth = spread / 2 / Math.tan(vFov / 2) / camera.aspect;
     const dist = Math.max(forHeight, forWidth) * 1.06;
-    camera.position.set(mid.x, mid.y + dist * 0.62, mid.z + dist * 0.86);
+    camera.position.set(mid.x, mid.y + dist * 0.82, mid.z + dist * 0.72);
     camera.lookAt(mid.x, mid.y, mid.z);
     camera.updateProjectionMatrix();
   };
@@ -971,7 +971,7 @@ async function mountCutoff(THREE) {
     const spread = Math.hypot(size.x, size.z);
     const dist = Math.max(size.y / 2 / Math.tan(vFov / 2),
                           spread / 2 / Math.tan(vFov / 2) / camera.aspect) * 1.12;
-    camera.position.set(c.x, c.y + dist * 0.42, c.z + dist * 0.92);
+    camera.position.set(c.x, c.y + dist * 0.68, c.z + dist * 0.78);
     camera.lookAt(c.x, c.y, c.z);
     camera.updateProjectionMatrix();
   };

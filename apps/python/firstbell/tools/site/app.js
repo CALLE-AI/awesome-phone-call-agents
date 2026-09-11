@@ -25,6 +25,12 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DESKTOP = matchMedia('(min-width: 60rem)').matches;
 const DATA = JSON.parse(document.getElementById('call-data').textContent);
 const AUDIO = document.documentElement.dataset.audio === 'present' ? 'audio' : null;
+// Which calls have a published recording. Audio presence used to be one flag for the
+// whole page, which is wrong now that four transcripts ship without their audio: a
+// single flag renders a play button for a clip the build deliberately did not copy.
+// The build writes the list, so the page can never disagree with the directory.
+const CLIPS = new Set(DATA.clips || []);
+const clipBase = (id) => (AUDIO && (CLIPS.size === 0 || CLIPS.has(id)) ? AUDIO : null);
 
 const players = [];
 
@@ -50,7 +56,16 @@ function startScroll() {
       const target = document.querySelector(href);
       if (!target) return;
       e.preventDefault();
-      lenis.scrollTo(target, { offset: -64 });
+      // A duration and an easing, not the instance lerp. `scrollTo` with neither falls
+      // back to `lerp: 0.1`, which is an asymptotic approach: it covers most of the
+      // distance quickly and then crawls at the target without ever quite arriving. Over
+      // the jumps this page offers, nine acts apart, that reads as the page dragging
+      // rather than navigating. A bounded tween arrives, and a reader can tell it has.
+      lenis.scrollTo(target, {
+        offset: -76,
+        duration: 0.7,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      });
       // The hash never moved, so the address bar could not be copied or shared and the
       // back button had nothing to go back to.
       if (history.pushState) history.pushState(null, '', href);
@@ -353,7 +368,7 @@ function wirePlayers() {
     const commits = (root.dataset.commits || '')
       .split(',').filter(Boolean).map(Number);
     players.push(new CallPlayer(root, DATA.calls, {
-      ids, start: ids[0], cueAt: Number(root.dataset.cue || 0), audioBase: AUDIO,
+      ids, start: ids[0], cueAt: Number(root.dataset.cue || 0), audioBase: clipBase(ids[0]),
       onTurn: paintRail, commits, onScene: onSceneState,
     }));
   }
@@ -774,7 +789,9 @@ function wireCallscope() {
       const label = btn.querySelector('[data-play-label]');
       if (label) label.textContent = btn.dataset.wordsPause;
       btn.setAttribute('aria-label', btn.dataset.wordsPause);
-      audio.src = `${AUDIO}/${id}.m4a`;
+      const base = clipBase(id);
+      if (!base) return;
+      audio.src = `${base}/${id}.m4a`;
       place(card, 0, len);
       const tick = () => {
         place(card, audio.currentTime, len);

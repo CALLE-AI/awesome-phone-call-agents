@@ -3,7 +3,8 @@
 A measurement log, taken 2026-09-10 and 2026-09-11 against `api.heycall-e.com` from the
 firstbell dialler. It is the companion to [`call-e-feedback.md`](call-e-feedback.md),
 which is the defect register and stays the place a numbered defect lives. This file holds
-the numbers behind three of them and two that were not previously known.
+the numbers behind three of them, and the findings in §4, §6, §7, §8 and §9, which that
+register does not carry.
 
 Everything here was recorded by `dispatch/trace.py`, which times each HTTP round trip at
 the transport and records every status a call is observed to pass through. It exists
@@ -19,24 +20,45 @@ illness, safeguarding, mid-sentence interruption, background noise, an evasive r
 and an unanswered call. Every call went to the author's own line, with consent recorded,
 with the author present, which is the same basis every call this project has ever placed.
 
-The run did not finish. Six calls were placed, four connected, and the account then became
-unable to place another (§4). Ten scenarios are outstanding.
+The first session did not finish. Six calls were placed, four connected, and the account
+then became unable to place another (§4). A second session the same afternoon placed
+thirteen more on the same account and the same route; eight connected, five failed, and not
+one create was refused, so the block of the night before did not recur. Between them, and
+with the eight calls of the 2026-09-04 locale experiment, twenty live calls are now
+published: fourteen `en-IN`, six `ta-IN`, 1,435 seconds of recording and 370 transcript
+turns, counted off the transcript file the receipts carry. The second session reached the
+Tamil-English code-switching pair the first never got to, and that pair produced the
+strongest finding in this document (§7). Interruption, background noise and an evasive
+relative appear in neither session.
 
 ```
-placed        6      252 credits ($2.52); the two that failed were not billed (§7)
+first session, creates 00:08:00 to 00:28:57
+
+placed        6      252 credits ($2.52); the two that failed were not billed (§10)
 connected     4      illness, medical appointment, and two safeguarding scenarios
 failed        2      one SIP 500, one SIP 480, both zero duration
-rejected      10     HTTP 429, no call_id, never dialled, not billed
+rejected      33     HTTP 429, no call_id, never dialled, not billed (§4)
+
+second session, creates 15:20:26 to 18:25:39
+
+placed        13     the dashboard was not read again, so no credit figure is stated
+connected     8      two of them `ta-IN` (§7), one with a one-way audio leg (§8)
+failed        5      three SIP 480 and two that did not connect, the last three in a row
+rejected      0      no create was refused, so the concurrency block did not recur
 ```
 
+The credits above are the first session's. The dashboard reading behind §10 was taken after
+it and has not been repeated, so what the second session spent is not in this repository
+and this report puts no number on it.
+
 Sample sizes are small and are stated on every number below. Nothing here is offered as a
-service-level characterisation of CALL-E; it is one account, one evening, one route to
-India.
+service-level characterisation of CALL-E; it is one account, two sessions on one day, one
+route to India.
 
 ## 1. Request latency
 
-Measured at the transport, wall clock from request sent to response received, over 514
-requests.
+Measured at the transport, wall clock from request sent to response received, over the
+first session's 514 requests.
 
 | Endpoint | n | min | median | mean | p95 | max |
 |---|---|---|---|---|---|---|
@@ -63,10 +85,10 @@ first of those for a different reason.
 
 ## 2. Rate limiting arrives with no way to back off
 
-Seventeen responses came back **HTTP 429**. Not one carried `Retry-After`,
-`X-RateLimit-Limit`, `X-RateLimit-Remaining` or `X-RateLimit-Reset`. The trace records an
-allowlist of those header names at the transport, before the SDK sees the response, so
-this is not the SDK dropping them: the server does not send them.
+Seventeen responses in the first session came back **HTTP 429**. Not one carried
+`Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` or `X-RateLimit-Reset`. The
+trace records an allowlist of those header names at the transport, before the SDK sees the
+response, so this is not the SDK dropping them: the server does not send them.
 
 ```
 responses:            491 x 200,  6 x 201,  17 x 429
@@ -83,23 +105,39 @@ then 45, then 120, and was wrong every time.
 
 ## 3. The status machine has two states, not five
 
-Twelve transitions were observed across six placed calls. Every one of them was one of:
+Forty status observations were recorded across every call this project has placed with the
+trace running: six creates in the first session, one probe create at 14:30:54 that showed
+the concurrency block had cleared (§4), and thirteen in the second session. The denominator
+is distinct `call_id` values across the fifteen trace files, twenty of them, and no id
+appears in two files. A raw count of status records over everything else the workshop holds
+comes out higher, because the receipts carry recipient and attempt statuses as well as call
+ones. Twenty of the forty are the first status a create was seen in, and every one of those
+was `queued`. The other twenty are that call's only other transition, and every one of them
+was one of:
 
 ```
 queued -> completed
 queued -> failed
 ```
 
-No call was ever observed in `ringing`, `in_progress`, `answered` or anything between
-acceptance and outcome, at an effective sampling interval of about one second on calls
-lasting tens of seconds. Either those states do not exist or they are not exposed.
+The documented `CallStatus` set has five values: `queued`, `in_progress`, `completed`,
+`failed` and `canceled`. Three of them were ever seen. **`in_progress` and `canceled` are
+documented statuses that no call has ever reached**, across those twenty production
+creates. Nineteen of them were polled at a requested interval of 0.5 seconds, which §1
+explains arrives as an effective second or more, and the probe create was polled every two
+seconds. Twelve of the twenty ran for between 31 and 196 seconds, and nothing was ever
+observed between acceptance and outcome. Either the two states do not exist behind the API
+or they are not exposed. `dispatch/trace.py` says in its own docstring that it exists
+partly to measure how long a call takes to reach `in_progress`, and the answer is that the
+transition does not occur.
 
 The consequence is that **a caller cannot tell a ringing phone from a connected one**. An
 attendance office watching a queue of calls has exactly two things it can display, "sent"
 and "done", and the forty seconds in between are a blank. That is the single change to
 this API that would most improve what can be built on it.
 
-Timing for the two calls that reached a terminal state through a full poll:
+Timing for the two calls of the first session that reached a terminal state through a full
+poll:
 
 | call | accepted | terminal | in queue |
 |---|---|---|---|
@@ -216,6 +254,17 @@ contained.
 reporting that they cannot account for their child is the opposite of a parent confirming
 they are aware of the absence, and the transcript says so in both calls.
 
+The second session reproduced it, and produced the contrast in plainer form than either row
+above. `S-3127` is the bicycle scenario dialled again. At its fifteenth turn of twenty-six,
+stamped 56 seconds into an 82-second call (§9 on what that stamp is worth), the parent asks
+**"Is he missing from the class?"**. The next two turns are the machine's: "Yes," and then
+the attendance record read back. The call ran another 26 seconds, and the structured result
+it returned recorded `parent_confirmed_aware: yes`, `reason_category: unknown`,
+`expected_return: unknown`. The machine had the alarm in words, in its own answer, and
+carried none of it into the fields. `S-3128`, the bus scenario dialled again, came back
+`parent_confirmed_aware: no`, which is the only one of the four that the old rule would not
+have closed on that field alone.
+
 This is a defect on CALL-E's side and a lesson on ours, and both are worth stating.
 
 On CALL-E's side, the field name is a question about the parent's knowledge and the model
@@ -236,10 +285,204 @@ of those twelve calls out of the closed pile, which lowers the desk time this pr
 claim to remove and is published in that direction rather than tuned away. It was found by
 placing real calls, which is the argument for placing them.
 
-## 7. Billing: the flat price is gone, and the failures are not charged
+## 7. The Tamil the agent generates is not Tamil, and the Tamil it hears is
 
-The dashboard was read after this run, on 2026-09-11, which settles every question the
-previous version of this section left open and raises a larger one.
+Two calls in the second session were placed in `ta-IN` against a Tamil-English
+code-switching script. Together they separate a defect that neither could have settled
+alone: what CALL-E hears is right and what it says is not.
+
+**`S-3119` is the control, and the control is the finding.** An illness scenario: twenty
+turns, six of them the caller's, 897 Tamil-script characters. The code-mixing came back
+transcribed correctly, loanwords included, ஃபீவரா (fever), கிளீனிக் (clinic), ரெஸ்ட்
+(rest), மார்னிங்ல (in the morning), ஸ்கூலுக்கு (to school), and the structured result was
+right as well: illness, returning tomorrow, guardian confirmed. Speech recognition in
+`ta-IN` works on this account and this route. The defect below is in output generation, not
+in understanding the caller. Without this call the same evidence would read as "the model
+cannot handle Tamil", which is a different claim and a weaker one.
+
+**`S-3120` is the defect.** A missing-child scenario: fifty turns, thirty-four the agent's
+and sixteen the caller's, and the caller's sixteen are coherent and answer what was asked.
+The agent's are not Tamil.
+
+மனதரம் is not a Tamil word, and it is the word this call is mostly made of. The agent used
+it ten times in one call. The eleventh occurrence is the parent repeating it back to ask
+what it meant, which the agent then confirmed. Counted on the `speaker` field CALL-E
+returns with each turn, over the fifty turns of `S-3120`:
+
+```
+மனதரம்                 occurrences   turns carrying it
+  agent  (`bot`)                 10                10
+  parent (`user`)                 1                 1
+```
+
+The agent's ten are nine deliveries of one question and then an affirmation of it. Eight of
+the nine are "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்." verbatim, the ninth is the same
+question with a differently malformed pronoun and no second clause, and the tenth is
+"ஆமாம், மனதரம்தான்.", in the table below. The parent echoes a variant spelling in two
+further turns, so three of the caller's
+sixteen turns are spent trying to make sense of a word that does not exist. The sentence
+reads as a broken rendering of "can you hear me? I am here". Three exchanges around the
+loop matter more than the loop itself:
+
+| what the parent said | what the agent said next |
+|---|---|
+| the child took his school bag in the morning and left on his bicycle | "சரீ, அவசரம் இல்லை.", **"right, there is no hurry"** |
+| "மனதரம், மனதிடம், ஆ மனதிடம் சொல்றீங்களா?", asking what the word is | "ஆமாம், மனதரம்தான்.", **"yes, it is [manatharam]"** |
+| put me through to a human, to whichever staff is there | the broken sentence again, then "நான் காத்திருக்கிறேன்.", **"I am waiting"** |
+
+A non-word, asked about directly by the person on the phone, confirmed as the word. The
+parent said "புரியல" (I do not understand) repeatedly, asked for English, and asked five
+times, in five separate turns, whether the child was in the classroom. The agent kept
+asking for a return date, which is the narrow-remit behaviour `call-e-feedback.md` already
+reports, now observed on live audio in Tamil.
+
+The loop is not the only malformed output. Five transliterated non-words are marked across
+the two calls, counted the same way. Every one of them is the agent's, and the only caller
+occurrences anywhere in the corpus are the three echoes described above:
+
+| non-word | row | agent occurrences | agent turns |
+|---|---|---|---|
+| `manatharam` | `S-3120` | 10 | 10 |
+| `indhu` | `S-3120` | 3 | 2 |
+| `indhum` | `S-3120` | 1 | 1 |
+| `vilakappadavillai`, for விளக்கப்படவில்லை, "has not been explained" | `S-3120` | 1 | 1 |
+| `maaranam`, for காரணம், "reason" | `S-3119` | 1 | 1 |
+
+None of the five appears in any of the other eighteen published calls.
+[`tools/glosses.json`](tools/glosses.json) carries a turn-by-turn gloss of every non-Latin
+turn in the published calls, and its `_brackets` key records why those words are
+transliterated rather than glossed to their probable intent: glossing மனதரம் as "can you
+hear me" would hide the defect the call is published for.
+
+What a school would experience. The call is `completed`. The structured result is
+schema-valid: `parent_confirmed_aware=no` and every other field `unknown`. No field in the
+response reports anything about the quality of the language the agent generated, and the
+transcript is returned as text, so a caller reading the API alone cannot tell this call
+from a call that simply went nowhere. So an attendance office sees an
+undetermined call that needs a human callback, which is the same thing it sees after a bad
+line or an evasive relative, and a Tamil-speaking parent of a missing child has been told
+there is no hurry by a system that could not be understood or escaped. The call ended
+because the operator hung up. The API has no field saying who ended a call, so that is
+knowable only from the person who was on it.
+
+This is CALL-E's and not this project's. The request carries a `locale` and a script;
+everything else in the path is the same code that produced well-formed English output on
+the call placed nine minutes earlier and the correct `ta-IN` transcript of `S-3119` four
+minutes earlier. It
+also lands on firstbell's own claim to call a family in the language it speaks, so it
+publishes here as a disclosed limitation rather than as someone else's problem.
+
+**What would let a caller detect it.** Nothing currently can. A language or confidence
+figure on generated turns, rather than on transcribed ones, would be enough: a caller could
+hold a call for review instead of filing it as undetermined. Failing that, a documented
+statement of which locales are supported for generation as against transcription would let
+an integrator decline to offer one.
+
+The sample is two calls. Six `ta-IN` calls are published in total, and the gloss marks no
+non-word in the four placed on 2026-09-04. That comparison is weaker than it looks: the
+two glossing passes used different models on the same instruction (`_method` in the gloss
+file names both), so the earlier four are not a matched control, and two calls cannot say
+whether this is every Tamil call or this Tamil call.
+
+## 8. A one-way audio leg is indistinguishable from a silent parent
+
+`S-3118` connected, ran **31.0 seconds**, and returned five turns, all of them the agent's.
+The structured result came back with every field `unknown`.
+
+CALL-E records the two legs on separate channels of the recording it returns, the agent
+outbound on the left and the caller inbound on the right. That separation is the platform's
+and it is what makes this measurable per leg rather than a matter of opinion; the threshold
+below is this report's, and it is stated so the measurement can be repeated. Measured on the
+returned WAV in 100 ms frames at a threshold of -40 dBFS:
+
+```
+S-3118   outbound leg   12.3 s of audio in 8 bursts, peak  -7.7 dBFS
+         inbound leg     0.4 s of audio in 3 bursts, peak -21.5 dBFS
+```
+
+The inbound bursts are 0.1 s at 19.0 s, and 0.2 s and 0.1 s at 27.0 s, the last two landing
+directly after the agent asked whether it was speaking to a parent or guardian. The same
+measurement over the other eleven recordings of 2026-09-11 gives an inbound total between
+5.3 s (`S-3130`, 13 bursts) and 48.4 s (`S-3120`, 64 bursts), median 14.4 s, on the same
+account, the same route and the same handset.
+
+**An earlier reading of this call was wrong, and the correction is the reason the section
+is here.** That reading was that the platform returned a transcript with the caller's
+speech missing from it. The transcript is accurate. The parent's channel genuinely carried
+almost no audio, so there was almost nothing to transcribe, and the receipt's note for this
+call, that the platform returned five of its own turns and none of the parent's, describes
+what the transcript contains rather than accusing it of omitting anything.
+
+The defect is what the API does not say. A one-way audio failure and a parent who answered
+and stayed silent arrive identically: `status=completed`, a duration in the same range, a
+transcript of the agent's turns only, every extracted field `unknown`, and no signal
+anywhere in the response about the media path. Those two need opposite follow-up. A silent
+parent is a person to try again later or visit; a dead inbound leg is a fault to report,
+and the same call placed again may work. A school running this at scale cannot separate
+them without listening to every recording, which is the labour the automation exists to
+remove.
+
+Whether this call was billed is an open question. §10 establishes that the zero-duration
+failures were not charged, but this call was not zero duration and the dashboard reading
+behind §10 was taken before it. It is not verified either way here.
+
+**What would let a caller detect it.** Per-leg audio presence, or even a single flag saying
+no inbound media was received, turns this from an unexplained undetermined call into an
+actionable one. The recording carries the evidence already, so the platform holds
+everything needed to say it.
+
+## 9. A turn's stamp does not locate it in the recording
+
+Each transcript turn carries a `speaker` of `bot` or `user` and an integer
+`offset_seconds`, both of them CALL-E's values. The text is trustworthy; §7 is built on it
+and §6 quotes it. The stamps are not, and the same measurement that settled §8 shows why.
+
+Grouping each channel of the twelve recordings of 2026-09-11 into utterances, at the same
+100 ms frames and -40 dBFS threshold as §8, joining anything separated by 0.6 seconds or
+less and dropping anything shorter than 0.3 seconds:
+
+```
+caller turns reported                                       74
+caller utterances on the inbound channel                    94
+caller turns whose stamp has no inbound audio within 1 s    43
+                                        within 5 s          13
+signed stamp error, caller turns          3.8 s early to 26.0 s late, median 0.2 s late
+calls with both channels speaking at once    11 of 12, from 1.3 s to 22.4 s per call
+```
+
+The median is fine and the tail is not, which is the shape that makes a stamp unusable: a
+client cannot know which of its turns is the one that is 26 seconds out. The grouping
+parameters move the counts, and they are stated for that reason; widening the window to 5
+seconds still leaves 13 caller turns with no caller audio anywhere near them.
+
+The clearest single instance is in the exchange §6 quotes. The `user` turn stamped 56
+seconds in `S-3127` has no inbound audio between 52.9 and 58.8 seconds, and the `bot` turn
+stamped the same second has its audio at 57.5. Two turns, one stamp, and neither of them
+where the stamp says.
+
+**Two consequences, and the second is a caution against a reading this report cannot
+support.** Anything that reasons over turns by time inherits this: seeking a recording to a
+stamp, measuring who held the floor, or deciding who interrupted whom. The turn counts in
+this document, including §7's, are counts of what the platform chose to segment rather than
+of utterances, and the two differ by 74 against 94 on the caller's side alone.
+
+The second is about the speaker labels. The phrase "I didn't get that" opens three of the
+370 published turns and all three are labelled `user`, in three different calls; it appears
+on no `bot` turn anywhere in the corpus. It is also exactly the sort of phrase a machine
+says when it fails to parse a reply, and in `S-3127` it opens the same turn as the parent's
+question, at a moment when both channels carry speech for 5.5 seconds together. So a
+diarisation merge, one turn carrying a fragment from each side, is possible there and is
+**not established**. Nothing in the files decides it: the labels cannot be checked against
+the audio without a person listening to the recording, which is itself the finding worth
+acting on. A caller cannot verify a speaker label from the API, and on overlapping speech it
+should not assume one.
+
+## 10. Billing: the flat price is gone, and the failures are not charged
+
+The dashboard was read after the first session, on 2026-09-11, which settles every question
+the previous version of this section left open and raises a larger one. Every figure in this
+section is that reading. It has not been repeated since the second session, so nothing here
+covers the thirteen calls that session placed.
 
 The account is denominated in credits, and the conversion is fixed by the top-up: **+$10.00
 bought 1,000 credits** on 2026-09-09, so one credit is one cent. That rate also reconciles
@@ -249,12 +492,13 @@ credits, and 65 credits is the $0.65 recorded in
 
 ```
 available balance      783 credits
-total period cost      317 credits   = 65 (2026-09-04) + 252 (this run)
+total period cost      317 credits   = 65 (2026-09-04) + 252 (the first session)
 ```
 
 The balance closes exactly against the earlier reading. The account held 1,035 credits after
-the 2026-09-09 top-up, this run settled 252, and 1,035 − 252 = 783. Nothing is unaccounted
-for, which is worth saying because the 2026-09-04 reconciliation was not able to say it.
+the 2026-09-09 top-up, the first session settled 252, and 1,035 − 252 = 783. Nothing is
+unaccounted for, which is worth saying because the 2026-09-04 reconciliation was not able
+to say it.
 
 ### The four connected calls, and what each one cost
 
@@ -336,7 +580,9 @@ card, would make both readings unnecessary.
 
 The consequence for a caller doing this is direct and it is not in CALL-E's favour. At 5
 credits a call the desk time firstbell removes was worth several times the call. At 41 to 75
-credits it is not: on the twelve recorded calls this project publishes, the desk time removed
+credits it is not: over the twelve calls pooled in
+[`evidence/recorded-calls.json`](evidence/recorded-calls.json), which is the denominator
+that file still carries and does not yet include the second session, the desk time removed
 is worth $0.39 a call gross and $0.08 net of the safeguarding work the same run creates
 ([`tools/money_across_runs.py`](tools/money_across_runs.py)), against a call that now costs
 $0.41 to $0.75. Whether a district can run this depends on a price the platform does not
@@ -350,8 +596,12 @@ change. It is off unless `FIRSTBELL_TRACE` names a file, it records no phone num
 The transport is supplied to the SDK through `CalleClient(http_client=...)`, so nothing in
 the library is patched and the measured path is the same one a real run uses.
 
-The honest limits: one account, one evening, one destination country, six placed calls and
-491 reads. The latency distributions are usable; the failure-code table is three
-observations; §6 is two calls and needs more before it is a rate rather than a
-demonstration. The ten unrun scenarios, Tamil-English code-switching in particular, are
-the ones most likely to produce a finding this run has not.
+The honest limits: one account, two sessions on one day, one destination country, twenty
+creates and 1,512 reads, of which the latency table in §1 is the first session's 514
+requests. The latency distributions are usable; the failure-code table is three
+observations; §6 is four calls, §7 is two calls and §8 is one, and each of them needs more
+before it is a rate rather than a demonstration. §9's counts are over twelve recordings and
+74 caller turns, which is enough to say the stamps are unreliable and not enough to say why.
+Every call went to one handset on one route, which is the limit that matters most for §8.
+Interruption, background noise and an evasive relative are still unrun, and they are the scenarios most likely to produce a
+finding these two sessions have not.

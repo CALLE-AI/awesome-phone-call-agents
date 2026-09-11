@@ -15,6 +15,7 @@ that are deliberately outside this repository. That skip is declared in
 """
 from __future__ import annotations
 
+import html
 import json
 import re
 from pathlib import Path
@@ -27,6 +28,7 @@ PAGE = APP / "out" / "index.html"
 WORD = {
     "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
     "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
 }
 
 
@@ -76,30 +78,93 @@ def test_the_hero_counts_the_calls_the_first_screen_actually_plays():
     )
 
 
-def test_the_hero_names_the_same_call_total_as_the_evidence():
-    """The first screen said four and the rest of the entry said twelve.
+def test_the_hero_separates_the_calls_it_publishes_from_the_money_denominator():
+    """Two quantities in one sentence, and this gate holds the relationship, not a value.
 
-    Both were true and the page never said so, which is the harder kind of contradiction
-    to find: a reader carrying the first number down nine screens finds the second one and
-    has no way to tell which is the claim. The hero now names the total as well as the
-    rows, and the total is checked against `evidence/recorded-calls.json`, which is where
-    every other surface reads it from.
+    It used to assert that the hero's "in total" figure EQUALS `counts.calls`. Those were
+    the same number the day it was written. Twelve more calls were placed on 2026-09-11
+    and the pool was deliberately not recomputed, because the cost model is frozen on the
+    original twelve, so "has placed 12 calls against CALL-E in total" went false on the
+    first screen and this gate stayed green while enforcing it. A gate asserting the one
+    relationship that had stopped holding is worse than no gate: the page carried a false
+    claim with a passing test beside it, which is the defect the whole entry is about.
+
+    So it checks three things, none of them a literal count:
+
+      the published figure is the number of calls the page actually carries, counted off
+      the `call-data` island the page is built from rather than off a receipt, because the
+      receipts are held outside this repository and a clean checkout has to be able to run
+      this;
+
+      the money figure is `counts.calls`, which is the frozen denominator; and
+
+      when the two differ, no sentence claims the money covers everything placed. That is
+      the clause that went false, and it is the one a reword would put back.
+
+    Neither figure is the number of calls placed. Counting by `apiId`, the only identifier
+    the receipts and `transcripts.json` share, the two sets hold twelve and twenty and
+    overlap on eight, so twenty-four distinct calls have been placed. Twenty-four is not
+    derivable from anything committed, so the page claims no total and this gate does not
+    invent one.
     """
-    import json
-
     page = _page()
-    total = json.loads(
+
+    island = re.search(
+        r"<script id=call-data type=application/json>(.*?)</script>", page, re.S)
+    assert island, (
+        "the call data island is gone, so there is nothing to count the published figure "
+        "against and this gate would be checking a number against itself")
+    published = len(json.loads(island.group(1))["calls"])
+
+    shown = re.search(r"This page publishes (\d+) calls", page)
+    assert shown, (
+        "the first screen no longer says how many calls it publishes. It is the figure a "
+        "reader compares against the player controls in front of them")
+    assert int(shown.group(1)) == published, (
+        f"the first screen says it publishes {shown.group(1)} calls and the page carries "
+        f"{published}")
+
+    pooled = json.loads(
         (APP / "evidence" / "recorded-calls.json").read_text(encoding="utf-8")
     )["counts"]["calls"]
-    claim = re.search(r"has placed (\d+) calls against CALL-E in total", page)
-    assert claim, (
-        "the first screen no longer names the total number of calls this software has "
-        "placed, which is the number every other surface uses"
-    )
-    assert int(claim.group(1)) == total, (
-        f"the first screen says {claim.group(1)} calls and the committed counts say "
-        f"{total}"
-    )
+
+    money = re.search(r"money is computed over the (\d+) pooled in", page)
+    assert money, (
+        "the first screen no longer names the denominator the money is computed over, so "
+        "a reader takes the published count for it, which is the contradiction this "
+        "sentence was rewritten to remove")
+    assert int(money.group(1)) == pooled, (
+        f"the first screen says the money is computed over {money.group(1)} calls and "
+        f"evidence/recorded-calls.json pools {pooled}")
+
+    if published != pooled:
+        # Scoped the way `test_real_call_denominator.py` scopes the same page, and for the
+        # reason its docstring records. The first version of this check split the stripped
+        # page on full stops, and caught two things it should not have. The mutation table
+        # is rendered on this page and its cells carry no terminator, so the whole tbody
+        # flattened into one 6,000 word "sentence" holding both halves of the pattern; it
+        # is also a catalogue of sentences this repository refuses, so matching it is
+        # matching the ledger rather than a claim. And a block element with no full stop
+        # joined the block after it, which is how a neighbouring cell gets to excuse a
+        # wrong one.
+        #
+        # So: table rows out, then every block close is a sentence boundary.
+        markup = re.sub(r"<tr>.*?</tr>", " ", page, flags=re.S)
+        markup = re.sub(r"</(?:dt|dd|p|li|h1|h2|h3|div|figcaption|summary|caption)>",
+                        ". ", markup)
+        text = html.unescape(re.sub(r"<[^>]+>", " ", markup))
+
+        totalising = [
+            " ".join(sentence.split())
+            for sentence in re.split(r"(?<=[.;:!?])\s+", text)
+            if re.search(r"in total|all of them|every call this software has placed",
+                         sentence)
+            and re.search(r"\bmoney\b|computed over|sample is", sentence)
+        ]
+        assert not totalising, (
+            f"the page pools {pooled} calls and publishes {published}, and these sentences "
+            "say the money covers everything this software placed, which is the claim that "
+            "went false when the two figures came apart:\n  " + "\n  ".join(totalising))
 
 
 def test_the_locale_fold_counts_the_comparisons_it_contains():

@@ -131,11 +131,33 @@ def test_the_pooled_row_counts_each_recorded_call_once():
     figure that summed the receipts would count those two twice, which is the class of
     arithmetic this whole tool exists to stop, so it would be a defect in the fix for a
     defect.
+
+    The pooled row is computed from this same file, so checking one against the other says
+    nothing. What can drift is the prose, and it did.
     """
     counts = json.loads(
         (APP / "evidence" / "recorded-calls.json").read_text(encoding="utf-8"))["counts"]
-    assert counts["calls"] == 12, (
-        f"the entry says twelve real calls everywhere and this says {counts['calls']}")
+
+    # This used to assert the literal 12, with the message "the entry says twelve real
+    # calls everywhere". That stopped being true of the world: twenty live calls are
+    # published now, twelve of them placed on 2026-09-11, and this file still counts only
+    # the 2026-09-04 set, which is the one with committed receipts. A gate holding the
+    # literal would have gone on passing while every surface quoting it read as a total, so
+    # what is asserted here is the agreement instead: whatever number this file holds, the
+    # surfaces that quote it as a denominator have to spell that number and say which calls
+    # it is.
+    words = {10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen"}
+    n = counts["calls"]
+    assert n in words, f"{n} calls is past what this gate can spell"
+    word = words[n]
+    for name in ("README.md", "docs/the-money-in-full.md",
+                 "docs/what-a-pilot-would-look-like.md"):
+        flat = " ".join((APP / name).read_text(encoding="utf-8").split())
+        assert re.search(rf"(?i)\b{word}\b[^.]{{0,70}}2026-09-04", flat), (
+            f"{name} does not say {word} anywhere in the same sentence as 2026-09-04, so "
+            f"the denominator behind its money figures reads as a total, and the entry "
+            f"publishes more calls than that")
+
     assert counts["answered"] <= counts["calls"], (
         "more calls were answered than were placed, which cannot happen")
     assert counts["attempts_removed"] <= counts["attempts_billed"], (
@@ -489,17 +511,23 @@ def test_no_platform_call_id_reaches_this_file():
 
 
 def test_the_rejection_count_agrees_everywhere_it_is_printed():
-    """One number, three copies, and nothing was holding them equal.
+    """One number, four copies, and nothing was holding them equal.
 
     The count of HTTP 429 rejections is stated in the report twice, once in the transport
-    table in section 4 and once in the billing answer in section 7, and a third time in
+    table in section 4 and once in the billing answer, and a third time in
     `observed-price.json`. It was published as "ten" in two of those places and as a
     twenty-minute narrative of "nine in a row" in the third, while the trace the run
     actually wrote recorded 33. Every copy passed every gate, because no gate read it.
 
+    Then the same figure was found stale a second time, in a fourth copy this test did not
+    read: the summary block at the top of the report, which still said ten after the other
+    three were corrected to 33. A test that gates three copies of a number and leaves a
+    fourth unread is a test that will pass while the document is wrong, so the summary
+    block is now in the set.
+
     This does not check that 33 is right; the trace that settles that lives outside the
-    repository with the receipts. It checks that the three copies cannot drift apart again,
-    which is the failure that happened.
+    repository with the receipts. It checks that the four copies cannot drift apart again,
+    which is the failure that happened, twice.
     """
     import re
 
@@ -510,22 +538,31 @@ def test_the_rejection_count_agrees_everywhere_it_is_printed():
     assert block, "section 4 no longer prints a rejected count in its transport block"
     in_block = int(block.group(1))
 
-    # Section 4's prose, and section 7's billing answer.
+    # The summary block at the top of the report. The tail of the line is part of the
+    # pattern on purpose: the report prints a rejection count per session, and this is the
+    # first session's copy, the one that went stale.
+    summary = re.search(r"(?m)^rejected\s+(\d+)\s+HTTP 429, no call_id", report)
+    assert summary, (
+        "the summary block at the top of the report no longer prints the first session's "
+        "rejection count, and that block is the copy that was found stale twice")
+    in_summary = int(summary.group(1))
+
+    # Section 4's prose, and the billing answer.
     prose = re.findall(r"The (\d+) rejections run consecutively", report)
     answer = re.findall(r"\*\*The (\d+) `account_concurrency_exceeded` rejections", report)
     assert prose, "section 4's prose no longer states the rejection count"
-    assert answer, "section 7 no longer states the rejection count"
+    assert answer, "the billing section no longer states the rejection count"
 
     # And the price file.
     in_price = re.findall(r"(\d+) HTTP 429", PRICE["observed_metered"]["not_billed"]
                           ["concurrency_rejections"])
     assert in_price, "the price file no longer states the rejection count"
 
-    seen = {in_block, int(prose[0]), int(answer[0]), int(in_price[0])}
+    seen = {in_summary, in_block, int(prose[0]), int(answer[0]), int(in_price[0])}
     assert len(seen) == 1, (
         f"the rejection count is printed as {sorted(seen)} in different places, so at least "
-        "one of them is stale: section 4's block, section 4's prose, section 7's answer and "
-        "evidence/observed-price.json all have to say the same thing")
+        "one of them is stale: the summary block, section 4's block, section 4's prose, the "
+        "billing answer and evidence/observed-price.json all have to say the same thing")
 
     # The attempts have to add up, because a refusal count without its denominator is not
     # a measurement of anything a reader can check.
