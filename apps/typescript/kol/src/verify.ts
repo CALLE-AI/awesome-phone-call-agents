@@ -24,13 +24,13 @@ export function verifyClaimOutcome(input: VerifyInput): Verification {
   required(checks, 'payer response present', reached, reached ? `${payerTurns.length} payer-side transcript turns` : 'no completed payer response');
   if (!reached) return finish('unreachable', checks, 'No payer response exists to verify.');
 
-  const expectedReference = canonicalNumber(input.expectedClaimReference);
-  const resultReference = canonicalNumber(input.outcome.claimReference);
-  const referenceBound = Boolean(expectedReference) && expectedReference === resultReference && numbersIn(payerText).has(expectedReference);
+  const expectedReference = canonicalReference(input.expectedClaimReference);
+  const resultReference = canonicalReference(input.outcome.claimReference);
+  const referenceBound = Boolean(expectedReference) && expectedReference === resultReference && referenceInClaimContext(payerText, expectedReference);
   required(checks, 'claim reference bound', referenceBound, referenceBound ? `payer repeated claim ${maskReference(expectedReference)}` : 'result is not bound to the requested claim');
 
   const questionGrounded = quoteInTurns(input.outcome.evidence.question, agentTurns.map((turn) => turn.text));
-  const questionSpecific = numbersIn(agentText).has(expectedReference) && /\b(status|paid|payment|denied|claim)\b/i.test(input.outcome.evidence.question);
+  const questionSpecific = referenceInClaimContext(agentText, expectedReference) && /\b(status|paid|payment|denied|claim)\b/i.test(input.outcome.evidence.question);
   required(checks, 'question was actually asked', questionGrounded && questionSpecific, questionGrounded && questionSpecific ? 'agent transcript contains the claim-specific question' : 'required question is absent from the agent transcript');
 
   const destinationGrounded = quoteInTurns(input.outcome.evidence.destination, payerTurns.map((turn) => turn.text));
@@ -58,7 +58,8 @@ export function verifyClaimOutcome(input: VerifyInput): Verification {
   }
 
   if (input.outcome.nextAction) {
-    const ok = contentWords(input.outcome.nextAction).every((word) => normalise(input.outcome.evidence.answer).includes(word));
+    const actionWords = contentWords(input.outcome.nextAction);
+    const ok = actionWords.length > 0 && actionWords.every((word) => normalise(input.outcome.evidence.answer).includes(word));
     checks.push({ name: 'next action provenance', passed: ok, severity: 'corroborating', detail: ok ? 'payer evidence contains the action' : 'operator-policy recommendation; not payer testimony' });
   }
 
@@ -110,7 +111,9 @@ function normalise(value: string) { return value.toLowerCase().replace(/[^a-z0-9
 function contentWords(value: string) { const ignored = new Set(['the', 'a', 'an', 'of', 'for']); return normalise(value).split(' ').filter((word) => word.length > 2 && !ignored.has(word)); }
 function quoteInTurns(quote: string, turns: string[]) { const needle = normalise(quote); return needle.length >= 4 && turns.some((turn) => normalise(turn).includes(needle)); }
 function canonicalNumber(value: string) { const clean = value.replace(/[^0-9.]/g, ''); const parsed = Number(clean); return Number.isFinite(parsed) ? String(parsed) : ''; }
+function canonicalReference(value: string) { return value.replace(/\D/g, ''); }
 function numbersIn(value: string) { return new Set([...value.matchAll(/(?:\$\s*)?\d[\d,]*(?:\.\d+)?/g)].map((match) => canonicalNumber(match[0]))); }
+function referenceInClaimContext(text: string, expected: string) { const windows = text.match(/\b(?:claim|reference)\b[^.!?\n]{0,80}/gi) ?? []; return windows.some((window) => (window.match(/\d(?:[\d\s-]*\d)?/g) ?? []).some((run) => run.replace(/\D/g, '') === expected)); }
 function maskReference(value: string) { return value.length <= 4 ? value : `${'*'.repeat(value.length - 4)}${value.slice(-4)}`; }
 function arraysEqual(a: string[], b: string[]) { return a.length === b.length && a.every((value, index) => value === b[index]); }
-function supportsDate(iso: string, evidence: string) { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); if (!match) return normalise(evidence).includes(normalise(iso)); const months = ['january','february','march','april','may','june','july','august','september','october','november','december']; return normalise(evidence).includes(months[Number(match[2]) - 1] ?? '') && numbersIn(evidence).has(String(Number(match[3]))); }
+function supportsDate(iso: string, evidence: string) { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); if (!match) return normalise(evidence).includes(normalise(iso)); const months = ['january','february','march','april','may','june','july','august','september','october','november','december']; return normalise(evidence).includes(months[Number(match[2]) - 1] ?? '') && numbersIn(evidence).has(String(Number(match[3]))) && numbersIn(evidence).has(match[1]); }

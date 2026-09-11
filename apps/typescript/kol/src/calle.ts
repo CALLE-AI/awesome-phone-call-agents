@@ -37,7 +37,7 @@ export async function runLiveCall(options: LiveOptions): Promise<CallRecord> {
     result_schema: CLAIM_STATUS_RESULT_SCHEMA,
     metadata: { kol_scenario: 'fictional-claim-status-demo', kol_reference: options.claimReference },
   };
-  const idempotencyKey = `kol-${createHash('sha256').update(`${to}:${options.claimReference}:${new Date().toISOString().slice(0, 13)}`).digest('hex').slice(0, 32)}`;
+  const idempotencyKey = `kol-${createHash('sha256').update(`${JSON.stringify(request)}:${new Date().toISOString().slice(0, 13)}`).digest('hex').slice(0, 32)}`;
   const created = await createOnce(baseUrl, apiKey, request, idempotencyKey);
   const callId = String(created.id ?? created.call_id ?? '');
   if (!callId) throw new Error('CALL-E returned no call id. Do not retry the POST; reconcile in the dashboard first.');
@@ -55,7 +55,7 @@ async function createOnce(baseUrl: string, apiKey: string, body: unknown, idempo
     throw new Error(`Call creation outcome is unknown (${String(error)}). Do not retry; reconcile by idempotency key in CALL-E first.`);
   }
   const text = await response.text();
-  if (!response.ok) throw new Error(`CALL-E create failed with ${response.status}: ${text.slice(0, 240)}. No automatic POST retry was attempted.`);
+  if (!response.ok) throw new Error(`CALL-E create failed with HTTP ${response.status}. No automatic POST retry was attempted; inspect the CALL-E dashboard.`);
   return JSON.parse(text) as CallRecord;
 }
 
@@ -64,7 +64,10 @@ async function poll(baseUrl: string, apiKey: string, callId: string, timeoutMs: 
   await sleep(15_000);
   while (Date.now() - started < timeoutMs) {
     const response = await fetch(`${baseUrl}/v1/calls/${encodeURIComponent(callId)}`, { headers: headers(apiKey) });
-    if (!response.ok) { await sleep(8_000); continue; }
+    if (!response.ok) {
+      if (response.status === 429 || response.status >= 500) { await sleep(8_000); continue; }
+      throw new Error(`CALL-E polling failed with HTTP ${response.status}. The call may still be running; reconcile it in the dashboard.`);
+    }
     const call = await response.json() as CallRecord;
     console.log(`  ${Math.round((Date.now() - started) / 1000)}s ${call.status ?? 'unknown'}`);
     if (TERMINAL.has(String(call.status ?? '').toLowerCase())) return call;
@@ -75,7 +78,7 @@ async function poll(baseUrl: string, apiKey: string, callId: string, timeoutMs: 
 
 function headers(apiKey: string, idempotencyKey?: string) { return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) }; }
 function checkedBaseUrl(value: string) { const url = new URL(value); if (url.protocol !== 'https:' || (url.hostname !== 'api.heycall-e.com' && process.env.KOL_ALLOW_CUSTOM_CALLE_BASE_URL !== 'true')) throw new Error('Refusing non-official CALL-E base URL. Set KOL_ALLOW_CUSTOM_CALLE_BASE_URL=true only for an owned test fixture.'); return value.replace(/\/$/, ''); }
-function normaliseE164(value: string) { const clean = value.replace(/[\s()-]/g, ''); if (!/^\+[1-9]\d{7,14}$/.test(clean)) throw new Error(`Invalid E.164 destination: ${maskPhone(clean)}`); return clean; }
+function normaliseE164(value: string) { const clean = value.replace(/[\s()-]/g, ''); if (!/^\+[1-9]\d{7,14}$/.test(clean)) throw new Error(`Invalid E.164 destination: ${maskPhone(clean)}`); if (!clean.startsWith('+1')) throw new Error('Kol\'s public healthcare demo currently supports authorised US/Canada (+1) fixture lines only.'); return clean; }
 function maskPhone(value: string) { const digits = value.replace(/\D/g, ''); return digits.length < 4 ? '***' : `+***${digits.slice(-4)}`; }
 function sleep(ms: number) { return new Promise((resolvePromise) => setTimeout(resolvePromise, ms)); }
 async function saveArtifact(callId: string, call: CallRecord) { const directory = resolve('artifacts'); await mkdir(directory, { recursive: true }); await writeFile(resolve(directory, `${callId || randomUUID()}.json`), `${JSON.stringify(call, null, 2)}\n`, { flag: 'wx' }); }

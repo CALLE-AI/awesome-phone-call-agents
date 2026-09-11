@@ -10,7 +10,7 @@ export function makeFixture(kind: FixtureKind, index = 0): { expectedAutoAccept:
   const department = kind === 'wrong_department' ? 'Provider services department.' : 'Claims status department.';
   const answer = kind === 'clean_denied'
     ? `Claim ${claimReference} is denied under code CO-16. Please submit the missing report.`
-    : `Claim ${claimReference} was paid ${paidAmount} on August 12.`;
+    : `Claim ${claimReference} was paid ${paidAmount} on August 12, 2026.`;
   const outcome: ClaimOutcome = kind === 'clean_denied'
     ? { claimReference, status: 'denied', department: 'claims status department', denialCode: 'CO-16', nextAction: 'Submit missing report', evidence: { destination: department, question, answer } }
     : { claimReference, status: 'paid', department: 'claims status department', paidAmount: kind === 'fabricated_amount' ? `$${(1380 + index).toLocaleString('en-US')}` : paidAmount, paymentDate: '2026-08-12', nextAction: 'Post payment', evidence: { destination: department, question, answer } };

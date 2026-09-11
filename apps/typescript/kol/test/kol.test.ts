@@ -23,6 +23,19 @@ test('model-reported keypresses cannot substitute for an independent receipt', (
   assert.equal(result.autoAccept, false);
 });
 
+test('leading-zero claim references do not collide', () => {
+  const fixture = makeFixture('clean_paid', 25);
+  fixture.input.expectedClaimReference = '004425';
+  fixture.input.outcome.claimReference = '4425';
+  assert.equal(verifyClaimOutcome(fixture.input).autoAccept, false);
+});
+
+test('payment year must be spoken by the payer', () => {
+  const fixture = makeFixture('clean_paid', 26);
+  fixture.input.outcome.paymentDate = '2025-08-12';
+  assert.equal(verifyClaimOutcome(fixture.input).autoAccept, false);
+});
+
 test('640-case corpus has no unsafe auto-accepts', () => {
   const metrics = evaluate();
   assert.equal(metrics.cases, 640);
