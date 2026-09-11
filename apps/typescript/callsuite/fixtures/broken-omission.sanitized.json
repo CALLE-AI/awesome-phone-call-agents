@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "broken-omission",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 0.95,
+    "summary": "The outbound reminder sounds successful and confirms attendance, but the required cancellation-fee disclosure is absent from the sanitized evidence.",
+    "evidence": {
+      "mentions": ["attendance confirmed for thursday", "see you then"]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "organization": "nws-boulder-denver",
+  "display_name": "NWS Boulder/Denver Dial-A-Forecast",
+  "numbers": ["+13034944221"],
+  "locale": "en-US",
+  "languages": ["en"],
+  "known_paths": [
+    {
+      "goal": "denver metro forecast",
+      "path": [
+        {
+          "level": 1,
+          "prompt_summary": "area menu: 1=Denver Metro/Boulder, 2=Washington/Morgan, 3=Summit County to Rocky Mountain National Park, 4=Fort Collins/Greeley, 5=Lyman, 6=Northeast Colorado, 7=Castle Rock/Parker/Deer Trail, 8=Foothills, 9=Denver climate information",
+          "keypress": null,
+          "meaning": "no input needed for the default Denver Metro/Boulder forecast; the line auto-plays it after the menu"
+        }
+      ],
+      "confidence": "observed",
+      "observations": 1,
+      "last_observed": "2026-09-11"
+    }
+  ],
+  "hold_profile": {
+    "typical_seconds": 0,
+    "max_observed_seconds": 0,
+    "best_time_local": null
+  },
+  "operator_fallback": {"keypress": null, "authorized": false},
+  "notes": [
+    "Fully automated recorded line; no human option observed.",
+    "Menu plays once, then the default forecast begins; pressing 9 reaches Denver climate information (unverified)."
+  ],
+  "last_verified": "2026-09-11",
+  "contributions": [{"date": "2026-09-11", "source": "holdfast-skill"}]
+}

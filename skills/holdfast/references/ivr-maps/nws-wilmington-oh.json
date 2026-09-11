@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "organization": "nws-wilmington-oh",
+  "display_name": "NWS Wilmington OH Forecast Line",
+  "numbers": ["+19373830031"],
+  "locale": "en-US",
+  "languages": ["en"],
+  "known_paths": [
+    {
+      "goal": "cincinnati southwest ohio forecast",
+      "path": [
+        {
+          "level": 1,
+          "prompt_summary": "no menu heard on this date; the line auto-cycled regional forecasts (Whitewater Valley first, then Southwest Ohio)",
+          "keypress": null,
+          "meaning": "wait through the cycle until the Southwest Ohio segment plays"
+        }
+      ],
+      "confidence": "observed",
+      "observations": 1,
+      "last_observed": "2026-09-11"
+    }
+  ],
+  "hold_profile": {
+    "typical_seconds": 0,
+    "max_observed_seconds": 0,
+    "best_time_local": null
+  },
+  "operator_fallback": {"keypress": null, "authorized": false},
+  "notes": [
+    "Public NWS documentation lists a press-2-then-press-3 path for Cincinnati; it was not required on 2026-09-11 and may be time-of-day dependent. Treat documented paths as hints, not guarantees.",
+    "Fully automated recorded line; no human option observed."
+  ],
+  "last_verified": "2026-09-11",
+  "contributions": [{"date": "2026-09-11", "source": "holdfast-skill"}]
+}

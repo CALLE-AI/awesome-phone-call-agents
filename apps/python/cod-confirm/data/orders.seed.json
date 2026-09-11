@@ -1,0 +1,89 @@
+[
+  {
+    "id": "1041",
+    "customer_name": "Rumana Example",
+    "phone": "+99900000001",
+    "address": "12 Example Road, Sample City 1205",
+    "items": [
+      "Hand-block cotton bedsheet, queen"
+    ],
+    "total": 3450.0,
+    "shipping_cost": 80.0,
+    "previous_orders": 4,
+    "previous_refusals": 0,
+    "outside_home_city": false,
+    "status": "pending-confirmation",
+    "attempts": 0,
+    "notes": []
+  },
+  {
+    "id": "1042",
+    "customer_name": "Tanvir Example",
+    "phone": "+99900000002",
+    "address": "90 Example Block C, Sample City 1229",
+    "items": [
+      "Jute floor rug, 5x7",
+      "Cushion cover set of 4"
+    ],
+    "total": 6200.0,
+    "shipping_cost": 220.0,
+    "previous_orders": 0,
+    "previous_refusals": 0,
+    "outside_home_city": false,
+    "status": "pending-confirmation",
+    "attempts": 0,
+    "notes": []
+  },
+  {
+    "id": "1043",
+    "customer_name": "Nusrat Example",
+    "phone": "+99900000003",
+    "address": "4 Example Lane 3, Sample City 1230",
+    "items": [
+      "Terracotta planter, large"
+    ],
+    "total": 1150.0,
+    "shipping_cost": 60.0,
+    "previous_orders": 2,
+    "previous_refusals": 0,
+    "outside_home_city": false,
+    "status": "pending-confirmation",
+    "attempts": 0,
+    "notes": []
+  },
+  {
+    "id": "1044",
+    "customer_name": "Shahriar Example",
+    "phone": "+99900000004",
+    "address": "22 Example Road 2, Second City 4100",
+    "items": [
+      "Nakshi kantha throw",
+      "Brass table lamp"
+    ],
+    "total": 9800.0,
+    "shipping_cost": 150.0,
+    "previous_orders": 1,
+    "previous_refusals": 2,
+    "outside_home_city": true,
+    "status": "pending-confirmation",
+    "attempts": 0,
+    "notes": []
+  },
+  {
+    "id": "1045",
+    "customer_name": "Farhana Example",
+    "phone": "+99900000005",
+    "address": "15 Example Bazar, Third City 3100",
+    "items": [
+      "Ceramic dinner set, 16 piece"
+    ],
+    "total": 4750.0,
+    "shipping_cost": 190.0,
+    "previous_orders": 0,
+    "previous_refusals": 0,
+    "outside_home_city": true,
+    "status": "pending-confirmation",
+    "attempts": 0,
+    "notes": []
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "right_person_reached": "yes",
+  "item_recognized": "yes",
+  "item_status": "still_has_item",
+  "notice_understood": "yes",
+  "selected_next_step": "pickup_request",
+  "preferred_time": "Thursday morning, before midday",
+  "questions": "",
+  "human_follow_up_required": "no",
+  "contact_outcome": "resolved",
+  "certainty": "high"
+}
