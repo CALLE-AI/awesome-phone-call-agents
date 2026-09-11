@@ -8,6 +8,7 @@ import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 const MIGRATION = new URL("../supabase/migrations/202609100001_initial_senior_phone_ai.sql", import.meta.url);
 const SCHEDULER_MIGRATION = new URL("../supabase/migrations/202609110001_reminder_delivery_scheduler.sql", import.meta.url);
 const POST_CALL_MIGRATION = new URL("../supabase/migrations/202609110002_post_call_finalization.sql", import.meta.url);
+const DASHBOARD_MIGRATION = new URL("../supabase/migrations/202609110003_family_dashboard_management.sql", import.meta.url);
 const SEED = new URL("../supabase/seed.sql", import.meta.url);
 
 async function countRows(db: PGlite, table: string): Promise<number> {
@@ -37,6 +38,7 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
     await db.exec(await readFile(MIGRATION, "utf8"));
     await db.exec(await readFile(SCHEDULER_MIGRATION, "utf8"));
     await db.exec(await readFile(POST_CALL_MIGRATION, "utf8"));
+    await db.exec(await readFile(DASHBOARD_MIGRATION, "utf8"));
     await db.exec(await readFile(SEED, "utf8"));
 
     assert.equal(await countRows(db, "public.seniors"), 1);
@@ -118,6 +120,53 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
       where id = '70000000-0000-4000-8000-000000000001'
     `);
     assert.equal(state.rows[0]?.status, "completed");
+
+    await db.exec(`
+      update public.senior_memberships set role = 'owner'
+      where senior_id = '20000000-0000-4000-8000-000000000001'
+        and user_id = '10000000-0000-4000-8000-000000000001';
+      insert into public.reminders (
+        id, senior_id, authorization_id, principal_user_id, idempotency_key,
+        destination_e164, message, timezone, scheduled_for, channel
+      ) values (
+        '70000000-0000-4000-8000-000000000002',
+        '20000000-0000-4000-8000-000000000001',
+        '60000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+        'reminder:database:two', '+12025550123', 'Cancelable reminder',
+        'Australia/Sydney', '2026-09-12T00:10:00Z', 'sms'
+      );
+      set role authenticated;
+      set "request.jwt.claim.sub" = '10000000-0000-4000-8000-000000000001';
+      select public.manage_senior_profile(
+        '20000000-0000-4000-8000-000000000001', 'Margaret',
+        'Australia/Sydney', 'Inner Sydney'
+      );
+      select public.manage_senior_preferences(
+        '20000000-0000-4000-8000-000000000001', false, true, 45
+      );
+    `);
+    const canceled = await db.query<{ result: string }>(`
+      select public.cancel_family_reminder(
+        '20000000-0000-4000-8000-000000000001',
+        '70000000-0000-4000-8000-000000000002'
+      ) as result
+    `);
+    assert.equal(canceled.rows[0]?.result, "canceled");
+    await db.exec("set \"request.jwt.claim.sub\" = '10000000-0000-4000-8000-000000000002'");
+    await assert.rejects(db.exec(`
+      select public.manage_senior_profile(
+        '20000000-0000-4000-8000-000000000001', 'Changed',
+        'Australia/Sydney', ''
+      )
+    `), /access denied/);
+    await assert.rejects(db.exec(`
+      select public.cancel_family_reminder(
+        '20000000-0000-4000-8000-000000000001',
+        '70000000-0000-4000-8000-000000000002'
+      )
+    `), /access denied/);
+    await db.exec("reset role");
 
     await db.exec(`
       update public.senior_preferences

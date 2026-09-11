@@ -1,0 +1,27 @@
+.shell { min-height: 100vh; background: #f5f2e9; color: #18322b; padding: 1.25rem; }
+.nav { max-width: 1120px; margin: 0 auto 1.25rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.nav a { color: #18322b; font-weight: 700; padding: .55rem .8rem; border-radius: 999px; }
+.nav a:first-child { margin-right: auto; font-size: 1.15rem; text-decoration: none; }
+.content { max-width: 1120px; margin: 0 auto; }
+.hero, .card { background: #fffdf7; border: 1px solid #d9d2c1; border-radius: 18px; padding: clamp(1rem, 3vw, 1.75rem); box-shadow: 0 8px 28px rgba(29, 51, 44, .07); }
+.hero { margin-bottom: 1rem; }
+.hero h1 { font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1; margin: .25rem 0 .75rem; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; font-weight: 800; color: #497064; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+.stack { display: grid; gap: 1rem; }
+.card h2, .card h3 { margin-top: 0; }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; min-width: 640px; }
+.table th, .table td { text-align: left; vertical-align: top; border-bottom: 1px solid #e5dfd1; padding: .75rem .5rem; }
+.pill { display: inline-block; padding: .2rem .55rem; border-radius: 999px; background: #e4eee9; font-size: .82rem; font-weight: 750; }
+.muted { color: #5f6d68; }
+.error { border-color: #b86f62; background: #fff6f2; }
+.empty { padding: 1.5rem; text-align: center; color: #5f6d68; }
+.list { margin: 0; padding-left: 1.2rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: .8rem; }
+.actions a { background: #1f5b4b; color: white; text-decoration: none; padding: .55rem .8rem; border-radius: 10px; font-weight: 700; }
+.card input { width: min(100%, 30rem); border: 1px solid #9aa9a2; border-radius: 9px; padding: .58rem .65rem; font: inherit; }
+.card input[type="checkbox"] { width: auto; }
+.card button { border: 0; border-radius: 9px; background: #1f5b4b; color: white; padding: .58rem .8rem; font: inherit; font-weight: 750; cursor: pointer; }
+.card a:focus-visible, .card button:focus-visible, .card input:focus-visible, .nav a:focus-visible { outline: 3px solid #d58b39; outline-offset: 2px; }
+@media (max-width: 640px) { .shell { padding: .75rem; } .nav a:first-child { width: 100%; } }

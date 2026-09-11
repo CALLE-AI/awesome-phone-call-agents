@@ -1,5 +1,5 @@
 const E164_PATTERN = /^\+[1-9][0-9]{7,14}$/;
-const PHONE_LIKE_PATTERN = /\+?\d(?:[\d ().-]{6,}\d)/g;
+const PHONE_LIKE_PATTERN = /[+(]?\d(?:[\d ().-]{6,}\d)/g;
 
 export function isStrictE164(value: string): boolean {
   return E164_PATTERN.test(value);
