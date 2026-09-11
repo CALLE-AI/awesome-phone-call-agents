@@ -1,0 +1,6 @@
+{
+  "name": "PawCall",
+  "description": "AI-powered emergency coordination platform for rescuing injured or distressed animals.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
