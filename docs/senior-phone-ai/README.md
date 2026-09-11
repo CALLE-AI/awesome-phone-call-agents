@@ -134,7 +134,7 @@ Acceptance criteria:
 - [ ] Live checks require explicit consent and configured test numbers. Run this gate only after SPA-015 passes.
 - [ ] Keep CALL-E for outbound actions; do not assume CALL-E inbound live tool calling.
 
-Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Each due item is claimed before its single provider request and reuses its durable idempotency key. The page checks due work while open and catches up on the next check after a restart. SPA-011 remains In progress until the Supabase multi-worker claim path, production scheduler authentication, SMS delivery, late-run policy and fake-provider race/failure tests are complete.
+Implementation notes and verification: Deferred to the final MVP ticket. No Twilio or inbound SIP implementation is active.
 
 ### SPA-005
 
@@ -250,7 +250,7 @@ Acceptance criteria:
 - [ ] Disabling/canceling stops future dispatch; already in-flight actions are described accurately.
 - [ ] Test scheduler restart, duplicate execution, cancellation race and provider failure without live calls.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Each due item is claimed before its single provider request and reuses its durable idempotency key. The page checks due work while open and catches up on the next check after a restart. SPA-011 remains In progress until the Supabase multi-worker claim path, production scheduler authentication, SMS delivery, late-run policy and fake-provider race/failure tests are complete.
 
 ### SPA-012
 
