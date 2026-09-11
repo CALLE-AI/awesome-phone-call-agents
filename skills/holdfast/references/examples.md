@@ -127,3 +127,22 @@ python3 scripts/verify_result.py --result call-result.json
 python3 scripts/map_update.py --maps-dir references/ivr-maps \
   --company example-airlines --observation observation.json
 ```
+
+## Offline acceptance (no CALL-E account needed)
+
+The `tests/` directory runs the whole safe path without credentials:
+
+```bash
+# from the repository root
+python3 skills/holdfast/scripts/run_task.py \
+  --task skills/holdfast/tests/fixtures/task.json          # dry-run preview
+python3 skills/holdfast/scripts/verify_result.py \
+  --result skills/holdfast/tests/fixtures/call-success.json
+python3 skills/holdfast/tests/test_holdfast.py             # full offline suite
+```
+
+Fixtures cover a complete task, a successful recorded-line call, a
+no-keypress call, a balance-failure start, and a result whose fields
+contradict its transcript. The test suite installs a fake `calle` executable
+and asserts it is never invoked without confirmation, so the side-effect gate
+is checked on every run.

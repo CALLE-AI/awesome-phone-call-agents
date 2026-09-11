@@ -53,8 +53,11 @@ print or expose tokens, plan identifiers, or confirmation tokens.
 Always follow these steps in order. The default mode is dry-run: plan and
 preview only. A real call happens only after the user confirms the plan. For
 a guided local run, `scripts/run_task.py` chains steps 1 through 7 in one
-command (dry-run by default; `--run` places exactly one call after the
-preview).
+command: dry-run by default; `--run` prints the same preview and then requires
+an explicit confirmation (a `--yes` flag or typing `CALL`) before it places
+exactly one call. A pending-call ledger is written before dialing, so an
+interrupted run is recovered with `--resume` (status polling only) and can
+never be re-dialed by accident.
 
 ### 1. Intake
 

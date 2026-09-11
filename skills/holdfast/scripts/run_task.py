@@ -3,13 +3,19 @@
 
 Chains the whole HoldFast workflow into one comfortable command:
 intake validation -> masked dry-run preview -> IVR map lookup -> instruction
-rendering -> (with --run) one real CALL-E call -> verification -> map update.
+rendering -> (with --run, after explicit confirmation) one real CALL-E call
+-> verification -> map observation proposal.
 
-Dry-run is the default; a real call happens only with --run.
+Dry-run is the default; a real call happens only with --run, only after the
+exact preview is shown, and only with an explicit confirmation (--yes flag or
+an interactive "CALL" prompt). A pending-call ledger makes interruption
+recovery safe: a run that stops mid-call is resumed, never re-dialed.
 
 Usage:
     python3 run_task.py --task task.json                 # preview only
-    python3 run_task.py --task task.json --run           # place one real call
+    python3 run_task.py --task task.json --run           # preview, confirm, one call
+    python3 run_task.py --task task.json --run --yes     # non-interactive confirm
+    python3 run_task.py --task task.json --run --resume  # recover an in-flight call
     python3 run_task.py --report runs/<dir>              # re-verify a finished run
 
 Task JSON shape (see references/examples.md for a full sample):
@@ -21,6 +27,7 @@ Task JSON shape (see references/examples.md for a full sample):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -38,6 +45,16 @@ E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
 TERMINAL = {"COMPLETED", "FAILED", "NO_ANSWER", "DECLINED", "CANCELED", "CANCELLED", "VOICEMAIL", "BUSY", "EXPIRED"}
 
 PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])(?:\+?[0-9](?:[0-9\s().\-]{8,}[0-9]))(?![A-Za-z0-9])")
+MENU_OPTION_RE = re.compile(r"press\s+([0-9*#])\s*(?:for|to|:|-)?\s*([^.;\n]{0,80})", re.IGNORECASE)
+FOR_PRESS_RE = re.compile(r"for\s+([^.;\n,]{2,60}?),?\s+press\s+([0-9*#])\b", re.IGNORECASE)
+KEY_PRESSED_RE = re.compile(r"\bpressed\s+([0-9*#])\b", re.IGNORECASE)
+NO_KEYPRESS_RE = re.compile(
+    r"no\s+key\s+press\s+(?:was\s+)?recorded"
+    r"|no\s+[^.;\n]{0,24}key\s*presses?\s+(?:was|were)\s+(?:recorded|captured)"
+    r"|no\s+keys?\s+were\s+pressed"
+    r"|did\s+not\s+press\s+any\s+(?:key|keys)",
+    re.IGNORECASE,
+)
 
 
 def _mask_phone_match(match: re.Match) -> str:
@@ -112,10 +129,7 @@ def find_key(node: object, key: str) -> object | None:
 
 
 def run_calle(args: list[str]) -> dict:
-    try:
-        proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
-    except (subprocess.TimeoutExpired, OSError):
-        fail("CLI request failed or timed out; outcome may be unknown. Stop and reconcile manually; command details omitted.")
+    proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
     return load_json_flexible(proc.stdout + proc.stderr)
 
 
@@ -124,7 +138,7 @@ def validate_task(task: dict) -> list[str]:
     for field in ("goal", "callee", "user_name", "success_criteria", "authorization_scope"):
         if field not in task:
             problems.append(f"missing required field: {field}")
-    if "callee" in task and not E164_RE.fullmatch(str(task["callee"])):
+    if "callee" in task and not E164_RE.match(str(task["callee"])):
         problems.append("callee must be strict ASCII E.164 (for example +12025550123)")
     elif "callee" in task and not str(task["callee"]).isascii():
         problems.append("callee must contain ASCII digits only")
@@ -204,35 +218,163 @@ def render_instructions(task: dict, map_info: dict) -> str:
 
 
 def print_preview(task: dict, instructions: str, map_info: dict) -> None:
-    targets = callee_variants(str(task["callee"]))
-    task = mask_sensitive(task, targets)
-    instructions = mask_sensitive(instructions, targets)
-    map_info = mask_sensitive(map_info, targets)
     print("HoldFast plan preview (no call placed)")
-    print(f"  Callee:       {task['callee']}")
+    print(f"  Callee:       {mask_number(str(task['callee']))}")
     print(f"  Goal:         {task['goal']}")
     print(f"  On behalf of: {task['user_name']}")
     print(f"  Map:          {'found (' + str(map_info.get('organization')) + ')' if map_info.get('found') else 'none; exploratory navigation'}")
     print(f"  Cost:         1 call credit; no cancel once started")
     print()
-    print("--- phone-masked call instructions (private request is unchanged) ---")
+    print("--- call instructions that will be sent ---")
     print(instructions)
     print("--- end ---")
     print()
-    print("To place this exact call once: python3 run_task.py --task <file> --run")
+
+
+def confirm_or_abort(out_dir: Path, yes: bool) -> dict:
+    """Gate the side effect behind one explicit confirmation.
+
+    Returns a consent record written to consent.json. Anything other than an
+    explicit yes aborts BEFORE any calle invocation: zero provider calls.
+    """
+    print("This places exactly one real call. It cannot be canceled once started.")
+    if yes:
+        consent = {"confirmed": True, "method": "--yes flag", "confirmed_at": _now()}
+        print("Confirmation supplied via --yes.")
+    elif sys.stdin.isatty():
+        answer = input("Type CALL to place this exact call (anything else aborts): ").strip()
+        if answer == "CALL":
+            consent = {"confirmed": True, "method": "interactive prompt", "confirmed_at": _now()}
+        else:
+            consent = {"confirmed": False, "method": "interactive prompt", "confirmed_at": _now()}
+    else:
+        consent = {"confirmed": False, "method": "none", "confirmed_at": _now()}
+        print("No confirmation available (stdin is not interactive).", file=sys.stderr)
+        print("Re-run with --yes after reviewing this preview, or run without --run.", file=sys.stderr)
+    (out_dir / "consent.json").write_text(json.dumps(consent, indent=2), encoding="utf-8")
+    if not consent["confirmed"]:
+        fail("call not confirmed; nothing was dialed")
+    return consent
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _task_fingerprint(task: dict) -> str:
+    canonical = json.dumps(task, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def read_ledger(out_dir: Path) -> dict | None:
+    path = out_dir / "pending.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"state": "unknown", "corrupt": True}
+
+
+def write_ledger(out_dir: Path, state: str, **fields: object) -> dict:
+    path = out_dir / "pending.json"
+    ledger: dict = {"state": state, "updated_at": _now()}
+    if path.exists():
+        try:
+            ledger = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    ledger.update({"state": state, "updated_at": _now()})
+    ledger.update(fields)
+    path.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+    return ledger
+
+
+def ledger_blocks_new_call(out_dir: Path) -> dict | None:
+    """Return the ledger if a call may still be in flight; else None."""
+    ledger = read_ledger(out_dir)
+    if not ledger:
+        return None
+    if (out_dir / "final.json").exists():
+        return None
+    if ledger.get("state") in ("dialing", "in_flight", "unknown"):
+        return ledger
+    return None
 
 
 def propose_observation(final: dict) -> dict:
-    """Pull menu options and keypress hints out of summary+transcript for the map."""
-    summary = str(find_key(final, "summary") or "")
+    """Pull menu options and keypress claims out of the call for the map.
+
+    Two strictly separated buckets:
+    - menu_options_observed: what the line offered ("press 1 for X"),
+      taken from the transcript only, verbatim-ish.
+    - keys_reported_pressed: keys the call claims to have pressed, taken
+      from explicit press claims only. "press 1 for X" menu phrasing never
+      counts as a pressed key. An explicit "no key press was recorded"
+      yields an empty list rather than a guessed one.
+    """
+    summary = str(find_key(final, "summary") or find_key(final, "post_summary") or "")
     transcript = str(find_key(final, "transcript") or "")
-    text = summary + "\n" + transcript
-    options = re.findall(r"press (\d|\*|#)[^.;\n]{0,80}", text, re.IGNORECASE)
-    pressed = re.findall(r"(?:pressed|press)\s+(\d|\*|#)", summary, re.IGNORECASE)
+    ts_re = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s*")
+    bot_lines = [line for line in transcript.splitlines() if re.search(r"\bBOT:", line)]
+    line_speakers = (re.sub(ts_re, "", line) for line in transcript.splitlines())
+    callee_lines = [
+        line for line in line_speakers
+        if line and not re.match(r"\s*BOT\s*:", line)
+    ]
+
+    # Menu options: what the line offered. Sources are the non-BOT turns
+    # (the recording speaks the menu); BOT turns are excluded even when they
+    # paraphrase a menu. Both phrasings are handled: "press 1 for X" and
+    # "For X, press 1". One entry per key; a bare "press 1" is upgraded when
+    # a later prompt gives it a meaning.
+    by_key: dict[str, str] = {}
+
+    def add_option(key: str, meaning: str) -> None:
+        meaning = ts_re.sub("", meaning).strip(" .;:,-")
+        if key in by_key:
+            if meaning and not by_key[key]:
+                by_key[key] = meaning
+        else:
+            by_key[key] = meaning
+
+    for line in callee_lines:
+        for match in MENU_OPTION_RE.finditer(line):
+            add_option(match.group(1), match.group(2))
+        for match in FOR_PRESS_RE.finditer(line):
+            add_option(match.group(2), match.group(1))
+
+    def key_sort(item: tuple[str, str]) -> tuple[int, int, str]:
+        key = item[0]
+        if key.isdigit():
+            return (0, int(key), key)
+        return (1, 0, key)
+
+    options = [
+        f"press {key}: {meaning}" if meaning else f"press {key}"
+        for key, meaning in sorted(by_key.items(), key=key_sort)
+    ][:12]
+
+    # Keys pressed: only explicit press claims by the call itself, never
+    # menu phrasing. An explicit "no key press was recorded" wins over any
+    # weaker paraphrase and yields an empty list.
+    no_keypress_observed = bool(NO_KEYPRESS_RE.search(summary)) or any(
+        NO_KEYPRESS_RE.search(line) for line in bot_lines
+    )
+    pressed: list[str] = []
+    if not no_keypress_observed:
+        for source in (summary, *bot_lines):
+            for match in KEY_PRESSED_RE.finditer(source):
+                key = match.group(1)
+                if key not in pressed:
+                    pressed.append(key)
+
     return {
-        "menu_options_observed": [f"press {o[0]}: {o[1].strip()}" for o in options][:12],
-        "keys_reported_pressed": sorted(set(pressed)),
-        "note": "Review against the transcript, then feed confirmed steps to map_update.py.",
+        "menu_options_observed": options[:12],
+        "keys_reported_pressed": sorted(pressed),
+        "keypress_claim": "none" if no_keypress_observed else ("reported" if pressed else "unknown"),
+        "note": "menu options come from transcript prompts; keys come only from explicit press claims. "
+        "Review against the transcript, then feed confirmed steps to map_update.py.",
     }
 
 
@@ -250,6 +392,12 @@ def provider_destination(data: dict) -> str:
 def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     authorized = str(task["callee"])
     targets = callee_variants(authorized)
+    write_ledger(
+        out_dir,
+        "dialing",
+        task_fingerprint=_task_fingerprint(task),
+        callee_digits_sha256=hashlib.sha256(re.sub(r"\D", "", authorized).encode("ascii")).hexdigest(),
+    )
     args = ["call", "start", "--to-phone", authorized, "--goal", instructions]
     if task.get("language"):
         args += ["--language", str(task["language"])]
@@ -260,10 +408,11 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
         json.dumps(mask_sensitive(start, targets), indent=2), encoding="utf-8"
     )
     if not start.get("ok") or start.get("call_started") is not True:
-        error = mask_sensitive(start.get("error") or start, targets)
-        fail(f"call did not start: {json.dumps(error, default=str)[:300]}")
+        write_ledger(out_dir, "never_started", detail="call start rejected by provider")
+        fail(f"call did not start: {json.dumps(start.get('error') or start, default=str)[:300]}")
     dialed = provider_destination(start)
     if dialed and dialed != authorized:
+        write_ledger(out_dir, "never_started", detail="provider destination mismatch")
         fail(
             f"provider destination mismatch: authorized {mask_number(authorized)}, "
             f"provider echoed {mask_number(dialed)}. Not polling; investigate before retrying."
@@ -281,40 +430,65 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     )
     run_id = find_key(start, "run_id")
     if not run_id:
+        write_ledger(out_dir, "unknown", detail="call started but no run_id captured; recover manually via calle call recover")
         fail("call started but no run_id found; check start.json and use calle call recover")
-    print(mask_sensitive(f"call started, run_id {run_id}; polling every 10s", targets))
-    final: dict = {}
+    write_ledger(out_dir, "in_flight", run_id=run_id)
+    print(f"call started, run_id {run_id}; polling every 10s")
+    final = poll_until_terminal(str(run_id))
+    final = mask_sensitive(final, targets)
+    (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
+    write_ledger(out_dir, "finished", run_id=run_id, terminal_status=str(find_key(final, "status") or "UNKNOWN"))
+    return final
+
+
+def do_resume(out_dir: Path) -> dict:
+    """Recover an interrupted run from its ledger. Never dials."""
+    ledger = read_ledger(out_dir)
+    if not ledger:
+        fail(f"no pending.json in {out_dir}; nothing to resume")
+    if (out_dir / "final.json").exists():
+        fail("final.json already exists for this run; use --report to re-verify it")
+    run_id = ledger.get("run_id")
+    if not run_id:
+        fail(
+            "ledger has no run_id (the call may have been lost before the id was recorded). "
+            "Do not redial. Run: calle call recover   then re-run with --report on the saved artifact."
+        )
+    print(f"resuming in-flight call {run_id}; polling every 10s (no new call is placed)")
+    final = poll_until_terminal(str(run_id))
+    final = mask_sensitive(final, [])
+    (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
+    write_ledger(out_dir, "finished", run_id=run_id, terminal_status=str(find_key(final, "status") or "UNKNOWN"))
+    return final
+
+
+def poll_until_terminal(run_id: str) -> dict:
     for _ in range(36):
         time.sleep(10)
-        status_out = run_calle(["call", "status", "--run-id", str(run_id)])
+        status_out = run_calle(["call", "status", "--run-id", run_id])
         status = find_key(status_out, "status")
         activity = find_key(status_out, "activity")
         if isinstance(activity, list) and activity:
             last = activity[-1]
-            print(mask_sensitive(f"  [{status}] {last.get('message', '')}", targets))
+            print(f"  [{status}] {last.get('message', '')}")
         else:
-            print(mask_sensitive(f"  [{status}]", targets))
+            print(f"  [{status}]")
         if str(status).upper() in TERMINAL:
-            final = status_out
-            break
-    if not final:
-        fail("call did not reach a terminal status within the wait window; poll manually with calle call status")
-    final = mask_sensitive(final, targets)
-    (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
-    return final
+            return status_out
+    fail("call did not reach a terminal status within the wait window; poll manually with calle call status")
 
 
-def do_verify(final: dict, out_dir: Path, targets: list[str] | None = None) -> dict:
+def do_verify(final: dict, out_dir: Path, targets: list[str]) -> dict:
     proc = subprocess.run([sys.executable, str(VERIFY), "--result", str(out_dir / "final.json")], capture_output=True, text=True)
-    report = mask_sensitive(json.loads(proc.stdout), targets or [])
-    (out_dir / "verification.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report = json.loads(proc.stdout)
+    (out_dir / "verification.json").write_text(
+        json.dumps(mask_sensitive(report, targets), indent=2), encoding="utf-8"
+    )
     return report
 
 
 def print_report(task: dict, final: dict, report: dict) -> None:
     targets = callee_variants(str(task["callee"]))
-    final = mask_sensitive(final, targets)
-    report = mask_sensitive(report, targets)
     status = find_key(final, "status") or "UNKNOWN"
     summary = mask_sensitive(
         find_key(final, "summary") or find_key(final, "post_summary") or "Not available", targets
@@ -345,7 +519,9 @@ def print_report(task: dict, final: dict, report: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", help="task JSON file")
-    parser.add_argument("--run", action="store_true", help="place one real call (default: dry-run)")
+    parser.add_argument("--run", action="store_true", help="place one real call after preview+confirmation")
+    parser.add_argument("--yes", action="store_true", help="explicit non-interactive confirmation for --run")
+    parser.add_argument("--resume", action="store_true", help="recover an in-flight call from its ledger; never dials")
     parser.add_argument("--report", help="re-verify an existing run directory")
     parser.add_argument("--out", type=Path, help="output directory for run artifacts")
     args = parser.parse_args()
@@ -354,7 +530,7 @@ def main() -> None:
         out_dir = Path(args.report)
         final = json.loads((out_dir / "final.json").read_text(encoding="utf-8"))
         task = json.loads((out_dir / "task.json").read_text(encoding="utf-8"))
-        report = do_verify(final, out_dir, callee_variants(str(task["callee"])))
+        report = do_verify(final, out_dir, [])
         print_report(task, final, report)
         return
 
@@ -369,25 +545,52 @@ def main() -> None:
 
     map_info = lookup_map(task)
     instructions = render_instructions(task, map_info)
+    targets = callee_variants(str(task["callee"]))
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     slug = re.sub(r"[^a-z0-9]+", "-", str(task.get("company") or "task").lower()).strip("-")
     out_dir = args.out or (Path.cwd() / "runs" / f"{stamp}-{slug}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    targets = callee_variants(str(task["callee"]))
-    (out_dir / "task.json").write_text(json.dumps(mask_sensitive(task, targets), indent=2), encoding="utf-8")
-    (out_dir / "instructions.txt").write_text(mask_sensitive(instructions, targets), encoding="utf-8")
+    (out_dir / "task.json").write_text(
+        json.dumps(mask_sensitive(task, targets), indent=2), encoding="utf-8"
+    )
+    (out_dir / "instructions.txt").write_text(
+        str(mask_sensitive(instructions, targets)), encoding="utf-8"
+    )
+
+    if args.resume:
+        final = do_resume(out_dir)
+        report = do_verify(final, out_dir, targets)
+        proposal = propose_observation(final)
+        (out_dir / "observation-proposal.json").write_text(
+            json.dumps(mask_sensitive(proposal, targets), indent=2), encoding="utf-8"
+        )
+        print_report(task, final, report)
+        return
 
     if not args.run:
         print_preview(task, instructions, map_info)
-        print(f"\npreview saved to {out_dir}")
+        print(f"To place this exact call once: python3 run_task.py --task <file> --run")
+        print(f"preview saved to {out_dir}")
         return
 
+    blocking_ledger = ledger_blocks_new_call(out_dir)
+    if blocking_ledger:
+        fail(
+            f"pending.json shows a call may still be in flight (state={blocking_ledger.get('state')}). "
+            "Refusing to place a second call. Use: python3 run_task.py --task <file> --run --resume "
+            f"--out {out_dir}"
+        )
+
+    print_preview(task, instructions, map_info)
+    confirm_or_abort(out_dir, args.yes)
     print(f"placing one real call to {mask_number(str(task['callee']))} (artifacts: {out_dir})")
     final = do_run(task, instructions, out_dir)
     report = do_verify(final, out_dir, targets)
     proposal = propose_observation(final)
-    (out_dir / "observation-proposal.json").write_text(json.dumps(proposal, indent=2), encoding="utf-8")
+    (out_dir / "observation-proposal.json").write_text(
+        json.dumps(mask_sensitive(proposal, targets), indent=2), encoding="utf-8"
+    )
     print_report(task, final, report)
     print()
     print("[IVR Map]")

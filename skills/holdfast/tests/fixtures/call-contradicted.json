@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "tool_name": "get_call_run",
+  "structuredContent": {
+    "run_id": "FIXTURE-CONTRA-1",
+    "status": "COMPLETED",
+    "result": {
+      "summary": "The call reached the recorded forecast line and captured the forecast.",
+      "structured_result": {
+        "tomorrow_high_f": 78,
+        "tomorrow_forecast": "mostly cloudy"
+      },
+      "transcript": "[00:00:05] USER: Here is the forecast for tomorrow. Mostly cloudy, with a slight chance of showers in the afternoon. Highs in the mid 80s. Lows in the lower 60s."
+    }
+  }
+}
