@@ -7,7 +7,8 @@
     "mazo-coach": "./mazo-coach.js"
   },
   "scripts": {
-    "start": "node mazo-coach.js"
+    "start": "node mazo-coach.js",
+    "test": "node --test test/mazo.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

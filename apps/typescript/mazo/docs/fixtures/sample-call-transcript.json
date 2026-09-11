@@ -1,0 +1,55 @@
+{
+  "callId": "calle_sess_99482",
+  "client": "Omar",
+  "coach": "The Clarifier",
+  "mode": "kickoff",
+  "durationSeconds": 164,
+  "transcriptTurns": [
+    {
+      "speaker": "The Clarifier",
+      "text": "Hey Omar, it's The Clarifier. Checking in for our 3-minute momentum block. What is the single highest-leverage bottleneck in front of you today?"
+    },
+    {
+      "speaker": "Omar",
+      "text": "Honestly, I'm stuck between redesigning the landing page and finishing the API contract for the hackathon submission. I keep jumping between both."
+    },
+    {
+      "speaker": "The Clarifier",
+      "text": "Context-switching is just another form of avoidance. Which of those two makes the other completely irrelevant if it isn't finished today?"
+    },
+    {
+      "speaker": "Omar",
+      "text": "The API contract. Without the working build, the landing page doesn't even matter."
+    },
+    {
+      "speaker": "The Clarifier",
+      "text": "Exactly. What can you ship on that API contract in a dedicated 90-minute focus block before 5:00 PM?"
+    },
+    {
+      "speaker": "Omar",
+      "text": "I will silence all notifications, lock myself in, and finalize the core endpoint schema and push the production build by 5:00 PM."
+    },
+    {
+      "speaker": "The Clarifier",
+      "text": "Locked in. 5:00 PM API build. I'll ring you back at 5:00 to verify completion. You know what to do—put the phone down and go execute."
+    }
+  ],
+  "extractedResult": {
+    "status": "completed",
+    "coreBreakthrough": "Recognized that context-switching between design and API was avoidance; locked in primary dependency.",
+    "actionItems": [
+      {
+        "task": "Finalize core API contract and push production build",
+        "deadline": "Today @ 5:00 PM",
+        "priority": "high",
+        "obstacle": "Context-switching and notification distractions",
+        "countermeasure": "90-minute silent focus block"
+      }
+    ],
+    "followupTrigger": {
+      "time": "Today @ 5:00 PM",
+      "callType": "accountability_verification",
+      "status": "armed"
+    }
+  }
+}

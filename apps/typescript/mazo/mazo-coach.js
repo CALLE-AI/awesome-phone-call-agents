@@ -147,19 +147,115 @@ async function main() {
     }
   }
 
-  console.log('🚀 Dispatching live call via CALL-E CLI / API...');
+  console.log('🚀 Dispatching live call via CALL-E...');
 
-  execFile('calle', ['call', 'plan', '--to-phone', targetPhone, '--goal', callGoal], (err, stdout, stderr) => {
-    if (err) {
-      console.error('❌ Failed to execute CALL-E CLI:', stderr || err.message);
-      console.log('Tip: Ensure `calle` CLI is installed and authenticated (`calle login`).');
-      process.exit(1);
+  const apiKey = process.env.CALLE_API_KEY || process.env.EXPO_PUBLIC_CALLE_API_KEY;
+
+  // Try CLI execution first
+  execFile('calle', ['call', 'plan', '--to-phone', targetPhone, '--goal', callGoal], async (err, stdout, stderr) => {
+    if (!err) {
+      console.log('✅ CALL-E call plan created via CLI:', stdout.trim());
+      return;
     }
-    console.log('✅ CALL-E call plan created:', stdout.trim());
+
+    // If CLI not present or failed, check for direct CALL-E API key
+    if (apiKey) {
+      console.log('ℹ️ CALL-E CLI not available. Falling back to direct CALL-E REST API...');
+      try {
+        const payload = {
+          task: callGoal,
+          recipients: [{ phones: [targetPhone] }],
+          metadata: { app: 'mazo-executive-coach', user: userName, coach: coachRole, mode: sessionMode }
+        };
+        const res = await fetch('https://api.heycall-e.com/v1/calls', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log(`✅ CALL-E call successfully dispatched via REST API! Task ID: ${data.id || 'dispatched'}`);
+          return;
+        } else {
+          const errText = await res.text();
+          console.error('❌ CALL-E REST API error response:', errText);
+          process.exit(1);
+        }
+      } catch (fetchErr) {
+        console.error('❌ Direct CALL-E API request failed:', fetchErr.message);
+        process.exit(1);
+      }
+    }
+
+    console.error('❌ Failed to execute CALL-E CLI:', stderr || err.message);
+    console.log('Tip: Ensure `calle` CLI is installed and authenticated, or set `CALLE_API_KEY` in environment.');
+    process.exit(1);
   });
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+function buildCallGoal(options = {}) {
+  const { coachRole = 'The Clarifier', userName = 'Omar', sessionMode = 'kickoff', sessionTopic = 'Weekly Momentum' } = options;
+  if (sessionMode === 'followup') {
+    return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName} for a scheduled follow-up check-in. Inquire whether the agreed milestone was completed, verify execution evidence, update streak momentum, and provide immediate unblocking if stalled.`;
+  }
+  return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion.`;
+}
+
+function simulateExtraction(options = {}) {
+  const { sessionMode = 'kickoff', coachRole = 'The Clarifier', userName = 'Omar' } = options;
+  if (sessionMode === 'followup') {
+    return {
+      sessionId: 'sess_fup_8842',
+      callType: 'accountability_verification',
+      coach: coachRole,
+      client: userName,
+      status: 'verified_completed',
+      reconciledMilestone: 'Finalize core API contract and submit production build',
+      verificationOutcome: 'Milestone 100% completed and shipped on schedule',
+      momentumScoreAwarded: '+25 XP',
+      streakLevel: 'Active (Day 4)',
+      nextScheduledCheckin: 'Tomorrow @ 8:30 AM Kickoff'
+    };
+  }
+  return {
+    sessionId: 'sess_kickoff_1092',
+    callType: 'kickoff_and_lockin',
+    coach: coachRole,
+    client: userName,
+    status: 'completed',
+    outcome: 'Breakthrough achieved on project milestone prioritization',
+    actionItems: [
+      {
+        task: 'Finalize core API contract and submit production build',
+        deadline: 'Today @ 5:00 PM',
+        priority: 'high',
+        identifiedObstacle: 'Context-switching between design and architecture',
+        solution: '90-minute deep work block with notifications silenced'
+      }
+    ],
+    breakthroughMoment: 'Realized that shipping the core feature first unblocks the entire product release.',
+    relentlessAccountabilityLoop: {
+      scheduledCallbackAt: 'Today @ 5:00 PM',
+      engine: 'CALL-E Telephony Protocol',
+      status: 'armed'
+    }
+  };
+}
+
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  isValidE164,
+  maskPhone,
+  buildCallGoal,
+  simulateExtraction,
+  main
+};
