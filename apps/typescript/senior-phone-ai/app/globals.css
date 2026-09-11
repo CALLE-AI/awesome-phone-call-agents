@@ -293,11 +293,12 @@ button.danger { background: #8b372a; }
 .call-table th { color: #526156; font-size: .82rem; text-transform: uppercase; }
 .call-table td:nth-child(1) { min-width: 180px; }
 .call-table details summary { cursor: pointer; font-weight: 800; }
-.call-history-table { min-width: 1400px; }
+.call-history-table { min-width: 1250px; }
 .call-history-table th:nth-child(5),
-.call-history-table td:nth-child(5) { min-width: 560px; width: 48%; }
+.call-history-table td:nth-child(5) { min-width: 480px; width: 44%; }
 .call-history-table th:nth-child(6),
-.call-history-table td:nth-child(6) { line-height: 1.6; min-width: 340px; width: 30%; }
+.call-history-table td:nth-child(6) { min-width: 260px; width: 24%; }
+.operator-summary { font-size: 1.05rem; font-weight: 650; line-height: 1.65; }
 .table-conversation { margin-top: 16px; max-height: 520px; overflow-y: auto; padding-right: 14px; }
 .table-conversation p {
   border-left: 3px solid #d6ded7;

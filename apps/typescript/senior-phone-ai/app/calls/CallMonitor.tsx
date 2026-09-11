@@ -334,7 +334,7 @@ export function CallMonitor() {
           <div className="call-table-wrap">
             <table className="call-table call-history-table">
               <thead>
-                <tr><th>Started</th><th>Call</th><th>Status</th><th>Outcome</th><th>Conversation</th><th>Summary</th></tr>
+                <tr><th>Started</th><th>Call</th><th>Status</th><th>Outcome</th><th>Summary</th><th>Conversation</th></tr>
               </thead>
               <tbody>
                 {calls.map((call) => (
@@ -343,6 +343,7 @@ export function CallMonitor() {
                     <td><code>{call.callId}</code></td>
                     <td><strong className="status-pill">{call.status}</strong></td>
                     <td><strong className="status-pill">{call.outcome}</strong></td>
+                    <td className="operator-summary">{call.summary ?? "Not available"}</td>
                     <td>
                       {call.transcript.length ? (
                         <details>
@@ -358,7 +359,6 @@ export function CallMonitor() {
                         </details>
                       ) : "Waiting for provider"}
                     </td>
-                    <td>{call.summary ?? "Not available"}</td>
                   </tr>
                 ))}
               </tbody>
