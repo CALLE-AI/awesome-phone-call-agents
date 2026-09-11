@@ -193,9 +193,35 @@ class PanelServer(unittest.TestCase):
         )
         self.assertIn("unknown fields", body)
 
-    def test_setup_without_a_base_is_refused_with_what_is_missing(self):
-        body = self.expect_error(400, self.post, "/api/setup", {"airtable_token": "pat_x"})
-        self.assertIn("AIRTABLE_BASE_ID", body)
+    def test_a_token_without_a_base_saves_and_reports_what_is_missing(self):
+        """The base is created from the token, so requiring both would deadlock."""
+        _, body = self.post("/api/setup", {"airtable_token": "pat_x"})
+        self.assertIn("AIRTABLE_BASE_ID", body["missing"])
+        self.assertFalse(body["can_read_table"])
+        self.assertTrue(body["airtable_token"].startswith("set ("))
+
+    def test_an_empty_setup_is_refused(self):
+        self.expect_error(400, self.post, "/api/setup", {})
+
+    def test_create_base_needs_a_token_first(self):
+        body = self.expect_error(
+            400, self.post, "/api/create-base", {"workspace_id": "wspAbc123"}
+        )
+        self.assertIn("token first", body)
+
+    def test_create_base_rejects_unknown_fields(self):
+        body = self.expect_error(
+            400, self.post, "/api/create-base",
+            {"workspace_id": "wspAbc123", "tables": []},
+        )
+        self.assertIn("unknown fields", body)
+
+    def test_create_base_refuses_a_bad_workspace_before_any_request(self):
+        self.post("/api/setup", {"airtable_token": "pat_x"})
+        body = self.expect_error(
+            400, self.post, "/api/create-base", {"workspace_id": "appNotAWorkspace"}
+        )
+        self.assertIn("workspace id", body)
 
     def test_setup_writes_an_owner_only_file(self):
         import stat as stat_mod

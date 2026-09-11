@@ -33,7 +33,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from .. import config as cfg
-from ..airtable import AirtableError, FixtureAirtable, LiveAirtable
+from ..airtable import AirtableError, FixtureAirtable, LiveAirtable, create_base
 from ..audit import AuditLog
 from ..runner import RunError, execute, plan
 from ..transport import FixtureTransport, LiveTransport, TransportError
@@ -176,11 +176,13 @@ class Panel:
             calle_api_key=str(values.get("calle_api_key") or current.calle_api_key).strip(),
             requester_name=str(values.get("requester_name") or current.requester_name).strip(),
         )
-        if not merged.can_read_table:
-            raise PanelError(
-                "an Airtable token and base id are needed before the panel can "
-                f"read your table; still missing: {', '.join(merged.missing())}"
-            )
+        if not any(
+            (merged.airtable_token, merged.airtable_base_id,
+             merged.calle_api_key, merged.requester_name)
+        ):
+            raise PanelError("nothing to save")
+        # A token with no base is a legitimate half-configured state: the base
+        # is created from that token, so requiring both here would deadlock.
         cfg.save(merged, self.env_path)
         self.reconfigure()
         return self.config_json()
@@ -269,6 +271,29 @@ class Panel:
 
         threading.Thread(target=work, daemon=True).start()
         return {"started": True, "view": view}
+
+    def create_base(self, workspace_id: str) -> dict[str, Any]:
+        """Build the Airtable base from the saved token, and record its id."""
+        if not self.config.airtable_token:
+            raise PanelError("save an Airtable token first")
+        try:
+            created = create_base(self.config.airtable_token, str(workspace_id).strip())
+        except AirtableError as exc:
+            raise PanelError(str(exc)) from exc
+        base_id = str(created.get("id") or "")
+        if not base_id:
+            raise PanelError("Airtable created the base but returned no id")
+        cfg.save(
+            cfg.Config(
+                airtable_token=self.config.airtable_token,
+                airtable_base_id=base_id,
+                calle_api_key=self.config.calle_api_key,
+                requester_name=self.config.requester_name,
+            ),
+            self.env_path,
+        )
+        self.reconfigure()
+        return dict(self.config_json(), created_base_id=base_id)
 
     def audit_status(self) -> dict[str, Any]:
         status = self.audit.verify_chain()
@@ -378,6 +403,15 @@ def make_handler(panel: Panel):
                     )
                 try:
                     return self._send(200, panel.apply_setup(body))
+                except PanelError as exc:
+                    return self._send(400, {"error": str(exc)})
+
+            if parts.path == "/api/create-base":
+                unexpected = set(body) - {"workspace_id"}
+                if unexpected:
+                    return self._send(400, {"error": f"unknown fields: {sorted(unexpected)}"})
+                try:
+                    return self._send(200, panel.create_base(body.get("workspace_id", "")))
                 except PanelError as exc:
                     return self._send(400, {"error": str(exc)})
 

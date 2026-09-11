@@ -260,6 +260,15 @@ input:focus { outline: none; border-color: var(--faint); background: var(--raise
 .hint { font-size: 13px; color: var(--faint); margin: 10px 0 0; line-height: 1.55; }
 .hint a { color: var(--muted); text-underline-offset: 3px; }
 .hint a:hover { color: var(--ink); }
+.makebase {
+  margin-top: 28px; padding: 22px 24px; border-radius: var(--r-soft);
+  background: var(--surface); border: 1px solid var(--line);
+}
+.makebase h3 { font-size: 16px; margin: 0 0 6px; }
+.makebase > p { margin: 0 0 18px; color: var(--muted); font-size: 14px; max-width: 60ch; }
+.makebase .inline { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.makebase .inline > div { flex: 1 1 260px; }
+.makebase .inline button { flex: none; margin-top: 30px; }
 .connect-foot {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 24px 34px; border-top: 1px solid var(--hair); background: var(--surface);
@@ -378,6 +387,19 @@ footer .bad { color: var(--stop); }
           <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
           <p class="hint">Spoken aloud on every call. An unnamed caller asking about an employee is pretexting.</p>
         </div>
+      </div>
+      <div class="makebase" id="makebase" hidden>
+        <h3>No base yet?</h3>
+        <p>Certa can build it for you — nineteen columns with the right types and the extraction instructions already written in. Your token needs the <code>schema.bases:write</code> scope.</p>
+        <div class="inline">
+          <div>
+            <label for="f-ws">Airtable workspace</label>
+            <input id="f-ws" autocomplete="off" placeholder="wsp…">
+            <p class="hint">The <code>wsp…</code> segment of your Airtable address bar.</p>
+          </div>
+          <button id="mkbase">Create the base</button>
+        </div>
+        <p class="hint" id="mkbase-msg" style="margin-top:14px"></p>
       </div>
     </div>
     <div class="connect-foot">
@@ -560,6 +582,7 @@ function renderConfig(c) {
   $("s-key").textContent = c.calle_api_key || "";
   $("f-base").value = c.airtable_base_id || "";
   $("f-req").value = c.requester_name || "";
+  $("makebase").hidden = !(c.airtable_token && !c.airtable_base_id);
   $("perm").textContent = c.permission_warning || "";
   $("perm").className = c.permission_warning ? "bad" : "";
   renderSteps();
@@ -607,6 +630,25 @@ $("save").addEventListener("click", async () => {
     $("setup-msg").textContent = "";
     say(e.message, true);
   } finally { $("save").disabled = false; }
+});
+
+$("mkbase").addEventListener("click", async () => {
+  const ws = $("f-ws").value.trim();
+  if (!ws) { $("mkbase-msg").textContent = "Paste your workspace id first."; return; }
+  $("mkbase").disabled = true;
+  $("mkbase-msg").textContent = "Creating the base…";
+  try {
+    const c = await api("/api/create-base", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace_id: ws }),
+    });
+    renderConfig(c);
+    $("mkbase-msg").textContent =
+      "Created " + c.created_base_id + " — now add a view called “Ready to verify”.";
+    await loadPlan();
+  } catch (e) {
+    $("mkbase-msg").textContent = e.message;
+  } finally { $("mkbase").disabled = false; }
 });
 
 async function loadPlan() {
