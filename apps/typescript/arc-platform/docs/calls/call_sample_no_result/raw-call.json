@@ -1,0 +1,69 @@
+{
+ "_note": "SYNTHETIC SAMPLE. This is not a record of a real call. The station, the people, the conversation, the identifiers and the timestamps are all invented. The number is on ITU country code +99, which is unassigned and cannot be dialled. Real archives of real calls are kept privately and are not published, because the person on the other end of a cold call did not agree to be quoted.",
+ "id": "call_sample_no_result",
+ "object": "call",
+ "status": "completed",
+ "task": "<task text omitted from the sample>",
+ "recipients": [
+  {
+   "phones": [
+    "+99000000000"
+   ],
+   "region": "ZZ",
+   "locale": "en-US",
+   "status": "completed"
+  }
+ ],
+ "structuredResult": null,
+ "summary": "Connected; the station declined to quote by phone.",
+ "taskCompleted": false,
+ "completionConfidence": 0.5,
+ "evidence": [
+  "Connected; the station would not quote by phone."
+ ],
+ "metadata": {
+  "targetName": "Coastline FM 98.6",
+  "targetType": "station"
+ },
+ "failureCode": null,
+ "failureMessage": null,
+ "createdAt": "2026-01-05T11:00:00Z",
+ "completedAt": "2026-01-05T11:02:00Z",
+ "turns": [
+  {
+   "at": 0,
+   "speaker": "bot",
+   "text": "Hello, this is Arc, an AI assistant calling on behalf of Bright Foods, about radio advertising."
+  },
+  {
+   "at": 7,
+   "speaker": "user",
+   "text": "Sorry, who is this?"
+  },
+  {
+   "at": 9,
+   "speaker": "bot",
+   "text": "Arc, an AI assistant. This is only an availability and pricing enquiry."
+  },
+  {
+   "at": 14,
+   "speaker": "user",
+   "text": "You need to email us. I cannot give rates on the phone."
+  },
+  {
+   "at": 18,
+   "speaker": "bot",
+   "text": "Understood. Is there an address you would like the enquiry sent to?"
+  },
+  {
+   "at": 23,
+   "speaker": "user",
+   "text": "It is on the website."
+  },
+  {
+   "at": 25,
+   "speaker": "bot",
+   "text": "Thank you for your time."
+  }
+ ]
+}
