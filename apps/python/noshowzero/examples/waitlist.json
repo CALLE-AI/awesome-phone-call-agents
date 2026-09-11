@@ -1,0 +1,54 @@
+[
+  {
+    "entry_id": "wl-201",
+    "patient_name": "Robert Chen",
+    "phone": "+12125550131",
+    "language": "en-US",
+    "service_type": "Dental Cleaning",
+    "preferred_dates": [],
+    "preferred_times": ["morning"],
+    "status": "waiting",
+    "consent_to_call": true,
+    "offered_slots": [],
+    "created_at": "2026-09-02T14:10:00Z"
+  },
+  {
+    "entry_id": "wl-202",
+    "patient_name": "Maya Torres",
+    "phone": "+12125550132",
+    "language": "es-US",
+    "service_type": "Consultation",
+    "preferred_dates": [],
+    "preferred_times": ["afternoon"],
+    "status": "waiting",
+    "consent_to_call": true,
+    "offered_slots": [],
+    "created_at": "2026-09-04T16:45:00Z"
+  },
+  {
+    "entry_id": "wl-203",
+    "patient_name": "Lena Fischer",
+    "phone": "+12125550134",
+    "language": "en-US",
+    "service_type": "Dental Cleaning",
+    "preferred_dates": [],
+    "preferred_times": [],
+    "status": "waiting",
+    "consent_to_call": false,
+    "offered_slots": [],
+    "created_at": "2026-09-06T09:20:00Z"
+  },
+  {
+    "entry_id": "wl-204",
+    "patient_name": "Olivia Chen",
+    "phone": "(212) 555-0199",
+    "language": "en-US",
+    "service_type": "Dental Cleaning",
+    "preferred_dates": [],
+    "preferred_times": ["afternoon"],
+    "status": "waiting",
+    "consent_to_call": true,
+    "offered_slots": [],
+    "created_at": "2026-09-11T15:05:00Z"
+  }
+]
