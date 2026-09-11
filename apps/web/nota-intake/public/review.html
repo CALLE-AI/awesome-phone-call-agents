@@ -115,7 +115,8 @@ const flag = r => String.fromCodePoint(...[...r].map(c => 0x1F1E6 + c.charCodeAt
 let TOKEN = "", MATTERS = {}, REGIONS = {}, DATA = [], filter = "all", timer = null, watching = null;
 try { TOKEN = localStorage.getItem("nota_tok") || ""; } catch {}
 function toast(m, ms=3200) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), ms); }
-const api = (path) => fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN));
+const auth = () => ({ "x-review-token": TOKEN });
+const api = (path) => fetch(path, { headers: auth() });
 
 async function boot() {
   const [m, r] = await Promise.all([fetch("/api/matters").then(r=>r.json()), fetch("/regions.json").then(r=>r.json())]);
@@ -173,7 +174,7 @@ $("#callform").onsubmit = e => {
 };
 async function placeCall() {
   const b = $("#go"); b.disabled = true; b.textContent = "Placing…";
-  const r = await fetch("/api/intake", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pending) });
+  const r = await fetch("/api/intake", { method: "POST", headers: { "content-type": "application/json", ...auth() }, body: JSON.stringify(pending) });
   const j = await r.json().catch(() => ({}));
   $("#confirm").classList.remove("show");
   if (!r.ok) { toast("CALL-E declined: " + (j.message || j.error || r.status), 6000); return; }
@@ -243,7 +244,7 @@ function card(x) {
 async function remind(id) {
   const el = document.getElementById("when_"+id); if (!el.value) { el.focus(); toast("Pick the consultation date and time first"); return; }
   const when = whenText(el.value);
-  const r = await fetch(`/api/remind?token=${encodeURIComponent(TOKEN)}`, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ id, when }) });
+  const r = await fetch("/api/remind", { method:"POST", headers:{"content-type":"application/json", ...auth()}, body: JSON.stringify({ id, when }) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { toast("CALL-E declined: " + (j.message || j.error), 6000); return; }
   toast("Reminder call placed for " + when); load(true);

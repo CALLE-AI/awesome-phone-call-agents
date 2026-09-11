@@ -3,3 +3,10 @@ CALLE_BASE_URL=https://api.heycall-e.com
 FIRM_NAME=Nota.Lawyer
 REVIEW_TOKEN=choose-a-long-random-string
 WEBHOOK_SECRET=choose-another-long-random-string
+
+# Optional hardening (all off by default):
+# INTAKE_ACCESS_CODE=          # when set, the public form must be opened as /?code=<value> to place a call
+# ALLOWED_RECIPIENTS=          # comma-separated E.164 list; when set, only these numbers can be dialed (use your own for demos)
+# ALLOWED_ORIGINS=             # comma-separated extra browser origins allowed to call the API (the app's own origin always is)
+# MAX_CALLS_PER_IP_HOUR=3      # public-form submissions per IP per hour
+# MAX_CALLS_PER_DAY=20         # all calls (intake + reminder) per day, whole deployment

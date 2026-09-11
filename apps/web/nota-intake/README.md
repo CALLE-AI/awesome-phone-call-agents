@@ -74,7 +74,31 @@ Verified by live calls (2026-09-04/05):
   then couldn't — STT and TTS run in the call's locale. The form's language choice is binding.
 
 The Spanish script is complete and wired; the day CALL-E enables Spanish on US lines, the only change is one
-row in `regions.json`. Adding any language = one row there + one script block in `functions/_intake.js`.
+row in `regions.json`. Adding any language = one row there + one file in `functions/locales/` + one block in `public/i18n.json`.
+
+## Authorization and safety
+
+Every call is a real, billed side effect, so the endpoints that can place one are gated (`functions/_lib.js`):
+
+| Endpoint | Who may call it | Controls |
+| --- | --- | --- |
+| `POST /api/intake` (public form) | A browser on this site | `Origin` must be the app's own origin (or `ALLOWED_ORIGINS`); explicit consent checkbox; optional `INTAKE_ACCESS_CODE` (open the form as `/?code=...`); 3 submissions per IP per hour; `MAX_CALLS_PER_DAY` cap on the whole deployment |
+| `POST /api/intake` with `source: "staff"` | Staff | Same, plus the `x-review-token` header must match `REVIEW_TOKEN` |
+| `GET /api/intakes` | Staff | `x-review-token` header (constant-time compare; never accepted in the query string) |
+| `POST /api/remind` | Staff | `x-review-token` + `Origin`; the number dialed is the one already on the stored record, never taken from the request |
+| `POST /api/calle-webhook` | CALL-E | Must present `WEBHOOK_SECRET` (`?s=` or `x-webhook-secret`); fails closed when unset; the body only identifies the call, and the record is re-fetched from CALL-E with the API key |
+
+Recipient policy on every dial: strict E.164, no emergency or short-code prefixes, and when `ALLOWED_RECIPIENTS`
+is set only those numbers can be called (recommended for demos and test deployments).
+
+What leaves the server: the console receives phone numbers masked to country code plus last four (`+1******0100`)
+and never receives CALL-E's raw payloads or evidence blobs. The webhook stores only the call id and arrival time.
+`CALLE_API_KEY`, `REVIEW_TOKEN` and `WEBHOOK_SECRET` live only as Pages secrets (locally `.dev.vars`) and are never
+sent to a browser; the CALL-E key is used exclusively server-to-server from Pages Functions.
+
+Cancellation: the public CALL-E API exposes create and read only (no cancel endpoint), so a call already handed
+to CALL-E is stopped from the CALL-E dashboard; provider-side blocklists and kill switches apply. The app never
+schedules recurring calls; a reminder is one explicit click per call, and the daily cap bounds the blast radius.
 
 ## Architecture
 
@@ -94,7 +118,7 @@ sequenceDiagram
   E->>P: POST /api/calle-webhook?s=secret
   P->>E: GET /v1/calls/{id}
   P->>K: update record (result, transcript, confidence, status)
-  A->>P: GET /api/intakes?token=…  (or &sync=1 to poll)
+  A->>P: GET /api/intakes  (x-review-token; &sync=1 to poll)
   A->>P: POST /api/remind {id, when}
   P->>E: POST /v1/calls (reminder task, REMINDER_SCHEMA)
 ```
@@ -104,14 +128,18 @@ Everything runs on Cloudflare (Pages, Functions, KV). No servers, no framework, 
 ## Files
 
 ```
-public/index.html          bilingual form; loads /regions.json for the country → language picker
+public/index.html          form (EN/ES/ID); loads /i18n.json for its strings and /regions.json for the country → language picker
+public/i18n.json           form UI strings in English, Spanish and Bahasa Indonesia (data only)
 public/review.html         attorney console: records, transcript, confidence, "schedule reminder call"
 public/regions.json        CALL-E region/language matrix (generated from the integrations README)
-functions/api/intake.js    POST /api/intake  — validate, pick locale, create the CALL-E call, store record
-functions/api/calle-webhook.js  POST — terminal result; re-fetches authoritative state from CALL-E
-functions/api/intakes.js   GET  /api/intakes — review list (token), optional sync of in-flight calls
+functions/api/intake.js    POST /api/intake  — validate, authorize, pick locale, create the CALL-E call, store record
+functions/api/calle-webhook.js  POST — terminal result; authenticated; re-fetches authoritative state from CALL-E
+functions/api/intakes.js   GET  /api/intakes — review list (token header), redacted; optional sync of in-flight calls
 functions/api/remind.js    POST /api/remind  — reminder call in the client's language
-functions/_intake.js       interview scripts (EN/ES), RESULT_SCHEMA, reminder script + schema
+functions/_lib.js          auth, origin, recipient policy, rate limits, masking
+functions/_intake.js       assembles the interview task and result schema; reminder task + schema
+functions/_matters.js      matter types: icon + result fields; text comes from the locale files
+functions/locales/{en,es,id}.js  interview scripts and matter labels per language (data only)
 functions/_calle.js        syncIntake(): GET /v1/calls/{id} → KV record
 functions/_regions.js      same matrix as regions.json, for the Functions
 wrangler.toml              Pages config, KV binding
