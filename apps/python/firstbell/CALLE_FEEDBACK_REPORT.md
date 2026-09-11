@@ -110,17 +110,28 @@ Timing for the two calls that reached a terminal state through a full poll:
 
 This is the finding that ended the run, and it is new.
 
-At 18:59:48 a call terminated with attempt code `480`. The client saw the task reach
-`failed` and moved to the next scenario. Every subsequent create returned
-`account_concurrency_exceeded` as an HTTP 429: nine in a row over the following twenty
-minutes, through waits of 4, 30, 45 and 120 seconds and two deliberate 150-second pauses.
-None of them placed a call and none was billed.
+The sixth call this run created, `S-3105`, was accepted at 00:28:57 and terminated with
+attempt code `480`, the phone switched off or out of coverage. The client saw the task
+reach `failed` and moved to the next scenario. Every subsequent create returned
+`account_concurrency_exceeded` as an HTTP 429.
 
-The account was still refusing new calls **sixty-five minutes later**, across nine
-further probes spaced from thirty seconds to five minutes apart. Every one returned the
-same 429. No call was placed and nothing was billed by any of them, so the block is not
-a budget: the platform believes a call is running that the client watched finish at
-18:59:48.
+The figures here are counted off `bench-trace.jsonl`, which records every HTTP round trip
+this run made, rather than off the console:
+
+```
+POST /v1/calls       39 attempts
+                      6 accepted (201)   00:08:00 to 00:28:57
+                     33 rejected (429)   00:30:37 to 01:00:37
+```
+
+Not one create succeeded after the 480. The 33 rejections run consecutively for **thirty
+minutes**, through waits from 2 seconds to 7 minutes, and the run ended still blocked
+rather than recovering. At the level of the work file that is 15 rows recorded
+`account_concurrency_exceeded`, the difference being that the dialler retried some rows;
+the 33 is the number of times the platform was asked and refused.
+
+No call was placed and nothing was billed by any of them, so the block is not a budget:
+the platform believes a call is running that the client watched finish.
 
 There is no way to investigate or clear it from the API:
 
@@ -137,6 +148,12 @@ that there is no way to end a call and §7 that `canceled` is a status with no w
 it. Those were filed as gaps in control. This run shows what they cost: **one call that
 fails in the wrong way takes the whole account offline, and the only available remedy is
 to wait an unknown length of time.**
+
+How long the wait is, measured once: the account was still refusing at 01:00:37 and
+accepted a create at 14:30:54 the same day, so the block cleared somewhere inside
+**thirteen and a half hours** and nothing was done to it in between. That is an upper
+bound from one observation, not a recovery time, and it is the only number this account
+can offer a buyer who asks how long an outage lasts.
 
 What would fix it, in order of how much it would help:
 
@@ -264,7 +281,7 @@ nowhere in the ledger. The account was charged for four calls and it placed six.
 absorbs a drop originating in its own infrastructure and a line it could not reach, which is
 the correct behaviour and it is now observed rather than assumed.
 
-**The ten `account_concurrency_exceeded` rejections are not billed either.** They returned no
+**The 33 `account_concurrency_exceeded` rejections are not billed either.** They returned no
 `call_id` and dialled nobody, and the ledger agrees (§2, §4). Another entry documented
 CALL-E consuming an allowance call on a planner-rejected request; whatever that was, it is
 not this, and an HTTP 429 on this account costs nothing.

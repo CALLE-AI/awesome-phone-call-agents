@@ -486,3 +486,52 @@ def test_no_platform_call_id_reaches_this_file():
     for row in METERED["calls"]:
         assert row["scenario_id"].startswith("S-"), (
             "the metered rows are labelled with something other than a scenario id")
+
+
+def test_the_rejection_count_agrees_everywhere_it_is_printed():
+    """One number, three copies, and nothing was holding them equal.
+
+    The count of HTTP 429 rejections is stated in the report twice, once in the transport
+    table in section 4 and once in the billing answer in section 7, and a third time in
+    `observed-price.json`. It was published as "ten" in two of those places and as a
+    twenty-minute narrative of "nine in a row" in the third, while the trace the run
+    actually wrote recorded 33. Every copy passed every gate, because no gate read it.
+
+    This does not check that 33 is right; the trace that settles that lives outside the
+    repository with the receipts. It checks that the three copies cannot drift apart again,
+    which is the failure that happened.
+    """
+    import re
+
+    report = (APP / "CALLE_FEEDBACK_REPORT.md").read_text(encoding="utf-8")
+
+    # Section 4's transport block: "33 rejected (429)".
+    block = re.search(r"(\d+)\s+rejected \(429\)", report)
+    assert block, "section 4 no longer prints a rejected count in its transport block"
+    in_block = int(block.group(1))
+
+    # Section 4's prose, and section 7's billing answer.
+    prose = re.findall(r"The (\d+) rejections run consecutively", report)
+    answer = re.findall(r"\*\*The (\d+) `account_concurrency_exceeded` rejections", report)
+    assert prose, "section 4's prose no longer states the rejection count"
+    assert answer, "section 7 no longer states the rejection count"
+
+    # And the price file.
+    in_price = re.findall(r"(\d+) HTTP 429", PRICE["observed_metered"]["not_billed"]
+                          ["concurrency_rejections"])
+    assert in_price, "the price file no longer states the rejection count"
+
+    seen = {in_block, int(prose[0]), int(answer[0]), int(in_price[0])}
+    assert len(seen) == 1, (
+        f"the rejection count is printed as {sorted(seen)} in different places, so at least "
+        "one of them is stale: section 4's block, section 4's prose, section 7's answer and "
+        "evidence/observed-price.json all have to say the same thing")
+
+    # The attempts have to add up, because a refusal count without its denominator is not
+    # a measurement of anything a reader can check.
+    attempts = re.search(r"POST /v1/calls\s+(\d+) attempts", report)
+    accepted = re.search(r"(\d+) accepted \(201\)", report)
+    assert attempts and accepted, "section 4 no longer prints attempts and acceptances"
+    assert int(accepted.group(1)) + in_block == int(attempts.group(1)), (
+        f"{accepted.group(1)} accepted plus {in_block} rejected is not the "
+        f"{attempts.group(1)} attempts section 4 claims")

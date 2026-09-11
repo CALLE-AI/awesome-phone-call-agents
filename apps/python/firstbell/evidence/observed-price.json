@@ -82,7 +82,7 @@
   "duration_source": "Measured from the WAV recording CALL-E returned for each call, with ffprobe. Not the dashboard's duration column. The API exposes no duration at all, and the panel's window and the recording's need not be the same, so the two are not conflated.",
   "not_billed": {
    "zero_duration_failures": "The SIP 500 and the SIP 480 placed in this run appear nowhere in the ledger. Six calls were placed and four were charged. CALL-E absorbs a drop originating in its own infrastructure and a line it could not reach.",
-   "concurrency_rejections": "Ten HTTP 429 `account_concurrency_exceeded` responses. They returned no `call_id` and dialled nobody, and the ledger agrees. An HTTP 429 on this account costs nothing."
+   "concurrency_rejections": "33 HTTP 429 `account_concurrency_exceeded` responses, counted off `bench-trace.jsonl`: 39 attempts to create a call, 6 accepted and 33 refused, with every refusal falling after the last acceptance. They returned no `call_id` and dialled nobody, and the ledger agrees. An HTTP 429 on this account costs nothing."
   },
   "call_id_note": "Rows are labelled with this project's own scenario ids. The platform call ids that join them to the dashboard are held with the receipts outside this repository: they are the key back to a recording of a real line, and tests/test_privacy.py fails if one is committed."
  },
