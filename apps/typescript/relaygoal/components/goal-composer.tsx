@@ -61,7 +61,7 @@ export function GoalComposer({
   }
 
   return (
-    <form className="rounded-xl border border-border bg-card p-5" onSubmit={submit}>
+    <form className="rounded-xl border border-border bg-surface p-5" onSubmit={submit}>
       <div className="mb-5 inline-flex rounded-lg border border-border p-1" role="group" aria-label="Call one place or compare several">
         {(["single", "batch"] as const).map((m) => (
           <button

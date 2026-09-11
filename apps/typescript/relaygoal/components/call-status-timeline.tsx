@@ -20,7 +20,7 @@ export function CallStatusTimeline({
   const current = stageIndex(stage);
 
   return (
-    <section aria-labelledby="progress-heading" className="rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="progress-heading" className="rounded-xl border border-border bg-surface p-5">
       <h2 id="progress-heading" className="text-lg">
         {stage === "done" ? "Call finished" : "Calling for you…"}{" "}
         <span className="font-mono text-sm text-muted-foreground">{phoneMasked}</span>

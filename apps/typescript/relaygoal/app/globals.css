@@ -9,25 +9,36 @@
   --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --background: oklch(0.99 0.005 220);
-  --foreground: oklch(0.22 0.02 245);
+  /* Ground is a committed cool paper, not near-white, so cards lift off it. */
+  --background: oklch(0.955 0.011 212);
+  --foreground: oklch(0.21 0.02 245);
+  /* Tool surfaces (composer, transcript, how-it-works) — quiet, recessive. */
+  --surface: oklch(0.988 0.005 210);
+  --surface-foreground: oklch(0.21 0.02 245);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.02 245);
+  --card-foreground: oklch(0.21 0.02 245);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.02 245);
-  --primary: oklch(0.47 0.10 208);
+  --popover-foreground: oklch(0.21 0.02 245);
+  --primary: oklch(0.47 0.128 206);
   --primary-foreground: oklch(0.99 0.01 220);
-  --secondary: oklch(0.96 0.01 220);
-  --secondary-foreground: oklch(0.28 0.03 235);
-  --muted: oklch(0.96 0.008 220);
+  --secondary: oklch(0.95 0.012 212);
+  --secondary-foreground: oklch(0.27 0.03 235);
+  --muted: oklch(0.955 0.01 212);
   --muted-foreground: oklch(0.44 0.02 245);
-  --accent: oklch(0.93 0.03 205);
-  --accent-foreground: oklch(0.26 0.03 230);
-  --border: oklch(0.89 0.01 230);
-  --input: oklch(0.89 0.01 230);
-  --ring: oklch(0.47 0.10 208);
+  --accent: oklch(0.92 0.035 202);
+  --accent-foreground: oklch(0.25 0.035 228);
+  --border: oklch(0.85 0.014 224);
+  --input: oklch(0.83 0.016 224);
+  --ring: oklch(0.47 0.128 206);
 
-  --verified: oklch(0.55 0.13 155);
+  /* The receipt (signature) — its own material: teal header band + tinted ledger. */
+  --receipt-head: oklch(0.42 0.115 205);
+  --receipt-head-foreground: oklch(0.99 0.012 200);
+  --ledger: oklch(0.975 0.012 200);
+  --brand-accent: oklch(0.62 0.14 175);
+
+  /* Verification semantics — ALWAYS paired with icon + text, never color-alone. */
+  --verified: oklch(0.53 0.135 155);
   --verified-foreground: oklch(0.99 0.01 150);
   --caution: oklch(0.74 0.14 76);
   --caution-foreground: oklch(0.24 0.05 70);
@@ -36,57 +47,77 @@
 }
 
 .dark {
-  --background: oklch(0.18 0.02 245);
+  --background: oklch(0.155 0.021 250);
   --foreground: oklch(0.96 0.01 220);
-  --card: oklch(0.22 0.02 245);
+  --surface: oklch(0.205 0.021 246);
+  --surface-foreground: oklch(0.96 0.01 220);
+  --card: oklch(0.235 0.022 245);
   --card-foreground: oklch(0.96 0.01 220);
-  --popover: oklch(0.22 0.02 245);
+  --popover: oklch(0.235 0.022 245);
   --popover-foreground: oklch(0.96 0.01 220);
-  --primary: oklch(0.72 0.11 200);
-  --primary-foreground: oklch(0.18 0.02 245);
-  --secondary: oklch(0.27 0.02 240);
+  --primary: oklch(0.74 0.115 199);
+  --primary-foreground: oklch(0.16 0.02 245);
+  --secondary: oklch(0.27 0.022 240);
   --secondary-foreground: oklch(0.96 0.01 220);
-  --muted: oklch(0.27 0.02 240);
-  --muted-foreground: oklch(0.74 0.02 230);
-  --accent: oklch(0.30 0.03 225);
+  --muted: oklch(0.26 0.02 242);
+  --muted-foreground: oklch(0.75 0.02 230);
+  --accent: oklch(0.31 0.035 222);
   --accent-foreground: oklch(0.96 0.01 220);
-  --border: oklch(0.31 0.02 240);
-  --input: oklch(0.31 0.02 240);
-  --ring: oklch(0.72 0.11 200);
+  --border: oklch(0.33 0.022 240);
+  --input: oklch(0.34 0.024 240);
+  --ring: oklch(0.74 0.115 199);
+
+  --receipt-head: oklch(0.34 0.075 204);
+  --receipt-head-foreground: oklch(0.98 0.012 200);
+  --ledger: oklch(0.27 0.028 220);
+  --brand-accent: oklch(0.72 0.14 178);
 
   --verified: oklch(0.72 0.15 155);
-  --verified-foreground: oklch(0.18 0.02 150);
+  --verified-foreground: oklch(0.16 0.02 150);
   --caution: oklch(0.80 0.14 78);
   --caution-foreground: oklch(0.20 0.04 70);
   --destructive: oklch(0.65 0.19 27);
-  --destructive-foreground: oklch(0.15 0.02 20);
+  --destructive-foreground: oklch(0.14 0.02 20);
 }
 
-/* High-contrast: pure black/white ground, stronger borders. Stacks with .dark. */
+/* High-contrast: pure black/white ground, stronger borders. Stacks with .dark.
+   Neutralizes the receipt band and paper tints so nothing softens contrast. */
 .hc {
   --background: oklch(1 0 0);
   --foreground: oklch(0.14 0 0);
+  --surface: oklch(1 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.14 0 0);
   --muted-foreground: oklch(0.24 0 0);
   --border: oklch(0.30 0 0);
-  --primary: oklch(0.34 0.12 250);
-  --ring: oklch(0.34 0.12 250);
+  --primary: oklch(0.30 0.12 250);
+  --ring: oklch(0.30 0.12 250);
+  --receipt-head: oklch(0.20 0.06 240);
+  --receipt-head-foreground: oklch(1 0 0);
+  --ledger: oklch(1 0 0);
+  --brand-accent: oklch(0.30 0.12 250);
 }
 .hc.dark {
-  --background: oklch(0.10 0 0);
+  --background: oklch(0.08 0 0);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.10 0 0);
+  --surface: oklch(0.08 0 0);
+  --card: oklch(0.08 0 0);
   --card-foreground: oklch(1 0 0);
   --muted-foreground: oklch(0.86 0 0);
-  --border: oklch(0.78 0 0);
-  --primary: oklch(0.82 0.13 205);
-  --ring: oklch(0.82 0.13 205);
+  --border: oklch(0.80 0 0);
+  --primary: oklch(0.84 0.13 205);
+  --ring: oklch(0.84 0.13 205);
+  --receipt-head: oklch(0.16 0.05 210);
+  --receipt-head-foreground: oklch(1 0 0);
+  --ledger: oklch(0.08 0 0);
+  --brand-accent: oklch(0.84 0.13 205);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -102,6 +133,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-receipt-head: var(--receipt-head);
+  --color-receipt-head-foreground: var(--receipt-head-foreground);
+  --color-ledger: var(--ledger);
+  --color-brand-accent: var(--brand-accent);
   --color-verified: var(--verified);
   --color-verified-foreground: var(--verified-foreground);
   --color-caution: var(--caution);
@@ -137,7 +172,8 @@ html[data-textsize="xlarge"] { font-size: 131.25%; } /* 21px */
   }
   h1, h2, h3 {
     font-family: var(--font-display);
-    line-height: 1.2;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
   }
   /* Always-visible, high-contrast focus — never remove outlines. */
   :focus-visible {
@@ -160,6 +196,52 @@ html[data-textsize="xlarge"] { font-size: 131.25%; } /* 21px */
   .skip-link:focus {
     top: 0.5rem;
   }
+}
+
+/* Brand accent bar pinned to the very top edge of the app. Static, decorative,
+   hidden from assistive tech; a thin teal→brand rule that reads "product". */
+.brand-rail {
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--brand-accent) 50%, var(--verified) 100%);
+}
+.dark .brand-rail { background: linear-gradient(90deg, var(--primary) 0%, var(--brand-accent) 50%, var(--verified) 100%); filter: saturate(1.15) brightness(1.1); }
+.hc .brand-rail { background: var(--primary); }
+
+/* Small brand mark tile in the masthead. */
+.brand-mark {
+  background: linear-gradient(150deg, var(--primary), var(--receipt-head));
+  color: var(--primary-foreground);
+}
+.hc .brand-mark { background: var(--primary); }
+.dark .brand-mark { color: oklch(0.99 0.01 200); }
+
+/* The receipt: the signature object, materially distinct from tool surfaces. */
+.receipt {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 2px oklch(0.2 0.03 245 / 0.04), 0 12px 32px -12px oklch(0.2 0.03 245 / 0.22);
+}
+.dark .receipt {
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 16px 40px -16px oklch(0 0 0 / 0.55);
+}
+.hc .receipt { box-shadow: none; border-width: 2px; }
+
+/* Tear-off perforation along the receipt's bottom edge. Static + decorative. */
+.receipt-perf {
+  height: 12px;
+  background-image: radial-gradient(circle at 8px 12px, var(--background) 6px, transparent 6.5px);
+  background-size: 16px 12px;
+  background-repeat: repeat-x;
+  background-position: -8px 0;
+}
+.hc .receipt-perf { display: none; }
+
+/* Rubber-stamp treatment for the disclosure line — reads as an audit mark. */
+.stamp {
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
 }
 
 /* Respect reduced-motion globally: kill non-essential animation. */

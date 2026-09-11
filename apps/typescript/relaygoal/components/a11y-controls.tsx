@@ -55,7 +55,7 @@ export function A11yControls() {
   const sizes: Prefs["textsize"][] = ["normal", "large", "xlarge"];
 
   return (
-    <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border p-1" role="group" aria-label="Display settings">
+    <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1" role="group" aria-label="Display settings">
       <span className="sr-only">Display</span>
       <Toggle pressed={prefs.dark} onClick={() => update({ dark: !prefs.dark })} label={prefs.dark ? "Switch to light theme" : "Switch to dark theme"}>
         {prefs.dark ? "Light" : "Dark"}
