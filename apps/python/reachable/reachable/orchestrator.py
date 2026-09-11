@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from . import policy
 from .calls import contracts
@@ -78,12 +78,20 @@ class CallOutcome:
         return policy.Decision(False, self.reason, self.detail).text
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 @dataclass
 class Orchestrator:
     store: Store
     config: Config
     client: CallClient
     dataset: Dataset = field(default_factory=Dataset)
+    #: Injectable so the dashboard and the tests share one source of "now".
+    #: The calling-window guard is time-of-day sensitive, so a wall clock would
+    #: make behaviour depend on when somebody happens to run it.
+    clock: Callable[[], datetime] = _utc_now
 
     # ------------------------------------------------------------------ ids
 
@@ -408,7 +416,7 @@ class Orchestrator:
         """Guards, then reserve, then dial. Never the other way round."""
         case = self._case(case_id)
         workflow = Workflow(case["workflow"])
-        moment = now or datetime.now(timezone.utc)
+        moment = now or self.clock()
 
         try:
             request, contact, pupil, key = self.build_request(case_id)

@@ -38,9 +38,12 @@ def env() -> dict[str, str]:
 
 @pytest.fixture
 def live_env(env: dict[str, str]) -> dict[str, str]:
-    """Live calls enabled, but the transport is still the in-process fake."""
-    env["REACHABLE_LIVE_CALLS"] = "1"
-    return env
+    """Live calls enabled, but the transport is still the in-process fake.
+
+    Returns a copy. Mutating ``env`` in place would make a test that requests
+    both the dry and live fixtures silently run both of them live.
+    """
+    return {**env, "REACHABLE_LIVE_CALLS": "1"}
 
 
 @pytest.fixture
@@ -61,7 +64,17 @@ def fake_client(fake_state: FakeCalleState) -> FakeCalleClient:
 
 
 def build(store: Store, env: dict[str, str], client) -> Orchestrator:
-    orchestrator = Orchestrator(store=store, config=Config.from_env(env), client=client)
+    """An orchestrator with a frozen clock.
+
+    The calling-window guard is time-of-day sensitive, so a wall clock would
+    make these tests pass or fail depending on when they are run.
+    """
+    orchestrator = Orchestrator(
+        store=store,
+        config=Config.from_env(env),
+        client=client,
+        clock=lambda: SCHOOL_DAY_IN_WINDOW,
+    )
     report = orchestrator.import_data()
     assert report.ok, report.fatal
     return orchestrator
