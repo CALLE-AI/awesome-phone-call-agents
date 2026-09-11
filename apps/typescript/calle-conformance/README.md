@@ -279,6 +279,54 @@ scored at once, and `label=path` renames a row.
 It skips `probe-results/`, which holds the unmasked captures. A corpus that scores
 its own private inputs is measuring nothing.
 
+## The server
+
+The checker reads fixtures a project already has. This serves the corpus over
+HTTP instead, on the routes the SDK calls, so a project can develop against the
+real behaviours before it has any fixtures at all.
+
+```bash
+node src/fake.ts            # http://127.0.0.1:4010
+node src/fake.ts --list     # which response carries which behaviour
+```
+
+`CALLE_BASE_URL=http://127.0.0.1:4010` is the whole integration. What arrives is
+a captured response put back on the wire: the SDK renames seven fields on the way
+in, so the corpus is mapped back to the spelling the platform actually sends,
+because a fake answering in the SDK's own vocabulary leaves every mapped field
+`undefined`.
+
+Two things are modelled rather than served. Creates are metered as measured, so a
+create the planner rejects still spends a unit and only the limiter answers for
+free, which is the finding the rest of this file argues for, executable locally
+without a key. And `/v1/account`, `/v1/balance`, `/v1/credits`, `/v1/usage` and
+`/v1/me` return 404, as they do on the platform, so nobody writes against a mock
+that answers them.
+
+Timestamps are served as captured, which puts them in the past. Moving them to
+now would have meant recomputing the intervals that carry three of the findings.
+
+## Scoring a fake against reality
+
+`src/quirks.ts` has said since it was written that a predicate scores a fake
+server against reality. This is that command, and it works on any fake, not only
+the one above.
+
+```bash
+node src/score.ts --base http://127.0.0.1:4010
+```
+
+It drives the server through the SDK the way an application would and reports
+which of the eight behaviours that server reproduces. Most mocks are written from
+the documentation, because the documentation is the only description of the API
+that ships with the API, so most mocks reproduce the documentation. The number it
+prints is not a score out of eight. It is the list of payloads that will reach
+production untested.
+
+It exits 0 when all eight are reproduced, 1 when any are missing, and refuses to
+run against a real CALL-E origin, because scoring means creating calls and
+creating calls there rings telephones.
+
 ## What this does not prove
 
 A dot is not a defect. It says a behaviour is absent from the payloads that
@@ -451,14 +499,14 @@ node src/docs.ts --check
 ```
 
 `npm install` is needed only for `npm run typecheck` and for the probes that
-contact the API. `npm test` is sixteen tests and touches no network. Seven of them
+contact the API. `npm test` is seventy-four tests and touches no network. Eight of them
 attack the gate itself with truncated JSON, wrong types and payloads that parse
 but mean nothing, and assert that none of it can be mistaken for coverage. It includes leak tests that fail
 if a real phone number or an identifier from the private captures reaches
 `fixtures/`, verified by injecting one. Every number in the corpus is drawn from
 ranges reserved for documentation.
 
-Two of the eight compare the published fixtures against the private captures they
+Two of the nine compare the published fixtures against the private captures they
 were derived from, so they skip from a clean checkout and say why. They are kept
 rather than deleted because they are the tests that prove the masking held, and
 they run for anyone holding the captures. The captures themselves are never

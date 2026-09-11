@@ -11,7 +11,7 @@
  * So the override survives, and the set of places it may point does not.
  */
 
-const ALLOWED = ["https://api.heycall-e.com", "https://test-api.heycall-e.com"] as const;
+export const ALLOWED = ["https://api.heycall-e.com", "https://test-api.heycall-e.com"] as const;
 
 export function baseUrl(): string {
   const raw = process.env.CALLE_BASE_URL?.trim();
