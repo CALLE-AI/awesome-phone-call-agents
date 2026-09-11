@@ -1,0 +1,5 @@
+# Cross-cutting ignores. web/ and engine/ each carry their own more specific
+# .gitignore for their own build artifacts and dependency dirs.
+.DS_Store
+*.pem
+/node_modules/

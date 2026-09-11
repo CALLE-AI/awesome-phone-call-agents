@@ -1,0 +1,12 @@
+{
+  "right_person_reached": "yes",
+  "item_recognized": "yes",
+  "item_status": "still_has_item",
+  "notice_understood": "yes",
+  "selected_next_step": "none",
+  "preferred_time": "",
+  "questions": "It leaked and damaged my worktop. Can I claim for that?",
+  "human_follow_up_required": "yes",
+  "contact_outcome": "escalate",
+  "certainty": "high"
+}
