@@ -58,6 +58,7 @@ Kol never submits an appeal, changes a claim, posts a payment, accepts an offer,
 ## Project links
 
 - Product source and interface: <https://github.com/N-45div/kol>
+- Live Vercel demo: <https://kol-verified-payer-calls.vercel.app>
 - CALL-E Developer API: <https://github.com/CALLE-AI/call-e-integrations>
 
 The project motivation is based on the documented cost of manual claim-status calls. The separate trust problem - whether billing teams are currently harmed by wrong AI answers - remains a product hypothesis until validated in interviews with revenue-cycle operators.
