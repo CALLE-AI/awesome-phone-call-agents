@@ -18,13 +18,14 @@ export async function POST() {
     id: randomUUID(),
     name: "Alex Morgan (Demo)",
     phone: "+12763229632", // <-- replace with a real E.164 number in a supported region
-    region: "GH", // <-- must match the country of the phone number above
-    locale: "en-GH", // <-- language/locale for the call, e.g. "en-GB", "en-KE"
+    region: "US", // <-- must match the country of the phone number above
+    locale: "en-US", // <-- language/locale for the call, e.g. "en-GB", "en-KE"
     email: "alex.demo@example.com",
     plan_name: "Pro Monthly",
     amount_cents: 2900,
     stripe_customer_id: null,
     status: "active",
+    followups_paused: 0,
     created_at: new Date().toISOString(),
   };
 

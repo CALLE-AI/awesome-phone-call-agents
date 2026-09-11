@@ -29,22 +29,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "subscriber not found" }, { status: 404 });
   }
 
-  const webhookUrl = process.env.APP_BASE_URL
-    ? `${process.env.APP_BASE_URL}/api/calle/webhook`
-    : undefined;
+  const webhookUrl =
+    process.env.CALLE_WEBHOOK_URL ||
+    (process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL}/api/calle/webhook` : undefined);
 
   if (!webhookUrl) {
     return NextResponse.json(
       {
         error:
-          "APP_BASE_URL is not set. CALL-E needs a publicly reachable webhook URL to report " +
-          "the call result -- set APP_BASE_URL in .env.local to your ngrok/tunnel URL.",
+          "Neither APP_BASE_URL nor CALLE_WEBHOOK_URL is set. CALL-E needs a publicly reachable webhook URL to report " +
+          "the call result -- set APP_BASE_URL in .env.local to your ngrok/tunnel URL (e.g. https://xxxx.ngrok-free.app).",
       },
       { status: 500 }
     );
   }
 
-  const idempotencyKey = `payment-recovery:${callLog.id}`;
+    // Include a timestamp so a genuinely new attempt (e.g. retrying after a
+  // rejected/failed prior attempt, or an updated task) gets a fresh key,
+  // rather than colliding with a previous attempt's now-stale request body.
+  const idempotencyKey = `payment-recovery:${callLog.id}:${Date.now()}`;
 
   try {
     const call = await placeRecoveryCall({
@@ -52,6 +55,7 @@ export async function POST(req: NextRequest) {
       failureReason: callLog.trigger_reason,
       idempotencyKey,
       webhookUrl,
+      attemptNumber: callLog.attempt_number,
     });
     callLogsTable.attachCalleCall(callLog.id, call.id);
     return NextResponse.json({ calleCallId: call.id });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import Stripe from "stripe";
-import { stripe, ALWAYS_DECLINED_TEST_CARD_TOKEN } from "@/lib/stripe";
+import { stripe, pickRandomDeclineScenario } from "@/lib/stripe";
 import { subscribersTable, callLogsTable } from "@/lib/db";
 import { buildRecoveryCallTask } from "@/lib/calle";
 
@@ -29,16 +29,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "subscriber not found" }, { status: 404 });
   }
 
-  let failureReason = "your card was declined";
+    const scenario = pickRandomDeclineScenario();
+  let failureReason: string = scenario.reason;
 
   try {
     await stripe.charges.create({
       amount: subscriber.amount_cents,
       currency: "usd",
-      source: ALWAYS_DECLINED_TEST_CARD_TOKEN,
+      source: scenario.token,
       description: `Renewal for ${subscriber.plan_name} -- ${subscriber.name} (test-mode simulated failure)`,
     });
-
     // If we ever get here, Stripe didn't decline -- shouldn't happen with
     // the always-declined test token, but don't silently proceed as if
     // a failure occurred.
@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
     calle_call_id: null,
     trigger_reason: failureReason,
     status: "pending_confirmation",
+    chain_id: callLogId, // first call in the chain is its own chain root
+    attempt_number: 1,
+    retry_of: null,
+    scheduled_for: null,
   });
 
   subscribersTable.updateStatus(subscriber.id, "past_due");

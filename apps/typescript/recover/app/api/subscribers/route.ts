@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     amount_cents: body.amountCents,
     stripe_customer_id: null,
     status: "active",
+    followups_paused: 0,
     created_at: new Date().toISOString(),
   };
 

@@ -6,7 +6,16 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil" as Stripe.LatestApiVersion,
 });
 
-// Stripe's well-known test card number that always fails with a generic decline.
-// Safe to use in test mode -- no real card, no real money.
+
+// Stripe's well-known test tokens for different decline reasons. Safe to use
+// in test mode -- no real card, no real money involved.
 // https://docs.stripe.com/testing#declined-payments
-export const ALWAYS_DECLINED_TEST_CARD_TOKEN = "tok_chargeDeclined";
+export const DECLINE_SCENARIOS = [
+  { token: "tok_chargeDeclined", reason: "your card was declined" },
+  { token: "tok_visa_chargeDeclinedInsufficientFunds", reason: "your card has insufficient funds" },
+  { token: "tok_chargeDeclinedExpiredCard", reason: "your card has expired" },
+] as const;
+
+export function pickRandomDeclineScenario() {
+  return DECLINE_SCENARIOS[Math.floor(Math.random() * DECLINE_SCENARIOS.length)];
+}

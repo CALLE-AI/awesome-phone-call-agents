@@ -58,17 +58,29 @@ export interface RecoveryCallSubscriberInput {
   locale: string;
 }
 
-export function buildRecoveryCallTask(subscriber: RecoveryCallSubscriberInput, failureReason: string): RecoveryCallTask {
+export function buildRecoveryCallTask(
+  subscriber: RecoveryCallSubscriberInput,
+  failureReason: string,
+  attemptNumber: number = 1
+): RecoveryCallTask {
   const amount = (subscriber.amount_cents / 100).toFixed(2);
 
-  const task =
-    `Call ${subscriber.name} about a failed payment for their "${subscriber.plan_name}" ` +
-    `subscription ($${amount}). The payment failed because: ${failureReason}. ` +
+  const openingLine =
+    attemptNumber > 1
+      ? `Call ${subscriber.name} again -- an earlier call about this didn't get through -- about a failed payment ` +
+        `for their "${subscriber.plan_name}" subscription ($${amount}).`
+      : `Call ${subscriber.name} about a failed payment for their "${subscriber.plan_name}" subscription ($${amount}).`;
+
+    const task =
+    `You are an AI billing assistant calling on behalf of Recover, the billing ` +
+    `platform that manages ${subscriber.name}'s "${subscriber.plan_name}" subscription. ` +
+    `${openingLine} The payment failed because: ${failureReason}. ` +
+    `Identify yourself clearly as calling on behalf of Recover at the start of the call. ` +
     `Explain the issue in plain, reassuring language -- this is a common, fixable problem, ` +
     `not a penalty. Ask whether they'd like to (a) retry the charge right now, ` +
     `(b) get a secure link texted to update their card, or (c) pause the subscription ` +
     `for now. Be warm and brief; do not make the customer feel at fault.`;
-
+    
   return {
     task,
     recipient: {
@@ -84,6 +96,7 @@ export interface PlaceRecoveryCallParams {
   failureReason: string;
   idempotencyKey: string;
   webhookUrl: string;
+  attemptNumber?: number;
 }
 
 /**
@@ -104,8 +117,9 @@ export async function placeRecoveryCall({
   failureReason,
   idempotencyKey,
   webhookUrl,
+  attemptNumber = 1,
 }: PlaceRecoveryCallParams) {
-  const { task, recipient } = buildRecoveryCallTask(subscriber, failureReason);
+  const { task, recipient } = buildRecoveryCallTask(subscriber, failureReason, attemptNumber);
 
   const call = await client.calls.create(
     {
@@ -122,4 +136,22 @@ export async function placeRecoveryCall({
   );
 
   return call;
+}
+
+// Retry policy for automatic follow-up calls (see app/api/calle/webhook/route.ts).
+// Capped at 3 total attempts -- this is a deliberate ceiling, not a full
+// retry-until-answered loop, so an unreachable customer isn't called
+// indefinitely.
+export const MAX_CALL_ATTEMPTS = 3;
+
+/**
+ * Delay before an automatic follow-up call becomes eligible for preview,
+ * in minutes. Defaults to 24 hours (1440 min), matching realistic dunning
+ * cadences. Override with FOLLOWUP_DELAY_MINUTES in .env.local for fast
+ * demo/testing (e.g. FOLLOWUP_DELAY_MINUTES=1).
+ */
+export function followUpDelayMinutes(): number {
+  const raw = process.env.FOLLOWUP_DELAY_MINUTES;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1440;
 }
