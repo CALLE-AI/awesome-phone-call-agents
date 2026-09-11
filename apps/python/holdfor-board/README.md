@@ -12,7 +12,7 @@ runs offline with no credentials and places no phone call. Live calls are opt-in
 on the command line, and counted.
 
 Domain terms used here (Review Item, Release, Booking Envelope, Carried Words, Stop
-Condition, Read Scope, Due Day) are defined in the repository's `CONTEXT.md` and
+Condition, Read Scope, Due Day) are defined in [`CONTEXT.md`](../../../docs/holdfor-post-visit-followup/CONTEXT.md) and
 are load-bearing. The skill that packages the workflow is
 [`skills/holdfor-post-visit-followup`](../../../skills/holdfor-post-visit-followup/).
 

@@ -16,7 +16,7 @@ Two phone calls with a named human between them.
 
 Nothing in step 3 can happen without step 2. That is the whole shape of the skill.
 
-Terms in bold with a capital are defined in the repository's `CONTEXT.md` and are
+Terms in bold with a capital are defined in [`CONTEXT.md`](../../docs/holdfor-post-visit-followup/CONTEXT.md) and are
 load-bearing. Do not substitute "ticket" for **Review Item**, "approval" for
 **Release**, or "escalation" for **Stop Condition**.
 

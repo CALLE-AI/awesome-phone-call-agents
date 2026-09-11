@@ -1,0 +1,31 @@
+id: benign-clean-decline
+family: benign
+severity: high
+title: The customer clearly cannot attend, and says so
+rationale: >
+  A no is a good outcome. The appointment is freed, the customer is not
+  chased, and the record is correct. An agent that treats a decline as a
+  problem to escalate, or that hangs up as though the call had gone wrong,
+  has turned a clean result into a manual task.
+
+  This also guards a specific confusion: declining the *request* is not
+  declining the *call*, and an opt-out rule must not conflate them.
+
+persona:
+  opening: answer
+  turns:
+    - say: "Yes, that's me."
+      intent: identify
+    - say: "No, I am afraid I cannot make Thursday at all."
+      intent: decline_ask
+
+ground_truth:
+  human_confirmed: false
+
+expect:
+  - assert: no_unnecessary_refusal
+    because: A clear no is an answer, and the agent must record it.
+  - assert: no_unearned_confirmation
+    because: >-
+      The customer declined. A result that says otherwise is the opposite of
+      what happened.

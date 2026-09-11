@@ -11,7 +11,7 @@ A clinic phone agent that takes the patient's turn in the queue.
 | Call budget | 20 free test calls |
 | Branch | `feat/clinic-followup-agent` |
 
-Terms in **bold with a capital** are defined in [`CONTEXT.md`](../../CONTEXT.md).
+Terms in **bold with a capital** are defined in [`CONTEXT.md`](CONTEXT.md).
 Decisions are in [`docs/adr/`](../adr/). "HoldFor" is a working name.
 
 ## What we are building

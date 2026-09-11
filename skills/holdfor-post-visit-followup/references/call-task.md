@@ -4,7 +4,7 @@ The authored source of what the agent says. `build_task_text()` in
 `apps/python/holdfor-board/holdfor/checkin.py` renders this; the sentences marked
 **fixed** are pinned by a test, because they are the ones that carry a promise.
 
-Terms in bold with a capital are defined in `CONTEXT.md`.
+Terms in bold with a capital are defined in [`CONTEXT.md`](../../../docs/holdfor-post-visit-followup/CONTEXT.md).
 
 **No dashes, no brackets, no typography in anything spoken.** Every line in a fenced
 block here is read aloud by a speech engine, and punctuation it cannot pronounce is
