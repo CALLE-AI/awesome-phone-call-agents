@@ -1,0 +1,31 @@
+{
+  "name": "asheard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
+    "operator-token": "node --experimental-strip-types scripts/operator-token.ts"
+  },
+  "dependencies": {
+    "asheard": "^0.2.2",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "description": "Read what actually happened to a CALL-E call, and see which field said so."
+}

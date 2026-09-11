@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fraud-ops-caller.local/schemas/outcome.schema.json",
+  "title": "FraudOpsOutcome",
+  "description": "Structured write-back after a Fraud Ops Caller attempt. Disposition enums are intent-specific.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "intent",
+    "call_id",
+    "recording_id",
+    "disposition",
+    "quotes",
+    "next_action",
+    "fields",
+    "transcript_snippet",
+    "ended_at"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "kyc_chase",
+        "evidence_collection",
+        "collections",
+        "merchant_outreach"
+      ]
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recording_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CALL-E recording id. Demo uses rec_pending_calle_swap until the SDK is wired."
+    },
+    "disposition": {
+      "type": "string",
+      "enum": [
+        "paid",
+        "ptp",
+        "refuse",
+        "wrong_party",
+        "voicemail",
+        "no_answer",
+        "handoff",
+        "uploading_now",
+        "callback",
+        "confused",
+        "reached",
+        "docs_promised",
+        "wrong_contact",
+        "statement_taken",
+        "will_upload",
+        "refused",
+        "unsafe_escalate"
+      ]
+    },
+    "quotes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "next_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ptp_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "missing_docs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "callback_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "contact_role": {
+          "type": "string"
+        },
+        "handoff_reason": {
+          "type": "string"
+        },
+        "follow_up_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sentiment_check_sent": {
+          "type": "boolean"
+        },
+        "advocate_assigned": {
+          "type": "boolean"
+        },
+        "root_cause_note": {
+          "type": "string"
+        },
+        "nvc_state": {
+          "type": "string"
+        },
+        "tool_invoked": {
+          "type": "string",
+          "enum": [
+            "none",
+            "check_payment_eligibility",
+            "generate_hardship_plan",
+            "execute_emergency_containment",
+            "fetch_previous_context",
+            "assign_human_spoc"
+          ]
+        },
+        "hostility_strikes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "deescalation_override": {
+          "type": "boolean"
+        },
+        "unsafe_flag": {
+          "type": "boolean"
+        }
+      }
+    },
+    "transcript_snippet": {
+      "type": "string"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "intent": {
+            "const": "collections"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "enum": [
+              "paid",
+              "ptp",
+              "refuse",
+              "wrong_party",
+              "voicemail",
+              "no_answer",
+              "handoff"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intent": {
+            "const": "kyc_chase"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "enum": [
+              "uploading_now",
+              "callback",
+              "confused",
+              "refuse",
+              "voicemail",
+              "no_answer",
+              "handoff"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intent": {
+            "const": "merchant_outreach"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "enum": [
+              "reached",
+              "docs_promised",
+              "wrong_contact",
+              "voicemail",
+              "no_answer",
+              "handoff"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intent": {
+            "const": "evidence_collection"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "enum": [
+              "statement_taken",
+              "will_upload",
+              "refused",
+              "unsafe_escalate",
+              "wrong_party",
+              "voicemail",
+              "no_answer",
+              "handoff"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

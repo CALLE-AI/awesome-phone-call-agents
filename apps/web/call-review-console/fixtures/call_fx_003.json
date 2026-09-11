@@ -1,0 +1,85 @@
+{
+ "id": "call_fx_003",
+ "object": "call_task",
+ "status": "completed",
+ "task": "Call +15550100003 and ask whether the order arrived on time and undamaged.",
+ "recipients": [
+  {
+   "id": "rcp_003",
+   "phones": [
+    "+15550100003"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": {
+    "delivered_on_time": "yes",
+    "damaged": "no"
+   },
+   "summary": "Customer confirmed delivery on time with no damage.",
+   "attempts": [
+    {
+     "id": "att_003",
+     "phone": "+15550100003",
+     "status": "completed",
+     "started_at": "2026-09-04T15:00:00Z",
+     "completed_at": "2026-09-04T15:03:00Z",
+     "summary": "Customer confirmed delivery on time with no damage.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0.0,
+       "speaker": "agent",
+       "text": "Hi! Quick question about your recent order, do you have a minute?"
+      },
+      {
+       "offset_seconds": 3.2,
+       "speaker": "callee",
+       "text": "Who is this? Please don't call this number again."
+      },
+      {
+       "offset_seconds": 4.0,
+       "speaker": "agent",
+       "text": "I understand. Just to confirm, was the order delivered on time?"
+      },
+      {
+       "offset_seconds": 7.5,
+       "speaker": "callee",
+       "text": "I said don't call me."
+      },
+      {
+       "offset_seconds": 8.1,
+       "speaker": "agent",
+       "text": "Okay. Was there any damage to the package?"
+      },
+      {
+       "offset_seconds": 10.0,
+       "speaker": "callee",
+       "text": "Hanging up."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ],
+ "structured_result": {
+  "delivered_on_time": "yes",
+  "damaged": "no"
+ },
+ "summary": "Customer confirmed delivery on time with no damage.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.62,
+  "label": "medium"
+ },
+ "evidence": null,
+ "metadata": {
+  "fixture": true
+ },
+ "failure_code": null,
+ "failure_message": null,
+ "created_at": "2026-09-04T14:59:30Z",
+ "completed_at": "2026-09-04T15:03:05Z"
+}
