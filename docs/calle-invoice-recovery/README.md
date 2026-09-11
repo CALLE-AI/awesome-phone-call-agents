@@ -1,13 +1,12 @@
 # calle-invoice-recovery — Operator Guide
 
-> Long-form guidance for the `calle-invoice-recovery` skill. (The repo validator
-> forbids `README.md` in a skill directory, so this operator guide lives in
-> `docs/`. `SKILL.md` is the canonical skill definition.)
+> Long-form guidance for the [calle-invoice-recovery skill](../../skills/calle-invoice-recovery/SKILL.md).
+> Paths such as `references/` and `scripts/` below are relative to that skill folder.
 
-A reusable CALL-E skill for outbound invoice-recovery calls. The skill phones a
-named client about a specific unpaid invoice, holds a structured multi-turn
-conversation to understand their situation, offers a payment arrangement when
-appropriate, and records a typed outcome — all behind a human approval gate.
+A reusable CALL-E workflow reference for outbound invoice-recovery calls, with a
+standalone no-call preview. It defines a structured conversation and typed outcomes;
+an integrating host must supply live dispatch, human approval, and storage. Those
+application controls are not executable features of this contribution.
 
 Designed for freelancers and small agencies that chase overdue payments from
 overseas clients in CALL-E-supported regions.
@@ -29,7 +28,10 @@ work with any platform that can invoke the CALL-E API.
 
 ---
 
-## What this skill does
+## Workflow for an integrating host
+
+The following describes the intended host integration, not application code shipped
+with this reference. The bundled preview only assembles a fictional call brief.
 
 1. Accepts a structured invoice record (reference, amount, currency, due date, client
    phone number, and region).
@@ -47,7 +49,10 @@ scheduled automatically — that is the host scheduler's responsibility.
 
 ---
 
-## Prerequisites
+## Live-host prerequisites
+
+These are for a separate live integration. The offline preview needs no account or
+credentials; it only needs Node.js with TypeScript support or `tsx`.
 
 - A CALL-E account with a valid `CALLE_API_KEY`.
 - The client's phone number in E.164 format (`+[country code][number]`) — see
@@ -56,7 +61,7 @@ scheduled automatically — that is the host scheduler's responsibility.
   AU, CA, GB, VN, DE, JP, FR, MX, BR, ID, PH, KE, and BD/Bangladesh — English only).
   Calls to a region CALL-E does not support cannot be placed; use a different channel.
 - Node.js 20+ (24 LTS recommended), or the runtime your host uses.
-- `npx` available, to run the dry-run script without installing anything.
+- If using `npx tsx` for the preview, its first run may download `tsx`.
 
 ---
 
@@ -75,10 +80,10 @@ database schema, and no package manifest.
 | `references/adaptation-guide.md` — porting to another host | A CALL-E SDK dependency |
 | `scripts/dry-run.ts` — standalone preview, no network calls | Any code that can place a call |
 
-A working reference implementation of this workflow — Next.js, Supabase, the CALL-E
-TypeScript SDK, the approval queue UI, and the migrations — lives in a separate
-repository: <https://github.com/minhaz1221/calle-invoice-agent>. Use it as a worked
-example of wiring the skill into a host. Nothing in this folder depends on it.
+The author also links a separate reference project at
+<https://github.com/minhaz1221/calle-invoice-agent>, described as a Next.js/Supabase
+host integration. Its live behavior is author-reported, not independently verified
+by this contribution. Nothing in this skill folder depends on that project.
 
 ---
 
@@ -104,9 +109,11 @@ Pass `--invoice-ref` to preview a specific sample invoice from
 npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts --invoice-ref INV-2026-038
 ```
 
-It prints the full API payload and agent script that would be sent to CALL-E, but makes
-no network request and consumes no credit. Phone numbers and client names are masked in
-all output. The script refuses to run at all if `CALLE_MODE=live` or `CALLE_API_KEY` is
+It prints an illustrative API payload and agent script, but makes no network request
+and consumes no credit. Summary fields are masked; the fictional source names and
+synthetic destination inside the example intent key remain visible elsewhere in the
+preview. This is not a general-purpose redactor for real records. The script refuses
+to run at all if `CALLE_MODE=live` or `CALLE_API_KEY` is
 present in the environment — it fails closed rather than assuming the operator meant
 something safe.
 
@@ -148,7 +155,7 @@ When the dry-run output looks correct and the approval gate is wired up in your 
 1. Set `CALLE_MODE=live` in the host, not in the shell you run the dry-run from.
 2. Invoke the skill with a real invoice record and a real E.164 recipient number.
 3. Approve the call brief when it surfaces for review.
-4. The skill dispatches the call, logs the result, and stops. No retry and no follow-up
+4. Your host dispatches the call, logs the result, and stops. No retry and no follow-up
    is scheduled automatically — that is the host scheduler's responsibility.
 
 ---
@@ -205,11 +212,10 @@ not the operator's location.
 - **Not autonomous.** Every call requires explicit human approval before it is
   dispatched. The skill does not schedule retries, follow-ups, or recurring calls
   without operator action.
-- **Not a research prototype built for the demo.** The conversation flow, outcome
-  classification, and safety guardrails reflect months of real-world experience
-  designing debt-resolution call flows for live agency clients. The sample dataset and
-  transcripts in `references/` are illustrative and fictional; they are not real call
-  logs.
+- **Author-reported design experience.** The author reports experience designing
+  debt-resolution call flows; that experience is not independently verified here.
+  The sample dataset and transcripts in `references/` are illustrative and fictional,
+  not real call logs.
 - **Not a small-sample benchmark.** Performance metrics (call completion rate, outcome
   distribution, ASR accuracy) will be measured from real calls and added when available.
   No figures are published here that were not measured from an actual run.

@@ -1,12 +1,14 @@
 ---
 name: calle-invoice-recovery
-description: Places a polite outbound invoice-recovery call via CALL-E, conducts a structured multi-turn conversation about a specific unpaid invoice, offers a payment arrangement when the client is receptive, and logs the structured outcome — designed for freelancers and small agencies chasing overdue payments from overseas clients in CALL-E-supported regions.
+description: Defines a polite CALL-E invoice-recovery conversation, structured outcomes, and human-approval requirements for freelancers and small agencies; includes a no-call preview, while live dispatch and storage require a host integration.
 license: MIT
 ---
 
 # CALL-E Invoice Recovery Skill
 
 A reusable phone-call skill that contacts a named client about an unpaid invoice via CALL-E, holds a multi-turn conversation to understand the client's situation, offers a payment arrangement when appropriate, and records the outcome (paid, committed-to-date, escalated, or unresponsive) for human review. Every action is draft-then-approve: the operator reviews the call script and any proposed arrangement before the call is placed or any commitment is logged.
+
+**This edition is a workflow reference and offline preview.** The only bundled executable is `scripts/dry-run.ts`, which cannot place calls. The live workflow and safety requirements below are instructions for an integrating host, not a shipped approval UI, transport, scheduler, or database. The host must provide and verify those controls before live use. See the [operator guide](../../docs/calle-invoice-recovery/README.md).
 
 ## When To Use
 
@@ -60,7 +62,7 @@ CALL-E extracts a structured outcome from every call using this schema. The decl
 | `voicemail` | `callback` | Call reached voicemail; agent left a brief message. |
 | `wrong_person` | `callback` | A third party answered; the named client was not reached. |
 
-The "DB value" column shows how the outcome is stored in the `calls` table after the `mapCalleOutcome` translation layer runs. The `commitment_date` and `dispute_reason` fields are stored in the `arrangements` record linked to the call.
+The "DB value" column is an illustrative host-storage mapping, not a bundled database implementation. A host may implement a `mapCalleOutcome` translation and store `commitment_date` and `dispute_reason` in records linked to the call; no mapper, `calls` table, or `arrangements` table ships with this skill.
 
 ---
 
@@ -289,7 +291,7 @@ No PII appears in dry-run output. Operators who store unmasked data in their own
 ### Credential Hygiene
 
 - Never commit `CALLE_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or any credential to version control or log output.
-- The Supabase service-role key is server-side only; it never reaches a browser client.
+- If the host uses Supabase, keep its service-role key server-side; it must never reach a browser client.
 - Log lines must not contain API keys, session tokens, or auth headers.
 - CALL-E call IDs returned in API responses may be stored as opaque references — they are not credentials.
 
