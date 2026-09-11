@@ -22,7 +22,8 @@ def validate_offer(payload: dict[str, Any], budget_cap: float = 50000.0) -> bool
         nego_price = payload.get("negotiated_total") or total_price
 
         if nego_price is not None and nego_price > budget_cap:
-            print(f"Warning: Negotiated price ({nego_price}) exceeds budget cap ({budget_cap})")
+            print(f"Error: Negotiated price ({nego_price}) exceeds budget cap ({budget_cap})")
+            return False
 
         orig_price = payload.get("original_total")
         if orig_price is not None and nego_price is not None and nego_price > orig_price:
