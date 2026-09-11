@@ -12,9 +12,9 @@ This was built for a hackathon in a short window, so some panels show what a ful
 | **Dry-run by default**                          | ✅ Real                         | Unless `DRY_RUN=false` is explicitly set, no call is placed; the endpoint returns a preview (masked phone number + generated call script) instead.                                                                                      |
 | **Consent gate**                                | ✅ Real                         | The server rejects the request unless `consent_confirmed: true` is in the body, which the UI only sends once the consent checkbox is checked.                                                                                           |
 | **Idempotency protection**                      | ✅ Real                         | Every request carries a generated `Idempotency-Key`; the server replays the cached result for a repeated key instead of dialing twice.                                                                                                  |
-| **Transcript capture** (for real calls)         | ✅ Real                         | The transcript comes back from CALL-E's own call result and is appended to `call_log.json`.                                                                                                                                             |
+| **Transcript capture** (for real calls)         | ✅ Real                         | The transcript comes back from CALL-E's own call result and is appended to `data/call_log.json` — outside `public/`, so it's never served as a plain static file, and only reachable via the authenticated `GET /api/call-log`.          |
 | **Mood label & distress flag** (for real calls) | ✅ Real, but a simple heuristic | Distress is a keyword scan over the transcript (`"help me"`, `"where am I"`, etc.); mood is derived from whether the call completed and CALL-E's own confidence label. The code comments say this outright: *not clinically validated*. |
-| **Live dashboard / "Live" indicator**           | ✅ Real                         | Polls `residents.json` and `call_log.json` every 8 seconds. Residents without real history yet show labeled sample data so the demo isn't empty, but any real call appears automatically.                                               |
+| **Live dashboard / "Live" indicator**           | ✅ Real                         | Polls `residents.json` (public, redacted) and `GET /api/call-log` (authenticated) every 8 seconds. Residents without real history yet show labeled sample data so the demo isn't empty, but any real call appears automatically.         |
 | **Transcript translation**                      | ✅ Real                         | A real Gemini call, with an honest fallback (returns the original text and `translated: false`) if no key is configured or the call fails.                                                                                              |
 | **"Preview call script" simulator**             | ✅ Real, rehearsal-only         | A working chat simulator (Gemini, or a scripted fallback with no key) for staff to rehearse what CALL-E might say. It never dials a phone — it's a practice tool, not the calling path.                                                 |
 | **Resident onboarding / edit form**             | 🟠 Illustrative / roadmap      | Updates browser state only. Nothing is written back to `scripts/residents.json`, so a resident added this way looks real in the dashboard but can't actually be called.                                                                 |
@@ -34,17 +34,22 @@ sequenceDiagram
     participant Script as run_reminiscence_call.cjs
     participant CALLE as CALL-E (calle CLI)
     participant Phone as Resident's Phone
-    participant Log as public/call_log.json
+    participant Log as data/call_log.json (private)
     participant Dash as Dashboard (polls every 8s)
 
     Staff->>Browser: Pick resident, check consent box, click "Call Now"
     Browser->>Browser: Generate Idempotency-Key (crypto.randomUUID)
     Browser->>Server: POST /api/calls/place-real-call<br/>{ residentId, consent_confirmed: true }<br/>headers: Idempotency-Key, X-API-Key?
 
-    opt SENTINEL_API_KEY configured
-        Server->>Server: Check X-API-Key header
-        alt missing or wrong
-            Server-->>Browser: 401 Missing or invalid X-API-Key
+    alt DRY_RUN=false (live calls enabled) or SENTINEL_API_KEY configured
+        Server->>Server: SENTINEL_API_KEY configured?
+        alt not configured and DRY_RUN=false
+            Server-->>Browser: 503 Live calls disabled, no SENTINEL_API_KEY configured
+        else configured
+            Server->>Server: Check X-API-Key header
+            alt missing or wrong
+                Server-->>Browser: 401 Missing or invalid X-API-Key
+            end
         end
     end
 
@@ -85,8 +90,18 @@ sequenceDiagram
     end
 
     Browser-->>Staff: Show result (preview, or "Call completed")
-    Dash->>Log: poll every 8s
-    Log-->>Dash: updated call_log.json
+
+    loop poll every 8s
+        Dash->>Server: GET /api/call-log<br/>headers: X-API-Key?
+        Server->>Server: checkApiKeyRequired() — same fail-closed gate as above
+        alt key required and missing/wrong
+            Server-->>Dash: 401 / 503 (dashboard falls back to sample data)
+        else
+            Server->>Log: read data/call_log.json
+            Log-->>Server: file contents
+            Server-->>Dash: { calls: [...] }
+        end
+    end
     Dash->>Dash: Shift Feed, mood, "Live" indicator update automatically
 ```
 
@@ -111,6 +126,8 @@ sequenceDiagram
    ```
    `scripts/residents.json` holds real phone numbers and is **git-ignored** — it's the private file the calling backend reads from. Edit it with real (or your own test) phone numbers before placing any real call.
 
+   If you skip this step, the backend automatically falls back to `scripts/residents.example.json` (safe example data, fake phone numbers) and logs a warning — so the dry-run preview still works on a fresh clone, but you'll need to do the copy above before placing any real call.
+
    The frontend doesn't read this file directly — it fetches the separate, already-redacted `public/residents.json` (no phone numbers). If you add or change a resident in `scripts/residents.json`, mirror the non-sensitive fields into `public/residents.json` by hand so it shows up in the dashboard. There's no automated sync between the two today.
 
 4. **Run it**
@@ -127,7 +144,15 @@ Real phone calls to real, vulnerable people are not something to place casually,
 2. **Explicit, per-request consent.** The server checks for `consent_confirmed: true` in the request body on every single call. The UI only sends that once a human has checked the consent confirmation box for that specific resident, that specific time.
 3. **Idempotency protection.** Every request must carry a unique `Idempotency-Key` header. If the same key shows up again within 5 minutes — a flaky retry, a double-click, a network hiccup — the server returns the original cached result instead of placing a second call to the same person.
 
-There's also an optional fourth layer: setting `SENTINEL_API_KEY` requires a matching `X-API-Key` header on every request to this endpoint, useful if this were ever exposed beyond a trusted local network.
+There's also a fourth layer, required (not optional) once real calls are enabled: setting `DRY_RUN=false` requires `SENTINEL_API_KEY` to be configured, and a matching `X-API-Key` header on every request. This fails closed — if `DRY_RUN=false` and no `SENTINEL_API_KEY` is set, the endpoint refuses every live-call request instead of silently allowing unauthenticated ones. `SENTINEL_API_KEY` stays optional only for the harmless dry-run preview.
+
+Real call transcripts are protected the same way. They're written to `data/call_log.json`, a path that sits outside `public/` and `dist/` — the two directories Vite's dev server and `express.static` will serve as plain files with no authentication at all — and the dashboard can only read them through `GET /api/call-log`, which applies the identical `SENTINEL_API_KEY` gate described above.
+
+### Known limitation: `SENTINEL_API_KEY` and the browser
+
+If you set `SENTINEL_API_KEY`, be aware of a real gap: this is a server-side static app with no login system, so there's no secure place for the **browser** to hold that secret. The dashboard's `fetch` calls to `/api/calls/place-real-call` and `/api/call-log` don't attach an `X-API-Key` header today, so turning the key on will make the dashboard itself start receiving `401`/`503` from those endpoints (it degrades gracefully to sample data rather than crashing, but real call data won't show).
+
+`SENTINEL_API_KEY` is meant for a scenario where this server is reached by something other than this bundled browser dashboard — a trusted internal script, an authenticated reverse proxy that injects the header, etc. For the common case of one operator running this locally, DRY_RUN and the other gates above are the real protection; `SENTINEL_API_KEY` is an optional extra layer with this accepted trade-off, not a substitute for a real auth system, and not something in scope to solve properly at hackathon scope.
 
 ## Multi-language support
 
@@ -154,14 +179,17 @@ recall-e/
 ├── public/
 │   ├── residents.json               # Redacted copy the frontend actually fetches
 │   ├── sample_call_history.json     # Seed/sample calls, shown until real ones exist
-│   ├── call_log.json                # Real call results land here (git-ignored)
 │   └── assets/
+├── data/
+│   └── call_log.json                # Real call results (git-ignored, NOT in public/ --
+│                                     # only reachable via authenticated GET /api/call-log)
 ├── src/
 │   ├── App.tsx                      # Top-level state, tabs, modal orchestration
 │   ├── main.tsx
 │   ├── types.ts
 │   ├── data/
-│   │   └── realData.ts              # Fetches + polls the public/*.json files above
+│   │   └── realData.ts              # Fetches residents.json + sample_call_history.json as
+│   │                                 # static files, and real call data via /api/call-log
 │   ├── lib/
 │   │   ├── language.ts              # Language -> flag emoji lookup
 │   │   └── speech.ts                # Shared speech-synthesis tuning

@@ -19,10 +19,15 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
-const { buildCallGoal, loadResidents } = require("./build_call_goal.cjs");
+const { execFile } = require("child_process");
+const { buildCallGoal, loadResidents, maskPhone } = require("./build_call_goal.cjs");
 
-const CALL_LOG_PATH = path.join(__dirname, "..", "public", "call_log.json");
+// Real call transcripts are sensitive, so this must live outside public/
+// and dist/ -- anything in those directories is served as a static file
+// with zero authentication by both Vite's dev server and express.static.
+// data/ is never statically served; it's only ever read via the
+// authenticated GET /api/call-log endpoint in server.ts.
+const CALL_LOG_PATH = path.join(__dirname, "..", "data", "call_log.json");
 
 
 const CALLE_ENV = {
@@ -31,41 +36,71 @@ const CALLE_ENV = {
   CALLE_INTEGRATION_VERSION: "0.1.0",
 };
 
-function runCalleCommand(args) {
-  const envPrefix = Object.entries(CALLE_ENV)
-    .map(([k, v]) => `${k}=${v}`)
-    .join(" ");
-  const command = `env ${envPrefix} calle ${args}`;
-  const output = execSync(command, { encoding: "utf8", maxBuffer: 1024 * 1024 * 10 });
-  return JSON.parse(output);
+/**
+ * Runs `calle <args>` with an argument array (never a shell string), so
+ * resident data such as names, topics, or family names can never be
+ * interpreted as shell metacharacters. `sensitiveValues` are redacted out
+ * of any error message before it's surfaced (e.g. to logs or an API
+ * response) -- execFile still embeds the full argument list, including
+ * the phone number, in a failed command's error message.
+ */
+function runCalleCommand(args, sensitiveValues = []) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "calle",
+      args,
+      { encoding: "utf8", maxBuffer: 1024 * 1024 * 10, env: { ...process.env, ...CALLE_ENV } },
+      (err, stdout) => {
+        if (err) {
+          let message = err.message;
+          for (const value of sensitiveValues) {
+            if (value) message = message.split(value).join(maskPhone(value));
+          }
+          return reject(new Error(message));
+        }
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (parseErr) {
+          reject(new Error(`Failed to parse calle output as JSON: ${parseErr.message}`));
+        }
+      }
+    );
+  });
 }
 
-function planCall(resident, goal) {
+async function planCall(resident, goal) {
   const region = "US";
   const language = resident.language || "English";
-  const escapedGoal = goal.replace(/"/g, '\\"');
-  const args = `call plan --to-phone "${resident.phone}" --goal "${escapedGoal}" --region ${region} --language ${language}`;
-  const result = runCalleCommand(args);
-  const content = JSON.parse(result.result.content[0].text);
-  return content;
+  const args = [
+    "call", "plan",
+    "--to-phone", resident.phone,
+    "--goal", goal,
+    "--region", region,
+    "--language", language,
+  ];
+  const result = await runCalleCommand(args, [resident.phone]);
+  return JSON.parse(result.result.content[0].text);
 }
 
-function runCall(planId, confirmToken) {
-  const args = `call run --plan-id "${planId}" --confirm-token "${confirmToken}"`;
-  const result = runCalleCommand(args);
-  const content = JSON.parse(result.result.content[0].text);
-  return content;
+async function runCall(planId, confirmToken) {
+  const args = ["call", "run", "--plan-id", planId, "--confirm-token", confirmToken];
+  const result = await runCalleCommand(args);
+  return JSON.parse(result.result.content[0].text);
 }
 
-function pollStatus(runId, maxAttempts = 20, delayMs = 10000) {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollStatus(runId, maxAttempts = 20, delayMs = 10000) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const args = `call status --run-id "${runId}"`;
-    const result = runCalleCommand(args);
+    const args = ["call", "status", "--run-id", runId];
+    const result = await runCalleCommand(args);
     const content = JSON.parse(result.result.content[0].text);
     if (content.status === "COMPLETED" || content.status === "FAILED") {
       return content;
     }
-    execSync(`sleep ${delayMs / 1000}`);
+    await delay(delayMs);
   }
   throw new Error(`Call ${runId} did not complete after ${maxAttempts} polling attempts`);
 }
@@ -140,6 +175,7 @@ function appendToCallLog(record) {
     }
   }
   log.calls.push(record);
+  fs.mkdirSync(path.dirname(CALL_LOG_PATH), { recursive: true });
   fs.writeFileSync(CALL_LOG_PATH, JSON.stringify(log, null, 2));
 }
 
@@ -152,7 +188,7 @@ async function runReminiscenceCall(residentId) {
 
   const goal = buildCallGoal(resident);
   console.log(`Planning call for ${resident.name}...`);
-  const plan = planCall(resident, goal);
+  const plan = await planCall(resident, goal);
 
   if (!plan.ready_to_run) {
     console.error("Plan not ready to run:", plan.clarifying_questions);
@@ -160,14 +196,14 @@ async function runReminiscenceCall(residentId) {
   }
 
   console.log(`Running call for ${resident.name}...`);
-  const run = runCall(plan.plan_id, plan.confirm_token);
+  const run = await runCall(plan.plan_id, plan.confirm_token);
 
   console.log(`Polling for completion (run_id: ${run.run_id})...`);
-  const finalResult = pollStatus(run.run_id);
+  const finalResult = await pollStatus(run.run_id);
 
   const record = buildEngagementRecord(resident, finalResult);
   appendToCallLog(record);
-  console.log("Saved to call_log.json:");
+  console.log("Saved to data/call_log.json:");
   console.log(JSON.stringify(record, null, 2));
   return record;
 }

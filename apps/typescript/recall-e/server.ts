@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -12,6 +13,11 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
+
+// Single source of truth for where real call transcripts live on disk --
+// outside public/ and dist/, so neither Vite's dev server nor
+// express.static can ever serve it as a plain file.
+const { CALL_LOG_PATH } = require('./scripts/run_reminiscence_call.cjs');
 
 const app = express();
 const PORT = 3000;
@@ -38,13 +44,40 @@ function pruneIdempotencyCache() {
   }
 }
 
+// Shared fail-closed gate for every endpoint that can expose real call or
+// transcript data. Dry-run preview data is harmless and stays key-free,
+// but anything real requires SENTINEL_API_KEY to be configured and
+// presented -- if DRY_RUN=false or a key has been configured, an absent
+// or wrong key is refused rather than silently allowed through.
+// Returns true if the request may proceed; on false it has already sent
+// the response, so the caller should return immediately.
+function checkApiKeyRequired(req: Request, res: Response): boolean {
+  const requiresApiKey = !DRY_RUN || Boolean(REQUIRED_API_KEY);
+  if (!requiresApiKey) return true;
+  if (!REQUIRED_API_KEY) {
+    res.status(503).json({
+      error: 'Access to real call data is disabled: SENTINEL_API_KEY is not configured on the server.',
+    });
+    return false;
+  }
+  const providedKey = req.header('X-API-Key');
+  if (providedKey !== REQUIRED_API_KEY) {
+    res.status(401).json({ error: 'Missing or invalid X-API-Key.' });
+    return false;
+  }
+  return true;
+}
+
 // ── Real CALL-E integration ────────────────────────────────────────────────
 // This is the actual phone call path: it shells out to the same
 // run_reminiscence_call.cjs script validated directly against CALL-E's
 // CLI (plan_call -> run_call -> poll -> log), not a Gemini simulation.
 //
 // Safety gates, in order:
-//   1. If an API key is configured, it must be present in X-API-Key.
+//   1. Dry-run preview requests never need a key. Anything that could place
+//      a real call or return real call/transcript data (DRY_RUN=false) must
+//      carry a valid X-API-Key -- if no SENTINEL_API_KEY is configured on
+//      the server, those requests are refused outright (fail closed).
 //   2. consent_confirmed: true must be present in the request body.
 //   3. An Idempotency-Key header is required; repeating the same key
 //      within 5 minutes returns the original result instead of calling
@@ -54,12 +87,7 @@ function pruneIdempotencyCache() {
 app.post('/api/calls/place-real-call', (req: Request, res: Response) => {
   pruneIdempotencyCache();
 
-  if (REQUIRED_API_KEY) {
-    const providedKey = req.header('X-API-Key');
-    if (providedKey !== REQUIRED_API_KEY) {
-      return res.status(401).json({ error: 'Missing or invalid X-API-Key.' });
-    }
-  }
+  if (!checkApiKeyRequired(req, res)) return;
 
   const { residentId, consent_confirmed } = req.body;
   if (!residentId || typeof residentId !== 'string' || !/^[a-zA-Z0-9_]+$/.test(residentId)) {
@@ -81,14 +109,14 @@ app.post('/api/calls/place-real-call', (req: Request, res: Response) => {
   // ── Dry run: build the real call script and return a preview, no call ──
   if (DRY_RUN) {
     try {
-      const { buildCallGoal, loadResidents } = require('./scripts/build_call_goal.cjs');
+      const { buildCallGoal, loadResidents, maskPhone } = require('./scripts/build_call_goal.cjs');
       const residents = loadResidents();
       const resident = residents.find((r: any) => r.id === residentId);
       if (!resident) {
         return res.status(404).json({ error: `No resident found with id ${residentId}` });
       }
       const goal = buildCallGoal(resident);
-      const maskedPhone = resident.phone ? resident.phone.replace(/\d(?=\d{2})/g, '•') : 'not on file';
+      const maskedPhone = maskPhone(resident.phone);
       const body = {
         ok: true,
         dryRun: true,
@@ -137,6 +165,24 @@ app.post('/api/calls/place-real-call', (req: Request, res: Response) => {
       }
     }
   );
+});
+
+// Real call transcripts live at data/call_log.json (outside public/ and
+// dist/, so they're never reachable as a static file). This is the only
+// way the dashboard may read them -- gated by the same fail-closed
+// SENTINEL_API_KEY check as placing a real call.
+app.get('/api/call-log', (req: Request, res: Response) => {
+  if (!checkApiKeyRequired(req, res)) return;
+
+  if (!fs.existsSync(CALL_LOG_PATH)) {
+    return res.json({ calls: [] });
+  }
+  try {
+    const raw = fs.readFileSync(CALL_LOG_PATH, 'utf8');
+    return res.json(JSON.parse(raw));
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Could not read the call log.', details: err.message });
+  }
 });
 
 // Initialize Gemini SDK lazily if key exists

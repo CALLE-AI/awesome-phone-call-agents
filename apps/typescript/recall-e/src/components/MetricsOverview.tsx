@@ -54,8 +54,8 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({
               <span className="text-xs text-emerald-600 font-medium">calmed / joyful</span>
             </div>
           </div>
-          <div className="text-[11px] text-slate-400 mt-1 truncate">
-            &nbsp;
+          <div className="text-[11px] text-amber-700 mt-1 truncate" title="AI-generated interpretation, not a clinical measurement">
+            AI-estimated, not clinical
           </div>
         </div>
       </div>

@@ -19,8 +19,32 @@ const path = require("path");
 
 function loadResidents() {
   const dataPath = path.join(__dirname, "residents.json");
-  const raw = fs.readFileSync(dataPath, "utf8");
+  const fallbackPath = path.join(__dirname, "residents.example.json");
+  // scripts/residents.json is git-ignored (it holds real phone numbers), so
+  // a fresh clone won't have it until someone copies the example file per
+  // the README. Fall back to the example data instead of crashing, so
+  // `npm run dev` and the dry-run preview work out of the box.
+  const pathToUse = fs.existsSync(dataPath) ? dataPath : fallbackPath;
+  if (pathToUse === fallbackPath) {
+    console.warn(
+      "[recall-e] scripts/residents.json not found -- using scripts/residents.example.json " +
+      "(safe example data, no real phone numbers). Run `cp scripts/residents.example.json " +
+      "scripts/residents.json` and add real numbers before placing real calls."
+    );
+  }
+  const raw = fs.readFileSync(pathToUse, "utf8");
   return JSON.parse(raw).residents;
+}
+
+/**
+ * Masks all but the last 2 digits of a phone number, e.g. "+15551234567"
+ * -> "+•••••••••67". Used anywhere a resident's phone number could end up
+ * in a UI or API response, so real numbers are never shown or logged
+ * in full.
+ */
+function maskPhone(phone) {
+  if (!phone) return "not on file";
+  return phone.replace(/\d(?=\d{2})/g, "•");
 }
 
 function pastCallSummary(resident) {
@@ -109,4 +133,4 @@ if (require.main === module) {
   console.log(buildCallGoal(resident));
 }
 
-module.exports = { buildCallGoal, pastCallSummary, loadResidents };
+module.exports = { buildCallGoal, pastCallSummary, loadResidents, maskPhone };

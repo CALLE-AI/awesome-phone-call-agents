@@ -109,7 +109,10 @@ export async function loadRealDashboardData(): Promise<{
 }> {
   const profilesFile = await fetchJson<{ residents: RawProfile[] }>('residents.json');
   const sampleFile = await fetchJson<Record<string, { calls: RawCall[] }>>('sample_call_history.json');
-  const logFile = await fetchJson<{ calls: (RawCall & { residentId: string; residentName?: string })[] }>('call_log.json');
+  // Real call transcripts are sensitive, so they're no longer served as a
+  // static file -- this hits the authenticated /api/call-log endpoint
+  // instead of fetching data/call_log.json directly.
+  const logFile = await fetchJson<{ calls: (RawCall & { residentId: string; residentName?: string })[] }>('/api/call-log');
 
   const isLive = profilesFile !== null;
   const profiles = profilesFile?.residents ?? [];

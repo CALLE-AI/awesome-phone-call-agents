@@ -3,7 +3,8 @@ import {
   Search,
   AlertTriangle,
   PhoneCall,
-  Sparkles
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { CallLog } from '../types';
 
@@ -134,6 +135,15 @@ export const CallLogsView: React.FC<CallLogsViewProps> = ({
           </div>
 
         </div>
+      </div>
+
+      {/* Advisory label: mood tags below are AI-generated, not clinical */}
+      <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+        <Info className="w-3.5 h-3.5 shrink-0" />
+        <span>
+          Mood tags are unverified, AI-generated interpretations for staff review, not clinical
+          assessments.
+        </span>
       </div>
 
       {/* Clean Call Feed */}

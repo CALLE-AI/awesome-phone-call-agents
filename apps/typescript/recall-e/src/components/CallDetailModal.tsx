@@ -18,7 +18,8 @@ import {
   HeartHandshake,
   FileText,
   Languages,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import { CallLog } from '../types';
 import { ModalShell } from './ui/ModalShell';
@@ -264,6 +265,17 @@ export const CallDetailModal: React.FC<CallDetailModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Advisory label: these are heuristic/AI-derived, not clinical measurements */}
+          <div className="flex items-start gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-900 leading-relaxed">
+              <strong>Unverified, AI-generated interpretation.</strong> Mood score, cognitive
+              alertness, and validation-therapy outcomes below are heuristic estimates from
+              CALL-E's call analysis, for staff review only -- not a clinical or diagnostic
+              measurement.
+            </p>
+          </div>
 
           {/* Mood & Metric Badges */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
