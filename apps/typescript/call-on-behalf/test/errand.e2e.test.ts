@@ -492,6 +492,38 @@ test("a call that ended early still reports the conversation it carried", async 
   }
 });
 
+for (const failureCode of ["404", "486", "603", "unexpected_diagnostic", null, "busy", "no_answer", "unreachable", "voicemail", "machine"]) {
+  for (const machineAnswered of [false, true]) {
+    test(`failed call with ${String(failureCode)} and ${machineAnswered ? "machine" : "empty"} transcript`, async () => {
+      await withFake(
+        [{
+          phone: CLINIC,
+          status: "failed",
+          failureCode,
+          botLines: [],
+          userLines: machineAnswered
+            ? ["You have reached Bayview Family Clinic. Please leave a message after the tone."]
+            : [],
+          structuredResult: null,
+        }],
+        async (port, fake) => {
+          const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+          assert.equal(report.call_status, "failed");
+          assert.equal(report.outcome, machineAnswered ? "voicemail" : "call_failed");
+          assert.equal(report.reached_person, false);
+          assert.equal(report.transcript.length, machineAnswered ? 1 : 0);
+          assert.equal(report.answers.every((answer) => !answer.answered), true);
+          assert.equal(report.commitment, "none_sought");
+          assert.equal(fake.created.length, 1);
+          if (machineAnswered) {
+            assert.match(report.next_step, /went to a machine/);
+          }
+        },
+      );
+    });
+  }
+}
+
 test("the transcript says who was on the line, not the failure code beside it", async () => {
   // A machine on the transcript is a machine, whatever code CALL-E filed the call
   // under. The ordering is the point here: the transcript is read before the code.

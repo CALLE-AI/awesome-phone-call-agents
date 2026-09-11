@@ -109,9 +109,8 @@ test("a call CALL-E has not finished with is no result, whatever the extraction 
 });
 
 test("no state short of finished is evaluated, whichever one it is", async () => {
-  // The last three are not CallStatus values at all. A no answer, a busy line or a
-  // voicemail arrives as a failure code on a failed call or as a machine on the
-  // transcript, so a status spelled this way is one this app does not understand.
+  // The last three are not CallStatus values at all. Diagnostic failure codes
+  // do not define additional statuses, so these cannot establish a terminal call.
   for (const status of [
     "queued",
     "in_progress",

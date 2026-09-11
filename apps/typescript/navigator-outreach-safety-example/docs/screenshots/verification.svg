@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="810" viewBox="0 0 1440 810" role="img" aria-label="Fictional local verification panel">
+  <rect width="1440" height="810" fill="#08111f"/><rect x="92" y="72" width="1256" height="666" rx="24" fill="#11213b" stroke="#50e3c2" stroke-width="3"/>
+  <text x="150" y="155" fill="#ffffff" font-family="Arial" font-size="42" font-weight="700">Local Verification · Proposed Public Package</text>
+  <text x="150" y="205" fill="#9fb3c8" font-family="Arial" font-size="24">FICTIONAL DISPLAY — GENERATED FROM NO-CALL CHECKS</text>
+  <g font-family="monospace" font-size="29" fill="#d7e4f2"><text x="170" y="310">PASS  CALL-E package imported at runtime</text><text x="170" y="375">PASS  mock/no-call guard test</text><text x="170" y="440">PASS  type-check</text><text x="170" y="505">PASS  local production build</text></g>
+  <text x="170" y="620" fill="#50e3c2" font-family="Arial" font-size="28">0 credentials · 0 live calls · 0 telephone requests</text>
+</svg>

@@ -29,8 +29,9 @@ example currently closes all 21 attacks without losing any of its 10 ordinary
 calls; a future change that trades one failure for another cannot hide behind
 the headline number.
 
-No account. No API key. No network. No phone rings. That run takes under a
-second, and you can reproduce it from a clean checkout in three commands.
+The static evaluation needs no account, API key or network and places no call.
+Follow the installation and example commands below from a clean checkout;
+downloading the source and dependencies does require network access.
 
 ---
 
@@ -69,8 +70,21 @@ REDLINE is not on PyPI yet, so install it from a checkout:
 ```console
 $ git clone https://github.com/CALLE-AI/awesome-phone-call-agents.git
 $ cd awesome-phone-call-agents/apps/python/redline
-$ pip install -e .
+$ python -m venv .venv
+$ source .venv/bin/activate
+$ python -m pip install -e .
 ```
+
+On Windows PowerShell, replace the activation and installation lines with:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .
+```
+
+Activation is optional: on Windows, use `.\.venv\Scripts\redline.exe`
+instead of `redline` in the commands below. Use Python 3.11 or 3.12 for
+the validated reproduction path. Run commands one at a time: the uncorrected
+example's `run` intentionally exits 1 when it reports modelled failures.
 
 The package lives at `apps/python/redline/` so the directory can be lifted
 into the CALL-E monorepo unchanged. Everything it needs — scenarios,
@@ -331,12 +345,38 @@ declaration.
 did not state it. Pasting in the whole clause library would be free to
 implement and would make the verification meaningless.
 
-Against the example agent that means **11 fixes applied: 10 policy clauses and
-1 schema change**. The two numbers are not interchangeable and it is worth
-being precise about which is which -- REDLINE knows exactly **10 defences**,
-and the eleventh change is the `result_schema` rewrite that gives an extractor
-somewhere to put "I don't know". `report.json` reports the first as
-`missing_defences`, `verify.json` reports the second as `remedies`.
+Against the bundled example that currently means **16 proposed remedies:
+10 policy clauses, 5 data-policy rules and 1 schema change**. The schema rewrite
+gives an extractor somewhere to put "I don't know". Counts depend on the input
+contract and catalogue; `missing_defences` and `remedies` describe different things.
+
+`redline fix` previews a correction. `redline verify` evaluates the generated
+correction in memory against the static and benign suites; it does **not** write
+the source YAML. Only an explicit `redline fix --apply` writes the correction
+and creates a backup. Review the proposed schema as well as the task text:
+changing a boolean result to `yes` / `no` / `unknown` requires corresponding
+changes in downstream consumers, which the static suite does not test.
+
+### Inspect the complete correction and save reports
+
+The terminal task diff is a preview and may be clipped at narrow widths. Export
+the before/after report to inspect the full task diff without terminal truncation:
+
+```console
+$ redline run --config examples/appointment-agent/redline.yaml --json .redline/report.json
+$ redline verify --config examples/appointment-agent/redline.yaml --json .redline/verify.json --receipt .redline/release-receipt.json
+```
+
+The first command still exits 1 for the uncorrected example. Run the second
+command separately. Open `.redline/verify.json` in a text editor to inspect
+`patch.goal_diff` and `patch.remedies`. The JSON marks `schema_changed` but does
+not include the full proposed schema: inspect the `Proposed result_schema`
+section printed by `redline fix --config examples/appointment-agent/redline.yaml`
+as well before deciding whether to apply anything. These filenames are explicit choices,
+not automatic output: `output_dir` alone does not request JSON reports.
+`--receipt` saves provenance and verdicts; it does not replace the full report.
+If no correction is needed, `verify` exits early and does not write a JSON
+before/after report; `--receipt` can still write a run receipt.
 
 Every generated clause has to satisfy one property, enforced by a test:
 **adding it must change what the goal demonstrably states.** Without that,
