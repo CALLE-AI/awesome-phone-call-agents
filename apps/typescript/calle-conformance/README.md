@@ -350,6 +350,11 @@ It exits 0 when all eight are reproduced, 1 when any are missing, and refuses to
 run against a real CALL-E origin, because scoring means creating calls and
 creating calls there rings telephones.
 
+A run the server cuts short exits 2 and says it is incomplete, never a score. A
+second scoring run against the same fake meets the metered cap the first one
+spent, and reporting the behaviours it never got to ask for as behaviours the
+server lacks would be this tool committing the error it exists to name.
+
 ## What this does not prove
 
 A dot is not a defect. It says a behaviour is absent from the payloads that
@@ -546,7 +551,7 @@ node src/docs.ts --check
 ```
 
 `npm install` is needed only for `npm run typecheck` and for the probes that
-contact the API. `npm test` is seventy-four tests and touches no network. Eight of them
+contact the API. `npm test` is seventy-seven tests and touches no network. Eight of them
 attack the gate itself with truncated JSON, wrong types and payloads that parse
 but mean nothing, and assert that none of it can be mistaken for coverage. It includes leak tests that fail
 if a real phone number or an identifier from the private captures reaches

@@ -19,6 +19,10 @@
  *
  *   node src/score.ts --base http://127.0.0.1:4010 [--calls 15] [--polls 4]
  *
+ * A run the server cuts short is reported as incomplete and never as a score,
+ * because handing over a partial reading as an answer is the mistake this whole
+ * corpus exists to name.
+ *
  * It refuses to run against a real CALL-E origin, because scoring means
  * creating calls, and creating calls there rings telephones.
  */
@@ -77,9 +81,14 @@ const observed = new Set<string>();
 const threw = new Map<string, string>();
 let settled = 0;
 let unsettled = 0;
+/** Set when the server stopped answering creates, which makes the run partial. */
+let cutShort: string | null = null;
 
-process.stdout.write(`scoring ${origin} against ${QUIRKS.length} behaviours from the corpus\n`);
-process.stdout.write(`${calls} calls, up to ${polls} polls each\n\n`);
+const out = (line: string) => process.stdout.write(`${line}\n`);
+
+out(`scoring ${origin} against ${QUIRKS.length} behaviours from the corpus`);
+out(`${calls} calls, up to ${polls} polls each`);
+out("");
 
 for (let n = 0; n < calls; n += 1) {
   let call: Call | null;
@@ -87,7 +96,7 @@ for (let n = 0; n < calls; n += 1) {
     call = await drive();
   } catch (error) {
     const e = error as Error & { status?: number; code?: string };
-    process.stdout.write(`the server refused a create: ${e.status ?? ""} ${e.code ?? e.message}\n`);
+    cutShort = `${e.status ?? ""} ${e.code ?? e.message}`.trim();
     break;
   }
   if (call === null) {
@@ -106,29 +115,53 @@ for (let n = 0; n < calls; n += 1) {
 
 const missing = QUIRKS.filter((q) => !observed.has(q.id));
 
+if (cutShort !== null) {
+  out(`the server stopped answering creates after ${settled}: ${cutShort}`);
+  out("");
+  out(`This run is incomplete, so it is not a score. ${observed.size} of ${QUIRKS.length} behaviours`);
+  out(`were seen before it stopped, and the rest were never asked for.`);
+  if (cutShort.includes("rate_limit")) {
+    out("");
+    out(`That is the metered counter, which src/fake.ts models: a create the planner`);
+    out(`rejects spends a unit too. A second scoring run against the same server meets`);
+    out(`the cap the first one spent. Restart it, or give it room:`);
+    out(`  node src/fake.ts --limit 200`);
+  }
+  process.exit(2);
+}
+
+if (settled === 0) {
+  out(`nothing settled out of ${calls}, so there is nothing to score.`);
+  process.exit(2);
+}
+
 process.stdout.write(`${settled} of ${calls} calls settled`);
 process.stdout.write(unsettled === 0 ? "\n\n" : `, ${unsettled} never left a waiting status\n\n`);
 
 for (const quirk of QUIRKS) {
-  process.stdout.write(`${observed.has(quirk.id) ? "reproduced  " : "absent      "}${quirk.id}\n`);
+  out(`${observed.has(quirk.id) ? "reproduced  " : "absent      "}${quirk.id}`);
 }
 
-process.stdout.write(`\n${observed.size} of ${QUIRKS.length} reproduced.\n`);
+out("");
+out(`${observed.size} of ${QUIRKS.length} reproduced.`);
 
 if (missing.length > 0) {
-  process.stdout.write(`\nWhat a suite written against this server never sees:\n\n`);
+  out("");
+  out(`What a suite written against this server never sees:`);
+  out("");
   for (const quirk of missing) {
-    process.stdout.write(`  ${quirk.id}\n`);
-    process.stdout.write(`    ${quirk.title}\n`);
-    process.stdout.write(`    ${quirk.consequence}\n\n`);
+    out(`  ${quirk.id}`);
+    out(`    ${quirk.title}`);
+    out(`    ${quirk.consequence}`);
+    out("");
   }
 }
 
 if (threw.size > 0) {
-  process.stdout.write(`predicates that threw on this server's payloads:\n`);
-  for (const [id, message] of threw) process.stdout.write(`  ${id}: ${message}\n`);
+  out(`predicates that threw on this server's payloads:`);
+  for (const [id, message] of threw) out(`  ${id}: ${message}`);
 }
 
 // A gate wants an exit code. Anything short of the full set is a fail, because
 // the point of the number is the behaviours that are not in it.
-process.exit(settled === 0 ? 2 : missing.length === 0 ? 0 : 1);
+process.exit(missing.length === 0 ? 0 : 1);
