@@ -1,0 +1,8 @@
+.env
+vouchcall.db
+__pycache__/
+*.pyc
+.idea/
+.venv/
+.qodo/
+title_card.html

@@ -1,0 +1,10 @@
+Subject: Unusual Activity Detected - Immediate Action Required
+
+Dear Customer,
+
+We have detected unusual activity on your account and a pending payment of $749.00 has failed to process.
+Your account will be suspended within 24 hours unless this is resolved.
+
+Please call us back immediately at (800) 555-0187 to verify your account and avoid suspension.
+
+Billing Security Team

@@ -1,0 +1,12 @@
+/data
+.env
+.env.*
+node_modules
+.next
+dist-scheduler
+*.tsbuildinfo
+*.db
+*.db-wal
+*.db-shm
+*.log
+.git

@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1786953124949,
+      "tag": "0000_spotty_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786962336824,
+      "tag": "0001_nice_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786973590051,
+      "tag": "0002_exotic_tyger_tiger",
+      "breakpoints": true
+    }
+  ]
+}

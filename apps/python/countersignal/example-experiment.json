@@ -1,0 +1,17 @@
+{
+  "experiment_id": "permit-ops-001",
+  "segment": "small construction firms that manage municipal permits",
+  "problem": "staff spend repeated operator time resolving permit status ambiguity",
+  "hypothesis": "the problem recurs often enough that firms already use a workaround",
+  "questions": [
+    "Tell me about the last time a permit status was unclear.",
+    "How did your team resolve it?",
+    "How often does this happen?",
+    "What happens if nobody follows up?"
+  ],
+  "decision_rule": {
+    "min_answered": 5,
+    "support_if_at_least": 3,
+    "weaken_if_at_least": 2
+  }
+}

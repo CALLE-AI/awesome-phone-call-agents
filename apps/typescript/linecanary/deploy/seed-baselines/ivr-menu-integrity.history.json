@@ -1,0 +1,98 @@
+[
+  {
+    "checkId": "ivr-menu-integrity",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 12,
+      "secondsToFirstResponse": 12,
+      "turnCount": 4
+    },
+    "confidence": 0.95,
+    "callId": "call_Y_qjikl1h1XiHOWV34H1Xg",
+    "at": "2026-08-03T19:34:26.753727Z",
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "billing_option",
+          "equals": "3"
+        },
+        "pass": true,
+        "actual": "3",
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "menu_options",
+          "contains": "appointments"
+        },
+        "pass": true,
+        "actual": "appointments: 1; opening hours: 2; billing questions: 3",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-menu-integrity",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 10,
+      "secondsToFirstResponse": 10,
+      "turnCount": 4
+    },
+    "confidence": 0.95,
+    "callId": "call_2SPS0thTO59_g4VInl3yIA",
+    "at": "2026-08-03T20:17:06.943945Z",
+    "transcript": [
+      {
+        "offsetSeconds": 0,
+        "speaker": "bot",
+        "text": "This is an automated test call from LineCanary,"
+      },
+      {
+        "offsetSeconds": 2,
+        "speaker": "bot",
+        "text": "monitoring this line on behalf of its owner."
+      },
+      {
+        "offsetSeconds": 10,
+        "speaker": "user",
+        "text": "Thank you for calling Sample Dental. This line is monitored. Canary ID, LC7391. For appointments, press 1. For opening hours, press 2. For billing questions, press 3."
+      },
+      {
+        "offsetSeconds": 18,
+        "speaker": "user",
+        "text": "For appointments, please visit sampledental.example or call back during business hours."
+      }
+    ],
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "billing_option",
+          "equals": "3"
+        },
+        "pass": true,
+        "actual": "3",
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "menu_options",
+          "contains": "appointments"
+        },
+        "pass": true,
+        "actual": "appointments press 1; opening hours press 2; billing questions press 3",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  }
+]

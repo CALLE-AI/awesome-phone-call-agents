@@ -1,0 +1,39 @@
+name: Documentation improvement
+description: Correct or improve CALL-E developer documentation, examples, or troubleshooting guidance.
+type: Task
+labels:
+  - "area:docs"
+  - "status:needs-triage"
+
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link the page, section, OpenAPI schema, example, or release artifact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Explain what is missing, unclear, or difficult to apply.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired guidance
+      description: Describe the concrete information or example that should be added.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Integration impact
+      description: Explain what developers currently misunderstand or cannot implement safely.
+    validations:
+      required: true

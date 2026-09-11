@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Heat Relief Directory Verification — evidence-backed phone verification</title>
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ============================ HEADER ============================ -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-text">
+            <h1>Heat Relief Directory Verification</h1>
+            <p id="dataset-line">Loading directory…</p>
+          </div>
+        </div>
+
+        <div class="sim-banner" role="status">
+          <span class="sim-dot" aria-hidden="true"></span>
+          <div>
+            <strong>ALL CALLS ON THIS SCREEN ARE SIMULATED.</strong>
+            <span
+              >No telephone call is placed. Transport =
+              <code id="transport-name">deterministic simulated facility</code>. Real CALL-E adapter:
+              <em id="adapter-state">wired, disabled</em>.</span
+            >
+          </div>
+          <button id="btn-show-adapter" class="ghost small">Show the request it would send</button>
+        </div>
+
+        <div class="controls">
+          <label class="budget">
+            <span>Call budget</span>
+            <input id="budget-input" type="number" min="1" max="60" step="1" value="25" />
+          </label>
+          <label class="budget">
+            <span>Speed</span>
+            <select id="speed-input">
+              <option value="0.5">slow</option>
+              <option value="1" selected>normal</option>
+              <option value="4">fast</option>
+              <option value="instant">instant</option>
+            </select>
+          </label>
+          <button id="btn-plan" class="primary">Plan calls</button>
+          <button id="btn-run" class="primary">Run batch</button>
+          <button id="btn-approve" class="ghost">Approve all in review</button>
+        </div>
+      </header>
+
+      <!-- ============================= MAIN ============================= -->
+      <main class="grid">
+        <!-- ---------------------------- LEFT --------------------------- -->
+        <section class="panel col-queue" aria-labelledby="h-queue">
+          <div class="panel-head">
+            <h2 id="h-queue">Call queue</h2>
+            <span class="hint" id="queue-count">—</span>
+          </div>
+
+          <div class="budget-box" id="budget-box">
+            <div class="bb-row">
+              <span>Directory risk pool</span><b id="bb-total">—</b>
+            </div>
+            <div class="bb-row">
+              <span>Bought by this budget</span><b id="bb-bought">—</b>
+            </div>
+            <div class="bb-bar"><i id="bb-bar-fill"></i></div>
+            <div class="bb-compare">
+              <div>
+                <span class="tag tag-plan">risk-ranked</span>
+                <b id="bb-plan">—</b>
+              </div>
+              <div>
+                <span class="tag tag-base">oldest-first</span>
+                <b id="bb-base">—</b>
+              </div>
+              <div class="lift"><b id="bb-lift">—</b><span>planned lift</span></div>
+            </div>
+            <p class="bb-note" id="bb-note">
+              Greedy selection with diminishing returns: one call verifies several fields, later
+              questions in a call are worth less, and duplicate listings that share a phone line are
+              discounted after the first is queued.
+            </p>
+          </div>
+
+          <ol class="queue" id="queue"></ol>
+        </section>
+
+        <!-- --------------------------- CENTRE -------------------------- -->
+        <section class="panel col-runner" aria-labelledby="h-runner">
+          <div class="panel-head">
+            <h2 id="h-runner">Live call runner</h2>
+            <span class="hint" id="runner-progress">idle</span>
+          </div>
+
+          <div class="call-head" id="call-head">
+            <div class="ch-main">
+              <h3 id="ch-name">No call in progress</h3>
+              <p id="ch-meta">Plan a batch, then press Run.</p>
+            </div>
+            <div class="ch-badges" id="ch-badges"></div>
+          </div>
+
+          <div class="runner-body">
+            <div class="transcript-wrap">
+              <div class="sub-head">
+                <span>Transcript <em>(simulated)</em></span>
+                <span class="hint" id="transcript-hint">—</span>
+              </div>
+              <div class="transcript" id="transcript"></div>
+            </div>
+
+            <div class="fields-wrap">
+              <div class="sub-head">
+                <span>Grounded fields</span>
+                <span class="hint">a value exists only if a span supports it</span>
+              </div>
+              <div class="fields" id="fields"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------------- RIGHT -------------------------- -->
+        <section class="panel col-review" aria-labelledby="h-review">
+          <div class="panel-head">
+            <h2 id="h-review">Review queue</h2>
+            <span class="hint" id="review-count">0 waiting</span>
+          </div>
+          <div class="review-list" id="review-list">
+            <p class="empty">Contradictions, hedged answers and low-confidence extractions land here
+              instead of in the directory.</p>
+          </div>
+
+          <div class="panel-head second">
+            <h2>Publishable delta</h2>
+            <span class="hint" id="delta-count">0 rows</span>
+          </div>
+          <div class="delta-list" id="delta-list">
+            <p class="empty">Approved changes append to a per-field history. Nothing is overwritten.</p>
+          </div>
+        </section>
+      </main>
+
+      <!-- =========================== EVALUATION ========================= -->
+      <footer class="panel evalpanel" aria-labelledby="h-eval">
+        <div class="panel-head">
+          <h2 id="h-eval">Evaluation — measured against simulator ground truth</h2>
+          <span class="hint" id="eval-state">run a batch to populate</span>
+        </div>
+        <div class="eval-grid">
+          <div class="tiles" id="eval-tiles"></div>
+          <div class="eval-table-wrap">
+            <table class="eval-table" id="eval-table">
+              <thead>
+                <tr>
+                  <th>field</th><th>att</th><th>grounded</th><th>precision</th><th>recall</th><th>unknown</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="eval-charts">
+            <div class="chart-block">
+              <h4>Harm reduction achieved <em>(realized, vs ground truth)</em></h4>
+              <div id="harm-bars" class="harm-bars"></div>
+            </div>
+            <div class="chart-block">
+              <h4>Freshness decay of what was just verified</h4>
+              <svg id="decay-chart" viewBox="0 0 460 118" preserveAspectRatio="none"></svg>
+              <div class="decay-legend" id="decay-legend"></div>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- adapter modal -->
+    <div class="modal-backdrop" id="adapter-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adapter-title">
+        <div class="modal-head">
+          <h3 id="adapter-title">Real CALL-E telephony adapter — DISABLED</h3>
+          <button id="btn-close-adapter" class="ghost small">Close</button>
+        </div>
+        <p class="modal-note">
+          This is the exact request the real adapter would send for the top queued call. It is never
+          sent. <code>CalleTelephonyAdapter.placeCall()</code> throws
+          <code>REAL_TELEPHONY_DISABLED</code> before any network call is constructed, and this
+          codebase contains no fetch to a telephony host.
+        </p>
+        <pre id="adapter-body"></pre>
+      </div>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,116 @@
+[
+  {
+    "title": "MEET RESCUE RELAY",
+    "text": "From finding an animal in need to bringing the right help together. Fictional example shown.",
+    "start": 0.0,
+    "end": 7.008
+  },
+  {
+    "title": "TRY A COMPLETE RESCUE",
+    "text": "Load the example, then make the same decisions you would in your own rescue.",
+    "start": 7.111,
+    "end": 14.113
+  },
+  {
+    "title": "DESCRIBE WHAT YOU SEE",
+    "text": "A dog cannot put weight on its rear leg. The location and a USD 200 budget are ready to review.",
+    "start": 14.29,
+    "end": 23.296
+  },
+  {
+    "title": "CLARIFY THE OUTCOME",
+    "text": "Review the report. Describe what a successful rescue should include.",
+    "start": 23.347,
+    "end": 35.355
+  },
+  {
+    "title": "YOUR GOAL, YOUR CHOICE",
+    "text": "Check the goal and location. Edit anything that is not right before finding help.",
+    "start": 35.393,
+    "end": 44.394
+  },
+  {
+    "title": "FIND AVAILABLE HELP",
+    "text": "Select and confirm the goal, then choose Find help to check availability and prices.",
+    "start": 44.454,
+    "end": 52.461
+  },
+  {
+    "title": "REVIEW THE FIRST OPTION",
+    "text": "Greenway Rescue covers all three tasks. Its USD 300 quote is above your budget.",
+    "start": 52.461,
+    "end": 62.464
+  },
+  {
+    "title": "FIND ANOTHER OPTION",
+    "text": "Keep your first offer and ask for another option. Your selected plan stays unchanged.",
+    "start": 62.51,
+    "end": 70.519
+  },
+  {
+    "title": "COMPARE COMPLETE PLANS",
+    "text": "Kindred Rescue offers the same requested tasks for USD 150, within your budget.",
+    "start": 70.519,
+    "end": 81.527
+  },
+  {
+    "title": "CHOOSE YOUR PLAN",
+    "text": "Choose the plan that works for you. You stay in control of the final approval.",
+    "start": 81.558,
+    "end": 88.571
+  },
+  {
+    "title": "READ THE SAVED CONVERSATION",
+    "text": "The saved conversation keeps the final identity, task, timing and all-in price available for review.",
+    "start": 88.606,
+    "end": 100.607
+  },
+  {
+    "title": "REVIEW BEFORE APPROVAL",
+    "text": "Confirm the selected helper, included tasks and price limit.",
+    "start": 101.403,
+    "end": 111.419
+  },
+  {
+    "title": "CONFIRM YOUR HELPER",
+    "text": "Approve the plan. The chosen helper is asked to confirm the agreed work and price.",
+    "start": 111.495,
+    "end": 120.507
+  },
+  {
+    "title": "HELP IS CONFIRMED",
+    "text": "The helper is ready. Keep the rescue up to date as you hear from them.",
+    "start": 120.507,
+    "end": 129.512
+  },
+  {
+    "title": "ON THE WAY",
+    "text": "When the helper confirms departure, record “On the way”.",
+    "start": 129.557,
+    "end": 137.572
+  },
+  {
+    "title": "ARRIVAL CONFIRMED",
+    "text": "Record arrival after it has been confirmed by you or the helper.",
+    "start": 137.572,
+    "end": 145.574
+  },
+  {
+    "title": "THEIR PART IS FINISHED",
+    "text": "Mark the helper’s work as finished once their part of the rescue is complete.",
+    "start": 145.611,
+    "end": 153.618
+  },
+  {
+    "title": "CLOSE THE LOOP",
+    "text": "Add where the animal is now, and confirm that it is safe.",
+    "start": 153.618,
+    "end": 165.624
+  },
+  {
+    "title": "A SAFE PLACE. A FINISHED RESCUE.",
+    "text": "The closing note, helper updates and conversations remain with your report.",
+    "start": 165.753,
+    "end": 174.765
+  }
+]

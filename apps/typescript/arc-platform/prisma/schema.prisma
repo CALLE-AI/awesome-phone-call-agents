@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id               String      @id @default(cuid())
+  clerkOrgId       String      @unique
+  name             String
+  logoUrl          String?
+  industry         Industry
+  subIndustry      String?
+  website          String?
+  ntn              String?
+  primaryCity      City        @default(KARACHI)
+  targetCities     City[]
+  targetAudience   String      @default("")
+  audienceAgeMin   Int         @default(18)
+  audienceAgeMax   Int         @default(45)
+  audienceGender   Gender      @default(ALL)
+  monthlyBudget    BudgetRange @default(UNDER_50K)
+  plan             Plan        @default(STARTER)
+  planExpiresAt    DateTime?
+  onboardingDone   Boolean     @default(false)
+  onboardingStep   Int         @default(1)
+  aiCreditsUsed    Int         @default(0)
+  aiCreditsLimit   Int         @default(5)
+  stripeCustomerId String?
+  channels         String[]
+  campaignGoal     String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  campaigns        Campaign[]
+  users            BrandUser[]
+  calls            Call[]
+}
+
+model BrandUser {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  brandId   String
+  role      UserRole @default(MEMBER)
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Campaign {
+  id      String @id @default(cuid())
+  brandId String
+  name    String
+  /// Left a String deliberately: converting it to an enum would rewrite every
+  /// existing row for no gain in this change.
+  status  String @default("DRAFT")
+
+  /// The approved plan's aggregates. Columns rather than part of `brief`
+  /// because the dashboard and analytics need to sum and filter them.
+  budgetTotal       Int?
+  currency          String?   @default("PKR")
+  flightStart       DateTime?
+  flightEnd         DateTime?
+  durationDays      Int?
+  estStationCost    Int?
+  estInfluencerCost Int?
+  estPlatformFee    Int?
+  estTotalCost      Int?
+  estTotalReach     Int?
+
+  /// The wizard brief as captured at launch. Json because it is only ever read
+  /// back whole - seventeen scalar columns would bloat the model for nothing.
+  brief Json?
+
+  brand     Brand            @relation(fields: [brandId], references: [id])
+  items     MediaPlanItem[]
+  scripts   CampaignScript[]
+  calls     Call[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([brandId])
+}
+
+/// One selected station or creator. Holds the estimate the wizard produced and,
+/// once CALL-E has phoned, the confirmed figures beside it - which is the whole
+/// point: "the estimate said 18,000, the call said 22,000".
+model MediaPlanItem {
+  id         String   @id @default(cuid())
+  campaignId String
+  kind       ItemKind
+
+  /// Id in the static catalogue (app/radio/_data.ts, app/influencers/_data.ts).
+  /// Not a foreign key - there are still no Station or Creator tables.
+  externalId String
+  name       String
+  channel    String?
+  city       String?
+
+  estCostPkr       Int?
+  estReach         Int?
+  matchScore       Float?
+  rationale        String?
+  recommendedSlots String[]
+
+  confirmedRatePkr Int?
+  confirmedReach   Int?
+  availability     Availability?
+  confirmedDetail  String?
+  confirmedNotes   String?
+  confirmedAt      DateTime?
+
+  /// What was actually booked, as opposed to estimated or quoted on a call.
+  /// Nothing here is derived from the estimate or the call: these are the
+  /// terms the brand committed to, and they stay null until it does.
+  spots          Int?
+  bookedDates    DateTime[]
+  bookedSlots    String[]
+  bookedTotalPkr Int?
+  bookedAt       DateTime?
+
+  status ItemStatus @default(SELECTED)
+
+  campaign  Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  calls     Call[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId])
+}
+
+/// One CALL-E attempt. campaignId and mediaPlanItemId are nullable on purpose:
+/// LiveCallCard is mounted on the station and creator detail pages, where there
+/// is no campaign in scope.
+model Call {
+  id              String  @id @default(cuid())
+  brandId         String
+  campaignId      String?
+  mediaPlanItemId String?
+
+  calleCallId    String? @unique
+  idempotencyKey String?
+
+  targetName   String
+  targetType   ItemKind
+  targetPhone  String?
+  contactName  String?
+  audienceSize Int?
+
+  status String  @default("queued")
+  done   Boolean @default(false)
+
+  /// STRICTLY "never reached the handset". A call that connects and produces
+  /// nothing is NOT failed - see `outcome`, which is the authoritative field.
+  failed Boolean @default(false)
+
+  /// What the call actually achieved. `status` is CALL-E's own string and
+  /// `failed` only covers transport, so neither could tell a call that never
+  /// connected apart from one that connected and returned nothing - the row
+  /// read `status="completed", failed=true`, which is a contradiction to
+  /// anyone querying it later. Nullable so pre-existing rows are backfilled
+  /// from their stored status rather than defaulted into a guess.
+  outcome CallOutcome?
+
+  verdict  Availability?
+  pricePkr Int?
+  /// Did the recipient confirm the figure read back to them? Null means the
+  /// call did not say either way - which is NOT the same as "they refused to
+  /// confirm it", and is why this is nullable rather than defaulting false.
+  /// Negotiation (C-03). All nullable with no default: every call placed
+  /// before the mandate existed was a plain enquiry that never asked for an
+  /// opening price, so NULL is the true value for them. Defaulting
+  /// openingPricePkr to pricePkr would invent a negotiation that never
+  /// happened on twenty real calls.
+  openingPricePkr  Int?
+  mandateTargetPkr Int?
+  mandateWalkAwayPkr Int?
+  /// The catalogue estimate for this line when the call was placed. Kept so a
+  /// confirmed rate can be judged against what we expected AT THE TIME, not
+  /// against a catalogue that has moved since.
+  estimateAtCallPkr Int?
+
+  /// The conversation itself: [{ at, speaker, text }]. Kept so the plan's
+  /// "heard here" link opens the moment a number was said without asking
+  /// CALL-E for it - their API has refused requests for hours at a stretch,
+  /// and a link into a transcript is no use if it depends on them being up.
+  transcript Json?
+
+  /// One entry per offer made, in order: { offered, response, rate_after }.
+  /// The sequence is the point - a final number alone cannot show that the
+  /// price moved because we offered volume.
+  concessions Json?
+
+  /// A rate nobody confirmed is worth keeping and worth marking; the one that
+  /// does damage is the wrong one that looks clean.
+  rateConfirmed Boolean?
+
+  /// CALL-E's own read on the call, kept because we were throwing it away.
+  /// On 1 Sep its evidence named the exact defect behind a wrong rate - "The
+  /// bot did not repeat back or clarify the rate before moving to later
+  /// questions" - and it lived only in the tab that was open at the time.
+  /// The score is stored but is not a gate: 0.78 "high" on that same call.
+  confidenceScore Float?
+  confidenceLabel String?
+  evidence        String[]
+
+  reach    Int?
+  detail   String?
+  notes    String?
+  score    Float?
+  summary  String?
+
+  /// CALL-E's raw payload, kept whole so a field we did not model is not lost.
+  structuredResult Json?
+
+  /// A simulated call must stay distinguishable from a real one forever -
+  /// BRANDING.md section 9, "no invented data", expressed in the schema.
+  mock Boolean @default(false)
+
+  brand       Brand          @relation(fields: [brandId], references: [id])
+  campaign    Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  item        MediaPlanItem? @relation(fields: [mediaPlanItemId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  @@index([brandId])
+  @@index([campaignId])
+  @@index([mediaPlanItemId])
+}
+
+/// The scripts the brand actually selected, with wizard edits already applied.
+model CampaignScript {
+  id         String @id @default(cuid())
+  campaignId String
+
+  externalId     String?
+  language       String
+  durationSec    Int
+  title          String
+  hook           String
+  body           String
+  callToAction   String
+  voiceDirection String?
+  bestTimeSlots  String[]
+  targetSegment  String?
+
+  campaign  Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([campaignId])
+}
+
+/// How much weight a figure can carry.
+enum Provenance {
+  /// Nobody's number: hand-written or generated. Says so on screen.
+  ESTIMATE
+  /// A citation exists - see `sourceNote`.
+  SOURCED
+}
+
+enum ItemKind {
+  STATION
+  CREATOR
+}
+
+/// Three genuinely different endings, all of which have happened.
+enum CallOutcome {
+  /// Connected and returned a structured result.
+  RESULT
+  /// Connected - a person answered - but CALL-E returned no structured
+  /// result. Nothing is confirmed by such a call.
+  NO_RESULT
+  /// Never reached the handset: busy, unavailable, no answer.
+  NOT_CONNECTED
+}
+
+enum Availability {
+  YES
+  NO
+  UNKNOWN
+}
+
+enum ItemStatus {
+  SELECTED
+  CALLING
+  CONFIRMED
+  DECLINED
+  BOOKED
+}
+
+enum Industry {
+  FMCG
+  TELECOM
+  FASHION_APPAREL
+  REAL_ESTATE
+  EDTECH
+  FOOD_BEVERAGE
+  BANKING_FINANCE
+  AUTOMOTIVE
+  HEALTHCARE_PHARMA
+  ECOMMERCE
+  MEDIA_ENTERTAINMENT
+  NGO_NONPROFIT
+  GOVERNMENT
+  OTHER
+}
+
+enum City {
+  KARACHI
+  LAHORE
+  ISLAMABAD
+  RAWALPINDI
+  FAISALABAD
+  PESHAWAR
+  QUETTA
+  MULTAN
+  HYDERABAD
+  SIALKOT
+  DUBAI
+  ABU_DHABI
+  RIYADH
+  JEDDAH
+  CAIRO
+  OTHER
+}
+
+enum Gender {
+  ALL
+  PRIMARILY_MALE
+  PRIMARILY_FEMALE
+}
+
+enum BudgetRange {
+  UNDER_50K
+  RANGE_50_150K
+  RANGE_150_500K
+  RANGE_500K_1M
+  RANGE_1M_5M
+  ABOVE_5M
+}
+
+enum Plan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+  FREE_TRIAL
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+/// The people and stations Arc can phone, and the numbers it may use.
+///
+/// The catalogue lived in two TypeScript files and the numbers in an env var,
+/// which meant adding a number was a redeploy and the two could disagree. This
+/// table is the callable identity: enough to place a call and label a row, not
+/// the rich profile data (slots, shows, reviews) that app/radio/_data.ts still
+/// owns for the browsing pages.
+///
+/// `phone` is nullable on purpose. A contact with no number is not dialled and
+/// says NO PHONE on the card - that distinction caught a silent failure on
+/// 2 September and is worth keeping visible.
+model Contact {
+  id String @id @default(cuid())
+
+  /// The catalogue id (app/radio/_data.ts, app/influencers/_data.ts) that
+  /// plan items and calls already carry as `externalId`.
+  externalId String   @unique
+  name       String
+  type       ItemKind
+  channel    String?
+  city       String?
+  frequency  String?
+  /// Who runs the station. Real catalogue data, and the thing you need to know
+  /// before asking whether an AI may phone their desk.
+  owner      String?
+
+  /// What this contact used to be called. MERA FM 107.4 launched as Samaa FM
+  /// in 2012 and rebranded in November 2021, and the market still says Samaa -
+  /// so a search for the old name has to find the new row. Kept as a field
+  /// rather than folded into the name, because the current name is the current
+  /// name.
+  formerName String?
+
+  /// A creator's @handle. Null for a station, which has a frequency instead.
+  handle   String?
+  /// What they make: "Food", "Cricket", a station's format. Null when unknown.
+  category String?
+
+  /// How big the audience is, and WHAT that number counts. A station's daily
+  /// listeners and a creator's followers are not the same quantity, and a
+  /// column called `audienceSize` holding both invites a UI that labels one as
+  /// the other - which is the mistake that made estTotalReach ambiguous.
+  audience      Int?
+  audienceBasis String?
+
+  rateEstimatePkr Int?
+
+  /// Where these figures came from. Every one of the 68 contacts carried an
+  /// audience or a rate and not one recorded a source: eight stations were
+  /// hand-written at the start of the project, fifty-five were generated by
+  /// lib/profile-gen.ts, and nothing on screen told them apart.
+  ///
+  /// ESTIMATE is the default and the truth for almost all of them. SOURCED
+  /// means a citation was supplied, and `sourceNote` says what. CONFIRMED is
+  /// never set here - a rate becomes confirmed by a call agreeing to it, which
+  /// lives on the Call and the plan line, not on the catalogue.
+  audienceProvenance Provenance @default(ESTIMATE)
+  rateProvenance     Provenance @default(ESTIMATE)
+  /// The citation itself, when there is one. Free text: a rate card, a media
+  /// kit, a date and a person.
+  sourceNote String?
+
+  /// E.164, or null when we hold no number for them.
+  phone String?
+
+  /// True when the number is one of ours standing in for a real desk. Real
+  /// stations are not called by an AI without their permission, and a demo
+  /// number must never be mistaken for a station's own line.
+  isDemoContact Boolean @default(false)
+
+  /// The full write-up the directory and profile pages render: dayparts,
+  /// shows, demographics, reviews, rating. Shaped as the Station / Creator
+  /// interface in app/radio/_data.ts and app/influencers/_data.ts, so a row
+  /// with a profile renders through exactly the same card and page as one of
+  /// the sixteen we researched by hand.
+  ///
+  /// Generated for the rest of the catalogue by scripts/seed-profiles.ts.
+  /// Deterministic and reversible - see that script's header.
+  profile Json?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+}
