@@ -1,0 +1,56 @@
+{% if not rows %}
+  <p class="empty">No consented support request is waiting right now.</p>
+{% endif %}
+{% for row in rows %}
+<article class="card">
+  <div class="card-head">
+    <div><h3>{{ row.first_name }} <code>{{ row.contact_id }}</code></h3>
+      <p class="sub"><code>{{ row.phone }}</code> · request {{ row.created_at.isoformat() }}</p>
+    </div>
+    <span class="pill {{ row.tone }}">{{ row.state.replace('_', ' ') }}</span>
+  </div>
+  <div class="facts">
+    <span class="fact">Route <strong>{{ row.category.replace('_', ' ') }}</strong></span>
+    <span class="fact">Timing <strong>{{ row.urgency.replace('_', ' ') }}</strong></span>
+    <span class="fact">Permission <strong>{{ row.consent }}</strong></span>
+    {% if row.provider_name %}<span class="fact">Provider <strong>{{ row.provider_name }}</strong></span>{% endif %}
+  </div>
+  {% if row.result %}
+  <div class="safety">
+    {% if row.result.availability is defined %}
+      <strong>Provider result:</strong> availability {{ row.result.availability }}.
+      {{ row.result.response_window }} {{ row.result.public_instructions }}
+    {% else %}
+      <strong>Needs attention:</strong> {{ row.result.reason }}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if row.state == 'PENDING_REVIEW' %}
+    {% if transport_ready and actions_enabled %}
+    <form class="inline" method="post" action="/support/{{ row.request_id }}/authorize">
+      <label class="field" for="support-actor-{{ loop.index }}">Operator ID
+        <input id="support-actor-{{ loop.index }}" type="text" name="actor" autocomplete="username" required>
+      </label>
+      <label class="field grow" for="support-provider-{{ loop.index }}">Approved provider
+        <select id="support-provider-{{ loop.index }}" name="provider_id" required>
+          <option value="">Choose a provider</option>
+          {% for provider in providers %}
+          <option value="{{ provider.provider_id }}">{{ provider.name }} · {{ provider.kind }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="check" for="support-confirm-{{ loop.index }}">
+        <input id="support-confirm-{{ loop.index }}" type="checkbox" name="confirm_provider_call" value="yes" required>
+        I authorize exactly one CALL-E call to this provider. I understand that live mode places a real call.
+      </label>
+      <button type="submit">Authorize provider call</button>
+    </form>
+    {% elif actions_enabled %}
+    <p class="note">Start the fixture or live worker to enable the provider-call action.</p>
+    {% endif %}
+  {% elif row.call_id %}
+    <p class="note">CALL-E call <code>{{ row.call_id }}</code>
+      {% if row.reviewed_by %} · authorized by {{ row.reviewed_by }}{% endif %}</p>
+  {% endif %}
+</article>
+{% endfor %}

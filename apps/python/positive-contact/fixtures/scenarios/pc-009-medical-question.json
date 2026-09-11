@@ -28,7 +28,11 @@
               "callback_window": "this afternoon",
               "preferred_language": "",
               "notify_alternate_contact": "unknown",
-              "notes_for_human": "Asked what to do about powered medical equipment. Routed to a human; no advice given."
+              "notes_for_human": "Critical supply support requested; permission recorded. No advice given.",
+              "support_category": "powered_equipment",
+              "support_urgency": "before_outage",
+              "provider_contact_consent": "yes",
+              "emergency_risk": "no"
             },
             "summary": "The customer confirmed the notice and asked a medical question, which was routed to a person.",
             "attempts": [
@@ -63,15 +67,25 @@
                   {
                     "offset_seconds": 28,
                     "speaker": "bot",
-                    "text": "I am not able to advise on medical equipment. A member of our team will call you back about that. The Community Resource Center at the Glen Ellen Community Hall will be open during the outage."
+                    "text": "I cannot give medical advice. If you are in immediate danger or having a medical emergency, call 911 now. Are you in immediate danger?"
                   },
                   {
                     "offset_seconds": 35,
                     "speaker": "user",
-                    "text": "Alright, please have somebody call me."
+                    "text": "No. I need help with powered equipment before the outage."
                   },
                   {
                     "offset_seconds": 42,
+                    "speaker": "bot",
+                    "text": "May the utility team contact an approved equipment supplier about general outage-support availability? This will not place an order or guarantee equipment."
+                  },
+                  {
+                    "offset_seconds": 48,
+                    "speaker": "user",
+                    "text": "Yes, please contact one."
+                  },
+                  {
+                    "offset_seconds": 53,
                     "speaker": "bot",
                     "text": "We will never ask for payment or account information on this call. Thank you."
                   }

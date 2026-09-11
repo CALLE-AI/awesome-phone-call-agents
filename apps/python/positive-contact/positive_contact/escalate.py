@@ -31,7 +31,11 @@ from .models import (
     LadderEvent,
     LadderTarget,
     NeedsAssistance,
+    SupportCategory,
+    SupportRequest,
+    SupportRequestState,
     WorkOrder,
+    YesNoUnknown,
     derive_idempotency_key,
     derive_intent_id,
 )
@@ -258,9 +262,29 @@ def advance_after_disposition(
                 "contact_type": disposition.contact_type.value,
                 "needs_assistance": disposition.needs_assistance.value,
                 "priority": disposition.needs_assistance is NeedsAssistance.MEDICAL_QUESTION,
+                "emergency_risk": disposition.emergency_risk.value,
             },
             at=now,
         )
+        if (
+            disposition.needs_assistance is NeedsAssistance.MEDICAL_QUESTION
+            and disposition.provider_contact_consent is YesNoUnknown.YES
+            and disposition.support_category is not SupportCategory.UNKNOWN
+            and disposition.emergency_risk is not YesNoUnknown.YES
+        ):
+            ledger.create_support_request(
+                SupportRequest(
+                    request_id=f"support:{event.event_id}:{intent.contact_id}",
+                    event_id=event.event_id,
+                    contact_id=intent.contact_id,
+                    source_intent_id=intent.intent_id,
+                    category=disposition.support_category,
+                    urgency=disposition.support_urgency,
+                    consent=disposition.provider_contact_consent,
+                    state=SupportRequestState.PENDING_REVIEW,
+                    created_at=now,
+                )
+            )
         # The ladder stops here, but the clock does not. `sweep_cutoff` will convert this
         # to FIELD_VISIT_PENDING if nobody resolves it in time.
         return state

@@ -40,9 +40,9 @@ class BudgetExceeded(RuntimeError):
 class LiveCallBudget:
     """A hard ceiling on real calls, counted across every path including reconciliation."""
 
-    def __init__(self, max_calls: int | None) -> None:
+    def __init__(self, max_calls: int | None, *, spent: int = 0) -> None:
         self.max_calls = max_calls
-        self.spent = 0
+        self.spent = spent
 
     @property
     def unlimited(self) -> bool:

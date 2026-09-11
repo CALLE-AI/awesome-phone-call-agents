@@ -29,6 +29,9 @@ from .models import (
     EvidenceSpan,
     JudgeVerdict,
     NeedsAssistance,
+    SupportCategory,
+    SupportUrgency,
+    YesNoUnknown,
 )
 from .redact import redact_free_text
 from .script import ResultValidationError, validate_recipient_result
@@ -356,6 +359,10 @@ def adjudicate(
     agree = judges_agree(a, b)
 
     needs_assistance = NeedsAssistance.UNKNOWN
+    support_category = SupportCategory.UNKNOWN
+    support_urgency = SupportUrgency.UNKNOWN
+    provider_contact_consent = YesNoUnknown.UNKNOWN
+    emergency_risk = YesNoUnknown.UNKNOWN
     notes_for_human: str | None = None
     if isinstance(snapshot.recipient_result, dict):
         raw_assist = snapshot.recipient_result.get("needs_assistance")
@@ -365,6 +372,27 @@ def adjudicate(
             except ValueError:
                 needs_assistance = NeedsAssistance.UNKNOWN
         notes_for_human = redact_free_text(snapshot.recipient_result.get("notes_for_human"))
+        for field_name, enum_type, fallback in (
+            ("support_category", SupportCategory, SupportCategory.UNKNOWN),
+            ("support_urgency", SupportUrgency, SupportUrgency.UNKNOWN),
+            ("provider_contact_consent", YesNoUnknown, YesNoUnknown.UNKNOWN),
+            ("emergency_risk", YesNoUnknown, YesNoUnknown.UNKNOWN),
+        ):
+            raw_value = snapshot.recipient_result.get(field_name)
+            if not isinstance(raw_value, str):
+                continue
+            try:
+                parsed = enum_type(raw_value)
+            except ValueError:
+                parsed = fallback
+            if field_name == "support_category":
+                support_category = parsed
+            elif field_name == "support_urgency":
+                support_urgency = parsed
+            elif field_name == "provider_contact_consent":
+                provider_contact_consent = parsed
+            else:
+                emergency_risk = parsed
 
     judge_c_note: str | None = None
     if judge_c is not None and getattr(judge_c, "enabled", False) and not agree:
@@ -398,6 +426,10 @@ def adjudicate(
             reason_code=reason_code,
             evidence_spans=evidence,
             notes_for_human=notes_for_human,
+            support_category=support_category,
+            support_urgency=support_urgency,
+            provider_contact_consent=provider_contact_consent,
+            emergency_risk=emergency_risk,
         )
 
     # Row: failed / canceled / anything not cleanly completed.

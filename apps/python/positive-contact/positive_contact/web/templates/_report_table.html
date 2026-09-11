@@ -1,4 +1,4 @@
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Metric</th><th>Value</th><th>Denominator</th></tr></thead>
   <tbody>
   {% for metric in report.metrics %}
@@ -6,4 +6,4 @@
         <td class="note">{{ metric.denominator }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>

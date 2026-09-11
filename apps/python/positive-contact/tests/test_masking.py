@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from positive_contact.cli import execute_run, seed_ledger
-from positive_contact.escalate import approve_field_visit
+from positive_contact.escalate import approve_field_visit, operator_confirm
 from positive_contact.models import IntentState
 from positive_contact.preflight import render_preview
 from positive_contact.redact import (
@@ -100,6 +100,42 @@ def test_snapshot_redaction_walks_nested_structures():
     }
     redacted = redact_snapshot(payload)
     assert find_raw_e164(json.dumps(redacted)) == []
+
+
+def test_snapshot_redaction_strips_health_email_and_long_digits():
+    payload = {
+        "transcript": "My oxygen model is 998877665; write sam@example.com",
+    }
+    redacted = json.dumps(redact_snapshot(payload))
+    assert "oxygen" not in redacted.lower()
+    assert "998877665" not in redacted
+    assert "sam@example.com" not in redacted
+
+
+def test_operator_evidence_is_redacted_before_the_append_only_log(
+    ledger, demo_preflight, fixture_transport, event, policy, now
+):
+    seed_ledger(ledger, demo_preflight)
+    execute_run(
+        ledger,
+        fixture_transport,
+        demo_preflight,
+        now=now,
+        simulated_clock=False,
+    )
+    intent = ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])[0]
+    operator_confirm(
+        ledger,
+        intent,
+        actor="op-7",
+        evidence_text="Call +14155550142 about oxygen, 998877665, sam@example.com",
+        now=now,
+    )
+    stored = json.dumps(ledger.list_transitions(intent.intent_id)[-1].evidence_refs)
+    assert find_raw_e164(stored) == []
+    assert "oxygen" not in stored.lower()
+    assert "998877665" not in stored
+    assert "sam@example.com" not in stored
 
 
 # -- every operator-visible surface ------------------------------------------------

@@ -14,6 +14,12 @@
   </p>
   <p class="note">Judge A <code>{{ row.judge_a }}</code> &middot; Judge B <code>{{ row.judge_b }}</code></p>
   {% if row.notes %}<p class="note">Note for the team: {{ row.notes }}</p>{% endif %}
+  {% if row.needs_assistance == 'medical_question' %}
+  <div class="safety"><strong>Safety boundary:</strong> no medical advice. Emergency risk
+    <strong>{{ row.emergency_risk }}</strong>; provider permission
+    <strong>{{ row.provider_contact_consent }}</strong>; route
+    <strong>{{ row.support_category }}</strong> {{ row.support_urgency }}.</div>
+  {% endif %}
   <div class="spans">
     {% for span in row.spans %}
       <div class="span">
@@ -24,15 +30,25 @@
       <p class="note">No evidence span was recorded for this outcome.</p>
     {% endfor %}
   </div>
+  {% if actions_enabled %}
   <form class="inline" method="post" action="/review/{{ row.intent_id }}/confirm">
-    <input type="text" name="actor" placeholder="your operator id" required>
-    <input class="grow" type="text" name="evidence" placeholder="paste the span you relied on, or type why" required>
+    <label class="field" for="confirm-actor-{{ loop.index }}">Operator ID
+      <input id="confirm-actor-{{ loop.index }}" type="text" name="actor" autocomplete="username" required>
+    </label>
+    <label class="field grow" for="confirm-evidence-{{ loop.index }}">Confirmation evidence
+      <input id="confirm-evidence-{{ loop.index }}" type="text" name="evidence" placeholder="Span or typed reason" required>
+    </label>
     <button type="submit">Confirm contact</button>
   </form>
   <form class="inline" method="post" action="/review/{{ row.intent_id }}/refuse">
-    <input type="text" name="actor" placeholder="your operator id" required>
-    <input class="grow" type="text" name="evidence" placeholder="what the customer said" required>
+    <label class="field" for="refuse-actor-{{ loop.index }}">Operator ID
+      <input id="refuse-actor-{{ loop.index }}" type="text" name="actor" autocomplete="username" required>
+    </label>
+    <label class="field grow" for="refuse-evidence-{{ loop.index }}">Refusal evidence
+      <input id="refuse-evidence-{{ loop.index }}" type="text" name="evidence" placeholder="What the customer said" required>
+    </label>
     <button class="ghost" type="submit">Record a refusal</button>
   </form>
+  {% endif %}
 </div>
 {% endfor %}

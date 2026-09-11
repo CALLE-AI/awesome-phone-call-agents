@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block body %}
-<h2>Report</h2>
+<div class="page-heading"><div><h2>Evidence report</h2>
 <p class="sub">Every count carries the denominator it was measured against. Confirmed comes from a
-CONFIRMED disposition or an operator confirmation with evidence, never from a completed call.</p>
+CONFIRMED disposition or an operator confirmation with evidence, never from a completed call.</p></div>
+<span class="mode">audit ready</span></div>
 <div hx-get="/reports/table" hx-trigger="every 5s" hx-swap="innerHTML">
   {% include "_report_table.html" %}
 </div>
@@ -25,9 +26,11 @@ CONFIRMED disposition or an operator confirmation with evidence, never from a co
     reason <code>{{ order.reason_code }}</code> &middot; prepared {{ order.created_at.isoformat() }}
     {% if order.approved_by %} &middot; approved by {{ order.approved_by }}{% endif %}
   </p>
-  {% if not order.approved_at %}
+  {% if not order.approved_at and actions_enabled %}
   <form class="inline" method="post" action="/field-visits/{{ order.work_order_id }}/approve">
-    <input type="text" name="actor" placeholder="your operator id" required>
+    <label class="field" for="visit-actor-{{ loop.index }}">Operator ID
+      <input id="visit-actor-{{ loop.index }}" type="text" name="actor" autocomplete="username" required>
+    </label>
     <button type="submit">Approve this field visit</button>
   </form>
   {% endif %}

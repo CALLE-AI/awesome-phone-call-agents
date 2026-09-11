@@ -16,6 +16,8 @@ from positive_contact.models import (
     Disposition,
     Event,
     Intent,
+    SupportProvider,
+    SupportRequest,
     WorkOrder,
 )
 from positive_contact.script import RECIPIENT_RESULT_SCHEMA
@@ -41,7 +43,7 @@ PHI_FIELD_FRAGMENTS = (
     "health_status",
 )
 
-MODELS = (Event, Contact, Intent, Disposition, WorkOrder)
+MODELS = (Event, Contact, Intent, Disposition, SupportProvider, SupportRequest, WorkOrder)
 
 
 @pytest.mark.parametrize("model", MODELS, ids=lambda model: model.__name__)

@@ -133,6 +133,7 @@ def load_event(path: Path | str) -> tuple[Event, Policy]:
             default_tz=document.get("default_tz", "America/Los_Angeles"),
             crc_info=document.get("crc_info", {}),
             policy=policy.raw,
+            support_providers=document.get("support_providers", []),
         )
     except (KeyError, ValueError) as exc:
         raise PreflightError(f"event definition is incomplete: {exc}") from exc

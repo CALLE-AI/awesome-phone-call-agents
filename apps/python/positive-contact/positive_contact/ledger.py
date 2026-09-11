@@ -26,10 +26,12 @@ from .models import (
     Intent,
     IntentState,
     LadderTarget,
+    SupportRequest,
+    SupportRequestState,
     Transition,
     WorkOrder,
 )
-from .redact import redact_snapshot
+from .redact import redact_free_text, redact_snapshot
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -43,7 +45,8 @@ CREATE TABLE IF NOT EXISTS events (
     field_visit_cutoff  TEXT NOT NULL,
     default_tz          TEXT NOT NULL,
     crc_info_json       TEXT NOT NULL,
-    policy_json         TEXT NOT NULL
+    policy_json         TEXT NOT NULL,
+    support_providers_json TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS contacts (
@@ -117,7 +120,30 @@ CREATE TABLE IF NOT EXISTS dispositions (
     disposition         TEXT NOT NULL,
     reason_code         TEXT NOT NULL,
     evidence_spans_json TEXT NOT NULL,
-    notes_for_human     TEXT
+    notes_for_human     TEXT,
+    support_category    TEXT NOT NULL DEFAULT 'unknown',
+    support_urgency     TEXT NOT NULL DEFAULT 'unknown',
+    provider_contact_consent TEXT NOT NULL DEFAULT 'unknown',
+    emergency_risk      TEXT NOT NULL DEFAULT 'unknown'
+);
+
+CREATE TABLE IF NOT EXISTS support_requests (
+    request_id       TEXT PRIMARY KEY,
+    event_id         TEXT NOT NULL REFERENCES events(event_id),
+    contact_id       TEXT NOT NULL REFERENCES contacts(contact_id),
+    source_intent_id TEXT NOT NULL UNIQUE REFERENCES intents(intent_id),
+    category         TEXT NOT NULL,
+    urgency          TEXT NOT NULL,
+    consent          TEXT NOT NULL,
+    state            TEXT NOT NULL,
+    created_at       TEXT NOT NULL,
+    provider_id      TEXT,
+    reviewed_by      TEXT,
+    reviewed_at      TEXT,
+    idempotency_key  TEXT UNIQUE,
+    call_id          TEXT UNIQUE,
+    result_json      TEXT,
+    completed_at     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS work_orders (
@@ -136,6 +162,8 @@ CREATE INDEX IF NOT EXISTS idx_intents_contact ON intents(contact_id, ladder_ste
 CREATE INDEX IF NOT EXISTS idx_intents_state ON intents(state);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_orders_contact
     ON work_orders(event_id, contact_id);
+CREATE INDEX IF NOT EXISTS idx_support_requests_event
+    ON support_requests(event_id, state, created_at);
 
 CREATE TRIGGER IF NOT EXISTS transitions_append_only_update
 BEFORE UPDATE ON transitions
@@ -185,7 +213,30 @@ class Ledger:
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate_additive_columns()
         self.conn.commit()
+
+    def _migrate_additive_columns(self) -> None:
+        """Add fields introduced after the first demo without replacing operator data."""
+        additions = {
+            "events": {
+                "support_providers_json": "TEXT NOT NULL DEFAULT '[]'",
+            },
+            "dispositions": {
+                "support_category": "TEXT NOT NULL DEFAULT 'unknown'",
+                "support_urgency": "TEXT NOT NULL DEFAULT 'unknown'",
+                "provider_contact_consent": "TEXT NOT NULL DEFAULT 'unknown'",
+                "emergency_risk": "TEXT NOT NULL DEFAULT 'unknown'",
+            },
+        }
+        for table, columns in additions.items():
+            existing = {
+                row["name"]
+                for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            for name, definition in columns.items():
+                if name not in existing:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     def close(self) -> None:
         self.conn.close()
@@ -212,8 +263,8 @@ class Ledger:
         with self.tx() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO events (event_id, utility_name, window_start, "
-                "window_end, field_visit_cutoff, default_tz, crc_info_json, policy_json) "
-                "VALUES (?,?,?,?,?,?,?,?)",
+                "window_end, field_visit_cutoff, default_tz, crc_info_json, policy_json, "
+                "support_providers_json) VALUES (?,?,?,?,?,?,?,?,?)",
                 (
                     event.event_id,
                     event.utility_name,
@@ -223,6 +274,7 @@ class Ledger:
                     event.default_tz,
                     json.dumps(event.crc_info),
                     json.dumps(event.policy),
+                    json.dumps([item.model_dump() for item in event.support_providers]),
                 ),
             )
 
@@ -241,6 +293,7 @@ class Ledger:
             default_tz=row["default_tz"],
             crc_info=json.loads(row["crc_info_json"]),
             policy=json.loads(row["policy_json"]),
+            support_providers=json.loads(row["support_providers_json"]),
         )
 
     # -- contacts ---------------------------------------------------------------
@@ -423,6 +476,29 @@ class Ledger:
         ).fetchone()
         return int(row["n"])
 
+    def count_call_authorizations_for_event(self, event_id: str) -> int:
+        """Count durable paths that may already have spent a live-call slot.
+
+        An accepted resident call has an attempt row. A rejected or ambiguous resident
+        submission entered `SUBMISSION_UNKNOWN` before it stopped, so it may also have
+        consumed a provider request. A reviewed support request may have reached CALL-E
+        before a crash. Counting all three paths is intentionally fail-closed on restart.
+        """
+        resident = self.conn.execute(
+            "SELECT COUNT(DISTINCT i.intent_id) AS n FROM intents i "
+            "LEFT JOIN attempts a ON a.intent_id = i.intent_id "
+            "LEFT JOIN transitions t ON t.intent_id = i.intent_id "
+            "AND t.to_state = ? "
+            "WHERE i.event_id = ? AND (a.intent_id IS NOT NULL OR t.intent_id IS NOT NULL)",
+            (IntentState.SUBMISSION_UNKNOWN.value, event_id),
+        ).fetchone()
+        support = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM support_requests "
+            "WHERE event_id = ? AND reviewed_at IS NOT NULL",
+            (event_id,),
+        ).fetchone()
+        return int(resident["n"]) + int(support["n"])
+
     @staticmethod
     def _intent_from_row(row: sqlite3.Row) -> Intent:
         return Intent(
@@ -457,6 +533,8 @@ class Ledger:
         `intents.state` is a cache. `transitions` is the truth; `reconstruct()` replays it.
         """
         stamp = to_iso(at or utcnow())
+        safe_evidence = redact_snapshot(evidence_refs or {})
+        safe_actor = redact_free_text(actor) or "system"
         with self.tx() as conn:
             conn.execute(
                 "INSERT INTO transitions (intent_id, from_state, to_state, reason_code, "
@@ -466,8 +544,8 @@ class Ledger:
                     from_state.value if from_state else None,
                     to_state.value,
                     reason_code,
-                    json.dumps(evidence_refs or {}),
-                    actor,
+                    json.dumps(safe_evidence),
+                    safe_actor,
                     stamp,
                 ),
             )
@@ -692,7 +770,9 @@ class Ledger:
                 "INSERT OR REPLACE INTO dispositions (intent_id, contact_type, acknowledged, "
                 "needs_assistance, confidence_score, confidence_label, judge_a, judge_b, "
                 "judge_c, judges_agree, disposition, reason_code, evidence_spans_json, "
-                "notes_for_human) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "notes_for_human, support_category, support_urgency, "
+                "provider_contact_consent, emergency_risk) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     disposition.intent_id,
                     disposition.contact_type.value,
@@ -708,6 +788,10 @@ class Ledger:
                     disposition.reason_code,
                     json.dumps([span.model_dump() for span in disposition.evidence_spans]),
                     disposition.notes_for_human,
+                    disposition.support_category.value,
+                    disposition.support_urgency.value,
+                    disposition.provider_contact_consent.value,
+                    disposition.emergency_risk.value,
                 ),
             )
 
@@ -733,6 +817,9 @@ class Ledger:
             DispositionKind,
             EvidenceSpan,
             NeedsAssistance,
+            SupportCategory,
+            SupportUrgency,
+            YesNoUnknown,
         )
 
         return Disposition(
@@ -750,7 +837,157 @@ class Ledger:
             reason_code=row["reason_code"],
             evidence_spans=[EvidenceSpan(**span) for span in json.loads(row["evidence_spans_json"])],
             notes_for_human=row["notes_for_human"],
+            support_category=SupportCategory(row["support_category"]),
+            support_urgency=SupportUrgency(row["support_urgency"]),
+            provider_contact_consent=YesNoUnknown(row["provider_contact_consent"]),
+            emergency_risk=YesNoUnknown(row["emergency_risk"]),
         )
+
+    # -- support requests ------------------------------------------------------
+
+    def create_support_request(self, request: SupportRequest) -> bool:
+        """Create one request per source intent. Returns False when it already exists."""
+        try:
+            with self.tx() as conn:
+                conn.execute(
+                    "INSERT INTO support_requests (request_id, event_id, contact_id, "
+                    "source_intent_id, category, urgency, consent, state, created_at, "
+                    "provider_id, reviewed_by, reviewed_at, idempotency_key, call_id, "
+                    "result_json, completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        request.request_id,
+                        request.event_id,
+                        request.contact_id,
+                        request.source_intent_id,
+                        request.category.value,
+                        request.urgency.value,
+                        request.consent.value,
+                        request.state.value,
+                        to_iso(request.created_at),
+                        request.provider_id,
+                        request.reviewed_by,
+                        to_iso(request.reviewed_at) if request.reviewed_at else None,
+                        request.idempotency_key,
+                        request.call_id,
+                        json.dumps(redact_snapshot(request.result))
+                        if request.result is not None
+                        else None,
+                        to_iso(request.completed_at) if request.completed_at else None,
+                    ),
+                )
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def get_support_request(self, request_id: str) -> SupportRequest | None:
+        row = self.conn.execute(
+            "SELECT * FROM support_requests WHERE request_id = ?", (request_id,)
+        ).fetchone()
+        return self._support_request_from_row(row) if row else None
+
+    def list_support_requests(self, event_id: str) -> list[SupportRequest]:
+        rows = self.conn.execute(
+            "SELECT * FROM support_requests WHERE event_id = ? "
+            "ORDER BY created_at, request_id",
+            (event_id,),
+        ).fetchall()
+        return [self._support_request_from_row(row) for row in rows]
+
+    @staticmethod
+    def _support_request_from_row(row: sqlite3.Row) -> SupportRequest:
+        from .models import SupportCategory, SupportUrgency, YesNoUnknown
+
+        return SupportRequest(
+            request_id=row["request_id"],
+            event_id=row["event_id"],
+            contact_id=row["contact_id"],
+            source_intent_id=row["source_intent_id"],
+            category=SupportCategory(row["category"]),
+            urgency=SupportUrgency(row["urgency"]),
+            consent=YesNoUnknown(row["consent"]),
+            state=SupportRequestState(row["state"]),
+            created_at=from_iso(row["created_at"]),
+            provider_id=row["provider_id"],
+            reviewed_by=row["reviewed_by"],
+            reviewed_at=from_iso(row["reviewed_at"]) if row["reviewed_at"] else None,
+            idempotency_key=row["idempotency_key"],
+            call_id=row["call_id"],
+            result=json.loads(row["result_json"]) if row["result_json"] else None,
+            completed_at=from_iso(row["completed_at"]) if row["completed_at"] else None,
+        )
+
+    def authorize_support_request(
+        self,
+        request_id: str,
+        *,
+        provider_id: str,
+        actor: str,
+        idempotency_key: str,
+        at: datetime,
+    ) -> SupportRequest:
+        safe_actor = redact_free_text(actor) or ""
+        if not safe_actor.strip():
+            raise LedgerError("a provider call needs a named operator")
+        with self.tx() as conn:
+            row = conn.execute(
+                "SELECT * FROM support_requests WHERE request_id = ?", (request_id,)
+            ).fetchone()
+            if row is None:
+                raise LedgerError(f"unknown support request {request_id}")
+            current = SupportRequestState(row["state"])
+            if current is not SupportRequestState.PENDING_REVIEW:
+                return self._support_request_from_row(row)
+            if row["provider_id"] and row["provider_id"] != provider_id:
+                raise LedgerError("this request is already bound to another provider")
+            conn.execute(
+                "UPDATE support_requests SET provider_id = ?, reviewed_by = ?, "
+                "reviewed_at = ?, idempotency_key = ? WHERE request_id = ?",
+                (provider_id, safe_actor, to_iso(at), idempotency_key, request_id),
+            )
+        refreshed = self.get_support_request(request_id)
+        assert refreshed is not None
+        return refreshed
+
+    def record_support_submission(
+        self,
+        request_id: str,
+        *,
+        state: SupportRequestState,
+        call_id: str | None = None,
+        result: dict | None = None,
+        at: datetime | None = None,
+    ) -> None:
+        if state not in {
+            SupportRequestState.SUBMISSION_UNKNOWN,
+            SupportRequestState.SUBMITTED,
+            SupportRequestState.COMPLETED,
+            SupportRequestState.NEEDS_HUMAN,
+            SupportRequestState.DECLINED,
+        }:
+            raise LedgerError(f"cannot record support submission state {state.value}")
+        completed = (
+            to_iso(at or utcnow())
+            if state
+            in {
+                SupportRequestState.COMPLETED,
+                SupportRequestState.NEEDS_HUMAN,
+                SupportRequestState.DECLINED,
+            }
+            else None
+        )
+        with self.tx() as conn:
+            conn.execute(
+                "UPDATE support_requests SET state = ?, call_id = COALESCE(?, call_id), "
+                "result_json = COALESCE(?, result_json), "
+                "completed_at = COALESCE(?, completed_at) WHERE request_id = ?",
+                (
+                    state.value,
+                    call_id,
+                    json.dumps(redact_snapshot(result)) if result is not None else None,
+                    completed,
+                    request_id,
+                ),
+            )
 
     # -- work orders ------------------------------------------------------------
 

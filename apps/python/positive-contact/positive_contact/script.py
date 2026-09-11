@@ -25,6 +25,8 @@ from .models import (
     Event,
     NeedsAssistance,
     SpokeWith,
+    SupportCategory,
+    SupportUrgency,
     YesNoUnknown,
 )
 
@@ -126,6 +128,42 @@ RECIPIENT_RESULT_SCHEMA: dict = {
                 "detail, condition, device, or diagnosis."
             ),
         },
+        "support_category": {
+            "type": "string",
+            "enum": [item.value for item in SupportCategory],
+            "description": (
+                "If needs_assistance is medical_question, record only the broad routing "
+                "category the caller selected. Never ask for or record a medicine name, "
+                "dose, prescription number, diagnosis, condition, or equipment model. "
+                "Use unknown when the caller did not select a category."
+            ),
+        },
+        "support_urgency": {
+            "type": "string",
+            "enum": [item.value for item in SupportUrgency],
+            "description": (
+                "Record only now, today, before_outage, or unknown. Do not collect a "
+                "clinical reason for the timing."
+            ),
+        },
+        "provider_contact_consent": {
+            "type": "string",
+            "enum": [item.value for item in YesNoUnknown],
+            "description": (
+                "Use yes only when the caller clearly gives permission for the utility "
+                "team to contact an approved pharmacy or equipment supplier about "
+                "general outage-support availability."
+            ),
+        },
+        "emergency_risk": {
+            "type": "string",
+            "enum": [item.value for item in YesNoUnknown],
+            "description": (
+                "Use yes when the caller says they are in immediate danger or having a "
+                "medical emergency, no when they clearly say they are not, and unknown "
+                "when it was not established."
+            ),
+        },
     },
 }
 
@@ -135,6 +173,10 @@ ENUM_FIELDS: dict[str, frozenset[str]] = {
     "spoke_with": frozenset(item.value for item in SpokeWith),
     "needs_assistance": frozenset(item.value for item in NeedsAssistance),
     "notify_alternate_contact": frozenset(item.value for item in YesNoUnknown),
+    "support_category": frozenset(item.value for item in SupportCategory),
+    "support_urgency": frozenset(item.value for item in SupportUrgency),
+    "provider_contact_consent": frozenset(item.value for item in YesNoUnknown),
+    "emergency_risk": frozenset(item.value for item in YesNoUnknown),
 }
 
 LENGTH_LIMITS: dict[str, int] = {
@@ -159,7 +201,10 @@ How to handle this call:
 - Say the disclosure above first, before anything else. Never skip it.
 - If voicemail or an answering machine answers: leave the notice, do not ask questions, and set contact_type to voicemail. A message you leave is never an acknowledgement.
 - You may answer only these: repeat the notice, the Community Resource Center location and hours ({crc_hours}), take a callback request, note a preferred language, and note whether an alternate contact should also be notified.
-- If you are asked anything about medical equipment, health, or what to do medically: say that a team member will call them back about it, set needs_assistance to medical_question, and end the call politely. Give no medical advice and no reassurance about equipment.
+- If you are asked anything about medical equipment, health, prescriptions, or what to do medically: Give no medical advice and no reassurance. Set needs_assistance to medical_question.
+- Ask whether the person is in immediate danger or having a medical emergency. If yes, tell them to call 911 or their local emergency number now, set emergency_risk to yes, say a team member will also review the request, and end politely. Do not continue supplier questions.
+- If there is no stated immediate danger, ask only which broad support route fits: prescription access, powered equipment, or another critical supply; ask whether help is needed now, today, or before the outage; and ask permission for the utility team to contact an approved pharmacy or equipment supplier about general availability. Never ask for a medicine name, dose, prescription number, diagnosis, condition, or equipment model.
+- Explain that permission does not place an order, reserve equipment, guarantee availability, or replace emergency or medical care. A utility operator reviews every request before any supplier is called.
 - Never discuss account status, billing, payment, or credit. Never ask for an account number, a card number, a date of birth, or any identifying detail beyond confirming you are speaking with someone in the household. Never offer to change the outage timing.
 - If the person cannot understand the language of this call: set contact_type to language_barrier and end politely. Do not attempt another language.
 - If the person says this is the wrong number: set contact_type to wrong_number and end politely.

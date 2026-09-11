@@ -6,71 +6,150 @@
 <title>PositiveContact - {{ event.event_id }}</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
 <style>
-  :root { color-scheme: light dark; --ink:#16191d; --paper:#fbfbfa; --line:#d9d7d2;
-          --muted:#63676d; --good:#1c6b3e; --goodbg:#e6f3ea; --wait:#5a4a12; --waitbg:#fbf3d8;
-          --attn:#8a2f1c; --attnbg:#fbe8e4; --truck:#1f4d78; --truckbg:#e4eef8; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink:#e8e6e3; --paper:#16181b; --line:#33373d; --muted:#a0a4aa;
-            --good:#7fd3a1; --goodbg:#16301f; --wait:#ddc46a; --waitbg:#332c12;
-            --attn:#f0a08c; --attnbg:#3a1d16; --truck:#8fbde8; --truckbg:#152836; }
+  :root {
+    color-scheme: light;
+    --ink:#14221d; --paper:#f5f7f3; --surface:#ffffff; --line:#dce4dd;
+    --muted:#617069; --brand:#116149; --brand-dark:#0a4635; --accent:#d7f064;
+    --good:#17603c; --goodbg:#e4f4ea; --wait:#705315; --waitbg:#fff2c9;
+    --attn:#9d3f27; --attnbg:#fff0ea; --truck:#245a8d; --truckbg:#e8f2fb;
+    --shadow:0 12px 34px rgba(20,34,29,.08);
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.5 ui-sans-serif,
-         system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { border-bottom:1px solid var(--line); padding:14px 20px; display:flex;
-           flex-wrap:wrap; gap:14px 24px; align-items:baseline; }
-  header h1 { font-size:16px; margin:0; letter-spacing:-0.01em; }
-  header .meta { color:var(--muted); font-size:12.5px; }
-  nav { display:flex; gap:4px; padding:0 20px; border-bottom:1px solid var(--line); }
-  nav a { padding:9px 14px; text-decoration:none; color:var(--muted); border-bottom:2px solid transparent; }
-  nav a.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
-  main { padding:20px; max-width:1180px; }
-  h2 { font-size:15px; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:12.5px; margin:0 0 16px; }
-  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
-  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
-  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11.5px;
-          font-weight:600; white-space:nowrap; }
+  * { box-sizing:border-box; }
+  html { background:var(--paper); }
+  body { margin:0; color:var(--ink); font:14px/1.55 ui-sans-serif, system-ui, -apple-system,
+         BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  a { color:inherit; }
+  .topbar { min-height:64px; padding:12px clamp(18px,4vw,48px); display:flex;
+            justify-content:space-between; gap:18px; align-items:center; background:var(--ink);
+            color:white; }
+  .brand { display:flex; align-items:center; gap:11px; }
+  .brand-mark { width:32px; height:32px; display:grid; place-items:center; border-radius:10px;
+                background:var(--accent); color:var(--ink); font-weight:900; letter-spacing:-.08em; }
+  .brand strong { display:block; font-size:15px; letter-spacing:-.01em; }
+  .brand small { display:block; color:#b9c8c1; font-size:11.5px; }
+  .event-chip { display:flex; align-items:center; gap:8px; color:#d9e5df; font-size:12px; }
+  .event-chip::before { content:""; width:8px; height:8px; border-radius:50%;
+                       background:var(--accent); box-shadow:0 0 0 4px rgba(215,240,100,.12); }
+  nav { padding:0 clamp(18px,4vw,48px); display:flex; gap:4px; overflow-x:auto;
+        border-bottom:1px solid var(--line); background:var(--surface); }
+  nav a { padding:13px 14px 11px; text-decoration:none; color:var(--muted);
+          border-bottom:3px solid transparent; white-space:nowrap; font-weight:650; }
+  nav a:hover { color:var(--brand); }
+  nav a.on { color:var(--brand); border-bottom-color:var(--brand); }
+  main { max-width:1240px; margin:0 auto; padding:28px clamp(18px,4vw,48px) 56px; }
+  .hero { position:relative; overflow:hidden; padding:26px clamp(20px,4vw,36px);
+          margin-bottom:22px; border-radius:20px; color:white;
+          background:linear-gradient(125deg,var(--brand-dark),var(--brand)); box-shadow:var(--shadow); }
+  .hero::after { content:""; position:absolute; width:230px; height:230px; border-radius:50%;
+                 right:-76px; top:-116px; background:rgba(215,240,100,.14); }
+  .eyebrow { margin:0 0 5px; color:var(--accent); text-transform:uppercase; letter-spacing:.12em;
+             font-size:10.5px; font-weight:800; }
+  .hero h1 { max-width:640px; margin:0; font-size:clamp(25px,4vw,40px); line-height:1.08;
+             letter-spacing:-.04em; }
+  .hero-copy { max-width:690px; margin:10px 0 0; color:#dceae4; font-size:13px; }
+  .stats { position:relative; z-index:1; display:grid; grid-template-columns:repeat(5,minmax(100px,1fr));
+           gap:9px; margin-top:22px; }
+  .stat { padding:10px 12px; border:1px solid rgba(255,255,255,.14); border-radius:12px;
+          background:rgba(255,255,255,.08); }
+  .stat strong { display:block; font-size:21px; line-height:1.1; }
+  .stat span { color:#c9ddd4; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+  .page-heading { display:flex; justify-content:space-between; gap:16px; align-items:flex-end;
+                  margin-bottom:16px; }
+  h2 { margin:0; font-size:20px; letter-spacing:-.025em; }
+  h3 { letter-spacing:-.01em; }
+  .sub { color:var(--muted); font-size:13px; margin:4px 0 0; max-width:780px; }
+  .mode { padding:5px 9px; border-radius:999px; background:var(--surface); border:1px solid var(--line);
+          color:var(--muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.06em; }
+  .table-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
+                border-radius:14px; box-shadow:0 5px 18px rgba(20,34,29,.04); }
+  table { border-collapse:collapse; width:100%; min-width:780px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:last-child td { border-bottom:0; }
+  tbody tr:hover { background:#f8faf7; }
+  th { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted);
+       font-weight:800; background:#f9faf8; }
+  .pill { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px;
+          font-size:10.5px; font-weight:800; white-space:nowrap; letter-spacing:.015em; }
   .good { background:var(--goodbg); color:var(--good); }
   .waiting { background:var(--waitbg); color:var(--wait); }
   .attention { background:var(--attnbg); color:var(--attn); }
   .truck { background:var(--truckbg); color:var(--truck); }
   .closed { background:transparent; color:var(--muted); border:1px solid var(--line); }
-  .card { border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:14px; }
-  .card h3 { margin:0 0 2px; font-size:14px; }
-  .spans { margin:10px 0; }
-  .span { border-left:3px solid var(--line); padding:4px 10px; margin:5px 0; }
-  .span .who { color:var(--muted); font-size:11.5px; }
-  form.inline { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
-  input[type=text] { padding:6px 8px; border:1px solid var(--line); border-radius:5px;
-                     background:var(--paper); color:var(--ink); }
-  input.grow { flex:1 1 260px; }
-  button { padding:6px 12px; border:1px solid var(--line); border-radius:5px; cursor:pointer;
-           background:var(--ink); color:var(--paper); font-weight:600; }
-  button.ghost { background:transparent; color:var(--ink); }
-  .banner { border:1px solid var(--line); border-radius:6px; padding:9px 12px; margin-bottom:14px;
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:15px; padding:18px;
+          margin-bottom:14px; box-shadow:0 5px 18px rgba(20,34,29,.04); }
+  .card h3 { margin:0 0 4px; font-size:15px; }
+  .card-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+  .facts { display:flex; flex-wrap:wrap; gap:8px; margin:13px 0; }
+  .fact { padding:7px 9px; border-radius:8px; background:#f4f7f4; color:var(--muted); font-size:11.5px; }
+  .fact strong { color:var(--ink); }
+  .spans { margin:13px 0; }
+  .span { border-left:3px solid #b8c8c0; padding:5px 11px; margin:7px 0; background:#f8faf8; }
+  .span .who { color:var(--muted); font-size:11px; }
+  form.inline { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:12px;
+                padding-top:12px; border-top:1px solid var(--line); }
+  .field { display:flex; flex:1 1 180px; flex-direction:column; gap:4px; color:var(--muted);
+           font-size:11.5px; font-weight:700; }
+  .field.grow { flex-basis:300px; }
+  input[type=text], input[type=password], select { width:100%; min-height:39px; padding:8px 10px;
+          border:1px solid #bfcac4; border-radius:8px; background:white; color:var(--ink); font:inherit; }
+  .check { display:flex; flex:1 1 100%; gap:8px; align-items:flex-start; color:var(--ink); font-size:12px; }
+  button { min-height:39px; padding:8px 14px; border:1px solid var(--brand); border-radius:8px;
+           cursor:pointer; background:var(--brand); color:white; font-weight:750; }
+  button:hover { background:var(--brand-dark); }
+  button.ghost { background:white; color:var(--brand); }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+    outline:3px solid rgba(17,97,73,.25); outline-offset:2px;
+  }
+  .banner { border:1px solid #ecd58d; border-radius:10px; padding:10px 13px; margin-bottom:15px;
             background:var(--waitbg); color:var(--wait); }
+  .safety { border-left:4px solid var(--brand); padding:9px 12px; margin:12px 0;
+            background:#edf6f1; color:#305c4d; font-size:12.5px; }
   .note { color:var(--muted); font-size:12.5px; }
-  code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
-  pre { overflow-x:auto; border:1px solid var(--line); border-radius:6px; padding:10px;
-        font:12px ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .empty { color:var(--muted); padding:18px 0; }
+  code { font:12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { overflow-x:auto; border:1px solid var(--line); border-radius:10px; padding:12px;
+        background:#f9faf8; font:12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .empty { color:var(--muted); padding:28px; text-align:center; background:var(--surface);
+           border:1px dashed #bcc8c1; border-radius:14px; }
+  @media (max-width:760px) {
+    .event-chip { display:none; }
+    .stats { grid-template-columns:repeat(2,1fr); }
+    .stat:last-child { grid-column:1/-1; }
+    .page-heading, .card-head { align-items:flex-start; flex-direction:column; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>PositiveContact</h1>
-  <span class="meta">{{ event.utility_name }} &middot; event <code>{{ event.event_id }}</code></span>
-  <span class="meta">shutoff {{ event.window_start.isoformat() }}</span>
-  <span class="meta">field-visit cutoff {{ event.field_visit_cutoff.isoformat() }}</span>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">PC</span>
+    <div><strong>PositiveContact</strong><small>Outage care operations</small></div>
+  </div>
+  <div class="event-chip">{{ event.utility_name }} · {{ event.event_id }}</div>
 </header>
-<nav>
-  <a href="/board" class="{{ 'on' if page == 'board' }}">Ladder board</a>
-  <a href="/review" class="{{ 'on' if page == 'review' }}">Review queue</a>
-  <a href="/reports" class="{{ 'on' if page == 'reports' }}">Reports</a>
+<nav aria-label="Operator sections">
+  <a href="/board" class="{{ 'on' if page == 'board' }}">Contact ladder</a>
+  <a href="/review" class="{{ 'on' if page == 'review' }}">Human review</a>
+  <a href="/support" class="{{ 'on' if page == 'support' }}">Support desk</a>
+  <a href="/reports" class="{{ 'on' if page == 'reports' }}">Evidence report</a>
 </nav>
 <main>
+  <section class="hero" aria-labelledby="mission-title">
+    <p class="eyebrow">PSPS mission control · {{ 'live' if live_mode else 'safe fixture' }}</p>
+    <h1 id="mission-title">Every warning heard. Every support request owned.</h1>
+    <p class="hero-copy">CALL-E handles the conversation. Operators keep control of consent,
+      supplier calls, field visits and the evidence behind every decision.</p>
+    <div class="stats" aria-label="Event summary">
+      <div class="stat"><strong>{{ summary.contacts }}</strong><span>In scope</span></div>
+      <div class="stat"><strong>{{ summary.confirmed }}</strong><span>Confirmed</span></div>
+      <div class="stat"><strong>{{ summary.review }}</strong><span>Human review</span></div>
+      <div class="stat"><strong>{{ summary.support }}</strong><span>Support open</span></div>
+      <div class="stat"><strong>{{ summary.field_visits }}</strong><span>Visits pending</span></div>
+    </div>
+  </section>
+{% if not actions_enabled %}
+  <div class="banner" role="status"><strong>Read-only public demo.</strong> Operator actions
+    are disabled. Run on localhost or configure <code>PC_OPERATOR_TOKEN</code> to enable them.</div>
+{% endif %}
 {% block body %}{% endblock %}
 </main>
 </body>

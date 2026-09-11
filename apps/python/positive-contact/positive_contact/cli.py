@@ -360,22 +360,48 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     from .web.app import create_app
 
-    settings = load_settings(mode=args.mode, db_path=args.db)
+    settings = load_settings(
+        mode=args.mode,
+        db_path=args.db,
+        max_calls=args.max_calls,
+        live_confirmed=args.i_understand_this_places_real_calls,
+    )
     event, policy = load_event(args.event)
+    if settings.mode is RunMode.LIVE:
+        print(
+            f"MODE: LIVE. This worker may place up to {settings.max_calls} total real "
+            "resident or provider calls, less any calls already recorded in this event."
+        )
+        typed = input("Type the word PLACE to start the live worker, anything else to abort: ")
+        if typed.strip() != "PLACE":
+            print("aborted; the server did not start and no call was placed")
+            return 1
     transport = _make_transport(settings, args)
+    budget = None
+    if settings.mode is RunMode.LIVE:
+        with Ledger(settings.db_path) as existing:
+            already_placed = existing.count_call_authorizations_for_event(event.event_id)
+        budget = LiveCallBudget(settings.max_calls, spent=already_placed)
     app = create_app(
         settings.db_path,
         event,
         policy,
         transport=transport,
         judge_c=_load_judge_c(settings),
+        budget=budget,
+        live_mode=settings.mode is RunMode.LIVE,
     )
     print(f"dashboard on http://{args.host}:{args.port}  (mode {settings.mode.value})")
     print(
         "intake worker running: draining the webhook inbox, polling open calls, and "
         "sweeping the field-visit cutoff"
     )
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    try:
+        uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    finally:
+        close = getattr(transport, "close", None)
+        if callable(close):
+            close()
     return 0
 
 
@@ -534,6 +560,13 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--mode", default=None, choices=[item.value for item in RunMode])
+    serve.add_argument("--max-calls", type=int, default=None, help="hard ceiling on real calls")
+    serve.add_argument(
+        LIVE_CONFIRMATION_FLAG,
+        dest="i_understand_this_places_real_calls",
+        action="store_true",
+        help="required for live mode, alongside PC_MODE=live and --max-calls",
+    )
     serve.set_defaults(func=cmd_serve)
 
     record = sub.add_parser("record", help="save one real call as a redacted replay payload")

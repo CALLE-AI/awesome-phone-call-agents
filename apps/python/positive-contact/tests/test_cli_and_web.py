@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime, time, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -13,10 +16,13 @@ from positive_contact.config import (
     RunMode,
     load_settings,
 )
-from positive_contact.escalate import approve_field_visit
+from positive_contact.dispatch import LiveCallBudget
+from positive_contact.escalate import approve_field_visit, seed_first_step
 from positive_contact.models import IntentState
+from positive_contact.policy import QuietHours, load_policy
 from positive_contact.transports.fixture import FixtureTransport
-from positive_contact.web.app import create_app
+from positive_contact.web.app import _drain_once, create_app
+from positive_contact.script import SCHEMA_VERSION, TASK_VERSION
 from tests.conftest import EVENT_PATH, ROSTER_PATH, SCENARIOS
 
 
@@ -101,6 +107,15 @@ def test_run_defaults_to_no_live_flags():
     assert args.i_understand_this_places_real_calls is False
 
 
+def test_the_serve_command_exposes_the_live_ceiling_and_confirmation():
+    args = build_parser().parse_args(
+        ["serve", "--mode", "live", "--max-calls", "4", LIVE_CONFIRMATION_FLAG]
+    )
+    assert args.mode == "live"
+    assert args.max_calls == 4
+    assert args.i_understand_this_places_real_calls is True
+
+
 def test_every_documented_command_exists():
     parser = build_parser()
     for command in ("preflight", "run", "serve", "report", "approve-field-visits", "record"):
@@ -161,6 +176,54 @@ def test_run_refuses_live_mode_without_the_gates(tmp_path, capsys):
     assert "confirmation flag" in capsys.readouterr().err
 
 
+def test_serve_refuses_live_mode_without_the_gates(tmp_path, capsys):
+    code = main(
+        [
+            "serve",
+            "--mode",
+            "live",
+            "--event",
+            str(EVENT_PATH),
+            "--db",
+            str(tmp_path / "serve.db"),
+        ]
+    )
+    assert code == 2
+    assert "confirmation flag" in capsys.readouterr().err
+
+
+def test_worker_dispatches_due_intents_under_the_shared_budget(
+    ledger, demo_preflight, fixture_transport, policy
+):
+    moment = datetime.now(timezone.utc)
+    future_event = demo_preflight.event.model_copy(
+        update={
+            "window_start": moment + timedelta(hours=8),
+            "window_end": moment + timedelta(hours=20),
+            "field_visit_cutoff": moment + timedelta(hours=6),
+        }
+    )
+    ledger.put_event(future_event)
+    contact = demo_preflight.callable_contacts[0]
+    ledger.put_contact(contact)
+    worker_policy = replace(policy, quiet_hours=QuietHours(time(0), time(0)))
+    seed_first_step(
+        ledger,
+        future_event,
+        worker_policy,
+        contact.contact_id,
+        now=moment - timedelta(seconds=1),
+        task_version=TASK_VERSION,
+        schema_version=SCHEMA_VERSION,
+    )
+    budget = LiveCallBudget(1)
+    _drain_once(
+        ledger, fixture_transport, future_event, worker_policy, None, budget
+    )
+    assert ledger.count_calls_for_event(future_event.event_id) == 1
+    assert budget.spent == 1
+
+
 def test_report_command_renders_every_format(tmp_path, capsys):
     db = tmp_path / "run.db"
     main(["run", "--mode", "fixture", "--event", str(EVENT_PATH),
@@ -219,7 +282,7 @@ def test_the_root_redirects_to_the_board(dashboard):
     assert response.headers["location"] == "/board"
 
 
-@pytest.mark.parametrize("path", ["/board", "/review", "/reports"])
+@pytest.mark.parametrize("path", ["/board", "/review", "/support", "/reports"])
 def test_every_page_renders(dashboard, path):
     client, _ledger = dashboard
     response = client.get(path)
@@ -227,7 +290,9 @@ def test_every_page_renders(dashboard, path):
     assert "PositiveContact" in response.text
 
 
-@pytest.mark.parametrize("path", ["/board/rows", "/review/rows", "/reports/table"])
+@pytest.mark.parametrize(
+    "path", ["/board/rows", "/review/rows", "/support/rows", "/reports/table"]
+)
 def test_every_polled_partial_renders(dashboard, path):
     client, _ledger = dashboard
     assert client.get(path).status_code == 200
@@ -257,6 +322,117 @@ def test_the_review_queue_shows_the_evidence_spans(dashboard):
 def test_the_review_queue_explains_that_the_deadline_keeps_running(dashboard):
     client, _ledger = dashboard
     assert "The deadline is not" in client.get("/review").text
+
+
+def test_review_forms_have_visible_accessible_labels(dashboard):
+    client, _ledger = dashboard
+    text = client.get("/review").text
+    assert '<label class="field"' in text
+    assert "Confirmation evidence" in text
+    assert "Refusal evidence" in text
+
+
+def test_health_and_public_status_endpoints(dashboard):
+    client, _ledger = dashboard
+    assert client.get("/healthz").json()["status"] == "ok"
+    status_payload = client.get("/api/v1/status").json()
+    assert status_payload["event_id"] == "psps-demo-2026-09"
+    assert status_payload["summary"]["contacts"] == 12
+
+
+def test_support_desk_authorizes_and_completes_the_fixture_provider_call(
+    ledger, demo_preflight, event, policy, now
+):
+    transport = FixtureTransport(SCENARIOS)
+    seed_ledger(ledger, demo_preflight)
+    execute_run(ledger, transport, demo_preflight, now=now, simulated_clock=False)
+    request = ledger.list_support_requests(event.event_id)[0]
+    client = TestClient(create_app(ledger.db_path, event, policy, transport=transport))
+    response = client.post(
+        f"/support/{request.request_id}/authorize",
+        data={
+            "actor": "op-7",
+            "provider_id": "demo-equipment",
+            "confirm_provider_call": "yes",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    refreshed = ledger.get_support_request(request.request_id)
+    assert refreshed is not None
+    assert refreshed.state.value == "COMPLETED"
+    page = client.get("/support").text
+    assert "Provider result" in page
+    assert "Within two hours" in page
+
+
+def test_support_api_is_masked_and_omits_provider_phone(
+    ledger, demo_preflight, event, policy, now
+):
+    transport = FixtureTransport(SCENARIOS)
+    seed_ledger(ledger, demo_preflight)
+    execute_run(ledger, transport, demo_preflight, now=now, simulated_clock=False)
+    client = TestClient(create_app(ledger.db_path, event, policy, transport=transport))
+    payload = client.get("/api/v1/support-requests").text
+    assert "+14155550109" not in payload
+    assert "+14155550181" not in payload
+    assert "•••" in payload
+
+
+def test_cross_origin_operator_action_is_denied(dashboard):
+    client, ledger = dashboard
+    intent = ledger.list_intents("psps-demo-2026-09", [IntentState.NEEDS_HUMAN])[0]
+    response = client.post(
+        f"/review/{intent.intent_id}/confirm",
+        data={"actor": "op-7", "evidence": "confirmed"},
+        headers={"Origin": "https://evil.example"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    assert ledger.reconstruct(intent.intent_id) is IntentState.NEEDS_HUMAN
+
+
+def test_public_operator_action_requires_a_configured_token(dashboard):
+    _client, ledger = dashboard
+    intent = ledger.list_intents("psps-demo-2026-09", [IntentState.NEEDS_HUMAN])[0]
+    stored_event = ledger.get_event("psps-demo-2026-09")
+    assert stored_event is not None
+    public = TestClient(
+        create_app(ledger.db_path, stored_event, load_policy(stored_event.policy)),
+        base_url="https://demo.example",
+    )
+    response = public.post(
+        f"/review/{intent.intent_id}/confirm",
+        data={"actor": "op-7", "evidence": "confirmed"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 503
+
+
+def test_configured_operator_token_uses_http_basic(
+    ledger, demo_preflight, event, policy, now
+):
+    transport = FixtureTransport(SCENARIOS)
+    seed_ledger(ledger, demo_preflight)
+    execute_run(ledger, transport, demo_preflight, now=now, simulated_clock=False)
+    intent = ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])[0]
+    client = TestClient(
+        create_app(ledger.db_path, event, policy, operator_token="test-secret"),
+        base_url="https://demo.example",
+    )
+    denied = client.post(
+        f"/review/{intent.intent_id}/confirm",
+        data={"actor": "op-7", "evidence": "confirmed"},
+        follow_redirects=False,
+    )
+    assert denied.status_code == 401
+    allowed = client.post(
+        f"/review/{intent.intent_id}/confirm",
+        data={"actor": "op-7", "evidence": "confirmed"},
+        auth=("operator", "test-secret"),
+        follow_redirects=False,
+    )
+    assert allowed.status_code == 303
 
 
 def test_a_confirmation_without_evidence_is_rejected(dashboard):

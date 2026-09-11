@@ -12,11 +12,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
 from ..escalate import (
@@ -26,15 +30,18 @@ from ..escalate import (
     operator_refuse,
     sweep_cutoff,
 )
+from ..dispatch import BudgetExceeded, dispatch_intent
 from ..intake import WebhookReceiver, build_router, poll_pending, process_inbox
 from ..ledger import Ledger, LedgerError
 from ..models import Event, IntentState
 from ..policy import Policy
 from ..redact import mask_e164
 from ..report import build_report, work_orders_csv
+from ..support import SupportError, authorize_provider_call, poll_support_requests
 
 LOG = logging.getLogger("positive_contact.web")
 DEFAULT_WORKER_INTERVAL_SECONDS = 10
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "testserver"})
 
 # Errors an operator action can raise from a stale form: the intent moved on between the
 # page render and the click, so the state machine refuses the edge.
@@ -125,12 +132,74 @@ def _review_rows(ledger: Ledger, event: Event) -> list[dict]:
                 "judge_b": disposition.judge_b if disposition else "-",
                 "judges_agree": disposition.judges_agree if disposition else False,
                 "notes": disposition.notes_for_human if disposition else None,
+                "support_category": (
+                    disposition.support_category.value if disposition else "unknown"
+                ),
+                "support_urgency": (
+                    disposition.support_urgency.value if disposition else "unknown"
+                ),
+                "provider_contact_consent": (
+                    disposition.provider_contact_consent.value if disposition else "unknown"
+                ),
+                "emergency_risk": (
+                    disposition.emergency_risk.value if disposition else "unknown"
+                ),
                 "spans": [span.model_dump() for span in disposition.evidence_spans]
                 if disposition
                 else [],
             }
         )
     return rows
+
+
+def _support_rows(ledger: Ledger, event: Event) -> list[dict]:
+    providers = {item.provider_id: item for item in event.support_providers}
+    rows: list[dict] = []
+    for item in ledger.list_support_requests(event.event_id):
+        contact = ledger.get_contact(item.contact_id)
+        provider = providers.get(item.provider_id or "")
+        tone = {
+            "PENDING_REVIEW": "attention",
+            "SUBMITTED": "waiting",
+            "SUBMISSION_UNKNOWN": "attention",
+            "COMPLETED": "good",
+            "NEEDS_HUMAN": "attention",
+            "DECLINED": "closed",
+        }.get(item.state.value, "waiting")
+        rows.append(
+            {
+                "request_id": item.request_id,
+                "contact_id": item.contact_id,
+                "first_name": contact.first_name if contact else "",
+                "phone": mask_e164(contact.phone_e164) if contact else "",
+                "category": item.category.value,
+                "urgency": item.urgency.value,
+                "consent": item.consent.value,
+                "state": item.state.value,
+                "tone": tone,
+                "provider_id": item.provider_id,
+                "provider_name": provider.name if provider else None,
+                "reviewed_by": item.reviewed_by,
+                "call_id": item.call_id,
+                "result": item.result or {},
+                "created_at": item.created_at,
+            }
+        )
+    return rows
+
+
+def _summary(ledger: Ledger, event: Event) -> dict[str, int]:
+    board = _board_rows(ledger, event)
+    support = _support_rows(ledger, event)
+    return {
+        "contacts": len(board),
+        "confirmed": sum(row["state"] == "CONFIRMED" for row in board),
+        "review": len(ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])),
+        "support": sum(row["state"] != "COMPLETED" for row in support),
+        "field_visits": sum(
+            order.approved_at is None for order in ledger.list_work_orders(event.event_id)
+        ),
+    }
 
 
 def create_app(
@@ -140,6 +209,9 @@ def create_app(
     *,
     transport=None,
     judge_c=None,
+    budget=None,
+    live_mode: bool = False,
+    operator_token: str | None = None,
     worker_interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS,
 ) -> FastAPI:
     """Build the operator dashboard, the webhook receiver, and the worker that drains it.
@@ -156,11 +228,46 @@ def create_app(
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     ledger = Ledger(db_path)
     app.include_router(build_router(WebhookReceiver(ledger)))
+    security = HTTPBasic(auto_error=False)
+    configured_token = operator_token or os.environ.get("PC_OPERATOR_TOKEN")
+
+    async def require_operator(
+        request: Request,
+        credentials: HTTPBasicCredentials | None = Depends(security),
+    ) -> None:
+        origin = request.headers.get("origin")
+        if origin and urlsplit(origin).hostname != request.url.hostname:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="cross-origin action denied")
+        if configured_token:
+            valid = bool(
+                credentials
+                and secrets.compare_digest(credentials.password, configured_token)
+            )
+            if not valid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="operator authentication required",
+                    headers={"WWW-Authenticate": "Basic"},
+                )
+            return
+        if request.url.hostname not in LOCAL_HOSTS:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="set PC_OPERATOR_TOKEN before enabling actions on a public host",
+            )
 
     async def worker() -> None:
         while True:
             try:
-                await asyncio.to_thread(_drain_once, ledger, transport, event, policy, judge_c)
+                await asyncio.to_thread(
+                    _drain_once,
+                    ledger,
+                    transport,
+                    event,
+                    policy,
+                    judge_c,
+                    budget,
+                )
             except asyncio.CancelledError:
                 raise
             except Exception:  # keep the loop alive; one bad cycle must not stop intake
@@ -182,11 +289,17 @@ def create_app(
                 await task
 
     def context(request: Request, **extra) -> dict:
+        actions_enabled = bool(
+            configured_token or request.url.hostname in LOCAL_HOSTS
+        )
         base = {
             "request": request,
             "event": event,
             "policy": policy,
             "now": datetime.now(timezone.utc),
+            "summary": _summary(ledger, event),
+            "live_mode": live_mode,
+            "actions_enabled": actions_enabled,
         }
         base.update(extra)
         return base
@@ -194,6 +307,19 @@ def create_app(
     @app.get("/", response_class=HTMLResponse)
     async def root() -> RedirectResponse:
         return RedirectResponse("/board")
+
+    @app.get("/healthz")
+    async def healthz() -> dict:
+        return {"status": "ok", "event_id": event.event_id}
+
+    @app.get("/api/v1/status")
+    async def api_status() -> dict:
+        return {
+            "status": "ok",
+            "event_id": event.event_id,
+            "mode": "live" if live_mode else "fixture",
+            "summary": _summary(ledger, event),
+        }
 
     @app.get("/board", response_class=HTMLResponse)
     async def board(request: Request) -> HTMLResponse:
@@ -226,7 +352,106 @@ def create_app(
             request, "_review_rows.html", context(request, rows=_review_rows(ledger, event))
         )
 
-    @app.post("/review/{intent_id}/confirm")
+    @app.get("/support", response_class=HTMLResponse)
+    async def support(request: Request, message: str | None = None) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "support.html",
+            context(
+                request,
+                rows=_support_rows(ledger, event),
+                providers=event.support_providers,
+                page="support",
+                message=message,
+                transport_ready=transport is not None,
+            ),
+        )
+
+    @app.get("/support/rows", response_class=HTMLResponse)
+    async def support_rows(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "_support_rows.html",
+            context(
+                request,
+                rows=_support_rows(ledger, event),
+                providers=event.support_providers,
+                transport_ready=transport is not None,
+            ),
+        )
+
+    @app.get("/api/v1/support-requests", dependencies=[Depends(require_operator)])
+    async def api_support_requests() -> dict:
+        rows = _support_rows(ledger, event)
+        return {
+            "event_id": event.event_id,
+            "requests": [
+                {
+                    key: row[key]
+                    for key in (
+                        "request_id",
+                        "contact_id",
+                        "phone",
+                        "category",
+                        "urgency",
+                        "consent",
+                        "state",
+                        "provider_id",
+                        "provider_name",
+                        "reviewed_by",
+                        "call_id",
+                        "result",
+                    )
+                }
+                for row in rows
+            ],
+        }
+
+    @app.post(
+        "/support/{request_id}/authorize",
+        dependencies=[Depends(require_operator)],
+    )
+    async def authorize_support(
+        request_id: str,
+        actor: str = Form(...),
+        provider_id: str = Form(...),
+        confirm_provider_call: str = Form(...),
+    ) -> RedirectResponse:
+        if confirm_provider_call != "yes":
+            return RedirectResponse(
+                "/support?message=confirm+one+provider+call+before+continuing",
+                status_code=303,
+            )
+        if transport is None:
+            return RedirectResponse(
+                "/support?message=start+the+fixture+or+live+worker+before+authorizing+a+call",
+                status_code=303,
+            )
+        try:
+            outcome = authorize_provider_call(
+                ledger,
+                transport,
+                event,
+                request_id,
+                provider_id=provider_id,
+                actor=actor,
+                now=datetime.now(timezone.utc),
+                budget=budget,
+                live_mode=live_mode,
+            )
+            if outcome.action == "submitted":
+                poll_support_requests(
+                    ledger, transport, event, now=datetime.now(timezone.utc)
+                )
+        except (SupportError, LedgerError, RuntimeError, ValueError) as exc:
+            return RedirectResponse(f"/support?message={exc}", status_code=303)
+        return RedirectResponse(
+            f"/support?message=provider+call+{outcome.action}", status_code=303
+        )
+
+    @app.post(
+        "/review/{intent_id}/confirm", dependencies=[Depends(require_operator)]
+    )
     async def confirm(
         intent_id: str, actor: str = Form(...), evidence: str = Form(...)
     ) -> RedirectResponse:
@@ -248,7 +473,9 @@ def create_app(
             f"/review?message=confirmed+{intent.contact_id}", status_code=303
         )
 
-    @app.post("/review/{intent_id}/refuse")
+    @app.post(
+        "/review/{intent_id}/refuse", dependencies=[Depends(require_operator)]
+    )
     async def refuse(
         intent_id: str, actor: str = Form(...), evidence: str = Form(...)
     ) -> RedirectResponse:
@@ -294,7 +521,10 @@ def create_app(
             request, "_report_table.html", context(request, report=report)
         )
 
-    @app.post("/field-visits/{work_order_id}/approve")
+    @app.post(
+        "/field-visits/{work_order_id}/approve",
+        dependencies=[Depends(require_operator)],
+    )
     async def approve(work_order_id: str, actor: str = Form(...)) -> RedirectResponse:
         now = datetime.now(timezone.utc)
         try:
@@ -307,9 +537,33 @@ def create_app(
     return app
 
 
-def _drain_once(ledger: Ledger, transport, event: Event, policy: Policy, judge_c) -> None:
-    """One worker cycle: drain the inbox, poll anything still open, sweep the cutoff."""
+def _drain_once(
+    ledger: Ledger, transport, event: Event, policy: Policy, judge_c, budget=None
+) -> None:
+    """One worker cycle: dispatch due work, poll both call types, then sweep."""
     now = datetime.now(timezone.utc)
+    due = [
+        intent
+        for intent in ledger.list_intents(
+            event.event_id, [IntentState.RESERVED, IntentState.SUBMISSION_UNKNOWN]
+        )
+        if intent.not_before <= now
+    ]
+    for intent in due:
+        try:
+            dispatch_intent(
+                ledger,
+                transport,
+                event,
+                policy,
+                intent,
+                now=now,
+                budget=budget,
+            )
+        except BudgetExceeded:
+            LOG.warning("call ceiling reached; due calls remain reserved")
+            break
     process_inbox(ledger, transport, event, policy, now=now, judge_c=judge_c)
     poll_pending(ledger, transport, event, policy, now=now, judge_c=judge_c)
+    poll_support_requests(ledger, transport, event, now=now)
     sweep_cutoff(ledger, event, policy, now=now)

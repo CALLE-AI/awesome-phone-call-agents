@@ -6,22 +6,28 @@ person heard the warning. Voicemail does not count.**
 PositiveContact takes a shutoff event and a customer roster, places one disclosed
 [CALL-E](https://www.heycall-e.com/) call per authorized step, decides fail-closed whether
 a human actually acknowledged the notice, walks an escalation ladder toward a field visit
-when they did not, and produces a report whose every count carries its denominator.
+when they did not, and produces a report whose every count carries its denominator. If a
+resident asks for critical-supply help, a named operator can approve one identity-free
+CALL-E availability call to an allowlisted pharmacy or equipment provider.
 
 Fixture mode is the default. Nothing here places a call until three separate gates are
 opened by a person.
 
 ```bash
 cd apps/python/positive-contact
-python3 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
-./.venv/bin/pc preflight          # validate the roster, print masked plan, place no calls
-./.venv/bin/pc run --mode fixture # walk every ladder in a simulated clock, print the report
-./.venv/bin/pc serve              # operator dashboard on http://127.0.0.1:8000
+python3 -m venv /tmp/positive-contact-venv
+/tmp/positive-contact-venv/bin/pip install -e ".[dev]"
+/tmp/positive-contact-venv/bin/pc preflight          # masked plan, no calls
+/tmp/positive-contact-venv/bin/pc run --mode fixture # full offline simulation
+/tmp/positive-contact-venv/bin/pc serve              # http://127.0.0.1:8000
 ```
 
-The fixture run finishes in under a second and prints the whole event: seven contacts
-confirmed, one contact who only ever reached voicemail, a medical question that a person
-now owns, and five field visits waiting for somebody to approve them.
+The virtual environment lives outside this checkout because the repository directory name
+contains a colon, which can break generated launcher paths on macOS.
+
+The fixture run finishes in under a second and prints the whole event: confirmed contacts,
+voicemail-only outcomes, a medical question owned by a person, a consented support request
+and field visits waiting for approval.
 
 ## The problem
 
@@ -74,8 +80,8 @@ A conversational agent can do three things a dialer cannot:
    carrier signal.
 2. **Answer the approved questions** about the outage window and the resource centre, so
    the call is useful and not merely compliant.
-3. **Recognise the question it must refuse**, route the medical question to a human
-   callback, and give no advice at all.
+3. **Recognise the question it must refuse**, give no medical advice, capture only a coded
+   support route and permission, then leave any supplier call to a named operator.
 
 That third one is the reason this is an agent and not a menu tree. The correct behaviour
 is to notice a question and decline to answer it.
@@ -103,7 +109,10 @@ Everything else in this app is machinery for holding that line under pressure.
    read, and produces exactly one disposition with the evidence spans that justify it.
 6. **Escalate.** Advances the ladder, opens human review, retires wrong numbers, refuses to
    redial a refusal, and prepares a field visit when the ladder or the clock runs out.
-7. **Report.** Counts with denominators, and never infers a confirmation from a completed
+7. **Coordinate support.** Creates one durable request after consent. An operator may
+   authorize a CALL-E call that asks an approved supplier about general availability. No
+   resident identity or clinical detail goes into that call.
+8. **Report.** Counts with denominators, and never infers a confirmation from a completed
    call.
 
 ### The escalation ladder
@@ -200,19 +209,20 @@ prevent.
 
 ```bash
 cd apps/python/positive-contact
-python3 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
+python3 -m venv /tmp/positive-contact-venv
+/tmp/positive-contact-venv/bin/pip install -e ".[dev]"
 
-./.venv/bin/pc preflight
-./.venv/bin/pc run --mode fixture --db /tmp/pc-demo.db
-./.venv/bin/pc serve --db /tmp/pc-demo.db
+/tmp/positive-contact-venv/bin/pc preflight
+/tmp/positive-contact-venv/bin/pc run --mode fixture --db /tmp/pc-demo.db
+/tmp/positive-contact-venv/bin/pc serve --db /tmp/pc-demo.db
 ```
 
 To look at the dashboard the way an operator would, mid-event, stop the simulated clock
 just short of the deadline so the review queue still has items in it:
 
 ```bash
-./.venv/bin/pc run --mode fixture --stop-before-cutoff --db /tmp/pc-mid.db
-./.venv/bin/pc serve --db /tmp/pc-mid.db
+/tmp/positive-contact-venv/bin/pc run --mode fixture --stop-before-cutoff --db /tmp/pc-mid.db
+/tmp/positive-contact-venv/bin/pc serve --db /tmp/pc-mid.db
 ```
 
 Without that flag the run plays the whole event through to the cutoff, which is correct
@@ -230,13 +240,16 @@ worker that drains the inbox, polls calls that are still open, and sweeps the fi
 cutoff. The receiver is deliberately inert, so without that worker a deployment would
 accept terminal webhooks and never act on them.
 
-The dashboard has three pages: a ladder board coloured by state, a review queue showing the
-evidence spans behind each decision, and the report with a field-visit approval button.
+The dashboard has four sections: the contact ladder, a review queue with the evidence
+behind each decision, the consented Support desk and a denominator-aware evidence report.
+In fixture mode, choose `Demo Equipment Support`, enter an operator ID, tick the explicit
+one-call authorization and submit. The scripted provider result returns without a network
+connection.
 
 To exercise the adjudicator against stored payloads instead of scripted ones:
 
 ```bash
-./.venv/bin/pc run --mode replay --db /tmp/pc-replay.db
+/tmp/positive-contact-venv/bin/pc run --mode replay --db /tmp/pc-replay.db
 ```
 
 Replay states its own provenance. Payloads captured from real calls by `pc record` are
@@ -252,7 +265,7 @@ independent gates, all supplied by a person, all required:
 ```bash
 export PC_MODE=live
 export CALLE_API_KEY=...            # never committed, never logged
-./.venv/bin/pc run \
+/tmp/positive-contact-venv/bin/pc run \
   --mode live \
   --i-understand-this-places-real-calls \
   --max-calls 3
@@ -262,6 +275,18 @@ Missing any one of them fails with a non-zero exit and no call placed. Then, bef
 dialling, the command prints the masked preview and the exact task text and waits for the
 operator to type `PLACE`. `--max-calls N` is a hard ceiling counted across every path
 including reconciliation; the run stops rather than exceeding it.
+
+The long-running live worker has the same gates:
+
+```bash
+/tmp/positive-contact-venv/bin/pc serve \
+  --mode live \
+  --i-understand-this-places-real-calls \
+  --max-calls 3
+```
+
+It asks for `PLACE` before opening the server. The ceiling is shared by resident and
+provider calls and starts with any durable submission paths already recorded for the event.
 
 Live credentials are only ever sent to `https://api.heycall-e.com`. A different base URL is
 refused rather than trusted.
@@ -302,25 +327,91 @@ ledger, never included in a log line, never stored in a recorded payload, and ne
 by `fixture` or `replay` mode. The whole test suite runs without it, and a session-wide
 fixture makes any outbound connection attempt fail the test that made it.
 
+Set `PC_OPERATOR_TOKEN` before exposing an operator-enabled dashboard outside localhost.
+State-changing routes reject cross-origin requests and require HTTP Basic authentication
+on a non-local host. The password is the token; the username is only an operator label.
+
+## App API
+
+PositiveContact calls CALL-E through its REST API. The application also exposes three
+small endpoints for hosting and approved operator integrations:
+
+| Endpoint | Access | Response |
+| --- | --- | --- |
+| `GET /healthz` | Public | Process and event health |
+| `GET /api/v1/status` | Public | Mode and masked event counts |
+| `GET /api/v1/support-requests` | Operator guard | Masked, redacted support requests |
+
+The JSON API cannot place a call. Provider-call authorization stays on the guarded support
+form so a person must see and accept the one-call statement.
+
+## Public read-only demo
+
+The deployment entry point seeds the full offline story and disables every operator
+mutation. It does not read `CALLE_API_KEY`, build a CALL-E transport or open the network.
+
+```bash
+cd apps/python/positive-contact
+docker build -t positive-contact-demo .
+docker run --rm -p 8000:8000 positive-contact-demo
+curl http://127.0.0.1:8000/healthz
+```
+
+For a host that reads a Procfile, the process is already defined. The equivalent command
+is:
+
+```bash
+uvicorn positive_contact.deploy:app --host 0.0.0.0 --port "${PORT:-8000}"
+```
+
+This public process is for judging. To demonstrate the authorization click, run the
+localhost fixture steps above. Do not turn the public fixture process into the live worker.
+
+For a static Cloudflare Pages deployment, export the same verified read views into a fresh
+directory, authenticate Wrangler and deploy that directory:
+
+```bash
+pc_site_dir=$(mktemp -d /tmp/positive-contact-site.XXXXXX)
+/tmp/positive-contact-venv/bin/python -m positive_contact.static_demo --out "$pc_site_dir"
+npx wrangler whoami
+npx wrangler pages deploy "$pc_site_dir" --project-name=positive-contact-demo
+```
+
+The exporter refuses to overwrite a non-empty directory. It writes all four pages, their
+HTMX fragments, the health and status JSON, and security headers. Every rendered action is
+disabled before the files leave the machine.
+
+The [timed demo script](docs/demo-script.md) covers the exact browser clicks, narration and
+recording checks for a video under three minutes.
+
+### Demo gallery
+
+| Operator support request | Completed provider result |
+| --- | --- |
+| ![A masked support request waiting for one operator-approved CALL-E provider call](docs/screenshots/03-support-pending.png) | ![The same request with a completed structured provider availability result](docs/screenshots/04-support-completed.png) |
+
 ## Where data is stored, and for how long
 
 One SQLite file. No external database, no queue service, no ORM.
 
 | Table | What is in it |
 | --- | --- |
-| `events` | The shutoff event, its window, its cutoff, and its policy |
-| `contacts` | The roster. **The only place a raw E.164 exists** |
+| `events` | The shutoff event, its window, policy and configured public supplier numbers |
+| `contacts` | The roster. **The only place a raw customer E.164 exists** |
 | `intents` | One authorized call intention, with its idempotency key |
 | `attempts` | The provider call id, and the terminal snapshot, redacted |
 | `inbox` | Webhook receipts, deduplicated by event id |
 | `transitions` | Append-only audit trail, enforced by database trigger |
 | `dispositions` | One adjudication per call, with its evidence spans |
+| `support_requests` | Coded consent, operator authorization and redacted supplier result |
 | `work_orders` | Field visits, and who approved each one |
 
 Everything except `contacts` uses the contact id and a masked number (`+1415<dots>0142`).
+Supplier numbers are public business destinations configured per event; views still mask
+them.
 `tests/test_masking.py` walks every table and asserts the raw numbers appear in `contacts`
 and nowhere else, and separately checks the preview, the run log, all three report formats,
-the work-order export, the audit rows, the stored provider snapshots, and every dashboard
+the work-order export, the audit rows, the stored CALL-E snapshots, and every dashboard
 page.
 
 Raw transcripts are retained for the event review window, 30 days by default and
@@ -335,12 +426,16 @@ justification for a decision, are kept longer.
   identifying detail beyond "am I speaking with {first_name} or someone in the household".
   Utility impersonation scams are common, and this design makes the real call trivially
   distinguishable from one.
-- **No medical content.** A question about equipment or health is answered with "a team
-  member will call you back", recorded as `needs_assistance=medical_question`, and the call
-  ends. No advice, no reassurance about how long equipment will run.
-- **No PHI.** There is no field anywhere for a condition, device, diagnosis, or
-  medication. Medical Baseline is a tariff enrollment flag. `tests/test_no_phi.py` scans
-  the models, the schema, the database columns, every shipped file, and every fixture.
+- **No medical advice.** A question about equipment or health gets the emergency boundary,
+  a coded route, a broad time window and a permission question. The agent asks for no
+  product or clinical detail and makes no promise about supply.
+- **No PHI-shaped field.** There is no field for a condition, specific device, diagnosis,
+  medicine, dose or prescription number. Medical Baseline is a tariff enrollment flag.
+  `tests/test_no_phi.py` scans the models, schema, database columns, shipped files and
+  fixtures.
+- **A supplier gets no resident identity.** Its CALL-E task contains only category, broad
+  timing and the supplier's own public details. The call checks availability. It does not
+  order, reserve or transfer a prescription.
 - **Free-text redaction.** Notes and transcript snippets pass through a redactor before
   they are stored outside `contacts`.
 - **No repaired numbers, no inferred timezones.** Both are refusals.
@@ -375,7 +470,7 @@ in `tests/test_regressions.py` that fails if it comes back.
 | --- | --- |
 | `pc preflight` | Validate event and roster, print the masked plan and the exact script, exit non-zero on any blocking issue |
 | `pc run` | Walk the ladder. Fixture by default, live behind three gates. `--stop-before-cutoff` holds the simulated clock at the deadline for the mid-event view |
-| `pc serve` | Operator dashboard, and the webhook receiver, on one process |
+| `pc serve` | Operator dashboard, webhook receiver and due-call worker on one process; live mode uses the same gates as `pc run` |
 | `pc report` | Print the report as Markdown, CSV, or JSON |
 | `pc approve-field-visits` | Approve prepared field visits and export them, masked |
 | `pc record` | Fetch one real call, redact it, and save it for replay mode |
@@ -395,19 +490,20 @@ positive_contact/
   intake.py       webhook receiver, re-read worker, poller fallback
   adjudicate.py   Judge A, Judge B, optional Judge C, confidence gate
   escalate.py     the transition table, and the engine that walks the ladder
+  support.py      operator-approved, identity-free supplier availability calls
   report.py       counts with denominators, work-order export
   cli.py          pc
   transports/     base, fixture, replay, calle
-  web/            FastAPI, Jinja2, HTMX. Three pages, no build step
-fixtures/         event, two rosters, 15 scenarios, 3 replay payloads
-docs/             adapter-notes.md, adjudication.md, threat-model.md
-tests/            427 tests, offline
+  web/            FastAPI, Jinja2, HTMX. Four sections, no build step
+fixtures/         event, rosters, resident/provider scenarios, replay payloads
+docs/             adapter notes, adjudication, threat model, timed demo script
+tests/            offline regression suite
 ```
 
 ## Tests
 
 ```bash
-./.venv/bin/pytest        # 427 tests, about 6 seconds, no network
+/tmp/positive-contact-venv/bin/pytest
 ```
 
 The suite is organised around the invariants rather than the modules:
@@ -427,7 +523,9 @@ The suite is organised around the invariants rather than the modules:
 | `test_report.py` | Denominators add up and confirmed counts only confirmations |
 | `test_masking.py` | No raw E.164 in any log, preview, report, export, audit row, snapshot, or dashboard page |
 | `test_no_phi.py` | No PHI-shaped field in any model, schema, column, fixture, or shipped file |
-| `test_cli_and_web.py` | The three live gates, and all three dashboard pages |
+| `test_support.py` | Consent gating, identity-free provider payload, idempotency and safe results |
+| `test_deploy.py` | Health check, seeded public story and disabled public mutations |
+| `test_cli_and_web.py` | The live gates, worker dispatch, operator guard, API and all four dashboard sections |
 | `test_calle_transport.py` | The live client's wire behaviour against a stub: the `Idempotency-Key` header, the request body against the contract, and which error codes mean "unknown" rather than "rejected" |
 | `test_regressions.py` | Every defect adversarial review turned up, each with the case that used to fail |
 
@@ -475,6 +573,8 @@ design disagreed. The load-bearing ones:
   opinion was consulted.
 - **No auto-dispatch of field visits.** The system prepares a work order; a named person
   approves it. Sending a crew to somebody's door is not a decision to automate.
+- **No automated purchase or prescription transfer.** The provider loop asks about general
+  availability. A person owns any resident-specific or regulated follow-up.
 - **No multi-locale scripts.** Adding one means adding an acknowledgement lexicon and a
   voicemail-greeting lexicon for that language, not translating the template. Until a
   destination line supports the language, the bilingual-callback path is the honest answer.

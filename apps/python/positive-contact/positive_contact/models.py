@@ -123,6 +123,50 @@ class YesNoUnknown(str, Enum):
     UNKNOWN = "unknown"
 
 
+class SupportCategory(str, Enum):
+    """Minimum coded detail needed to route a consented support request."""
+
+    PRESCRIPTION_ACCESS = "prescription_access"
+    POWERED_EQUIPMENT = "powered_equipment"
+    OTHER_CRITICAL_SUPPLY = "other_critical_supply"
+    UNKNOWN = "unknown"
+
+
+class SupportUrgency(str, Enum):
+    NOW = "now"
+    TODAY = "today"
+    BEFORE_OUTAGE = "before_outage"
+    UNKNOWN = "unknown"
+
+
+class SupportRequestState(str, Enum):
+    PENDING_REVIEW = "PENDING_REVIEW"
+    SUBMISSION_UNKNOWN = "SUBMISSION_UNKNOWN"
+    SUBMITTED = "SUBMITTED"
+    COMPLETED = "COMPLETED"
+    NEEDS_HUMAN = "NEEDS_HUMAN"
+    DECLINED = "DECLINED"
+
+
+class SupportProvider(BaseModel):
+    """An allowlisted public business contact supplied by the event operator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    name: str
+    kind: str
+    phone_e164: str
+    locale: str = "en-US"
+    region: str = "US"
+    demo_only: bool = False
+
+    @field_validator("phone_e164")
+    @classmethod
+    def _check_phone(cls, value: str) -> str:
+        return validate_e164(value)
+
+
 class DispositionKind(str, Enum):
     """Exactly one of these comes out of the adjudicator for a verified terminal call."""
 
@@ -200,6 +244,7 @@ class Event(BaseModel):
     default_tz: str
     crc_info: dict[str, str] = Field(default_factory=dict)
     policy: dict = Field(default_factory=dict)
+    support_providers: list[SupportProvider] = Field(default_factory=list)
 
     @field_validator("window_start", "window_end", "field_visit_cutoff")
     @classmethod
@@ -325,6 +370,33 @@ class Disposition(BaseModel):
     reason_code: str
     evidence_spans: list[EvidenceSpan] = Field(default_factory=list)
     notes_for_human: str | None = None
+    support_category: SupportCategory = SupportCategory.UNKNOWN
+    support_urgency: SupportUrgency = SupportUrgency.UNKNOWN
+    provider_contact_consent: YesNoUnknown = YesNoUnknown.UNKNOWN
+    emergency_risk: YesNoUnknown = YesNoUnknown.UNKNOWN
+
+
+class SupportRequest(BaseModel):
+    """A consented handoff to an operator-selected support provider."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str
+    event_id: str
+    contact_id: str
+    source_intent_id: str
+    category: SupportCategory
+    urgency: SupportUrgency
+    consent: YesNoUnknown
+    state: SupportRequestState
+    created_at: datetime
+    provider_id: str | None = None
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
+    idempotency_key: str | None = None
+    call_id: str | None = None
+    result: dict | None = None
+    completed_at: datetime | None = None
 
 
 class WorkOrder(BaseModel):

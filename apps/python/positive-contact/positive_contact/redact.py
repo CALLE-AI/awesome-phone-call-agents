@@ -101,15 +101,17 @@ def find_raw_e164(text: str) -> list[str]:
 
 
 def redact_snapshot(payload: object) -> object:
-    """Deep-copy a CALL-E payload with every phone-shaped string masked.
+    """Deep-copy a payload with every durable free-text value redacted.
 
     Used before a provider snapshot is written to `attempts.raw_snapshot_redacted_json`
-    and before a recorded payload is saved to `fixtures/recorded/`.
+    and before a recorded payload is saved to `fixtures/recorded/`. Applying the full
+    free-text pass here matters because a transcript can contain a health detail, an
+    email address, or a long account number even when the result schema forbids them.
     """
     if isinstance(payload, dict):
         return {key: redact_snapshot(value) for key, value in payload.items()}
     if isinstance(payload, list):
         return [redact_snapshot(item) for item in payload]
     if isinstance(payload, str):
-        return mask_numbers_in_text(payload)
+        return redact_free_text(payload)
     return payload

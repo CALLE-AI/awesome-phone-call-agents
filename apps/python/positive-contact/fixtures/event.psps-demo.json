@@ -8,6 +8,26 @@
     "location": "the Glen Ellen Community Hall, 100 block of Warm Springs Rd",
     "hours": "8:00 AM to 8:00 PM daily while the shutoff is active"
   },
+  "support_providers": [
+    {
+      "provider_id": "demo-pharmacy",
+      "name": "Glen Ellen Community Pharmacy (demo)",
+      "kind": "pharmacy",
+      "phone_e164": "+14155550180",
+      "locale": "en-US",
+      "region": "US",
+      "demo_only": true
+    },
+    {
+      "provider_id": "demo-equipment",
+      "name": "Northbay Equipment Support (demo)",
+      "kind": "equipment supplier",
+      "phone_e164": "+14155550181",
+      "locale": "en-US",
+      "region": "US",
+      "demo_only": true
+    }
+  ],
   "policy": {
     "ladder": [
       {
