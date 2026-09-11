@@ -158,6 +158,30 @@ def test_the_machine_greeting_is_never_stored_as_acknowledgement_evidence():
         assert span.source != "transcript_acknowledgement"
 
 
+def test_a_live_caller_saying_please_record_is_not_a_voicemail_greeting():
+    result = {
+        "contact_type": "live_person",
+        "acknowledged": "yes",
+        "needs_assistance": "medical_question",
+        "support_category": "powered_equipment",
+        "support_urgency": "before_outage",
+        "provider_contact_consent": "yes",
+        "emergency_risk": "no",
+    }
+    caller = (
+        "Yes, I heard the warning. Before we finish, please record that this is not an "
+        "emergency and I consent to an approved supplier availability check."
+    )
+
+    transcript_verdict = judge_b_transcript(snapshot(caller, result=result))
+    disposition = adjudicate(snapshot(caller, result=result), intent_id="int:test")
+
+    assert transcript_verdict.contact_type is ContactType.LIVE_PERSON
+    assert transcript_verdict.acknowledged is Acknowledged.YES
+    assert disposition.reason_code == "medical_question_priority_review"
+    assert disposition.contact_type is ContactType.LIVE_PERSON
+
+
 # -- a health fact was stored durably and rendered on the dashboard ---------------
 #
 # No schema field carries PHI, but a customer can say one out loud and extraction can copy

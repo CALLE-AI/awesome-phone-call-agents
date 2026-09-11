@@ -65,7 +65,6 @@ VOICEMAIL_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
         r"\bcan(?:'|’)?t (?:come to|get to) the phone\b",
         r"\bunable to (?:take|answer) your call\b",
         r"\bnot able to take your call\b",
-        r"\bplease record\b",
         r"\brecord your (?:message|name)\b",
         r"\bvoice ?mail\b",
         r"\bmailbox\b",
