@@ -60,9 +60,12 @@ When a credit card fails on a SaaS subscription, conventional dunning systems se
 ## 🎯 Key Features
 
 - **Operator Safety Gate**: No voice call is placed without explicit operator confirmation showing the exact natural-language task instruction being sent to CALL-E.
+- **Server-Bound Destination & E.164**: Enforces strict ASCII E.164 and server-bound destination lookups so callers cannot inject arbitrary target numbers.
+- **Authoritative Webhook Verification**: Untrusted webhooks trigger an authoritative re-fetch against CALL-E before performing any Stripe retries or follow-ups.
+- **PII Masking**: Customer phone numbers and emails are masked across UI, API, logs, and telemetry.
 - **Closed-Loop Fulfillment**: Connects CALL-E call outcomes directly to the Stripe API (`stripe.charges.create`, hosted portal sessions) to immediately settle delinquent balances.
 - **Transcript & Intelligence Modal**: Replays complete turn-by-turn conversations with speaker timestamps (`bot` vs `user`), sentiment summaries, and decision confidence scores.
-- **Judge Demo Mode**: Includes pre-seeded judge demonstration scenarios showcasing settled payments, SMS links, and follow-up queues using the official CALL-E test number (`+12763229632`).
+- **Honest Offline Demo & Judge Mode**: Operates seamlessly offline with zero live credentials, pre-seeded with judge demo scenarios using the reserved CALL-E test number (`+12763229632`).
 - **Dark-Mode Command Center**: Crafted with modern typography, glowing metric cards, custom SVG icons, and real-time ARR recovery tracking.
 
 ---

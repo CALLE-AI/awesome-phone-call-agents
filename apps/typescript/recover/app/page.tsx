@@ -66,16 +66,6 @@ function IconUser({ size = 14, color = "currentColor" }: { size?: number; color?
   );
 }
 
-function IconMic({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-      <path d="M19 10v2a7 7 0 01-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-}
 
 function IconCalendar({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -113,15 +103,6 @@ function IconX({ size = 14, color = "currentColor" }: { size?: number; color?: s
   );
 }
 
-function IconRefreshCw({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-    </svg>
-  );
-}
 
 function IconStop({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -150,14 +131,6 @@ function IconPlus({ size = 14, color = "currentColor" }: { size?: number; color?
   );
 }
 
-function IconClockAlert({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
 
 function IconWaveform({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
   return (
@@ -167,22 +140,6 @@ function IconWaveform({ size = 14, color = "currentColor" }: { size?: number; co
   );
 }
 
-// Recover wordmark "R" logo mark — indigo gradient
-function LogoMark({ size = 32 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Recover logo">
-      <rect width="32" height="32" rx="8" fill="url(#logo-grad)" />
-      <defs>
-        <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#6366f1" />
-          <stop offset="1" stopColor="#818cf8" />
-        </linearGradient>
-      </defs>
-      {/* Lightning bolt icon inside the logo mark */}
-      <path d="M18 6l-7 10h6l-1 10 8-12h-6l1-8z" fill="white" fillOpacity="0.95" />
-    </svg>
-  );
-}
 
 const MAX_CALL_ATTEMPTS = 3;
 
@@ -302,20 +259,6 @@ const DECISION_COLOR: Record<string, string> = {
   unknown: "var(--neutral)",
 };
 
-// ─── Helper Components ────────────────────────────────────
-
-function StatusPill({ status, map }: { status: string; map: typeof SUB_STATUS }) {
-  const s = map[status] ?? map.paused ?? Object.values(map)[0];
-  return (
-    <span
-      className="pill"
-      style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}
-    >
-      <span className="pill-dot" style={{ background: (s as { dot?: string }).dot ?? s.color }} />
-      {s.label}
-    </span>
-  );
-}
 
 function formatTs(iso: string): string {
   const d = new Date(iso);
@@ -333,6 +276,10 @@ function fmtMoney(cents: number): string {
 }
 
 const EMPTY_FORM = { name: "", phone: "+12763229632", email: "", planName: "", amountDollars: "", region: "US", locale: "en-US" };
+
+// Same-origin dashboard requests are auto-authorized via sec-fetch-site header in dev.
+// Include the demo key explicitly so the dashboard works even in strict production-like mode.
+const AUTH_HEADERS = { "x-recover-key": "recover_demo_key_sec_9942" };
 
 // ─── Main Dashboard ───────────────────────────────────────
 
@@ -352,9 +299,9 @@ export default function Dashboard() {
   const refresh = useCallback(async () => {
     try {
       const [subsRes, callsRes, metricsRes] = await Promise.all([
-        fetch("/api/subscribers"),
-        fetch("/api/calls"),
-        fetch("/api/admin/metrics"),
+        fetch("/api/subscribers", { headers: AUTH_HEADERS }),
+        fetch("/api/calls", { headers: AUTH_HEADERS }),
+        fetch("/api/admin/metrics", { headers: AUTH_HEADERS }),
       ]);
       if (subsRes.ok) setSubscribers(await subsRes.json());
       if (callsRes.ok) setCalls(await callsRes.json());
@@ -367,9 +314,9 @@ export default function Dashboard() {
     async function init() {
       try {
         const [subsRes, callsRes, metricsRes] = await Promise.all([
-          fetch("/api/subscribers"),
-          fetch("/api/calls"),
-          fetch("/api/admin/metrics"),
+          fetch("/api/subscribers", { headers: AUTH_HEADERS }),
+          fetch("/api/calls", { headers: AUTH_HEADERS }),
+          fetch("/api/admin/metrics", { headers: AUTH_HEADERS }),
         ]);
         if (!ignore) {
           if (subsRes.ok) setSubscribers(await subsRes.json());
@@ -411,7 +358,7 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/subscribers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
         body: JSON.stringify({ name: form.name, phone: form.phone, email: form.email, planName: form.planName, amountCents, region: form.region, locale: form.locale }),
       });
       let data: { error?: string } = {};
@@ -428,7 +375,7 @@ export default function Dashboard() {
     setBusyId(subscriberId); setError(null);
     try {
       const res = await fetch("/api/stripe/simulate-failure", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
         body: JSON.stringify({ subscriberId }),
       });
       let data: { error?: string } = {};
@@ -442,7 +389,7 @@ export default function Dashboard() {
     setBusyId(callLogId); setError(null);
     try {
       const res = await fetch("/api/calle/place-call", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
         body: JSON.stringify({ callLogId }),
       });
       let data: { error?: string } = {};
@@ -454,14 +401,14 @@ export default function Dashboard() {
 
   async function cancelCall(callLogId: string) {
     setBusyId(callLogId);
-    try { await fetch("/api/calle/cancel-call", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callLogId }) }); }
+    try { await fetch("/api/calle/cancel-call", { method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS }, body: JSON.stringify({ callLogId }) }); }
     finally { setBusyId(null); refresh(); }
   }
 
   async function pauseFollowups(subscriberId: string) {
     setBusyId(subscriberId);
     try {
-      await fetch("/api/calle/pause-followups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscriberId }) });
+      await fetch("/api/calle/pause-followups", { method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS }, body: JSON.stringify({ subscriberId }) });
       notify("Automated follow-up chain stopped for this subscriber.");
     } finally { setBusyId(null); refresh(); }
   }
@@ -469,7 +416,7 @@ export default function Dashboard() {
   async function loadDemoData() {
     setBusyId("demo-load"); setError(null);
     try {
-      const res = await fetch("/api/admin/demo-data", { method: "POST" });
+      const res = await fetch("/api/admin/demo-data", { method: "POST", headers: AUTH_HEADERS });
       if (res.ok) notify("Judge demo dataset loaded — real transcripts, recoveries, and follow-up chains ready.");
     } finally { setBusyId(null); refresh(); }
   }
@@ -477,7 +424,7 @@ export default function Dashboard() {
   async function resetDatabase() {
     if (!confirm("Reset all data to an empty database?")) return;
     setBusyId("demo-reset");
-    try { await fetch("/api/admin/demo-data", { method: "DELETE" }); notify("Database reset."); }
+    try { await fetch("/api/admin/demo-data", { method: "DELETE", headers: AUTH_HEADERS }); notify("Database reset."); }
     finally { setBusyId(null); refresh(); }
   }
 

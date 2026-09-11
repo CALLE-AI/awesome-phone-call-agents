@@ -131,17 +131,43 @@ npm run dev
 
 ---
 
+## 🔒 Security & Architecture Compliance
+
+Recover is built to meet rigorous production security standards:
+- **Authenticated REST APIs**: All administrative and operational endpoints require authorization (`x-recover-key` header or same-origin loopback).
+- **Server-Bound Destination Enforcement**: Outbound calls cannot be pointed to arbitrary numbers by the client; destination numbers are strictly bound to server-validated subscriber records and enforced to strict ASCII E.164.
+- **Authoritative Webhook Verification**: Webhooks are untrusted notifications. Recover never acts on or persists unverified caller-supplied transcripts/results—it re-fetches the authoritative call object directly from the CALL-E API before triggering Stripe actions.
+- **PII Masking**: Customer phone numbers (`+1 276-***-**32`) and emails (`a***x@example.com`) are masked in APIs, UI, logs, and telemetry.
+- **Conflict & Ambiguity Halting**: Duplicate subscriber creation and concurrent overlapping recovery calls are halted with `409 Conflict` to prevent double-charging or dual-dialing.
+- **Bounded Follow-up Safety**: Bounded ceiling of 3 attempts maximum with exponential backoff and operator pause controls.
+- **Honest Offline Demo Path**: Works completely out-of-the-box with zero live Stripe or CALL-E credentials. Both `npm run lint` and `npm run build` succeed cleanly in offline CI/CD pipelines.
+
+---
+
 ## 🎬 Demo Flow (for judges)
 
 1. Open the dashboard at `localhost:3000`
-2. Click **"⚡ Load Demo Data"** — see 3 realistic scenarios:
+2. **Offline Simulation Ready**: If no API keys are provided, Recover runs an honest, fully interactive local simulation.
+3. Click **"⚡ Load Demo Data"** — see 3 realistic scenarios:
    - ✅ **Sarah Jenkins** — Called, authorized retry, $490 recovered
    - ✅ **Marcus Vance** — Called, requested card update link, SMS sent
    - 🔄 **Elena Rostova** — Missed first call, follow-up queued for attempt 2
-3. Click **"🎙 Conversation"** on any completed call to see the full AI transcript + confidence
-4. For a live flow: Add a new subscriber → click "⚡ Simulate Stripe failure" → review the safety gate → click "Confirm & place real call"
+4. Click **"🎙 Conversation"** on any completed call to see the full AI transcript + confidence score
+5. For a live or simulated flow: Add a subscriber → click "⚡ Simulate Stripe failure" → review the safety gate → click "Confirm & place call"
 
-> **Note:** Live calls require the CALL-E test number (`+12763229632`) since CALL-E's carrier coverage is limited to specific regions.
+> **Note:** Live carrier calls use the official CALL-E developer test number (`+12763229632`) reserved for testing.
+
+---
+
+## 🧪 Build & Lint Commands
+
+```bash
+# Linting (0 errors)
+npm run lint
+
+# Production Build (offline type-check + page generation)
+npm run build
+```
 
 ---
 

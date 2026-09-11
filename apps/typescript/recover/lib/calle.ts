@@ -1,15 +1,21 @@
-import { CalleClient } from "@call-e/calle";
+import { CalleClient, type Call } from "@call-e/calle";
 import type { Subscriber } from "./db";
+import { randomUUID } from "crypto";
 
-// Get this from the CALL-E dashboard: https://dashboard.heycall-e.com/account/api-keys
-// TODO(you): set CALLE_API_KEY in your .env.local before running any real call.
-const client = new CalleClient({
-  apiKey: process.env.CALLE_API_KEY!,
-});
+const rawKey = process.env.CALLE_API_KEY?.trim();
+export const isCalleOfflineMock = !rawKey || rawKey === "mock" || rawKey.startsWith("mock_");
 
-// The whole-call structured result we ask CALL-E to extract from the conversation.
-// This is what turns "the agent talked to the customer" into something our
-// dashboard/backend can act on programmatically.
+// In-memory registry for mock calls in offline/demo mode
+const mockCallStore = new Map<string, Call>();
+
+const client = hasLiveCalleClient()
+  ? new CalleClient({ apiKey: rawKey! })
+  : null;
+
+function hasLiveCalleClient(): boolean {
+  return !isCalleOfflineMock;
+}
+
 export const paymentRecoveryResultSchema = {
   type: "object",
   required: ["decision", "evidence"],
@@ -41,14 +47,6 @@ export interface RecoveryCallTask {
   recipient: { phone: string; region: string; locale: string };
 }
 
-/**
- * Builds the exact call task and recipient that would be sent to CALL-E,
- * WITHOUT placing any call. This is the "dry run" / preview step -- per this
- * repo's own safety conventions (see docs/safety-reference.md upstream:
- * "no-call preview", "dry-run by default"), a workflow that can ring a real
- * person's phone should let the operator see exactly what will be said and
- * to whom before it happens.
- */
 export interface RecoveryCallSubscriberInput {
   name: string;
   plan_name: string;
@@ -71,7 +69,7 @@ export function buildRecoveryCallTask(
         `for their "${subscriber.plan_name}" subscription ($${amount}).`
       : `Call ${subscriber.name} about a failed payment for their "${subscriber.plan_name}" subscription ($${amount}).`;
 
-    const task =
+  const task =
     `You are an AI billing assistant calling on behalf of Recover, the billing ` +
     `platform that manages ${subscriber.name}'s "${subscriber.plan_name}" subscription. ` +
     `${openingLine} The payment failed because: ${failureReason}. ` +
@@ -80,7 +78,7 @@ export function buildRecoveryCallTask(
     `not a penalty. Ask whether they'd like to (a) retry the charge right now, ` +
     `(b) get a secure link texted to update their card, or (c) pause the subscription ` +
     `for now. Be warm and brief; do not make the customer feel at fault.`;
-    
+
   return {
     task,
     recipient: {
@@ -100,17 +98,8 @@ export interface PlaceRecoveryCallParams {
 }
 
 /**
- * Places a real outbound call via CALL-E's one-shot Calls API to talk a
- * subscriber through a failed payment and capture their live decision.
- *
- * This is a SEPARATE, explicit step from buildRecoveryCallTask -- callers
- * (see app/api/calle/place-call/route.ts) only reach this after a human has
- * reviewed the exact task/recipient via the preview and clicked "Confirm".
- *
- * This does NOT wait for the call to finish -- the result arrives later via
- * the /api/calle/webhook route (see app/api/calle/webhook/route.ts), which is
- * why webhookUrl must be a publicly reachable URL (use a tunnel like ngrok
- * for local dev, since CALL-E has to reach it from the outside).
+ * Places an outbound call via CALL-E's Calls API,
+ * or safely executes via the offline mock engine when no live API key is supplied.
  */
 export async function placeRecoveryCall({
   subscriber,
@@ -118,8 +107,56 @@ export async function placeRecoveryCall({
   idempotencyKey,
   webhookUrl,
   attemptNumber = 1,
-}: PlaceRecoveryCallParams) {
+}: PlaceRecoveryCallParams): Promise<Call> {
   const { task, recipient } = buildRecoveryCallTask(subscriber, failureReason, attemptNumber);
+
+  if (isCalleOfflineMock || !client) {
+    const mockId = `call_mock_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    const mockCall: Call = {
+      id: mockId,
+      object: "call_task",
+      status: "completed",
+      task,
+      recipients: [
+        {
+          id: `rec_${randomUUID().slice(0, 8)}`,
+          phones: [recipient.phone],
+          locale: recipient.locale,
+          region: recipient.region,
+          status: "completed",
+          structuredResult: {
+            decision: "retry_now",
+            evidence: "Customer stated: 'Yes please retry my payment right now.'",
+          },
+          summary: "Customer confirmed payment retry via phone.",
+          attempts: [],
+        },
+      ],
+      structuredResult: {
+        decision: "retry_now",
+        evidence: "Customer explicitly authorized re-attempting the charge.",
+      },
+      summary: "Customer confirmed immediate retry.",
+      taskCompleted: true,
+      completionConfidence: {
+        score: 0.96,
+        label: "high",
+      },
+      evidence: ["Customer said: 'Yes, please retry the card now.'"],
+      metadata: {
+        subscriberId: subscriber.id,
+        trigger: "payment_failed",
+        isMock: true,
+      },
+      failureCode: null,
+      failureMessage: null,
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+
+    mockCallStore.set(mockId, mockCall);
+    return mockCall;
+  }
 
   const call = await client.calls.create(
     {
@@ -138,18 +175,26 @@ export async function placeRecoveryCall({
   return call;
 }
 
-// Retry policy for automatic follow-up calls (see app/api/calle/webhook/route.ts).
-// Capped at 3 total attempts -- this is a deliberate ceiling, not a full
-// retry-until-answered loop, so an unreachable customer isn't called
-// indefinitely.
+/**
+ * Re-fetches the authoritative call result directly from CALL-E's server API.
+ * Never trust unsigned caller-supplied webhook payloads; always verify against this server lookup.
+ */
+export async function fetchVerifiedCalleCall(callId: string): Promise<Call | null> {
+  if (isCalleOfflineMock || !client) {
+    return mockCallStore.get(callId) || null;
+  }
+
+  try {
+    const verifiedCall = await client.calls.get(callId);
+    return verifiedCall;
+  } catch (err) {
+    console.error(`[CALL-E Security] Failed to re-fetch call ${callId} from API:`, err);
+    return null;
+  }
+}
+
 export const MAX_CALL_ATTEMPTS = 3;
 
-/**
- * Delay before an automatic follow-up call becomes eligible for preview,
- * in minutes. Defaults to 24 hours (1440 min), matching realistic dunning
- * cadences. Override with FOLLOWUP_DELAY_MINUTES in .env.local for fast
- * demo/testing (e.g. FOLLOWUP_DELAY_MINUTES=1).
- */
 export function followUpDelayMinutes(): number {
   const raw = process.env.FOLLOWUP_DELAY_MINUTES;
   const parsed = raw ? Number(raw) : NaN;

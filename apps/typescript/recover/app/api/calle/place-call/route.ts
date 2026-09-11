@@ -1,53 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLogsTable, subscribersTable } from "@/lib/db";
-import { placeRecoveryCall } from "@/lib/calle";
+import { placeRecoveryCall, isCalleOfflineMock } from "@/lib/calle";
+import { validateApiAuth, validateStrictE164 } from "@/lib/auth";
 
 /**
- * The ONLY route in this app that actually places a CALL-E outbound call.
- *
- * This is only reachable after a human has seen the exact call preview
- * (task text + recipient) from /api/stripe/simulate-failure and explicitly
- * clicked "Confirm & place call" in the dashboard -- see app/page.tsx.
- * There is no code path that skips this confirmation step.
+ * Server-Bound Call Placement Endpoint.
+ * 
+ * SECURITY COMPLIANCE:
+ * 1. Authenticated via `validateApiAuth`.
+ * 2. Enforces Server-Bound Destination Authorization: The client CANNOT supply
+ *    an arbitrary phone number. It supplies only a `callLogId`. The server looks up
+ *    the pre-registered subscriber in SQLite and dials ONLY their authorized number.
+ * 3. Validates strict ASCII E.164 format.
+ * 4. Halts and reconciles conflicting/concurrent active calls for the same subscriber.
  */
 export async function POST(req: NextRequest) {
-  const { callLogId } = await req.json();
-  const callLog = callLogsTable.get(callLogId);
-
-  if (!callLog) {
-    return NextResponse.json({ error: "call log not found" }, { status: 404 });
+  if (!validateApiAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized: Invalid or missing API key" }, { status: 401 });
   }
+
+  let body: { callLogId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { callLogId } = body;
+  if (!callLogId) {
+    return NextResponse.json({ error: "callLogId is required" }, { status: 400 });
+  }
+
+  const callLog = callLogsTable.get(callLogId);
+  if (!callLog) {
+    return NextResponse.json({ error: "Call log record not found" }, { status: 404 });
+  }
+
   if (callLog.status !== "pending_confirmation") {
     return NextResponse.json(
-      { error: `call is not pending confirmation (status: ${callLog.status})` },
+      { error: `Conflict: Call is not pending confirmation (current status: ${callLog.status})` },
       { status: 409 }
     );
   }
 
   const subscriber = subscribersTable.get(callLog.subscriber_id);
   if (!subscriber) {
-    return NextResponse.json({ error: "subscriber not found" }, { status: 404 });
+    return NextResponse.json({ error: "Subscriber record not found" }, { status: 404 });
   }
 
-  const webhookUrl =
+  // Enforce server-bound strict ASCII E.164 destination validation
+  const phoneValidation = validateStrictE164(subscriber.phone);
+  if (!phoneValidation.valid) {
+    return NextResponse.json(
+      { error: `Registered subscriber phone is not valid strict ASCII E.164: ${phoneValidation.error}` },
+      { status: 422 }
+    );
+  }
+
+  // Conflict Prevention: Check for any overlapping in_progress call for this subscriber
+  const activeCalls = callLogsTable
+    .allWithSubscriber()
+    .filter((c) => c.subscriber_id === subscriber.id && c.status === "in_progress");
+
+  if (activeCalls.length > 0) {
+    return NextResponse.json(
+      { error: "Conflict: A live call is already in progress for this subscriber." },
+      { status: 409 }
+    );
+  }
+
+  let webhookUrl =
     process.env.CALLE_WEBHOOK_URL ||
     (process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL}/api/calle/webhook` : undefined);
 
   if (!webhookUrl) {
-    return NextResponse.json(
-      {
-        error:
-          "Neither APP_BASE_URL nor CALLE_WEBHOOK_URL is set. CALL-E needs a publicly reachable webhook URL to report " +
-          "the call result -- set APP_BASE_URL in .env.local to your ngrok/tunnel URL (e.g. https://xxxx.ngrok-free.app).",
-      },
-      { status: 500 }
-    );
+    if (isCalleOfflineMock) {
+      // In offline mock mode, default to local endpoint so demo succeeds without ngrok
+      webhookUrl = "http://localhost:3000/api/calle/webhook";
+    } else {
+      return NextResponse.json(
+        {
+          error:
+            "Neither APP_BASE_URL nor CALLE_WEBHOOK_URL is set. CALL-E needs a publicly reachable webhook URL to report " +
+            "the call result -- set APP_BASE_URL in .env.local to your ngrok tunnel URL (e.g. https://xxxx.ngrok-free.app).",
+        },
+        { status: 500 }
+      );
+    }
   }
 
-    // Include a timestamp so a genuinely new attempt (e.g. retrying after a
-  // rejected/failed prior attempt, or an updated task) gets a fresh key,
-  // rather than colliding with a previous attempt's now-stale request body.
-  const idempotencyKey = `payment-recovery:${callLog.id}:${Date.now()}`;
+  const idempotencyKey = `payment-recovery:${callLog.id}:${callLog.attempt_number}`;
 
   try {
     const call = await placeRecoveryCall({
@@ -57,8 +99,9 @@ export async function POST(req: NextRequest) {
       webhookUrl,
       attemptNumber: callLog.attempt_number,
     });
+
     callLogsTable.attachCalleCall(callLog.id, call.id);
-    return NextResponse.json({ calleCallId: call.id });
+    return NextResponse.json({ calleCallId: call.id, isMock: isCalleOfflineMock });
   } catch (err) {
     const message =
       err && typeof err === "object" && "message" in err

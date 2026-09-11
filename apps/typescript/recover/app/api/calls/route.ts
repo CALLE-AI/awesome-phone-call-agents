@@ -1,11 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { callLogsTable, promoteDueScheduledCalls } from "@/lib/db";
 import { buildRecoveryCallTask } from "@/lib/calle";
+import { validateApiAuth } from "@/lib/auth";
+import { maskPhone } from "@/lib/masking";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!validateApiAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized: Invalid or missing API key" }, { status: 401 });
+  }
+
   // Lightweight polling-based scheduler: promotes any "scheduled" follow-up
-  // whose time has arrived into "pending_confirmation" so its preview shows
-  // up below. See lib/db.ts for why this runs here instead of a real cron.
+  // whose time has arrived into "pending_confirmation" so its preview shows up.
   promoteDueScheduledCalls();
 
   const calls = callLogsTable.allWithSubscriber();
@@ -13,7 +18,7 @@ export async function GET() {
   const withPreviewAndIntelligence = calls.map((call) => {
     let preview = null;
     if (call.status === "pending_confirmation") {
-      preview = buildRecoveryCallTask(
+      const taskObj = buildRecoveryCallTask(
         {
           name: call.subscriber_name,
           plan_name: call.plan_name,
@@ -25,6 +30,14 @@ export async function GET() {
         call.trigger_reason,
         call.attempt_number
       );
+
+      preview = {
+        ...taskObj,
+        recipient: {
+          ...taskObj.recipient,
+          phone: maskPhone(taskObj.recipient.phone),
+        },
+      };
     }
 
     let intelligence = null;
@@ -50,6 +63,7 @@ export async function GET() {
 
     return {
       ...call,
+      subscriber_phone: maskPhone(call.subscriber_phone),
       preview,
       intelligence,
     };

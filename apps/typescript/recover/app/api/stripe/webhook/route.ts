@@ -2,57 +2,84 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { subscribersTable, callLogsTable } from "@/lib/db";
 import { buildRecoveryCallTask } from "@/lib/calle";
+import { maskPhone } from "@/lib/masking";
 
 /**
  * Production-ready Stripe Webhook receiver.
- * Listens for real subscription invoice failures (invoice.payment_failed)
- * and charge declines (charge.failed).
+ * Listens for real subscription invoice failures (invoice.payment_failed).
  *
- * Instead of firing an unmonitored robocall, Recover intercepts the event
- * and stages a pending confirmation preview in the dashboard with the exact
- * script and customer details, maintaining our strict safety protocol.
+ * Conflict Handling: If an intervention is already active for this subscriber,
+ * returns 409 and halts rather than creating a duplicate side effect.
  */
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-    const event = JSON.parse(rawBody);
+    let event: { type?: string; data?: { object?: Record<string, unknown> } };
+
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
 
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data?.object;
-      const customerEmail = invoice?.customer_email || "customer@example.com";
-      const customerName = invoice?.customer_name || "Valued Subscriber";
-      const amountCents = invoice?.amount_due || 2900;
+      const customerEmail = (invoice?.customer_email as string) || null;
+      const customerName = (invoice?.customer_name as string) || "Valued Subscriber";
+      const amountCents = (invoice?.amount_due as number) || 2900;
       const failureReason =
-        invoice?.last_payment_error?.message ||
-        invoice?.charge?.failure_message ||
+        ((invoice?.last_payment_error as Record<string, string>)?.message) ||
+        ((invoice?.charge as Record<string, string>)?.failure_message) ||
         "Your card was declined.";
-      const planName = invoice?.lines?.data?.[0]?.description || "Subscription Plan";
+      const planName =
+        ((invoice?.lines as { data?: Array<{ description?: string }> })?.data?.[0]?.description) ||
+        "Subscription Plan";
 
-      // Find existing subscriber by email or create one
       const allSubs = subscribersTable.all();
-      let subscriber = allSubs.find((s) => s.email === customerEmail);
+      let subscriber = customerEmail ? allSubs.find((s) => s.email === customerEmail) : undefined;
 
       if (!subscriber) {
         subscriber = {
           id: randomUUID(),
           name: customerName,
-          phone: "+12763229632", // User's CALL-E assigned US test number
+          // Default to CALL-E test number; real subscribers will already exist in DB with their registered number.
+          phone: "+12763229632",
           region: "US",
           locale: "en-US",
-          email: customerEmail,
+          email: customerEmail || `unknown-${randomUUID().slice(0, 8)}@example.com`,
           plan_name: planName,
           amount_cents: amountCents,
-          stripe_customer_id: invoice?.customer || null,
+          stripe_customer_id: (invoice?.customer as string) || null,
           status: "past_due",
           followups_paused: 0,
           created_at: new Date().toISOString(),
         };
         subscribersTable.insert(subscriber);
       } else {
+        // Conflict Resolution: Halt if already pending or in_progress
+        const activeConflict = callLogsTable
+          .allWithSubscriber()
+          .find(
+            (c) =>
+              c.subscriber_id === subscriber!.id &&
+              (c.status === "pending_confirmation" || c.status === "in_progress")
+          );
+
+        if (activeConflict) {
+          return NextResponse.json(
+            {
+              received: true,
+              conflict: true,
+              message: "An active recovery intervention already exists for this subscriber. Halted to avoid duplicate.",
+              existingCallId: activeConflict.id,
+            },
+            { status: 409 }
+          );
+        }
+
         subscribersTable.updateStatus(subscriber.id, "past_due");
       }
 
-      // Check if there is already an active or pending call for this subscriber
       const callLogId = randomUUID();
       callLogsTable.insert({
         id: callLogId,
@@ -64,12 +91,16 @@ export async function POST(req: NextRequest) {
         attempt_number: 1,
         retry_of: null,
         scheduled_for: null,
-        action_taken: "Staged from live Stripe invoice.payment_failed webhook",
-        action_link: null,
-        recovered_cents: 0,
       });
 
-      const preview = buildRecoveryCallTask(subscriber, failureReason);
+      const rawPreview = buildRecoveryCallTask(subscriber, failureReason);
+      const preview = {
+        ...rawPreview,
+        recipient: {
+          ...rawPreview.recipient,
+          phone: maskPhone(rawPreview.recipient.phone),
+        },
+      };
 
       return NextResponse.json({
         received: true,
