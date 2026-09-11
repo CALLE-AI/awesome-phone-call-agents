@@ -1,0 +1,98 @@
+{
+  "riverside-produce:supplier_quote": {
+    "result": {
+      "reached": "yes",
+      "item_match": "exact",
+      "available_quantity": "20",
+      "unit": "kg",
+      "unit_price": "14.50",
+      "currency": "USD",
+      "extra_fees": "0",
+      "fulfillment_method": "pickup",
+      "ready_at": "2026-09-11T18:15:00-07:00",
+      "quote_expires_at": "2026-09-11T20:00:00-07:00",
+      "contact_name": "Sam",
+      "conditions": "None stated",
+      "certainty": "high"
+    },
+    "summary": "Sam at Riverside Produce can supply 20 kg of Genovese basil at $14.50/kg with no fees, boxed for pickup by 6:15 PM; the price holds until 8 PM.",
+    "transcript": [
+      { "speaker": "bot", "text": "Hi, this is ProcurePulse, an AI assistant for Harbor and Vine. Is this Riverside Produce?" },
+      { "speaker": "user", "text": "Yep, Sam here." },
+      { "speaker": "bot", "text": "We need twenty kilos of fresh Genovese basil by seven tonight. Can you do that?" },
+      { "speaker": "user", "text": "Yeah, I've got twenty kilos. Came in this morning." },
+      { "speaker": "bot", "text": "What's the price per kilo, and any fees?" },
+      { "speaker": "user", "text": "Fourteen fifty a kilo. No fees if you pick it up." },
+      { "speaker": "bot", "text": "When would it be ready, and how long does that price hold?" },
+      { "speaker": "user", "text": "Boxed by six fifteen. Price is good till eight." },
+      { "speaker": "bot", "text": "Perfect. This is only a quote, nothing is being ordered. Thanks, Sam!" }
+    ],
+    "confidence": { "score": 0.94, "label": "high" }
+  },
+  "northstar-foods:supplier_quote": {
+    "result": {
+      "reached": "yes",
+      "item_match": "substitute",
+      "available_quantity": "30",
+      "unit": "kg",
+      "unit_price": "13.75",
+      "currency": "USD",
+      "extra_fees": "35",
+      "fulfillment_method": "delivery",
+      "ready_at": "2026-09-11T17:00:00-07:00",
+      "quote_expires_at": "2026-09-11T21:00:00-07:00",
+      "contact_name": "Dana",
+      "conditions": "Italian large-leaf basil instead of Genovese; $35 delivery fee",
+      "certainty": "high"
+    },
+    "summary": "Dana at Northstar Foods is out of Genovese but offers 30 kg of Italian large-leaf basil at $13.75/kg plus a $35 delivery fee, delivered by 5 PM.",
+    "transcript": [
+      { "speaker": "bot", "text": "Hi, this is ProcurePulse, an AI assistant for Harbor and Vine. Is this Northstar Foods?" },
+      { "speaker": "user", "text": "It is, this is Dana. We're out of Genovese today, but I have Italian large-leaf basil." },
+      { "speaker": "bot", "text": "How much, and at what price?" },
+      { "speaker": "user", "text": "Thirty kilos, thirteen seventy-five a kilo, plus thirty-five for delivery. By five o'clock." }
+    ],
+    "confidence": { "score": 0.91, "label": "high" }
+  },
+  "golden-gate-supply:supplier_quote": {
+    "result": {
+      "reached": "yes",
+      "item_match": "unknown",
+      "available_quantity": "5",
+      "unit": "case",
+      "unit_price": "",
+      "currency": "USD",
+      "extra_fees": "",
+      "fulfillment_method": "unknown",
+      "ready_at": "",
+      "quote_expires_at": "",
+      "contact_name": "Tony",
+      "conditions": "Around $40 a case; depends on the market",
+      "certainty": "low"
+    },
+    "summary": "Tony at Golden Gate Supply has maybe five cases of basil at around $40 a case, depending on the market; no firm price, fee or time.",
+    "transcript": [
+      { "speaker": "bot", "text": "How much basil could you do by seven?" },
+      { "speaker": "user", "text": "A few cases. Maybe five?" },
+      { "speaker": "bot", "text": "And the price per case?" },
+      { "speaker": "user", "text": "Eh, around forty bucks. Depends on the market." }
+    ],
+    "confidence": { "score": 0.58, "label": "low" }
+  },
+  "riverside-produce:hold_request": {
+    "result": {
+      "reached": "yes",
+      "hold_placed": "yes",
+      "hold_expires_at": "2026-09-11T20:00:00-07:00",
+      "contact_name": "Sam",
+      "notes": "Sam will set aside 20 kg of Genovese basil under Harbor & Vine's name until 8 PM and acknowledged it is not an order or payment."
+    },
+    "summary": "Sam agreed to hold 20 kg of Genovese basil for Harbor & Vine until 8 PM, as a non-purchase hold.",
+    "transcript": [
+      { "speaker": "bot", "text": "Hi Sam, it's the ProcurePulse assistant again, calling for Harbor and Vine." },
+      { "speaker": "bot", "text": "Could you hold the twenty kilos until eight tonight? It's not an order or a payment, just a hold." },
+      { "speaker": "user", "text": "Sure, I'll put your name on it till eight." }
+    ],
+    "confidence": { "score": 0.95, "label": "high" }
+  }
+}
