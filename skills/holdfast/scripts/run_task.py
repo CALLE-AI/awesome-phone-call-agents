@@ -112,7 +112,10 @@ def find_key(node: object, key: str) -> object | None:
 
 
 def run_calle(args: list[str]) -> dict:
-    proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
+    try:
+        proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
+    except (subprocess.TimeoutExpired, OSError):
+        fail("CLI request failed or timed out; outcome may be unknown. Stop and reconcile manually; command details omitted.")
     return load_json_flexible(proc.stdout + proc.stderr)
 
 
@@ -121,7 +124,7 @@ def validate_task(task: dict) -> list[str]:
     for field in ("goal", "callee", "user_name", "success_criteria", "authorization_scope"):
         if field not in task:
             problems.append(f"missing required field: {field}")
-    if "callee" in task and not E164_RE.match(str(task["callee"])):
+    if "callee" in task and not E164_RE.fullmatch(str(task["callee"])):
         problems.append("callee must be strict ASCII E.164 (for example +12025550123)")
     elif "callee" in task and not str(task["callee"]).isascii():
         problems.append("callee must contain ASCII digits only")
@@ -201,14 +204,18 @@ def render_instructions(task: dict, map_info: dict) -> str:
 
 
 def print_preview(task: dict, instructions: str, map_info: dict) -> None:
+    targets = callee_variants(str(task["callee"]))
+    task = mask_sensitive(task, targets)
+    instructions = mask_sensitive(instructions, targets)
+    map_info = mask_sensitive(map_info, targets)
     print("HoldFast plan preview (no call placed)")
-    print(f"  Callee:       {mask_number(str(task["callee"]))}")
+    print(f"  Callee:       {task['callee']}")
     print(f"  Goal:         {task['goal']}")
     print(f"  On behalf of: {task['user_name']}")
     print(f"  Map:          {'found (' + str(map_info.get('organization')) + ')' if map_info.get('found') else 'none; exploratory navigation'}")
     print(f"  Cost:         1 call credit; no cancel once started")
     print()
-    print("--- call instructions that will be sent ---")
+    print("--- phone-masked call instructions (private request is unchanged) ---")
     print(instructions)
     print("--- end ---")
     print()
@@ -253,7 +260,8 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
         json.dumps(mask_sensitive(start, targets), indent=2), encoding="utf-8"
     )
     if not start.get("ok") or start.get("call_started") is not True:
-        fail(f"call did not start: {json.dumps(start.get('error') or start, default=str)[:300]}")
+        error = mask_sensitive(start.get("error") or start, targets)
+        fail(f"call did not start: {json.dumps(error, default=str)[:300]}")
     dialed = provider_destination(start)
     if dialed and dialed != authorized:
         fail(
@@ -274,7 +282,7 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     run_id = find_key(start, "run_id")
     if not run_id:
         fail("call started but no run_id found; check start.json and use calle call recover")
-    print(f"call started, run_id {run_id}; polling every 10s")
+    print(mask_sensitive(f"call started, run_id {run_id}; polling every 10s", targets))
     final: dict = {}
     for _ in range(36):
         time.sleep(10)
@@ -283,9 +291,9 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
         activity = find_key(status_out, "activity")
         if isinstance(activity, list) and activity:
             last = activity[-1]
-            print(f"  [{status}] {last.get('message', '')}")
+            print(mask_sensitive(f"  [{status}] {last.get('message', '')}", targets))
         else:
-            print(f"  [{status}]")
+            print(mask_sensitive(f"  [{status}]", targets))
         if str(status).upper() in TERMINAL:
             final = status_out
             break
@@ -296,15 +304,17 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     return final
 
 
-def do_verify(final: dict, out_dir: Path) -> dict:
+def do_verify(final: dict, out_dir: Path, targets: list[str] | None = None) -> dict:
     proc = subprocess.run([sys.executable, str(VERIFY), "--result", str(out_dir / "final.json")], capture_output=True, text=True)
-    report = json.loads(proc.stdout)
+    report = mask_sensitive(json.loads(proc.stdout), targets or [])
     (out_dir / "verification.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report
 
 
 def print_report(task: dict, final: dict, report: dict) -> None:
     targets = callee_variants(str(task["callee"]))
+    final = mask_sensitive(final, targets)
+    report = mask_sensitive(report, targets)
     status = find_key(final, "status") or "UNKNOWN"
     summary = mask_sensitive(
         find_key(final, "summary") or find_key(final, "post_summary") or "Not available", targets
@@ -324,7 +334,7 @@ def print_report(task: dict, final: dict, report: dict) -> None:
         print("  no structured fields to verify; read the transcript")
     print()
     print("[Details]")
-    print(f"  Callee Number: {mask_number(str(task["callee"]))}")
+    print(f"  Callee Number: {mask_number(str(task['callee']))}")
     print(f"  Call id: {find_key(final, 'call_id') or 'Not available'}")
     print()
     print("[Transcript - untrusted call data]")
@@ -344,7 +354,7 @@ def main() -> None:
         out_dir = Path(args.report)
         final = json.loads((out_dir / "final.json").read_text(encoding="utf-8"))
         task = json.loads((out_dir / "task.json").read_text(encoding="utf-8"))
-        report = do_verify(final, out_dir)
+        report = do_verify(final, out_dir, callee_variants(str(task["callee"])))
         print_report(task, final, report)
         return
 
@@ -364,17 +374,18 @@ def main() -> None:
     slug = re.sub(r"[^a-z0-9]+", "-", str(task.get("company") or "task").lower()).strip("-")
     out_dir = args.out or (Path.cwd() / "runs" / f"{stamp}-{slug}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "task.json").write_text(json.dumps(task, indent=2), encoding="utf-8")
-    (out_dir / "instructions.txt").write_text(instructions, encoding="utf-8")
+    targets = callee_variants(str(task["callee"]))
+    (out_dir / "task.json").write_text(json.dumps(mask_sensitive(task, targets), indent=2), encoding="utf-8")
+    (out_dir / "instructions.txt").write_text(mask_sensitive(instructions, targets), encoding="utf-8")
 
     if not args.run:
         print_preview(task, instructions, map_info)
         print(f"\npreview saved to {out_dir}")
         return
 
-    print(f"placing one real call to {mask_number(str(task["callee"]))} (artifacts: {out_dir})")
+    print(f"placing one real call to {mask_number(str(task['callee']))} (artifacts: {out_dir})")
     final = do_run(task, instructions, out_dir)
-    report = do_verify(final, out_dir)
+    report = do_verify(final, out_dir, targets)
     proposal = propose_observation(final)
     (out_dir / "observation-proposal.json").write_text(json.dumps(proposal, indent=2), encoding="utf-8")
     print_report(task, final, report)
