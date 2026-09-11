@@ -66,6 +66,8 @@ $env:CALLE_API_KEY="..."
 
 The live UI requires an operator-supplied E.164 phone number plus region and locale. Only use a number you are authorized to contact and a region/language combination currently supported by CALL-E. Example displays use masked phone placeholders rather than real personal numbers.
 
+Live requests are loopback-only and require a fresh recipient-authorization checkbox for each run (`authorized: true` for local API clients). Do not expose the live endpoint through a tunnel or reverse proxy. This local operator demo is not a remotely hosted calling service. Displayed live results mask phone numbers, and provider error bodies are not returned to the browser.
+
 A live verification creates a real outbound phone call and may consume CALL-E quota or billable usage. Review the claim, contact, region and locale before dispatch.
 
 ## Result contract
@@ -122,6 +124,7 @@ This is intentional: successful contact is not automatically evidence for the cl
 - **Live verification:** creates a real outbound CALL-E call after the operator clicks the live action.
 - CallProof does **not** implement post-dispatch cancellation or rollback. Treat dispatch as the side-effect boundary and do not start a live call unless the recipient, claim and routing inputs are ready.
 - If infrastructure fails or the recipient is non-authoritative, ambiguous or unable to confirm, the app does not promote that failure into a positive claim verdict.
+- After a timeout or unknown provider outcome, stop and reconcile in the CALL-E dashboard before requesting another call; refreshing the UI does not cancel an accepted call.
 
 ## Safety boundaries
 
@@ -136,7 +139,7 @@ This is intentional: successful contact is not automatically evidence for the cl
 ## Validation
 
 ```bash
-python -m unittest test_verdicts.py
+python -m unittest test_verdicts.py test_safety.py
 ```
 
 The tests cover authority gating, direct verification, contradiction, ambiguity, qualified evidence and high-confidence unresolved results.

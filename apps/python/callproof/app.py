@@ -1,14 +1,16 @@
 import asyncio
 import json
 import os
+import re
 import uuid
+from ipaddress import ip_address
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 CALLE_API_BASE = "https://api.heycall-e.com/v1"
@@ -34,6 +36,45 @@ class VerifyRequest(BaseModel):
     contact_context: str = Field(default="Operational contact", max_length=300)
     region: str = Field(default="GB", min_length=2, max_length=2)
     locale: str = Field(default="en-GB", min_length=2, max_length=16)
+    authorized: bool = False
+
+
+def is_loopback(host: str | None) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ip_address(host or "").is_loopback
+    except ValueError:
+        return False
+
+
+@app.middleware("http")
+async def local_live_only(request: Request, call_next):
+    if request.url.path == "/verify" and (
+        not request.client
+        or not is_loopback(request.client.host)
+        or not is_loopback(request.url.hostname)
+    ):
+        return JSONResponse(status_code=403, content={"detail": "Live verification is local-only; use the documented loopback server."})
+    return await call_next(request)
+
+
+def mask_phone_text(value: str) -> str:
+    return re.sub(
+        r"\+[1-9](?:[ ()-]*[0-9]){7,14}(?![0-9])",
+        lambda match: "+***" + re.sub(r"[^0-9]", "", match.group())[-4:],
+        value,
+    )
+
+
+def masked_result(value: Any) -> Any:
+    if isinstance(value, str):
+        return mask_phone_text(value)
+    if isinstance(value, list):
+        return [masked_result(item) for item in value]
+    if isinstance(value, dict):
+        return {key: masked_result(item) for key, item in value.items()}
+    return value
 
 
 class VerifyResponse(BaseModel):
@@ -150,6 +191,10 @@ def first_recipient(call: dict[str, Any]) -> dict[str, Any]:
 
 
 async def create_call(req: VerifyRequest) -> dict[str, Any]:
+    if not req.authorized:
+        raise HTTPException(status_code=403, detail="Confirm authorization to contact this recipient for this live run.")
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", req.phone):
+        raise HTTPException(status_code=422, detail="Supply a valid E.164 destination with a leading + and ASCII digits.")
     api_key = os.getenv("CALLE_API_KEY")
     if not api_key:
         raise HTTPException(status_code=503, detail="CALLE_API_KEY is not configured")
@@ -176,7 +221,7 @@ async def create_call(req: VerifyRequest) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(f"{CALLE_API_BASE}/calls", json=payload, headers=headers)
         if response.status_code >= 400:
-            raise HTTPException(status_code=502, detail=f"CALL-E create failed: {response.text[:500]}")
+            raise HTTPException(status_code=502, detail=f"CALL-E create returned HTTP {response.status_code}. Do not redial until the provider outcome is reconciled.")
         return response.json()
 
 
@@ -189,7 +234,7 @@ async def wait_for_terminal(call_id: str, *, max_wait_seconds: int = 240) -> dic
         while True:
             response = await client.get(f"{CALLE_API_BASE}/calls/{call_id}", headers=headers)
             if response.status_code >= 400:
-                raise HTTPException(status_code=502, detail=f"CALL-E status failed: {response.text[:500]}")
+                raise HTTPException(status_code=502, detail=f"CALL-E status returned HTTP {response.status_code}. The call may still be running; reconcile before redialing.")
             call = response.json()
             if str(call.get("status", "")).lower() in TERMINAL:
                 return call
@@ -250,6 +295,7 @@ button.live{border-style:dashed}.empty{display:flex;min-height:495px;align-items
 <label>Phone</label><input id="phone" placeholder="+44…">
 <label>Contact context</label><input id="context" value="Site operations contact responsible for vehicle access">
 <div class="row"><div><label>Region</label><input id="region" value="GB"></div><div><label>Locale</label><input id="locale" value="en-GB"></div></div>
+<label><input id="authorized" type="checkbox" style="width:auto"> I am authorized to contact this recipient and intend one real call now.</label>
 <div class="buttons">
 <button class="primary" onclick="run('demo')">Production scenario</button>
 <button onclick="run('fixture')">Recorded live proof</button>
@@ -270,10 +316,11 @@ const liveButton=document.getElementById('liveButton');
 if(!LIVE_AVAILABLE){liveButton.disabled=true;liveButton.textContent='Live API unavailable locally';liveButton.title='Set CALLE_API_KEY to enable the Developer API path.';}
 async function run(mode){
  const r=document.getElementById('result');
+ if(mode==='live'&&!document.getElementById('authorized').checked){r.textContent='Confirm recipient authorization before a live call.';return;}
  r.innerHTML='<div class="empty"><div><b>Resolving evidence…</b><br><br>CALL-E is testing the claim against the real world.</div></div>';
  const url=mode==='demo'?'/verify/demo':mode==='fixture'?'/verify/live-fixture':'/verify';
  const opts={method:'POST',headers:{'Content-Type':'application/json'}};
- if(mode==='live')opts.body=JSON.stringify({claim:claim.value,phone:phone.value,contact_context:context.value,region:region.value,locale:locale.value});
+ if(mode==='live'){opts.body=JSON.stringify({claim:claim.value,phone:phone.value,contact_context:context.value,region:region.value,locale:locale.value,authorized:true});document.getElementById('authorized').checked=false;liveButton.disabled=true;}
  try{
    const res=await fetch(url,opts);const d=await res.json();if(!res.ok)throw new Error(d.detail||'Verification failed');
    const evidence=(d.evidence||[]).map(x=>`<li>${esc(x)}</li>`).join('');
@@ -291,7 +338,7 @@ async function run(mode){
  }catch(e){
    r.innerHTML=`<div class="eyebrow">03 · Warrant</div><div class="verdict UNRESOLVED">UNRESOLVED</div><div class="summary">${esc(e.message)}</div>
    <div class="note">Infrastructure failure is never upgraded into a claim verdict.</div>`;
- }
+ }finally{if(mode==='live')liveButton.disabled=!LIVE_AVAILABLE;}
 }
 </script>
 </body></html>
@@ -312,7 +359,7 @@ async def health() -> dict[str, str | bool]:
 @app.post("/verify", response_model=VerifyResponse)
 async def verify(req: VerifyRequest) -> VerifyResponse:
     created = await create_call(req)
-    call = await wait_for_terminal(created["id"])
+    call = masked_result(await wait_for_terminal(created["id"]))
     recipient = first_recipient(call)
     structured = recipient.get("structured_result") or call.get("structured_result") or {}
     verdict = map_verdict(structured)
@@ -326,7 +373,7 @@ async def verify(req: VerifyRequest) -> VerifyResponse:
     return VerifyResponse(
         verification_id=verification_id,
         verdict=verdict,
-        claim=req.claim,
+        claim=mask_phone_text(req.claim),
         evidence=evidence,
         confidence=confidence_for(call),
         call_id=call.get("id") or call.get("call_id"),
