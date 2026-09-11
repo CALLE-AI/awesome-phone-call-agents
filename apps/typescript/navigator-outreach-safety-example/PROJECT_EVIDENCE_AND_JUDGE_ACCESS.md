@@ -8,7 +8,9 @@ It is **not** the private canonical application and must not be treated as proof
 
 ## Corrected canonical evidence
 
-The corrected private canonical release is identified by:
+The following private-release results are author-reported and have not been
+independently verified as part of this public contribution. The author identifies
+the corrected private canonical release by:
 
 - Filename: `Navigator_Outreach_Gate6_Phase4_5PM-9PM_BINDING_R1_CORRECTED.zip`
 - SHA-256: `cabc54c57e90f69e3e75a616e69aa02af0b4545f9027915b150643499b31ee63`
@@ -17,13 +19,16 @@ The corrected private canonical release is identified by:
 - Production build: PASS with Vite's runner config loader, 48 modules
 - Verified: September 5, 2026
 
-These results verify the corrected canonical package's mock/no-call and safety behavior. They **do not establish successful live outbound CALL-E execution**.
+The author reports these results for the corrected canonical package's mock/no-call
+and safety behavior. They **do not establish successful live outbound CALL-E execution**.
 
 The private canonical archive is intentionally not included in this public contribution.
 
 ## Historical authenticated CALL-E runtime evidence
 
-A retained project evidence record dated **August 9, 2026** documents an authenticated CALL-E SDK/API operation using the exact read-only request:
+The author reports a retained private project evidence record dated **August 9, 2026**
+for an authenticated CALL-E SDK/API operation using the following read-only request.
+This historical account has not been independently verified as part of this contribution:
 
 `GET /v1/goals?limit=1`
 
@@ -61,6 +66,6 @@ The default verification is offline/no-call and requires no credentials.
 Please keep these claims separate:
 
 1. **Public companion:** SDK import + permanent no-call safeguards + fictional mock verification.
-2. **Corrected canonical evidence:** 158/158 mock/no-call tests, TypeScript PASS, production build PASS.
-3. **Historical authenticated runtime evidence:** read-only authenticated `GET /v1/goals?limit=1` on August 9, 2026.
+2. **Author-reported canonical evidence (not independently verified):** 158/158 mock/no-call tests, TypeScript PASS, production build PASS.
+3. **Author-reported historical runtime evidence (not independently verified):** read-only authenticated `GET /v1/goals?limit=1` on August 9, 2026.
 4. **Live outbound execution:** pending; not established by the evidence above.
