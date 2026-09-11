@@ -309,3 +309,59 @@ def test_approving_a_field_visit_from_the_dashboard(ledger, demo_preflight, even
     assert response.status_code == 303
     refreshed = {item.work_order_id: item for item in ledger.list_work_orders(event.event_id)}
     assert refreshed[order.work_order_id].approved_by == "op-7"
+
+
+# -- the mid-event view ------------------------------------------------------------
+
+
+def test_stop_before_cutoff_leaves_the_review_queue_populated(tmp_path, capsys):
+    """The full run sweeps everything to the field-visit queue, which is correct and
+    leaves nothing to review. An operator mid-event needs the other view."""
+    db = tmp_path / "mid.db"
+    assert main([
+        "run", "--mode", "fixture", "--event", str(EVENT_PATH),
+        "--roster", str(ROSTER_PATH), "--db", str(db), "--stop-before-cutoff",
+    ]) == 0
+    capsys.readouterr()
+
+    from positive_contact.ledger import Ledger
+    from positive_contact.preflight import load_event
+
+    event, policy = load_event(EVENT_PATH)
+    ledger = Ledger(db)
+    try:
+        open_items = ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN])
+        assert len(open_items) == 3  # medical question, wrong number, refusal
+        # The ladder still ran to completion for everyone it could confirm.
+        confirmed = [
+            intent for intent in ledger.list_intents(event.event_id)
+            if ledger.reconstruct(intent.intent_id) is IntentState.CONFIRMED
+        ]
+        assert len(confirmed) == 7
+        # Nothing was swept early.
+        assert ledger.list_work_orders(event.event_id) == [] or all(
+            order.reason_code != "field_visit_cutoff_reached_while_open"
+            for order in ledger.list_work_orders(event.event_id)
+        )
+    finally:
+        ledger.close()
+
+
+def test_the_full_run_still_sweeps_to_the_cutoff(tmp_path, capsys):
+    db = tmp_path / "full.db"
+    assert main([
+        "run", "--mode", "fixture", "--event", str(EVENT_PATH),
+        "--roster", str(ROSTER_PATH), "--db", str(db),
+    ]) == 0
+    capsys.readouterr()
+
+    from positive_contact.ledger import Ledger
+    from positive_contact.preflight import load_event
+
+    event, _policy = load_event(EVENT_PATH)
+    ledger = Ledger(db)
+    try:
+        assert ledger.list_intents(event.event_id, [IntentState.NEEDS_HUMAN]) == []
+        assert len(ledger.list_work_orders(event.event_id)) == 5
+    finally:
+        ledger.close()

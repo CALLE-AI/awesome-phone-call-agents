@@ -207,6 +207,17 @@ python3 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
 ./.venv/bin/pc serve --db /tmp/pc-demo.db
 ```
 
+To look at the dashboard the way an operator would, mid-event, stop the simulated clock
+just short of the deadline so the review queue still has items in it:
+
+```bash
+./.venv/bin/pc run --mode fixture --stop-before-cutoff --db /tmp/pc-mid.db
+./.venv/bin/pc serve --db /tmp/pc-mid.db
+```
+
+Without that flag the run plays the whole event through to the cutoff, which is correct
+and leaves the review queue empty, because everything unresolved has become a field visit.
+
 `preflight` prints the masked roster, the ladder, the quiet-hours window, the confidence
 gate, the contact that will not be called and why, and the exact call script. It exits
 non-zero on any blocking issue.
@@ -363,7 +374,7 @@ in `tests/test_regressions.py` that fails if it comes back.
 | Command | What it does |
 | --- | --- |
 | `pc preflight` | Validate event and roster, print the masked plan and the exact script, exit non-zero on any blocking issue |
-| `pc run` | Walk the ladder. Fixture by default, live behind three gates |
+| `pc run` | Walk the ladder. Fixture by default, live behind three gates. `--stop-before-cutoff` holds the simulated clock at the deadline for the mid-event view |
 | `pc serve` | Operator dashboard, and the webhook receiver, on one process |
 | `pc report` | Print the report as Markdown, CSV, or JSON |
 | `pc approve-field-visits` | Approve prepared field visits and export them, masked |
@@ -390,13 +401,13 @@ positive_contact/
   web/            FastAPI, Jinja2, HTMX. Three pages, no build step
 fixtures/         event, two rosters, 15 scenarios, 3 replay payloads
 docs/             adapter-notes.md, adjudication.md, threat-model.md
-tests/            425 tests, offline
+tests/            427 tests, offline
 ```
 
 ## Tests
 
 ```bash
-./.venv/bin/pytest        # 425 tests, about 6 seconds, no network
+./.venv/bin/pytest        # 427 tests, about 6 seconds, no network
 ```
 
 The suite is organised around the invariants rather than the modules:

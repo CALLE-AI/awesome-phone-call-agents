@@ -99,12 +99,18 @@ def execute_run(
     simulated_clock: bool,
     budget: LiveCallBudget | None = None,
     judge_c=None,
+    stop_before_cutoff: bool = False,
 ) -> RunOutcome:
     """Walk every contact's ladder until nothing is left to do.
 
     With a simulated clock the whole event runs in seconds: when no work is due, the clock
     jumps to the next scheduled step. With a real clock it does one pass and returns, and
     `pc serve` is what keeps it moving.
+
+    `stop_before_cutoff` halts the simulated clock at the last moment before the
+    field-visit deadline. That is the state an operator actually works in: calls done,
+    review items still open, nothing swept to a truck yet. Without it the demo runs the
+    whole event and the review queue is correctly, but unhelpfully, empty.
     """
     event = result.event
     policy = result.policy
@@ -187,11 +193,15 @@ def execute_run(
         if upcoming:
             next_time = min(upcoming)
             if open_items and event.field_visit_cutoff < next_time:
+                if stop_before_cutoff:
+                    break
                 clock = event.field_visit_cutoff
             else:
                 clock = next_time
             continue
         if open_items and clock < event.field_visit_cutoff:
+            if stop_before_cutoff:
+                break
             clock = event.field_visit_cutoff
             continue
         break
@@ -269,6 +279,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             simulated_clock=settings.mode is not RunMode.LIVE,
             budget=budget,
             judge_c=judge_c,
+            stop_before_cutoff=args.stop_before_cutoff,
         )
         print("\nRun log:")
         for line in outcome.log:
@@ -494,6 +505,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip prompts in the offline modes; it does not skip the live confirmation",
     )
     run.add_argument("--report-out", default=None, help="write the report next to this path")
+    run.add_argument(
+        "--stop-before-cutoff",
+        action="store_true",
+        help=(
+            "stop the simulated clock just before the field-visit cutoff, leaving review "
+            "items open. This is the mid-event view an operator works in"
+        ),
+    )
     run.set_defaults(func=cmd_run)
 
     report = sub.add_parser("report", help="print the denominator-honest report")
