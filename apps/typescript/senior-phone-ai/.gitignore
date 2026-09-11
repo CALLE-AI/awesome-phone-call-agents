@@ -13,6 +13,7 @@ next-env.d.ts
 
 # Local application data
 data/
+logs/
 *.log
 .vercel/
 .DS_Store

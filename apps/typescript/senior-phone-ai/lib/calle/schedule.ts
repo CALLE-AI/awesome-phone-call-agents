@@ -5,6 +5,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { withFileLock } from "../storage/file-lock";
+import { callFailureCode, writeCallLog } from "../observability/call-log";
 import { createCalleCall } from "./client";
 import { type OutboundCallRequest, outboundCallPreview, validateOutboundCallRequest } from "./outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "./registry";
@@ -105,6 +106,12 @@ export async function createScheduledCall(request: OutboundCallRequest, schedule
       status: "pending",
     };
     await writeSchedule({ version: 1, calls: [record, ...schedule.calls].slice(0, 100) });
+    await writeCallLog({
+      destinationE164: validated.destinationE164,
+      event: "schedule_created",
+      scheduleId: record.id,
+      scheduledFor: record.scheduledFor,
+    });
     return summary(record, secret);
   });
 }
@@ -121,6 +128,9 @@ export async function cancelScheduledCall(id: string, secret: string): Promise<S
     if (existing.status !== "pending" && existing.status !== "canceled") throw new Error("scheduled call has already started");
     const updated = existing.status === "canceled" ? existing : { ...existing, status: "canceled" as const };
     await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === id ? updated : call) });
+    if (existing.status !== "canceled") {
+      await writeCallLog({ event: "schedule_canceled", scheduleId: id, scheduledFor: existing.scheduledFor });
+    }
     return summary(updated, secret);
   });
 }
@@ -134,10 +144,12 @@ async function claimDueCall(now: Date): Promise<{ record?: ScheduledCallRecord; 
     if (scheduledCallDispatchDecision(due.scheduledFor, now) === "expired") {
       const expired = { ...due, status: "expired" as const };
       await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? expired : call) });
+      await writeCallLog({ event: "schedule_expired", scheduleId: due.id, scheduledFor: due.scheduledFor });
       return { expired: true };
     }
     const claimed = { ...due, status: "claimed" as const };
     await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? claimed : call) });
+    await writeCallLog({ event: "dispatch_claimed", scheduleId: due.id, scheduledFor: due.scheduledFor });
     return { record: claimed, expired: false };
   });
 }
@@ -165,20 +177,56 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
     }
     if (!claimed.record) throw new Error("scheduled call claim is invalid");
     const request = open(claimed.record.sealedRequest, secret);
+    const startedAt = Date.now();
     try {
       const reservation = await reserveOutboundCall(request);
       if (reservation.state === "accepted" && reservation.callId) {
         await finishClaim(claimed.record.id, { status: "accepted", callId: reservation.callId });
+        await writeCallLog({
+          destinationE164: request.destinationE164,
+          durationMs: Date.now() - startedAt,
+          event: "provider_accepted",
+          scheduleId: claimed.record.id,
+          source: "registry",
+        });
       } else if (reservation.state === "unknown") {
         await finishClaim(claimed.record.id, { status: "unknown" });
+        await writeCallLog({
+          destinationE164: request.destinationE164,
+          durationMs: Date.now() - startedAt,
+          event: "provider_outcome_unknown",
+          scheduleId: claimed.record.id,
+          source: "registry",
+        });
       } else {
+        await writeCallLog({
+          destinationE164: request.destinationE164,
+          event: "provider_request_started",
+          scheduleId: claimed.record.id,
+          source: "provider",
+        });
         const result = await createCalleCall(request, secret);
         await recordOutboundCallResult(request.idempotencyKey, { state: "accepted", callId: result.callId });
         await finishClaim(claimed.record.id, { status: "accepted", callId: result.callId });
+        await writeCallLog({
+          destinationE164: request.destinationE164,
+          durationMs: Date.now() - startedAt,
+          event: "provider_accepted",
+          scheduleId: claimed.record.id,
+          source: "provider",
+        });
       }
-    } catch {
+    } catch (cause) {
       await recordOutboundCallResult(request.idempotencyKey, { state: "unknown" }).catch(() => undefined);
       await finishClaim(claimed.record.id, { status: "unknown" });
+      await writeCallLog({
+        destinationE164: request.destinationE164,
+        durationMs: Date.now() - startedAt,
+        event: "provider_request_failed",
+        providerCode: callFailureCode(cause),
+        scheduleId: claimed.record.id,
+        source: "provider",
+      });
     }
     processed += 1;
   }

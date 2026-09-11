@@ -12,6 +12,7 @@ import {
   toE164FromNationalNumber,
 } from "../lib/safety/phone";
 import { assessConversationBoundary, mayRunAutomatically } from "../lib/safety/policy";
+import { callFailureCode, createCallLogEntry } from "../lib/observability/call-log";
 
 const request: ActionRequest = {
   principalId: "synthetic-senior",
@@ -57,6 +58,24 @@ test("phone summaries and nested log text reveal only the last four digits", () 
     redactPhoneNumbers("Call +1 (202) 555-0123 or 020 7946 0958."),
     "Call [phone ending 0123] or [phone ending 0958].",
   );
+});
+
+test("call scheduler logs mask destinations and hash schedule identifiers", () => {
+  const entry = createCallLogEntry({
+    destinationE164: request.destinationE164,
+    durationMs: 123,
+    event: "provider_request_failed",
+    providerCode: "http_503 response details are excluded",
+    scheduleId: "private-idempotency-key",
+    scheduledFor: "2026-09-11T08:00:00.000Z",
+    source: "provider",
+  }, "2026-09-11T08:00:01.000Z");
+  const serialized = JSON.stringify(entry);
+  assert.equal(entry.destination, "[phone ending 0123]");
+  assert.equal(entry.providerCode, "http_503_response_details_are_excluded");
+  assert.equal(entry.scheduleReference.length, 12);
+  assert.doesNotMatch(serialized, /12025550123|private-idempotency-key/);
+  assert.equal(callFailureCode(new Error("CALL-E create status 503")), "http_503");
 });
 
 test("read-only tools may run automatically while side effects may not", () => {
