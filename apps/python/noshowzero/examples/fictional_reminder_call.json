@@ -1,0 +1,61 @@
+{
+  "id": "call_fictional0reminder0001",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Call Daniel to remind them about their upcoming appointment at Bright Smile Dental and confirm they can make it. (full task omitted)",
+  "recipients": [
+    {
+      "id": "rcp_fictional0001",
+      "phones": ["+12125550116"],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structured_result": null,
+      "summary": "Daniel cannot make today's 4:30 PM cleaning and asked to reschedule for next Tuesday morning.",
+      "attempts": [
+        {
+          "id": "att_fictional0001",
+          "phone": "+12125550116",
+          "status": "completed",
+          "started_at": "2026-09-11T16:41:02Z",
+          "completed_at": "2026-09-11T16:41:44Z",
+          "summary": "Daniel cannot make today's 4:30 PM cleaning and asked to reschedule for next Tuesday morning.",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Hi there! Is this Daniel?" },
+            { "offset_seconds": 2, "speaker": "user", "text": "Yeah, speaking." },
+            { "offset_seconds": 3, "speaker": "bot", "text": "Hi Daniel! This is Ava, the virtual assistant for Bright Smile Dental. I'm calling about your dental cleaning with us today at four thirty. Are you still able to make it?" },
+            { "offset_seconds": 14, "speaker": "user", "text": "Oh, shoot. Actually, something came up at work, and I don't think I can make it today. Could we move it?" },
+            { "offset_seconds": 20, "speaker": "bot", "text": "No problem at all, life happens! Which days and times would work better for you?" },
+            { "offset_seconds": 25, "speaker": "user", "text": "Um, next Tuesday morning would be perfect, if you have anything." },
+            { "offset_seconds": 29, "speaker": "bot", "text": "Got it, next Tuesday morning. I'll release today's slot, and our front desk will call you to confirm the new time. Have a great day, Daniel!" },
+            { "offset_seconds": 38, "speaker": "user", "text": "Great, thanks so much. Bye!" }
+          ],
+          "provider_call_id": "provider_fictional0001",
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "structured_result": {
+    "reached_patient": "yes",
+    "outcome": "wants_reschedule",
+    "reschedule_preference": "next Tuesday morning",
+    "notes": "Work conflict today. Asked to move the cleaning to next Tuesday morning; front desk to confirm."
+  },
+  "summary": "Daniel cannot make today's 4:30 PM cleaning and asked to reschedule for next Tuesday morning.",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.95, "label": "high" },
+  "evidence": [],
+  "metadata": {
+    "app": "noshowzero",
+    "kind": "reminder",
+    "clinic_id": "clinic-bright-smile",
+    "appointment_id": "appt-1042",
+    "reminder_window": "24h"
+  },
+  "failure_code": null,
+  "failure_message": null,
+  "created_at": "2026-09-11T16:40:58Z",
+  "completed_at": "2026-09-11T16:41:46Z"
+}
