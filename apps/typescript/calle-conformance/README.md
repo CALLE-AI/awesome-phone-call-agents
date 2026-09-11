@@ -459,6 +459,30 @@ on 7 September do not. `docs/what-the-re-read-found.md` carries the reproduction
 the limits, and the mistakes the tool's own first runs made before this was
 written.
 
+## What it changed
+
+One of the two defects in `docs/found-by-the-corpus.md` is gone from the
+repository, and the trail is public.
+
+| | |
+| --- | --- |
+| 8 September | The finding is filed: `failureOutcome()` in `call-on-behalf` branches on words inside `failureCode`, and the three codes in this corpus are `404`, `486` and `603`. |
+| 8 September | A maintainer opens [#375](https://github.com/CALLE-AI/awesome-phone-call-agents/issues/375), citing this report by line, and replays the app through its own localhost fake against each code. |
+| 10 September | [#446](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/446) removes `failureOutcome()` and adds twenty full-workflow cases covering the numeric codes, an unknown value and `null`. |
+| 11 September | It merges as `5741719`. The comment left in its place says `failureCode` is diagnostic context and cannot distinguish no answer, a busy line or voicemail. |
+
+That replay also contradicted part of the report, and the part it contradicted is
+withdrawn above with its date: the misclassification reached the outcome, and the
+voicemail consequence this document had drawn from it did not reproduce, because
+the full workflow reads the transcript before it consults the failure code.
+
+Defect 2, in `hirecall`, stands unchanged in `src/lib/place-call.ts` as of
+11 September. The maintainer's replay of that one did not reach model scoring
+either, and what remains is the guard itself, stated narrowly in the document.
+
+One fix is not a distribution. It is one piece of code that used to branch on a
+value this corpus showed it would never receive, and no longer does.
+
 ## What this cannot see
 
 Every behaviour here is about the shape of a response. None of them is about who
