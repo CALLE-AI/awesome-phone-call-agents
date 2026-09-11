@@ -1,7 +1,8 @@
 # Examples
 
-Worked examples for `emergency-dispatch-relay`. Every phone number below is
-fictional and masked per repository policy.
+Synthetic worked examples for `emergency-dispatch-relay`. The reserved fictional
+phone is only for no-call preview; live exercises require an authorized recipient.
+Result snippets illustrate requested output, not guaranteed or verified decisions.
 
 ## Example 1 - The ordinary relay
 
@@ -15,11 +16,11 @@ node scripts/relay.mjs \
   --incident "Cardiac / breathing emergency (CRITICAL P1)" \
   --location "Shalimar Bagh B-block, Delhi" \
   --unit-name "PCR Van 11" \
-  --phone "+919999XXXXXX" \
+  --phone "+12025550123" --region US --locale en-US \
   --confirmed-by "dispatcher-a"
 ```
 
-**Result returned (`--real`):**
+**Illustrative advisory structured result:**
 
 ```json
 {
@@ -29,8 +30,8 @@ node scripts/relay.mjs \
 }
 ```
 
-The console flips the case to `CONFIRMED` and appends a `RELAY_RESULT`
-timeline entry. The unit was asked; it was never told to move.
+A human reviews the answer before recording any confirmation in a separate console.
+The CLI makes no case-state mutation and does not certify acceptance or prompt adherence.
 
 ## Example 2 - The uncertain answer, which stays unknown
 
@@ -39,7 +40,7 @@ timeline entry. The unit was asked; it was never told to move.
 **What happened:** the line was noisy; the officer started answering, then
 the call dropped mid-sentence.
 
-**Result returned:**
+**Illustrative advisory result (missing or invalid output is also possible):**
 
 ```json
 {
@@ -61,7 +62,7 @@ human dispatch decision on record.
 
 ```bash
 node scripts/relay.mjs --case-id KWR-0007 --incident "..." \
-  --location "..." --unit-name "Ambulance 302" --phone "+919999XXXXXX" --real
+  --location "..." --unit-name "Ambulance 302" --phone "+12025550123" --real
 ```
 
 **Result:** the script exits non-zero:
@@ -87,6 +88,6 @@ already made.
 }
 ```
 
-The console marks the case `DECLINED` and returns it to the dispatcher to
-choose the next unit. The skill does not auto-escalate to a second unit on
-its own — escalation is a decision, and decisions belong to a person.
+A dispatcher verifies the answer before marking a case declined in their own
+console or choosing another unit. The CLI does not mutate case state or
+auto-escalate — those decisions remain with a person.

@@ -1,11 +1,11 @@
 # Demo Guide
 
-A five-minute, zero-cost walk-through of the skill that never places a call,
-followed by the one authorized real call for a live demo.
+A no-call walkthrough, followed by an optional authorized exercise call.
+This is an experimental notification demo, not validated emergency dispatch.
 
 ## 0. Preconditions
 
-- Node 20+; `npm i @call-e/calle` (or use your own copy of the SDK).
+- Node 20+; only step 4 needs `npm i @call-e/calle`.
 - `CALLE_API_KEY` exported only for step 4.
 - A number you are authorized to call — for first tests, your own phone.
 
@@ -14,15 +14,16 @@ followed by the one authorized real call for a live demo.
 ```bash
 node scripts/relay.mjs \
   --case-id DEMO-1 \
-  --incident "Cardiac / breathing emergency (CRITICAL P1)" \
-  --location "Shalimar Bagh B-block, Delhi" \
-  --unit-name "PCR Van 11" \
-  --phone "+91<your-number>" \
-  --confirmed-by "your-name"
+  --incident "Synthetic training exercise" \
+  --location "Fictional training room" \
+  --unit-name "Training unit" \
+  --phone "+12025550123" --region US --locale en-US \
+  --confirmed-by "fictional-operator"
 ```
 
-Read the printed payload aloud in a demo: goal, recipient, locale, schema,
-policy. Point at the hard constraints — this is the auditability story.
+Inspect the phone-masked goal, recipient, locale, schema, and policy. The original
+destination remains in the private request; the preview is not byte-identical.
+Prompt constraints request a bounded conversation but cannot guarantee model behavior.
 
 ## 2. The refusal (no call, by design)
 
@@ -33,20 +34,26 @@ human decision, no call — demonstrate the boundary.
 
 `unit_accepted` is yes/no/unknown. `eta_minutes` returns digits ("12") or the
 word "unknown". `notes` is one English sentence. Unknown is a real answer for
-a bad line — the console keeps a predictable shape in every possible world.
+a bad line. Missing, invalid, or mistaken provider results remain possible; the
+operator must treat unverified answers as unknown and review any proposed confirmation.
 
 ## 4. One real call (authorized, budgeted)
 
 ```bash
+# Replace the fictional preview recipient with an authorized exercise number
+# and the confirmed assignment; do not call an emergency service for a demo.
 node scripts/relay.mjs ... --confirmed-by "your-name" --real
 ```
 
 The script prints the provider call id, reminds that a submitted call cannot
-be recalled, polls every 5s, and prints the structured result with schema
-validation and a transcript excerpt. Answer your phone; reply in the relay
-locale; watch the JSON come back.
+be recalled through this CLI, polls every 5s, and prints an advisory structured
+result alongside the provider's validation status. Phone-shaped text is masked;
+raw transcripts and provider error details are omitted. Answer your own authorized
+exercise phone; reply in the relay locale; review the JSON without automatic actions.
 
 ## 5. After the demo
 
 Nothing to clean up: single attempt, no schedules, no recurrence. The
-idempotency key means a replay of the same command cannot place a second call.
+stable case key requests provider deduplication, subject to provider retention and
+enforcement. After any ambiguous error or timeout, stop and reconcile manually
+before another intent. No live call is needed to verify this contribution.

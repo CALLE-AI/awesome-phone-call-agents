@@ -1,6 +1,6 @@
 ---
 name: emergency-dispatch-relay
-description: Phone a response unit to relay a human-confirmed emergency dispatch decision and collect a tri-state structured answer (unit accepted yes/no/unknown, ETA, notes) without ever instructing the unit to move. Use for 112/911-style control rooms notifying police, ambulance, or fire units, and any life-safety context where the AI must carry the decision, not make it.
+description: Preview an experimental human-confirmed dispatch relay, or make one authorized call to collect an advisory unit answer. Use to explore a human-to-unit notification workflow, never as autonomous emergency dispatch or a replacement for established command channels.
 license: MIT
 ---
 
@@ -10,11 +10,12 @@ Use this skill when a dispatcher has already decided *"PCR Van 11 takes this
 cardiac call in Shalimar Bagh"* and the remaining work is to reach the unit by
 phone, say it, and record their answer — without a human dialing.
 
-`emergency-dispatch-relay` is a purpose-bound outbound workflow skill for
-life-safety dispatch. It places exactly one bounded call per confirmed
-assignment, relays the decision in the unit's language, and returns a
-tri-state structured result. It does not select units, reassign cases,
-instruct anyone to move, or promise anything to the unit.
+`emergency-dispatch-relay` is an experimental notification demo, not a validated
+emergency-dispatch system. It submits one call attempt per invocation and asks
+the voice agent to relay a human's decision and request a tri-state answer.
+The CLI does not select units, reassign cases, or act on results. Prompt instructions
+are not guaranteed conversational enforcement; established human command channels
+remain authoritative and must not depend on this demo.
 
 The boundary this skill exists to enforce: **an AI voice can carry a human's
 dispatch decision to a response unit — it must never become the decision.**
@@ -54,9 +55,12 @@ Do not use this skill to:
 }
 ```
 
-`unknown` is a first-class value. A bad line, an unsure officer, or an
-unanswered phone returns `unknown` — never a guess — so downstream consoles
-keep a predictable shape for every possible real-world call.
+The prompt asks for `unknown` when the answer is uncertain. Provider output can
+still be missing, invalid, or mistaken: the CLI displays it with `result_validation`
+and an advisory flag, without certifying it. A completed call is not proof that a
+unit accepted. A human must treat absent, invalid, or unclear answers as unknown,
+verify any confirmation or ETA, and decide the next step. Never connect these
+outputs directly to dispatch, escalation, or other consequential automatic actions.
 
 ## Safety Rules
 
@@ -64,44 +68,51 @@ keep a predictable shape for every possible real-world call.
    the second half of a decision a human already made.
 2. **Relay, never command.** The goal template forbids instructing the unit
    to move, changing the dispatch decision, and discussing other cases.
-3. **Preview first.** Default mode prints the exact payload (goal, recipient,
-   schema, metadata) and places no call. `--real` is the only path to a
+3. **Preview first.** Default mode prints the payload with phone-shaped text masked
+   and places no call. The private provider request retains the original destination.
+   `--real` is the only path to a
    phone call.
-4. **Bounded side effect.** One call, capped at two minutes by the goal.
+4. **Bounded side effect.** One submission, with a two-minute target in the goal
+   rather than a client-enforced duration cap.
    No scheduling or recurrence lives in the skill — recurrence belongs to
    the host scheduler (provider/host separation).
-5. **No personal numbers in code.** Numbers arrive via flags or env;
-   samples use masked placeholders.
+5. **Authorized contacts only.** The operator must have the recipient's authorization
+   and a human-confirmed assignment before adding `--real`. Output masks phone-shaped
+   text and omits raw transcripts/provider errors, but does not remove every kind of
+   personal data. Minimize incident details and keep any local records private.
 
 ## Setup
 
 ```bash
-npm i @call-e/calle        # or: pip install calle-ai
+npm i @call-e/calle        # Node SDK for this JavaScript CLI; not needed for preview
 export CALLE_API_KEY=...   # server/CLI side only
 ```
 
 ## Usage
 
 ```bash
-# PREVIEW — prints the exact call payload, places no call:
+# PREVIEW — fictional exercise, phone-masked output, no call or key needed:
 node scripts/relay.mjs \
   --case-id KWR-0001 \
-  --incident "Cardiac / breathing emergency (CRITICAL P1)" \
-  --location "Shalimar Bagh B-block, Delhi" \
-  --unit-name "PCR Van 11" \
-  --phone "+919999XXXXXX" \
-  --confirmed-by "dispatcher-a"
+  --incident "Synthetic training exercise" \
+  --location "Fictional training room" \
+  --unit-name "Training unit" \
+  --phone "+12025550123" --region US --locale en-US \
+  --confirmed-by "fictional-operator"
 
-# REAL — places one call (locale defaults to hi, region IN):
+# REAL — replace the fictional inputs with an authorized exercise recipient
+# and a named human's confirmed assignment before adding --real:
 node scripts/relay.mjs ... --real
 ```
 
 ## Side Effects & Cancellation
 
-- `--real` places exactly one real outbound call to the given number.
+- `--real` submits one real outbound call attempt to the given number.
 - PREVIEW mode (default) has zero side effects.
-- No recurring behavior exists inside the skill, so there is nothing to
-  cancel post-hoc; cancellable retry patterns belong to the host.
+- There are no recurring jobs. This CLI has no cancellation operation: exiting it
+  need not stop an accepted provider call. After an error or timeout, stop and
+  reconcile manually before another intent. The stable case key requests provider
+  deduplication; it is not an unlimited or crash-proof duplicate-call guarantee.
 
 ## References
 
