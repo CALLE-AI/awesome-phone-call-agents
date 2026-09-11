@@ -731,7 +731,7 @@ def fix(
         console.print(
             Text(
                 "\n  -> redline fix --apply    (write this into the config)\n"
-                "  -> redline verify         (apply, re-run, and diff)\n",
+                "  -> redline verify         (evaluate in memory; config unchanged)\n",
                 style="cyan",
             )
         )
@@ -755,7 +755,7 @@ def verify(
         ),
     ] = None,
 ) -> None:
-    """Check the generated patch against the static contract and benign suite."""
+    """Evaluate the generated patch in memory; leave the source config unchanged."""
     loaded = _load(config)
     console.print(
         Text("\n  evidence: static (declared policy model); no real calls", style="dim")

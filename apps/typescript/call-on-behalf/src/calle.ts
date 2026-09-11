@@ -53,10 +53,9 @@ export class CalleWaitTimeout extends Error {}
  *
  * `CallStatus` in the SDK's generated schema is `queued`, `in_progress`,
  * `completed`, `failed` or `canceled`. The SDK's own `waitForResult` returns on
- * exactly the last three, so those three are the whole set here. A no answer, a
- * busy line or a voicemail is not a status of its own: it arrives as `failed` with
- * a failure code or as a completed call whose transcript is a machine, both of
- * which are read further down.
+ * exactly the last three, so those three are the whole set here. The Calls API
+ * does not guarantee distinct no-answer, busy or voicemail failure codes.
+ * Machine-answer evidence is read from the transcript of a terminal call.
  *
  * Anything not in this list is a call with no result yet. A call with no result
  * is not something to report an outcome from.
