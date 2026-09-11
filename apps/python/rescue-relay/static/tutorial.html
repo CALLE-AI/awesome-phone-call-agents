@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#193f33">
+<meta name="description" content="A complete Rescue Relay walkthrough, from your first report to a safe outcome.">
+<title>Rescue Relay · The complete walkthrough</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<p class="hint" style="max-width:1100px;margin:16px auto;padding:0 20px">The short product demonstration shows version 5.6.0: choose Send, select a goal, Confirm goal to save, then Find help. The longer tutorial is a historical version 5.4.0 supplement.</p>
+<a class="skip" href="#main">Skip to walkthrough</a>
+<header class="top"><a class="brand" href="#main"><img src="favicon.svg" width="38" height="38" alt=""><span><strong>Rescue</strong>Relay</span></a><a class="open-app" href="/" id="openApp">Open your workspace <span aria-hidden="true">↗</span></a></header>
+<main id="main">
+<section class="intro"><p class="eyebrow">THE COMPLETE WALKTHROUGH</p><h1>From the first report<br>to a safe place.</h1><p class="lede">Find the right help, choose a plan, and keep everyone connected until the rescue is finished.</p><p class="example"><span aria-hidden="true">●</span> Fictional example. The same app, controls and rescue flow.</p></section>
+<section class="watch" aria-label="Video walkthrough">
+<div class="video-column">
+<div class="switcher" role="group" aria-label="Choose a walkthrough"><button type="button" data-video="demo" aria-pressed="true">Product demo <span id="demoLength"></span></button><button type="button" data-video="full" aria-pressed="false">Full walkthrough <span id="fullLength"></span></button></div>
+<div class="player"><video id="video" controls playsinline preload="metadata" poster="media/demo-poster.jpg" aria-label="Rescue Relay product demonstration"><source src="media/rescue-relay-demo.mp4" type="video/mp4"><track id="captionTrack" kind="captions" src="media/rescue-relay-demo.vtt" srclang="en" label="English">Your browser does not support video. Use the download below.</video></div>
+<div class="under-player"><span id="playingLabel">Product demo · Caption-led, no audio</span><a id="downloadVideo" href="media/rescue-relay-demo.mp4" download>Download video ↓</a></div>
+<p id="videoError" class="video-error" role="status" hidden>The video could not be opened. Check that the media folder was extracted with this page, or use the download link.</p>
+</div>
+<aside class="chapter-panel"><p class="eyebrow">JUMP TO A MOMENT</p><h2>Follow the rescue</h2><nav id="chapters" class="chapters" aria-label="Video chapters"></nav><noscript>Enable JavaScript to jump between chapters. The video and written guide work without it.</noscript></aside>
+</section>
+<section class="follow" aria-labelledby="followTitle"><div class="section-heading"><p class="eyebrow">TRY IT YOURSELF</p><h2 id="followTitle">One rescue. Every step.</h2><p>Open the app and choose <strong>Try the demo</strong>. Follow the steps below at your own pace.</p></div>
+<div class="steps">
+<article><span class="number">01</span><h3>Keep your circle ready</h3><p>In Trusted contacts, add the people and organisations you rely on. Save their services and permission to receive rescue calls. Demo contacts are already included.</p></article>
+<article><span class="number">02</span><h3>Describe what you see</h3><p>Tell us what happened, where the animal is and your budget. The example starts with a dog that cannot put weight on one leg, on Willow Road.</p></article>
+<article><span class="number">03</span><h3>Clarify the outcome</h3><p>Choose Send. Describe what success means: trained responders, safe transport and a receiving veterinarian. Select the proposed goal and confirm it to save. Then choose Find help separately.</p></article>
+<article><span class="number">04</span><h3>Find available help</h3><p>After saving the goal, choose Find help to begin inquiries. The first complete offer appears with its included tasks, quoted price and timing. Greenway Rescue quotes USD 300 against a USD 200 budget.</p></article>
+<article><span class="number">05</span><h3>Compare, then choose</h3><p>Choose Find another option, then compare complete plans. Kindred Rescue quotes USD 150. Select that plan. Details &amp; history keeps the saved replies within reach.</p></article>
+<article><span class="number">06</span><h3>Approve your helper</h3><p>Choose Review &amp; approve. Check the helper, tasks and price limits, then tick the approval box. Only the selected helper receives the confirmation callback.</p></article>
+<article><span class="number">07</span><h3>Keep the rescue current</h3><p>Record On the way, Arrived and Finished only as each update is confirmed. A helper’s agreement is not an automatic arrival or a finished rescue.</p></article>
+<article><span class="number">08</span><h3>Close the loop</h3><p>When the work is finished, add where the animal is now and confirm it is safe. Copy a shareable update. Your closing note, progress and replies stay with the saved report.</p></article>
+</div></section>
+<section class="more"><h2>When the plan needs another step</h2><details><summary>A helper still needs confirmation</summary><p>Use the condition-check action to ask about the unresolved prerequisite. In the demo, choose the response you want to test. A pending answer stays pending; it does not approve work.</p></details><details><summary>The final reply or price is incomplete</summary><p>Review the saved reply. Use Confirm with helper when offered to reconfirm that helper’s tasks and approved price. A changed price, refusal or unresolved provider status remains visible rather than being treated as success.</p></details><details><summary>You need to stop or return later</summary><p>Use Stop during an inquiry to stop subsequent work. A call already submitted to the provider may continue. Use Switch report to return to saved cases. Recording progress and closing a rescue always require your confirmation.</p></details><details><summary>Read the video transcript</summary><ol id="transcript" class="transcript"></ol></details></section>
+<section class="setup" id="setup"><div><p class="eyebrow">RUN THE APP LOCALLY</p><h2>Your workspace, ready.</h2><p>From the rescue-relay-app folder, install the Python dependencies and start the server. Use a virtual environment as described in README.md. The default is Demo mode.</p></div><pre><code>python -m pip install -r requirements.txt
+python run.py
+
+# Open http://127.0.0.1:8000</code></pre><p id="offlineNote" hidden>This walkthrough is open from a file. Start the app, then open the local address above in your browser.</p></section>
+</main><footer><span>Rescue Relay · The right help. Together.</span><span>5.6.0 product demonstration · 5.4.0 tutorial</span></footer>
+<script src="walkthrough-data.js" defer></script><script src="tutorial.js" defer></script>
+</body></html>

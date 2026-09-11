@@ -1,0 +1,24 @@
+{
+  "version": "5.5.0",
+  "date": "2026-09-10",
+  "python": {
+    "passed": 560,
+    "skipped": 1,
+    "skip_reason": "OpenAI SDK not installed; package installation was unavailable in the verification environment."
+  },
+  "javascript": {
+    "passed": 67
+  },
+  "intake_browser": {
+    "assertions_passed": 7
+  },
+  "release_browser": {
+    "assertions_passed": 58
+  },
+  "browser_http_bridge": true,
+  "native_browser_origin_and_reload_verified": false,
+  "external_model_inference": false,
+  "real_phone_calls": false,
+  "new_runtime_dependencies": false,
+  "historical_media_version": "5.4.0"
+}

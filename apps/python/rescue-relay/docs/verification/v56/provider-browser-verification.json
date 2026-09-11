@@ -1,0 +1,17 @@
+{
+  "version": "5.6.0",
+  "passed": 6,
+  "checks": [
+    "No-ID readiness error says creation is unconfirmed, not rejected or ringing",
+    "Recovery review shows the saved ID/key and cancellation performs no request (replay)",
+    "Request diagnostics and long IDs reflow at 320, 390 and 1440 pixels (replay)",
+    "Known-ID pending result uses a status-check action",
+    "Recovery review shows the saved ID/key and cancellation performs no request (read)",
+    "Request diagnostics and long IDs reflow at 320, 390 and 1440 pixels (read)"
+  ],
+  "javascript_errors": [],
+  "provider_response_fixtures": true,
+  "http_bridge": true,
+  "live_calls": false,
+  "external_model_inference": false
+}
