@@ -1,0 +1,11 @@
+{
+  "name": "Acme Renovations",
+  "industry": "Home Renovation",
+  "agent_name": "Riley",
+  "qualification_questions": [
+    "What is your budget range for this project?",
+    "What is your timeline - when do you need this done?",
+    "Are you the primary decision maker, or are others involved?",
+    "What is the main outcome you are hoping to achieve?"
+  ]
+}
