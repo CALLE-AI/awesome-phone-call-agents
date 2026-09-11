@@ -193,6 +193,7 @@ class ConsentBoundary(unittest.TestCase):
             )
 
     def test_missing_consent_receipt_is_refused(self):
+        """A row that has a number but no consent names the consent gap."""
         request = VerificationRequest(
             request_id="VR-1043",
             applicant_ref="APP-8825",
@@ -207,7 +208,7 @@ class ConsentBoundary(unittest.TestCase):
                 task_spec_version=SPEC,
                 presented_token="anything",
             )
-        self.assertIn("no consent receipt", str(ctx.exception))
+        self.assertIn("no consent recorded", str(ctx.exception))
 
     def test_cancelled_request_never_authorises(self):
         request = a_request(cancelled=True)
@@ -230,6 +231,24 @@ class ConsentBoundary(unittest.TestCase):
                     task_spec_version=SPEC,
                     presented_token=empty,
                 )
+
+
+class MostActionableGapFirst(unittest.TestCase):
+    """With several gaps, name the one to fix first."""
+
+    def test_a_row_with_neither_names_the_missing_number(self):
+        request = VerificationRequest(
+            request_id="VR-1099", applicant_ref="APP-9", employer_name="Sterling Corp",
+            applicant_name="Priya Menon", consent=None, sourced=None,
+        )
+        with self.assertRaises(BoundaryError) as ctx:
+            authorize(
+                request, relationship=Relationship.EMPLOYER,
+                task_spec_version=SPEC, presented_token="",
+            )
+        message = str(ctx.exception)
+        self.assertIn("no independently sourced employer number", message)
+        self.assertNotIn("no consent recorded", message)
 
 
 class NumberHandling(unittest.TestCase):

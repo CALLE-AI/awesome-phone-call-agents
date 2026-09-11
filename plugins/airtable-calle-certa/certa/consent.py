@@ -87,16 +87,20 @@ def authorize(
     if request.cancelled:
         raise BoundaryError(f"{request.request_id}: request is cancelled")
 
-    if request.consent is None:
-        raise BoundaryError(
-            f"{request.request_id}: no consent receipt on this request"
-        )
-
+    # Order matters for the message, not the outcome: consent is consent to a
+    # *specific number* being called, so a row with no number has nothing to
+    # consent to yet. Reporting the missing consent first would send an
+    # operator to fix the wrong thing.
     if request.sourced is None:
         raise BoundaryError(
             f"{request.request_id}: no independently sourced employer number. "
             "The number on the application is never dialed, so this request is "
             "employer-unverifiable rather than ready to call."
+        )
+
+    if request.consent is None:
+        raise BoundaryError(
+            f"{request.request_id}: no consent recorded for this employer"
         )
 
     if not isinstance(relationship, Relationship):
