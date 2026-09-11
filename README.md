@@ -164,6 +164,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
 - [Kol](apps/typescript/kol/) - Evidence-gated healthcare claim-status calls with strict CALL-E structured results, independent route receipts, a fail-closed verifier, and a 640-case no-call adversarial evaluation.
 - [ReturnReady](apps/python/returnready/) - Local return-enquiry review workbench that compares recipient quotations and later corrections with written instructions, with no-call examples and explicit approval before CALL-E requests.
 - [ActionBridge](https://actionbridge.vercel.app) - Human-controlled phone-work orchestration web app that turns a bounded goal into a reviewed CALL-E call plan, with explicit confirmation, status/events, structured results and evidence; the public demo is no-call by default.
@@ -175,7 +176,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Veyra](apps/web/veyra/) - Converts a plain-language outbound process into an editable, approval-gated CALL-E campaign with fake mode enabled by default.
 
 - [CareLoop AI](apps/typescript/careloop-ai/) - Consent-gated post-consultation CALL-E follow-ups that preserve uncertain patient reports and route concerning outcomes to human clinical review, with a no-call default.
-
 - [Audition Agent](apps/python/audition-agent/) - Producer-reviewed CALL-E role-disclosure calls that collect performer interest, callback availability, and unanswered questions, with a no-call verification path.
 - [SupplyCall AI](apps/web/supplycall-ai/) - Procurement exception recovery that uses CALL-E to confirm a missing PO with the supplier, then applies deterministic resolve/escalate rules, with Vitest no-call verification.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
