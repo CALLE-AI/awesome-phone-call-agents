@@ -33,12 +33,24 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from .. import config as cfg
-from ..airtable import AirtableError, FixtureAirtable, LiveAirtable, create_base
+from ..airtable import (
+    AirtableError,
+    FieldMap,
+    FixtureAirtable,
+    LiveAirtable,
+    create_base,
+    to_row,
+)
+from ..grant import GrantError, grant_consent, revoke_consent
 from ..audit import AuditLog
 from ..runner import RunError, execute, plan
 from ..transport import FixtureTransport, LiveTransport, TransportError
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+# Recorded against every consent, so a change of wording is visible in the
+# audit chain and invalidates tokens gathered under the previous text.
+DISCLOSURE_VERSION = "voe-disclosure-2026-01"
 PANEL_DIR = Path(__file__).resolve().parent
 PLUGIN_DIR = PANEL_DIR.parent.parent
 CONSOLE = PANEL_DIR / "index.html"
@@ -102,8 +114,17 @@ def _plan_json(current) -> dict[str, Any]:
         "skipped": [
             {
                 "request_id": item.row.request.request_id or item.row.record_id,
+                "record_id": item.row.record_id,
                 "employer": item.row.request.employer_name,
                 "reason": item.reason,
+                # Only a row whose sole gap is consent can be granted from here.
+                "grantable": (
+                    item.row.request.sourced is not None
+                    and not item.row.request.cancelled
+                    and bool(item.row.request.applicant_name.strip())
+                    and bool(item.row.request.employer_name.strip())
+                    and not item.row.presented_token
+                ),
             }
             for item in current.skipped
         ],
@@ -298,6 +319,38 @@ class Panel:
         self.reconfigure()
         return dict(self.config_json(), created_base_id=base_id)
 
+    def views(self) -> list[dict[str, str]]:
+        try:
+            return self.client.views(self.table)
+        except Exception:  # noqa: BLE001 - a missing view list must not break the panel
+            return []
+
+    def _row(self, record_id: str):
+        fields = FieldMap()
+        for record in self.client.list_view(self.table, ""):
+            if record.get("id") == record_id:
+                return to_row(record, fields)
+        raise PanelError(f"no row {record_id!r} in {self.table}")
+
+    def grant(self, record_id: str) -> dict[str, Any]:
+        """Record that the applicant consented to this employer being called."""
+        try:
+            g = grant_consent(
+                self.client, self.audit, table=self.table,
+                row=self._row(record_id), disclosure_version=DISCLOSURE_VERSION,
+            )
+        except (GrantError, AirtableError) as exc:
+            raise PanelError(str(exc)) from exc
+        return {"granted": g.request_id, "receipt_id": g.receipt_id}
+
+    def revoke(self, record_id: str) -> dict[str, Any]:
+        try:
+            revoke_consent(self.client, self.audit, table=self.table,
+                           row=self._row(record_id))
+        except (GrantError, AirtableError) as exc:
+            raise PanelError(str(exc)) from exc
+        return {"revoked": record_id}
+
     def disconnect(self) -> dict[str, Any]:
         """Forget every stored credential and fall back to sample data."""
         cfg.clear(self.env_path)
@@ -379,7 +432,7 @@ def make_handler(panel: Panel):
                 if parts.path == "/api/audit":
                     return self._send(200, panel.audit_status())
                 if parts.path == "/api/config":
-                    return self._send(200, panel.config_json())
+                    return self._send(200, dict(panel.config_json(), views=panel.views()))
             except Exception as exc:  # noqa: BLE001 - reported to the operator
                 return self._send(400, {"error": str(exc)})
             return self._send(404, {"error": "not found"})
@@ -412,6 +465,21 @@ def make_handler(panel: Panel):
                     )
                 try:
                     return self._send(200, panel.apply_setup(body))
+                except PanelError as exc:
+                    return self._send(400, {"error": str(exc)})
+
+            if parts.path in ("/api/consent/grant", "/api/consent/revoke"):
+                unexpected = set(body) - {"record_id"}
+                if unexpected:
+                    return self._send(400, {"error": f"unknown fields: {sorted(unexpected)}"})
+                record_id = str(body.get("record_id") or "")
+                if not record_id:
+                    return self._send(400, {"error": "record_id is required"})
+                try:
+                    action = (
+                        panel.grant if parts.path.endswith("grant") else panel.revoke
+                    )
+                    return self._send(200, action(record_id))
                 except PanelError as exc:
                     return self._send(400, {"error": str(exc)})
 

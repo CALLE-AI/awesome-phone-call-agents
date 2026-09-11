@@ -291,6 +291,15 @@ input:focus { outline: none; border-color: var(--faint); background: var(--raise
   padding: 22px 26px; border-radius: var(--r-card);
   border: 1px solid var(--line); background: var(--raised); margin-bottom: 48px;
 }
+select {
+  font: 400 14px/1 var(--text); letter-spacing: 0.01em; color: var(--ink);
+  padding: 11px 16px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--raised); cursor: pointer;
+  transition: border-color var(--t-fast);
+}
+select:hover { border-color: var(--faint); }
+.act { display: flex; gap: 8px; margin-top: 14px; }
+.act button { padding: 8px 15px; font-size: 13px; }
 .bar .say { font-size: 14px; color: var(--muted); margin-left: auto; text-align: right; letter-spacing: 0.01em; }
 .bar .say.warn { color: var(--stop); }
 
@@ -424,6 +433,7 @@ footer .bad { color: var(--stop); }
   <div class="bar">
     <button class="primary" id="run">Run</button>
     <button id="refresh">Preview again</button>
+    <select id="viewpick" title="Which Airtable view to run"></select>
     <button class="quiet" id="open-connect">Connections</button>
     <span class="say" id="hint"></span>
   </div>
@@ -512,6 +522,7 @@ function skipRow(x) {
       <div class="rec-main">
         <div class="rec-org">${esc(x.employer)}</div>
         <p class="rec-note">${esc(x.reason)}</p>
+        ${x.grantable ? `<div class="act"><button data-grant="${esc(x.record_id)}">Record consent</button></div>` : ""}
       </div>
       <span class="tag" data-s="stop">Not called</span>
     </div>
@@ -585,6 +596,17 @@ function renderConfig(c) {
   $("f-req").value = c.requester_name || "";
   const baseLooksRight = (c.airtable_base_id || "").startsWith("app");
   $("makebase").hidden = !(c.airtable_token && !baseLooksRight);
+  const pick = $("viewpick");
+  const views = c.views || [];
+  pick.innerHTML = views.length
+    ? views.map(v => `<option${v.name === c.view ? " selected" : ""}>${esc(v.name)}</option>`).join("")
+    : `<option selected>${esc(c.view || "All rows")}</option>`;
+  if (views.length && !views.some(v => v.name === c.view)) {
+    /* The configured view no longer exists. Fall back to a real one rather
+       than failing every request with a 422. */
+    VIEW = views[0].name;
+    pick.value = VIEW;
+  }
   $("perm").textContent = c.permission_warning || "";
   $("perm").className = c.permission_warning ? "bad" : "";
   renderSteps();
@@ -682,6 +704,31 @@ async function loadAudit() {
       : `audit · CHAIN BROKEN at seq ${a.broken_at} · ${a.reason}`;
   } catch (e) { /* panel remains usable */ }
 }
+
+/* Consent is recorded, not created: the operator attests that the applicant
+   named this employer and agreed to it being contacted. */
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-grant]");
+  if (!btn) return;
+  if (!confirm(
+    "Record that the applicant consented to this employer being called?\n\n" +
+    "You are attesting that they named this employer and agreed to the contact. " +
+    "This goes into the audit record under your organisation."
+  )) return;
+  btn.disabled = true; btn.textContent = "Recording\u2026";
+  try {
+    await api("/api/consent/grant", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ record_id: btn.dataset.grant }),
+    });
+    await loadPlan(); await loadAudit();
+  } catch (e) {
+    say(e.message, true);
+    btn.disabled = false; btn.textContent = "Record consent";
+  }
+});
+
+$("viewpick").addEventListener("change", () => { VIEW = $("viewpick").value; loadPlan(); });
 
 $("refresh").addEventListener("click", loadPlan);
 

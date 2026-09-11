@@ -224,3 +224,29 @@ class BaseCreation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CountingRows(unittest.TestCase):
+    """The row count must not smuggle an invalid parameter into the request.
+
+    Asking Airtable for `fields[]=` with an empty value is rejected as an
+    unknown field name, which turned the hidden-by-filter report into a 422
+    against a real base while passing every fixture test.
+    """
+
+    def test_count_sends_no_field_selector(self):
+        seen = []
+
+        class Recording(LiveAirtable):
+            def _request(self, method, path, *, body=None):
+                seen.append(path)
+                return {"records": []}
+
+        Recording("pat_x", "appX").count_table("Verification Requests")
+        self.assertTrue(seen)
+        self.assertNotIn("fields", seen[0])
+
+    def test_scope_counts_view_and_table_separately(self):
+        client = FixtureAirtable(SCHEMA, [record()] * 7, view_records=[record()] * 2)
+        result = scope(client, "T", "V")
+        self.assertEqual((result.in_view, result.in_table, result.hidden), (2, 7, 5))

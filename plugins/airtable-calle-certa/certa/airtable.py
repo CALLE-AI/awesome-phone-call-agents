@@ -119,6 +119,8 @@ class Row:
 class AirtableClient(Protocol):
     def table_schema(self, table: str) -> list[dict[str, Any]]: ...
 
+    def views(self, table: str) -> list[dict[str, str]]: ...
+
     def list_view(self, table: str, view: str) -> list[dict[str, Any]]: ...
 
     def count_table(self, table: str) -> int: ...
@@ -200,12 +202,36 @@ class LiveAirtable:
                 return records
 
     def list_view(self, table: str, view: str) -> list[dict[str, Any]]:
-        return self._paged(table, {"view": view, "pageSize": "100"})
+        # An empty view name reads the whole table. Certa already skips rows
+        # that are not ready and says why, so a filtered view is a convenience
+        # rather than a requirement, and demanding one that does not exist yet
+        # is a dead end during setup.
+        params = {"pageSize": "100"}
+        if view:
+            params["view"] = view
+        return self._paged(table, params)
+
+    def views(self, table: str) -> list[dict[str, str]]:
+        """Views on the table, so the operator can pick one instead of typing it."""
+        payload = self._request("GET", f"/v0/meta/bases/{self.base_id}/tables")
+        for entry in payload.get("tables", []):
+            if table in (entry.get("id"), entry.get("name")):
+                return [
+                    {"id": v.get("id", ""), "name": v.get("name", "")}
+                    for v in entry.get("views", [])
+                    if v.get("type") == "grid"
+                ]
+        return []
 
     def count_table(self, table: str) -> int:
-        # `fields[]=` with no field asks for record ids only, which keeps the
-        # count cheap against the free plan's monthly call budget.
-        return len(self._paged(table, {"pageSize": "100", "fields[]": ""}))
+        """How many rows the table holds, for the hidden-by-filter report.
+
+        An earlier version asked for `fields[]=` with an empty value, hoping to
+        fetch record ids only and save bandwidth against the free plan's
+        monthly budget. Airtable rejects that as an unknown field name, so the
+        cheap count was simply a broken count. Correctness first.
+        """
+        return len(self._paged(table, {"pageSize": "100"}))
 
     def update_records(self, table: str, updates: Sequence[dict[str, Any]]) -> None:
         for start in range(0, len(updates), MAX_WRITE_BATCH):
@@ -229,6 +255,9 @@ class FixtureAirtable:
 
     def table_schema(self, table: str) -> list[dict[str, Any]]:
         return self._schema
+
+    def views(self, table: str) -> list[dict[str, str]]:
+        return [{"id": "viwFixture", "name": "Ready to verify"}]
 
     def list_view(self, table: str, view: str) -> list[dict[str, Any]]:
         return list(self._view)
