@@ -133,16 +133,19 @@ python3 scripts/map_update.py --maps-dir references/ivr-maps \
 The `tests/` directory runs the whole safe path without credentials:
 
 ```bash
-# from the repository root
+# from the repository root — one command, both suites (40 tests), zero credentials
+python3 -m unittest skills.holdfast.scripts.test_run_task skills.holdfast.tests.test_holdfast
+
+# the judge path itself
 python3 skills/holdfast/scripts/run_task.py \
   --task skills/holdfast/tests/fixtures/task.json          # dry-run preview
 python3 skills/holdfast/scripts/verify_result.py \
   --result skills/holdfast/tests/fixtures/call-success.json
-python3 skills/holdfast/tests/test_holdfast.py             # full offline suite
 ```
 
 Fixtures cover a complete task, a successful recorded-line call, a
 no-keypress call, a balance-failure start, and a result whose fields
-contradict its transcript. The test suite installs a fake `calle` executable
-and asserts it is never invoked without confirmation, so the side-effect gate
-is checked on every run.
+contradict its transcript. The suites install a fake `calle` and assert on
+its invocation log: no confirmation means zero calls, an in-flight task is
+never re-dialed (the ledger is keyed on the task, not the output directory),
+and a finished task re-dials only behind an explicit `--retry`.
