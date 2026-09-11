@@ -1,6 +1,17 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import "./App.css";
 
+function maskPhoneNumber(phone) {
+  if (!phone) return "";
+
+  const value = String(phone);
+
+  if (value.length <= 4) {
+    return "â€¢â€¢â€¢â€¢";
+  }
+
+  return `${value.slice(0, 4)}â€¢â€¢â€¢â€¢â€¢${value.slice(-4)}`;
+}
 const API_URL = "http://127.0.0.1:8000";
 
 function App() {
@@ -208,7 +219,7 @@ function App() {
         return;
       }
 
-      setMessage("Patient added successfully ✓");
+      setMessage("Patient added successfully âœ“");
 
       setNewPatientName("");
       setPatientPhone("");
@@ -283,7 +294,7 @@ function App() {
         return;
       }
 
-      setMessage("Appointment created successfully ✓");
+      setMessage("Appointment created successfully âœ“");
 
       setSelectedPatient("");
       setAppointmentDate("");
@@ -336,7 +347,7 @@ function App() {
 
     if (!isValidKenyanPhone(phone)) {
       setMessage(
-        `Invalid phone number for ${patient.name}: ${patient.phone_number}`
+        `Invalid phone number for ${patient.name}: ${maskPhoneNumber(patient.phone_number)}`
       );
       return;
     }
@@ -410,7 +421,7 @@ function App() {
         return;
       }
 
-      setCallStatus("AI call completed ✓");
+      setCallStatus("AI call completed âœ“");
 
       setMessage(
         `ClinicCall successfully contacted ${patient.name}.`
@@ -511,7 +522,7 @@ function App() {
       <aside className="sidebar">
 
         <div className="logo">
-          <div className="logo-icon">✚</div>
+          <div className="logo-icon">âœš</div>
 
           <div>
             <h2>ClinicCall</h2>
@@ -531,7 +542,7 @@ function App() {
           }
           onClick={() => setPage("Dashboard")}
         >
-          <span>⌂</span>
+          <span>âŒ‚</span>
           Dashboard
         </button>
 
@@ -543,7 +554,7 @@ function App() {
           }
           onClick={() => setPage("Appointments")}
         >
-          <span>▣</span>
+          <span>â–£</span>
           Appointments
         </button>
 
@@ -555,7 +566,7 @@ function App() {
           }
           onClick={() => setPage("Patients")}
         >
-          <span>♙</span>
+          <span>â™™</span>
           Patients
         </button>
 
@@ -567,7 +578,7 @@ function App() {
           }
           onClick={() => setPage("Call Center")}
         >
-          <span>☎</span>
+          <span>â˜Ž</span>
           Call Center
         </button>
 
@@ -576,7 +587,7 @@ function App() {
           <div className="ai-box">
 
             <div className="ai-icon">
-              ☎
+              â˜Ž
             </div>
 
             <div>
@@ -608,7 +619,7 @@ function App() {
               </span>
             </div>
 
-            <b>⌄</b>
+            <b>âŒ„</b>
 
           </div>
 
@@ -632,7 +643,7 @@ function App() {
 
             <h1>
               {page}
-              {page === "Dashboard" && " 👋"}
+              {page === "Dashboard" && " ðŸ‘‹"}
             </h1>
 
           </div>
@@ -645,7 +656,7 @@ function App() {
                 setShowPatientForm(true)
               }
             >
-              ♙ &nbsp; Add patient
+              â™™ &nbsp; Add patient
             </button>
 
             <button
@@ -686,10 +697,10 @@ function App() {
 
               {calling ? (
                 <span className="phone-pulse">
-                  ☎
+                  â˜Ž
                 </span>
               ) : (
-                "✓"
+                "âœ“"
               )}
 
             </div>
@@ -713,10 +724,8 @@ function App() {
                     callingPatient
                   ) && (
                     <>
-                      {" • "}
-                      {getPatientPhone(
-                        callingPatient
-                      )}
+                      {" â€¢ "}
+                      {maskPhoneNumber(getPatientPhone(callingPatient))}
                     </>
                   )}
 
@@ -781,14 +790,14 @@ function App() {
                     setPage("Call Center")
                   }
                 >
-                  ☎ &nbsp; Open Call Center
-                  <span>→</span>
+                  â˜Ž &nbsp; Open Call Center
+                  <span>â†’</span>
                 </button>
 
                 <div className="hero-features">
-                  <span>◉ Secure</span>
-                  <span>⚡ Fast</span>
-                  <span>✓ Reliable</span>
+                  <span>â—‰ Secure</span>
+                  <span>âš¡ Fast</span>
+                  <span>âœ“ Reliable</span>
                 </div>
 
               </div>
@@ -798,7 +807,7 @@ function App() {
                 <div className="doctor-glow"></div>
 
                 <div className="heartbeat">
-                  〰〰〰〰〰
+                  ã€°ã€°ã€°ã€°ã€°
                 </div>
 
                 <img
@@ -808,7 +817,7 @@ function App() {
                 />
 
                 <div className="phone-floating">
-                  ☎
+                  â˜Ž
                 </div>
 
               </div>
@@ -820,7 +829,7 @@ function App() {
               <div className="stat-card">
 
                 <div className="stat-icon green">
-                  ♙
+                  â™™
                 </div>
 
                 <span>
@@ -840,7 +849,7 @@ function App() {
               <div className="stat-card">
 
                 <div className="stat-icon purple">
-                  ▣
+                  â–£
                 </div>
 
                 <span>
@@ -860,7 +869,7 @@ function App() {
               <div className="stat-card">
 
                 <div className="stat-icon blue">
-                  ☎
+                  â˜Ž
                 </div>
 
                 <span>
@@ -880,7 +889,7 @@ function App() {
               <div className="stat-card">
 
                 <div className="stat-icon orange">
-                  ✓
+                  âœ“
                 </div>
 
                 <span>
@@ -910,7 +919,7 @@ function App() {
                   <div>
 
                     <h2>
-                      📅 Upcoming Appointments
+                      ðŸ“… Upcoming Appointments
                     </h2>
 
                     <p>
@@ -973,9 +982,7 @@ function App() {
                             </strong>
 
                             <span>
-                              {getPatientPhone(
-                                appointment.patient_id
-                              )}
+                              {maskPhoneNumber(getPatientPhone(appointment.patient_id))}
                             </span>
 
                           </div>
@@ -1006,8 +1013,8 @@ function App() {
                               Number(
                                 appointment.patient_id
                               )
-                              ? "☎ Calling..."
-                              : "☎ Call"}
+                              ? "â˜Ž Calling..."
+                              : "â˜Ž Call"}
                           </button>
 
                         </div>
@@ -1025,7 +1032,7 @@ function App() {
                       setPage("Appointments")
                     }
                   >
-                    View all appointments →
+                    View all appointments â†’
                   </button>
 
                 )}
@@ -1041,7 +1048,7 @@ function App() {
                   <div>
 
                     <h2>
-                      ☎ Recent Calls
+                      â˜Ž Recent Calls
                     </h2>
 
                     <p>
@@ -1111,8 +1118,7 @@ function App() {
                             </strong>
 
                             <span>
-                              {call.phone_number ||
-                                "AI Patient Call"}
+                              {maskPhoneNumber(call.phone_number) || "AI Patient Call"}
                             </span>
 
                           </div>
@@ -1125,7 +1131,7 @@ function App() {
                             {String(status)
                               .toLowerCase() ===
                             "completed"
-                              ? "✓ Completed"
+                              ? "âœ“ Completed"
                               : status}
                           </div>
 
@@ -1144,7 +1150,7 @@ function App() {
                       setPage("Call Center")
                     }
                   >
-                    View all calls →
+                    View all calls â†’
                   </button>
 
                 )}
@@ -1156,7 +1162,7 @@ function App() {
             <section className="ai-banner">
 
               <div className="ai-banner-icon">
-                ☎
+                â˜Ž
               </div>
 
               <div>
@@ -1177,7 +1183,7 @@ function App() {
                   setPage("Call Center")
                 }
               >
-                Open Call Center →
+                Open Call Center â†’
               </button>
 
             </section>
@@ -1199,7 +1205,7 @@ function App() {
               <div>
 
                 <h2>
-                  👥 Patients
+                  ðŸ‘¥ Patients
                 </h2>
 
                 <p>
@@ -1256,7 +1262,7 @@ function App() {
                     </h3>
 
                     <p>
-                      {patient.phone_number}
+                      {maskPhoneNumber(patient.phone_number)}
                     </p>
 
                     <small>
@@ -1275,8 +1281,8 @@ function App() {
                       {calling &&
                       Number(callingPatient) ===
                         Number(patient.id)
-                        ? "☎ Calling..."
-                        : "☎ Call patient"}
+                        ? "â˜Ž Calling..."
+                        : "â˜Ž Call patient"}
                     </button>
 
                   </div>
@@ -1304,7 +1310,7 @@ function App() {
               <div>
 
                 <h2>
-                  📅 Appointments
+                  ðŸ“… Appointments
                 </h2>
 
                 <p>
@@ -1368,9 +1374,7 @@ function App() {
                         </strong>
 
                         <span>
-                          {getPatientPhone(
-                            appointment.patient_id
-                          )}
+                          {maskPhoneNumber(getPatientPhone(appointment.patient_id))}
                         </span>
 
                       </div>
@@ -1401,8 +1405,8 @@ function App() {
                           Number(
                             appointment.patient_id
                           )
-                          ? "☎ Calling..."
-                          : "☎ Call patient"}
+                          ? "â˜Ž Calling..."
+                          : "â˜Ž Call patient"}
                       </button>
 
                     </div>
@@ -1428,7 +1432,7 @@ function App() {
             <div className="call-hero">
 
               <div className="big-call-icon">
-                ☎
+                â˜Ž
               </div>
 
               <div>
@@ -1462,7 +1466,7 @@ function App() {
                 <div>
 
                   <h2>
-                    📞 Patient Calling
+                    ðŸ“ž Patient Calling
                   </h2>
 
                   <p>
@@ -1522,7 +1526,7 @@ function App() {
                         </strong>
 
                         <span>
-                          {patient.phone_number}
+                          {maskPhoneNumber(patient.phone_number)}
                         </span>
 
                       </div>
@@ -1539,8 +1543,8 @@ function App() {
                         {calling &&
                         Number(callingPatient) ===
                           Number(patient.id)
-                          ? "☎ Calling..."
-                          : "☎ Call"}
+                          ? "â˜Ž Calling..."
+                          : "â˜Ž Call"}
                       </button>
 
                     </div>
@@ -1573,7 +1577,7 @@ function App() {
                 <button
                   onClick={loadCalls}
                 >
-                  ↻ Refresh
+                  â†» Refresh
                 </button>
 
               </div>
@@ -1626,8 +1630,7 @@ function App() {
                         </strong>
 
                         <span>
-                          {call.phone_number ||
-                            "AI patient call"}
+                          {maskPhoneNumber(call.phone_number) || "AI Patient Call"}
                         </span>
 
                       </div>
@@ -1673,11 +1676,11 @@ function App() {
                 setMessage("");
               }}
             >
-              ×
+              Ã—
             </button>
 
             <div className="modal-icon">
-              ♙
+              â™™
             </div>
 
             <h2>
@@ -1759,11 +1762,11 @@ function App() {
                 setMessage("");
               }}
             >
-              ×
+              Ã—
             </button>
 
             <div className="modal-icon">
-              ▣
+              â–£
             </div>
 
             <h2>
@@ -1800,8 +1803,8 @@ function App() {
                     key={patient.id}
                     value={patient.id}
                   >
-                    {patient.name} —{" "}
-                    {patient.phone_number}
+                    {patient.name} â€”{" "}
+                    {maskPhoneNumber(patient.phone_number)}
                   </option>
 
                 ))}
@@ -1860,3 +1863,6 @@ function App() {
 }
 
 export default App;
+
+
+
