@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --background: oklch(0.99 0.005 220);
+  --foreground: oklch(0.22 0.02 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 245);
+  --primary: oklch(0.47 0.10 208);
+  --primary-foreground: oklch(0.99 0.01 220);
+  --secondary: oklch(0.96 0.01 220);
+  --secondary-foreground: oklch(0.28 0.03 235);
+  --muted: oklch(0.96 0.008 220);
+  --muted-foreground: oklch(0.44 0.02 245);
+  --accent: oklch(0.93 0.03 205);
+  --accent-foreground: oklch(0.26 0.03 230);
+  --border: oklch(0.89 0.01 230);
+  --input: oklch(0.89 0.01 230);
+  --ring: oklch(0.47 0.10 208);
+
+  --verified: oklch(0.55 0.13 155);
+  --verified-foreground: oklch(0.99 0.01 150);
+  --caution: oklch(0.74 0.14 76);
+  --caution-foreground: oklch(0.24 0.05 70);
+  --destructive: oklch(0.55 0.20 27);
+  --destructive-foreground: oklch(0.99 0.01 20);
+}
+
+.dark {
+  --background: oklch(0.18 0.02 245);
+  --foreground: oklch(0.96 0.01 220);
+  --card: oklch(0.22 0.02 245);
+  --card-foreground: oklch(0.96 0.01 220);
+  --popover: oklch(0.22 0.02 245);
+  --popover-foreground: oklch(0.96 0.01 220);
+  --primary: oklch(0.72 0.11 200);
+  --primary-foreground: oklch(0.18 0.02 245);
+  --secondary: oklch(0.27 0.02 240);
+  --secondary-foreground: oklch(0.96 0.01 220);
+  --muted: oklch(0.27 0.02 240);
+  --muted-foreground: oklch(0.74 0.02 230);
+  --accent: oklch(0.30 0.03 225);
+  --accent-foreground: oklch(0.96 0.01 220);
+  --border: oklch(0.31 0.02 240);
+  --input: oklch(0.31 0.02 240);
+  --ring: oklch(0.72 0.11 200);
+
+  --verified: oklch(0.72 0.15 155);
+  --verified-foreground: oklch(0.18 0.02 150);
+  --caution: oklch(0.80 0.14 78);
+  --caution-foreground: oklch(0.20 0.04 70);
+  --destructive: oklch(0.65 0.19 27);
+  --destructive-foreground: oklch(0.15 0.02 20);
+}
+
+/* High-contrast: pure black/white ground, stronger borders. Stacks with .dark. */
+.hc {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.14 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.14 0 0);
+  --muted-foreground: oklch(0.24 0 0);
+  --border: oklch(0.30 0 0);
+  --primary: oklch(0.34 0.12 250);
+  --ring: oklch(0.34 0.12 250);
+}
+.hc.dark {
+  --background: oklch(0.10 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.10 0 0);
+  --card-foreground: oklch(1 0 0);
+  --muted-foreground: oklch(0.86 0 0);
+  --border: oklch(0.78 0 0);
+  --primary: oklch(0.82 0.13 205);
+  --ring: oklch(0.82 0.13 205);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-verified: var(--verified);
+  --color-verified-foreground: var(--verified-foreground);
+  --color-caution: var(--caution);
+  --color-caution-foreground: var(--caution-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Text-size preference (set on <html> by A11yControls) */
+html { font-size: 106.25%; } /* 17px base */
+html[data-textsize="large"] { font-size: 118.75%; }  /* 19px */
+html[data-textsize="xlarge"] { font-size: 131.25%; } /* 21px */
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    line-height: 1.2;
+  }
+  /* Always-visible, high-contrast focus — never remove outlines. */
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* Skip link for keyboard/screen-reader users. */
+  .skip-link {
+    position: absolute;
+    left: 0.5rem;
+    top: -3rem;
+    z-index: 50;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius);
+    transition: top 0.15s ease;
+  }
+  .skip-link:focus {
+    top: 0.5rem;
+  }
+}
+
+/* Respect reduced-motion globally: kill non-essential animation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Manual reduce-motion toggle mirrors the media query. */
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* The one signature motion: evidence-link highlight. */
+@keyframes evidence-pulse {
+  0% { background-color: color-mix(in oklch, var(--caution) 45%, transparent); }
+  100% { background-color: color-mix(in oklch, var(--caution) 0%, transparent); }
+}
+.evidence-flash {
+  animation: evidence-pulse 1.6s ease-out 1;
+}
