@@ -72,9 +72,8 @@ export async function reserveOutboundCall(request: OutboundCallRequest): Promise
       if (!sameIntent(existing, validated)) throw new Error("idempotency key was reused with changed details");
       return existing;
     }
-    if (registry.calls.some((call) => call.state === "unknown" && sameIntent(call, validated))) {
-      throw new Error("a matching call has an unresolved dispatch");
-    }
+    const unresolved = registry.calls.find((call) => call.state === "unknown" && sameIntent(call, validated));
+    if (unresolved) return unresolved;
     const record: RegistryRecord = {
       createdAt: new Date().toISOString(),
       idempotencyKey: validated.idempotencyKey,

@@ -4,6 +4,7 @@ import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } fro
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
+const CREATE_CALL_TIMEOUT_MS = 45_000;
 
 export async function createCalleCall(
   request: OutboundCallRequest,
@@ -12,7 +13,7 @@ export async function createCalleCall(
 ): Promise<CalleCallSnapshot> {
   const validated = validateOutboundCallRequest(request);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), CREATE_CALL_TIMEOUT_MS);
   try {
     const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
       method: "POST",

@@ -55,16 +55,18 @@ export async function POST(request: Request) {
   if (reserved.state === "accepted" && reserved.callId) {
     return NextResponse.json({ callReference: `${reserved.callId.slice(0, 14)}…`, status: "queued" }, { headers: noStoreHeaders });
   }
-  if (reserved.state === "unknown") {
-    return NextResponse.json({ error: "This call has an unresolved dispatch and was not retried" }, { status: 409, headers: noStoreHeaders });
-  }
 
+  const dispatchRequest = reserved.state === "unknown"
+    ? { ...callRequest, idempotencyKey: reserved.idempotencyKey }
+    : callRequest;
   try {
-    const result = await createCalleCall(callRequest, apiKey);
-    await recordOutboundCallResult(callRequest.idempotencyKey, { state: "accepted", callId: result.callId });
+    const result = await createCalleCall(dispatchRequest, apiKey);
+    await recordOutboundCallResult(dispatchRequest.idempotencyKey, { state: "accepted", callId: result.callId });
     return NextResponse.json({ callReference: `${result.callId.slice(0, 14)}…`, status: result.status }, { status: 201, headers: noStoreHeaders });
   } catch {
-    await recordOutboundCallResult(callRequest.idempotencyKey, { state: "unknown" }).catch(() => undefined);
-    return NextResponse.json({ error: "Call dispatch is uncertain and will not be retried automatically" }, { status: 502, headers: noStoreHeaders });
+    await recordOutboundCallResult(dispatchRequest.idempotencyKey, { state: "unknown" }).catch(() => undefined);
+    return NextResponse.json({
+      error: "CALL-E did not confirm acceptance. Review and confirm the same unchanged call again to reconcile it with the original idempotency key.",
+    }, { status: 502, headers: noStoreHeaders });
   }
 }
