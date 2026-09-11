@@ -5,6 +5,7 @@ import { resolveBriefingTask } from "@/lib/briefings/store";
 import { outboundCallPreview, type OutboundCallRequest } from "@/lib/calle/outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "@/lib/calle/registry";
 import { getRuntimeMode, requireSecret } from "@/lib/config/server";
+import { callFailureCode, writeCallLog } from "@/lib/observability/call-log";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter } from "@/lib/realtime/access";
 
 export const runtime = "nodejs";
@@ -56,18 +57,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This call conflicts with an existing or unresolved request" }, { status: 409, headers: noStoreHeaders });
   }
   if (reserved.state === "accepted" && reserved.callId) {
+    await writeCallLog({
+      destinationE164: callRequest.destinationE164,
+      event: "provider_accepted",
+      requestId: reserved.idempotencyKey,
+      source: "registry",
+    });
     return NextResponse.json({ callReference: `${reserved.callId.slice(0, 14)}…`, status: "queued" }, { headers: noStoreHeaders });
   }
 
   const dispatchRequest = reserved.state === "unknown"
     ? { ...callRequest, idempotencyKey: reserved.idempotencyKey }
     : callRequest;
+  const startedAt = Date.now();
   try {
+    await writeCallLog({
+      destinationE164: dispatchRequest.destinationE164,
+      event: "provider_request_started",
+      requestId: dispatchRequest.idempotencyKey,
+      source: "provider",
+    });
     const result = await createCalleCall(dispatchRequest, apiKey);
     await recordOutboundCallResult(dispatchRequest.idempotencyKey, { state: "accepted", callId: result.callId });
+    await writeCallLog({
+      destinationE164: dispatchRequest.destinationE164,
+      durationMs: Date.now() - startedAt,
+      event: "provider_accepted",
+      requestId: dispatchRequest.idempotencyKey,
+      source: "provider",
+    });
     return NextResponse.json({ callReference: `${result.callId.slice(0, 14)}…`, status: result.status }, { status: 201, headers: noStoreHeaders });
-  } catch {
+  } catch (cause) {
     await recordOutboundCallResult(dispatchRequest.idempotencyKey, { state: "unknown" }).catch(() => undefined);
+    await writeCallLog({
+      destinationE164: dispatchRequest.destinationE164,
+      durationMs: Date.now() - startedAt,
+      event: "provider_request_failed",
+      providerCode: callFailureCode(cause),
+      requestId: dispatchRequest.idempotencyKey,
+      source: "provider",
+    });
     return NextResponse.json({
       error: "CALL-E did not confirm acceptance. Review and confirm the same unchanged call again to reconcile it with the original idempotency key.",
     }, { status: 502, headers: noStoreHeaders });

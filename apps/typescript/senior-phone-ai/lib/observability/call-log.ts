@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { maskPhoneNumber } from "../safety/phone";
 
-const logPath = join(process.cwd(), "logs", "call-scheduler.ndjson");
+const logPath = join(process.cwd(), "logs", "call-activity.ndjson");
 
 const EVENTS = [
   "schedule_created",
@@ -24,7 +24,7 @@ export interface CallLogInput {
   readonly durationMs?: number;
   readonly event: CallLogEvent;
   readonly providerCode?: string;
-  readonly scheduleId: string;
+  readonly requestId: string;
   readonly scheduledFor?: string;
   readonly source?: "provider" | "registry";
 }
@@ -35,7 +35,7 @@ export interface CallLogEntry {
   readonly durationMs?: number;
   readonly event: CallLogEvent;
   readonly providerCode?: string;
-  readonly scheduleReference: string;
+  readonly requestReference: string;
   readonly scheduledFor?: string;
   readonly source?: "provider" | "registry";
 }
@@ -51,12 +51,16 @@ export function callFailureCode(cause: unknown): string {
   const httpStatus = /^CALL-E create status ([0-9]{3})$/.exec(cause.message)?.[1];
   if (httpStatus) return `http_${httpStatus}`;
   if (cause.message === "CALL-E redirect rejected") return "redirect_rejected";
+  const nestedCode = typeof cause.cause === "object" && cause.cause !== null && "code" in cause.cause
+    ? (cause.cause as { code?: unknown }).code
+    : undefined;
+  if (typeof nestedCode === "string") return boundedCode(nestedCode)?.toLowerCase() ?? "network_error";
   return boundedCode(cause.name)?.toLowerCase() ?? "unknown_error";
 }
 
 export function createCallLogEntry(input: CallLogInput, at = new Date().toISOString()): CallLogEntry {
   if (!EVENTS.includes(input.event)) throw new Error("invalid call log event");
-  if (!input.scheduleId) throw new Error("call log schedule identifier is required");
+  if (!input.requestId) throw new Error("call log request identifier is required");
   if (!Number.isFinite(Date.parse(at))) throw new Error("invalid call log timestamp");
   if (input.durationMs !== undefined && (!Number.isInteger(input.durationMs) || input.durationMs < 0)) {
     throw new Error("invalid call log duration");
@@ -71,7 +75,7 @@ export function createCallLogEntry(input: CallLogInput, at = new Date().toISOStr
     durationMs: input.durationMs,
     event: input.event,
     providerCode: input.providerCode ? boundedCode(input.providerCode) : undefined,
-    scheduleReference: createHash("sha256").update(input.scheduleId).digest("hex").slice(0, 12),
+    requestReference: createHash("sha256").update(input.requestId).digest("hex").slice(0, 12),
     scheduledFor: input.scheduledFor,
     source: input.source,
   };

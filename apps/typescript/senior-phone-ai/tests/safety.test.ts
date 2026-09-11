@@ -66,16 +66,17 @@ test("call scheduler logs mask destinations and hash schedule identifiers", () =
     durationMs: 123,
     event: "provider_request_failed",
     providerCode: "http_503 response details are excluded",
-    scheduleId: "private-idempotency-key",
+    requestId: "private-idempotency-key",
     scheduledFor: "2026-09-11T08:00:00.000Z",
     source: "provider",
   }, "2026-09-11T08:00:01.000Z");
   const serialized = JSON.stringify(entry);
   assert.equal(entry.destination, "[phone ending 0123]");
   assert.equal(entry.providerCode, "http_503_response_details_are_excluded");
-  assert.equal(entry.scheduleReference.length, 12);
+  assert.equal(entry.requestReference.length, 12);
   assert.doesNotMatch(serialized, /12025550123|private-idempotency-key/);
   assert.equal(callFailureCode(new Error("CALL-E create status 503")), "http_503");
+  assert.equal(callFailureCode(new Error("fetch failed", { cause: { code: "UND_ERR_CONNECT_TIMEOUT" } })), "und_err_connect_timeout");
 });
 
 test("read-only tools may run automatically while side effects may not", () => {

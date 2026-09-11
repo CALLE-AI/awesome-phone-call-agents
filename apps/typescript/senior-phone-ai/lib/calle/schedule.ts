@@ -109,7 +109,7 @@ export async function createScheduledCall(request: OutboundCallRequest, schedule
     await writeCallLog({
       destinationE164: validated.destinationE164,
       event: "schedule_created",
-      scheduleId: record.id,
+      requestId: record.id,
       scheduledFor: record.scheduledFor,
     });
     return summary(record, secret);
@@ -129,7 +129,7 @@ export async function cancelScheduledCall(id: string, secret: string): Promise<S
     const updated = existing.status === "canceled" ? existing : { ...existing, status: "canceled" as const };
     await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === id ? updated : call) });
     if (existing.status !== "canceled") {
-      await writeCallLog({ event: "schedule_canceled", scheduleId: id, scheduledFor: existing.scheduledFor });
+      await writeCallLog({ event: "schedule_canceled", requestId: id, scheduledFor: existing.scheduledFor });
     }
     return summary(updated, secret);
   });
@@ -144,12 +144,12 @@ async function claimDueCall(now: Date): Promise<{ record?: ScheduledCallRecord; 
     if (scheduledCallDispatchDecision(due.scheduledFor, now) === "expired") {
       const expired = { ...due, status: "expired" as const };
       await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? expired : call) });
-      await writeCallLog({ event: "schedule_expired", scheduleId: due.id, scheduledFor: due.scheduledFor });
+      await writeCallLog({ event: "schedule_expired", requestId: due.id, scheduledFor: due.scheduledFor });
       return { expired: true };
     }
     const claimed = { ...due, status: "claimed" as const };
     await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? claimed : call) });
-    await writeCallLog({ event: "dispatch_claimed", scheduleId: due.id, scheduledFor: due.scheduledFor });
+    await writeCallLog({ event: "dispatch_claimed", requestId: due.id, scheduledFor: due.scheduledFor });
     return { record: claimed, expired: false };
   });
 }
@@ -186,7 +186,7 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
           destinationE164: request.destinationE164,
           durationMs: Date.now() - startedAt,
           event: "provider_accepted",
-          scheduleId: claimed.record.id,
+          requestId: claimed.record.id,
           source: "registry",
         });
       } else if (reservation.state === "unknown") {
@@ -195,14 +195,14 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
           destinationE164: request.destinationE164,
           durationMs: Date.now() - startedAt,
           event: "provider_outcome_unknown",
-          scheduleId: claimed.record.id,
+          requestId: claimed.record.id,
           source: "registry",
         });
       } else {
         await writeCallLog({
           destinationE164: request.destinationE164,
           event: "provider_request_started",
-          scheduleId: claimed.record.id,
+          requestId: claimed.record.id,
           source: "provider",
         });
         const result = await createCalleCall(request, secret);
@@ -212,7 +212,7 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
           destinationE164: request.destinationE164,
           durationMs: Date.now() - startedAt,
           event: "provider_accepted",
-          scheduleId: claimed.record.id,
+          requestId: claimed.record.id,
           source: "provider",
         });
       }
@@ -224,7 +224,7 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
         durationMs: Date.now() - startedAt,
         event: "provider_request_failed",
         providerCode: callFailureCode(cause),
-        scheduleId: claimed.record.id,
+        requestId: claimed.record.id,
         source: "provider",
       });
     }

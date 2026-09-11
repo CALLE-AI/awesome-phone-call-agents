@@ -315,7 +315,7 @@ export function CallMonitor() {
           The local scheduler checks while this page is open and catches up on its next check after a restart.
           Production deployment requires the authenticated durable scheduler work tracked in SPA-011.
           Pending details are encrypted in the ignored local registry. Safe scheduler diagnostics are written
-          to <code>logs/call-scheduler.ndjson</code> with phone numbers masked.
+          to <code>logs/call-activity.ndjson</code> with phone numbers masked.
         </p>
       </section>
 
