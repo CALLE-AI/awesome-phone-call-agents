@@ -1,0 +1,1 @@
+ALTER TABLE `sourcing_requests` ADD `history_access_hash` text;

@@ -166,7 +166,7 @@ outcome.]`
 
 **Agent:** Just to recap — Northgate Digital has confirmed payment for invoice
 INV-2026-041 has been sent. If you have any questions, the team can be reached at
-accounts@devixus.example. Thank you very much for your time, Rachel. Have a good day.
+accounts@example.com. Thank you very much for your time, Rachel. Have a good day.
 
 **Client:** Thanks, bye.
 
@@ -255,7 +255,7 @@ then. Is there anything else I can help clarify?
 
 **Agent:** Just to recap — Summit Creative has committed to paying invoice INV-2026-038
 for AUD 2,200 by 31 July 2026. If you have any questions, the team can be reached at
-accounts@devixus.example. Thank you very much for your time. Have a good day.
+accounts@example.com. Thank you very much for your time. Have a good day.
 
 `[Call ends. Total duration: approximately 2 minutes 45 seconds.]`
 
@@ -338,7 +338,7 @@ reviews the correspondence and comes back to you directly with the corrected pos
 amount, citing a scope reduction agreed in May. The team will review the correspondence
 and come back to you directly. We won't be chasing further by phone until that's
 resolved. If you have any questions in the meantime, please reach us at
-accounts@devixus.example. Thank you for your time, Sandra. Have a good day.
+accounts@example.com. Thank you for your time, Sandra. Have a good day.
 
 **Client:** Thank you, I appreciate it.
 
@@ -423,7 +423,7 @@ and they'll follow up with you directly about the details.
 **Agent:** I understand, and I appreciate your honesty, David. We'll pass this back to
 the team and they'll be in touch to discuss options, including whether a payment plan is
 possible. There's no further pressure from me today. If you have any questions, the team
-can be reached at accounts@devixus.example. Thank you for your time. Have a good day.
+can be reached at accounts@example.com. Thank you for your time. Have a good day.
 
 **Client:** Thank you for being understanding. Sorry again about the delay.
 

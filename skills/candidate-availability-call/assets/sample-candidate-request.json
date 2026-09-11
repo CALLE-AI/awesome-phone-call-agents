@@ -1,0 +1,33 @@
+{
+  "request_id": "req-2026-10-06-001",
+  "candidate_name": "Jordan Lee",
+  "to_phone_e164": "+15550101337",
+  "role_label": "Product Engineer technical interview",
+  "company_name": "Example Robotics",
+  "coordinator_name": "Avery Chen",
+  "authorized_contact_reason": "Jordan opted into phone coordination for this interview loop.",
+  "interview_duration_minutes": 45,
+  "allowed_windows": [
+    {
+      "start": "2026-10-06T14:00:00-04:00",
+      "end": "2026-10-06T17:00:00-04:00"
+    },
+    {
+      "start": "2026-10-07T10:00:00-04:00",
+      "end": "2026-10-07T12:00:00-04:00"
+    }
+  ],
+  "timezone": "America/New_York",
+  "followup_channels": ["email", "sms"],
+  "voicemail_allowed": true,
+  "voicemail_message": "This is an AI phone assistant calling for Example Robotics about interview scheduling. Please reply to Avery's email with your availability.",
+  "language": "English",
+  "region": "US",
+  "candidate_context": "Fictional sample candidate for dry-run demonstration.",
+  "do_not_discuss": [
+    "compensation",
+    "immigration",
+    "protected characteristics",
+    "technical screening"
+  ]
+}

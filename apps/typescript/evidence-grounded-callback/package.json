@@ -1,0 +1,18 @@
+{
+  "name": "calle-evidence-grounded-callback",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Compile reviewed source evidence and callback consent into a guarded CALL-E MCP workflow.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "preview": "node --import tsx src/cli.ts preview --input examples/callback.example.json",
+    "verify": "npm run check && npm test && npm run preview"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

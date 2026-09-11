@@ -1,0 +1,76 @@
+{
+ "status": "completed",
+ "task_completed": true,
+ "completion_confidence": "high",
+ "summary": "The company offered a partial settlement instead of the full amount.",
+ "evidence": [
+  "Representative offered 'a goodwill credit of 60 dollars' instead of the 140 dollar refund."
+ ],
+ "structured_result": {
+  "outcome": "offer_made",
+  "status_statement": "The refund request was reviewed and a goodwill credit is offered instead.",
+  "reference_number": "EXAMPLE-REFUND-0002",
+  "representative": "Priya, Billing",
+  "commitment_action": "",
+  "commitment_by_date": "",
+  "commitment_quote": "",
+  "customer_action_required": "",
+  "offer_quote": "We can offer a goodwill credit of 60 dollars to the account today instead of the refund.",
+  "ivr_path": "1, 4",
+  "needs_human": true,
+  "needs_human_reason": "A partial offer was made; only the customer can accept or decline it."
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12125550100"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Partial credit offered; customer decision needed.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12125550100",
+     "status": "completed",
+     "started_at": "2026-09-02T09:00:10Z",
+     "completed_at": "2026-09-02T09:06:40Z",
+     "summary": "Partial credit offered; customer decision needed.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "agent",
+       "text": "Hello, I'm an AI assistant calling on behalf of Jordan Sample about refund request EXAMPLE-REFUND-0002."
+      },
+      {
+       "offset_seconds": 12,
+       "speaker": "recipient",
+       "text": "I have it here. We can offer a goodwill credit of 60 dollars to the account today instead of the refund."
+      },
+      {
+       "offset_seconds": 24,
+       "speaker": "agent",
+       "text": "Thank you. I'm not able to accept or decline offers. I'll pass the exact wording to Jordan, who will respond. Is there a reference for this offer?"
+      },
+      {
+       "offset_seconds": 36,
+       "speaker": "recipient",
+       "text": "Use EXAMPLE-REFUND-0002, it's noted on the account."
+      },
+      {
+       "offset_seconds": 48,
+       "speaker": "agent",
+       "text": "Thank you, Priya."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}

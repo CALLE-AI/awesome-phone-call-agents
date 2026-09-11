@@ -1,0 +1,20 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 144 144"
+  role="img"
+  aria-labelledby="fieldclose-mark-title"
+>
+  <title id="fieldclose-mark-title">FieldClose</title>
+  <path
+    fill="#14221d"
+    d="M26 14h82l18 18v34h-24V42H50v64h38v24H26L8 112V32z"
+  />
+  <path
+    fill="#14221d"
+    d="M58 52h36v17H75v10h17v17H75v10H58z"
+  />
+  <path
+    fill="#d65f32"
+    d="M94 106h8V94h24v18l-18 18H94z"
+  />
+</svg>

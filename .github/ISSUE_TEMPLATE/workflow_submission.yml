@@ -1,7 +1,10 @@
 name: Workflow resource submission
 description: Suggest a phone-call skill, runnable app, workflow plugin, adapter, scheduler recipe, or safety resource.
 title: "[Submission]: "
-labels: [enhancement]
+type: Task
+labels:
+  - "area:community-repo"
+  - "status:needs-triage"
 body:
   - type: input
     id: name
