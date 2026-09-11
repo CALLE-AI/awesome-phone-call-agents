@@ -150,9 +150,8 @@ function FieldRow({
   onCiteQuote: (offsetSeconds: number) => void;
   sameSentenceAs?: string;
 }) {
-  const value = field.value === null || field.value === undefined || field.value === ""
-    ? "No answer"
-    : String(field.value);
+  const raw = field.value === null || field.value === undefined || field.value === "" ? "No answer" : String(field.value);
+  const value = raw.charAt(0).toUpperCase() + raw.slice(1);
   const quote = field.quotes[0];
 
   return (

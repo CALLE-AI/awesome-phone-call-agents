@@ -4,6 +4,11 @@ import type { BatchOutcome, BatchItemResult } from "@/src/core/batch";
 import { VerificationChip } from "./verification-chip";
 import { EvidenceQuote } from "./evidence-quote";
 
+/** Present raw extracted tokens ("yes", "unknown") as sentence-case statements. */
+function sentence(v: string): string {
+  return v.length > 0 ? v.charAt(0).toUpperCase() + v.slice(1) : v;
+}
+
 function humanize(key: string): string {
   const s = key.replace(/_/g, " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -72,8 +77,9 @@ function PlaceCard({ item, isBest, rankKey }: { item: BatchItemResult; isBest: b
         </h3>
         <div className="flex items-baseline gap-3">
           {rankValue && (
-            <span className={`text-xl font-medium ${rankField?.status === "verified" ? "text-foreground" : "text-muted-foreground line-through decoration-caution"}`} title={rankField?.status === "verified" ? "verified on the call" : "not confirmed on the call"}>
-              {rankValue}
+            <span className={`text-xl font-medium ${rankField?.status === "verified" ? "text-foreground" : "text-muted-foreground"}`} title={rankField?.status === "verified" ? "verified on the call" : "not confirmed on the call"}>
+              {sentence(rankValue)}
+              {rankField?.status !== "verified" && <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-caution-foreground">unconfirmed</span>}
             </span>
           )}
           <span className="font-mono text-sm text-muted-foreground">{item.recipient.phone}</span>
@@ -86,7 +92,7 @@ function PlaceCard({ item, isBest, rankKey }: { item: BatchItemResult; isBest: b
       )}
       <dl className="mt-3 divide-y divide-border">
         {item.outcome.fields.map((field) => {
-          const value = field.value === null || field.value === "" ? "No answer" : String(field.value);
+          const value = field.value === null || field.value === "" ? "No answer" : sentence(String(field.value));
           return (
             <div key={field.key} className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
