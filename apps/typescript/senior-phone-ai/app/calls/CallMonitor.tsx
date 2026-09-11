@@ -329,7 +329,7 @@ export function CallMonitor() {
         </div>
         {calls.length ? (
           <div className="call-table-wrap">
-            <table className="call-table">
+            <table className="call-table call-history-table">
               <thead>
                 <tr><th>Started</th><th>Call</th><th>Status</th><th>Outcome</th><th>Conversation</th><th>Summary</th></tr>
               </thead>

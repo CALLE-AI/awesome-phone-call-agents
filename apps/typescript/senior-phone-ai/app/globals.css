@@ -233,7 +233,9 @@ button.danger { background: #8b372a; }
 
 .monitor-page { min-height: 100vh; padding-bottom: 96px; }
 .monitor-card,
-.monitor-transcript { margin: 54px auto 0; max-width: 1120px; }
+.monitor-transcript { margin: 54px auto 0; }
+.monitor-card { max-width: 1120px; }
+.monitor-transcript { max-width: 1500px; }
 .monitor-card {
   background: var(--card);
   border: 1px solid #cbd8cd;
@@ -290,10 +292,20 @@ button.danger { background: #8b372a; }
 .call-table td { border-bottom: 1px solid #d6ded7; padding: 16px 12px; text-align: left; vertical-align: top; }
 .call-table th { color: #526156; font-size: .82rem; text-transform: uppercase; }
 .call-table td:nth-child(1) { min-width: 180px; }
-.call-table td:nth-child(4) { min-width: 300px; }
 .call-table details summary { cursor: pointer; font-weight: 800; }
-.table-conversation { margin-top: 12px; max-height: 320px; overflow-y: auto; }
-.table-conversation p { border-left: 3px solid #d6ded7; margin: 10px 0; padding-left: 10px; }
+.call-history-table { min-width: 1400px; }
+.call-history-table th:nth-child(5),
+.call-history-table td:nth-child(5) { min-width: 560px; width: 48%; }
+.call-history-table th:nth-child(6),
+.call-history-table td:nth-child(6) { line-height: 1.6; min-width: 340px; width: 30%; }
+.table-conversation { margin-top: 16px; max-height: 520px; overflow-y: auto; padding-right: 14px; }
+.table-conversation p {
+  border-left: 3px solid #d6ded7;
+  line-height: 1.65;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+  padding: 4px 0 4px 14px;
+}
 
 @media (max-width: 760px) {
   body { font-size: 17px; }
