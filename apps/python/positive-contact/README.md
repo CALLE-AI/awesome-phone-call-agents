@@ -350,6 +350,12 @@ form so a person must see and accept the one-call statement.
 The deployment entry point seeds the full offline story and disables every operator
 mutation. It does not read `CALLE_API_KEY`, build a CALL-E transport or open the network.
 
+Hosted FastAPI demo: [positive-contact-demo.onrender.com](https://positive-contact-demo.onrender.com/)
+
+The hosted free instance may take a short time to wake after inactivity. Use the local
+fixture flow below when recording the operator authorization action; the public process
+intentionally renders no forms or action buttons.
+
 ```bash
 cd apps/python/positive-contact
 docker build -t positive-contact-demo .

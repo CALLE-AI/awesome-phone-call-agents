@@ -5,6 +5,11 @@ fit on screen. Record fixture mode only; do not place a real call for the video.
 
 ## Before recording
 
+Check the public read-only demo at
+`https://positive-contact-demo.onrender.com/`. Record the local fixture below for the
+operator authorization sequence because the public process intentionally has no forms or
+action buttons.
+
 ```bash
 cd apps/python/positive-contact
 python3 -m venv /tmp/positive-contact-venv
