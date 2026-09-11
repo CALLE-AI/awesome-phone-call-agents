@@ -1,0 +1,28 @@
+{
+  "taskCompleted": true,
+  "completionConfidence": { "score": 0.9, "label": "high" },
+  "summary": "Downtown Auto Body reports Ravi's repair is in progress, estimated ready 2026-09-11, estimated cost about $1,850. Waiting on a replacement headlight assembly. Spoke with Dana at the service desk.",
+  "evidence": [
+    "Service desk said: 'It's in progress, should be ready by Friday the eleventh.'",
+    "Service desk said: 'Estimate is around eighteen fifty.'",
+    "Service desk said: 'We're just waiting on the headlight assembly to arrive.'"
+  ],
+  "structuredResult": {
+    "work_status": "in_progress",
+    "eta_date": "2026-09-11",
+    "estimated_cost_amount": 1850,
+    "estimated_cost_currency": "USD",
+    "blockers": "Waiting on a replacement headlight assembly to arrive.",
+    "contact_name": "Dana"
+  },
+  "transcript": [
+    { "offsetSeconds": 0, "speaker": "bot", "text": "Press 2 for the service desk." },
+    { "offsetSeconds": 3, "speaker": "bot", "text": "Hi, this is an automated assistant calling on behalf of an insurer about a customer's repair status. Do you have a moment?" },
+    { "offsetSeconds": 10, "speaker": "user", "text": "Sure, this is Dana at the service desk." },
+    { "offsetSeconds": 14, "speaker": "bot", "text": "Thank you Dana. Can you tell me the status of the repair for a silver sedan, claim reference CLM-1001?" },
+    { "offsetSeconds": 21, "speaker": "user", "text": "It's in progress, should be ready by Friday the eleventh." },
+    { "offsetSeconds": 27, "speaker": "bot", "text": "Great. Do you have an estimated cost, and is anything holding it up?" },
+    { "offsetSeconds": 33, "speaker": "user", "text": "Estimate is around eighteen fifty. We're just waiting on the headlight assembly to arrive." },
+    { "offsetSeconds": 41, "speaker": "bot", "text": "Perfect, thank you. That's all I needed. Goodbye." }
+  ]
+}

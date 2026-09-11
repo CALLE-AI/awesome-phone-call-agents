@@ -1,0 +1,28 @@
+{
+  "taskCompleted": true,
+  "completionConfidence": { "score": 0.94, "label": "high" },
+  "summary": "City General Hospital billing confirmed a total of $2,450 USD for services from 2026-08-30 to 2026-08-31. An itemized bill is available on request. Spoke with Marcus in accounts.",
+  "evidence": [
+    "Billing said: 'The total on this account is two thousand four hundred and fifty dollars.'",
+    "Billing said: 'Services were on the thirtieth and thirty-first of August.'",
+    "Billing said: 'Yes, we can send an itemized statement.'"
+  ],
+  "structuredResult": {
+    "total_amount": 2450,
+    "currency": "USD",
+    "service_from_date": "2026-08-30",
+    "service_to_date": "2026-08-31",
+    "itemized_available": "Yes, available on request",
+    "contact_name": "Marcus"
+  },
+  "transcript": [
+    { "offsetSeconds": 0, "speaker": "bot", "text": "Press 3 for billing and accounts." },
+    { "offsetSeconds": 3, "speaker": "bot", "text": "Hello, this is an AI assistant calling on behalf of a patient's insurer to confirm a bill. This call is recorded. Is that okay?" },
+    { "offsetSeconds": 11, "speaker": "user", "text": "Sure, this is Marcus in accounts." },
+    { "offsetSeconds": 15, "speaker": "bot", "text": "Thank you. Can you confirm the total billed for claim reference CLM-2101?" },
+    { "offsetSeconds": 21, "speaker": "user", "text": "The total on this account is two thousand four hundred and fifty dollars." },
+    { "offsetSeconds": 28, "speaker": "bot", "text": "And the service dates, plus whether an itemized bill is available?" },
+    { "offsetSeconds": 34, "speaker": "user", "text": "Services were on the thirtieth and thirty-first of August. Yes, we can send an itemized statement." },
+    { "offsetSeconds": 42, "speaker": "bot", "text": "Perfect, thank you Marcus. Goodbye." }
+  ]
+}
