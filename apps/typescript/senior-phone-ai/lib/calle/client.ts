@@ -6,6 +6,17 @@ import { validateOutboundCallRequest, type OutboundCallRequest } from "./outboun
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
 
+export class CalleRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`CALL-E create status ${status}`);
+    this.name = "CalleRequestError";
+  }
+}
+
+export function isDefinitiveCalleRejection(cause: unknown): cause is CalleRequestError {
+  return cause instanceof CalleRequestError && cause.status >= 400 && cause.status < 500;
+}
+
 export async function createCalleCall(
   request: OutboundCallRequest,
   apiKey: string,
@@ -30,7 +41,7 @@ export async function createCalleCall(
     redirect: "manual",
   });
   if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
-  if (!response.ok) throw new Error(`CALL-E create status ${response.status}`);
+  if (!response.ok) throw new CalleRequestError(response.status);
   return parseCalleCallSnapshot(await response.json());
 }
 

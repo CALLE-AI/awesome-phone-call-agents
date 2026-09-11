@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createCalleCall } from "@/lib/calle/client";
+import { createCalleCall, isDefinitiveCalleRejection } from "@/lib/calle/client";
 import { resolveBriefingTask } from "@/lib/briefings/store";
 import { outboundCallPreview, type OutboundCallRequest } from "@/lib/calle/outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "@/lib/calle/registry";
@@ -88,15 +88,26 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ callReference: `${result.callId.slice(0, 14)}…`, status: result.status }, { status: 201, headers: noStoreHeaders });
   } catch (cause) {
-    await recordOutboundCallResult(dispatchRequest.idempotencyKey, { state: "unknown" }).catch(() => undefined);
+    const rejected = isDefinitiveCalleRejection(cause);
+    await recordOutboundCallResult(dispatchRequest.idempotencyKey, {
+      state: rejected ? "rejected" : "unknown",
+    }).catch(() => undefined);
     await writeCallLog({
       destinationE164: dispatchRequest.destinationE164,
       durationMs: Date.now() - startedAt,
-      event: "provider_request_failed",
+      event: rejected ? "provider_rejected" : "provider_request_failed",
       providerCode: callFailureCode(cause),
       requestId: dispatchRequest.idempotencyKey,
       source: "provider",
     });
+    if (rejected) {
+      const guidance = cause.status === 422
+        ? "Review the destination and call instructions, then create a new confirmation."
+        : "Review the call details and CALL-E configuration, then create a new confirmation.";
+      return NextResponse.json({
+        error: `CALL-E rejected this request (HTTP ${cause.status}). ${guidance}`,
+      }, { status: 422, headers: noStoreHeaders });
+    }
     return NextResponse.json({
       error: "CALL-E did not confirm acceptance. Review and confirm the same unchanged call again to reconcile it with the original idempotency key.",
     }, { status: 502, headers: noStoreHeaders });

@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 
 import { withFileLock } from "../storage/file-lock";
 import { callFailureCode, writeCallLog } from "../observability/call-log";
-import { createCalleCall } from "./client";
+import { createCalleCall, isDefinitiveCalleRejection } from "./client";
 import { type OutboundCallRequest, outboundCallPreview, validateOutboundCallRequest } from "./outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "./registry";
 import { scheduledCallDispatchDecision, type ScheduledCallStatus, type ScheduledCallSummary, validateScheduledFor } from "./schedule-types";
@@ -154,7 +154,7 @@ async function claimDueCall(now: Date): Promise<{ record?: ScheduledCallRecord; 
   });
 }
 
-async function finishClaim(id: string, result: { status: "accepted"; callId: string } | { status: "unknown" }): Promise<void> {
+async function finishClaim(id: string, result: { status: "accepted"; callId: string } | { status: "rejected" | "unknown" }): Promise<void> {
   await mutate(async (schedule) => {
     await writeSchedule({
       version: 1,
@@ -217,12 +217,15 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
         });
       }
     } catch (cause) {
-      await recordOutboundCallResult(request.idempotencyKey, { state: "unknown" }).catch(() => undefined);
-      await finishClaim(claimed.record.id, { status: "unknown" });
+      const rejected = isDefinitiveCalleRejection(cause);
+      await recordOutboundCallResult(request.idempotencyKey, {
+        state: rejected ? "rejected" : "unknown",
+      }).catch(() => undefined);
+      await finishClaim(claimed.record.id, { status: rejected ? "rejected" : "unknown" });
       await writeCallLog({
         destinationE164: request.destinationE164,
         durationMs: Date.now() - startedAt,
-        event: "provider_request_failed",
+        event: rejected ? "provider_rejected" : "provider_request_failed",
         providerCode: callFailureCode(cause),
         requestId: claimed.record.id,
         source: "provider",

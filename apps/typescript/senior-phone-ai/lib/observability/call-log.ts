@@ -13,6 +13,7 @@ const EVENTS = [
   "dispatch_claimed",
   "provider_request_started",
   "provider_accepted",
+  "provider_rejected",
   "provider_outcome_unknown",
   "provider_request_failed",
 ] as const;

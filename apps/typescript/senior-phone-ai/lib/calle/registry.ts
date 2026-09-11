@@ -8,7 +8,7 @@ import { withFileLock } from "../storage/file-lock";
 import { assertCalleCallId, parseCalleCallIds } from "./status";
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 
-type DispatchState = "reserved" | "accepted" | "unknown";
+type DispatchState = "reserved" | "accepted" | "rejected" | "unknown";
 
 interface RegistryRecord {
   readonly createdAt: string;
@@ -87,7 +87,7 @@ export async function reserveOutboundCall(request: OutboundCallRequest): Promise
 
 export async function recordOutboundCallResult(
   idempotencyKey: string,
-  result: { state: "accepted"; callId: string } | { state: "unknown" },
+  result: { state: "accepted"; callId: string } | { state: "rejected" | "unknown" },
 ): Promise<void> {
   await mutate(async (registry) => {
     const calls = registry.calls.map((call): RegistryRecord => call.idempotencyKey === idempotencyKey

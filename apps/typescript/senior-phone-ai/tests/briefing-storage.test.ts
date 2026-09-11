@@ -15,7 +15,7 @@ test("encrypted snapshots, daily deduplication and the CALL-E payload work toget
     const root = await mkdtemp(join(tmpdir(), 'senior-briefing-test-'));
     process.chdir(root);
     const { saveProfile, prepareProfile, readBriefingState, resolveBriefingTask, prepareDueBriefings, deleteProfile } = await import(storeUrl);
-    const { createCalleCall } = await import(clientUrl);
+    const { CalleRequestError, createCalleCall } = await import(clientUrl);
     let searches = 0;
     globalThis.fetch = async (input) => {
       assert.equal(String(input), 'https://api.openai.com/v1/responses');
@@ -43,6 +43,10 @@ test("encrypted snapshots, daily deduplication and the CALL-E payload work toget
       assert.ok(payload.task.includes('Synthetic local news'));
       assert.ok(payload.task.includes('cannot browse during this phone call'));
       assert.deepEqual(payload.recipients,[{phones:['+12025550100']}]);
+      await assert.rejects(
+        createCalleCall({destinationE164:'+12025550100',purpose:'Rejected fixture.',idempotencyKey:'fixture-rejected-1234'},process.env.CALLE_API_KEY,async ()=>Response.json({}, {status:422})),
+        (error) => error instanceof CalleRequestError && error.status === 422,
+      );
       const fresh = await prepareProfile(profile.id,true);
       assert.notEqual(fresh.id,brief.id);
       assert.ok((await resolveBriefingTask(brief.id)).includes('Synthetic local news'));

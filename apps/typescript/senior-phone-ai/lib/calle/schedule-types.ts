@@ -1,4 +1,4 @@
-export type ScheduledCallStatus = "pending" | "claimed" | "accepted" | "unknown" | "canceled" | "expired";
+export type ScheduledCallStatus = "pending" | "claimed" | "accepted" | "rejected" | "unknown" | "canceled" | "expired";
 
 export interface ScheduledCallSummary {
   readonly id: string;
