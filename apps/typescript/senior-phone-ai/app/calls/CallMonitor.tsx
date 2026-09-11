@@ -5,8 +5,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CalleCallSnapshot } from "@/lib/calle/status";
 import type { ScheduledCallSummary } from "@/lib/calle/schedule-types";
+import { toE164FromNationalNumber } from "@/lib/safety/phone";
 
 const POLL_INTERVAL_MS = 2_000;
+
+const COUNTRY_OPTIONS = [
+  { id: "au", label: "Australia", callingCode: "+61", removeTrunkPrefix: true },
+  { id: "nz", label: "New Zealand", callingCode: "+64", removeTrunkPrefix: true },
+  { id: "gb", label: "United Kingdom", callingCode: "+44", removeTrunkPrefix: true },
+  { id: "us", label: "United States / Canada", callingCode: "+1", removeTrunkPrefix: false },
+  { id: "cn", label: "China", callingCode: "+86", removeTrunkPrefix: false },
+  { id: "sg", label: "Singapore", callingCode: "+65", removeTrunkPrefix: false },
+  { id: "in", label: "India", callingCode: "+91", removeTrunkPrefix: true },
+  { id: "jp", label: "Japan", callingCode: "+81", removeTrunkPrefix: true },
+  { id: "kr", label: "South Korea", callingCode: "+82", removeTrunkPrefix: true },
+] as const;
 
 interface CallListResponse {
   readonly calls: CalleCallSnapshot[];
@@ -36,7 +49,8 @@ async function loadCalls(signal: AbortSignal): Promise<CallListResponse> {
 }
 
 export function CallMonitor() {
-  const [destinationE164, setDestinationE164] = useState("");
+  const [countryId, setCountryId] = useState("au");
+  const [nationalNumber, setNationalNumber] = useState("");
   const [purpose, setPurpose] = useState("");
   const [scheduledLocal, setScheduledLocal] = useState("");
   const [review, setReview] = useState<CallReview>();
@@ -52,10 +66,18 @@ export function CallMonitor() {
   const refresh = useCallback(() => setRefreshVersion((version) => version + 1), []);
 
   const reviewCall = (schedule: boolean) => {
-    const destination = destinationE164.trim();
     const callPurpose = purpose.trim();
-    if (!/^\+[1-9][0-9]{7,14}$/.test(destination)) {
-      setError("Enter the destination in E.164 format, such as +614XXXXXXXX.");
+    const country = COUNTRY_OPTIONS.find((option) => option.id === countryId);
+    let destination: string;
+    try {
+      if (!country) throw new Error("Choose a country or region.");
+      destination = toE164FromNationalNumber(
+        country.callingCode,
+        nationalNumber.trim(),
+        country.removeTrunkPrefix,
+      );
+    } catch {
+      setError("Enter a valid local phone number, such as 0449 852 021 for Australia.");
       return;
     }
     if (callPurpose.length > 300) {
@@ -102,7 +124,7 @@ export function CallMonitor() {
       setDispatchMessage(review.scheduledFor
         ? `Call scheduled for ${new Date(review.scheduledFor).toLocaleString()}.`
         : `CALL-E accepted ${result.callReference ?? "the call"}. Monitoring has started.`);
-      setDestinationE164("");
+      setNationalNumber("");
       setPurpose("");
       setScheduledLocal("");
       setReview(undefined);
@@ -190,16 +212,34 @@ export function CallMonitor() {
           seconds and show transcript turns as CALL-E publishes them.
         </p>
         <div className="call-form">
-          <label htmlFor="destination">Destination phone number</label>
-          <input
-            autoComplete="tel"
-            id="destination"
-            inputMode="tel"
-            onChange={(event) => { setDestinationE164(event.target.value); setReview(undefined); }}
-            placeholder="+614XXXXXXXX"
-            value={destinationE164}
-          />
-          <small>Use E.164 format: country code with a leading + and no spaces. Do not put this number in `.env.local`.</small>
+          <div className="phone-input-row">
+            <div className="phone-input-country">
+              <label htmlFor="country-code">Country or region</label>
+              <select
+                id="country-code"
+                onChange={(event) => { setCountryId(event.target.value); setReview(undefined); }}
+                value={countryId}
+              >
+                {COUNTRY_OPTIONS.map((country) => (
+                  <option key={country.id} value={country.id}>
+                    {country.label} ({country.callingCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="phone-input-number">
+              <label htmlFor="destination">Mobile or phone number</label>
+              <input
+                autoComplete="tel-national"
+                id="destination"
+                inputMode="tel"
+                onChange={(event) => { setNationalNumber(event.target.value); setReview(undefined); }}
+                placeholder="0449 852 021"
+                value={nationalNumber}
+              />
+            </div>
+          </div>
+          <small>Select the country code, then enter the local number. Spaces and a leading 0 are accepted where applicable.</small>
           <label htmlFor="purpose">Purpose of the call <span className="optional-label">(optional)</span></label>
           <textarea
             id="purpose"

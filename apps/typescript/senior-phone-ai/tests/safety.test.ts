@@ -5,7 +5,12 @@ import {
   InMemoryActionAuthorizationStore,
   type ActionRequest,
 } from "../lib/safety/authorization";
-import { assertStrictE164, maskPhoneNumber, redactPhoneNumbers } from "../lib/safety/phone";
+import {
+  assertStrictE164,
+  maskPhoneNumber,
+  redactPhoneNumbers,
+  toE164FromNationalNumber,
+} from "../lib/safety/phone";
 import { assessConversationBoundary, mayRunAutomatically } from "../lib/safety/policy";
 
 const request: ActionRequest = {
@@ -37,6 +42,13 @@ test("strict E.164 validation rejects conversational and non-ASCII forms", () =>
   ]) {
     assert.throws(() => assertStrictE164(invalid));
   }
+});
+
+test("national phone input is normalized to E.164", () => {
+  assert.equal(toE164FromNationalNumber("+61", "0449 852 021", true), "+61449852021");
+  assert.equal(toE164FromNationalNumber("+1", "(202) 555-0123"), "+12025550123");
+  assert.throws(() => toE164FromNationalNumber("61", "0449852021", true));
+  assert.throws(() => toE164FromNationalNumber("+61", "+61 449 852 021", true));
 });
 
 test("phone summaries and nested log text reveal only the last four digits", () => {

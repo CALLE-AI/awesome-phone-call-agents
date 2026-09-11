@@ -257,6 +257,7 @@ button.danger { background: #8b372a; }
 .call-form label { font-weight: 800; margin-top: 8px; }
 .optional-label { color: #53655a; font-size: .85em; font-weight: 400; }
 .call-form input,
+.call-form select,
 .call-form textarea {
   background: #fff;
   border: 1px solid #9eafa1;
@@ -264,6 +265,13 @@ button.danger { background: #8b372a; }
   color: var(--ink);
   font: inherit;
   padding: 14px 16px;
+}
+.phone-input-row { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(220px, .9fr) minmax(240px, 1.1fr); }
+.phone-input-country,
+.phone-input-number { display: grid; gap: 10px; }
+.phone-input-row label { margin-top: 8px; }
+@media (max-width: 620px) {
+  .phone-input-row { grid-template-columns: 1fr; }
 }
 .call-form button { justify-self: start; margin-top: 8px; }
 .call-form .controls { margin-top: 8px; }
