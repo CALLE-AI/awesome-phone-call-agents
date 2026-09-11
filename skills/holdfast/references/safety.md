@@ -22,7 +22,9 @@ the conflict instead of bending the rule.
   construct a number, extension, country code, or region.
 - Mask phone numbers in all user-facing summaries and in any stored artifact
   (for example `+1******0123`). Full numbers may appear only in the execution
-  payload sent to the CLI.
+  payload sent to the CLI. Run artifacts and printed reports must be masked
+  for both the destination and any provider-context data (summaries,
+  transcripts, echoed metadata) before they are stored or displayed.
 - Use only identity details the user explicitly provided for this call. Never
   invent names, dates of birth, account numbers, or answers to verification
   questions. If the callee asks for information the user did not provide, the

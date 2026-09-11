@@ -34,17 +34,50 @@ MAP_LOOKUP = SKILL_DIR / "scripts" / "map_lookup.py"
 MAP_UPDATE = SKILL_DIR / "scripts" / "map_update.py"
 VERIFY = SKILL_DIR / "scripts" / "verify_result.py"
 
-E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
 TERMINAL = {"COMPLETED", "FAILED", "NO_ANSWER", "DECLINED", "CANCELED", "CANCELLED", "VOICEMAIL", "BUSY", "EXPIRED"}
+
+PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])(?:\+?[0-9](?:[0-9\s().\-]{8,}[0-9]))(?![A-Za-z0-9])")
+
+
+def _mask_phone_match(match: re.Match) -> str:
+    digits = re.sub(r"\D", "", match.group(0))
+    if 10 <= len(digits) <= 15:
+        return mask_number("+" + digits)
+    return match.group(0)
+
+
+def mask_number(number: str) -> str:
+    return number[:2] + "*" * max(4, len(number) - 6) + number[-4:]
+
+
+def mask_sensitive(value: object, extra_targets: list[str]) -> object:
+    """Recursively mask phone numbers in provider output before it is stored
+    or displayed. Targets include every spelling of the authorized callee
+    plus any other phone-like sequence (E.164, NANP, with separators)."""
+    if isinstance(value, str):
+        masked = value
+        for target in extra_targets:
+            if len(target) >= 6:
+                masked = masked.replace(target, mask_number(target))
+        return PHONE_LIKE_RE.sub(_mask_phone_match, masked)
+    if isinstance(value, list):
+        return [mask_sensitive(item, extra_targets) for item in value]
+    if isinstance(value, dict):
+        return {key: mask_sensitive(item, extra_targets) for key, item in value.items()}
+    return value
+
+
+def callee_variants(callee: str) -> list[str]:
+    digits = re.sub(r"\D", "", callee)
+    spaced = " ".join(digits)
+    variants = {callee, digits, spaced, " ".join(callee)}
+    return [v for v in variants if len(v) >= 6]
 
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
     raise SystemExit(1)
-
-
-def mask(number: str) -> str:
-    return number[:2] + "*" * max(4, len(number) - 6) + number[-4:]
 
 
 def load_json_flexible(raw: str) -> dict:
@@ -89,7 +122,9 @@ def validate_task(task: dict) -> list[str]:
         if field not in task:
             problems.append(f"missing required field: {field}")
     if "callee" in task and not E164_RE.match(str(task["callee"])):
-        problems.append("callee must be E.164 (for example +12025550123)")
+        problems.append("callee must be strict ASCII E.164 (for example +12025550123)")
+    elif "callee" in task and not str(task["callee"]).isascii():
+        problems.append("callee must contain ASCII digits only")
     scope = task.get("authorization_scope", {})
     for key in ("may_provide", "may_confirm", "must_not"):
         if key not in scope:
@@ -167,7 +202,7 @@ def render_instructions(task: dict, map_info: dict) -> str:
 
 def print_preview(task: dict, instructions: str, map_info: dict) -> None:
     print("HoldFast plan preview (no call placed)")
-    print(f"  Callee:       {mask(str(task['callee']))}")
+    print(f"  Callee:       {mask_number(str(task["callee"]))}")
     print(f"  Goal:         {task['goal']}")
     print(f"  On behalf of: {task['user_name']}")
     print(f"  Map:          {'found (' + str(map_info.get('organization')) + ')' if map_info.get('found') else 'none; exploratory navigation'}")
@@ -194,16 +229,48 @@ def propose_observation(final: dict) -> dict:
     }
 
 
+def provider_destination(data: dict) -> str:
+    """Echoed destination from provider output, when the provider returns one."""
+    for key in ("to_phones", "to_phone", "callee", "destination"):
+        value = find_key(data, key)
+        if isinstance(value, list) and value and isinstance(value[0], str):
+            return value[0]
+        if isinstance(value, str):
+            return value
+    return ""
+
+
 def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
-    args = ["call", "start", "--to-phone", str(task["callee"]), "--goal", instructions]
+    authorized = str(task["callee"])
+    targets = callee_variants(authorized)
+    args = ["call", "start", "--to-phone", authorized, "--goal", instructions]
     if task.get("language"):
         args += ["--language", str(task["language"])]
     if task.get("region"):
         args += ["--region", str(task["region"])]
     start = run_calle(args)
-    (out_dir / "start.json").write_text(json.dumps(start, indent=2), encoding="utf-8")
+    (out_dir / "start.json").write_text(
+        json.dumps(mask_sensitive(start, targets), indent=2), encoding="utf-8"
+    )
     if not start.get("ok") or start.get("call_started") is not True:
         fail(f"call did not start: {json.dumps(start.get('error') or start, default=str)[:300]}")
+    dialed = provider_destination(start)
+    if dialed and dialed != authorized:
+        fail(
+            f"provider destination mismatch: authorized {mask_number(authorized)}, "
+            f"provider echoed {mask_number(dialed)}. Not polling; investigate before retrying."
+        )
+    (out_dir / "destination-check.json").write_text(
+        json.dumps(
+            {
+                "authorized": mask_number(authorized),
+                "provider_echo": mask_number(dialed) if dialed else "not echoed by provider",
+                "match": (dialed == authorized) if dialed else "structurally pinned (runner builds the command from the authorized number only)",
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     run_id = find_key(start, "run_id")
     if not run_id:
         fail("call started but no run_id found; check start.json and use calle call recover")
@@ -224,6 +291,7 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
             break
     if not final:
         fail("call did not reach a terminal status within the wait window; poll manually with calle call status")
+    final = mask_sensitive(final, targets)
     (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
     return final
 
@@ -236,9 +304,12 @@ def do_verify(final: dict, out_dir: Path) -> dict:
 
 
 def print_report(task: dict, final: dict, report: dict) -> None:
+    targets = callee_variants(str(task["callee"]))
     status = find_key(final, "status") or "UNKNOWN"
-    summary = find_key(final, "summary") or find_key(final, "post_summary") or "Not available"
-    transcript = find_key(final, "transcript") or "Not available."
+    summary = mask_sensitive(
+        find_key(final, "summary") or find_key(final, "post_summary") or "Not available", targets
+    )
+    transcript = mask_sensitive(find_key(final, "transcript") or "Not available.", targets)
     print()
     print("[Outcome]")
     print(report["overall"] if status == "COMPLETED" else f"failed: {status}")
@@ -253,7 +324,7 @@ def print_report(task: dict, final: dict, report: dict) -> None:
         print("  no structured fields to verify; read the transcript")
     print()
     print("[Details]")
-    print(f"  Callee Number: {mask(str(task['callee']))}")
+    print(f"  Callee Number: {mask_number(str(task["callee"]))}")
     print(f"  Call id: {find_key(final, 'call_id') or 'Not available'}")
     print()
     print("[Transcript - untrusted call data]")
@@ -301,7 +372,7 @@ def main() -> None:
         print(f"\npreview saved to {out_dir}")
         return
 
-    print(f"placing one real call to {mask(str(task['callee']))} (artifacts: {out_dir})")
+    print(f"placing one real call to {mask_number(str(task["callee"]))} (artifacts: {out_dir})")
     final = do_run(task, instructions, out_dir)
     report = do_verify(final, out_dir)
     proposal = propose_observation(final)

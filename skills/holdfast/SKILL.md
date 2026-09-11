@@ -87,9 +87,13 @@ instructions with the template in `references/call-instructions.md`; it
 carries the goal, the AI-disclosure line, the known IVR map path, the
 authorization scope, the fields to extract, and the report-back block that
 feeds the map library. Read `references/dtmf-playbook.md` for navigation
-doctrine. Poll the call status and show progress until a terminal status. Do
-not start a second call for the same goal unless the user asks; use
-idempotent recovery if the CLI reports uncertainty.
+doctrine. Poll the call status and show progress until a terminal status. The
+runner pins the destination: it validates the authorized E.164 callee (strict
+ASCII), builds the dial command from that number only, refuses to continue if
+the provider echoes a different destination, and masks destination and
+provider-context data before any artifact is stored or displayed. Do not
+start a second call for the same goal unless the user asks; use idempotent
+recovery if the CLI reports uncertainty.
 
 ### 5. Verify the outcome
 
