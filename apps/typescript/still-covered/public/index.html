@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Still Covered</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --panel-2: #1d262e; --line: #2a353f; --text: #e8eef2; --muted: #8fa0ad;
+    --green: #2ecc71; --teal: #1abc9c; --yellow: #f1c40f; --red: #e74c3c; --grey: #7f8c8d; --blue: #3498db; --violet: #9b59b6; --orange: #e67e22;
+    font-family: -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+  header .sub, .sub { color: var(--muted); font-size: 13px; font-weight: 400; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .badge.live { border-color: var(--red); color: var(--red); }
+  .badge.dry { border-color: var(--blue); color: var(--blue); }
+  .spacer { flex: 1; }
+  button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1f4d7a; border-color: #2b6ca8; }
+  button.review { background: #1f5a3a; border-color: #2a8e52; padding: 5px 10px; }
+  select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; }
+  main { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+  section h2 { margin: 0 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; grid-column: 1 / -1; }
+  @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  .kpi { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; border-left: 4px solid var(--line); }
+  .kpi .v { font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .kpi .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .kpi.green { border-left-color: var(--green); } .kpi.teal { border-left-color: var(--teal); } .kpi.yellow { border-left-color: var(--yellow); } .kpi.red { border-left-color: var(--red); } .kpi.grey { border-left-color: var(--grey); } .kpi.blue { border-left-color: var(--blue); } .kpi.orange { border-left-color: var(--orange); } .kpi.violet { border-left-color: var(--violet); }
+  .aware { background: var(--panel-2); border-radius: 10px; padding: 14px; margin-bottom: 12px; border-left: 4px solid var(--orange); }
+  .aware .big { font-size: 30px; font-weight: 700; }
+  .aware .l { color: var(--muted); font-size: 13px; }
+  .bar { display: grid; grid-template-columns: 220px 1fr 40px; gap: 10px; align-items: center; font-size: 13px; margin: 6px 0; }
+  .bar .track { background: var(--panel-2); border-radius: 6px; height: 12px; overflow: hidden; }
+  .bar .fill { height: 12px; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  .item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .item .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); min-width: 140px; padding-top: 2px; }
+  .item .k.correction_call { color: var(--red); } .item .k.exemption_packet { color: var(--green); } .item .k.navigator_callback { color: var(--yellow); } .item .k.mail_letter { color: var(--orange); }
+  .item .hp { color: var(--red); font-size: 11px; margin-left: 6px; }
+  .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .card { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; border-left: 4px solid var(--grey); }
+  .card.likely_exempt { border-left-color: var(--green); } .card.likely_meets { border-left-color: var(--teal); } .card.at_risk { border-left-color: var(--red); } .card.needs_review { border-left-color: var(--yellow); } .card.cleared_by_data { border-left-color: #16a085; } .card.declined { border-left-color: #5dade2; } .card.opted_out { border-left-color: var(--grey); } .card.identity_unconfirmed, .card.unverified { border-left-color: var(--violet); } .card.not_attempted { border-left-color: var(--orange); } .card.calling { border-left-color: var(--blue); animation: pulse 1.2s infinite; } .card.awaiting { border-left-color: var(--blue); } .card.pending { border-left-color: var(--line); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,152,219,.45); } 100% { box-shadow: 0 0 0 10px rgba(52,152,219,0); } }
+  .card .name { font-weight: 600; }
+  .card .meta { font-size: 12px; color: var(--muted); }
+  .card .why { font-size: 12px; margin-top: 6px; }
+  .card .quote { font-size: 12px; color: #c9d6e0; font-style: italic; margin-top: 4px; }
+  .card .flag { font-size: 12px; color: var(--red); margin-top: 4px; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 6px; background: rgba(127,140,141,.2); color: #b8c2c6; }
+  .pill.likely_exempt { background: rgba(46,204,113,.18); color: var(--green); } .pill.likely_meets, .pill.cleared_by_data { background: rgba(26,188,156,.18); color: var(--teal); } .pill.at_risk { background: rgba(231,76,60,.2); color: var(--red); } .pill.needs_review { background: rgba(241,196,15,.18); color: var(--yellow); } .pill.calling, .pill.awaiting, .pill.declined { background: rgba(52,152,219,.2); color: #8ec5ef; } .pill.not_attempted { background: rgba(230,126,34,.2); color: #f0b27a; } .pill.identity_unconfirmed, .pill.unverified { background: rgba(155,89,182,.2); color: #c9a3dc; }
+  .timeline { max-height: 340px; overflow: auto; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .timeline div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .timeline .t { color: var(--muted); margin-right: 8px; }
+  .timeline .error { color: var(--red); } .timeline .warning { color: var(--yellow); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .banner { grid-column: 1 / -1; background: #3a2a10; border: 1px solid #7a5a1a; color: #f3d9a4; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  footer { padding: 10px 20px 24px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Still Covered <span class="sub">Medicaid work-requirement exemption screener on CALL-E</span></h1>
+    <div class="sub" id="headline">No campaign yet</div>
+  </div>
+  <span class="badge" id="mode">mode</span>
+  <span class="badge" id="conn">connecting</span>
+  <div class="spacer"></div>
+  <select id="campaign"><option value="">Load past campaign...</option></select>
+  <select id="registry"></select>
+  <button class="primary" id="start">Start drill (dry-run)</button>
+  <button id="reportBtn">Outreach report</button>
+</header>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="banner" id="banner" hidden></div>
+  <section>
+    <h2>What the calls found</h2>
+    <div class="aware" id="aware"></div>
+    <div id="found"></div>
+    <h2 style="margin-top:16px">By language</h2>
+    <div id="langs"></div>
+  </section>
+  <section>
+    <h2>Worklist <span class="sub">(nothing changes anyone's coverage until a caseworker reviews it)</span></h2>
+    <div id="work"><div class="empty">Nothing yet.</div></div>
+  </section>
+  <section style="grid-column: 1 / -1;">
+    <h2>People</h2>
+    <div class="people" id="people"><div class="empty">Load or start a campaign.</div></div>
+  </section>
+  <section style="grid-column: 1 / -1;">
+    <h2>Live timeline <span class="sub">(ledger stream; phone numbers masked)</span></h2>
+    <div class="timeline" id="timeline"></div>
+  </section>
+</main>
+<footer>Dry-run drills simulate conversations with the local fake CALL-E server. Live campaigns are started only from the command line with <code>--confirm</code>. The agent never says anyone is exempt; the code decides "may qualify" and a caseworker confirms.</footer>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let token = new URLSearchParams(location.search).get("token") || null;
+  try { if (token) localStorage.setItem("sc_token", token); else token = localStorage.getItem("sc_token"); } catch (e) { /* storage unavailable */ }
+  const withToken = (url) => token ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token) : url;
+  const api = (url, opts) => fetch(withToken(url), Object.assign({ headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}) }, opts || {}));
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmtSec = (s) => s == null ? "-" : s < 90 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s";
+  const LABEL = { cleared_by_data: "cleared by data", likely_exempt: "may qualify", likely_meets: "may meet rule", at_risk: "at risk", needs_review: "needs review", declined: "call later", opted_out: "opted out", identity_unconfirmed: "identity unconfirmed", unreachable: "not reached", unverified: "call unfinished", not_attempted: "not attempted", calling: "calling", awaiting: "awaiting", pending: "pending" };
+  function render(state) {
+    const k = state.kpis || {};
+    $("headline").textContent = state.campaign ? `${state.campaign.title} - ${state.stateName || ""} - calls on behalf of ${state.callerOrg || ""}${state.running ? " - campaign in progress" : ""}` : "No campaign yet";
+    const mode = state.mode || "dry-run";
+    $("mode").textContent = mode; $("mode").className = "badge " + (mode === "live" ? "live" : "dry");
+    const answered = (k.awareYes || 0) + (k.awareNo || 0);
+    const notScreened = (k.unreachable || 0) + (k.identityUnconfirmed || 0) + (k.unverified || 0) + (k.declined || 0) + (k.optedOut || 0) + (k.notAttempted || 0);
+    $("kpis").innerHTML = [
+      ["blue", k.people ?? 0, "on the outreach list"],
+      ["teal", k.cleared ?? 0, "cleared by state data, no call"],
+      ["blue", k.screened ?? 0, "screened by phone"],
+      ["orange", answered ? `${k.awareNo}/${answered}` : "-", "had not heard of the rule"],
+      ["green", k.likelyExempt ?? 0, "may qualify for an exemption"],
+      ["teal", k.likelyMeets ?? 0, "may already meet the rule"],
+      ["red", k.atRisk ?? 0, "at risk of losing coverage"],
+      ["yellow", k.needsReview ?? 0, "need a navigator's review"],
+      ["grey", notScreened, "not screened yet"],
+      ["violet", k.work ?? 0, `worklist items (${k.workNeedsReview ?? 0} to review)`],
+      ["blue", k.calls ?? 0, "CALL-E calls"],
+      ["blue", fmtSec(k.lastResultSeconds), "time to last result"],
+    ].map(([c, v, l]) => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+    const failed = (state.failedWaves || []).length, pendingCalls = k.pendingCalls || 0;
+    const showBanner = !state.running && (failed > 0 || pendingCalls > 0);
+    $("banner").hidden = !showBanner;
+    if (showBanner) $("banner").textContent = `Incomplete: ${pendingCalls} call(s) still pending, ${failed} task(s) not accepted by CALL-E. Nothing is inferred about people who were never dialled. Run: still-covered resume --campaign-id ${state.campaign ? state.campaign.id : ""}`;
+    $("aware").innerHTML = answered ? `<div class="big">${k.awareNo} of ${answered}</div><div class="l">people who answered had <b>not</b> heard of the rule before this call. In Arkansas in 2018, a third never had, and 18,000 lost coverage.</div>` : `<div class="l">Awareness appears here as people answer.</div>`;
+    const outcomes = [["May qualify for an exemption", k.likelyExempt, "var(--green)"], ["May already meet the rule", k.likelyMeets, "var(--teal)"], ["At risk", k.atRisk, "var(--red)"], ["Needs a navigator's review", k.needsReview, "var(--yellow)"], ["Cleared by state data", k.cleared, "#16a085"], ["Not screened yet", notScreened, "var(--grey)"]];
+    const max = Math.max(1, ...outcomes.map((o) => o[1] || 0));
+    const ex = state.exemptionCounts || [];
+    $("found").innerHTML = outcomes.map(([l, v, c]) => `<div class="bar"><span>${l}</span><div class="track"><div class="fill" style="width:${Math.round(((v || 0) / max) * 100)}%;background:${c}"></div></div><span>${v || 0}</span></div>`).join("")
+      + (ex.length ? `<h2 style="margin-top:14px">Exemptions</h2>` + ex.map((e) => `<div class="bar"><span>${esc(e.label)}</span><div class="track"><div class="fill" style="width:${Math.round(((e.fromCalls + e.fromData) / max) * 100)}%;background:var(--green)"></div></div><span>${e.fromCalls + e.fromData}</span></div>`).join("") : "");
+    const langs = state.languages || [];
+    $("langs").innerHTML = langs.length ? `<table><tr><th>Language</th><th>On list</th><th>Screened</th><th>Had not heard</th></tr>${langs.map((l) => `<tr><td>${esc(l.language)}</td><td>${l.people}</td><td>${l.screened}</td><td>${l.notAware}</td></tr>`).join("")}</table>` : '<div class="empty">No campaign yet.</div>';
+    const work = (state.work || []).slice().sort((a, b) => (b.highPriority - a.highPriority) || (b.kind === "correction_call") - (a.kind === "correction_call"));
+    $("work").innerHTML = work.length === 0 ? '<div class="empty">Nothing yet.</div>' : work.map((w) => `<div class="item"><span class="k ${w.kind}">${w.kind.replace(/_/g, " ")}${w.highPriority ? '<span class="hp">high</span>' : ""}</span><span style="flex:1">${esc(w.summary)}${w.checklist && w.checklist.length ? `<div class="sub">${w.checklist.map(esc).join(" / ")}</div>` : ""}</span>${w.needsHumanReview ? (w.reviewedAt ? '<span class="pill likely_exempt">reviewed</span>' : `<button class="review" data-id="${w.id}">Review</button>`) : ""}</div>`).join("");
+    for (const b of document.querySelectorAll("button.review")) b.onclick = () => api(`/api/work/${b.dataset.id}/review`, { method: "POST" });
+    const people = state.people || [];
+    $("people").innerHTML = people.length === 0 ? '<div class="empty">Load or start a campaign.</div>' : people.map((p) => {
+      const s = p.status || "pending";
+      return `<div class="card ${s}"><div class="name">${esc(p.name)}<span class="pill ${s}">${LABEL[s] || s}</span></div>
+        <div class="meta">${esc(p.maskedPhone)} - ${esc(p.language)} - check ${esc(p.checkDate || "unknown")}${p.daysToCheck != null ? ` (${p.daysToCheck} days)` : ""} - calls ${p.attempts}</div>
+        ${p.exemptions && p.exemptions.length ? `<div class="why"><b>${esc(p.exemptions.join("; "))}</b></div>` : ""}
+        ${p.reasons && p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}
+        ${p.awareBefore ? `<div class="meta">had heard of the rule: ${esc(p.awareBefore)}</div>` : ""}
+        ${(p.evidence || []).slice(-2).map((q) => `<div class="quote">"${esc(q)}"</div>`).join("")}
+        ${p.correctionNeeded ? `<div class="flag">Agent said more than the answers support: correction call queued</div>` : ""}
+        ${p.nextAction ? `<div class="meta">next: ${esc(p.nextAction.type)}${p.preferredCallback ? ` - prefers ${esc(p.preferredCallback)}` : ""}</div>` : ""}
+      </div>`;
+    }).join("");
+    const tl = state.timeline || [];
+    $("timeline").innerHTML = tl.slice(-150).reverse().map((e) => `<div class="${e.level}"><span class="t">${e.at.slice(11, 19)}</span>${esc(e.message)}</div>`).join("");
+  }
+  function connect() {
+    const es = new EventSource(withToken("/api/stream"));
+    es.addEventListener("state", (e) => render(JSON.parse(e.data)));
+    es.onopen = () => { $("conn").textContent = "live"; };
+    es.onerror = () => { $("conn").textContent = "reconnecting"; };
+  }
+  async function loadLists() {
+    try {
+      const r = await api("/api/registries"); const body = await r.json();
+      $("registry").innerHTML = (body.registries || []).map((n) => `<option value="${esc(n)}">${esc(n.replace("enrollees.", "").replace(".csv", ""))} list</option>`).join("");
+      if (!body.canDrill) { $("start").disabled = true; $("start").textContent = "Drills disabled (live mode)"; }
+    } catch (e) { /* ignore */ }
+    try {
+      const r = await api("/api/campaigns"); const body = await r.json();
+      $("campaign").innerHTML = '<option value="">Load past campaign...</option>' + (body.campaigns || []).map((c) => `<option value="${esc(c.campaignId)}">${esc(c.title || c.campaignId)} (${c.updatedAt.slice(0, 16).replace("T", " ")})</option>`).join("");
+    } catch (e) { /* ignore */ }
+  }
+  $("campaign").onchange = async () => { if ($("campaign").value) await api("/api/load", { method: "POST", body: JSON.stringify({ campaignId: $("campaign").value }) }); };
+  $("reportBtn").onclick = () => window.open(withToken("/api/report"), "_blank");
+  $("start").onclick = async () => {
+    $("start").disabled = true;
+    try {
+      const r = await api("/api/run", { method: "POST", body: JSON.stringify({ registry: $("registry").value || undefined }) });
+      const body = await r.json();
+      if (!r.ok) alert(body.error || "could not start");
+      setTimeout(loadLists, 4000);
+    } finally { setTimeout(() => { $("start").disabled = false; }, 3000); }
+  };
+  api("/api/state").then((r) => r.json()).then(render).catch(() => undefined);
+  loadLists();
+  connect();
+})();
+</script>
+</body>
+</html>

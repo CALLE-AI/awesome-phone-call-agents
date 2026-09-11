@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { join } from "node:path";
+import { test } from "node:test";
+import { dialAllowed, loadConfig } from "../src/config.js";
+import { CallInbox } from "../src/orchestrator.js";
+import { formatWindow, isQuietNow, parseQuietHours } from "../src/quiet-hours.js";
+import { startServer } from "../src/server.js";
+
+test("quiet hours default to 21:00-08:00 and wrap midnight", () => {
+  const config = loadConfig({});
+  assert.equal(formatWindow(config.quietHours), "21:00-08:00");
+  const window = parseQuietHours("21:00-08:00");
+  assert.equal(isQuietNow(new Date("2026-09-14T22:30:00Z"), window, "UTC"), true);
+  assert.equal(isQuietNow(new Date("2026-09-14T07:59:00Z"), window, "UTC"), true);
+  assert.equal(isQuietNow(new Date("2026-09-14T12:00:00Z"), window, "UTC"), false);
+  assert.equal(isQuietNow(new Date("2026-09-14T12:00:00Z"), window, "America/New_York"), false);
+  assert.equal(isQuietNow(new Date("2026-09-15T02:00:00Z"), window, "America/New_York"), true, "10 p.m. in New York");
+});
+
+test("configuration refuses unsafe values", () => {
+  assert.throws(() => loadConfig({ SC_MAX_ATTEMPTS: "4" }), /at most three calls/);
+  assert.throws(() => loadConfig({ SC_MODE: "maybe" }));
+  assert.throws(() => loadConfig({ SC_LIVE_ALLOWLIST: "415-555-0100" }));
+  assert.equal(loadConfig({}).mode, "dry-run", "dry-run is the default");
+});
+
+test("in a live rehearsal only allowlisted numbers can be dialled", () => {
+  const live = loadConfig({ SC_MODE: "live", CALLE_API_KEY: "k", SC_LIVE_ALLOWLIST: "+14155550301" });
+  assert.equal(dialAllowed(live, "+14155550301"), true);
+  assert.equal(dialAllowed(live, "+14155550302"), false);
+  assert.equal(dialAllowed(loadConfig({ SC_MODE: "live", CALLE_API_KEY: "k" }), "+14155550302"), true);
+  assert.equal(dialAllowed(loadConfig({ SC_LIVE_ALLOWLIST: "+14155550301" }), "+14155550302"), true, "dry-run never dials anyone anyway");
+});
+
+test("a public URL forces a dashboard token; the webhook stays open, everything else is closed", async () => {
+  const config = loadConfig({ SC_MODE: "dry-run", SC_PORT: "0", SC_PUBLIC_URL: "https://example-tunnel.ngrok.app" });
+  assert.ok(config.dashboardToken && config.dashboardToken.length >= 20);
+  const server = await startServer({ config, inbox: new CallInbox(), publicDir: join(process.cwd(), "public") });
+  try {
+    assert.equal((await fetch(`${server.url}/api/state`)).status, 401);
+    assert.equal((await fetch(`${server.url}/`)).status, 401);
+    assert.equal((await fetch(`${server.url}/api/work/x/review`, { method: "POST" })).status, 401);
+    assert.equal((await fetch(`${server.url}/api/state?token=${config.dashboardToken}`)).status, 200);
+    assert.equal((await fetch(`${server.url}/api/state`, { headers: { authorization: `Bearer ${config.dashboardToken}` } })).status, 200);
+    const webhook = await fetch(`${server.url}/calle/webhook`, { method: "POST", headers: { "content-type": "application/json", "CALL-E-Event-Id": "evt_open" }, body: JSON.stringify({ id: "evt_open", type: "call.completed", data: { id: "call_x" } }) });
+    assert.equal(webhook.status, 200);
+  } finally {
+    await server.close();
+  }
+});
