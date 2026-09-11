@@ -99,7 +99,11 @@ def main(argv=None) -> int:
 
     pg = sub.add_parser("gate", help="gate a call plan JSON")
     pg.add_argument("plan", help="path to call plan JSON")
-    pg.add_argument("--execute", action="store_true", help="place real calls (requires CALLE_API_KEY + E.164)")
+    pg.add_argument("--execute", action="store_true", dest="execute",
+                    help="place real calls (requires CALLE_API_KEY + E.164)")
+    pg.add_argument("--dry-run", action="store_false", dest="execute",
+                    help="gate only; do not place calls (default)")
+    pg.set_defaults(execute=False)
     pg.add_argument("--agent-id", default="sched_agent_01")
     pg.set_defaults(func=cmd_gate)
 

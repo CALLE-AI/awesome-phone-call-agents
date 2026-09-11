@@ -1,6 +1,6 @@
 {
   "task": "Confirm Tuesday 2:00 PM appointment for patient #4471; if they cannot make it, offer the next open slot and update the record. Identify yourself as the clinic's scheduling assistant.",
-  "phones": ["+12025550146"],
+  "phones": ["+155****4567"],
   "region": "US",
   "locale": "en-US",
   "estimated_cost": 1.0,

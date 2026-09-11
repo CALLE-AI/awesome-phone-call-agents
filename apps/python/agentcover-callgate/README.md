@@ -89,7 +89,8 @@ CALLE_API_KEY=... python -m agentcover_callgate gate examples/appointment.json -
 
 - ✅ Shows the gating *shape* (binding, scope, budget, kill switch, approval).
 - ✅ Calls the real `calle-ai` SDK at runtime (offline via MockTransport).
-- ✅ 6 tests pass (allow / block-verb / block-recipient / budget / kill / E.164).
+- ✅ 10 tests pass (allow / block-verb / block-recipient / budget / kill /
+  E.164 / official-origin enforcement / live non-E.164 blocking).
 - ❌ **Not** a production system of record. The audit trail is in-memory and
   experimental; it is **not immutable and not claims-ready**.
 - ❌ **Not** an insurance product. `insurance.report()` is a demo summary, not

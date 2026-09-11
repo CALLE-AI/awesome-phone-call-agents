@@ -91,6 +91,34 @@ class TestGate(unittest.TestCase):
         self.assertFalse(is_e164("+1 555 123 4567"))   # spaces
         self.assertFalse(is_e164("+abc"))              # letters
 
+    def test_constructor_rejects_non_official_origin(self):
+        with self.assertRaises(ValueError):
+            g = AgentCoverCallGate(
+                agent_id="a", user_id="u", base_url="https://evil.example")
+
+    def test_injected_client_must_use_official_origin(self):
+        from calle import CalleClient
+        bad = CalleClient(api_key="not-a-secret",
+                          base_url="https://evil.example")
+        with self.assertRaises(ValueError):
+            AgentCoverCallGate(
+                agent_id="a", user_id="u", calle_client=bad,
+                offline=False)
+
+    def test_live_dispatch_blocks_non_e164_before_sdk(self):
+        g = gate(offline=False)   # no key -> mock transport, but "live" path
+        plan = CallPlan(
+            task="Hi.",
+            phones=["647-555-0101"],  # not strict E.164
+            region="US", locale="en-US", estimated_cost=1.0,
+            idempotency_key="t_badnum",
+        )
+        res = g.gate(plan, execute=True)
+        self.assertEqual(res.outcome, "blocked_scope")
+        self.assertIn("strict E.164", res.reason)
+        events = [e["event_type"] for e in g.protocol.audit._entries]
+        self.assertIn("call_blocked_bad_number", events)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -5,7 +5,7 @@ scheduling recipients / regions, with bounded params and a per-call cost cap.
 PHI is never part of the scope — the call *content* is the agent's job; the
 protocol bounds *whether* and *to whom* the agent may dial.
 """
-from safety_protocol.core import ScopeRule
+from ._engine import ScopeRule
 
 # Closed action vocabulary — an unregistered verb is blocked before any rule.
 ALLOWED_VERBS = ["run_call"]

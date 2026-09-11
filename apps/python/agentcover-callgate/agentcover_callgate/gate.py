@@ -16,6 +16,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 from calle import CalleClient
 
@@ -45,6 +46,20 @@ def is_e164(phone: str) -> bool:
 def _fp(phone: str) -> str:
     """Fingerprint a phone number — never store it in the clear."""
     return "fp:" + hashlib.sha256(phone.strip().encode()).hexdigest()[:16]
+
+
+def _client_uses_official_origin(client: CalleClient) -> bool:
+    """True only if the client's underlying transport targets the official origin."""
+    inner = getattr(client, "_client", None)
+    base_url = getattr(inner, "base_url", None) if inner is not None else None
+    if base_url is None:
+        return False
+    try:
+        actual = urlparse(str(base_url))
+        official = urlparse(OFFICIAL_CALLE_BASE_URL)
+        return (actual.scheme, actual.netloc) == (official.scheme, official.netloc)
+    except ValueError:
+        return False
 
 
 @dataclass
@@ -123,6 +138,12 @@ class AgentCoverCallGate:
 
         self._api_key = api_key or os.environ.get("CALLE_API_KEY")
         if calle_client is not None:
+            if not _client_uses_official_origin(calle_client):
+                raise ValueError(
+                    f"Injected CALLE client must target the official origin "
+                    f"{OFFICIAL_CALLE_BASE_URL}; credentials must never be "
+                    f"sent to a custom or http base URL"
+                )
             self.calle = calle_client
         elif offline or self._api_key is None:
             # Real SDK client, but with a mock transport so nothing hits the
@@ -165,6 +186,19 @@ class AgentCoverCallGate:
         """
         results = []
         for phone in plan.phones:
+            # Live dispatch: refuse any recipient that is not strict E.164
+            # before any scope/budget processing or SDK interaction.
+            if execute and not self.offline and not is_e164(phone):
+                self.protocol.audit.append(
+                    "call_blocked_bad_number", self.agent_id,
+                    {"target": _fp(phone)})
+                results.append(GateResult(
+                    outcome="blocked_scope",
+                    request_id=plan.idempotency_key,
+                    reason=f"refusing live dispatch: recipient {phone!r} "
+                           f"is not strict E.164",
+                ))
+                continue
             req = ActionRequest(
                 action_type="run_call",
                 target=f"calle:call:{_fp(phone)}",
@@ -210,7 +244,8 @@ class AgentCoverCallGate:
     def _dispatch(self, plan: CallPlan, phone: str) -> dict:
         """Call the real CALL-E SDK. Returns the structured call result.
 
-        Live recipients must be strict E.164. Use only the official origin.
+        Live recipients are guaranteed strict E.164 by the gate (see ``gate``);
+        this check is a defensive backstop. Use only the official origin.
         """
         # In offline/demo mode the "phone" may be a masked placeholder; the
         # mock transport never dials. For a REAL call we require strict E.164.

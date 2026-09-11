@@ -3,7 +3,6 @@
 # Uses the real `calle-ai` SDK with a MockTransport — no network, no real call.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-export SAFETY_PROTOCOL_SRC="${SAFETY_PROTOCOL_SRC:-C:/Users/michael/safety-protocol/src}"
 cd "$HERE"
 echo ">> running demo (offline, real SDK via MockTransport)"
 python -m agentcover_callgate demo

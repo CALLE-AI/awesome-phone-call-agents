@@ -1,7 +1,7 @@
 [project]
 name = "agentcover-callgate"
 version = "0.1.0"
-description = "Bounded-autonomy gateway that wraps every CALL-E phone call in the safety_protocol enforcement layer."
+description = "Bounded-autonomy gateway that wraps every CALL-E phone call in a vendored in-memory enforcement layer (scope allowlist, budget, kill switch)."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
