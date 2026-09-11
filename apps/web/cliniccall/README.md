@@ -1,6 +1,6 @@
 # ClinicCall
 
-ClinicCall is an AI-powered clinic appointment reminder and calling interface. It helps clinics manage patients, appointments, and appointment reminders from one dashboard.
+ClinicCall is an automated clinic appointment reminder and calling interface. It helps clinics manage patients, appointments, and appointment reminders from one dashboard.
 
 ## Features
 
@@ -9,9 +9,9 @@ ClinicCall is an AI-powered clinic appointment reminder and calling interface. I
 * Appointment reminder call interface
 * Call history
 * Phone-number masking in the interface
-* Demo mode for testing without real phone calls
+* Credential-free demo mode
 * React + Vite frontend
-* Optional CALL-E integration for real calls
+* Optional CALL-E integration for real outbound calls
 
 ## Project Structure
 
@@ -104,7 +104,7 @@ In demo mode, starting a patient call simulates the call and records it in call 
 
 ## API Endpoints
 
-The demo backend provides:
+The backend provides:
 
 * `GET /` — API status
 * `GET /patients` — list patients
@@ -116,21 +116,44 @@ The demo backend provides:
 
 ## Real CALL-E Mode
 
-Real CALL-E calling can be enabled by setting:
+ClinicCall also supports real outbound CALL-E calls.
+
+To enable real calling:
 
 ```text
 CLINICCALL_DEMO_MODE=false
 ```
 
-and providing the required CALL-E API credentials through environment variables.
+and provide the required CALL-E API credentials through environment variables.
 
 **Never commit API keys, tokens, passwords, or other secrets to the repository.**
 
-Real calling also depends on CALL-E supporting the destination phone number, language, region, and account configuration.
+Real calling depends on CALL-E supporting the destination phone number, language, region, and account configuration.
+
+### Live CALL-E verification
+
+The ClinicCall CALL-E integration has been successfully verified with a **live outbound demonstration call** using CALL-E's designated US testing hotline.
+
+The verification confirmed that:
+
+* the outbound call completed successfully;
+* the ClinicCall agent introduced itself as an automated clinic appointment reminder;
+* the recipient confirmed that they could hear the agent clearly;
+* the agent completed the requested demonstration conversation and ended the call;
+* CALL-E reported the call as `completed`;
+* CALL-E reported the task as completed with high confidence.
+
+The live test returned a **0.93 (high)** completion-confidence score and no failure code or failure message.
+
+The US testing route was used because outbound calls to Kenya are currently restricted by CALL-E.
+
+No API credentials are included in this repository.
 
 ## Privacy
 
-Patient phone numbers are masked in the user interface and application logs. Example:
+Patient phone numbers are masked in the user interface and application logs.
+
+Example:
 
 ```text
 +2547•••••5678
@@ -147,3 +170,20 @@ npm run build
 ```
 
 For the demo backend, verify that the API starts successfully and that the demo call flow works without CALL-E credentials.
+
+For real CALL-E testing, use valid CALL-E credentials supplied through environment variables and a destination supported by the CALL-E account.
+
+The live CALL-E integration has been separately verified using CALL-E's designated US testing route.
+### Reproducing the live CALL-E test
+
+To reproduce the live integration test:
+
+1. Set `CLINICCALL_DEMO_MODE=false`.
+2. Provide a valid CALL-E API key through the `CALLE_API_KEY` environment variable.
+3. Use CALL-E's designated US testing hotline as the destination.
+4. Use the `US` region and `en-US` locale.
+5. Start the outbound reminder call through the ClinicCall backend.
+
+API credentials must be supplied by the tester and must not be committed to the repository.
+
+
