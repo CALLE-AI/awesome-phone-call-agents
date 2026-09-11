@@ -119,6 +119,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`quantum-emergency-sentinel`](skills/quantum-emergency-sentinel/) - Emergency phone triage and NIST FIPS 204 ML-DSA-65 post-quantum key rotation during quantum Shor factoring threats.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
@@ -166,6 +167,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [OmniCall Quantum Sentinel](https://github.com/elon00/omnicall-quantum-sentinel) - Autonomous CALL-E emergency voice incident responder and NIST FIPS 204 post-quantum key rotation console during Shor factorization threats. [Live Demo](https://elon00.github.io/omnicall-quantum-sentinel/)
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
 - [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
