@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-11
 
-Implementation is in progress. MVP: **10/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **11/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-012](#spa-012), now that durable reminder delivery in SPA-011 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-013](#spa-013), now that post-call finalization in SPA-012 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -61,8 +61,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Done | [SPA-009](#spa-009), [SPA-010](#spa-010) |
-| [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Ready | [SPA-007](#spa-007), [SPA-009](#spa-009) |
-| [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
+| [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Done | [SPA-007](#spa-007), [SPA-009](#spa-009) |
+| [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Ready | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Backlog | [SPA-013](#spa-013) |
 | [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Backlog | [SPA-014](#spa-014) |
 | [SPA-004](#spa-004) | Connect Twilio inbound SIP and SMS and pass the live phone gate | M3 | High | Backlog | [SPA-015](#spa-015) |
@@ -258,13 +258,13 @@ Implementation notes and verification: The local operator supports one-time CALL
 
 Generate a brief summary from actual conversation/tool outcomes after a call.
 Acceptance criteria:
-- [ ] Include only grounded information and saved/confirmed actions; distinguish failed or pending actions.
-- [ ] Send concise SMS only when opted in, with a confirmed recipient and minimal sensitive content.
-- [ ] Deduplicate finalization and summary delivery across repeated call-end events.
-- [ ] Persist summaries and delivery outcomes with access controls and retention policy.
-- [ ] Handle incomplete/disconnected calls and failed SMS honestly.
+- [x] Include only grounded information and saved/confirmed actions; distinguish failed or pending actions.
+- [x] Send concise SMS only when opted in, with a confirmed recipient and minimal sensitive content.
+- [x] Deduplicate finalization and summary delivery across repeated call-end events.
+- [x] Persist summaries and delivery outcomes with access controls and retention policy.
+- [x] Handle incomplete/disconnected calls and failed SMS honestly.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: The post-call finalizer accepts terminal CALL-E snapshots, masks phone numbers, labels saved actions by outcome and uses an explicit fallback when no reliable summary exists. Summary storage requires the senior's active sharing consent. Supabase persistence uses family-member row-level security, deletes finalization data when call-summary retention clears it, and reserves SMS delivery atomically so concurrent call-end workers cannot send duplicates. SMS requires explicit opt-in, strict E.164, the exact confirmed message and the existing authorization service; provider uncertainty is stored as `unknown` without automatic retry. See [post-call summaries and follow-up](post-call-summaries.md). Live Twilio delivery remains in SPA-004.
 
 ### SPA-013
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-012 | Added grounded terminal-call summaries, explicit action states, consent-gated persistence, atomic SMS reservation and honest incomplete/failure outcomes; marked SPA-012 Done and SPA-013 Ready. | Eighty-four offline tests, lint and typecheck passed. Embedded PostgreSQL verified consent, family RLS, retention deletion and one-winner SMS claiming without a live provider. |
 | 2026-09-11 | SPA-011 | Added provider-neutral SMS/CALL-E delivery, current preference enforcement, bounded definite-failure retries and a service-role-only Supabase enqueue/claim/finish transaction; marked SPA-011 Done and SPA-012 Ready. | Seventy-eight offline tests, lint, typecheck, production build and repository validation passed. The embedded PostgreSQL migration enqueued, claimed and completed a synthetic reminder without a live provider. |
 | 2026-09-11 | SPA-011 | Added cross-worker schedule locking, an authenticated host-scheduler endpoint and a 15-minute late-run cutoff that expires missed calls instead of dispatching them late. | Seventy-three offline tests, lint, typecheck, production build and repository validation passed. No scheduled provider request or live call ran. |
 | 2026-09-11 | SPA-010 | Added documented MCP/REST boundaries, coarse terminal outcomes, an offline fixed-origin fake provider and a stale-lock-aware cross-worker file lock; marked SPA-010 Done and made SPA-011 next. | Seventy-one offline tests, lint, typecheck, production build and repository validation passed. CALL-E was not contacted and no call was placed. |

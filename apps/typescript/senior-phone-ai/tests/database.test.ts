@@ -7,6 +7,7 @@ import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 
 const MIGRATION = new URL("../supabase/migrations/202609100001_initial_senior_phone_ai.sql", import.meta.url);
 const SCHEDULER_MIGRATION = new URL("../supabase/migrations/202609110001_reminder_delivery_scheduler.sql", import.meta.url);
+const POST_CALL_MIGRATION = new URL("../supabase/migrations/202609110002_post_call_finalization.sql", import.meta.url);
 const SEED = new URL("../supabase/seed.sql", import.meta.url);
 
 async function countRows(db: PGlite, table: string): Promise<number> {
@@ -35,6 +36,7 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
     `);
     await db.exec(await readFile(MIGRATION, "utf8"));
     await db.exec(await readFile(SCHEDULER_MIGRATION, "utf8"));
+    await db.exec(await readFile(POST_CALL_MIGRATION, "utf8"));
     await db.exec(await readFile(SEED, "utf8"));
 
     assert.equal(await countRows(db, "public.seniors"), 1);
@@ -116,6 +118,66 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
       where id = '70000000-0000-4000-8000-000000000001'
     `);
     assert.equal(state.rows[0]?.status, "completed");
+
+    await db.exec(`
+      update public.senior_preferences
+      set store_summaries = true, summary_sharing_consent_at = '2026-09-11T00:00:00Z'
+      where senior_id = '20000000-0000-4000-8000-000000000001';
+      insert into public.call_sessions (
+        id, senior_id, correlation_id, direction, status, ended_at
+      ) values (
+        '30000000-0000-4000-8000-000000000010',
+        '20000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000011',
+        'outbound', 'completed', '2026-09-11T01:00:00Z'
+      );
+    `);
+    const finalization = await db.query<{ record: { smsStatus: string; summary: string } }>(`
+      select public.reserve_post_call_finalization(
+        '80000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000010',
+        'call_database123', repeat('a', 64),
+        'Call outcome: completed.', 'Senior Phone AI: Call outcome: completed.',
+        '2026-09-11T01:01:00Z'
+      ) as record
+    `);
+    assert.equal(finalization.rows[0]?.record.smsStatus, "not_requested");
+    assert.equal(finalization.rows[0]?.record.summary, "Call outcome: completed.");
+    assert.equal(await countRows(db, "public.post_call_finalizations"), 1);
+    await db.exec(`
+      set role authenticated;
+      set "request.jwt.claim.sub" = '10000000-0000-4000-8000-000000000001';
+    `);
+    assert.equal(await countRows(db, "public.post_call_finalizations"), 1);
+    await db.exec("set \"request.jwt.claim.sub\" = '10000000-0000-4000-8000-000000000002'");
+    assert.equal(await countRows(db, "public.post_call_finalizations"), 0);
+    await db.exec("reset role");
+    const firstClaim = await db.query<{ result: { claimed: boolean; record: { smsStatus: string } } }>(`
+      select public.claim_post_call_sms('80000000-0000-4000-8000-000000000001') as result
+    `);
+    const duplicateClaim = await db.query<{ result: { claimed: boolean; record: { smsStatus: string } } }>(`
+      select public.claim_post_call_sms('80000000-0000-4000-8000-000000000001') as result
+    `);
+    assert.equal(firstClaim.rows[0]?.result.claimed, true);
+    assert.equal(firstClaim.rows[0]?.result.record.smsStatus, "queued");
+    assert.equal(duplicateClaim.rows[0]?.result.claimed, false);
+    assert.equal(duplicateClaim.rows[0]?.result.record.smsStatus, "queued");
+    await assert.rejects(db.exec(`
+      select public.reserve_post_call_finalization(
+        '80000000-0000-4000-8000-000000000002',
+        '20000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000010',
+        'call_database123', repeat('b', 64),
+        'Changed summary.', 'Senior Phone AI: Changed summary.',
+        '2026-09-11T01:02:00Z'
+      )
+    `), /changed after reservation/);
+    await db.exec(`
+      update public.call_sessions set summary = null
+      where id = '30000000-0000-4000-8000-000000000010'
+    `);
+    assert.equal(await countRows(db, "public.post_call_finalizations"), 0);
   } finally {
     await db.close();
   }
