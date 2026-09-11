@@ -290,6 +290,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`What a call can establish`](apps/python/muster/docs/what-a-call-can-establish.md) - Separating reachability from identity from the fact you wanted, why a third party vouching is never a pass, scoring challenges in code rather than asking the model to mark its own work, and the asymmetry rule for which error may be automatic.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 - [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
+- [`Rehearse before you act`](docs/rehearse-before-you-act.md) - Why a structured result is a report to verify rather than a fact to act on: rehearsing a task against a scripted counterparty, putting world facts in the task, treating confidence as consistency rather than truth, and checking far-side values against the transcript turn they came from.
 
 ## Contributing
 
