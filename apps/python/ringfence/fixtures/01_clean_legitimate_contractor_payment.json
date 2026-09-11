@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: fictional contractor-payment scenario, modeled on an ordinary legitimate large transaction",
+  "category": "clean_legitimate",
+  "case": {
+    "case_id": "case_f01",
+    "account_holder_name": "Pat Rivera",
+    "on_file_phone": "+14155550101",
+    "claimed_transaction_amount": "8200.00",
+    "claimed_recipient": "Rivera Home Renovations LLC",
+    "claimed_payment_method": "ach_transfer",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f01",
+    "status": "completed",
+    "task": "Verify a flagged $8,200 ACH transaction to Rivera Home Renovations LLC.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.95, "label": "high"},
+    "summary": "Account holder confirmed the payment is for a kitchen renovation, no pressure or secrecy reported."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f01",
+      "phone": "+14155550101",
+      "status": "completed",
+      "started_at": "2026-09-10T09:00:00Z",
+      "completed_at": "2026-09-10T09:03:40Z",
+      "summary": "Account holder confirmed the transaction.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, not at all."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "No, it's just my contractor's final invoice."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "They're the contractor who just finished renovating my kitchen."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "No, just a normal bank transfer, same as the deposit I paid earlier."}
+      ],
+      "provider_call_id": "prov_f01",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f01a", "type": "call.dialing", "call_id": "call_f01", "created_at": "2026-09-10T09:00:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f01b", "type": "call.completed", "call_id": "call_f01", "created_at": "2026-09-10T09:03:40Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": true,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_ALLOW"
+}

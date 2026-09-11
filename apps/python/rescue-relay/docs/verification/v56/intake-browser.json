@@ -1,0 +1,18 @@
+{
+  "version": "5.6.0",
+  "passed": 7,
+  "checks": [
+    "A clear goal produces an optional button but is not implicitly selected or saved",
+    "Selecting a goal is local only; optional suggestions are above the free-text box",
+    "Typing, clearing text and editing facts never silently retain or restore consent",
+    "Goal controls and free text reflow without horizontal overflow at four viewport widths",
+    "Draft restoration does not restore goal selection or authorization (storage fixture)",
+    "Confirm goal saves the exact goal without creating a coordination run or making calls",
+    "Only the separate Find help action starts inquiries; helpers still need plan approval"
+  ],
+  "javascript_errors": [],
+  "http_bridge": true,
+  "native_reload_verified": false,
+  "live_calls": false,
+  "external_model_inference": false
+}

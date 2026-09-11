@@ -38,7 +38,7 @@ from client import (
 )
 from compliance.jurisdictions import fr, us_federal
 from fake_server import INSUFFICIENT_BALANCE_PHONE, RATE_LIMITED_ONCE_PHONE, FakeCalleServer
-from verdict import patient_intent_result_schema
+from verdict import subject_intent_result_schema
 
 TEST_API_KEY = "iams_live_fake_test_key_do_not_use"
 
@@ -59,7 +59,7 @@ def test_live_base_url_is_blocked_without_allow_live() -> None:
 
 def test_create_and_poll_reaches_completed_with_structured_result() -> None:
     """Proves the REST transport itself (CallEClient) works end to end
-    against the fake server, using the same patient_intent_result_schema
+    against the fake server, using the same subject_intent_result_schema
     Reality Resolver actually sends.
     """
     with FakeCalleServer() as server:
@@ -69,7 +69,7 @@ def test_create_and_poll_reaches_completed_with_structured_result() -> None:
         created = client.create_call(
             task="Call the recipient to confirm their appointment.",
             recipients=[recipient],
-            result_schema=patient_intent_result_schema(),
+            result_schema=subject_intent_result_schema(),
             idempotency_key="test-happy-path-1",
         )
         assert created["status"] == "queued"
@@ -79,7 +79,7 @@ def test_create_and_poll_reaches_completed_with_structured_result() -> None:
 
         assert final_call["status"] == "completed"
         assert final_call["structured_result"] == {
-            "patient_intent": "confirmed",
+            "subject_intent": "confirmed",
             "answered_by": "human",
             "confidence_note": "Fake server: deterministic canned result, not extracted from real call evidence.",
             "manipulation_attempt_detected": False,
@@ -583,7 +583,7 @@ def _hostile_call() -> dict:
         "task_completed": True,
         "completion_confidence": {"score": 0.86, "label": "high" + poison},
         "structured_result": {
-            "patient_intent": "unknown",
+            "subject_intent": "unknown",
             "confidence_note": "note" + poison + long_text,
             "manipulation_attempt_note": "note2" + poison + long_text,
             "manipulation_attempt_detected": False,
@@ -680,7 +680,7 @@ def test_display_copy_stays_valid_json_and_keeps_structure() -> None:
     assert display["completion_confidence"]["score"] == 0.86
     assert display["task_completed"] is True
     assert display["structured_result"]["manipulation_attempt_detected"] is False
-    assert display["structured_result"]["patient_intent"] == "unknown"
+    assert display["structured_result"]["subject_intent"] == "unknown"
     assert len(display["evidence"]) == 2
     assert display["recipients"][0]["attempts"][0]["transcript_turns"][0]["offset_seconds"] == 0
 
@@ -712,7 +712,7 @@ def test_reconcile_sees_the_raw_result_not_the_display_copy() -> None:
         (Evidence("calendar", EvidenceType.STRUCTURED, timedelta(hours=1), "confirmed", Ambiguity.LOW),)
     )
     raw = {
-        "patient_intent": "confirmed",
+        "subject_intent": "confirmed",
         "answered_by": "human",
         "confidence_note": "note" + ESC + "[2J" + "A" * 100000,
     }
@@ -812,7 +812,7 @@ def test_verdict_evidence_line_is_bounded_at_display_time() -> None:
         (Evidence("calendar", EvidenceType.STRUCTURED, timedelta(hours=1), "ok", Ambiguity.LOW),)
     )
     verdict = reconcile(
-        {"patient_intent": "X" * 100000 + ESC, "answered_by": "human"},
+        {"subject_intent": "X" * 100000 + ESC, "answered_by": "human"},
         {"if_confirmed": "KEEP_SLOT", "if_cancelled": "RELEASE_SLOT"},
         matrix,
     )

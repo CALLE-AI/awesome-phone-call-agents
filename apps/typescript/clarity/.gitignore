@@ -1,0 +1,21 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+next-env.d.ts
+*.tsbuildinfo
+
+# Applications, transcripts, and locally captured fixtures
+data/
+fixtures/golden-run.json
+
+# Local tooling
+.DS_Store
+*.log
+.vercel/

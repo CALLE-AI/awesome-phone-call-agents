@@ -70,6 +70,40 @@ def test_appointment_confirmation_still_blocks_on_disclosure_failure() -> None:
     assert filtered.blocking_reasons == ("missing required elements",)
 
 
+def test_critical_service_escalation_exempts_the_same_solicitation_checks() -> None:
+    """The second shipped use case is registered and resolves to the same
+    exempt set - the solicitation scoping is a property of the statutes,
+    not of the use case, so both non-solicitation use cases land on it.
+    """
+    decision = PreCallDecision(
+        allowed=False,
+        jurisdiction_chain=("us_federal", "us_oregon"),
+        results=COMMERCIAL_CHECKS_FAILING + GENERIC_CHECKS_PASSING,
+    )
+    filtered = apply_use_case(decision, "critical_service_escalation")
+
+    assert filtered.allowed is True
+    filtered_names = {r.check_name for r in filtered.results}
+    assert filtered_names == {"us_federal_disclosure_script", "us_federal_revocation"}
+
+
+def test_critical_service_escalation_still_blocks_on_a_generic_check() -> None:
+    """Registering a use case narrows which rules apply; it never turns
+    the gate off. GDPR basis is not solicitation-scoped, so it blocks
+    this use case exactly as it blocks the appointment one.
+    """
+    decision = PreCallDecision(
+        allowed=False,
+        jurisdiction_chain=("fr", "eu_common"),
+        results=COMMERCIAL_CHECKS_FAILING
+        + (CheckResult("eu_common_gdpr_basis", False, "no documented Art. 6 lawful basis"),),
+    )
+    filtered = apply_use_case(decision, "critical_service_escalation")
+
+    assert filtered.allowed is False
+    assert filtered.blocking_reasons == ("no documented Art. 6 lawful basis",)
+
+
 def test_unknown_use_case_fails_closed() -> None:
     decision = PreCallDecision(allowed=True, jurisdiction_chain=("us_federal",), results=GENERIC_CHECKS_PASSING)
     with pytest.raises(UnknownUseCaseError):
