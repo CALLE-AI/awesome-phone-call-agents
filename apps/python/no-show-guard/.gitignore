@@ -1,0 +1,21 @@
+# ---- Secrets ----
+# The real CALLE_API_KEY lives in .env (never committed).
+.env
+
+# ---- Runtime artifacts ----
+__pycache__/
+*.py[cod]
+*.db
+*_report.csv
+*.log
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
