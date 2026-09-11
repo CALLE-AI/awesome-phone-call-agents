@@ -330,6 +330,15 @@ footer .bad { color: var(--stop); }
   .rec-top { flex-wrap: wrap; gap: 14px; }
   .rec-id { width: auto; }
 }
+/* Phones. The console is a desktop tool, but an operator checking a run from
+   a phone should not meet a three-line tagline wedged against a status chip. */
+@media (max-width: 620px) {
+  .top { gap: 10px; padding: 22px 0 18px; }
+  .top a span { display: none; }          /* tagline: the logo already says it */
+  .rec-top { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .rec-top .tag { align-self: flex-start; }
+  .bar { flex-wrap: wrap; gap: 12px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
