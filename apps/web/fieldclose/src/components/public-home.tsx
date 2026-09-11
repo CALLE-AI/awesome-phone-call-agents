@@ -120,7 +120,7 @@ const exceptionRows = [
 
 export function PublicHome({ signedIn }: PublicHomeProps) {
   const primaryHref = signedIn ? "/workspace" : "/?auth=signup";
-  const primaryLabel = signedIn ? "Open workspace" : "Explore demo workspace";
+  const primaryLabel = signedIn ? "Open workspace" : "Create demo workspace";
   const secondaryHref = signedIn ? "/workspace" : "/?auth=signin";
   const secondaryLabel = signedIn ? "View cases" : "Sign in";
 
@@ -163,7 +163,7 @@ export function PublicHome({ signedIn }: PublicHomeProps) {
             ) : (
               <>
                 <Link href="/?auth=signin">Sign in</Link>
-                <Link href="/?auth=signup">Explore demo workspace</Link>
+                <Link href="/?auth=signup">Create demo workspace</Link>
               </>
             )}
           </nav>

@@ -156,6 +156,34 @@ The normalizer must prefer safe uncertainty over optimistic inference.
 - One operator cannot access another account's cases when multi-tenancy is enabled.
 - Public demo route exposes no administrative or private data.
 
+## Inspectable accepted-call recovery evidence
+
+The browser close/reopen boundary can be reviewed without placing a call. The
+evidence is intentionally split between client lifecycle code, persisted server
+policy, and existing automated coverage:
+
+| Claim | Inspectable evidence |
+| --- | --- |
+| Opening an accepted nonterminal case schedules a refresh after about five seconds | `FieldCloseWorkbench` first loads the selected case detail, then its accepted-live-attempt effect schedules `POST /api/attempts/<attemptId>/refresh` with `window.setTimeout(..., 5_000)` |
+| Leaving or closing the page stops automatic refresh | The same effect cleanup marks the loop inactive and calls `window.clearTimeout`; the repository has no service worker or hosted accepted-call polling worker |
+| Reopening resumes the existing call rather than redialing | The selected-case effect reloads persisted case detail; when the stored attempt is eligible, the refresh effect uses `detail.attempt.id`, while `refreshAcceptedLiveAttempt` accepts only an attempt with an existing CALL-E `providerCallId` and never calls provider creation |
+| Time away still counts toward the bound | `prepareLiveStatusRefresh` compares the request time with persisted `acceptedAt` using `liveStatusPollTimeoutMs` (`600_000`) |
+| A late terminal result can resolve reconciliation without another call | Integration case `times out to one reconciliation task and can recover on a later manual refresh` asserts one provider creation, one resolved reconciliation task, and later completion |
+| Five-second throttling and terminal idempotency survive repeated refresh | Integration cases `polls an accepted call without creating a result until the provider is terminal` and `allows only one provider lookup for concurrent refreshes` cover the persisted throttle and one-result boundary |
+
+For a manual browser inspection, use a fake or intercepted provider response:
+
+1. Open a case fixture whose persisted live attempt has a provider call ID and
+   no result, and observe the accepted-call status panel.
+2. Leave the case before the first five-second request and confirm that no
+   refresh request is emitted while the case is closed.
+3. Reopen that case and confirm one refresh request appears after about five
+   seconds with the same attempt ID.
+4. Confirm that no execute or provider-create request occurs during reopen.
+
+This inspection demonstrates lifecycle wiring only. It is not evidence of a
+real CALL-E call or unattended background execution.
+
 ## Accessibility and product tests
 
 - Approval cannot be triggered accidentally by loading a page.
@@ -280,9 +308,15 @@ the automated evidence for the P0A closure; live-provider verification remains
 a separate opt-in activity. On 2026-08-06, one separately authorized local
 CALL-E attempt produced redacted evidence of provider acceptance, terminal
 result retrieval, uncertainty-preserving normalization, human routing, final
-operator disposition, and duplicate protection. The call reached a Sonetel
-free-trial forwarding announcement, so the participant was not connected and
-all three HVAC questions remained `not_asked`.
+operator disposition, and duplicate protection. A correction recorded on
+2026-08-10 confirms that the intended participant was reached and a conversation
+occurred after the Sonetel forwarding announcement. The retained structured
+result incorrectly classified the announcement as terminal and stored all three
+HVAC questions as `not_asked`. The original machine artifacts remain unchanged;
+the dated correction is separate human-observation evidence. Without a retained
+transcript, recording, or participant answer attestation, the exact live answers
+are not reconstructed. The deterministic fictional fixture supplies the public
+demo values and is not live-call evidence.
 
 Markdown documentation is checked separately with `markdownlint-cli2`. Formatting is enforced through the lint and production-build toolchain; a dedicated formatter has not been added.
 

@@ -4,8 +4,15 @@
 
 - Objective: Compete for **Most Practical Use Case**
 - Scope: Frozen to one human-approved commercial HVAC closeout call
-- Last updated: 2026-08-06
-- Current phase: Close upstream review blockers, verify protected staging, and produce the final demonstration
+- Last updated: 2026-08-24
+- Current phase: Produce and verify the final demonstration and submission
+
+Publicly verifiable evidence is limited to this repository tree, visible pull
+request and CI history, the public fake-only URL, and published submission
+artifacts. Server configuration, protected accounts, local live-attempt records,
+and private validation logs are maintainer-reported operational evidence, not
+public source, build, or deployment provenance. This plan intentionally does not
+cite inaccessible revision identifiers.
 
 ## Submission thesis
 
@@ -29,7 +36,7 @@ workflow or an expansion of the UI information architecture.
 
 ## Current readiness snapshot
 
-As of 2026-08-06:
+As of 2026-08-24:
 
 - the workflow is implemented from case creation through normalized result,
   creation of a human next-action task, and role-gated final disposition;
@@ -44,30 +51,35 @@ As of 2026-08-06:
   state, so concurrent executions converge on one consistent recorded outcome;
 - the local demo secret writer narrows its target to owner-only permissions and
   refuses symlink and other non-regular targets before writing;
-- the repository validation gate has passed locally across type-check, lint,
-  unit tests, Drizzle schema validation, PostgreSQL integration tests,
-  production build, and Playwright;
+- the maintainer reports a complete local validation run across type-check,
+  lint, unit tests, Drizzle schema validation, PostgreSQL integration tests,
+  production build, and Playwright; the public repository validator is the
+  independently visible PR gate;
 - the fake-only judge environment is deployed at
   <https://fieldclose.dramaforge.icu/> and retains its build-time no-call gate;
-- protected-workspace provisioning and SMTP provider self-test evidence exist,
-  but protected-staging deployment, isolation, production access, and deployed
-  CALL-E/SMTP configuration have not been verified with inspectable evidence;
+- protected staging is deployed behind TLS and Basic authentication with
+  separate services, databases, roles, application secrets, and privacy-filtered
+  logs; deployed CALL-E/SMTP configuration and minimum-privilege operator access
+  have inspectable private evidence, with one same-owner SMTP identity exception
+  explicitly accepted by the operator;
 - one authorized local CALL-E attempt has a redacted private evidence bundle:
-  CALL-E accepted and completed one provider task, the Sonetel trial forwarding
-  announcement prevented participant connection, every HVAC answer remained
-  `not_asked`, and the result routed through human follow-up to one recorded
-  disposition without a retry or duplicate provider creation;
-- the current upstream contribution is open as
-  [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96), with
-  final review-blocker fixes and validation still pending;
-- no successful participant conversation, protected-staging live execution, or
-  final sub-three-minute video is claimed.
+  CALL-E accepted and completed one provider task, reached the intended
+  participant, and completed a conversation; the structured result incorrectly
+  treated a Sonetel forwarding announcement as terminal, so every stored HVAC
+  answer remained `not_asked` and the case routed through human follow-up to one
+  recorded disposition without a retry or duplicate provider creation;
+- the operator-observed participant contact is recorded as a dated correction
+  beside the unchanged machine artifacts; no exact live-call answer values are
+  reconstructed without a retained transcript, recording, or participant
+  answer attestation;
+- [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96) was
+  merged on 2026-08-10;
+- no accurate structured capture of the live answers, protected-staging live
+  execution, or final sub-three-minute video is claimed.
 
-P0A, the public deployment step, and one local authorized live-evidence run are
-complete. The local run does not replace the independent protected-staging
-gate. Remaining work begins with closing the upstream blockers and verifying
-protected staging, followed by demonstration and submission packaging. The only
-later product convenience is a preset
+P0A, the public deployment step, protected-staging verification, and one local
+authorized live-evidence run are complete. Remaining work centers on the final
+demonstration and submission packaging. The only later product convenience is a preset
 fictional work order for the demonstration; it must use the existing case
 workflow and must not create a new stage.
 
@@ -87,7 +99,7 @@ work-order mutation.
 | Implement the application service and API | Done | An owner/operator can atomically record one route-appropriate disposition; exact repeats are idempotent and stale or conflicting requests fail without mutation |
 | Implement the operator disposition UI | Done | Result and exception views provide the permitted action, bounded note, submitted state, final case state, resolved task, and visible audit evidence |
 | Add complete automated coverage | Done | Unit and PostgreSQL tests cover every outcome, permissions, route constraints, idempotency, stale state, audit redaction, and task/case atomicity; Playwright covers case creation through final human disposition |
-| Pass formal validation after closure | Done | `pnpm validate` passes with 107 unit, 64 PostgreSQL integration, and 15 Playwright tests plus type-check, lint, migration validation, and production build |
+| Pass formal validation after closure | Done, maintainer-reported | The maintainer reports a complete local `pnpm validate` run; the public PR separately exposes the repository validation check |
 
 Every P0A item now passes, so P0B deployment work may begin. No deployment should
 be treated as a release candidate unless it preserves the validated functional
@@ -98,16 +110,16 @@ loop and its safety boundaries.
 | Item | Status | Done when |
 | --- | --- | --- |
 | Deploy a judge-accessible fake-only public version | Done | The stable HTTPS deployment documented in [Public Fake-Only Deployment](public-demo-deployment.md) contains no CALL-E credentials and preserves the fake-only build gate |
-| Establish an isolated protected staging environment | Pending verification | Inspectable evidence proves separate data and secrets, production authentication for an allow-listed operator, and a paused live-call gate |
-| Complete one authorized real CALL-E test | Done locally with contact exception | One exact recipient, brief, timezone, and window were approved; CALL-E accepted and completed one task; the participant was not connected; uncertainty was preserved; one human disposition was recorded; and no duplicate provider creation occurred |
-| Preserve a redacted live-evidence bundle | Done privately | The gitignored bundle contains authorization, preflight, provider acceptance, terminal normalized result, human disposition, audit and duplicate evidence, cleanup state, and verified SHA-256 hashes without the full number, email, raw provider ID, transcript, recording, or credentials |
+| Establish an isolated protected staging environment | Done with documented SMTP exception | Private inspectable evidence proves separate data, roles and secrets, production authentication for a minimum-privilege operator, privacy-filtered logs, and a paused durable live-call gate; the same-owner SMTP identity is an explicitly accepted exception |
+| Complete one authorized real CALL-E test | Done locally with structured-result discrepancy | One exact recipient, brief, timezone, and window were approved; CALL-E accepted and completed one task; the intended participant was reached and a conversation occurred; the stored non-connection classification was preserved and corrected by dated operator clarification; one human disposition was recorded; and no duplicate provider creation occurred |
+| Preserve a redacted live-evidence bundle | Done privately | The gitignored bundle contains authorization, preflight, provider acceptance, unchanged terminal normalized result, human disposition, audit and duplicate evidence, cleanup state, a dated observation correction, and verified SHA-256 hashes without the full number, email, raw provider ID, transcript, recording, or credentials |
 | Stabilize the three-minute golden path | Pending rehearsal | The path uses a preset case, ends with a recorded disposition, completes within three minutes in three consecutive rehearsals, and labels every waiting-time edit accurately |
 
 ### P0 dependency order
 
-Steps 1–6 are complete. A separately authorized local protected-workspace run
-also completed steps 8–10 with a contact exception, but step 7 remains an
-independent deployment gate and must not be described as verified.
+Steps 1–7 are complete. A separately authorized local protected-workspace run
+also completed steps 8–10 and reached the intended participant, with a
+structured-result discrepancy documented by a dated correction.
 
 1. Add the human-disposition persistence contract and migration.
 2. Implement the authorized, idempotent application service and HTTP route.
@@ -132,11 +144,11 @@ P1 makes the project reviewable and acceptable as an upstream contribution.
 
 | Item | Status | Done when |
 | --- | --- | --- |
-| Package the contribution under `apps/web/fieldclose/` | Done; update pending | PR #96 contains the runnable app; the final concurrency and local-secret-writer fixes must be synchronized before review completion |
-| Complete the contribution README | Partial | The packaged README covers requirements, installation, fake/no-call default, credential handling, opt-in live side effects, cancellation limits, validation, and known limitations |
-| Run upstream repository validation | Rerun pending | The published PR snapshot passed; rerun `python3 scripts/validate_repository.py` after synchronizing the final blocker fixes |
-| Open the upstream pull request | Done; draft review active | [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96) is the active contribution and supersedes PRs #93 and #72 |
-| Add the PR URL to Devpost | Pending | The submitted Devpost project contains the final PR #96 URL |
+| Package the contribution under `apps/web/fieldclose/` | Done; follow-up in review | PR #96 was merged with the safety fixes; [PR #222](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/222) contains the focused reviewer-release update |
+| Complete the contribution README | Done | The packaged README covers requirements, installation, fake/no-call default, credential handling, opt-in live side effects, cancellation limits, validation, known limitations, and the public/private evidence boundary |
+| Run upstream repository validation | Done for current branch | `python3 scripts/validate_repository.py` passes locally and the public PR exposes the repository validation check |
+| Open the upstream pull request | In review | [PR #222](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/222) follows the merged [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96) |
+| Add the PR URL to Devpost | Done | The Devpost submission references PR #222 |
 | Finish the English Devpost About text | Pending | The copy leads with the practical HVAC closeout problem, explains the human boundary and six mechanisms, and makes only evidence-supported claims |
 
 The packaging checklist follows the current
@@ -157,7 +169,7 @@ P2 improves comprehension without expanding the product.
 | Edit CALL-E waiting time accurately | Pending video | Nonessential waiting is shortened in editing and the video explicitly states that elapsed time was edited; it never implies instant completion |
 | Feature one memorable result | Pending evidence choice | The main story uses either a normal resolved report or one strong exception; other cases are mentioned, not toured |
 | Show audit and duplicate protection in the final 10 seconds | Pending script | One repeated action demonstrates the original attempt is reused, followed by the relevant audit evidence |
-| Capture domain or user feedback | Pending outreach | At least one consenting HVAC office, dispatcher, service manager, or adjacent domain reviewer provides a short, attributable or safely anonymized observation |
+| Capture domain or user feedback | Practitioner evidence unavailable; desk research complete | The current public-source brief is explicit that interviews are `n = 0`; this item becomes complete only if at least one consenting HVAC office, dispatcher, service manager, or adjacent domain reviewer provides a short, attributable or safely anonymized observation |
 
 ## Three-minute golden path
 
@@ -193,9 +205,11 @@ Do not submit until all of the following are true:
 - [ ] An owner or operator can complete the workflow from result review through
   persisted disposition, resolved task, final case state, and audit history.
 - [ ] The public fake-only URL passes the signed-out judge smoke test.
-- [ ] The protected staging environment is isolated from the public project.
-- [x] One authorized live CALL-E attempt has redacted, inspectable private
-  evidence and an explicitly documented contact exception.
+- [x] The protected staging environment has verified isolation evidence with a
+  documented operator-approved same-owner SMTP identity exception.
+- [x] One authorized live CALL-E attempt reached the intended participant and
+  has redacted, inspectable private evidence; its structured-result discrepancy
+  and later operator correction are both explicitly documented.
 - [ ] The video completes the fixed golden path in three minutes.
 - [ ] The upstream packaged app passes `scripts/validate_repository.py`.
 - [ ] The upstream PR URL is present in Devpost.

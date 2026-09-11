@@ -12,6 +12,7 @@ test("creates, approves, simulates, and closes a fictional case through human di
   page,
 }) => {
   const fixtures = await installWorkflowFixtures(page);
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/workspace/demo-e2e/cases/new");
 
   await expect(
@@ -31,6 +32,7 @@ test("creates, approves, simulates, and closes a fictional case through human di
     exactBrief.getByText("site manager · +*******0142", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("FAKE / NO NETWORK")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 
   await page
     .getByLabel("This fictional contact is authorized for the demo.")
@@ -65,6 +67,7 @@ test("creates, approves, simulates, and closes a fictional case through human di
   await expect(
     page.getByText("This resolves the current FieldClose task only."),
   ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await page
     .getByRole("button", { name: "Record human disposition" })
     .click();
@@ -79,13 +82,8 @@ test("creates, approves, simulates, and closes a fictional case through human di
     page.locator(".case-heading-status").getByText("closed", { exact: true }),
   ).toBeVisible();
   expect(fixtures.getDispositionRequestCount()).toBe(1);
-  await page.setViewportSize({ width: 390, height: 844 });
   await expect(recordedDisposition).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow(page);
 
   await page.getByRole("link", { name: "Open audit" }).click();
   await expect(page).toHaveURL(`/workspace/demo-e2e/audit/${caseId}`);
@@ -102,6 +100,7 @@ test("creates, approves, simulates, and closes a fictional case through human di
   await expect(
     auditTimeline.getByText("user-e2e", { exact: true }),
   ).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
   await page.goBack();
   await expect(page).toHaveURL(`/workspace/demo-e2e/cases/${caseId}`);
 });
@@ -124,34 +123,96 @@ test("identifies an invalid E.164 field before creating a case", async ({
   await expect(page).toHaveURL("/workspace/demo-e2e/cases/new");
 });
 
+test("restores the fixed fictional preset without creating or approving a case", async ({
+  page,
+}) => {
+  const fixtures = await installWorkflowFixtures(page);
+  await page.goto("/workspace/demo-e2e/cases/new");
+
+  const restorePreset = page.getByRole("button", {
+    name: "Restore fictional preset",
+  });
+  const operatingStatus = page.getByRole("checkbox", {
+    name: /Observed operating status/u,
+  });
+  const unresolvedIssue = page.getByRole("checkbox", {
+    name: /Unresolved issue/u,
+  });
+  const returnVisit = page.getByRole("checkbox", {
+    name: /Return-visit request/u,
+  });
+
+  await expect(restorePreset).toBeVisible();
+  await page.getByLabel("Work-order reference").fill("CHANGED-WORK-ORDER");
+  await page.getByLabel("Contractor display name").fill("Changed contractor");
+  await page.getByLabel("Fictional site label").fill("Changed site");
+  await page.getByLabel("IANA timezone").selectOption("Asia/Shanghai");
+  await page.getByLabel("Fictional E.164 number").fill("+12025550199");
+  await page.getByLabel("Service date").fill("2026-08-13");
+  await page.getByLabel("Equipment label").fill("Changed equipment");
+  await unresolvedIssue.uncheck();
+
+  await restorePreset.click();
+
+  await expect(page.getByLabel("Work-order reference")).toHaveValue(
+    "WO-DEMO-1042",
+  );
+  await expect(page.getByLabel("Contractor display name")).toHaveValue(
+    "Example HVAC",
+  );
+  await expect(page.getByLabel("Fictional site label")).toHaveValue(
+    "Fictional North Store",
+  );
+  await expect(page.getByLabel("IANA timezone")).toHaveValue(
+    "America/Chicago",
+  );
+  await expect(page.getByLabel("Fictional E.164 number")).toHaveValue(
+    "+12025550142",
+  );
+  await expect(page.getByLabel("Service date")).toHaveValue("2026-07-27");
+  await expect(page.getByLabel("Equipment label")).toHaveValue(
+    "Rooftop unit RTU-2",
+  );
+  await expect(operatingStatus).toBeChecked();
+  await expect(unresolvedIssue).toBeChecked();
+  await expect(returnVisit).toBeChecked();
+  await expect(page).toHaveURL("/workspace/demo-e2e/cases/new");
+  expect(fixtures.getCreateCaseRequestCount()).toBe(0);
+});
+
 test("keeps case creation available and readable on tablet and mobile", async ({
   page,
 }) => {
   await installWorkflowFixtures(page);
-  await page.goto("/workspace/demo-e2e/cases/new");
-  await page.getByRole("button", { name: "Create demo case" }).click();
-  await expect(page).toHaveURL(`/workspace/demo-e2e/cases/${caseId}`);
-
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/workspace/demo-e2e/cases");
-  const mobileNewCase = page.getByRole("button", { name: "New case" });
+  await expect(page.locator(".rail-empty")).toBeVisible();
+  await expect(page.locator(".empty-workspace")).toBeHidden();
+  const mobileNewCase = page.getByRole("button", {
+    name: "Create the first case",
+  });
   await expect(mobileNewCase).toBeVisible();
   await mobileNewCase.click();
   await expect(page).toHaveURL("/workspace/demo-e2e/cases/new");
+  await expect(page.getByLabel("Work-order reference")).toHaveValue(
+    "WO-DEMO-1042",
+  );
   await expect(
     page.getByRole("heading", { name: "Prepare the closeout brief" }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow(page);
 
   await page.setViewportSize({ width: 1024, height: 900 });
   const panelWidth = await page.locator(".workspace-panel").evaluate(
     (panel) => panel.getBoundingClientRect().width,
   );
   expect(panelWidth).toBeGreaterThan(800);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByRole("button", { name: "Create demo case" }).click();
+  await expect(page).toHaveURL(`/workspace/demo-e2e/cases/${caseId}`);
+  await expect(page.getByText("Exact call brief")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("presents an empty exceptions queue as a resolved operational state", async ({
@@ -179,13 +240,9 @@ test("presents an empty exceptions queue as a resolved operational state", async
     "/workspace/demo-e2e/cases",
   );
 
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 375, height: 812 });
   await expect(allCasesLink).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+  await expectNoHorizontalOverflow(page);
 });
 
 test("keeps mobile sign-out available and returns to the public home", async ({
@@ -265,6 +322,12 @@ test("keeps a protected live call explicit from authorization through asynchrono
   await expect(page.getByText("Protected live calls")).toBeVisible();
   await page.getByRole("button", { name: "New case" }).click();
   await expect(page.getByText("Live mode can place one real CALL-E")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Restore fictional preset" }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Work-order reference")).toHaveValue(
+    /^WO-LIVE-[A-F0-9]{8}$/u,
+  );
 
   await page.getByLabel("Work-order reference").fill("WO-LIVE-E2E");
   await page.getByLabel("Contractor display name").fill("Authorized HVAC");
@@ -273,7 +336,7 @@ test("keeps a protected live call explicit from authorization through asynchrono
   await page
     .getByLabel("Contact display name")
     .fill("Consenting site manager");
-  await page.getByLabel("Authorized E.164 number").fill("+861012345678");
+  await page.getByLabel("Authorized E.164 number").fill("+442079460000");
   await page
     .getByLabel("Authorization record")
     .fill("The consenting test participant confirmed this exact call.");
@@ -355,9 +418,18 @@ test("keeps a protected live call explicit from authorization through asynchrono
   ).toBe(true);
 });
 
+async function expectNoHorizontalOverflow(page: Page) {
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+}
+
 async function installWorkflowFixtures(page: Page) {
   let stage: "empty" | "draft" | "approved" | "completed" | "closed" =
     "empty";
+  let createCaseRequestCount = 0;
   let dispositionRequestCount = 0;
 
   await page.route("**/api/auth/**", async (route) => {
@@ -436,6 +508,7 @@ async function installWorkflowFixtures(page: Page) {
     const url = new URL(request.url());
 
     if (url.pathname === "/api/cases" && request.method() === "POST") {
+      createCaseRequestCount += 1;
       stage = "draft";
       await route.fulfill({
         contentType: "application/json",
@@ -567,6 +640,7 @@ async function installWorkflowFixtures(page: Page) {
   });
 
   return {
+    getCreateCaseRequestCount: () => createCaseRequestCount,
     getDispositionRequestCount: () => dispositionRequestCount,
   };
 }

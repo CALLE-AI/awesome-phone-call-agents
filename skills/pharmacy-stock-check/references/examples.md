@@ -213,33 +213,23 @@ the recipient is free and both dial.
 
 ---
 
-## Example 11 — verifying against CALL-E's testing hotline
+## Example 11 — offline planning with a fictional pharmacy
 
-CALL-E publishes an inbound hotline at **+1 276-322-9632** for testing. It
-answers with a general-purpose prompt rather than role-playing a pharmacist, so
-this is a pipeline check, not a source of stock data.
+This standards-reserved number is for the offline planning path only. It cannot
+be dialed and is not a source of stock data.
 
 ```bash
-$ printf 'name,phone,address\nCALL-E Hotline,+12763229632,Testing hotline\n' \
+$ printf 'name,phone,address\nFictional Pharmacy,+14155550132,Reserved offline example\n' \
     > pharmacies.hotline.csv
-$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv
 
 Pharmacy          Stock     Qty  Price  Rx       Hold  Conf
-CALL-E Hotline    unknown     —      —  unknown     —  0.34  ⚠ unverified
+Fictional Pharmacy unknown    —      —  unknown     —  0.34  ⚠ unverified
     The recipient did not provide stock information.
 ```
 
-The right outcome. The hotline can't answer a stock question, confidence is
-low, and the row is marked unverified rather than filled with plausible
-guesses. It exercises plan, run, poll, the completion gate and the ledger
-without calling a business.
-
-Interrupt it mid-poll and run it again to check the durable path:
-
-```bash
-$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
-  …9632: resuming run 4BJPgjIFv3gZ
-```
+The row is marked unverified rather than filled with plausible guesses. This
+exercise performs no network request and places no call.
 
 ---
 

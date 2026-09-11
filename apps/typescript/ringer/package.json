@@ -16,7 +16,7 @@
     "verify:all": "pnpm build && pnpm typecheck:api && pnpm verify && pnpm verify:api && pnpm verify:render"
   },
   "dependencies": {
-    "@call-e/calle": "^0.2.2",
+    "@call-e/calle": "^0.7.0",
     "@gsap/react": "^2.1.2",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",

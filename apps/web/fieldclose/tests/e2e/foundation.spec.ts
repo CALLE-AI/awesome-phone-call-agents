@@ -14,7 +14,7 @@ test("explains FieldClose before asking for an account", async ({ page }) => {
     page.getByText("Public demo · No phone call placed"),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Explore demo workspace" }).first(),
+    page.getByRole("link", { name: "Create demo workspace" }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {
@@ -119,7 +119,7 @@ test("offers password, email-code, and account-registration paths in the drawer"
   ).toHaveCount(0);
 
   const signInTab = page.getByRole("tab", { name: "Sign in" });
-  const createAccountTab = page.getByRole("tab", { name: "Create account" });
+  const createAccountTab = page.getByRole("tab", { name: "Create workspace" });
   const passwordMethod = page.getByRole("button", { name: "Password" });
   const emailCodeMethod = page.getByRole("button", { name: "Email code" });
 
@@ -171,14 +171,18 @@ test("offers password, email-code, and account-registration paths in the drawer"
   await expect(signInTab).toBeFocused();
   await expect(signInTab).toHaveAttribute("aria-selected", "true");
   await expect(page).toHaveURL("/?auth=signin");
-  await page.getByRole("tab", { name: "Create account" }).click();
+  await page.getByRole("tab", { name: "Create workspace" }).click();
   await expect(page).toHaveURL("/?auth=signin");
   await expect(page.getByLabel("Your name")).toBeVisible();
-  await expect(page.getByLabel("Username")).toBeVisible();
+  await expect(page.getByLabel("Username")).toHaveCount(0);
   await expect(page.getByLabel("Work email")).toBeVisible();
   await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 
   await page.route("**/api/auth/sign-up/email", async (route) => {
+    const requestBody = route.request().postDataJSON() as {
+      username?: string;
+    };
+    expect(requestBody.username).toMatch(/^[a-z0-9_.]{3,30}$/u);
     await route.fulfill({
       contentType: "application/json",
       status: 200,
@@ -194,10 +198,12 @@ test("offers password, email-code, and account-registration paths in the drawer"
     });
   });
   await page.getByLabel("Your name").fill("Evaluator");
-  await page.getByLabel("Username").fill("evaluator");
   await page.getByLabel("Work email").fill("evaluator@example.com");
   await page.getByLabel("Password", { exact: true }).fill("ExamplePass123!");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(
+    page.getByLabel("Password requirements").getByText("8–128 characters"),
+  ).toHaveAttribute("data-met", "true");
+  await page.getByRole("button", { name: "Create demo workspace" }).click();
 
   await expect(page.getByLabel("Six-digit code")).toBeVisible();
   await expect(
@@ -253,19 +259,14 @@ test("identifies and highlights only the registration fields that need attention
   await page.goto("/?auth=signup");
 
   await page.getByLabel("Your name").fill("A");
-  await page.getByLabel("Username").fill("not allowed");
   await page.getByLabel("Work email").fill("not-an-email");
   await page.getByLabel("Password", { exact: true }).fill("short");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create demo workspace" }).click();
 
   await expect(page.locator(".signin-error")).toContainText(
-    "Your name, Username, Work email, and Password",
+    "Your name, Work email, and Password",
   );
   await expect(page.getByLabel("Your name")).toHaveAttribute(
-    "aria-invalid",
-    "true",
-  );
-  await expect(page.getByLabel("Username")).toHaveAttribute(
     "aria-invalid",
     "true",
   );
@@ -277,11 +278,8 @@ test("identifies and highlights only the registration fields that need attention
     "aria-invalid",
     "true",
   );
-  await expect(page.locator("#signup-password-help")).toHaveCount(0);
+  await expect(page.locator("#signup-password-help")).toBeVisible();
   await expect(page.locator("#signup-password-error")).toBeVisible();
-  await expect(page.locator("#signup-username-error")).toContainText(
-    "letters, numbers, dots, or underscores",
-  );
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -290,7 +288,6 @@ test("identifies and highlights only the registration fields that need attention
   ).toBe(true);
 
   await page.getByLabel("Your name").fill("Evaluator");
-  await page.getByLabel("Username").fill("evaluator");
   await page.getByLabel("Work email").fill("evaluator@example.com");
   await page.getByLabel("Password", { exact: true }).fill("ExamplePass123!");
   await expect(page.locator("#signup-password-help")).toBeVisible();
@@ -305,22 +302,18 @@ test("identifies and highlights only the registration fields that need attention
       }),
     });
   });
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create demo workspace" }).click();
 
-  await expect(page.getByLabel("Username")).toHaveAttribute(
+  await expect(page.getByLabel("Work email")).toHaveAttribute(
     "aria-invalid",
     "true",
   );
-  await expect(page.locator("#signup-username-error")).toHaveText(
-    "This username is already in use. Choose another.",
-  );
-  await expect(page.getByLabel("Work email")).not.toHaveAttribute(
-    "aria-invalid",
-    "true",
+  await expect(page.locator("#signup-email-error")).toHaveText(
+    "An account identifier for this email is unavailable. Use another email.",
   );
 
   await page.unroute("**/api/auth/sign-up/email");
-  await page.getByLabel("Username").fill("available_name");
+  await page.getByLabel("Work email").fill("another-evaluator@example.com");
   await page.route("**/api/auth/sign-up/email", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -331,7 +324,7 @@ test("identifies and highlights only the registration fields that need attention
       }),
     });
   });
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create demo workspace" }).click();
 
   await expect(page.locator(".signin-error")).toHaveText(
     "The account service could not complete this request. Your details are still in the form; try again in a moment.",

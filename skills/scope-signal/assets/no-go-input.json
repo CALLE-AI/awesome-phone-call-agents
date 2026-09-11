@@ -1,0 +1,21 @@
+{
+  "schema_version": "2.0",
+  "request_id": "northstar-site-refusal",
+  "freelancer_name": "Northstar Studio",
+  "contact": {
+    "name": "Casey Park",
+    "organization": "Example Orchard",
+    "phone_e164": "+12025550125"
+  },
+  "authorization": {
+    "authorization_type": "explicit_consent",
+    "authorized_by": "Casey Park",
+    "authorized_at": "2026-09-01T03:10:00Z",
+    "purpose": "Verify the project brief for human review.",
+    "source": "contact_written_consent"
+  },
+  "project_summary": "Prepare a fictional brand refresh and a small website design package.",
+  "known_context": ["The written brief needs verification before proposal review."],
+  "language": "English",
+  "region": "US"
+}

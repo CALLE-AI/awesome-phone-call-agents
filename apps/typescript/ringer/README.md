@@ -12,7 +12,8 @@ confidence, quoted evidence, and the full transcript.
 - **Source:** https://github.com/DevJustinTech/ringer
 - **Language:** TypeScript (React + Vite front end, Vercel serverless functions)
 - **CALL-E surface used:** server SDK (`@call-e/calle`), REST API
-  (`/v1/calls`, `/v1/calls/{id}`, `/v1/calls/{id}/events`), signed webhooks
+  (`/v1/calls`, `/v1/calls/{id}`, `/v1/calls/{id}/events`), current unsigned
+  terminal webhooks
 
 ## Why not just use the CALL-E assistant?
 
@@ -102,8 +103,16 @@ pnpm dlx vercel dev
   when the scheduler is armed (KV + server key) it **requires `CRON_SECRET`** and
   a matching Bearer token and **fails closed** if the secret is unset — the
   dialer is never publicly triggerable.
-- Optional `CALLE_WEBHOOK_SECRET` enables signed-webhook verification via the
-  SDK's HMAC check on the raw request body.
+- Optional `CALLE_WEBHOOK_URL` opts calls into current unsigned terminal-event
+  delivery. `/api/webhook` requires `application/json`, validates that the
+  `CALL-E-Event-Id` header matches the bounded body event ID, accepts only the
+  documented terminal event types, and logs only bounded event/call IDs. This
+  consistency check is not sender authentication, so the endpoint performs no
+  business side effect and the live UI remains polling-based. A production
+  extension must durably deduplicate event IDs and reconcile through an
+  authenticated Calls API read before trusting a notification. Current CALL-E
+  deliveries do not include a webhook secret or signature headers; see the
+  [webhook guide](https://docs.heycall-e.com/#/webhooks).
 - A caller-supplied API base URL is honored only for the official
   `*.heycall-e.com` host (or loopback) and only alongside a BYOK key — the
   operator's server key is never redirected to a client-chosen host.

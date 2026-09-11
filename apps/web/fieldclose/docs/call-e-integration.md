@@ -83,6 +83,33 @@ Refresh never creates, retries, or redials a call. Provider state is handled as 
 
 The 600-second boundary is calculated from the persisted `acceptedAt` timestamp. Automatic refresh stops at a terminal result, reconciliation, navigation away from the active case, or component unmount. A human may still use `Refresh provider status` after timeout; a late terminal snapshot completes the normal result transaction and resolves the reconciliation task.
 
+### Browser close and reopen boundary
+
+The current MVP has no background worker, service worker, hosted poller, or
+server timer that continues CALL-E status lookup after the operator leaves the
+case. The five-second timer belongs to the mounted workbench only:
+
+1. Opening a case first loads its persisted detail from FieldClose.
+2. If that detail contains a live attempt with a stored provider call ID, no
+   result, and no reconciliation state, the workbench schedules its first
+   refresh for about five seconds later.
+3. Navigating to another case, opening the new-case form, signing out, closing
+   the tab, or unloading the workbench clears the browser timer. No CALL-E
+   request continues in the background.
+4. Reopening the same nonterminal case loads the same attempt from the database
+   and starts a new five-second timer. The refresh route looks up the stored
+   provider call ID; it does not execute call creation or mint a new attempt or
+   idempotency key.
+5. Time away from the page still counts toward the 600-second boundary because
+   the server compares the current time with persisted `acceptedAt`. If the
+   boundary elapsed while the page was closed, the first eligible refresh after
+   reopening performs the bounded final lookup. A terminal provider snapshot is
+   persisted normally; an unresolved snapshot creates one reconciliation task.
+
+Once the case is already in `needs_attention`, automatic refresh does not
+restart on reopen. The operator must use `Refresh provider status` to retrieve a
+late terminal snapshot from the same accepted call.
+
 ## Protected live path
 
 The authenticated HTTP API supports protected-workspace live mode without changing the fake public-demo default:
@@ -158,11 +185,12 @@ Failed-before-acceptance and ambiguous creation outcomes remain frozen.
 
 The SDK adapter, live application path, authenticated status refresh, protected
 operator UI, and protected-workspace provisioning boundary are implemented and
-covered through the injected HTTP boundary. A separately authorized local test
-also created exactly one real CALL-E task and retrieved its terminal result.
-The call reached a Sonetel free-trial forwarding announcement rather than the
-intended participant, so FieldClose preserved all approved HVAC questions as
-`not_asked` and routed the case to human follow-up. This verifies the provider
-boundary but not a successful conversation. The fake-only public environment is
-deployed; protected-staging isolation, production access, and deployed
-CALL-E/SMTP configuration still require inspectable verification.
+covered through the injected HTTP boundary. A maintainer-reported private record
+describes one separately authorized local CALL-E task, its terminal result, a
+structured-result discrepancy, and a dated operator correction. That record is
+redacted and not independently accessible, so it is not public validation or
+deployment provenance and does not establish accurate structured answer
+capture. The publicly reviewable environment is fake-only. Protected-staging,
+SMTP, and live-attempt statements elsewhere in this tree are likewise qualified
+as private operational observations unless a public artifact directly supports
+them.

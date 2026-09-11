@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="speech" language="en-US" speechTimeout="auto" timeout="5" action="/twiml/confirm-followup.xml" method="POST">
+    <Say voice="alice" language="en-US">Hello. This is an automated E-mploye test recipient. The proposed appointment works for me. Please say that you confirm it.</Say>
+  </Gather>
+  <Say voice="alice" language="en-US">I did not hear a response. Goodbye.</Say>
+</Response>

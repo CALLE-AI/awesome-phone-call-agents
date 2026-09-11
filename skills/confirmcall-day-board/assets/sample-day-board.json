@@ -1,0 +1,45 @@
+{
+  "business_display_name": "Northside Tutoring",
+  "timezone": "America/Los_Angeles",
+  "appointments": [
+    {
+      "request_id": "apt-maya-1",
+      "recipient_first_name": "Maya",
+      "to_phone_e164": "+15555550101",
+      "appointment": {
+        "service": "Algebra tutoring",
+        "starts_at": "2026-09-10T16:00:00-07:00",
+        "location": "Studio B"
+      },
+      "consent": true,
+      "authorized_reason": "Confirm existing booked session",
+      "reschedule_windows": ["2026-09-11T16:00:00-07:00", "2026-09-12T16:00:00-07:00"]
+    },
+    {
+      "request_id": "apt-jordan-2",
+      "recipient_first_name": "Jordan",
+      "to_phone_e164": "+15555550102",
+      "appointment": {
+        "service": "College essay coaching",
+        "starts_at": "2026-09-10T17:00:00-07:00",
+        "location": "Zoom"
+      },
+      "consent": true,
+      "authorized_reason": "Confirm existing booked session",
+      "reschedule_windows": ["2026-09-11T17:00:00-07:00", "2026-09-11T18:00:00-07:00"]
+    },
+    {
+      "request_id": "apt-eli-3",
+      "recipient_first_name": "Eli",
+      "to_phone_e164": "+15555550103",
+      "appointment": {
+        "service": "SAT math drill",
+        "starts_at": "2026-09-10T18:00:00-07:00",
+        "location": "Studio A"
+      },
+      "consent": true,
+      "authorized_reason": "Confirm existing booked session",
+      "reschedule_windows": []
+    }
+  ]
+}

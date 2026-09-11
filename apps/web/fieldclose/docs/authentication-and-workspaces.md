@@ -7,20 +7,51 @@
 - Passwordless authentication: Six-digit email OTP for existing accounts
 - Secondary authentication: Optional GitHub OAuth
 - Session storage: PostgreSQL through the Better Auth Drizzle adapter
-- Public demo workspace - authenticated, per-user, and fake-only
+- Public demo workspace — Authenticated, per-user, and fake-only
 - Protected workspace provisioning: Implemented for server-allow-listed operators
 - SMTP email delivery: Implemented; STARTTLS authentication and self-delivery
-  verified with an operator-supplied provider configuration
-- Protected staging deployment and production access: Not yet verified
+  verified with an operator-supplied provider configuration; production signup
+  verification-code delivery and account verification were operator-verified on
+  2026-08-24
+- Protected staging endpoint and Basic-auth perimeter: Deployed and verified
+- Protected staging resource isolation: Verified with an operator-approved
+  same-owner SMTP exception
+- Protected staging application access: Basic-auth and minimum-privilege
+  operator workspace access verified on 2026-08-24
 - Hosted Resend delivery and GitHub OAuth verification: Not yet completed
+
+Deployment and account statements in this document are maintainer-reported
+private operational observations unless they are directly visible at the public
+URL. They do not identify a public deployment revision and are not offered as
+public source, build, or independent validation provenance.
 
 This document describes the implemented authentication boundary and workspace
 isolation rules. SMTP credentials remain external to this repository. The
 verification evidence confirms connection, TLS upgrade, authentication, and
-provider acceptance of one self-test message; it does not claim that a
-protected production deployment, deployed SMTP sender, hosted Resend sender, or
-GitHub OAuth application has been configured. Protected-staging isolation and
-allow-listed production access therefore remain open evidence gates.
+provider acceptance of one self-test message. The protected-staging hostname is
+deployed behind a valid TLS certificate and Caddy Basic-auth perimeter, and an
+earlier private preflight record identifies a protected application release and
+workspace. A later read-only server inspection verified separate public and
+staging services, database URLs, authentication secrets, encryption and lookup
+keys, and protected CALL-E/allowlist configuration. The environment files are
+root-owned mode `0600`. Follow-up remediation isolated and rotated the Basic-auth
+credential and added a dedicated, privacy-filtered, bounded-retention staging
+access log. PostgreSQL uses distinct databases and roles over a loopback-only
+same-host boundary. The operator accepted the shared QQ SMTP identity as a
+documented same-owner deployment exception. A verified non-owner `operator`
+subsequently signed in and observed the protected workspace; the bounded latest
+session record independently confirmed that role and the eight-hour session
+duration without retaining account identifiers.
+
+On 2026-08-24 the operator completed the deployed signup verification-code
+flow. A subsequent privacy-bounded query confirmed that the verified-user count
+increased from one to two without reading an email address, verification code,
+or account identifier. No active session remained at inspection time, and the
+newly verified account had not yet been assigned a protected-workspace
+membership at that inspection. Later on 2026-08-24, explicit operator authority
+was used to assign the unique verified non-owner account an idempotent
+`operator` membership. The environment administration allowlist and live-call
+gates were not changed.
 
 ## Authentication boundary
 
@@ -37,7 +68,13 @@ OAuth account tokens are encrypted by Better Auth before persistence. `BETTER_AU
 
 ### Credential and email-code flows
 
-Credential registration collects a display name, username, work email, and password. Usernames are normalized to lowercase, must contain 3–30 letters, numbers, dots, or underscores, and are unique. Passwords must contain 8–128 characters. A registration does not create a session until the email is verified, and duplicate registration responses remain generic to reduce account enumeration.
+Credential registration collects a display name, work email, and password. The
+browser derives an internal username from the normalized email so registration
+does not require a separate username field. Generated usernames contain 3–30
+lowercase letters, numbers, dots, or underscores and remain unique; the work
+email is the user-facing credential. Passwords must contain 8–128 characters. A
+registration does not create a session until the email is verified, and
+duplicate registration responses remain generic to reduce account enumeration.
 
 Email verification and passwordless sign-in use a six-digit OTP:
 
@@ -194,4 +231,7 @@ The workspace migration supports databases created by the prior persistence feat
 - Provisioning and actual live-gate changes create append-only workspace administration evidence without storing the actor email.
 - Unit and PostgreSQL tests cover every independent live-call switch.
 
-Hosted Resend delivery, GitHub OAuth login, secret configuration, secure-cookie behavior on HTTPS, and protected-environment access still require deployment verification.
+Hosted Resend delivery and GitHub OAuth login remain unverified. SMTP signup,
+secret configuration, secure-cookie behavior on HTTPS, and protected-environment
+access have maintainer-reported private operational evidence, but not independent
+public verification.
