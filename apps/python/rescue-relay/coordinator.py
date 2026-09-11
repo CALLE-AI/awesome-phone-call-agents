@@ -9,8 +9,9 @@ import json
 import os
 import re
 from typing import Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
+import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from pricing import extract_quote, CostQuote, validate_quote, describe_quote, cost_summary, DEFAULT_CURRENCY
@@ -23,23 +24,50 @@ from intake import INSTRUCTION as INTAKE_INSTRUCTION, rule_review, validate_revi
 
 
 LOCAL_LLM_HOSTS = {"127.0.0.1", "localhost", "::1"}
+DEFAULT_REMOTE_LLM_ORIGINS = {"https://api.openai.com"}
 
 
-def llm_endpoint_kind(base_url: str) -> str | None:
-    """Allow only loopback development or the official OpenAI HTTPS API."""
+def _https_origin(value: str) -> str | None:
+    """Normalize a configured origin; paths and credentials are never valid here."""
+    try:
+        parsed = urlparse(value.strip())
+        port = parsed.port
+    except ValueError:
+        return None
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+            or parsed.query or parsed.fragment or parsed.path not in {"", "/"}):
+        return None
+    host = parsed.hostname.lower()
+    return f"https://{host}" + (f":{port}" if port not in {None, 443} else "")
+
+
+def approved_llm_origins(configured: str) -> set[str]:
+    origins = set(DEFAULT_REMOTE_LLM_ORIGINS)
+    for value in configured.split(","):
+        origin = _https_origin(value)
+        if origin:
+            origins.add(origin)
+    return origins
+
+
+def llm_endpoint_kind(base_url: str, allowed_origins: set[str] | None = None) -> str | None:
+    """Allow loopback development or an exact, explicitly approved HTTPS origin."""
     try:
         parsed = urlparse(base_url)
         port = parsed.port
     except ValueError:
         return None
-    if (not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment
-            or parsed.path.rstrip("/") != "/v1"):
+    if (not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment):
+        return None
+    segments = [unquote(part) for part in parsed.path.split("/") if part]
+    if not segments or segments[-1] != "v1" or any(part in {".", ".."} for part in segments):
         return None
     host = parsed.hostname.lower()
     if host in LOCAL_LLM_HOSTS and parsed.scheme in {"http", "https"}:
         return "local"
-    if host == "api.openai.com" and parsed.scheme == "https" and port in {None, 443}:
-        return "openai"
+    origin = f"https://{host}" + (f":{port}" if port not in {None, 443} else "")
+    if parsed.scheme == "https" and origin in (allowed_origins or DEFAULT_REMOTE_LLM_ORIGINS):
+        return "remote"
     return None
 
 
@@ -398,15 +426,16 @@ class Coordinator:
         self.model = os.getenv("LLM_MODEL", "").strip()
         self.timeout = max(1.0, float(os.getenv("LLM_TIMEOUT_SECONDS", "60")))
         self.json_mode = os.getenv("LLM_JSON_MODE", "true").lower() == "true"
-        endpoint_kind = llm_endpoint_kind(self.base_url) if self.base_url else None
+        self.allowed_origins = approved_llm_origins(os.getenv("LLM_ALLOWED_ORIGINS", ""))
+        endpoint_kind = llm_endpoint_kind(self.base_url, self.allowed_origins) if self.base_url else None
         self.local = endpoint_kind == "local"
         self.configuration_error = ""
         if self.base_url and self.model and endpoint_kind is None:
             self.configuration_error = (
-                "Configured model endpoint is not an approved HTTPS OpenAI API endpoint or a loopback /v1 address."
+                "Configured model endpoint is not an approved HTTPS /v1 endpoint or a loopback /v1 address."
             )
-        elif self.base_url and self.model and endpoint_kind == "openai" and not self.api_key:
-            self.configuration_error = "The approved OpenAI endpoint requires an API key."
+        elif self.base_url and self.model and endpoint_kind == "remote" and not self.api_key:
+            self.configuration_error = "The approved remote model endpoint requires an API key."
         self.enabled = bool(self.base_url and self.model and endpoint_kind and (self.api_key or self.local))
         self.required = os.getenv("LLM_FALLBACK", "true").lower() == "false" or self.mode == "required"
         self.client_factory = None
@@ -418,14 +447,20 @@ class Coordinator:
                 "fallback_enabled": not self.required}
 
     async def _json(self, purpose: str, instruction: str, data: dict) -> dict:
+        http_client = None
         try:
             factory = self.client_factory
             if factory is None:
                 from openai import AsyncOpenAI
                 factory = AsyncOpenAI
+                http_client = httpx.AsyncClient(follow_redirects=False)
             # Loopback development never receives a credential from the environment.
             client_key = "local" if self.local else self.api_key
-            async with factory(base_url=self.base_url, api_key=client_key, timeout=self.timeout, max_retries=0) as client:
+            client_options = {"base_url": self.base_url, "api_key": client_key,
+                              "timeout": self.timeout, "max_retries": 0}
+            if http_client is not None:
+                client_options["http_client"] = http_client
+            async with factory(**client_options) as client:
                 kwargs = {"response_format": {"type": "json_object"}} if self.json_mode else {}
                 response = await client.chat.completions.create(
                     model=self.model,
@@ -440,6 +475,9 @@ class Coordinator:
                 return parsed
         except Exception as exc:
             raise PlannerUnavailable(f"Model unavailable for {purpose} ({type(exc).__name__}).") from None
+        finally:
+            if http_client is not None and not http_client.is_closed:
+                await http_client.aclose()
 
     async def _run(self, phase: str, instruction: str, data: dict, validate, fallback, *, model_validate=None) -> dict:
         reason = self.configuration_error or "No model configured."

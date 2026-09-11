@@ -18,7 +18,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(calling, "MOCK_DELAY_SECONDS", .005)
     monkeypatch.setenv("LLM_MODE", "auto")
     monkeypatch.setenv("LLM_FALLBACK", "true")
-    for key in ("LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
+    for key in ("LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY", "LLM_ALLOWED_ORIGINS"):
         monkeypatch.setenv(key, "")
     monkeypatch.setattr(relay, "planner", Coordinator())
     with TestClient(relay.app, base_url="http://localhost", client=("127.0.0.1", 50000)) as c:

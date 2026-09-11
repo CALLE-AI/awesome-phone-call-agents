@@ -75,7 +75,7 @@ Stop the old server first and back up its `.env` and SQLite database. Extract th
 
 The database adds a default-empty decision-results field to existing coordination runs. The earlier original-request ledger and provider fields remain. Existing rows are not deleted or reset; conditional branch results are not invented for older runs. A legacy flat plan that conflicts with a conditional goal is flagged rather than silently granted new authorization. Do not reset a live database or restart an unresolved call as a new rescue just to clear an error.
 
-Remote model calls now require `LLM_BASE_URL=https://api.openai.com/v1`, a model ID and an environment-only key. Credential-free loopback `/v1` endpoints remain available for local development; the environment key is never attached to them. Other origins and insecure remote URLs are rejected before any model client or case-data request is created. `LLM_FALLBACK=false` pauses on unavailable or invalid model output rather than substituting limited rules.
+Remote model calls require an exact HTTPS origin listed in `LLM_ALLOWED_ORIGINS`, a base path ending in `/v1`, a model ID and an environment-only key. `https://api.openai.com` is pre-approved. Redirects are disabled, so credentials and case data cannot be forwarded to a second origin. Credential-free loopback `/v1` endpoints remain available for local development; the environment key is never attached to them. `LLM_FALLBACK=false` pauses on unavailable or invalid model output rather than substituting limited rules.
 
 ## Verification and limits
 

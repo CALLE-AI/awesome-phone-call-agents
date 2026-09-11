@@ -21,7 +21,7 @@ The workspace then follows the rescue through human-confirmed updates. A helper 
 ## How we built it
 Rescue Relay uses Python, FastAPI and SQLite, with a lightweight HTML, CSS and JavaScript interface. CALL-E’s REST API handles the live phone transport. The app submits a task for one approved saved destination, records the provider call ID, polls the result and analyses the saved recipient transcript turns. Availability inquiries and approved-helper callbacks have different purposes and permissions.
 
-An optional official OpenAI HTTPS endpoint supports intake and offer interpretation; credential-free loopback `/v1` development is also supported. Other remote origins are rejected before any client or case-data request is created. A conservative built-in fallback makes the fictional demonstration reproducible without credentials. The app retains the distinction between model-generated interpretation, saved evidence and human approval.
+An optional OpenAI-compatible HTTPS endpoint supports intake and offer interpretation when its exact origin is explicitly allowlisted; redirects are disabled. Credential-free loopback `/v1` development is also supported. Other remote origins are rejected before any client or case-data request is created. A conservative built-in fallback makes the fictional demonstration reproducible without credentials.
 
 The product demonstration and live experience share the same frontend and rescue workflow. The final recording was captured with Playwright by typing and clicking the running v5.6 app against an isolated fictional-data API. It is not a separate presentation interface.
 

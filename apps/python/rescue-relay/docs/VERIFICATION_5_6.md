@@ -4,7 +4,7 @@ Verified 11 September 2026. The uploaded original archives remain unchanged. Raw
 
 | Check | Result |
 | --- | --- |
-| Python application, API, migration, conditional-contract, authentication, diagnostic, endpoint-security and mocked-provider tests | **668 passed** |
+| Python application, API, migration, conditional-contract, authentication, diagnostic, endpoint-security and mocked-provider tests | **673 passed** |
 | Dependency-free JavaScript state projection tests | **77 passed** |
 | Conditional goal / approval / assessment / branch UI journey | **10 passed** |
 | Existing semantic intake selection UI journey | **7 passed** |
@@ -23,7 +23,7 @@ Browser counts are checks/scenarios, not independent live rescues. The 6 provide
 
 **CALL-E transport.** Every unconfirmed create outcome performs one POST and then halts for reconciliation; `call_not_ready` is never an automatic replay trigger. A known-ID `call_not_ready` is polled with GET only. Tests cover the overall deadline, numeric/date Retry-After, insufficient remaining polling budget, cancellation, missing IDs, and non-readiness 422 errors. IDs mentioned only in arbitrary error details are never promoted to Calls API IDs. Sanitized provider `message` and `details.questions` guidance is preserved without exposing credentials, email addresses or phone numbers.
 
-**Model transport.** Remote LLM traffic is allowed only to the official OpenAI HTTPS `/v1` endpoint. Other remote origins and malformed URLs are rejected before client creation. Loopback `/v1` development is allowed but never receives the environment API key. All model calls remain backend-only.
+**Model transport.** Remote LLM traffic requires an exact origin match in the explicit HTTPS allowlist and a base path ending in `/v1`; the official OpenAI origin is pre-approved. Insecure origins, hostname lookalikes, URL credentials, queries, fragments and traversal segments are rejected before client creation. Redirect following is disabled. Loopback `/v1` development is allowed but never receives the environment API key. All model calls remain backend-only.
 
 **Public authentication.** Production mode fails closed unless both HTTP Basic environment credentials are configured. The root page, static assets, read APIs, run/transcript data and mutation endpoints all require authentication. Invalid schemes, malformed Base64 and wrong credentials receive the same bounded 401 response. `/health` is the only public route so Render can verify readiness; it exposes only status and version.
 

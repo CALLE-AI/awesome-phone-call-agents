@@ -5,7 +5,7 @@
 - Remove the conditional-transport stage-choice override; retire its saved question without discarding an understood IF/ELSE goal.
 - Carry grounded decisions, gates and prerequisites into responder offers, callbacks, branch-aware progress and closure. Unknown is not NO. Recording a reporter-acknowledged assessment makes no call.
 - Treat every unconfirmed create outcome, including `call_not_ready` without an ID, as ambiguous and halt after one POST for reconciliation. Known IDs stay GET-only. Preserve sanitized provider `message` and `details.questions` guidance without exposing credentials or phone numbers.
-- Restrict remote model traffic to the official OpenAI HTTPS `/v1` origin. Credential-free loopback development remains available, and loopback clients never receive `LLM_API_KEY`.
+- Require remote model traffic to use an exact explicitly allowed HTTPS origin and a base path ending in `/v1`; redirects are disabled. The official OpenAI origin is pre-approved. Credential-free loopback development remains available, and loopback clients never receive `LLM_API_KEY`.
 - Show whether a Calls API ID actually exists, retain private provider diagnostics outside public API output, and provide a read-only diagnostic script.
 - Add conditional end-to-end, mocked-provider, privacy and responsive UI regressions. See UPGRADE_5_6.md and docs/VERIFICATION_5_6.md for results and limitations.
 

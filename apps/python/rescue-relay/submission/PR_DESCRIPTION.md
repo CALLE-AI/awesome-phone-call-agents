@@ -23,7 +23,7 @@ Open http://127.0.0.1:8000 and choose **Try the demo**. Use the example budget o
 ## Credentials and side effects
 No keys are required for the fictional product test path. Live mode requires a CALL-E API key, an explicitly enabled live configuration and consenting saved contacts. It is local-only. Public demonstrations must remain isolated fictional sandboxes with no secrets or personal data. One server worker is required.
 
-Remote model calls are restricted to `https://api.openai.com/v1`. Other remote or insecure origins are rejected before a client is created. Credential-free loopback `/v1` development is allowed, but loopback requests never receive the environment `LLM_API_KEY`. Model calls remain backend-only.
+Remote model calls require an exact HTTPS origin listed in `LLM_ALLOWED_ORIGINS` and a base path ending in `/v1`; the official OpenAI origin is pre-approved. Redirects are disabled. Insecure or nonmatching origins are rejected before a client is created. Credential-free loopback `/v1` development is allowed, but loopback requests never receive the environment `LLM_API_KEY`. Model calls remain backend-only.
 
 Opening, reviewing or selecting a plan does not authorise a confirmation callback. Stop prevents subsequent work, but does not promise to terminate a provider call already in progress. There is no automatic redial.
 

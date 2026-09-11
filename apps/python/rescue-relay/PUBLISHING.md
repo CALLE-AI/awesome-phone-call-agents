@@ -70,6 +70,7 @@ Use a separate installation with a disposable database and exactly these setting
 CALL_MODE=mock
 ENABLE_LIVE_CALLS=false
 CALLE_API_KEY=
+LLM_ALLOWED_ORIGINS=
 LLM_BASE_URL=
 LLM_MODEL=
 LLM_API_KEY=
@@ -91,7 +92,7 @@ docker build -t rescue-relay:5.6.0 .
 docker run --rm -p 127.0.0.1:8000:8000 \
   -e APP_ENV=production -e CALL_MODE=mock -e ENABLE_LIVE_CALLS=false \
   -e BASIC_AUTH_USERNAME=reviewer -e BASIC_AUTH_PASSWORD='<generated-secret>' \
-  -e CALLE_API_KEY= -e LLM_BASE_URL= -e LLM_MODEL= -e LLM_API_KEY= \
+  -e CALLE_API_KEY= -e LLM_ALLOWED_ORIGINS= -e LLM_BASE_URL= -e LLM_MODEL= -e LLM_API_KEY= \
   -v rescue-relay-demo:/data rescue-relay:5.6.0
 ```
 

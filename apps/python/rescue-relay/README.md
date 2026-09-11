@@ -65,7 +65,7 @@ Official integration reference: https://github.com/CALLE-AI/call-e-integrations
 
 ## Optional language model
 
-The coordinator accepts either the official `https://api.openai.com/v1` endpoint with `LLM_MODEL` and an environment-only `LLM_API_KEY`, or a credential-free loopback `/v1` endpoint for local development. Other remote origins, insecure remote URLs, embedded URL credentials, and unexpected paths are rejected before a client is created or case data is serialized for transport. Blank or rejected settings use the conservative built-in fallback when `LLM_FALLBACK=true`; they are not external AI inference. Set `LLM_FALLBACK=false` to pause when usable model output is unavailable.
+The coordinator accepts the pre-approved official OpenAI origin or an exact HTTPS origin explicitly listed in `LLM_ALLOWED_ORIGINS`. The configured base path must end in `/v1`; redirects, insecure remote URLs, hostname lookalikes, embedded URL credentials, query strings and fragments are rejected. A credential-free loopback `/v1` endpoint remains available for local development and never receives the environment key. Blank or rejected settings use the conservative built-in fallback when `LLM_FALLBACK=true`; they are not external AI inference.
 
 Both modes retain the same review and approval boundaries. The model may interpret observations and offers; it does not authorise payments, invent arrivals, diagnose an animal or replace human consent. Source/provenance remains available in technical history.
 
