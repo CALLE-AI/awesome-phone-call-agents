@@ -1,0 +1,179 @@
+{
+  "generated": "deterministic",
+  "calls": [
+    {
+      "file": "queued-no-failure-0turns-10f4ce.json",
+      "quirks": [],
+      "status": "queued",
+      "failureCode": null,
+      "turns": 0
+    },
+    {
+      "file": "completed-no-failure-9turns-549d84.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 9
+    },
+    {
+      "file": "completed-no-failure-7turns-8a9aeb.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 7
+    },
+    {
+      "file": "completed-no-failure-8turns-0f3ac1.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 8
+    },
+    {
+      "file": "completed-no-failure-7turns-4260e0.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 7
+    },
+    {
+      "file": "completed-no-failure-2turns-d1d516.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 2
+    },
+    {
+      "file": "completed-no-failure-7turns-f62388.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed",
+        "recipient-speaks-after-the-agent-stops"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 7
+    },
+    {
+      "file": "failed-404-0turns-09c72b.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "404",
+      "turns": 0
+    },
+    {
+      "file": "failed-486-0turns-d09b8b.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "486",
+      "turns": 0
+    },
+    {
+      "file": "failed-486-0turns-c64ac1.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "486",
+      "turns": 0
+    },
+    {
+      "file": "failed-603-0turns-42b9b8.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "603",
+      "turns": 0
+    },
+    {
+      "file": "failed-486-0turns-ba0ca6.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "486",
+      "turns": 0
+    },
+    {
+      "file": "completed-no-failure-8turns-ff6b5c.json",
+      "quirks": [
+        "connected-call-timestamps-are-well-formed"
+      ],
+      "status": "completed",
+      "failureCode": null,
+      "turns": 8
+    },
+    {
+      "file": "failed-603-0turns-14ab2d.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "603",
+      "turns": 0
+    },
+    {
+      "file": "failed-603-0turns-d4734e.json",
+      "quirks": [
+        "failed-attempt-timestamp-has-no-zone",
+        "failed-attempt-timestamp-lags-four-hours",
+        "raw-sip-code-as-failure-code",
+        "structured-result-without-conversation",
+        "summary-suggests-retry-for-unreachable-destination",
+        "single-attempt-reported"
+      ],
+      "status": "failed",
+      "failureCode": "603",
+      "turns": 0
+    }
+  ]
+}
