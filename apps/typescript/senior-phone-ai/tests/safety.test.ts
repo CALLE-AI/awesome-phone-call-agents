@@ -81,6 +81,7 @@ test("call scheduler logs mask destinations and hash schedule identifiers", () =
   assert.equal(entry.requestReference.length, 12);
   assert.doesNotMatch(serialized, /12025550123|private-idempotency-key/);
   assert.equal(callFailureCode(new Error("CALL-E create status 503")), "http_503");
+  assert.equal(callFailureCode(Object.assign(new Error("CALL-E create status 422"), { providerCode: "invalid_phone" })), "invalid_phone");
   assert.equal(callFailureCode(new Error("fetch failed", { cause: { code: "UND_ERR_CONNECT_TIMEOUT" } })), "und_err_connect_timeout");
 });
 

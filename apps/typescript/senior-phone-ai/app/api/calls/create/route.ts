@@ -101,11 +101,24 @@ export async function POST(request: Request) {
       source: "provider",
     });
     if (rejected) {
-      const guidance = cause.status === 422
-        ? "Review the destination and call instructions, then create a new confirmation."
-        : "Review the call details and CALL-E configuration, then create a new confirmation.";
+      const guidanceByCode: Readonly<Record<string, string>> = {
+        insufficient_balance: "Check the CALL-E account balance.",
+        invalid_phone: "Check the selected country and destination number.",
+        invalid_recipient: "Check the selected country and destination number.",
+        no_recipients: "Enter a destination number.",
+        policy_violation: "Revise the call instructions so they comply with CALL-E policy.",
+        recipient_blocked: "CALL-E governance does not allow calls to this recipient.",
+        unsupported_language: "Choose a language supported for the recipient's region.",
+        unsupported_region: "CALL-E does not support this recipient region.",
+      };
+      const providerCode = cause.providerCode;
+      const guidance = (providerCode && guidanceByCode[providerCode])
+        ?? (cause.status === 422
+          ? "Review the destination and call instructions, then create a new confirmation."
+          : "Review the call details and CALL-E configuration, then create a new confirmation.");
+      const diagnostic = providerCode ? `, ${providerCode}` : "";
       return NextResponse.json({
-        error: `CALL-E rejected this request (HTTP ${cause.status}). ${guidance}`,
+        error: `CALL-E rejected this request (HTTP ${cause.status}${diagnostic}). ${guidance}`,
       }, { status: 422, headers: noStoreHeaders });
     }
     return NextResponse.json({

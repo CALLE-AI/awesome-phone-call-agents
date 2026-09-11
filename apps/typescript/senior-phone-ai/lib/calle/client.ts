@@ -6,8 +6,40 @@ import { validateOutboundCallRequest, type OutboundCallRequest } from "./outboun
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
 
+const CALLE_ERROR_CODES = new Set([
+  "invalid_request",
+  "unauthorized",
+  "forbidden",
+  "rate_limit_exceeded",
+  "insufficient_balance",
+  "unsupported_region",
+  "unsupported_language",
+  "recipient_blocked",
+  "policy_violation",
+  "call_not_ready",
+  "no_recipients",
+  "invalid_recipient",
+  "invalid_phone",
+  "result_schema_invalid",
+  "recipient_result_schema_invalid",
+  "idempotency_conflict",
+  "provider_unavailable",
+  "internal_error",
+  "not_found",
+]);
+
+async function readCalleErrorCode(response: Response): Promise<string | undefined> {
+  try {
+    const body = await response.json() as { error?: { code?: unknown } };
+    const code = body.error?.code;
+    return typeof code === "string" && CALLE_ERROR_CODES.has(code) ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export class CalleRequestError extends Error {
-  constructor(readonly status: number) {
+  constructor(readonly status: number, readonly providerCode?: string) {
     super(`CALL-E create status ${status}`);
     this.name = "CalleRequestError";
   }
@@ -41,7 +73,7 @@ export async function createCalleCall(
     redirect: "manual",
   });
   if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
-  if (!response.ok) throw new CalleRequestError(response.status);
+  if (!response.ok) throw new CalleRequestError(response.status, await readCalleErrorCode(response));
   return parseCalleCallSnapshot(await response.json());
 }
 

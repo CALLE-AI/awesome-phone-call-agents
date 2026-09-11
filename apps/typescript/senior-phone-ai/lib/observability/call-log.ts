@@ -49,6 +49,8 @@ function boundedCode(value: string): string | undefined {
 export function callFailureCode(cause: unknown): string {
   if (cause instanceof DOMException && cause.name === "AbortError") return "timeout";
   if (!(cause instanceof Error)) return "unknown_error";
+  const providerCode = "providerCode" in cause ? cause.providerCode : undefined;
+  if (typeof providerCode === "string") return boundedCode(providerCode)?.toLowerCase() ?? "provider_error";
   const httpStatus = /^CALL-E create status ([0-9]{3})$/.exec(cause.message)?.[1];
   if (httpStatus) return `http_${httpStatus}`;
   if (cause.message === "CALL-E redirect rejected") return "redirect_rejected";

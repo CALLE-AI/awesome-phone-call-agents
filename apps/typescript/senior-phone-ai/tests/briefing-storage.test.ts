@@ -44,8 +44,12 @@ test("encrypted snapshots, daily deduplication and the CALL-E payload work toget
       assert.ok(payload.task.includes('cannot browse during this phone call'));
       assert.deepEqual(payload.recipients,[{phones:['+12025550100']}]);
       await assert.rejects(
-        createCalleCall({destinationE164:'+12025550100',purpose:'Rejected fixture.',idempotencyKey:'fixture-rejected-1234'},process.env.CALLE_API_KEY,async ()=>Response.json({}, {status:422})),
-        (error) => error instanceof CalleRequestError && error.status === 422,
+        createCalleCall({destinationE164:'+12025550100',purpose:'Rejected fixture.',idempotencyKey:'fixture-rejected-1234'},process.env.CALLE_API_KEY,async ()=>Response.json({error:{code:'invalid_phone',message:'fixture',details:{}}}, {status:422})),
+        (error) => error instanceof CalleRequestError && error.status === 422 && error.providerCode === 'invalid_phone',
+      );
+      await assert.rejects(
+        createCalleCall({destinationE164:'+12025550100',purpose:'Rejected fixture.',idempotencyKey:'fixture-rejected-unknown'},process.env.CALLE_API_KEY,async ()=>Response.json({error:{code:'untrusted_code',message:'fixture',details:{}}}, {status:422})),
+        (error) => error instanceof CalleRequestError && error.status === 422 && error.providerCode === undefined,
       );
       const fresh = await prepareProfile(profile.id,true);
       assert.notEqual(fresh.id,brief.id);
