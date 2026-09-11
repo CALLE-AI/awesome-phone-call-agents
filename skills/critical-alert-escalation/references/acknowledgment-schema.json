@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Critical alert acknowledgment",
+  "description": "The structured result CALL-E extracts from each escalation call.",
+  "type": "object",
+  "properties": {
+    "reached": { "type": "boolean", "description": "A live human answered." },
+    "acknowledged": { "type": "boolean", "description": "They confirmed receipt of the alert." },
+    "responder_role": { "type": "string", "description": "Who acknowledged (e.g. trainer, physician, on-call)." },
+    "action_taken": { "type": "string", "description": "What they said they'd do." },
+    "notes": { "type": "string" }
+  },
+  "required": ["reached", "acknowledged"]
+}
