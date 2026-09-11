@@ -6,8 +6,7 @@
   },
   "eta_minutes": {
     "type": "string",
-    "enum": ["unknown"],
-    "description": "Estimated arrival time in minutes as stated by the unit. Use the number if stated, else \"unknown\"."
+    "description": "Estimated arrival in minutes exactly as the unit stated it, as digits (for example \"12\"). If the unit did not state a time or the answer was unclear, return the word \"unknown\"."
   },
   "notes": {
     "type": "string",

@@ -18,6 +18,16 @@ call under two minutes. Identify yourself as calling on behalf of the emergency
 control room relay.
 ```
 
+## Request policy (sent alongside the goal)
+
+```json
+{ "maxAttempts": 1, "voicemail": "do_not_leave", "onNotReady": "error" }
+```
+
+Single attempt, no voicemail, errors surface — no automatic redial, ever. A
+relay that reaches voicemail has NOT reached a unit; retrying automatically is
+how one ambiguous dispatch becomes three calls.
+
 ## Why each constraint exists
 
 | Constraint | Rationale |
@@ -29,3 +39,4 @@ control room relay.
 | "If uncertain, return unknown — never guess" | Tri-state results keep downstream systems predictable; a guessed ETA is worse than none. |
 | "Keep the call under two minutes" | Bounded side effect; emergency channels must not be held. |
 | Written `confirmed-by` required in the skill | The skill refuses to place a call without a named human decision — the human-in-loop is auditable. |
+| `eta_minutes` is free-form, not enum-locked | An enum of only `"unknown"` would forbid the agent from ever returning a number; the description instructs digits ("12") or the literal word "unknown". |
