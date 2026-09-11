@@ -1,0 +1,522 @@
+/* Layer order MUST be declared before the import, and before any style rule.
+   CSS allows @layer statements ahead of @import, and this is the only spot
+   the bundler preserves - declared after the import it was optimised away,
+   which let `legacy` sort last (first-appearance order) and beat utilities.
+
+   Tailwind declares `theme, base, components, utilities`; this restates it
+   with `legacy` inserted after base, so the legacy block outranks preflight
+   but loses to components and utilities. */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* BRANDING.md section 0 mandates `[data-theme="dark"]`, not shadcn's `.dark`.
+   Redefined so the eventual dark pass is a values-only override. No dark
+   values are defined yet, by design - `dark:` utilities simply never match. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/* ============================================================================
+   ARC DESIGN TOKENS - BRANDING.md v1.1, sections 2 / 3 / 4
+   ----------------------------------------------------------------------------
+   Stage 2 output: tokens + fonts ONLY. No component consumes these yet, and
+   the legacy CSS below this block is untouched on purpose - it still styles
+   every unconverted (Track C) screen. It gets stripped per-file as components
+   are converted, not before.
+
+   Structure is deliberate and load-bearing for dark mode:
+     :root          raw palette values + semantic role aliases
+     @theme inline  maps roles into Tailwind's --color-* namespace
+
+   `inline` makes generated utilities emit `var(--bg)` rather than a resolved
+   hex, so a later `[data-theme="dark"] { --bg: ... }` block re-themes the whole
+   app by changing VALUES ONLY - no component is touched. Do not flatten these
+   two layers into one; that is what breaks the dark-mode promise.
+
+   Components use the SEMANTIC names only (bg / surface / text / border / ...).
+   Reach for a palette name (lilac / blush / butter) only for chart fills,
+   status pills and the tuner strip, where the colour IS the meaning.
+   ============================================================================ */
+
+:root {
+  /* --- palette (section 2) ------------------------------------------------ */
+  --bone:        #FBFAF7;  /* page background, warm off-white */
+  --paper:       #FFFFFF;  /* cards, panels */
+  --ink:         #141118;  /* primary text, primary button fill */
+  --graphite:    #6C6676;  /* secondary text, labels, captions */
+  --hairline:    #E8E4EF;  /* borders, dividers, table rules */
+  --lilac:       #DCD8FB;  /* field/section background */
+  --lilac-deep:  #A79BF2;  /* chart fill, active state */
+  --blush:       #FBC7E6;  /* field/section background */
+  --blush-deep:  #F08FCE;  /* chart fill, emphasis */
+  --butter:      #FAEDA1;  /* highlight marker, secondary button */
+  --butter-deep: #F2D64F;  /* chart fill, warning-adjacent */
+
+  /* --- semantic aliases: components use ONLY these ------------------------ */
+  --bg:         var(--bone);
+  --surface:    var(--paper);
+  /* --fg / --fg-muted are the canonical foreground tokens.
+     They exist because Tailwind v4 reserves the `--text-*` namespace for FONT
+     SIZES, so a `@theme` value of `var(--text)` does not resolve reliably -
+     it silently emitted the wrong colour and rendered table headers and
+     inactive tabs white-on-white. BRANDING.md's `--text` / `--text-muted`
+     names are kept below as readable aliases; both point here, so dark mode
+     still flips ONE pair of values. */
+  --fg:         var(--ink);
+  --fg-muted:   var(--graphite);
+  --text:       var(--fg);
+  --text-muted: var(--fg-muted);
+  --border:     var(--hairline);
+  --primary:    var(--ink);   /* near-black. NOT lilac, NOT a gradient. */
+  --primary-fg: var(--paper);
+  --accent:     var(--butter);
+
+  /* --- status tokens (approved, BRANDING.md v1.1 section 2) ---------------
+     The pastel palette has no status colours, but the app has 215 status
+     occurrences. Each value below is contrast-checked as TEXT on both
+     --paper and --bone (>= 4.5:1); the pale companions are fills only.
+     --focus is lilac-deep because it must stay visible against BOTH --bone
+     and the near-black --primary button; --ink rings vanish on --ink fills. */
+  --success:    #1F7A5C;   /* 5.25:1 on paper */
+  --success-bg: #DDF3E9;
+  --warning:    #8A5A00;   /* 5.93:1 on paper */
+  --warning-bg: var(--butter);
+  --danger:     #C4356B;   /* 5.16:1 on paper */
+  --danger-bg:  #FBE4EE;
+  --focus:      var(--lilac-deep);
+
+  /* --- shadcn/ui compatibility layer --------------------------------------
+     shadcn primitives are written against these names. Rather than keep two
+     palettes, every one is remapped onto an Arc token above. Nothing here
+     holds a literal colour - change Arc's values and shadcn follows.
+     Do not re-add shadcn's oklch defaults; `shadcn add` will try.           */
+  /* NOTE: --background / --foreground are deliberately NOT defined here.
+     The legacy :root further down re-declares both (#0F0E1A / #ffffff) and,
+     being later in the file at equal specificity, it wins. Routing through
+     them rendered table headers and inactive tabs white-on-white. The two
+     --color-* entries below bind straight to Arc tokens instead. */
+  --card:                 var(--surface);
+  --card-foreground:      var(--text);
+  --popover:              var(--surface);
+  --popover-foreground:   var(--text);
+  --primary-foreground:   var(--primary-fg);
+  --secondary:            var(--butter);      /* butter = secondary button */
+  --secondary-foreground: var(--ink);
+  --muted:                var(--bone);
+  --muted-foreground:     var(--fg-muted);
+  --accent-foreground:    var(--ink);
+  --destructive:          var(--danger);
+  --input:                var(--border);
+  --ring:                 var(--focus);
+  --chart-1:              var(--lilac-deep);
+  --chart-2:              var(--blush-deep);
+  --chart-3:              var(--butter-deep);
+  --chart-4:              var(--ink);
+  --chart-5:              var(--graphite);
+  --radius:               12px;               /* = --radius-control */
+  --sidebar:                    var(--surface);
+  --sidebar-foreground:         var(--text);
+  --sidebar-primary:            var(--primary);
+  --sidebar-primary-foreground: var(--primary-fg);
+  --sidebar-accent:             var(--lilac);
+  --sidebar-accent-foreground:  var(--ink);
+  --sidebar-border:             var(--border);
+  --sidebar-ring:               var(--focus);
+}
+
+@theme inline {
+  /* --- colours ------------------------------------------------------------
+     Semantic first - these are what components are allowed to use.          */
+  --color-bg:         var(--bg);
+  --color-surface:    var(--surface);
+  --color-text:       var(--fg);
+  --color-text-muted: var(--fg-muted);
+  --color-border:     var(--border);
+  --color-primary:    var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent:     var(--accent);
+
+  /* Palette - chart fills, status pills, tuner strip segments only.         */
+  --color-bone:        var(--bone);
+  --color-paper:       var(--paper);
+  --color-ink:         var(--ink);
+  --color-graphite:    var(--graphite);
+  --color-hairline:    var(--hairline);
+  --color-lilac:       var(--lilac);
+  --color-lilac-deep:  var(--lilac-deep);
+  --color-blush:       var(--blush);
+  --color-blush-deep:  var(--blush-deep);
+  --color-butter:      var(--butter);
+  --color-butter-deep: var(--butter-deep);
+
+  /* Status + focus tokens (see :root note above). */
+  --color-success:    var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning:    var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger:     var(--danger);
+  --color-danger-bg:  var(--danger-bg);
+  --color-focus:      var(--focus);
+
+  /* --- typography (section 3) ---------------------------------------------
+     Three roles, loaded in app/layout.tsx via next/font/google.
+       display  Gabarito       headings only, 600-800
+       sans     Inter          body, 400/500
+       mono     JetBrains Mono frequencies, call signs, timestamps, rates,
+                               durations. Functional, not decorative.        */
+  --font-display: var(--font-gabarito), ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-heading: var(--font-display);   /* shadcn alias -> Gabarito */
+  /* Accent - the emphasised half of a landing headline, italic. Marketing page
+     only; it never appears inside the app. */
+  --font-accent:  var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --color-sidebar-ring:        var(--sidebar-ring);
+  --color-sidebar-border:        var(--sidebar-border);
+  --color-sidebar-accent-foreground:        var(--sidebar-accent-foreground);
+  --color-sidebar-accent:        var(--sidebar-accent);
+  --color-sidebar-primary-foreground:        var(--sidebar-primary-foreground);
+  --color-sidebar-primary:        var(--sidebar-primary);
+  --color-sidebar-foreground:        var(--sidebar-foreground);
+  --color-sidebar:        var(--sidebar);
+  --color-chart-5:        var(--chart-5);
+  --color-chart-4:        var(--chart-4);
+  --color-chart-3:        var(--chart-3);
+  --color-chart-2:        var(--chart-2);
+  --color-chart-1:        var(--chart-1);
+  --color-ring:        var(--ring);
+  --color-input:        var(--input);
+  --color-destructive:        var(--destructive);
+  --color-accent-foreground:        var(--accent-foreground);
+  --color-muted-foreground:        var(--muted-foreground);
+  --color-muted:        var(--muted);
+  --color-secondary-foreground:        var(--secondary-foreground);
+  --color-secondary:        var(--secondary);
+  --color-primary-foreground:        var(--primary-foreground);
+  --color-popover-foreground:        var(--popover-foreground);
+  --color-popover:        var(--popover);
+  --color-card-foreground:        var(--card-foreground);
+  --color-card:        var(--card);
+  --color-foreground:     var(--fg);     /* NOT var(--foreground) - see note in :root */
+  --color-background:     var(--bg);     /* NOT var(--background) - see note in :root */
+  --radius-sm:        calc(var(--radius) * 0.6);
+  --radius-md:        calc(var(--radius) * 0.8);
+  --radius-lg:        var(--radius);
+  --radius-xl:        calc(var(--radius) * 1.4);
+  --radius-2xl:        calc(var(--radius) * 1.8);
+  --radius-3xl:        calc(var(--radius) * 2.2);
+  --radius-4xl:        calc(var(--radius) * 2.6);
+}
+
+@theme {
+  /* --- type scale (section 3) ---------------------------------------------
+     Two properties in the brief cannot live in a --text-* token: `label` is
+     uppercase and `data` is tabular-nums. Apply those with `uppercase` and
+     `tabular-nums` at the call site; the helper classes below pair them up. */
+  --text-display: clamp(2.75rem, 6vw, 4.5rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 800;
+
+  --text-h1: clamp(2rem, 4vw, 3rem);
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 700;
+
+  --text-h2: 1.75rem;
+  --text-h2--line-height: 1.2;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--font-weight: 700;
+
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-body--font-weight: 400;
+
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  --text-small--font-weight: 400;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.04em;
+  --text-label--font-weight: 500;
+
+  --text-data: 0.875rem;
+  --text-data--line-height: 1.5;
+  --text-data--font-weight: 500;
+
+  /* --- shape and depth (section 4) ---------------------------------------- */
+  --radius-card:    24px;
+  --radius-control: 12px;
+  --radius-pill:    999px;
+
+  /* The ONE shadow. Cards only - never buttons, inputs or pills, and never
+     on a card that already has a border.                                    */
+  --shadow-card: 0 1px 2px rgba(20, 17, 24, 0.04), 0 8px 32px rgba(20, 17, 24, 0.06);
+}
+
+/* Composite helpers for the two roles that need a non-size property.
+   `type-label` and `type-data` keep uppercase / tabular-nums bound to their
+   role so call sites cannot forget them. */
+@layer components {
+  .type-label {
+    font-family: var(--font-sans);
+    font-size: var(--text-label);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+  .type-data {
+    font-family: var(--font-mono);
+    font-size: var(--text-data);
+    font-weight: 500;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Clerk focus rings.
+
+   Clerk styles its components with Emotion, which injects UNLAYERED <style>
+   tags. Unlayered CSS beats layered CSS, so neither the `appearance` object's
+   :focus rules nor anything in @layer components could win - the ring came
+   out transparent. These rules are deliberately unlayered and !important so
+   they beat Emotion, and they only match .cl-* so they collide with nothing
+   else.
+
+   Parity with the primitives: 2px --focus at a 2px offset, faked with two
+   box-shadow rings because Clerk sets outline-color itself.
+   ------------------------------------------------------------------------ */
+.cl-formFieldInput:focus,
+.cl-formFieldInput:focus-visible,
+.cl-otpCodeFieldInput:focus,
+.cl-formButtonPrimary:focus-visible,
+.cl-socialButtonsBlockButton:focus-visible,
+.cl-footerActionLink:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus) !important;
+}
+.cl-formFieldInput:focus,
+.cl-formFieldInput:focus-visible {
+  border-color: var(--focus) !important;
+}
+
+/* Error state parity with the Input primitive. Clerk flags the offending
+   field with data-invalid; Emotion is unlayered, so the border has to be
+   asserted here for the same reason the focus ring is. */
+.cl-formFieldInput[data-invalid="true"],
+.cl-formFieldInput[aria-invalid="true"] {
+  border-color: var(--danger) !important;
+}
+.cl-formFieldInput[data-invalid="true"]:focus,
+.cl-formFieldInput[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--danger) !important;
+}
+
+/* ============================ END ARC TOKENS ==============================
+   The pre-rebrand stylesheet that used to follow is gone - 279 class rules,
+   12 keyframes, and finally the three element rules, which now live in the
+   base layer below.
+   ========================================================================== */
+
+/* shadcn wrote a full `.dark {}` palette here. Removed: BRANDING.md section 8
+   requires no dark-mode work this branch, and its oklch values would have
+   been a second competing palette. Dark ships later as ONE block that
+   overrides the Arc tokens at the top of this file - nothing else. */
+
+@layer base {
+  /* Re-homed from the deleted legacy layer.
+
+     The `*` reset that sat beside these is gone rather than moved: Tailwind's
+     Preflight already declares box-sizing: border-box, margin: 0 and
+     padding: 0 on a wider selector list (* plus ::before, ::after, ::backdrop
+     and ::file-selector-button), so the legacy copy was redundant. It was
+     also the rule that beat every spacing utility before the layer wrapper
+     existed; Preflight's version sits in the base layer where utilities
+     outrank it.
+
+     body's font-family is deliberately NOT carried over. It declared
+     'Inter', Arial, Helvetica - a plain family name that is not what
+     next/font loads - so body computed to the Arial fallback while every
+     element under a .font-sans ancestor used the real metric-matched stack.
+     Dropping it lets body inherit the stack on <html>. */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ── Landing page, dark ────────────────────────────────────────────────────
+   Scoped to the marketing page and nowhere else. The app stays on paper: it
+   is a working surface people read tables and transcripts in for an hour at a
+   time, and inverting that is a different decision from styling a front page.
+
+   Only the semantic tokens move. Every component underneath keeps using
+   bg-surface, text-text and border-border and comes out dark without knowing
+   anything changed - which is the whole reason those tokens exist. The three
+   pastels are untouched: they are still fields, and they still carry ink text
+   on top. */
+.landing-dark {
+  --bg:         #0B0910;
+  --surface:    #141118;
+  --fg:         #F7F5F2;
+  --fg-muted:   #9A93A6;
+  --hairline:   rgba(247, 245, 242, 0.12);
+  --border:     rgba(247, 245, 242, 0.12);
+  --primary:    var(--butter);
+  --primary-fg: var(--ink);
+  /* Badge's muted variant reaches for bg-bone directly rather than a semantic
+     token, so without this the "estimate - not sourced" chip renders as a
+     near-white block on a near-black page. Remapping the raw value is the
+     narrow fix; the broad one is for that variant to stop naming a palette
+     colour, which is a change inside the app and not this page's business.
+
+     It has to be --color-bone, not --bone: Tailwind v4 resolves @theme into
+     --color-* and `bg-bone` compiles to var(--color-bone), so overriding the
+     raw name cascades to nothing. */
+  --bone:       #17141D;
+  --color-bone: #17141D;
+}
+
+/* ── Marketing homepage ────────────────────────────────────────────────────
+   The homepage used to carry its own palette and type - purple #6D28D9, pill
+   buttons, Fraunces and Instrument Sans - which made signing up feel like
+   arriving at a different product. It now uses the app's tokens and nothing of
+   its own, so there is one design system rather than two.
+
+   `.arc-v2` survives only as a scope for the keyframes below. It defines no
+   colours: every surface here resolves through --bg, --surface, --text and the
+   three pastels, exactly as the dashboard does.
+
+   Only transform and opacity are animated, so all of this runs on the
+   compositor and none of it can shift layout. */
+
+/* A. Rate desk ticker. The list is rendered twice and travels exactly -50%,
+   so the second copy lands where the first began and the seam is invisible. */
+@keyframes tickerY { from { transform: translateY(0) } to { transform: translateY(-50%) } }
+.arc-v2 .ticker { animation: tickerY 26s linear infinite; will-change: transform; }
+.arc-v2 .ticker-mask:hover .ticker { animation-play-state: paused; }
+/* The fade has to be at least one row deep, or a row is cut through its
+   middle at the edge and you get half a line of text sitting on the mask
+   boundary. MEASURED, not estimated: a row is 96px in a 340px window - 28% -
+   so the stops sit past that at 31% and 69%. My first guess of 79px was the
+   row height before the design-token conversion changed its padding, and 24%
+   still cut through text. */
+.arc-v2 .ticker-mask::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom,
+    var(--paper) 0%, var(--paper) 4%, transparent 31%, transparent 69%, var(--paper) 96%, var(--paper) 100%);
+}
+
+/* B. The two live dots, and nothing else on the page. */
+@keyframes v2pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+.arc-v2 .live-dot { animation: v2pulse 2.4s ease-in-out infinite; }
+
+/* C. FM dial marquee. Same duplicated-list trick, horizontally. */
+@keyframes marqueeX { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+.arc-v2 .dial-track { animation: marqueeX 32s linear infinite; will-change: transform; }
+.arc-v2 .dial:hover .dial-track { animation-play-state: paused; }
+.arc-v2 .dial {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 60px, black calc(100% - 60px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 60px, black calc(100% - 60px), transparent);
+}
+
+/* D. Hero entrance. Once, on load, and the only entrance animation here. */
+@keyframes v2rise { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
+@keyframes v2riseScale { from { opacity: 0; transform: translateY(16px) scale(.98) } to { opacity: 1; transform: none } }
+.arc-v2 .rise {
+  opacity: 0;
+  animation: v2rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.arc-v2 .rise-card {
+  opacity: 0;
+  animation: v2riseScale 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* E. Chat demo. Hidden but still laid out, so nothing jumps when it fires. */
+.arc-v2 .chat-item { opacity: 0; transform: translateY(10px); }
+.arc-v2 .chat-in .chat-item {
+  animation: v2rise 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* F. FAQ. 0fr -> 1fr opens the answer without measuring anything. */
+.arc-v2 .faq-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 250ms ease; }
+.arc-v2 details[open] .faq-body { grid-template-rows: 1fr; }
+.arc-v2 .faq-body > div { overflow: hidden; }
+.arc-v2 .faq-plus { transition: transform 200ms ease; }
+.arc-v2 details[open] .faq-plus { transform: rotate(45deg); }
+.arc-v2 summary::-webkit-details-marker { display: none; }
+.arc-v2 summary { list-style: none; }
+
+/* Cards. The first build of this page deliberately had none of this - the
+   brief said no hover lift, no shadow transition - and it was asked for
+   afterwards, so it is here rather than smuggled in.
+   Still transform and opacity plus a border colour, so nothing reflows. */
+.arc-v2 .card-lift {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 220ms ease,
+              box-shadow 220ms ease;
+}
+.arc-v2 .card-lift:hover {
+  transform: translateY(-4px);
+  border-color: var(--lilac-deep);
+}
+
+/* No separate animation on the step number.
+   It had one - a pop keyed off a .rise or .in class - and those classes are
+   never applied, because Reveal animates through React state and Tailwind
+   rather than by adding a marker class. The rule set opacity:0 with nothing
+   able to set it back, so every badge on the page was invisible. The card's
+   own reveal already carries the motion; a second mechanism only added a way
+   to hide content. */
+
+/* G. Micro-interactions, and only these. */
+.arc-v2 .btn-v2 { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease; }
+.arc-v2 .btn-v2:hover { transform: translateY(-1px); }
+.arc-v2 .btn-v2:active { transform: translateY(0); }
+.arc-v2 .link-v2 { transition: color 150ms ease; }
+
+/* H. Reduced motion: A-E off entirely, F and G keep colour only. */
+@media (prefers-reduced-motion: reduce) {
+  .arc-v2 .ticker,
+  .arc-v2 .dial-track,
+  .arc-v2 .live-dot { animation: none !important; }
+  .arc-v2 .rise,
+  .arc-v2 .rise-card,
+  .arc-v2 .chat-item,
+  .arc-v2 .chat-in .chat-item {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .arc-v2 .faq-body { transition: none; }
+  .arc-v2 .faq-plus { transition: none; }
+  .arc-v2 .btn-v2 { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  .arc-v2 .btn-primary-v2:hover { transform: none; }
+  .arc-v2 .card-lift { transition: border-color 220ms ease; }
+  .arc-v2 .card-lift:hover { transform: none; }
+
+}

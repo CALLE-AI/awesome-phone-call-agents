@@ -1,0 +1,53 @@
+{
+  "_evidence_source": "synthetic: models the case the disposition table calls out explicitly — an account holder's own stop/hold request must always block, at any point in the call",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f07",
+    "account_holder_name": "Grace Lindqvist",
+    "on_file_phone": "+14155550107",
+    "claimed_transaction_amount": "12000.00",
+    "claimed_recipient": "Unfamiliar overseas account",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f07",
+    "status": "completed",
+    "task": "Verify a flagged $12,000 wire transaction to an unfamiliar overseas account.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.93, "label": "high"},
+    "summary": "Account holder asked to stop and hold the transaction mid-call after realizing something felt wrong."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f07",
+      "phone": "+14155550107",
+      "status": "completed",
+      "started_at": "2026-09-10T15:05:00Z",
+      "completed_at": "2026-09-10T15:07:40Z",
+      "summary": "Account holder requested an immediate hold.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No — actually, wait, please stop this transaction. I don't think this is real, hold everything."},
+        {"speaker": "bot", "text": "Understood — I'm flagging this transaction to be held immediately. No further questions needed."}
+      ],
+      "provider_call_id": "prov_f07",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f07a", "type": "call.dialing", "call_id": "call_f07", "created_at": "2026-09-10T15:05:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f07b", "type": "call.completed", "call_id": "call_f07", "created_at": "2026-09-10T15:07:40Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": true
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

@@ -1,0 +1,37 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1600
+PlayResY: 900
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,DejaVu Sans,24,&H00F5F7F3,&H00F5F7F3,&H00333F19,&H00333F19,0,0,0,0,100,100,0,0,1,0,0,2,45,45,13,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:07.00,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}MEET RESCUE RELAY{\fs24\c&H00F3F7F5&}\NFrom finding an animal in need to bringing the right help together. Fictional example shown.
+Dialogue: 0,0:00:07.09,0:00:19.09,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}YOUR TRUSTED CONTACTS{\fs24\c&H00F3F7F5&}\NStart with people you trust: rescue teams, receiving clinics and nearby volunteers.
+Dialogue: 0,0:00:19.14,0:00:41.14,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}ADD SOMEONE WHO CAN HELP{\fs24\c&H00F3F7F5&}\NAdd a name, their services and permission to receive rescue calls.
+Dialogue: 0,0:00:41.32,0:00:50.32,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}SAVE YOUR CONTACT{\fs24\c&H00F3F7F5&}\NSave the contact. Their services remain editable whenever you need to update them.
+Dialogue: 0,0:00:50.32,0:00:57.32,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}TRY A COMPLETE RESCUE{\fs24\c&H00F3F7F5&}\NLoad the example, then make the same decisions you would in your own rescue.
+Dialogue: 0,0:00:57.48,0:01:06.48,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}DESCRIBE WHAT YOU SEE{\fs24\c&H00F3F7F5&}\NA dog cannot put weight on its rear leg. The location and a PKR 2,000 budget are ready to review.
+Dialogue: 0,0:01:06.54,0:01:18.54,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CLARIFY THE OUTCOME{\fs24\c&H00F3F7F5&}\NReview the report. Describe what a successful rescue should include.
+Dialogue: 0,0:01:18.61,0:01:27.61,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}YOUR GOAL, YOUR CHOICE{\fs24\c&H00F3F7F5&}\NCheck the goal and location. Edit anything that is not right before finding help.
+Dialogue: 0,0:01:27.67,0:01:35.67,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}FIND AVAILABLE HELP{\fs24\c&H00F3F7F5&}\NConfirm the goal to check your trusted contacts for availability and prices.
+Dialogue: 0,0:01:35.67,0:01:45.67,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}REVIEW THE FIRST OPTION{\fs24\c&H00F3F7F5&}\NGreenway Rescue covers all three tasks. Its PKR 3,000 quote is above your budget.
+Dialogue: 0,0:01:45.72,0:01:53.72,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}FIND ANOTHER OPTION{\fs24\c&H00F3F7F5&}\NKeep your first offer and ask for another option. Your selected plan stays unchanged.
+Dialogue: 0,0:01:53.72,0:02:04.72,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}COMPARE COMPLETE PLANS{\fs24\c&H00F3F7F5&}\NKindred Rescue offers the same requested tasks for PKR 1,500, within your budget.
+Dialogue: 0,0:02:04.78,0:02:11.78,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CHOOSE YOUR PLAN{\fs24\c&H00F3F7F5&}\NChoose the plan that works for you. You stay in control of the final approval.
+Dialogue: 0,0:02:11.82,0:02:28.82,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}READ THE REPLIES{\fs24\c&H00F3F7F5&}\NOpen Details & history to see what each helper said about the rescue and price.
+Dialogue: 0,0:02:28.87,0:02:35.87,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}BACK TO YOUR PLAN{\fs24\c&H00F3F7F5&}\NThe report keeps its replies and prices together. Return to your selected plan to approve it.
+Dialogue: 0,0:02:35.87,0:02:45.87,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}REVIEW BEFORE APPROVAL{\fs24\c&H00F3F7F5&}\NConfirm the selected helper, included tasks and price limit.
+Dialogue: 0,0:02:45.96,0:02:54.96,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CONFIRM YOUR HELPER{\fs24\c&H00F3F7F5&}\NApprove the plan. The chosen helper is asked to confirm the agreed work and price.
+Dialogue: 0,0:02:54.96,0:03:03.96,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}HELP IS CONFIRMED{\fs24\c&H00F3F7F5&}\NThe helper is ready. Keep the rescue up to date as you hear from them.
+Dialogue: 0,0:03:04.00,0:03:12.01,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}ON THE WAY{\fs24\c&H00F3F7F5&}\NWhen the helper confirms departure, record “On the way”.
+Dialogue: 0,0:03:12.01,0:03:20.01,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}ARRIVAL CONFIRMED{\fs24\c&H00F3F7F5&}\NRecord arrival after it has been confirmed by you or the helper.
+Dialogue: 0,0:03:20.05,0:03:28.05,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}THEIR PART IS FINISHED{\fs24\c&H00F3F7F5&}\NMark the helper’s work as finished once their part of the rescue is complete.
+Dialogue: 0,0:03:28.05,0:03:40.05,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CLOSE THE LOOP{\fs24\c&H00F3F7F5&}\NAdd where the animal is now, and confirm that it is safe.
+Dialogue: 0,0:03:40.19,0:03:49.19,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}A SAFE PLACE. A FINISHED RESCUE.{\fs24\c&H00F3F7F5&}\NThe closing note, helper updates and conversations remain with your report.
+Dialogue: 0,0:03:49.23,0:04:00.23,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}SHARE AN UPDATE{\fs24\c&H00F3F7F5&}\NCopy a summary for the people involved. Browsers without clipboard access save a text file instead.
+Dialogue: 0,0:04:00.27,0:04:11.27,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}RETURN TO YOUR REPORT{\fs24\c&H00F3F7F5&}\NUse Switch report to return to saved cases. Opening a report preserves the existing history.
+Dialogue: 0,0:04:11.32,0:04:21.32,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}KEEP YOUR CIRCLE READY{\fs24\c&H00F3F7F5&}\NUpdate contacts, report the next incident, and keep the right people connected.

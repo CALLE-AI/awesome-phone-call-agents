@@ -1,0 +1,75 @@
+1
+00:00:00,000 --> 00:00:07,008
+From finding an animal in need to bringing the right help together. Fictional example shown.
+
+2
+00:00:07,111 --> 00:00:14,113
+Load the example, then make the same decisions you would in your own rescue.
+
+3
+00:00:14,290 --> 00:00:23,296
+A dog cannot put weight on its rear leg. The location and a USD 200 budget are ready to review.
+
+4
+00:00:23,347 --> 00:00:35,355
+Review the report. Describe what a successful rescue should include.
+
+5
+00:00:35,393 --> 00:00:44,394
+Check the goal and location. Edit anything that is not right before finding help.
+
+6
+00:00:44,454 --> 00:00:52,461
+Select and confirm the goal, then choose Find help to check availability and prices.
+
+7
+00:00:52,461 --> 00:01:02,464
+Greenway Rescue covers all three tasks. Its USD 300 quote is above your budget.
+
+8
+00:01:02,510 --> 00:01:10,519
+Keep your first offer and ask for another option. Your selected plan stays unchanged.
+
+9
+00:01:10,519 --> 00:01:21,527
+Kindred Rescue offers the same requested tasks for USD 150, within your budget.
+
+10
+00:01:21,558 --> 00:01:28,571
+Choose the plan that works for you. You stay in control of the final approval.
+
+11
+00:01:28,606 --> 00:01:40,607
+The saved conversation keeps the final identity, task, timing and all-in price available for review.
+
+12
+00:01:41,403 --> 00:01:51,419
+Confirm the selected helper, included tasks and price limit.
+
+13
+00:01:51,495 --> 00:02:00,507
+Approve the plan. The chosen helper is asked to confirm the agreed work and price.
+
+14
+00:02:00,507 --> 00:02:09,512
+The helper is ready. Keep the rescue up to date as you hear from them.
+
+15
+00:02:09,557 --> 00:02:17,572
+When the helper confirms departure, record “On the way”.
+
+16
+00:02:17,572 --> 00:02:25,574
+Record arrival after it has been confirmed by you or the helper.
+
+17
+00:02:25,611 --> 00:02:33,618
+Mark the helper’s work as finished once their part of the rescue is complete.
+
+18
+00:02:33,618 --> 00:02:45,624
+Add where the animal is now, and confirm that it is safe.
+
+19
+00:02:45,753 --> 00:02:54,765
+The closing note, helper updates and conversations remain with your report.
