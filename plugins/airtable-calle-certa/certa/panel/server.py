@@ -44,6 +44,7 @@ from ..airtable import (
 from ..grant import GrantError, grant_consent, revoke_consent
 from ..audit import AuditLog
 from ..runner import RunError, execute, plan
+from ..mcp import McpTransport
 from ..transport import FixtureTransport, LiveTransport, TransportError
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
@@ -61,6 +62,21 @@ FIXTURES = PLUGIN_DIR / "examples" / "fixtures"
 FIXTURES_MODE = "fixtures"
 PREVIEW_MODE = "preview"
 LIVE_MODE = "live"
+
+# REST is the primary transport and the only one that returns typed answers.
+# If its host does not resolve on this network, fall through to MCP rather
+# than presenting a Run button that always fails, and say which is in use.
+REST_HOST = "api.heycall-e.com"
+
+
+def _rest_reachable(host: str = REST_HOST) -> bool:
+    import socket
+
+    try:
+        socket.getaddrinfo(host, 443)
+        return True
+    except OSError:
+        return False
 
 
 class PanelError(Exception):
@@ -169,22 +185,35 @@ class Panel:
     def reconfigure(self) -> None:
         """(Re)build clients from the current config. Never raises upward."""
         self.config = cfg.load(self.env_path)
+        self.transport_name = ""
         if self.force_fixtures or not self.config.can_read_table:
             self.client, self.transport = _fixture_clients()
             self.mode = FIXTURES_MODE
+            self.transport_name = "fixtures"
             return
         try:
             self.client = LiveAirtable(
                 self.config.airtable_token, self.config.airtable_base_id
             )
-            self.transport = (
-                LiveTransport(self.config.calle_api_key)
-                if self.config.can_place_calls
-                else None
-            )
+            self.transport = None
+            self.transport_name = ""
+            if self.config.can_place_calls:
+                if _rest_reachable():
+                    self.transport = LiveTransport(self.config.calle_api_key)
+                    self.transport_name = "rest"
+                else:
+                    # The REST host is unresolvable, so use MCP. It places real
+                    # calls but cannot return typed answers, which the
+                    # interpreter already handles by routing to human review.
+                    try:
+                        self.transport = McpTransport()
+                        self.transport_name = "mcp"
+                    except TransportError:
+                        self.transport = None
         except (AirtableError, TransportError) as exc:
             self.client, self.transport = _fixture_clients()
             self.mode = FIXTURES_MODE
+            self.transport_name = "fixtures"
             raise PanelError(str(exc)) from exc
         self.mode = LIVE_MODE if self.transport else PREVIEW_MODE
 
@@ -220,6 +249,8 @@ class Panel:
                 "table": self.table,
                 "forced_fixtures": self.force_fixtures,
                 "permission_warning": cfg.permission_warning(self.env_path),
+                "transport": getattr(self, "transport_name", ""),
+                "typed_results": getattr(self, "transport_name", "") != "mcp",
             }
         )
         return payload

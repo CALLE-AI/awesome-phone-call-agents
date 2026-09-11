@@ -587,7 +587,9 @@ function renderSteps() {
 
 function renderConfig(c) {
   CONFIG = c; VIEW = c.view; MODE = c.mode;
-  $("mode-text").textContent = { fixtures: "Sample data", preview: "Preview only", live: "Live" }[MODE] || MODE;
+  const liveLabel = c.transport === "mcp" ? "Live \u00b7 MCP" : "Live";
+  $("mode-text").textContent =
+    { fixtures: "Sample data", preview: "Preview only", live: liveLabel }[MODE] || MODE;
   $("mode").dataset.live = String(MODE === "live");
 
   $("s-token").textContent = c.airtable_token || "";
@@ -620,6 +622,13 @@ function renderConfig(c) {
     n.hidden = false;
     t.innerHTML = "<b>Preview only.</b> Reading your real table, but there is no CALL-E key yet, so nothing can be dialled.";
     cta.textContent = "Add key";
+  } else if (c.transport === "mcp") {
+    n.hidden = false;
+    t.innerHTML = "<b>Calling over MCP.</b> CALL-E's REST host does not resolve, " +
+      "so calls go through the MCP surface instead. It dials for real, but cannot " +
+      "return typed answers \u2014 so every result lands in <em>needs review</em> " +
+      "with its transcript, rather than being marked verified.";
+    cta.textContent = "Connections";
   } else { n.hidden = true; }
 }
 
