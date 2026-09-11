@@ -45,11 +45,13 @@ place a call — this is the recommended default path for dry runs.
 
 ## Installation and usage
 
-No install beyond a CALL-E API key and a Python environment with `requests`.
-Reference implementation: `calle_chaser.py` in
-https://github.com/thanawinhvh/gotpaid — `run_for_unpaid_invoice(...,
-confirm=False)` drafts the goal and plans the call with zero side effects;
-pass `confirm=True` (or `--confirm` on the CLI) to place the real call.
+An implementation of this skill must validate and authorize the exact
+destination number before any call, default to a fake/no-network dry-run
+mode (drafting and planning the call goal with zero side effects), and only
+place a real call behind explicit human confirmation. It must not print or
+persist raw phone numbers, provider identifiers, or call transcripts —
+apply the masking rules above before any log, status output, or stored
+record.
 
 ## Result
 

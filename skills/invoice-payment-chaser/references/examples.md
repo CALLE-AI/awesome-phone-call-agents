@@ -8,11 +8,11 @@ own historical average of ~40 days across 34 prior payments.
 The agent has explicit per-run intent (invoice, amount, days overdue,
 buyer's learned pattern), confirms the contact is the buyer's authorized
 billing representative, and calls the fictional/reserved E.164 sample
-number `+15550101234`.
+number `+12025550123`.
 
 The call proceeds only after all required safety checks pass. The result
 is presented for human/reconciliation review before the invoice status is
-updated. The phone number is masked in normal output as `+1•••••••1234`.
+updated. The phone number is masked in normal output as `+1•••••••0123`.
 
 ## Invalid Phone Number
 
@@ -90,19 +90,19 @@ status.
 
 ## Successful Structured Result
 
-Real result from a live test call (transcript and video available at
-https://github.com/thanawinhvh/gotpaid):
+Illustrative structured result (synthetic invoice, no real call/contact
+data):
 
 ```json
 {
-  "invoice_id": "INV-1111",
-  "amount": 6293346.22,
-  "currency": "CNY",
-  "days_overdue": 105,
-  "buyer_usual_lag_days": 40.4,
+  "invoice_id": "INV-0001",
+  "amount": 125000.00,
+  "currency": "USD",
+  "days_overdue": 60,
+  "buyer_usual_lag_days": 20.0,
   "outcome": "confirmed_date",
-  "confirmed_payment_date": "2026-09-20",
-  "confidence": 0.95,
+  "confirmed_payment_date": "2026-10-01",
+  "confidence": 0.9,
   "human_approval_required": true,
   "human_approval_status": "pending",
   "next_action": "Reconcile against the next matching bank deposit"

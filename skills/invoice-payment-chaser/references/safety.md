@@ -24,7 +24,7 @@ Outbound phone numbers MUST use strict E.164 format.
 
 Valid fictional example:
 
-`+15550101234`
+`+12025550123`
 
 Reject local, punctuation-formatted, whitespace-formatted, or otherwise
 malformed numbers.
@@ -34,7 +34,7 @@ and examples.
 
 Example:
 
-`+15550101234` → `+1******1234`
+`+12025550123` → `+1•••••••0123`
 
 Never include real personal phone numbers in repository examples.
 
