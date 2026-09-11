@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { @apply bg-ink text-white antialiased; }
+.card { @apply bg-panel border border-line rounded-2xl; }
+.btn-primary { @apply bg-accent hover:opacity-90 text-white font-semibold rounded-xl px-5 py-3 transition; }
+.btn-ghost { @apply border border-line hover:border-accent rounded-xl px-5 py-3 transition text-white/90; }
+.input { @apply w-full bg-ink border border-line rounded-xl px-4 py-3 text-white placeholder:text-white/30 outline-none focus:border-accent; }
+.label { @apply text-xs uppercase tracking-widest text-white/50 font-semibold; }
+.timeline-dot { @apply w-2.5 h-2.5 rounded-full; }
+@keyframes pulse-soft { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.live { animation: pulse-soft 1.6s ease-in-out infinite; }
+pre.json { @apply text-xs leading-relaxed overflow-auto; }

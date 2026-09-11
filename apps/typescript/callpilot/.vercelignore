@@ -1,0 +1,6 @@
+# Never upload local secrets or data to a deployment
+.env
+.env.local
+.env.*.local
+.data/
+*.log
