@@ -305,6 +305,13 @@ def test_the_board_shows_one_row_per_contact(dashboard):
         assert contact.contact_id in text
 
 
+def test_normal_operator_board_does_not_claim_hackathon_live_verification(dashboard):
+    client, _ledger = dashboard
+    text = client.get("/board").text
+    assert "Redacted live CALL-E verification" not in text
+    assert "Verification call 1" not in text
+
+
 def test_the_board_marks_the_contact_that_was_never_dialled(dashboard):
     client, _ledger = dashboard
     text = client.get("/board").text

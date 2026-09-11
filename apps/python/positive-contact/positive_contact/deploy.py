@@ -19,6 +19,50 @@ from .transports.fixture import FixtureTransport
 from .web.app import create_app
 
 
+# Public proof from two owner-consented CALL-E checks. These rows stay outside the
+# operational fixture ledger: they prove that the CALL-E runtime path ran, but must not
+# change the demo's contact counts or publish a transcript, phone number, name, call id,
+# or health detail.
+PUBLIC_LIVE_VERIFICATIONS = (
+    {
+        "verification_id": "live-check-01",
+        "label": "Verification call 1",
+        "status": "CALL-E completed",
+        "turns": 24,
+        "confidence": "0.92 high",
+        "contact_type": "Live person",
+        "acknowledged": "Yes",
+        "support_signal": "Medical question",
+        "support_category": "Not captured",
+        "support_timing": "Not captured",
+        "provider_consent": "Not captured",
+        "emergency_risk": "Not captured",
+        "next_step": (
+            "Human callback. No provider call was opened because the support category, "
+            "timing and provider-contact consent were incomplete."
+        ),
+    },
+    {
+        "verification_id": "live-check-02",
+        "label": "Verification call 2",
+        "status": "CALL-E completed",
+        "turns": 43,
+        "confidence": "0.95 high",
+        "contact_type": "Live person",
+        "acknowledged": "Yes",
+        "support_signal": "Medical question",
+        "support_category": "Powered equipment",
+        "support_timing": "Before outage",
+        "provider_consent": "Yes",
+        "emergency_risk": "No",
+        "next_step": (
+            "Human review, then one identity-free equipment-provider availability call "
+            "may be authorized. No provider call has been placed."
+        ),
+    },
+)
+
+
 def build_demo_app(db_path: Path | str):
     event, policy = load_event(DEFAULT_EVENT)
     database = Path(db_path)
@@ -60,7 +104,14 @@ def build_demo_app(db_path: Path | str):
                 )
     # No transport means no call action and no background dispatcher. Public views are
     # evidence-only; judges can run the local fixture server to exercise the button.
-    return create_app(database, event, policy, transport=None, live_mode=False)
+    return create_app(
+        database,
+        event,
+        policy,
+        transport=None,
+        live_mode=False,
+        live_verifications=PUBLIC_LIVE_VERIFICATIONS,
+    )
 
 
 app = build_demo_app(os.environ.get("PC_DEMO_DB", "/tmp/positive-contact-demo.db"))

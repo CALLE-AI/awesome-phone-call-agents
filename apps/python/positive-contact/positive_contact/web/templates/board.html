@@ -3,6 +3,42 @@
 <div class="page-heading"><div><h2>Contact ladder</h2>
 <p class="sub">One row per enrolled contact. Numbers are masked; the raw customer number never leaves the contact record.</p></div>
 <span class="mode">updates every 5s</span></div>
+{% if live_verifications %}
+<section id="live-verification" class="verification-section" aria-labelledby="live-verification-title">
+  <div class="card-head verification-heading">
+    <div>
+      <p class="verification-kicker">CALL-E runtime checked on a real phone</p>
+      <h3 id="live-verification-title">Redacted live CALL-E verification</h3>
+      <p class="sub">The CALL-E account view showed conversation detail. PositiveContact
+        turns its structured result into the operational summary below.</p>
+    </div>
+    <span class="pill good">2 owner-consented calls</span>
+  </div>
+  <div class="verification-grid">
+  {% for run in live_verifications %}
+    <article class="verification-card" data-verification-id="{{ run.verification_id }}">
+      <div class="card-head">
+        <div><h4>{{ run.label }}</h4><p class="note">{{ run.turns }} conversation turns · {{ run.confidence }} confidence</p></div>
+        <span class="pill good">{{ run.status }}</span>
+      </div>
+      <div class="verification-facts" aria-label="{{ run.label }} structured result">
+        <div><span>Reached</span><strong>{{ run.contact_type }}</strong></div>
+        <div><span>Notice heard</span><strong>{{ run.acknowledged }}</strong></div>
+        <div><span>Support asked</span><strong>{{ run.support_signal }}</strong></div>
+        <div><span>Safe category</span><strong>{{ run.support_category }}</strong></div>
+        <div><span>Timing</span><strong>{{ run.support_timing }}</strong></div>
+        <div><span>Provider consent</span><strong>{{ run.provider_consent }}</strong></div>
+        <div><span>Emergency risk</span><strong>{{ run.emergency_risk }}</strong></div>
+      </div>
+      <div class="next-action"><span>PositiveContact route · Human review</span><strong>{{ run.next_step }}</strong></div>
+    </article>
+  {% endfor %}
+  </div>
+  <p class="verification-note"><strong>Privacy boundary:</strong> no name, phone number,
+    transcript, call ID or health detail is published. These validation calls are separate
+    from the fictional fixture rows and are excluded from every metric below.</p>
+</section>
+{% endif %}
 <div hx-get="/board/rows" hx-trigger="every 5s" hx-swap="innerHTML">
   {% include "_board_rows.html" %}
 </div>

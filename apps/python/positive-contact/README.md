@@ -352,6 +352,12 @@ mutation. It does not read `CALLE_API_KEY`, build a CALL-E transport or open the
 
 Hosted FastAPI demo: [positive-contact-demo.onrender.com](https://positive-contact-demo.onrender.com/)
 
+The Contact ladder begins with a separate, redacted record of two owner-consented live
+CALL-E checks. It reports only the returned coded fields and the safe next step. The cards
+contain no identity, transcript, call ID or health detail, and they do not change the
+fictional fixture totals below them. CALL-E's account view supplies conversation detail;
+the cards are PositiveContact's application summary of those structured results.
+
 The hosted free instance may take a short time to wake after inactivity. Use the local
 fixture flow below when recording the operator authorization action; the public process
 intentionally renders no forms or action buttons.
@@ -391,6 +397,8 @@ The [timed demo script](docs/demo-script.md) covers the exact browser clicks, na
 recording checks for a video under three minutes.
 
 ### Demo gallery
+
+![Two redacted owner-consented CALL-E verification results kept outside the fictional event metrics](docs/screenshots/00-live-verification.png)
 
 | Operator support request | Completed provider result |
 | --- | --- |

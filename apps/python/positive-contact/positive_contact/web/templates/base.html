@@ -79,6 +79,28 @@
           margin-bottom:14px; box-shadow:0 5px 18px rgba(20,34,29,.04); }
   .card h3 { margin:0 0 4px; font-size:15px; }
   .card-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+  .verification-section { margin-bottom:20px; padding:18px; border:1px solid #bfd7cc;
+                          border-radius:16px; background:#edf6f1; }
+  .verification-heading { margin-bottom:13px; }
+  .verification-heading h3 { margin:0; font-size:17px; }
+  .verification-kicker { margin:0 0 2px; color:var(--brand); font-size:10.5px;
+                         font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+  .verification-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .verification-card { padding:15px; border:1px solid #d4e5dd; border-radius:12px;
+                       background:var(--surface); box-shadow:0 5px 18px rgba(20,34,29,.04); }
+  .verification-card h4 { margin:0; font-size:14px; }
+  .verification-card .note { margin:2px 0 0; font-size:11px; }
+  .verification-facts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px;
+                        margin:12px 0; }
+  .verification-facts div { min-width:0; padding:7px 8px; border-radius:8px; background:#f4f7f4; }
+  .verification-facts span, .next-action span { display:block; color:var(--muted); font-size:9.5px;
+                                                font-weight:800; letter-spacing:.05em;
+                                                text-transform:uppercase; }
+  .verification-facts strong { display:block; margin-top:1px; font-size:11.5px; }
+  .next-action { padding:9px 10px; border-left:3px solid var(--brand); border-radius:6px;
+                 background:#f7faf8; }
+  .next-action strong { display:block; margin-top:2px; font-size:11.5px; font-weight:650; }
+  .verification-note { margin:12px 0 0; color:#305c4d; font-size:11.5px; }
   .facts { display:flex; flex-wrap:wrap; gap:8px; margin:13px 0; }
   .fact { padding:7px 9px; border-radius:8px; background:#f4f7f4; color:var(--muted); font-size:11.5px; }
   .fact strong { color:var(--ink); }
@@ -115,6 +137,8 @@
     .stats { grid-template-columns:repeat(2,1fr); }
     .stat:last-child { grid-column:1/-1; }
     .page-heading, .card-head { align-items:flex-start; flex-direction:column; }
+    .verification-grid { grid-template-columns:1fr; }
+    .verification-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
 </style>
 </head>

@@ -14,6 +14,7 @@ import contextlib
 import logging
 import os
 import secrets
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -211,6 +212,7 @@ def create_app(
     judge_c=None,
     budget=None,
     live_mode: bool = False,
+    live_verifications: Sequence[Mapping[str, object]] = (),
     operator_token: str | None = None,
     worker_interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS,
 ) -> FastAPI:
@@ -299,6 +301,7 @@ def create_app(
             "now": datetime.now(timezone.utc),
             "summary": _summary(ledger, event),
             "live_mode": live_mode,
+            "live_verifications": live_verifications,
             "actions_enabled": actions_enabled,
         }
         base.update(extra)
