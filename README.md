@@ -166,7 +166,6 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/oauth-login-client`](apps/typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`apps/typescript/vibehub-founder-relay`](apps/typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/typescript/ringer`](apps/typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
-| [`apps/python/call-sentinel`](apps/python/call-sentinel/) | Python | Phone-call quality and anomaly-detection agent that scores spam/scam risk from a transcript, emits a masked incident report, and exposes 7 MCP tools for monitoring and reviewing calls. No-call, no-credential dry-run mode by default. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
@@ -186,6 +185,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 
 ### Safety patterns
 
+- [`CallSentinel design reference`](docs/call-sentinel/) - Documentation-only concept for advisory phone-call transcript anomaly scoring and a proposed MCP interface; no local application is included.
 - [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, cancellation, duplicate-job prevention, and medical reminder boundaries.
 - [`Dispatch safety reference`](skills/service-dispatch-call/references/safety.md) - Purpose-bound authorization, third-party privacy on outbound calls, the commitment boundary between gathering an answer and accepting it, and retention limits on transcripts and spoken values.
 - [`Ambiguous outcome handling`](skills/service-dispatch-call/references/ambiguous-outcomes.md) - Why an unknown call outcome is a state to reconcile rather than an error to retry, and how client timeouts cause duplicate calls.
