@@ -1,0 +1,24 @@
+{
+  "name": "navigator-outreach-safety-locked-calle-example",
+  "version": "0.11.0-gate6-a1-integration-preflight",
+  "private": true,
+  "type": "module",
+  "description": "Proposed public, safety-locked CALL-E import and mock-guard example. It cannot place a call.",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "build": "node ./server/build-check.js",
+    "verify": "npm test && npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.2",
+    "vite": "^6.0.7"
+  }
+}
