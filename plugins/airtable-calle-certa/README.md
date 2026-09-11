@@ -17,6 +17,48 @@ Python 3.11+, **standard library only**. No install, no build step, no lockfile.
 
 ---
 
+## How it fits together
+
+Certa is a connector, not a platform. It runs on the operator's own machine,
+reads a table they already own, and hands CALL-E a task it is not allowed to
+exceed. Nothing is hosted, and no data passes through a third party.
+
+```mermaid
+flowchart TB
+  subgraph M["Operator's machine · loopback only · nothing hosted"]
+    direction LR
+    P["Console<br/>127.0.0.1"] --- C["Certa<br/>Python stdlib"] --- L[("audit.jsonl<br/>hash-chained")]
+  end
+  C --- AT[("Airtable<br/>your base, your columns")]
+  C --- CE["CALL-E<br/>Developer API"]
+  CE --- HR(["Employer's HR line"])
+```
+
+*Structure, not sequence — the order of operations is the sequence diagram further down.*
+
+**Where the model is.** CALL-E's LLM does the speaking, the listening, and the
+extraction. Certa runs no model at all. It decides what may be asked, who may
+be called, and whether the answer counts — and those three decisions are
+deterministic code, not a prompt. If Certa did the extraction, a hallucination
+would become a verified employment record in a lending file.
+
+| Concern | Decided by |
+| --- | --- |
+| Speaking, listening, understanding | CALL-E's model |
+| Conversation into typed fields | CALL-E's model, against a schema Certa derives |
+| What may be said at all | Certa — `tasks.py`, version-pinned into the consent token |
+| Whether a result is trustworthy | Certa — ordered gates, no model |
+
+**Two transports, one of them primary.** The REST Developer API is the product:
+it is the only surface that accepts `result_schema` and
+`recipient_result_schema`, which is what turns your columns into typed answers.
+The MCP surface (`plan_call` → `run_call`) is a fallback for a network where
+the REST host will not resolve; it takes no schema, so a call placed over it
+returns a transcript and **can never read as verified** — `tests/test_mcp.py`
+asserts exactly that. The console shows which transport is live.
+
+---
+
 ## The problem
 
 Every mortgage, most tenancy applications, much consumer lending and a large share of hiring require **Verification of Employment** — an independent confirmation that the employer, the job title and the dates on an application are real.
@@ -81,6 +123,31 @@ The dialer's only parameter type is a `ConsentedEmployerContact`, which carries 
 
 If no independent source exists, the request fails closed as **employer unverifiable** — itself a Fannie Mae red flag, not an error.
 
+```mermaid
+flowchart TD
+  APP["Number typed on the application"] --> AS["ApplicantSuppliedNumber"]
+  OFF["Employer's official site<br/>registry · directory · employer record"] --> SN["SourcedNumber<br/>carries NumberSource"]
+
+  AS --> DEAD["no conversion exists<br/>NumberSource has no 'application' member"]
+
+  SN --> AUTH{"authorize()"}
+  REC["Consent receipt<br/>who, which employer, which wording"] --> AUTH
+  TOK["Consent token<br/>sha256 of request + number<br/>+ relationship + task version"] --> AUTH
+
+  AUTH -->|"hmac.compare_digest"| CEC["ConsentedEmployerContact<br/>the only type the dialer accepts"]
+  AUTH -->|"any check fails"| SKIP["skipped, with the reason named"]
+  CEC --> DIAL[["CALL-E places the call"]]
+
+  style DEAD fill:#3b1f1f,stroke:#8b4444,color:#e8d5d5
+  style CEC fill:#1f3b2a,stroke:#448b63,color:#d5e8dd
+```
+
+An applicant who lists a friend's mobile as "HR" is the fraud this is built
+against, and it is the one control neither a payroll database nor the manual
+process performs. The boundary is a type, not a validation rule, so it cannot
+be forgotten at a call site: there is no code path from the left branch to the
+right one.
+
 > A payroll database cannot detect a fake employer, because a fake employer is by construction not in it. The manual process calls the number on the form. Certa structurally cannot. **This is a control neither existing method performs.**
 
 Tests: `tests/test_boundaries.py` asserts direct construction fails, that no function anywhere accepts an `ApplicantSuppliedNumber`, and that filling a consent token down a column is refused.
@@ -117,11 +184,107 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 
 **A refusal is terminal.** `declined_to_answer: yes` is a complete answer with `retryable=False`. An HR department declining to confirm has not failed; redialling them is harassment.
 
+Every gate below can only move a result *toward* review. There is no rule
+anywhere that promotes one, and `tests/test_calle.py` asserts that property
+directly rather than trusting the reading.
+
+```mermaid
+flowchart TD
+  R["CALL-E returns"] --> T{"terminal?"}
+  T -->|no| PEND["PENDING<br/>reconcile later"]
+  T -->|yes| F{"failed or canceled?"}
+  F -->|yes| UNR["EMPLOYER_UNREACHABLE"]
+  F -->|no| ST{"structured result present?"}
+  ST -->|no| NR["NEEDS REVIEW<br/>a person reads it"]
+  ST -->|yes| RE{"reached_employer == yes?"}
+  RE -->|no| UNR
+  RE -->|yes| DEC{"declined_to_answer == yes?"}
+  DEC -->|yes| DCL["DECLINED<br/>retryable = False"]
+  DEC -->|no| CONF{"confidence >= floor?"}
+  CONF -->|no| NR
+  CONF -->|yes| EV{"evidence supports the claim?"}
+  EV -->|no| NR
+  EV -->|yes| CON{"internal contradiction?"}
+  CON -->|yes| NR
+  CON -->|no| EST{"all three facts established?"}
+  EST -->|no| PAR["PARTIAL"]
+  EST -->|yes| VER["VERIFIED"]
+
+  style VER fill:#1f3b2a,stroke:#448b63,color:#d5e8dd
+  style NR fill:#3b331f,stroke:#8b7a44,color:#e8e2d5
+  style DCL fill:#2a2a33,stroke:#6a6a80,color:#dcdce6
+```
+
+The `reached_employer` gate is the one that matters most. CALL-E issue **#341**
+reports the API returning `task_completed: true` when voice-agent setup fails
+before dialing — for a verification product that is *employment confirmed with
+no conversation*. That gate sits above every positive outcome, and a table
+whose columns cannot express it is refused at setup.
+
 **Fails closed, always.** Low confidence, a positive claim with no supporting evidence string, or any internal contradiction all route to human review. `tests/test_calle.py` asserts **no rule can promote a result** — every gate can only move a disposition toward review.
 
 **Hash-chained audit log.** Editing a record, deleting one from the middle, or reordering all break the chain, and `verify_chain()` names the sequence number. Records are fsynced before the call they authorise is dispatched: a record with no call is recoverable, a call with no record is not.
 
 ---
+
+---
+
+## What a run actually does
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant O as Operator
+  participant C as Certa
+  participant A as Airtable
+  participant E as CALL-E
+  participant H as Employer HR
+
+  O->>C: Preview
+  C->>A: rows + table schema
+  A-->>C: rows, answer columns
+  C->>C: derive schema · check consent · resolve region
+  C-->>O: "1 call · $0.05 · 1 skipped (no sourced number)"
+  Note over O,C: zero side effects up to here
+  O->>C: Run — explicit confirmation
+  C->>C: append call.authorized, fsync
+  Note right of C: record before dispatch:<br/>a record with no call is recoverable,<br/>a call with no record is not
+  C->>E: POST /v1/calls
+  E->>H: dials the sourced number
+  H-->>E: speech
+  E-->>C: typed answers + confidence + evidence
+  C->>C: ordered gates → disposition
+  C->>A: writeback
+  C->>C: append call.interpreted
+  C-->>O: dispositions, with reasons
+```
+
+### Live testing, stated precisely
+
+This has been run against the real CALL-E API and a real Airtable base, not
+only fixtures. Being exact about what that did and did not establish:
+
+**Confirmed working end to end.** A call placed through CALL-E to a real phone
+connected, held a 48-second conversation over 13 turns, and CALL-E returned the
+extraction *"confirmed that the applicant is currently employed there as an
+operations manager, with a start date of 2 March"*. Separately, the Airtable
+writeback has landed real dispositions (`Status`, `Reason`, `Call ID`,
+`Consent receipt ID`) on a live base, and the audit chain verified intact
+across consent, authorisation, dispatch and interpretation records.
+
+**Not yet demonstrated.** A single run that carries the full product payload
+all the way from Airtable to a *verified* disposition. Live attempts after the
+successful call failed inside CALL-E's telephony leg before the destination
+rang — `failure_code` varying (404, 500) across payloads whose recipient
+fields were byte-identical to the one that connected. That is not a signature
+this plugin's input can produce, and the cause is still open. It is recorded
+here rather than omitted.
+
+**What that means for a reviewer.** The plugin's own path — schema derivation,
+consent gating, provenance refusal, region resolution, dispatch, audit
+chaining, interpretation and writeback — is exercised by 250 tests and by live
+traffic. The remaining gap is CALL-E-side call completion, which this plugin
+cannot fix and does not pretend to.
 
 ## Limits, stated plainly
 
@@ -134,6 +297,43 @@ Add a question by adding a column. `tests/test_airtable.py` asserts that.
 - **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Certa does not itself source numbers.
 
 ---
+
+---
+
+## The four credentials, and which is which
+
+This trips people up, so plainly: there are four token-shaped things and they
+do completely different jobs. Only two are secrets you paste.
+
+| | What it is | Where it comes from | Where it lives |
+| --- | --- | --- | --- |
+| **Console access token** | A random string in the console URL, e.g. `?token=LOMOe…`. It stops anything else on your machine from driving the console. | Generated fresh **every time Certa starts**. Printed in the terminal window that opens. | Nowhere. It dies when you close Certa. |
+| **Airtable token** | A personal access token so Certa can read your base and write results back. | You create it at [airtable.com/create/tokens](https://airtable.com/create/tokens) with `data.records:read`, `data.records:write`, `schema.bases:read`. | `.env`, created `0600`, never staged by git. |
+| **CALL-E API key** | Authorises placing calls, and is what gets billed. | CALL-E sends it when you request credits. | `.env`, same file, same permissions. |
+| **Consent token** | **Not a credential.** A SHA-256 fingerprint proving a specific applicant agreed to a specific employer being called under a specific script version. | Derived by Certa when you record consent. | A column in your Airtable row. |
+
+### Why the consent token is the interesting one
+
+It is not a password and nobody types it. It is
+`sha256(request_id · phone · relationship · task_spec_version · consent_receipt_id)`,
+and `authorize()` compares it with `hmac.compare_digest`. Three consequences
+fall straight out of that:
+
+- **You cannot fill it down a column.** A token copied from row 1 to row 2 is
+  a token for row 1's number, so row 2 fails the comparison. Spreadsheet drag-fill
+  is the most obvious way consent gets faked, and it simply does not work here.
+- **Changing the script invalidates every existing consent.** `task_spec_version`
+  is an input to the hash. Edit what the agent is allowed to say and every token
+  gathered under the old wording stops matching. Consent to be asked three
+  questions is not consent to be asked a fourth — that is a hash, not a policy.
+- **Revoking is real.** Clear the column and the row can never be dialled again.
+
+### If you lose the console URL
+
+Close the Certa window and start it again. A new access token is printed. There
+is nothing to reset and nothing to recover — the token is deliberately
+disposable, and the console only ever listens on `127.0.0.1`, so nothing off
+your machine can reach it regardless.
 
 ## Setup
 

@@ -368,6 +368,7 @@ footer .bad { color: var(--stop); }
     <div class="connect-head">
       <h2>Connect your verification queue</h2>
       <p>Two connections and you are working from your own Airtable base. Everything stays on this machine.</p>
+      <p class="hint">Both are written to <code>.env</code> beside Certa, created readable only by you (<code>0600</code>), and sent to Airtable and CALL-E only. The <code>?token=</code> in this page's address is a different thing again — a throwaway key generated each time Certa starts, so nothing else on your machine can drive the console. Lose it and you just restart Certa; a new one is printed.</p>
     </div>
     <div class="steps">
       <div class="step" id="step-1"><span class="n">1</span> Airtable base</div>

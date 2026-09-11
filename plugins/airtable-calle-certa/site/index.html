@@ -231,9 +231,9 @@ footer a:hover { color:var(--ink); }
       and writes a typed answer back into your table.
     </p>
     <div class="cta reveal">
-      <a class="btn primary" href="#how" id="console-link">See how it works</a>
-      <a class="btn" href="https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/airtable-calle-certa">Get the source</a>
-      <span class="note">Python 3.11+ · no install · no build step</span>
+      <a class="btn primary" href="https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/airtable-calle-certa" id="console-link">Get Certa</a>
+      <a class="btn" href="#how">See how it works</a>
+      <span class="note" id="cta-note">Download, then double-click. The console runs on your own machine — nothing is hosted.</span>
     </div>
 
     <div class="bento">
@@ -376,10 +376,12 @@ themeBtn.addEventListener("click", () =>
    the button simply scrolls to the explanation. */
 (() => {
   const href = (window.__CERTA__ || {}).console;
-  if (!href) return;
+  if (!href) return;   // static host: the button stays "Get Certa"
   const link = document.getElementById("console-link");
   link.href = href;
   link.textContent = "Open the console";
+  const note = document.getElementById("cta-note");
+  if (note) note.textContent = "Certa is running on this machine. The console is loopback-only.";
 })();
 
 /* motion ----------------------------------------------------------------- */
