@@ -1,0 +1,30 @@
+{
+  "event_id": "evt_sample_stuck_support_001",
+  "trigger_id": "stuck_support",
+  "severity": "high",
+  "summary": "Sample stdin event — Acme support loop after two bot handoffs.",
+  "brief": "This is a sample AccountEvent (not a fixture). Pipe it with --stdin to dress-rehearse without loading fixtures/*.json. Stage Manager still cues the CS owner only.",
+  "ticket_id": "SAMPLE-4821",
+  "occurred_at": "2026-08-01T15:00:00.000Z",
+  "account": {
+    "id": "acct_acme",
+    "name": "Acme Corp",
+    "tier": "enterprise",
+    "health_flags": ["support_loop"]
+  },
+  "cs_owner": {
+    "id": "cs_maya",
+    "name": "Maya Chen",
+    "e164": "+15555550100",
+    "opt_in_phone": true,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "07:00",
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  "metadata": {
+    "source": "stdin_sample",
+    "bot_handoffs": 2
+  }
+}

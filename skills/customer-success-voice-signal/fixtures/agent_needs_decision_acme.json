@@ -1,0 +1,32 @@
+{
+  "fixture_id": "agent_needs_decision_acme",
+  "trigger_id": "agent_needs_decision",
+  "severity": "critical",
+  "summary": "Automation on Acme Corp emitted needs_human — exception policy missing.",
+  "brief": "An internal agent hit a needs_human stop on Acme Corp. It cannot approve an exception without a human choice between option A, option B, or reject and escalate. Stage Manager is cueing the CS owner for a closed-set line reading.",
+  "ticket_id": "AGENT-991",
+  "account": {
+    "id": "acct_acme",
+    "name": "Acme Corp",
+    "tier": "enterprise",
+    "health_flags": ["agent_blocked"]
+  },
+  "cs_owner": {
+    "id": "cs_maya",
+    "name": "Maya Chen",
+    "e164": "+15555550100",
+    "opt_in_phone": true,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "07:00",
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  "metadata": {
+    "agent_id": "agent_policy_gate",
+    "options_context": {
+      "A": "Allow one-time retention credit",
+      "B": "Require signed amendment first"
+    }
+  }
+}

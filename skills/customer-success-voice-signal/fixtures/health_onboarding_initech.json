@@ -1,0 +1,28 @@
+{
+  "fixture_id": "health_onboarding_initech",
+  "trigger_id": "health_onboarding",
+  "severity": "high",
+  "summary": "Initech onboarding stall — no first event in 14 days, renewal window approaching.",
+  "brief": "Initech has not sent a first product event in fourteen days and sits inside a renewal window. Stage Manager needs a CS call on booking an SE session, watchlisting, or flagging churn risk.",
+  "account": {
+    "id": "acct_initech",
+    "name": "Initech",
+    "tier": "business",
+    "health_flags": ["no_first_event", "renewal_window"]
+  },
+  "cs_owner": {
+    "id": "cs_sam",
+    "name": "Sam Ortiz",
+    "e164": "+15555550100",
+    "opt_in_phone": true,
+    "quiet_hours": {
+      "start": "21:00",
+      "end": "08:00",
+      "timezone": "America/Chicago"
+    }
+  },
+  "metadata": {
+    "days_since_first_event": 14,
+    "usage_delta_pct": -40
+  }
+}
