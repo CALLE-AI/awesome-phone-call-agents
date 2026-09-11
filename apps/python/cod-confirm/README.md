@@ -92,8 +92,9 @@ call rarely produces a clearer one, so it goes to a human instead.
 
 The decision table in [`decide.py`](codconfirm/decide.py) is total: every
 combination of answers maps to exactly one status, so no order is left in
-limbo by a reply nobody anticipated. Seventy one tests cover it, the pricing model
-and the call-safety rules, and none of them need an API key or place a call.
+limbo by a reply nobody anticipated. Ninety five tests cover it, the pricing model,
+the call-safety rules and the WooCommerce connector, and none of them need an
+API key, a store or a phone line.
 
 ## Side effects and safety
 
@@ -138,6 +139,10 @@ and the call-safety rules, and none of them need an API key or place a call.
 - Ninety seconds, maximum.
 - `MAX_CALL_ATTEMPTS` bounds retries per order. Nothing recurs on its own:
   each sweep is one command, and stopping is not running it again.
+- **Against a live WooCommerce store**, a `--live` run writes to it: a
+  private order note and two meta fields per order it acted on. It never
+  changes an order's status or address. A dry run reads the store and writes
+  nothing. See [Run it against a real WooCommerce store](#run-it-against-a-real-woocommerce-store).
 - The demo order book carries fictional numbers. `DEMO_PHONE` redirects a
   live run to one handset you control, so a demo never dials a stranger.
 
@@ -200,22 +205,67 @@ pip install pytest
 python -m pytest tests -q
 ```
 
-71 tests, none of which need an API key or place a call.
+95 tests, none of which need an API key, a store or a phone line.
 
-## How it fits a real shop
+## Run it against a real WooCommerce store
 
-[`orders.py`](codconfirm/orders.py) is the only file that knows where orders
-live. It reads and writes JSON shaped like a WooCommerce order payload, so
-pointing it at a live store means replacing `load` and `save` with two REST
-calls. The pricing constants in `Economics` are the shop's own numbers and
-are meant to be edited.
+The demo book is a JSON file, but the sweep runs against a live WooCommerce
+store with no code changes. Create a REST API key under *WooCommerce >
+Settings > Advanced > REST API* with read/write access, then:
+
+```bash
+STORE_SOURCE=woocommerce
+WOO_BASE_URL=https://your-shop.example      # must be https
+WOO_KEY=ck_...
+WOO_SECRET=cs_...
+STORE_CITY=Dhaka                            # optional: marks out-of-city parcels
+```
+
+**What it reads.** Cash-on-delivery orders still waiting for dispatch
+(`processing` and `on-hold` by default) that were placed in the last seven
+days. Ringing somebody about an order from last month is not a confirmation,
+so older ones are left alone. Prepaid orders are skipped: nothing is waiting
+at the door.
+
+**Where the risk comes from.** Each customer's history in the same store,
+matched exactly on their phone number: completed orders count as deliveries
+taken, and `failed`, `refused` or `returned` orders as refusals. WooCommerce
+has no built-in "refused at the door" status, so set
+`WOO_REFUSED_STATUSES` to whatever your shop calls it. A free-shipping order
+is priced at `WOO_DEFAULT_FREIGHT` rather than zero, because free shipping to
+the customer is not free to the shop.
+
+**What it writes, and only on `--live`.** A private order note with the
+decision, and the transcript when a person has to finish the order, plus two
+meta fields, `cod_confirm_status` and `cod_confirm_attempts`. Each order is
+written the moment its call ends, not at the end of the sweep, so a store that
+stops answering halfway cannot leave called customers looking uncalled. If a
+write fails, the sweep stops and names the order that needs recording by hand.
+
+**What it never does.** It never changes an order's WooCommerce status and
+never edits the order's address. Whether a confirmed order moves to packing
+or a refused one is cancelled stays the shop's decision. A corrected address
+from the call arrives as a note for a person to apply, because a misheard
+street is a parcel sent somewhere else.
+
+**The safety rules still hold across runs.** An order the sweep marked
+`needs-human` is not picked up again until somebody clears its
+`cod_confirm_status`, so an ambiguous call is never redialled by a later
+sweep. A phone number stored without a country code is not guessed at: the
+order goes to a person, unless you set `WOO_DEFAULT_CALLING_CODE` (for example
+`880`) to say every local number is in one country.
+
+A dry run against a live store reads it and writes nothing, so it is safe to
+point at a real shop first. The pricing constants in `Economics` are the
+shop's own numbers and are meant to be edited.
 
 ## Layout
 
 ```
 codconfirm/
   config.py      settings from the environment
-  orders.py      the order model and the store it reads and writes
+  orders.py      the order model and the demo order book
+  woo.py         reading a live WooCommerce store, and writing results back
   economics.py   which orders justify a call, and in what order
   schema.py      the call brief and the structured answer we ask for
   phones.py      which numbers may be dialled, and cleaning what comes back
@@ -230,6 +280,7 @@ tests/
   test_phones.py       destination validation, masking and the allowlist
   test_sweep.py        the sweep loop end to end, with the phone line replaced
   test_call_safety.py  what a call may and may not be taken to mean
+  test_woo.py          a live store, played by a fake one, with every write recorded
 ```
 
 ## Licence

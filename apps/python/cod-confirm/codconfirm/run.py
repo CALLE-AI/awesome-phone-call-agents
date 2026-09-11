@@ -7,6 +7,7 @@ import logging
 from codconfirm import economics as econ_mod
 from codconfirm import phones
 from codconfirm import orders as store
+from codconfirm import woo
 from codconfirm.agent import new_run_id, place_call, simulate_call
 from codconfirm.config import Settings
 from codconfirm.decide import decide
@@ -31,7 +32,17 @@ def sweep(*, live: bool, limit: int | None = None,
         except phones.UnsafeNumber as exc:
             raise SystemExit(str(exc)) from exc
 
-    all_orders = store.load()
+    shop = None
+    if store.source() == "woocommerce":
+        try:
+            shop = woo.store()
+            all_orders = shop.load()
+        except woo.WooError as exc:
+            raise SystemExit(str(exc)) from exc
+        log.info("Read %d cash-on-delivery order(s) from %s.",
+                 len(all_orders), shop.config.base_url)
+    else:
+        all_orders = store.load()
     waiting = store.pending(all_orders)
 
     queue = econ_mod.rank([o for o in waiting if econ_mod.worth_calling(o, econ)], econ)
@@ -45,7 +56,7 @@ def sweep(*, live: bool, limit: int | None = None,
 
     if not queue:
         log.info("Nothing worth calling right now.")
-        store.save(all_orders)
+        persist(all_orders, shop, live)
         return all_orders, skipped
 
     phone = phone or settings.demo_phone or None
@@ -82,12 +93,50 @@ def sweep(*, live: bool, limit: int | None = None,
             if attempt.summary:
                 order.log(f"summary: {phones.scrub(attempt.summary)}")
 
+        if shop is not None and live:
+            # Recorded straight after the call, not at the end of the sweep.
+            # If the store stops answering halfway, a batch at the end would
+            # leave every called order looking uncalled, and the next sweep
+            # would ring them all again.
+            try:
+                shop.write_back([order])
+            except woo.WooError as exc:
+                raise SystemExit(
+                    f"Order {order.id} was called but its result could not be "
+                    f"written back to the store ({exc}). Record it by hand before "
+                    "the next sweep, or it may be called again."
+                ) from exc
+
         if outcome.halt:
             log.warning("  stopping the sweep here rather than risk a second call.")
             break
 
-    store.save(all_orders)
+    persist(all_orders, shop, live)
     return all_orders, skipped
+
+
+def persist(all_orders: list[store.Order], shop, live: bool) -> None:
+    """Keep what this sweep decided.
+
+    The demo book is a local file and is always saved. A live store is only
+    written to on a live run: a dry run reads the shop and changes nothing in
+    it, which is what makes it safe to point at a real one first.
+    """
+    if shop is None:
+        store.save(all_orders)
+        return
+    if not live:
+        log.info("\nDry run: nothing was written back to the store.")
+        return
+    # Called orders were recorded one by one as the sweep went. What is left
+    # here is anything decided without a call, such as an order sent to a
+    # person because its phone number could not be used.
+    try:
+        changed = shop.write_back(all_orders)
+    except woo.WooError as exc:
+        raise SystemExit(f"Writing the remaining results back failed: {exc}") from exc
+    if changed:
+        log.info("\nWrote %d further result(s) back to the store.", changed)
 
 
 def summarise(all_orders: list[store.Order], skipped: list[store.Order]) -> None:
@@ -131,6 +180,9 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.reset:
+        if store.source() != "json":
+            raise SystemExit("--reset only restores the demo order book. "
+                             "It does nothing to a live store.")
         store.reset()
         print("Demo order book restored.")
         return
