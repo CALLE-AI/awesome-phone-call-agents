@@ -1,0 +1,11 @@
+{
+  "contact_role": "driver",
+  "reached": "yes",
+  "shipment_recognized": "yes",
+  "current_status": "Somewhere on the expressway",
+  "revised_eta": "later this afternoon, maybe an hour",
+  "can_accept": "unknown",
+  "blocker": "",
+  "next_action": "",
+  "certainty": "low"
+}

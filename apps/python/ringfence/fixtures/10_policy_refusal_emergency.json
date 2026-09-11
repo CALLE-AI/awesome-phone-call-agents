@@ -1,0 +1,29 @@
+{
+  "_evidence_source": "synthetic: modeled on public CALL-E-AI issue #180's content-refusal pattern (a call task containing 'emergency'/credential-adjacent language triggers a pre-dial policy refusal), adapted to a ringfence case where the claimed context itself reads as an urgent-safety framing",
+  "category": "escalation_case",
+  "case": {
+    "case_id": "case_f10",
+    "account_holder_name": "Felix Ibarra",
+    "on_file_phone": "+14155550110",
+    "claimed_transaction_amount": "7300.00",
+    "claimed_recipient": "Emergency medical escrow account",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f10",
+    "status": "failed",
+    "task": "Verify a flagged $7,300 wire transaction described as an urgent medical emergency payment.",
+    "failure_code": "policy_violation",
+    "failure_message": "I can't place a call that involves an emergency safety claim without additional review.",
+    "task_completed": false,
+    "completion_confidence": {"score": 0.1, "label": "low"},
+    "summary": "Call task was refused before dialing due to the emergency-framed content policy check."
+  },
+  "attempts": [],
+  "events": [
+    {"id": "evt_f10a", "type": "call.rejected", "call_id": "call_f10", "created_at": "2026-09-10T17:30:00Z", "level": "error", "status": "failed", "message": "Pre-dial content policy check refused this task.", "details": {"region": "US"}}
+  ],
+  "signals": {},
+  "expected_disposition": "ESCALATE_TO_HUMAN"
+}

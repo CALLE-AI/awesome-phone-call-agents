@@ -1,0 +1,270 @@
+[
+ {
+  "_note": "SYNTHETIC SAMPLE - not a real call. Station, people, conversation, identifiers and timestamps are invented. +99 is an unassigned ITU country code and cannot be dialled. Written to exercise every state the board can be in, and to carry the same properties the tests check: a read-back that settles, an earlier ask that does not, an implausible confirmed rate, and a call nobody answered.",
+  "id": "call_sample_low_rate",
+  "status": "completed",
+  "targetName": "Radio Meridian 92.4",
+  "targetType": "station",
+  "phone": "+99000000000",
+  "failureCode": null,
+  "createdAt": "2026-01-05T10:00:00Z",
+  "completedAt": "2026-01-05T10:07:00Z",
+  "structuredResult": {
+   "availability": "yes",
+   "rate_per_spot": 1253,
+   "rate_confirmed": true,
+   "spot_length_seconds": 30
+  },
+  "estimatePkr": null,
+  "mandate": null,
+  "turns": [
+   {
+    "at": 0,
+    "speaker": "bot",
+    "text": "Hello, this is Arc, an AI assistant calling on behalf of Bright Foods."
+   },
+   {
+    "at": 5,
+    "speaker": "bot",
+    "text": "This is about radio advertising - is this the ad sales desk?"
+   },
+   {
+    "at": 10,
+    "speaker": "user",
+    "text": "Go ahead."
+   },
+   {
+    "at": 12,
+    "speaker": "bot",
+    "text": "Can you hear me?"
+   },
+   {
+    "at": 14,
+    "speaker": "user",
+    "text": "Yes."
+   },
+   {
+    "at": 16,
+    "speaker": "bot",
+    "text": "Can you hear me?"
+   },
+   {
+    "at": 18,
+    "speaker": "user",
+    "text": "Yes."
+   },
+   {
+    "at": 20,
+    "speaker": "bot",
+    "text": "Can you hear me?"
+   },
+   {
+    "at": 22,
+    "speaker": "user",
+    "text": "Yes."
+   },
+   {
+    "at": 24,
+    "speaker": "bot",
+    "text": "Can you hear me?"
+   },
+   {
+    "at": 26,
+    "speaker": "user",
+    "text": "Yes."
+   },
+   {
+    "at": 28,
+    "speaker": "bot",
+    "text": "This is only an availability and pricing enquiry for next month."
+   },
+   {
+    "at": 33,
+    "speaker": "user",
+    "text": "Which dates?"
+   },
+   {
+    "at": 35,
+    "speaker": "bot",
+    "text": "The nineteenth to the twenty-fifth."
+   },
+   {
+    "at": 37,
+    "speaker": "user",
+    "text": "That is fine, we have space."
+   },
+   {
+    "at": 39,
+    "speaker": "bot",
+    "text": "Do you have a per-spot rate for that window?"
+   },
+   {
+    "at": 42,
+    "speaker": "user",
+    "text": "One two five three."
+   },
+   {
+    "at": 44,
+    "speaker": "bot",
+    "text": "Could you give that rate as digits, one by one, and then confirm it?"
+   },
+   {
+    "at": 49,
+    "speaker": "user",
+    "text": "One two five three per spot."
+   },
+   {
+    "at": 51,
+    "speaker": "bot",
+    "text": "Just to confirm, is that 1 2 5 3 rupees per spot?"
+   },
+   {
+    "at": 55,
+    "speaker": "user",
+    "text": "Yes, that is right."
+   },
+   {
+    "at": 57,
+    "speaker": "bot",
+    "text": "Thank you. I have no authority to book anything today - a person will follow up."
+   },
+   {
+    "at": 63,
+    "speaker": "user",
+    "text": "Understood."
+   },
+   {
+    "at": 65,
+    "speaker": "bot",
+    "text": "Thank you for your time."
+   }
+  ]
+ },
+ {
+  "_note": "SYNTHETIC SAMPLE - not a real call. Station, people, conversation, identifiers and timestamps are invented. +99 is an unassigned ITU country code and cannot be dialled. Written to exercise every state the board can be in, and to carry the same properties the tests check: a read-back that settles, an earlier ask that does not, an implausible confirmed rate, and a call nobody answered.",
+  "id": "call_sample_rate_readback",
+  "status": "completed",
+  "targetName": "Coastline FM 98.6",
+  "targetType": "station",
+  "phone": "+99000000000",
+  "failureCode": null,
+  "createdAt": "2026-01-05T11:00:00Z",
+  "completedAt": "2026-01-05T11:05:00Z",
+  "structuredResult": {
+   "availability": "yes",
+   "rate_per_spot": 8000,
+   "rate_confirmed": true,
+   "opening_rate": 1500,
+   "spot_length_seconds": 30
+  },
+  "estimatePkr": null,
+  "mandate": null,
+  "turns": [
+   {
+    "at": 0,
+    "speaker": "bot",
+    "text": "Hello, this is Arc, an AI assistant calling on behalf of Bright Foods."
+   },
+   {
+    "at": 5,
+    "speaker": "bot",
+    "text": "This is about radio advertising - is this the right person?"
+   },
+   {
+    "at": 9,
+    "speaker": "user",
+    "text": "Yes."
+   },
+   {
+    "at": 11,
+    "speaker": "bot",
+    "text": "This is only an availability and pricing enquiry."
+   },
+   {
+    "at": 15,
+    "speaker": "user",
+    "text": "We have availability."
+   },
+   {
+    "at": 17,
+    "speaker": "bot",
+    "text": "Do you have a per-spot rate for that window?"
+   },
+   {
+    "at": 20,
+    "speaker": "user",
+    "text": "Fifteen hundred."
+   },
+   {
+    "at": 22,
+    "speaker": "bot",
+    "text": "Just to confirm, is that 1 5 0 0 rupees per spot?"
+   },
+   {
+    "at": 26,
+    "speaker": "user",
+    "text": "No, sorry, that is the old card."
+   },
+   {
+    "at": 28,
+    "speaker": "bot",
+    "text": "No problem. Could you give the current rate as digits, one by one?"
+   },
+   {
+    "at": 33,
+    "speaker": "user",
+    "text": "Eight thousand. Eight zero zero zero."
+   },
+   {
+    "at": 36,
+    "speaker": "bot",
+    "text": "Just to confirm, is that 8 0 0 0 rupees per spot?"
+   },
+   {
+    "at": 40,
+    "speaker": "user",
+    "text": "Yes, eight thousand."
+   },
+   {
+    "at": 42,
+    "speaker": "bot",
+    "text": "Thank you. Is that for a thirty second spot?"
+   },
+   {
+    "at": 45,
+    "speaker": "user",
+    "text": "Thirty seconds."
+   },
+   {
+    "at": 47,
+    "speaker": "bot",
+    "text": "I have no authority to book anything today - a person will follow up."
+   },
+   {
+    "at": 52,
+    "speaker": "user",
+    "text": "That's fine."
+   },
+   {
+    "at": 54,
+    "speaker": "bot",
+    "text": "Thank you for your time."
+   }
+  ]
+ },
+ {
+  "_note": "SYNTHETIC SAMPLE - not a real call. Station, people, conversation, identifiers and timestamps are invented. +99 is an unassigned ITU country code and cannot be dialled. Written to exercise every state the board can be in, and to carry the same properties the tests check: a read-back that settles, an earlier ask that does not, an implausible confirmed rate, and a call nobody answered.",
+  "id": "call_sample_busy",
+  "status": "failed",
+  "targetName": "Northline Radio 104.2",
+  "targetType": "station",
+  "phone": "+99000000000",
+  "failureCode": 486,
+  "createdAt": "2026-01-05T12:00:00Z",
+  "completedAt": "2026-01-05T12:00:30Z",
+  "structuredResult": null,
+  "estimatePkr": null,
+  "mandate": null,
+  "turns": []
+ }
+]
