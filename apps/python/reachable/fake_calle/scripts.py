@@ -44,6 +44,36 @@ def _pattern_result(**overrides: Any) -> dict[str, Any]:
     return base
 
 
+def _shared_result(
+    metadata: dict[str, Any], *, outcome: str, identity: str, quote: str = ""
+) -> dict[str, Any]:
+    """A result in whichever shape the workflow's schema asked for.
+
+    Outcomes like wrong_person and not_in_service happen in both workflows, and
+    CALL-E returns a result matching the schema we sent -- so the fake must do
+    the same, or a shared script would be schema-invalid in one of them.
+    """
+    if metadata.get("workflow") == "pattern_followup":
+        return _pattern_result(
+            outcome=outcome,
+            identity_confirmed=identity,
+            aware_of_absence="unknown",
+            reason_category="unknown",
+            reason_note="",
+            barrier_mentioned="unknown",
+            wants_call_from_attendance_officer="unknown",
+            knows_child_whereabouts="unknown",
+            verbatim_quotes=[quote] if quote else [],
+        )
+    return _contact_result(
+        outcome=outcome,
+        identity_confirmed=identity,
+        still_willing_to_be_contact="unknown",
+        best_number_for_school="unknown",
+        verbatim_identity_quote=quote,
+    )
+
+
 # --------------------------------------------------------------------- scripts
 
 
@@ -95,12 +125,11 @@ def wrong_person(destination: str, metadata: dict[str, Any]) -> dict[str, Any]:
         "call_wrong",
         destination=destination,
         metadata=metadata,
-        structured_result=_contact_result(
+        structured_result=_shared_result(
+            metadata,
             outcome="wrong_person",
-            identity_confirmed="no",
-            still_willing_to_be_contact="unknown",
-            best_number_for_school="unknown",
-            verbatim_identity_quote="Sorry, who did you say? I've had this number about a year.",
+            identity="no",
+            quote="Sorry, who did you say? I've had this number about a year.",
         ),
         score=0.9,
         label="high",
@@ -117,13 +146,7 @@ def not_in_service(destination: str, metadata: dict[str, Any]) -> dict[str, Any]
         "call_dead",
         destination=destination,
         metadata=metadata,
-        structured_result=_contact_result(
-            outcome="not_in_service",
-            identity_confirmed="unknown",
-            still_willing_to_be_contact="unknown",
-            best_number_for_school="unknown",
-            verbatim_identity_quote="",
-        ),
+        structured_result=_shared_result(metadata, outcome="not_in_service", identity="unknown"),
         score=0.95,
         label="high",
         summary="Number unobtainable.",
@@ -137,13 +160,7 @@ def voicemail(destination: str, metadata: dict[str, Any]) -> dict[str, Any]:
         "call_voicemail",
         destination=destination,
         metadata=metadata,
-        structured_result=_contact_result(
-            outcome="voicemail",
-            identity_confirmed="unknown",
-            still_willing_to_be_contact="unknown",
-            best_number_for_school="unknown",
-            verbatim_identity_quote="",
-        ),
+        structured_result=_shared_result(metadata, outcome="voicemail", identity="unknown"),
         score=0.91,
         label="high",
         summary="Answering machine.",
@@ -159,13 +176,7 @@ def no_answer(destination: str, metadata: dict[str, Any]) -> dict[str, Any]:
         "call_noanswer",
         destination=destination,
         metadata=metadata,
-        structured_result=_contact_result(
-            outcome="no_answer",
-            identity_confirmed="unknown",
-            still_willing_to_be_contact="unknown",
-            best_number_for_school="unknown",
-            verbatim_identity_quote="",
-        ),
+        structured_result=_shared_result(metadata, outcome="no_answer", identity="unknown"),
         score=0.94,
         label="high",
         summary="Nobody answered.",

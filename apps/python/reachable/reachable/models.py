@@ -183,6 +183,49 @@ NO_CALL_TEXT = {
 # --------------------------------------------------------------------------
 
 
+class ContactHealth(str, Enum):
+    """What the office needs to know about one contact, at a glance.
+
+    Written by BOTH workflows: the termly check sets it, and a failed pattern
+    call overwrites it immediately rather than waiting for next term. That
+    write-back is the loop.
+    """
+
+    NOT_CHECKED = "not_checked"
+    VERIFIED = "verified"
+    WRONG_PERSON = "wrong_person"
+    NUMBER_NOT_WORKING = "number_not_working"
+    NO_LONGER_A_CONTACT = "no_longer_a_contact"
+    UPDATE_REQUESTED = "update_requested"
+    UNREACHED = "unreached"
+    INVALID_NUMBER = "invalid_number"
+    LANGUAGE_UNSUPPORTED = "language_unsupported"
+
+
+#: Health values that mean this contact should not be relied on in an emergency.
+FLAGGED_HEALTH = frozenset(
+    {
+        ContactHealth.WRONG_PERSON,
+        ContactHealth.NUMBER_NOT_WORKING,
+        ContactHealth.NO_LONGER_A_CONTACT,
+        ContactHealth.INVALID_NUMBER,
+        ContactHealth.LANGUAGE_UNSUPPORTED,
+    }
+)
+
+HEALTH_TEXT = {
+    ContactHealth.NOT_CHECKED: "Not checked this term",
+    ContactHealth.VERIFIED: "Verified",
+    ContactHealth.WRONG_PERSON: "Wrong person answered",
+    ContactHealth.NUMBER_NOT_WORKING: "Number not working",
+    ContactHealth.NO_LONGER_A_CONTACT: "No longer willing to be a contact",
+    ContactHealth.UPDATE_REQUESTED: "Wants their details updated",
+    ContactHealth.UNREACHED: "Could not be reached",
+    ContactHealth.INVALID_NUMBER: "Stored number is not valid E.164",
+    ContactHealth.LANGUAGE_UNSUPPORTED: "Needs a language the UK line cannot serve",
+}
+
+
 class SessionSlot(str, Enum):
     AM = "AM"
     PM = "PM"
