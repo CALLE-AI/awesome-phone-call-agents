@@ -25,10 +25,11 @@ snapshots, reads no credentials and opens no network connection. Automated tests
 and terminal outcome behavior. Live credentials and real outbound calls are never required by the
 default test command.
 
-Create-call acceptance may take longer than ordinary status reads. The app allows 45 seconds before
-recording an uncertain result. It never retries in the background. If the operator reviews and
-confirms the same unchanged intent again, the registry reuses the original idempotency key so CALL-E
-returns the existing call when it already accepted the request instead of creating a duplicate.
+Create-call acceptance may take longer than ordinary status reads. The app does not impose its own
+timeout on call creation; it waits for CALL-E or the underlying network connection to return. It never
+retries in the background. If the network still produces an uncertain failure and the operator reviews
+and confirms the same unchanged intent again, the registry reuses the original idempotency key so
+CALL-E returns the existing call when it already accepted the request instead of creating a duplicate.
 
 Sources:
 

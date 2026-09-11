@@ -5,7 +5,6 @@ import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } fro
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
-const CREATE_CALL_TIMEOUT_MS = 45_000;
 
 export async function createCalleCall(
   request: OutboundCallRequest,
@@ -14,32 +13,25 @@ export async function createCalleCall(
 ): Promise<CalleCallSnapshot> {
   const validated = validateOutboundCallRequest(request);
   const briefingTask = validated.briefingId ? await resolveBriefingTask(validated.briefingId) : undefined;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CREATE_CALL_TIMEOUT_MS);
-  try {
-    const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": validated.idempotencyKey,
-      },
-      body: JSON.stringify({
-        task: briefingTask ?? (validated.purpose
-          ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
-          : "Identify yourself as Senior Phone AI and have a general conversation with the recipient."),
-        recipients: [{ phones: [validated.destinationE164] }],
-        metadata: { application: "senior-phone-ai" },
-      }),
-      redirect: "manual",
-      signal: controller.signal,
-    });
-    if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
-    if (!response.ok) throw new Error(`CALL-E create status ${response.status}`);
-    return parseCalleCallSnapshot(await response.json());
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": validated.idempotencyKey,
+    },
+    body: JSON.stringify({
+      task: briefingTask ?? (validated.purpose
+        ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
+        : "Identify yourself as Senior Phone AI and have a general conversation with the recipient."),
+      recipients: [{ phones: [validated.destinationE164] }],
+      metadata: { application: "senior-phone-ai" },
+    }),
+    redirect: "manual",
+  });
+  if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
+  if (!response.ok) throw new Error(`CALL-E create status ${response.status}`);
+  return parseCalleCallSnapshot(await response.json());
 }
 
 export async function getCalleCallSnapshot(

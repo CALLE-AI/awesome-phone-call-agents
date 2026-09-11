@@ -35,6 +35,7 @@ test("encrypted snapshots, daily deduplication and the CALL-E payload work toget
       assert.ok(!sealed.includes(profile.lastHealthCheck));
       let payload;
       const result = await createCalleCall({destinationE164:'+12025550100',purpose:'Discuss the morning briefing.',idempotencyKey:'fixture-call-1234',briefingId:brief.id},process.env.CALLE_API_KEY,async (_url,init)=>{
+        assert.equal(init.signal, undefined);
         payload=JSON.parse(init.body);
         return Response.json({id:'call_fixture123',status:'queued',recipients:[]});
       });
