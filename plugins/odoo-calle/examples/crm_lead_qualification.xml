@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- CALL-E Server Action: CRM Lead Automated Screening -->
+        <record id="action_calle_crm_lead_qualification" model="ir.actions.server">
+            <field name="name">CALL-E: CRM Lead Screening</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">calle_call</field>
+            <field name="calle_phone_field_chain">phone</field>
+        </record>
+
+        <!-- Call Section 1: Opening Screening Question -->
+        <record id="section_crm_lead_intro" model="calle.section">
+            <field name="server_action_id" ref="action_calle_crm_lead_qualification"/>
+            <field name="section_text">Hello {{ record.contact_name or record.partner_id.name or 'there' }}, this is customer service following up on your inquiry for {{ record.name }}. Are you available for a brief product demo this week?</field>
+        </record>
+
+        <!-- Response Choice A: Interested in Demo -->
+        <record id="response_crm_lead_demo_yes" model="calle.section.response">
+            <field name="section_id" ref="section_crm_lead_intro"/>
+            <field name="name">Interested in demo</field>
+            <field name="action_code"># Post note on opportunity
+record.message_post(body="Lead expressed interest in product demo during CALL-E screening call.")
+            </field>
+        </record>
+
+        <!-- Response Choice B: Not Interested -->
+        <record id="response_crm_lead_demo_no" model="calle.section.response">
+            <field name="section_id" ref="section_crm_lead_intro"/>
+            <field name="name">Not interested</field>
+            <field name="action_code"># Post note on opportunity
+record.message_post(body="Lead indicated not interested during CALL-E screening call.")
+            </field>
+        </record>
+
+        <!-- CALL-E Automation Rule: Trigger on Lead Creation -->
+        <record id="rule_calle_crm_lead_qualification" model="base.automation">
+            <field name="name">CALL-E: CRM Lead Screening Automation Rule</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="trigger">on_create</field>
+            <field name="action_server_ids" eval="[(4, ref('action_calle_crm_lead_qualification'))]"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>
