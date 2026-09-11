@@ -33,6 +33,7 @@
 
 import { CalleClient } from "@call-e/calle";
 import { writeFile } from "node:fs/promises";
+import { assertDialable } from "../src/endpoint.ts";
 import { unsupportedDestination } from "../src/unsupported-destination.ts";
 
 const UNROUTABLE = { phone: "+14155550100", region: "US", locale: "en-US" };
@@ -144,7 +145,8 @@ async function place(label: string, dest: { phone: string; region: string; local
   log.push({ arm: label, destination: dest.phone, before, outcome, after, delta });
 }
 
-const testPhone = process.env.CALLE_TEST_PHONE ?? "";
+const rawTestPhone = process.env.CALLE_TEST_PHONE?.trim() ?? "";
+const testPhone = rawTestPhone === "" ? "" : assertDialable(rawTestPhone);
 
 await place("rejected-create", UNSUPPORTED);
 await place("unroutable", UNROUTABLE);

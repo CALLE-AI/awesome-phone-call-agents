@@ -25,17 +25,18 @@
  *
  *   CALLE_TEST_PHONE   destination, E.164, in a supported region. Defaults to the
  *                      CALL-E English testing hotline, which a maintainer published
- *                      on 7 September 2026 for exactly this purpose.
+ *                      on 7 September 2026 for exactly this purpose. Set to anything
+ *                      else it is validated as E.164 and the run also has to carry
+ *                      --i-have-authorization-for-this-destination, which is the
+ *                      operator stating that whoever answers that line agreed to be
+ *                      called. Without both, nothing is sent.
  *   CALLE_TEST_REGION  defaults to US
  *   CALLE_TEST_LOCALE  defaults to en-US
  */
 
 import { CalleClient } from "@call-e/calle";
 import { mkdir, writeFile } from "node:fs/promises";
-import { maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
-
-/** The English testing hotline CALL-E publishes for integration testing. */
-const TESTING_HOTLINE = PUBLIC_TESTING_HOTLINE;
+import { maskPhone, testDestination } from "../src/endpoint.ts";
 
 const REQUIRED_LINE = "This is an automated call from an AI assistant.";
 
@@ -59,7 +60,7 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-const phone = process.env.CALLE_TEST_PHONE ?? TESTING_HOTLINE;
+const phone = testDestination();
 const region = process.env.CALLE_TEST_REGION ?? "US";
 const locale = process.env.CALLE_TEST_LOCALE ?? "en-US";
 

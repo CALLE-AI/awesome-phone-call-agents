@@ -10,7 +10,14 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { baseUrl, maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
+import {
+  AUTHORIZED_FLAG,
+  assertDialable,
+  baseUrl,
+  maskPhone,
+  PUBLIC_TESTING_HOTLINE,
+  testDestination,
+} from "../src/endpoint.ts";
 
 function withEnv<T>(value: string | undefined, fn: () => T): T {
   const before = process.env.CALLE_BASE_URL;
@@ -98,4 +105,91 @@ describe("no probe prints a destination or a transcript by default", () => {
       );
     });
   }
+});
+
+/**
+ * CALLE_TEST_PHONE decides which telephone rings. It used to reach calls.create
+ * exactly as typed, so a transposed digit dialled a stranger and nothing in the
+ * run said whether that stranger had agreed to it.
+ */
+describe("the destination override", () => {
+  function withPhone<T>(value: string | undefined, fn: () => T): T {
+    const before = process.env.CALLE_TEST_PHONE;
+    if (value === undefined) delete process.env.CALLE_TEST_PHONE;
+    else process.env.CALLE_TEST_PHONE = value;
+    try {
+      return fn();
+    } finally {
+      if (before === undefined) delete process.env.CALLE_TEST_PHONE;
+      else process.env.CALLE_TEST_PHONE = before;
+    }
+  }
+
+  test("unset falls back to the published testing hotline", () => {
+    assert.equal(withPhone(undefined, () => testDestination([])), PUBLIC_TESTING_HOTLINE);
+  });
+
+  test("blank and whitespace are treated as unset", () => {
+    assert.equal(withPhone("   ", () => testDestination([])), PUBLIC_TESTING_HOTLINE);
+  });
+
+  test("the published hotline needs no attestation", () => {
+    assert.equal(
+      withPhone(PUBLIC_TESTING_HOTLINE, () => testDestination([])),
+      PUBLIC_TESTING_HOTLINE,
+    );
+  });
+
+  for (const malformed of [
+    "12763229632",
+    "+1 276 322 9632",
+    "+1(276)3229632",
+    "+12763229632x",
+    "+0763229632",
+    "+1234567",
+    "+1234567890123456",
+  ]) {
+    test(`refuses a destination that is not E.164: ${malformed}`, () => {
+      assert.throws(
+        () => assertDialable(malformed, [AUTHORIZED_FLAG]),
+        /not E\.164/,
+        "a malformed destination reached the client",
+      );
+    });
+  }
+
+  test("a well formed destination still needs the attestation", () => {
+    assert.throws(
+      () => withPhone("+12025550142", () => testDestination([])),
+      /other than the published testing hotline/,
+    );
+  });
+
+  test("the attestation lets a well formed destination through", () => {
+    assert.equal(
+      withPhone("+12025550142", () => testDestination([AUTHORIZED_FLAG])),
+      "+12025550142",
+    );
+  });
+
+  test("the attestation does not excuse a malformed destination", () => {
+    assert.throws(() => assertDialable("+1 202 555 0142", [AUTHORIZED_FLAG]), /not E\.164/);
+  });
+
+  test("no refusal prints the number it refused", () => {
+    for (const [value, argv] of [
+      ["+1 202 555 0142", [AUTHORIZED_FLAG]],
+      ["+12025550142", []],
+    ] as const) {
+      let message = "";
+      try {
+        assertDialable(value, argv);
+        assert.fail(`${value} was accepted`);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      assert.ok(!message.includes("5550142"), `the subscriber number survived: ${message}`);
+      assert.ok(message.includes("Nothing was sent."), "the refusal does not say nothing was sent");
+    }
+  });
 });

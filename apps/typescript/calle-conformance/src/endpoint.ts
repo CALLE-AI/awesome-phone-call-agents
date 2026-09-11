@@ -53,3 +53,52 @@ export function maskPhone(phone: string): string {
   const cc = digits.slice(0, digits.length > 11 ? 3 : 2);
   return `+${cc}${"*".repeat(digits.length - cc.length - 2)}${digits.slice(-2)}`;
 }
+
+/**
+ * The operator's destination override.
+ *
+ * `CALLE_TEST_PHONE` decides which telephone rings, so it is a destination in the
+ * same sense `CALLE_BASE_URL` is, and it was reaching `calls.create` exactly as
+ * typed. A transposed digit dials a stranger, and the only scripts that read it
+ * are the ones that place a real call.
+ *
+ * Left unset it stays on the hotline CALL-E publishes for testing, which nobody
+ * has to authorise because the platform put it there for this. Set to anything
+ * else it has to be well formed, and the operator has to say in that same run
+ * that whoever answers agreed to be called. The attestation is the operator's
+ * word, which is what the repository's review policy asks for, and it is spent
+ * per run rather than stored, so it cannot be set once and forgotten.
+ *
+ * The refusals mask the number. An operator who mistypes a destination should
+ * not have the mistyped line printed into a terminal they are about to paste.
+ */
+const E164 = /^\+[1-9]\d{7,14}$/;
+
+export const AUTHORIZED_FLAG = "--i-have-authorization-for-this-destination";
+
+export function assertDialable(phone: string, argv: readonly string[] = process.argv): string {
+  if (!E164.test(phone)) {
+    throw new Error(
+      `CALLE_TEST_PHONE is not E.164: ${maskPhone(phone)}\n` +
+        "Expected a leading +, a country code, and 8 to 15 digits in total, with no\n" +
+        "spaces, dashes or brackets. Nothing was sent.",
+    );
+  }
+  if (phone === PUBLIC_TESTING_HOTLINE) return phone;
+  if (!argv.includes(AUTHORIZED_FLAG)) {
+    throw new Error(
+      `CALLE_TEST_PHONE points somewhere other than the published testing hotline: ` +
+        `${maskPhone(phone)}\n` +
+        "A real telephone will ring. Re-run with " + AUTHORIZED_FLAG + " to state that\n" +
+        "whoever answers that line has agreed to be called. Nothing was sent.",
+    );
+  }
+  return phone;
+}
+
+/** The destination those scripts dial: the published hotline unless an operator overrode it. */
+export function testDestination(argv: readonly string[] = process.argv): string {
+  const raw = process.env.CALLE_TEST_PHONE?.trim();
+  if (raw === undefined || raw === "") return PUBLIC_TESTING_HOTLINE;
+  return assertDialable(raw, argv);
+}

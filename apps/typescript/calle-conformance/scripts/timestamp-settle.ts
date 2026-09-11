@@ -23,7 +23,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { CalleClient } from "@call-e/calle";
-import { baseUrl, maskPhone, PUBLIC_TESTING_HOTLINE } from "../src/endpoint.ts";
+import { baseUrl, maskPhone, testDestination } from "../src/endpoint.ts";
 
 const REQUIRED_LINE = "This is an automated call from an AI assistant.";
 const TASK = [
@@ -50,7 +50,7 @@ const SCHEMA = {
 const EVERY_MS = 10_000;
 const AFTER_COMPLETION_MS = 240_000;
 
-const phone = process.env.CALLE_TEST_PHONE ?? PUBLIC_TESTING_HOTLINE;
+const phone = testDestination();
 const region = process.env.CALLE_TEST_REGION ?? "US";
 const locale = process.env.CALLE_TEST_LOCALE ?? "en-US";
 
