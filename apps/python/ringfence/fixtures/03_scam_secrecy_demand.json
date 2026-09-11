@@ -1,0 +1,54 @@
+{
+  "_evidence_source": "synthetic: modeled on the FBI/FTC-documented grandparent/imposter-scam secrecy-demand pattern (see references/scam-red-flags.md)",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f03",
+    "account_holder_name": "Lena Cho",
+    "on_file_phone": "+14155550103",
+    "claimed_transaction_amount": "6500.00",
+    "claimed_recipient": "Unknown bail bond office",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f03",
+    "status": "completed",
+    "task": "Verify a flagged $6,500 wire transaction to an unfamiliar bail bond office.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.9, "label": "high"},
+    "summary": "Account holder said she was told to keep the call about her grandson's arrest private from family."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f03",
+      "phone": "+14155550103",
+      "status": "completed",
+      "started_at": "2026-09-10T11:00:00Z",
+      "completed_at": "2026-09-10T11:04:12Z",
+      "summary": "Account holder reported a secrecy demand.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private, or not to tell your bank or family?"},
+        {"speaker": "user", "text": "Yes — the caller said not to tell anyone, especially not my daughter, or my grandson would stay in jail longer."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "Yes, they said it had to happen within the hour."}
+      ],
+      "provider_call_id": "prov_f03",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f03a", "type": "call.dialing", "call_id": "call_f03", "created_at": "2026-09-10T11:00:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f03b", "type": "call.completed", "call_id": "call_f03", "created_at": "2026-09-10T11:04:12Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": true,
+    "urgency_pressure_present": true,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": true,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}
