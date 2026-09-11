@@ -13,12 +13,15 @@ export interface CascadePolicy {
   retryDelayMinutes: number;
   /** Hours until a yellow person is checked again. */
   followUpHours: number;
+  /** Minutes until a person who asked to be called later is called again. */
+  declinedRetryMinutes: number;
 }
 
 export const DEFAULT_POLICY: CascadePolicy = {
   maxPersonAttempts: 2,
   retryDelayMinutes: 20,
   followUpHours: 2,
+  declinedRetryMinutes: 45,
 };
 
 export function nextAction(state: Pick<PersonState, "attempts" | "contactCalled" | "outcome">, hasContact: boolean, policy: CascadePolicy = DEFAULT_POLICY): NextAction {
@@ -47,6 +50,12 @@ export function nextAction(state: Pick<PersonState, "attempts" | "contactCalled"
       };
     case "not_attempted":
       return { type: "operator-review", reason: "CALL-E did not accept the call task; nobody was dialled, so nobody is alerted. Resume the event or call by hand." };
+    case "declined":
+      return {
+        type: "follow-up",
+        reason: "answered and asked to be called later; a person who declines is reachable, so no contact is alerted",
+        delayMinutes: policy.declinedRetryMinutes,
+      };
     case "unreachable":
     case "unverified":
       if (state.attempts < policy.maxPersonAttempts) {

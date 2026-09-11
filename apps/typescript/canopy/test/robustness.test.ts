@@ -103,7 +103,7 @@ test("resume re-places refused waves with the same idempotency keys and finishes
 
     const resumed = await h.make().resume();
     assert.equal(resumed.notAttempted, 0);
-    assert.deepEqual(resumed.outcomes, { green: 3, yellow: 1, red: 2, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
+    assert.deepEqual(resumed.outcomes, { green: 3, yellow: 1, red: 2, declined: 0, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
     assert.equal(resumed.escalationCalls, 3);
     const ledger = new Ledger(h.ledgerPath);
     assert.equal(ledger.projection.failedWaves.length, 0);
@@ -130,7 +130,7 @@ test("a call that does not finish in time is left pending, never guessed, and re
 
     const settled = await h.make({ callTimeoutMs: 10000, waveSize: 8 }).resume();
     assert.equal(settled.pending, 0);
-    assert.deepEqual(settled.outcomes, { green: 3, yellow: 1, red: 2, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
+    assert.deepEqual(settled.outcomes, { green: 3, yellow: 1, red: 2, declined: 0, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
     assert.equal(settled.escalationCalls, 3);
   } finally {
     await h.cleanup();
@@ -154,7 +154,7 @@ test("per-person mode places one single-recipient task per person with its own k
   const h = await harness({}, {}, { CANOPY_TASK_MODE: "per-person" });
   try {
     const summary = await h.make().run();
-    assert.deepEqual(summary.outcomes, { green: 3, yellow: 1, red: 2, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
+    assert.deepEqual(summary.outcomes, { green: 3, yellow: 1, red: 2, declined: 0, unreachable: 1, unverified: 1, not_attempted: 0, pending: 0 });
     const ledger = new Ledger(h.ledgerPath);
     const waveCalls = [...ledger.projection.calls.values()].filter((c) => c.kind === "wave");
     assert.equal(waveCalls.length, 10, "8 first-pass tasks plus 2 redials");

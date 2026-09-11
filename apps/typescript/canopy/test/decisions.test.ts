@@ -103,6 +103,23 @@ test("the tier never moves down from what the agent said", () => {
   assert.equal(classify({ recipient: recipient(triage({ tier: "red" })), confidenceLabel: "high" }).outcome, "red");
 });
 
+test("a person who answered and asked to be called later is declined: follow up later, never escalate", () => {
+  const c = classify({ recipient: recipient(triage({ call_outcome: "declined_now", is_cool: "unknown", hydrated: "unknown", symptoms: [], needs: [], tier: "yellow" })), confidenceLabel: "high" });
+  assert.equal(c.outcome, "declined");
+  const a = nextAction({ attempts: 2, contactCalled: false, outcome: "declined" }, true);
+  assert.equal(a.type, "follow-up");
+  assert.equal(a.delayMinutes, DEFAULT_POLICY.declinedRetryMinutes);
+});
+
+test("declining does not hide a volunteered red flag", () => {
+  const c = classify({ recipient: recipient(triage({ call_outcome: "declined_now", symptoms: ["faint"], tier: "yellow" })), confidenceLabel: "high" });
+  assert.equal(c.outcome, "red");
+});
+
+test("a conversation cut short is unverified", () => {
+  assert.equal(classify({ recipient: recipient(triage({ call_outcome: "cut_short" })), confidenceLabel: "high" }).outcome, "unverified");
+});
+
 test("cascade: unreachable is redialled once, then the contact is phoned, then a door knock", () => {
   assert.equal(nextAction({ attempts: 1, contactCalled: false, outcome: "unreachable" }, true).type, "retry");
   assert.equal(nextAction({ attempts: 2, contactCalled: false, outcome: "unreachable" }, true).type, "contact-call");

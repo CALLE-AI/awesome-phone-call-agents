@@ -69,6 +69,8 @@ export type TaskMode = "batch" | "per-person";
 
 /** What the agent is asked to extract for each person. Mirrors the recipient result schema exactly. */
 export interface TriageResult {
+  /** How far the conversation got. declined_now: a person answered but asked not to continue. */
+  call_outcome?: "completed" | "declined_now" | "cut_short" | "voicemail" | "no_person";
   answered_by: "person" | "other_person" | "voicemail" | "ivr" | "unknown";
   is_cool: YesNoUnknown;
   hydrated: YesNoUnknown;
@@ -89,9 +91,9 @@ export interface EscalationResult {
 }
 
 /** Canopy's own verdict after applying fail-closed rules to the agent's result. */
-export type Outcome = "green" | "yellow" | "red" | "unreachable" | "unverified" | "not_attempted";
+export type Outcome = "green" | "yellow" | "red" | "declined" | "unreachable" | "unverified" | "not_attempted";
 
-export const OUTCOMES: readonly Outcome[] = ["green", "yellow", "red", "unreachable", "unverified", "not_attempted"];
+export const OUTCOMES: readonly Outcome[] = ["green", "yellow", "red", "declined", "unreachable", "unverified", "not_attempted"];
 
 export interface Classification {
   outcome: Outcome;

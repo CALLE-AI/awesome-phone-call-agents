@@ -69,7 +69,8 @@ Run from `apps/typescript/canopy/`. `npm install` once. Every command is `node -
 
 ## Person states
 
-`green`, `yellow`, `red`, `unreachable`, `unverified` are verdicts from a completed call. `not_attempted` means CALL-E never
+`green`, `yellow`, `red`, `unreachable`, `unverified` are verdicts from a completed call. `declined` means a person
+answered and asked to be called later: a follow-up is scheduled and no contact is alerted. `not_attempted` means CALL-E never
 accepted the task (nobody was dialled, nobody is alerted; resume the event). `awaiting` means the call is accepted but not
 finished (resume settles it).
 

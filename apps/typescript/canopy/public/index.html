@@ -41,14 +41,14 @@
   #map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.9) saturate(0.6); }
   .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .card { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; border-left: 4px solid var(--grey); }
-  .card.green { border-left-color: var(--green); } .card.yellow { border-left-color: var(--yellow); } .card.red { border-left-color: var(--red); } .card.unreachable { border-left-color: var(--grey); } .card.unverified { border-left-color: var(--violet); } .card.pending { border-left-color: var(--line); } .card.calling { border-left-color: var(--blue); animation: pulse 1.2s infinite; } .card.awaiting { border-left-color: var(--blue); } .card.not_attempted { border-left-color: var(--orange); }
+  .card.green { border-left-color: var(--green); } .card.yellow { border-left-color: var(--yellow); } .card.red { border-left-color: var(--red); } .card.unreachable { border-left-color: var(--grey); } .card.unverified { border-left-color: var(--violet); } .card.declined { border-left-color: #5dade2; } .card.pending { border-left-color: var(--line); } .card.calling { border-left-color: var(--blue); animation: pulse 1.2s infinite; } .card.awaiting { border-left-color: var(--blue); } .card.not_attempted { border-left-color: var(--orange); }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,152,219,.45); } 100% { box-shadow: 0 0 0 10px rgba(52,152,219,0); } }
   .card .name { font-weight: 600; }
   .card .meta { font-size: 12px; color: var(--muted); }
   .card .why { font-size: 12px; margin-top: 6px; }
   .card .quote { font-size: 12px; color: #c9d6e0; font-style: italic; margin-top: 4px; }
   .pill { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 6px; }
-  .pill.green { background: rgba(46,204,113,.18); color: var(--green); } .pill.yellow { background: rgba(241,196,15,.18); color: var(--yellow); } .pill.red { background: rgba(231,76,60,.2); color: var(--red); } .pill.unreachable { background: rgba(127,140,141,.2); color: #b8c2c6; } .pill.unverified { background: rgba(155,89,182,.2); color: #c9a3dc; } .pill.pending { background: rgba(42,53,63,.6); color: #9fb0bd; } .pill.calling, .pill.awaiting { background: rgba(52,152,219,.2); color: #8ec5ef; } .pill.not_attempted { background: rgba(230,126,34,.2); color: #f0b27a; }
+  .pill.green { background: rgba(46,204,113,.18); color: var(--green); } .pill.yellow { background: rgba(241,196,15,.18); color: var(--yellow); } .pill.red { background: rgba(231,76,60,.2); color: var(--red); } .pill.unreachable { background: rgba(127,140,141,.2); color: #b8c2c6; } .pill.unverified { background: rgba(155,89,182,.2); color: #c9a3dc; } .pill.declined { background: rgba(93,173,226,.2); color: #a9d6f5; } .pill.pending { background: rgba(42,53,63,.6); color: #9fb0bd; } .pill.calling, .pill.awaiting { background: rgba(52,152,219,.2); color: #8ec5ef; } .pill.not_attempted { background: rgba(230,126,34,.2); color: #f0b27a; }
   .timeline { max-height: 340px; overflow: auto; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .timeline div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
   .timeline .t { color: var(--muted); margin-right: 8px; }
@@ -114,7 +114,7 @@
   const withToken = (url) => token ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token) : url;
   const api = (url, opts) => fetch(withToken(url), Object.assign({ headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}) }, opts || {}));
   let map = null, markers = [];
-  const COLOURS = { green: "#2ecc71", yellow: "#f1c40f", red: "#e74c3c", unreachable: "#7f8c8d", unverified: "#9b59b6", not_attempted: "#e67e22", calling: "#3498db", awaiting: "#3498db", pending: "#4a5a68" };
+  const COLOURS = { green: "#2ecc71", yellow: "#f1c40f", red: "#e74c3c", declined: "#5dade2", unreachable: "#7f8c8d", unverified: "#9b59b6", not_attempted: "#e67e22", calling: "#3498db", awaiting: "#3498db", pending: "#4a5a68" };
   function ensureMap(people) {
     if (typeof L === "undefined") { $("map").innerHTML = '<div class="empty" style="padding:12px">Map tiles unavailable offline; see the people list below.</div>'; return; }
     if (!map) {
@@ -147,7 +147,7 @@
       ["green", k.green ?? 0, "green"],
       ["yellow", k.yellow ?? 0, "yellow"],
       ["red", k.red ?? 0, "red"],
-      ["grey", (k.unreachable ?? 0) + (k.unverified ?? 0), "unreachable / unverified"],
+      ["grey", (k.unreachable ?? 0) + (k.unverified ?? 0) + (k.declined ?? 0), "unreachable / unverified / declined"],
       ["orange", (k.notAttempted ?? 0) + (k.pending ?? 0), "not attempted / awaiting"],
       ["blue", k.calls ?? 0, "CALL-E call tasks"],
       ["blue", k.escalations ?? 0, "escalation calls"],

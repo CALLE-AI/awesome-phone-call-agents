@@ -35,8 +35,14 @@ export const NEEDS = [
 export const RECIPIENT_RESULT_SCHEMA: JsonObject = {
   type: "object",
   additionalProperties: false,
-  required: ["answered_by", "is_cool", "hydrated", "symptoms", "confusion_suspected", "needs", "tier", "notes"],
+  required: ["call_outcome", "answered_by", "is_cool", "hydrated", "symptoms", "confusion_suspected", "needs", "tier", "notes"],
   properties: {
+    call_outcome: {
+      type: "string",
+      enum: ["completed", "declined_now", "cut_short", "voicemail", "no_person"],
+      description:
+        "How far the conversation got. Use completed when the questions were asked and answered. Use declined_now when a person answered but said it was not a good time or asked not to continue; in that case still fill every other field, using unknown, empty lists, tier yellow and a note saying they asked to be called later. Use cut_short when the line dropped or the person stopped responding before the questions were finished. Use voicemail when voicemail answered. Use no_person when nobody identifiable spoke.",
+    },
     answered_by: {
       type: "string",
       enum: ["person", "other_person", "voicemail", "ivr", "unknown"],
@@ -47,12 +53,12 @@ export const RECIPIENT_RESULT_SCHEMA: JsonObject = {
       type: "string",
       enum: ["yes", "no", "unknown"],
       description:
-        "Use yes only if the person says they are in a cool or shaded place AND a fan or air conditioner is working. Use no if the home is hot, the fan or AC is broken or off, or they are outdoors in the sun. Use unknown if this was not clearly established.",
+        "Use yes only if the person says they are in a cool or shaded place AND a fan or air conditioner is working. Use no if the home is hot, the fan or AC is broken or off, or they are outdoors in the sun. Use unknown if this was not clearly established or the question was never asked.",
     },
     hydrated: {
       type: "string",
       enum: ["yes", "no", "unknown"],
-      description: "Use yes only if the person says they have been drinking water today. Use no if they say they have not. Use unknown if not clearly established.",
+      description: "Use yes only if the person says they have been drinking water today. Use no if they say they have not. Use unknown if not clearly established or the question was never asked.",
     },
     symptoms: {
       type: "array",

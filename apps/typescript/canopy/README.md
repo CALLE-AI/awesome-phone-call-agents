@@ -35,8 +35,8 @@ Long-form background, evidence and the demo guide live in [`docs/canopy/README.m
    always knows whom it is speaking to. In batch mode, one task per wave with `recipients[]`. Both carry
    a per-recipient result schema (who answered, cool, hydrated, symptoms, needs, tier), a task-level
    aggregate schema, correlation metadata, and an idempotency key per event, wave, attempt and person.
-4. **Classify.** Fail-closed rules turn the agent's result into `green`, `yellow`, `red`, `unreachable`
-   or `unverified`. Confusion or a red-flag symptom always wins; an unknown never becomes green.
+4. **Classify.** Fail-closed rules turn the agent's result into `green`, `yellow`, `red`, `declined`,
+   `unreachable` or `unverified`. Confusion or a red-flag symptom always wins; an unknown never becomes green.
 5. **Cascade.** Silence is the signal. Unreachable people are redialled once, then their emergency
    contact is phoned by CALL-E and asked for a commitment and an ETA, then they go on the door-knock list.
    Red people escalate immediately, and an emergency-services ticket waits for a human to approve.
@@ -59,6 +59,7 @@ This is the part that matters for real people, so it is explicit:
 | A call has not finished when the timeout passes | Leaves the people `awaiting`, records the call id, keeps going | Guess a verdict |
 | The process crashes or is stopped | `resume --event-id` reattaches to pending calls by id and re-places refused waves with the same keys | Dial anyone a second time for the same wave |
 | The cascade runs twice (resume, follow-up) | Tickets are unique per person and kind; a contact is phoned at most once per event | Duplicate an escalation |
+| A person answers and says "not now" | Classifies them `declined`, schedules a follow-up in 45 minutes, keeps their emergency contact out of it | Escalate someone who is demonstrably alive and reachable |
 | A live run is started inside quiet hours | Refuses, unless the playbook is life-safety and the operator gives `--override-quiet-hours "<reason>"`, which is written to the ledger | Ring elderly people at 3 a.m. for a boil-water notice |
 | The dashboard is exposed through a tunnel for webhooks | Requires a token on every route except `/calle/webhook` (auto-generated when `CANOPY_PUBLIC_URL` is set) | Let the internet approve a dispatch |
 

@@ -633,7 +633,7 @@ export class Orchestrator {
   }
 
   summary(): RunSummary {
-    const outcomes: Record<Outcome | "pending", number> = { green: 0, yellow: 0, red: 0, unreachable: 0, unverified: 0, not_attempted: 0, pending: 0 };
+    const outcomes: Record<Outcome | "pending", number> = { green: 0, yellow: 0, red: 0, declined: 0, unreachable: 0, unverified: 0, not_attempted: 0, pending: 0 };
     for (const state of this.states.values()) {
       outcomes[state.outcome ?? "pending"] += 1;
     }

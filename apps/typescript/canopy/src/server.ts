@@ -110,6 +110,7 @@ export function toPublicState(projection: Projection, mode: Config["mode"], runn
       red: count("red"),
       unreachable: count("unreachable"),
       unverified: count("unverified"),
+      declined: count("declined"),
       notAttempted: count("not_attempted"),
       pending: states.filter((s) => s.outcome === null).length,
       pendingCalls,

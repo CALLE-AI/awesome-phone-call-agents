@@ -65,6 +65,7 @@ export function buildReport(projection: Projection): string {
   lines.push(`| Reached (a person or caregiver spoke) | ${reached} (${pct(reached, total)}) |`);
   lines.push(`| Green | ${byOutcome("green").length} |`);
   lines.push(`| Yellow (follow-up due) | ${byOutcome("yellow").length} |`);
+  lines.push(`| Declined (asked to be called later) | ${byOutcome("declined").length} |`);
   lines.push(`| Red (human escalation) | ${byOutcome("red").length} |`);
   lines.push(`| Unreachable | ${byOutcome("unreachable").length} |`);
   lines.push(`| Unverified (answered, facts not established) | ${byOutcome("unverified").length} |`);
@@ -115,6 +116,9 @@ export function buildReport(projection: Projection): string {
   section("Unreachable", byOutcome("unreachable"), "Everyone was reached.");
   section("Unverified", byOutcome("unverified"), "Every completed call established the facts.");
   section("Yellow: follow-up due", byOutcome("yellow"), "Nobody needed a follow-up.");
+  if (byOutcome("declined").length > 0) {
+    section("Declined: asked to be called later", byOutcome("declined"), "");
+  }
   if (byOutcome("not_attempted").length > 0) {
     section("Not attempted: CALL-E did not accept the call task", byOutcome("not_attempted"), "");
   }

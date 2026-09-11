@@ -96,6 +96,7 @@ export const SCENARIOS = [
   "unreachable",
   "unverified",
   "slow-green",
+  "declined",
   "contact-commit",
   "contact-decline",
   "contact-no-answer",
@@ -189,7 +190,7 @@ function playTriage(scenario: Scenario, name: string): Played {
     case "slow-green": {
       const offset = scenario === "slow-green" ? 23 : 2;
       return {
-        result: { answered_by: "person", is_cool: "yes", hydrated: "yes", symptoms: ["none"], confusion_suspected: false, needs: ["none"], tier: "green", notes: "Feels fine, fan is on, has been drinking water." },
+        result: { call_outcome: "completed", answered_by: "person", is_cool: "yes", hydrated: "yes", symptoms: ["none"], confusion_suspected: false, needs: ["none"], tier: "green", notes: "Feels fine, fan is on, has been drinking water." },
         summary: `${name} answered, is in a cool room with the fan on, has been drinking water, reports no symptoms and needs nothing.`,
         turns: [
           { ...bot0, offset_seconds: offset },
@@ -210,7 +211,7 @@ function playTriage(scenario: Scenario, name: string): Played {
     }
     case "yellow":
       return {
-        result: { answered_by: "person", is_cool: "no", hydrated: "yes", symptoms: ["headache"], confusion_suspected: false, needs: ["fan_or_ac"], tier: "yellow", notes: "The fan stopped working this morning and the flat is very hot; has a headache." },
+        result: { call_outcome: "completed", answered_by: "person", is_cool: "no", hydrated: "yes", symptoms: ["headache"], confusion_suspected: false, needs: ["fan_or_ac"], tier: "yellow", notes: "The fan stopped working this morning and the flat is very hot; has a headache." },
         summary: `${name} answered. The fan is broken and the home is hot; reports a headache; has been drinking water; would like a fan.`,
         turns: [
           bot0,
@@ -230,7 +231,7 @@ function playTriage(scenario: Scenario, name: string): Played {
       };
     case "red":
       return {
-        result: { answered_by: "person", is_cool: "no", hydrated: "no", symptoms: ["dizziness", "faint", "nausea"], confusion_suspected: false, needs: ["someone_to_visit"], tier: "red", notes: "Feels dizzy and nearly fainted; no air conditioning; has not been drinking." },
+        result: { call_outcome: "completed", answered_by: "person", is_cool: "no", hydrated: "no", symptoms: ["dizziness", "faint", "nausea"], confusion_suspected: false, needs: ["someone_to_visit"], tier: "red", notes: "Feels dizzy and nearly fainted; no air conditioning; has not been drinking." },
         summary: `${name} answered but sounds unwell: dizzy, nearly fainted, nauseous, no air conditioning, not drinking water. Advised to call emergency services; asked for someone to come.`,
         turns: [
           bot0,
@@ -250,7 +251,7 @@ function playTriage(scenario: Scenario, name: string): Played {
       };
     case "red-confusion":
       return {
-        result: { answered_by: "person", is_cool: "unknown", hydrated: "unknown", symptoms: ["confusion"], confusion_suspected: true, needs: ["someone_to_visit"], tier: "yellow", notes: "Could not say what day it is and repeated the same sentence several times." },
+        result: { call_outcome: "completed", answered_by: "person", is_cool: "unknown", hydrated: "unknown", symptoms: ["confusion"], confusion_suspected: true, needs: ["someone_to_visit"], tier: "yellow", notes: "Could not say what day it is and repeated the same sentence several times." },
         summary: `${name} answered but seemed confused, repeated themselves and could not say what day it is. Could not establish whether the home is cool.`,
         turns: [
           bot0,
@@ -265,7 +266,7 @@ function playTriage(scenario: Scenario, name: string): Played {
       };
     case "caregiver":
       return {
-        result: { answered_by: "other_person", is_cool: "yes", hydrated: "yes", symptoms: ["none"], confusion_suspected: false, needs: ["none"], tier: "green", notes: "Daughter answered; says her mother is resting in an air-conditioned room and drinking water." },
+        result: { call_outcome: "completed", answered_by: "other_person", is_cool: "yes", hydrated: "yes", symptoms: ["none"], confusion_suspected: false, needs: ["none"], tier: "green", notes: "Daughter answered; says her mother is resting in an air-conditioned room and drinking water." },
         summary: `${name}'s daughter answered and spoke for her: resting in an air-conditioned room, drinking water, no symptoms.`,
         turns: [
           bot0,
@@ -283,9 +284,18 @@ function playTriage(scenario: Scenario, name: string): Played {
       };
     case "voicemail":
       return {
-        result: { answered_by: "voicemail", is_cool: "unknown", hydrated: "unknown", symptoms: [], confusion_suspected: false, needs: [], tier: "yellow", notes: "Voicemail answered; left the heat safety message." },
+        result: { call_outcome: "voicemail", answered_by: "voicemail", is_cool: "unknown", hydrated: "unknown", symptoms: [], confusion_suspected: false, needs: [], tier: "yellow", notes: "Voicemail answered; left the heat safety message." },
         summary: "Voicemail picked up. Left the welfare message.",
         turns: [{ offset_seconds: 3, speaker: "bot", text: "This is an automated welfare call because of the extreme heat. Please stay cool and drink water. We will try again shortly." }],
+        attemptStatus: "completed",
+        recipientStatus: "completed",
+        failureCode: null,
+      };
+    case "declined":
+      return {
+        result: { call_outcome: "declined_now", answered_by: "person", is_cool: "unknown", hydrated: "unknown", symptoms: [], confusion_suspected: false, needs: [], tier: "yellow", notes: "Answered but said it was not a good time and asked to be called later." },
+        summary: `${name} answered but said it was not a good time to talk and asked to be called later.`,
+        turns: [bot0, { offset_seconds: 5, speaker: "user", text: "Hello? No, not now, I am at the doctor. Call me later." }, { offset_seconds: 8, speaker: "bot", text: "I am sorry for the timing. Please call nine one one if you feel dizzy, confused or faint. We will call again later. Thank you." }],
         attemptStatus: "completed",
         recipientStatus: "completed",
         failureCode: null,

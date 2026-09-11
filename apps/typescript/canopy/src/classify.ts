@@ -3,6 +3,7 @@
 // Rules, in order:
 //   1. Nobody was reached (failed recipient, voicemail, IVR, no completed attempt) -> unreachable.
 //   2. A completed call with no usable structured result -> unverified. Never green.
+//   2b. A person who answered and asked not to continue -> declined (follow up later, never escalate).
 //   3. Any red flag in the agent's own fields overrides a softer agent tier upward.
 //   4. Green requires every signal to agree: cool, hydrated, no symptoms, no needs, a person spoke.
 //   5. Low completion confidence never closes a check: green becomes unverified.
@@ -34,7 +35,7 @@ export function isTriageResult(value: unknown): value is TriageResult {
 }
 
 function rank(outcome: Outcome): number {
-  return { green: 0, unverified: 1, not_attempted: 1, yellow: 2, unreachable: 2, red: 3 }[outcome];
+  return { green: 0, unverified: 1, not_attempted: 1, declined: 1, yellow: 2, unreachable: 2, red: 3 }[outcome];
 }
 
 export function classify(input: ClassifyInput): Classification {
@@ -63,6 +64,16 @@ export function classify(input: ClassifyInput): Classification {
   if (result.answered_by === "unknown") {
     reasons.push("nobody clearly identifiable answered");
     return { outcome: "unverified", reasons, agentTier };
+  }
+  if (result.call_outcome === "cut_short" || result.call_outcome === "no_person") {
+    reasons.push(result.call_outcome === "cut_short" ? "conversation cut short before the questions were finished" : "no identifiable person spoke");
+    return { outcome: "unverified", reasons, agentTier };
+  }
+  // A person who answered and asked to be called later is alive and reachable: no escalation,
+  // a later follow-up instead. Red flags still win if any were volunteered.
+  if (result.call_outcome === "declined_now" && !result.confusion_suspected && !result.symptoms.some((s) => RED_SYMPTOMS.has(s))) {
+    reasons.push("answered but asked not to continue now");
+    return { outcome: "declined", reasons, agentTier };
   }
 
   let outcome: Outcome = agentTier ?? "unverified";

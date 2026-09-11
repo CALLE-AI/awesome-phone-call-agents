@@ -53,7 +53,7 @@ alert feed or operator  ->  hazard event  ->  risk-ordered waves
                               re-fetched) or polling, whichever comes first
                                                     |
                                    fail-closed verdict per person
-                                   green | yellow | red | unreachable | unverified
+                                   green | yellow | red | declined | unreachable | unverified
                                    not_attempted (task refused) | awaiting (pending)
                                                     |
                    +----------------+---------------+------------------+
@@ -160,6 +160,13 @@ state as an uninterrupted run, with no duplicate call and no duplicate ticket.
    use cases.
 10. India is served from the international line, so recipients see a foreign caller ID. Local numbers
     for India would remove the single biggest trust barrier for this use case there.
+11. Observed on the first live call: when the recipient answered and said "not now", the agent ended the
+    call correctly but returned `structured_result: null` and a task-level aggregate of zeros, even though
+    the summary text knew exactly what had happened. A schema with a `call_outcome` enum
+    (`declined_now`, `cut_short`, ...) and explicit "use unknown when the question was never asked"
+    guidance fixed this on our side; a platform-level "conversation outcome" field would make it
+    unnecessary. Measured on that call: 66 s from task creation to dial, 31 s of conversation, 30 s to
+    finalize; first bot word at 0 s.
 
 ## Roadmap
 
