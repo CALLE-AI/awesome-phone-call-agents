@@ -93,17 +93,17 @@ python3 scripts/create_branch.py docs/git-naming-conventions
 
 ## Skill folder requirements
 
-A skill should be a directory with a required `SKILL.md` file.
-
-Recommended structure:
+Every skill must include these files to pass repository validation:
 
 ```text
 skills/example-skill/
 ├── SKILL.md
-├── references/
-├── scripts/
-└── assets/
+└── references/
+    ├── safety.md
+    └── examples.md
 ```
+
+Use `references/safety.md` for the workflow's safety rules and `references/examples.md` for usage examples. Additional reference files, `scripts/`, and `assets/` are optional; include them when the skill needs them.
 
 The frontmatter should include at least:
 
