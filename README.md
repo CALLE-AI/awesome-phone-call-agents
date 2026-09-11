@@ -157,12 +157,14 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`ledger-collections-call`](skills/ledger-collections-call/) - HITL outbound collections call from overdue JSON (E.164, integer minor units, region); CALL-E `create` + poll; structured promise out; dry-run default; never posts to unsupported regions (including YE)
 - [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured information for RDN review and referral follow-up. See [`docs/rdn-intake-referral.md`](docs/rdn-intake-referral.md) for documentation and synthetic validation examples.
 - [`recall-outreach`](skills/recall-outreach/) - Calls affected customers about a product recall using only organisation-approved wording, routes every unapproved question to a human, and reports call completion and recall resolution as separate measures so a completed call is never counted as a completed return.
+- [`kol-ivr-route`](skills/kol-ivr-route/) - Verifies healthcare claim-status phone call results against the question asked, payer-side field evidence, destination identity, and an independent IVR route receipt before downstream use.
 - [`pharmacy-cash-price`](skills/pharmacy-cash-price/) - Asks one retail pharmacy for a cash price with no insurance and returns a structured quote, a refusal, or an explicit unknown, with the disclosure and the medical boundary written into the call.
 - [`logistics-exception`](skills/logistics-exception/) - Resolves a missed dock window by calling the driver and receiving dock concurrently with one strict CALL-E result schema, reconciling terminal results by event id and re-fetch, combining only reached-contact facts into a recovery card, and gating any dock-changing follow-up call behind explicit human approval.
 - [`otherend-task-test`](skills/otherend-task-test/) - Rehearses a CALL-E task text and result schema against a programmable receptionist line the operator owns, reads the deterministic grade (manifest, self-report, fabrication, disclosure, confidence calibration), and turns each failing check into a task-text edit before the task reaches real people.
 
 ### Apps
 
+- [Kol](apps/typescript/kol/) - Evidence-gated healthcare claim-status calls with strict CALL-E structured results, independent route receipts, a fail-closed verifier, and a 640-case no-call adversarial evaluation.
 - [ReturnReady](apps/python/returnready/) - Local return-enquiry review workbench that compares recipient quotations and later corrections with written instructions, with no-call examples and explicit approval before CALL-E requests.
 - [ActionBridge](https://actionbridge.vercel.app) - Human-controlled phone-work orchestration web app that turns a bounded goal into a reviewed CALL-E call plan, with explicit confirmation, status/events, structured results and evidence; the public demo is no-call by default.
 - [AfterCare](apps/python/aftercare/) - Consent-aware post-discharge CALL-E follow-ups with protocol schemas, dry-run by default, risk scoring, and a clinic UI.
@@ -193,6 +195,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
 | [`apps/typescript/teamline`](apps/typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
 | [`apps/web/veyra`](apps/web/veyra/) | TypeScript / Next.js / Python | Natural-language campaign builder with exact recipient review, operator-gated live dispatch, fail-closed reconciliation, and fake mode enabled by default. |
