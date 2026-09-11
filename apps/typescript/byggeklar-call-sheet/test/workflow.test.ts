@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPreview, maskPhone, validateRequest } from "../src/workflow.js";
+import { buildPreview, maskPhone, renderPreview, validateRequest } from "../src/workflow.js";
 
 const valid = {
   request_id: "rfq-1", project_name: "Project Elm", supplier_name: "Demo Supplier",
@@ -22,6 +22,15 @@ test("changing the call changes the approval receipt", () => {
 });
 
 test("masks the destination", () => assert.equal(maskPhone("+442079460123"), "+44********23"));
+
+test("rendered task masks the recipient without changing the approved payload", () => {
+  const preview = buildPreview(validateRequest(valid));
+  const receipt = preview.receipt;
+  assert.ok(!renderPreview(preview).includes(valid.phone));
+  assert.ok(renderPreview(preview).includes(preview.maskedPhone));
+  assert.ok(preview.task.includes(valid.phone));
+  assert.equal(preview.receipt, receipt);
+});
 
 test("refuses unsupported regions", () => {
   assert.throws(() => validateRequest({ ...valid, region: "DK" }), /not currently supported/);

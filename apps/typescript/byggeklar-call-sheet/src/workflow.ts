@@ -104,7 +104,7 @@ export function renderPreview(preview: Preview): string {
     "",
     "The call may collect facts only. Ordering, negotiation, substitutions and fees remain human decisions.",
     "",
-    preview.task,
+    preview.task.replaceAll(preview.request.phone, preview.maskedPhone),
     "",
     `Approval receipt: ${preview.receipt}`,
   ].join("\n");
