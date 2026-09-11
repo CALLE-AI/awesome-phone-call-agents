@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from cryptography.fernet import Fernet
-from apps.python.medops_call_commander.auth import verify_jwt_token
+from apps.python.medops_call_commander.auth import verify_jwt_token, verify_clinical_admin_role
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Depends
@@ -46,9 +46,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
+allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()] if allowed_origins_env else [
+    "https://gen-lang-client-0574518291.web.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://gen-lang-client-0574518291.web.app"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -91,6 +98,14 @@ def _load_consent_source():
             def get_consent_status(self, patient_id: str, call_type: str) -> str:
                 raise RuntimeError("Test stub: consent_gate._source was not replaced by conftest.py")
         return _UnconfiguredStub()
+
+    bypass_auth = os.environ.get("MEDOPS_BYPASS_AUTH", "").lower() in ("1", "true", "yes", "on")
+    if bypass_auth:
+        class _BypassConsent:
+            def get_consent_status(self, patient_id: str, call_type: str) -> str:
+                return "GRANTED"
+        logger.info("ConsentGate: MEDOPS_BYPASS_AUTH is active. Bypassing EHR consent checks.")
+        return _BypassConsent()
 
     has_opendental = bool(
         os.environ.get("OPENDENTAL_API_URL")
@@ -165,10 +180,11 @@ def index_page():
     return {"status": "MedOps Call Commander API Running"}
 
 @app.post("/api/events/trigger")
-def trigger_event(req: TriggerEventRequest, _=Depends(verify_jwt_token)):
+def trigger_event(req: TriggerEventRequest, auth_payload: dict = Depends(verify_clinical_admin_role)):
     """
     Receives an EHR event payload, routes to the appropriate agent, checks patient consent,
     generates a CallPlan in PENDING_APPROVAL, and notifies HITL admin.
+    Requires bounded clinical admin authorization.
     """
     event = EHREvent(
         event_type=req.event_type,
@@ -197,7 +213,7 @@ def trigger_event(req: TriggerEventRequest, _=Depends(verify_jwt_token)):
             plan_id=plan.plan_id,
             action="CREATED",
             agent_type=plan.agent.value,
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason=f"Event '{event.event_type}' routed to agent '{plan.agent.value}'",
         ))
 
@@ -215,7 +231,7 @@ def trigger_event(req: TriggerEventRequest, _=Depends(verify_jwt_token)):
         audit_log.append(AuditEntry(
             plan_id="N/A",
             action="BLOCKED_CONSENT_DENIED",
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason=f"Consent denied for patient {req.patient_id}",
         ))
         raise HTTPException(status_code=403, detail=str(e))
@@ -249,7 +265,7 @@ def get_config(_=Depends(verify_jwt_token)):
 def list_plans(_=Depends(verify_jwt_token)):
     """List all call plans sorted by creation time descending."""
     sorted_plans = sorted(PLANS_DB.values(), key=lambda p: p.created_at, reverse=True)
-    return [plan_to_dict(p) for p in sorted_plans]
+    return {"plans": [plan_to_dict(p) for p in sorted_plans]}
 
 
 @app.get("/api/plans/{plan_id}")
@@ -262,8 +278,8 @@ def get_plan(plan_id: str, _=Depends(verify_jwt_token)):
 
 
 @app.post("/api/plans/{plan_id}/approve")
-def approve_plan(plan_id: str, req: ApprovePlanRequest, _=Depends(verify_jwt_token)):
-    """Approve call plan via Web Dashboard or Telegram callback."""
+def approve_plan(plan_id: str, req: ApprovePlanRequest, auth_payload: dict = Depends(verify_clinical_admin_role)):
+    """Approve call plan via Web Dashboard or Telegram callback. Requires clinical admin role."""
     if plan_id not in PLANS_DB:
         raise HTTPException(status_code=404, detail="Plan not found")
     plan = PLANS_DB[plan_id]
@@ -280,7 +296,7 @@ def approve_plan(plan_id: str, req: ApprovePlanRequest, _=Depends(verify_jwt_tok
 
     plan.state = PlanState.APPROVED
     plan.dry_run = False
-    plan.approved_by = req.admin_id or "admin_web"
+    plan.approved_by = req.admin_id if (req.admin_id and req.admin_id != "admin_web") else auth_payload.get("uid", "admin_web")
     plan.approved_at = datetime.now(timezone.utc)
 
     audit_log.append(AuditEntry(
@@ -295,8 +311,8 @@ def approve_plan(plan_id: str, req: ApprovePlanRequest, _=Depends(verify_jwt_tok
 
 
 @app.post("/api/plans/{plan_id}/dispatch")
-def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, _=Depends(verify_jwt_token)):
-    """Dispatches an approved CallPlan to CALL-E."""
+def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, auth_payload: dict = Depends(verify_clinical_admin_role)):
+    """Dispatches an approved CallPlan to CALL-E. Requires clinical admin role."""
     if plan_id not in PLANS_DB:
         raise HTTPException(status_code=404, detail="Plan not found")
     plan = PLANS_DB[plan_id]
@@ -328,7 +344,7 @@ def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, _=Depends(ver
             plan_id=plan.plan_id,
             action="DISPATCHED",
             agent_type=plan.agent.value,
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason=f"Call dispatched to CALL-E (ref: {call_result.transcript_ref})",
         ))
 
@@ -336,7 +352,7 @@ def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, _=Depends(ver
             plan_id=plan.plan_id,
             action="COMPLETED",
             agent_type=plan.agent.value,
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason=f"Call completed with outcome '{call_result.outcome.value}'",
         ))
 
@@ -347,7 +363,7 @@ def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, _=Depends(ver
         audit_log.append(AuditEntry(
             plan_id=plan.plan_id,
             action="PHI_SCRUBBED",
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason="E.164 phone zeroed post-dispatch",
         ))
 
@@ -362,30 +378,32 @@ def dispatch_plan(plan_id: str, background_tasks: BackgroundTasks, _=Depends(ver
         audit_log.append(AuditEntry(
             plan_id=plan.plan_id,
             action="FAILED",
-            admin_id="system",
+            admin_id=auth_payload.get("uid", "system"),
             reason=f"Execution error: {str(e)}",
         ))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/plans/{plan_id}/dismiss")
-def dismiss_plan(plan_id: str, _=Depends(verify_jwt_token)):
+def dismiss_plan(plan_id: str, auth_payload: dict = Depends(verify_clinical_admin_role)):
+    """Dismisses a call plan. Requires clinical admin role."""
     if plan_id not in PLANS_DB:
         raise HTTPException(status_code=404, detail="Plan not found")
     plan = PLANS_DB[plan_id]
     plan.state = PlanState.DISMISSED
+    admin_id = auth_payload.get("uid", "admin_web")
     audit_log.append(AuditEntry(
         plan_id=plan.plan_id,
         action="DISMISSED",
-        admin_id="admin_web",
-        reason="Plan dismissed by admin",
+        admin_id=admin_id,
+        reason="Plan dismissed by authorized admin",
     ))
     return {"status": "dismissed", "plan": plan_to_dict(plan)}
 
 
 @app.get("/api/audit")
-def get_audit_log(_=Depends(verify_jwt_token)):
-    """Retrieve full audit log entries."""
+def get_audit_log(auth_payload: dict = Depends(verify_clinical_admin_role)):
+    """Retrieve full audit log entries for authorized clinical admins."""
     entries = audit_log.all()
     return [
         {
@@ -405,6 +423,13 @@ async def telegram_webhook(request: Request):
     """Incoming Telegram Webhook callback endpoint."""
     if not hitl_gate:
         return JSONResponse(content={"ok": False, "reason": "HITL gate disabled"}, status_code=400)
+
+    secret = os.environ.get("HITL_SIGNING_SECRET") or os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+    if secret:
+        header_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if not header_token or header_token != secret:
+            logger.warning("Unauthorized Telegram Webhook attempt with invalid/missing secret token.")
+            return JSONResponse(content={"ok": False, "reason": "Unauthorized webhook signature"}, status_code=401)
 
     payload = await request.json()
     logger.info("Telegram Webhook payload received: %s", payload)
@@ -442,11 +467,3 @@ async def telegram_webhook(request: Request):
 
     return {"ok": True}
 
-@app.get("/api/audit")
-def get_audit_logs(token_payload=Depends(verify_jwt_token)):
-    role = token_payload.get("role", "admin")
-    if role != "admin" and role != "super_admin":
-        raise HTTPException(status_code=403, detail="Not authorized to view audit logs")
-        
-    logs = audit_log.get_logs()
-    return {"logs": [log.model_dump() for log in logs]}

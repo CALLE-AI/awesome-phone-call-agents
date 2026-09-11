@@ -1,9 +1,11 @@
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +36,35 @@ class CalleClient:
             "recipients": [{"phones": [phone or "+14155550100"], "region": "US"}] if phone else [],
             "metadata": {"plan_id": plan_id} if plan_id else {},
         }
+        mock_enabled = os.environ.get("CALLE_MOCK_MODE", "").lower() in ("1", "true", "yes", "on")
         try:
             resp = requests.post(url, json=payload, headers=self.headers, timeout=60)
             if resp.status_code in (200, 201):
                 return resp.json()
+            elif not mock_enabled:
+                logger.error("CALL-E API creation error HTTP %s: %s", resp.status_code, resp.text)
+                return {
+                    "id": f"call_failed_{uuid.uuid4().hex[:8]}",
+                    "status": "failed",
+                    "task_completed": False,
+                    "error": f"API returned status {resp.status_code}",
+                    "structured_result": {},
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
         except Exception as exc:
-            logger.info("CALL-E API fallback to local execution: %s", exc)
+            logger.error("CALL-E API request exception: %s", exc)
+            if not mock_enabled:
+                return {
+                    "id": f"call_failed_{uuid.uuid4().hex[:8]}",
+                    "status": "failed",
+                    "task_completed": False,
+                    "error": str(exc),
+                    "structured_result": {},
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
 
-        # Simulated fallback for hackathon demo robustness
-        call_id = f"call_e_{uuid.uuid4().hex[:10]}"
+        # Explicit mock mode only (CALLE_MOCK_MODE=1) for offline dry-run testing
+        call_id = f"call_e_mock_{uuid.uuid4().hex[:10]}"
         mock_data = {
             "id": call_id,
             "status": "completed",
@@ -52,7 +74,7 @@ class CalleClient:
             "structured_result": {
                 "reschedule_confirmed": True,
                 "promise_date": "2026-08-12",
-                "call_summary": "Patient confirmed appointment reschedule for next Wednesday."
+                "call_summary": "[MOCK DEMO] Patient confirmed appointment reschedule."
             },
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -69,22 +91,28 @@ class CalleClient:
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
                 return resp.json()
+            logger.warning("CALL-E get status error HTTP %s for call %s", resp.status_code, call_id)
+            return {
+                "id": call_id,
+                "status": "failed",
+                "task_completed": False,
+                "error": f"HTTP {resp.status_code}",
+                "structured_result": {},
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
         except Exception as exc:
             logger.warning("Error fetching CALL-E call %s: %s", call_id, exc)
-
-        return {
-            "id": call_id,
-            "status": "completed",
-            "task_completed": True,
-            "structured_result": {
-                "reschedule_confirmed": True,
-                "call_summary": "Call completed successfully via MedOps Call Commander."
-            },
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        }
+            return {
+                "id": call_id,
+                "status": "failed",
+                "task_completed": False,
+                "error": str(exc),
+                "structured_result": {},
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
 
     def calls_cancel(self, call_id: str) -> None:
-        """Cancel a call."""
+        """Cancel an in-flight call (best effort)."""
         if call_id in self._mock_calls:
             self._mock_calls[call_id]["status"] = "canceled"
             return
@@ -92,4 +120,4 @@ class CalleClient:
         try:
             requests.post(url, headers=self.headers, timeout=5)
         except Exception as exc:
-            logger.warning("Error canceling CALL-E call %s: %s", call_id, exc)
+            logger.warning("Best-effort error canceling CALL-E call %s: %s", call_id, exc)

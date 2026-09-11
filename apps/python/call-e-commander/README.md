@@ -1,8 +1,8 @@
-# CALL-E Commander: Enterprise-Grade Dispatch & Audit Platform
+# CALL-E Commander: Outbound Call Dispatch & Audit Prototype
 
-CALL-E Commander is a Python/FastAPI backend and React frontend application designed to securely manage, authorize, and audit phone-call tasks before they are dispatched to the CALL-E API.
+CALL-E Commander is a Python/FastAPI backend and React frontend application designed to manage, authorize, and audit phone-call tasks before they are dispatched to the CALL-E API.
 
-This application acts as an enterprise governance layer, ensuring that all AI-driven calls require Human-in-the-Loop (HITL) approval, are fully audited, and execute securely via the CALL-E integration.
+This application acts as a governance prototype for hackathon demonstration, ensuring that AI-driven calls require Human-in-the-Loop (HITL) approval, are audited, and execute securely via the CALL-E integration.
 
 ## Setup
 
@@ -20,21 +20,22 @@ This application acts as an enterprise governance layer, ensuring that all AI-dr
 ## Side Effects
 
 - **Outbound Calls:** When an administrator approves a Call Plan in the web dashboard, this application makes a `POST /v1/calls` HTTP request to the `api.heycall-e.com` endpoint, which initiates a real outbound phone call via CALL-E.
-- **Audit Logging:** Every state change (Creation, Approval, Dispatch, Scrubbing) is written to an in-memory Audit DB (or a persistent DB if configured).
+- **Audit Logging:** Every state change (Creation, Approval, Dispatch, Scrubbing) is written to an Audit DB.
 
 ## Credential Handling
 
 - **API Keys:** The CALL-E API key is strictly loaded from the backend environment (`os.environ["CALLE_API_KEY"]`) and is **never** exposed to the React frontend.
-- **Admin Identity:** Administrators authenticate using Firebase Auth. The backend verifies the JWT tokens via `firebase-admin` to ensure only authorized personnel can dispatch calls.
+- **Admin Identity:** Administrators authenticate using Firebase Auth with origin validation. The backend verifies JWT tokens to ensure only authorized personnel with clinical admin roles can approve or dispatch calls.
 - **Data Scrubbing:** Patient Phone numbers (E.164) are encrypted in memory prior to dispatch and zeroed out (PHI-scrubbed) immediately after dispatching to CALL-E.
 
-## Dry-run & Preview Behavior
+## Provider Failure Semantics & Dry-run Mode
 
-- **Built-in Fallback/Mock Mode:** If the `CALLE_API_KEY` is missing or the network request times out, the `CalleClient` gracefully falls back to local execution. It will simulate a completed call and return a mock structured result (e.g., `reschedule_confirmed: True`) to allow safe offline testing, UI development, and hackathon demos without consuming real CALL-E credits or dialing actual numbers.
-- **Approval Gate:** No call is ever executed or simulated automatically. Every event is generated as `PENDING_APPROVAL` and requires explicit user action to preview the script and click "Approve & Dispatch".
+- **Failure Semantics:** If a network request times out or the provider API fails, the execution returns `status: "failed"` and `task_completed: False`. Network or API failures are **never** fabricated as completed or reschedule-confirmed, preventing false clinical states.
+- **Offline Mock Mode:** Offline dry-run simulation is enabled only when `CALLE_MOCK_MODE=1` is explicitly set for local UI development and testing.
+- **Approval Gate:** No call is ever executed automatically. Every event is generated as `PENDING_APPROVAL` and requires explicit user action to preview the script and click "Approve & Dispatch".
 
-## Cancellation
+## Cancellation Behavior & Guarantees
 
-- Cancellation is supported via the backend endpoint `POST /api/plans/{plan_id}/dismiss`.
-- If dismissed before dispatch, the plan is marked `DISMISSED` and the CALL-E API is never contacted.
-- If the call is already in progress, the system can invoke the `/v1/calls/{call_id}/cancel` endpoint via the `CalleClient.calls_cancel` method to terminate the active CALL-E task.
+- **Pre-dispatch Cancellation:** Supported via `POST /api/plans/{plan_id}/dismiss`. Dismissing a plan before dispatch guarantees the plan is marked `DISMISSED` and the CALL-E API is never contacted.
+- **In-flight Cancellation:** If a call has already been dispatched, the system sends a best-effort cancellation request via `CalleClient.calls_cancel` to the remote API. In-flight cancellation relies on telephony network propagation and is not guaranteed to terminate an active call synchronously.
+
