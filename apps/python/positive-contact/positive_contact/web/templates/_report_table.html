@@ -1,0 +1,9 @@
+<div class="table-wrap"><table>
+  <thead><tr><th>Metric</th><th>Value</th><th>Denominator</th></tr></thead>
+  <tbody>
+  {% for metric in report.metrics %}
+    <tr><td>{{ metric.label }}</td><td><strong>{{ metric.value }}</strong></td>
+        <td class="note">{{ metric.denominator }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>

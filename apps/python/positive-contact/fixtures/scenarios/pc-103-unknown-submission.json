@@ -1,0 +1,13 @@
+{
+  "scenario": "unknown-submission",
+  "contact_id": "pc-103",
+  "note": "Scripted CALL-E responses for the unknown-submission path.",
+  "steps": [
+    {
+      "ladder_step": 1,
+      "submit": "unknown",
+      "error_code": "provider_unavailable",
+      "reason": "CALL-E did not confirm whether the call was created"
+    }
+  ]
+}
