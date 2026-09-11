@@ -21,6 +21,14 @@ import gate
 ROOT = Path(__file__).resolve().parent.parent
 FAILURES: list[str] = []
 
+# pytest happily collects module-level test_* functions on its own, bypassing
+# main() and the FAILURES-then-report design above: a failed check() just
+# appends to a list nobody reads and the test function returns normally, so
+# `pytest scripts/ -q` reports PASSED for a suite that never actually asserted
+# anything. __test__ = False tells pytest's collector to skip this module
+# entirely; the only supported entry point is `python scripts/self_test.py`.
+__test__ = False
+
 
 def check(label: str, condition: bool) -> None:
     if not condition:

@@ -25,18 +25,23 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
+import re
+import socket
 import sys
 import time
 import urllib.error
 import urllib.request
 from typing import Any
+from urllib.parse import urlsplit
 
 import gate
 
 BASE_URL_DEFAULT = "https://api.heycall-e.com"
 BASE_URL_ENV_VAR = "CALLE_BASE_URL"
+ALLOWED_ORIGINS_ENV_VAR = "CALLE_ALLOWED_ORIGINS"
 API_KEY_ENV_VAR = "CALLE_API_KEY"
 
 CREATE_PATH = "/v1/calls"
@@ -50,11 +55,104 @@ POLL_TIMEOUT_SECONDS = 600
 
 
 class TransportError(RuntimeError):
-    """The request did not produce a usable answer."""
+    """The request did not produce a usable answer.
+
+    reached_server records whether any bytes actually got to the provider,
+    because that decides which warning the operator sees. A DNS failure or a
+    refused connection proves no call was placed. Anything that did reach the
+    provider - an HTTP error, a refused redirect (the 302 means the POST
+    arrived), a read timeout - leaves it genuinely unknown, and those keep the
+    louder "may already have dialed" warning. Telling an operator a call might
+    be out when it provably is not trains them to ignore the warning that
+    matters.
+    """
+
+    def __init__(self, *args: object, reached_server: bool = True) -> None:
+        super().__init__(*args)
+        self.reached_server = reached_server
+
+
+def _is_loopback_host(hostname: str) -> bool:
+    """Is this host loopback, so a plain http:// rehearsal is allowed?
+
+    Reuses gate's `_embedded_v4` (the NAT64/6to4/Teredo/v4-mapped unwrap) rather
+    than re-deriving that handling here, per the instruction not to write a
+    second, weaker parser. Deliberately narrower than gate._host_is_public's
+    hostname branch, though: it recognizes only the literal forms an operator
+    would type (127.0.0.1, ::1, localhost), not octal/hex/short-form spellings
+    like `127.1`. Under-recognizing loopback only forces https, which is the
+    safe direction here; the risk this whole allowlist exists to close is
+    something being MISTAKEN for loopback and let through as http.
+    """
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return hostname == "localhost"
+    return gate._embedded_v4(address).is_loopback
+
+
+def _default_allowed_hosts() -> set[str]:
+    """The host in BASE_URL_DEFAULT, plus loopback. Always allowed, unconditionally.
+
+    Loopback must stay in the default set no matter what CALLE_ALLOWED_ORIGINS
+    says: mock_calle.py binds 127.0.0.1, and `--base-url http://127.0.0.1:PORT`
+    is the documented free-rehearsal path. Breaking it breaks the skill.
+    """
+    return {urlsplit(BASE_URL_DEFAULT).hostname or "", "127.0.0.1", "::1", "localhost"}
+
+
+def _operator_allowed_hosts() -> set[str]:
+    """Additional hosts an operator has explicitly approved, via env.
+
+    Each entry may be a bare host or a full origin (scheme://host[:port]); only
+    the host is compared, since the scheme constraint (https, except loopback)
+    is enforced separately and unconditionally in resolve_base_url.
+    """
+    hosts = set()
+    for origin in os.environ.get(ALLOWED_ORIGINS_ENV_VAR, "").split(","):
+        origin = origin.strip()
+        if not origin:
+            continue
+        parsed = urlsplit(origin if "//" in origin else f"//{origin}")
+        hosts.add((parsed.hostname or origin).lower())
+    return hosts
 
 
 def resolve_base_url(explicit: str | None) -> str:
-    return (explicit or os.environ.get(BASE_URL_ENV_VAR) or BASE_URL_DEFAULT).rstrip("/")
+    """Resolve the provider base URL and refuse anything off the allowlist.
+
+    Two independent checks, both required (PR #454): the scheme must be https,
+    except for loopback where http is required for mock_calle.py rehearsal;
+    and the host must be on an operator-approved allowlist, because https alone
+    does not stop the Bearer credential from being sent to an arbitrary,
+    correctly-TLS'd host the operator never approved.
+    """
+    raw = (explicit or os.environ.get(BASE_URL_ENV_VAR) or BASE_URL_DEFAULT).rstrip("/")
+    parts = urlsplit(raw)
+    hostname = (parts.hostname or "").lower()
+    if not hostname:
+        raise TransportError(f"--base-url {raw!r} has no host")
+
+    if parts.scheme == "https":
+        pass
+    elif parts.scheme == "http" and _is_loopback_host(hostname):
+        pass  # mock_calle.py rehearsal path; loopback traffic never leaves the box
+    else:
+        raise TransportError(
+            f"--base-url {raw!r} uses scheme {parts.scheme!r}, which is refused. "
+            "Only https:// is permitted for a non-loopback host; http:// is allowed "
+            "only for 127.0.0.1 / ::1 / localhost, to rehearse against mock_calle.py."
+        )
+
+    allowed = _default_allowed_hosts() | _operator_allowed_hosts()
+    if hostname not in allowed:
+        raise TransportError(
+            f"--base-url host {hostname!r} is not on the operator allowlist "
+            f"({', '.join(sorted(h for h in allowed if h))}). To permit another "
+            f"provider origin, set {ALLOWED_ORIGINS_ENV_VAR}=https://your-provider.example "
+            "(comma-separated for more than one)."
+        )
+    return raw
 
 
 def require_api_key() -> str:
@@ -83,6 +181,61 @@ def idempotency_key(body: dict[str, Any], claim_id: str) -> str:
     return f"ground-truth-gate:{hashlib.sha256(canonical).hexdigest()[:32]}"
 
 
+class _CredentialRedirectRefused(Exception):
+    """Raised in place of following a redirect on a request that carries a Bearer token.
+
+    Deliberately NOT a urllib.error.URLError subclass: URLError's __str__
+    wraps the message as "<urlopen error ...>", and this is caught by its
+    exact type below (before the generic URLError handler runs), so nothing
+    needs it to be part of that hierarchy. A plain Exception keeps the
+    TransportError message that wraps it readable.
+    """
+
+
+class _NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow a redirect while the request carries credentials.
+
+    The default opener's HTTPRedirectHandler rebuilds the request for the new
+    location and resends it with the SAME headers, Authorization included. A
+    provider origin (or anything on-path to it) that answers with a 302 to a
+    different, attacker-controlled host would otherwise get the Bearer token
+    handed to it for free. Every request this script makes carries a token
+    (see request_json), so this refuses every redirect rather than trying to
+    reason about which ones are same-origin-safe.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+        if req.has_header("Authorization"):
+            raise _CredentialRedirectRefused(
+                f"refused to follow {code} redirect to {newurl!r}: the request carries "
+                "credentials, and this skill never resends those cross-request"
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+# Built once: an opener whose only difference from urllib's default is refusing
+# credential-carrying redirects. Reused for every request_json() call.
+_OPENER = urllib.request.build_opener(_NoCredentialRedirect)
+
+_BEARER_RE = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
+
+
+def _sanitize_error_body(text: str, api_key: str) -> str:
+    """Strip what safety.md promises never appears in a line the operator sees.
+
+    Truncating the body (the old `[:400]`) is not content filtering: a provider
+    that echoes the request back on error put the key and the recipient's
+    number on the stderr line this raises to, just below the 400-char cutoff.
+    gate.mask / gate.mask_text already do the phone masking this skill relies
+    on everywhere else, so they are reused rather than re-implemented, and
+    safe_print strips control characters that could hide something in a
+    truncated span.
+    """
+    scrubbed = text.replace(api_key, "[REDACTED]") if api_key else text
+    scrubbed = _BEARER_RE.sub("Bearer [REDACTED]", scrubbed)
+    return gate.mask_text(gate.safe_print(scrubbed))
+
+
 def request_json(
     method: str,
     url: str,
@@ -98,15 +251,23 @@ def request_json(
     for name, value in headers.items():
         request.add_header(name.replace("_", "-"), value)
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with _OPENER.open(request, timeout=30) as response:
             decoded = json.loads(response.read().decode("utf-8"))
+    except _CredentialRedirectRefused as error:
+        raise TransportError(str(error)) from error
     except urllib.error.HTTPError as error:
         # The key must never reach a log line, and an error body can echo the
-        # request back, so the detail is truncated and never includes headers.
-        detail = error.read().decode("utf-8", "replace")[:400]
+        # request back, so it is content-filtered, not just truncated.
+        raw = error.read().decode("utf-8", "replace")[:400]
+        detail = _sanitize_error_body(raw, api_key)
         raise TransportError(f"HTTP {error.code} from {method} {url}: {detail}") from error
     except urllib.error.URLError as error:
-        raise TransportError(f"could not reach {url}: {error.reason}") from error
+        # A read timeout can fire after the POST is already on the wire, so it
+        # stays ambiguous. A DNS or connect failure never delivered a byte.
+        reached = isinstance(error.reason, TimeoutError)
+        raise TransportError(
+            f"could not reach {url}: {error.reason}", reached_server=reached
+        ) from error
     except json.JSONDecodeError as error:
         raise TransportError(f"{method} {url} returned a non-JSON body") from error
     if not isinstance(decoded, dict):
@@ -192,9 +353,26 @@ def summarize(call: dict[str, Any], abstain: bool | None, reveal: bool) -> int:
     return 0
 
 
+def _dns_resolver(hostname: str) -> list[str]:
+    """The resolver gate.require_public_https() needs to catch DNS rebinding.
+
+    Wired in only right before a webhook_url is actually used to place a call
+    (see main(), `resolver=_dns_resolver if args.send else None`): resolving a
+    hostname opens a socket, and gate.py's own docstring is explicit that
+    nothing in that module does. A dry run must not either.
+    """
+    infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+    # sockaddr is (host, port) for AF_INET or (host, port, flowinfo, scopeid)
+    # for AF_INET6; element 0 is the address in both, typed as str | Any by
+    # typeshed, hence the explicit str() rather than trusting inference.
+    return [str(info[4][0]) for info in infos]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--input", metavar="CLAIM.JSON", help="the claim to gate")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--input", metavar="CLAIM.JSON", help="the claim to gate")
+    mode.add_argument("--call-id", help="reconcile an existing call instead of placing one")
     parser.add_argument("--claim-id", default="claim-demo")
     parser.add_argument("--webhook-url", help="https endpoint with an unguessable path segment")
     parser.add_argument("--base-url", help=f"default {BASE_URL_DEFAULT}, or ${BASE_URL_ENV_VAR}")
@@ -202,18 +380,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--poll", action="store_true", help="wait for a terminal state, then reconcile"
     )
-    parser.add_argument("--call-id", help="reconcile an existing call instead of placing one")
     parser.add_argument("--abstain", choices=("true", "false"))
     parser.add_argument("--reveal", action="store_true", help="print numbers unmasked")
     args = parser.parse_args(argv)
 
-    base_url = resolve_base_url(args.base_url)
+    try:
+        base_url = resolve_base_url(args.base_url)
+    except TransportError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
     abstain = {"true": True, "false": False}.get(args.abstain)
 
     # Reconcile-only: the call already happened, re-fetch and apply the rule.
     if args.call_id:
         try:
-            call = get_call(base_url, require_api_key(), args.call_id)
+            api_key = require_api_key()
+        except TransportError as error:
+            print(f"ERROR: {error}", file=sys.stderr)
+            return 2
+        try:
+            call = get_call(base_url, api_key, args.call_id)
         except TransportError as error:
             print(f"ERROR: {error}", file=sys.stderr)
             return 2
@@ -230,7 +416,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"decision: {action} - {reason}")
             print("No call is warranted. Nothing was sent.")
             return 0
-        body = gate.build_request(claim, args.claim_id, args.webhook_url)
+        # The DNS resolver is a real socket op, so it is withheld on a dry run
+        # and supplied only when this invocation is actually about to place
+        # the call - see references/safety.md and _dns_resolver's docstring.
+        body = gate.build_request(
+            claim,
+            args.claim_id,
+            args.webhook_url,
+            resolver=_dns_resolver if args.send else None,
+        )
     except (gate.ClaimError, OSError, json.JSONDecodeError) as error:
         print(f"cannot build the call: {error}", file=sys.stderr)
         return 2
@@ -248,15 +442,31 @@ def main(argv: list[str] | None = None) -> int:
         print("\nRe-run with --send to place the call.")
         return 0
 
+    # Hoisted out of the try below and given its own error path: a missing key
+    # never opens a socket, so it must never be reported as "may have dialed".
     try:
-        created = create_call(base_url, require_api_key(), body, key)
+        api_key = require_api_key()
     except TransportError as error:
-        print(
-            f"ERROR: {error}\n"
-            "The call MAY ALREADY HAVE BEEN PLACED. Do not re-run blind: retry with the "
-            f"same idempotency key, which cannot place a second call:\n  {key}",
-            file=sys.stderr,
-        )
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+
+    try:
+        created = create_call(base_url, api_key, body, key)
+    except TransportError as error:
+        if error.reached_server:
+            print(
+                f"ERROR: {error}\n"
+                "The call MAY ALREADY HAVE BEEN PLACED. Do not re-run blind: retry with "
+                f"the same idempotency key, which cannot place a second call:\n  {key}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"ERROR: {error}\n"
+                "No connection was established, so no call was placed. Fix the "
+                "connection and re-run.",
+                file=sys.stderr,
+            )
         return 2
 
     call_id = created.get("id")
@@ -266,18 +476,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        call = poll_until_terminal(base_url, require_api_key(), str(call_id))
+        terminal_call = poll_until_terminal(base_url, api_key, str(call_id))
     except TransportError as error:
         print(f"ERROR while polling: {error}", file=sys.stderr)
         return 2
-    if call is None:
+    if terminal_call is None:
         print(
             f"\nNo terminal event within {POLL_TIMEOUT_SECONDS}s. The claim is UNRESOLVED, "
             "which is not the same as unconfirmed-and-settled. Surface it to the user as "
             "still unconfirmed rather than leaving them waiting for a correction."
         )
         return 0
-    return summarize(call, abstain, args.reveal)
+    return summarize(terminal_call, abstain, args.reveal)
 
 
 if __name__ == "__main__":

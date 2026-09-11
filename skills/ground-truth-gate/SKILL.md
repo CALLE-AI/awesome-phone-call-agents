@@ -123,15 +123,43 @@ python3 scripts/gate.py --reconcile assets/sample-result.json --abstain false
 python3 scripts/self_test.py
 ```
 
+To rehearse the live-call path itself — send, poll, reconcile — with no credential and no real phone ringing, start the mock server and point `place_call.py` at it:
+
+```bash
+python3 scripts/mock_calle.py --outcome unknown &
+CALLE_API_KEY=test python3 scripts/place_call.py \
+    --input assets/sample-claim.json --base-url http://127.0.0.1:8787 \
+    --send --poll --abstain false
+```
+
+## Environment Variables
+
+Two more variables control credentials and the target endpoint, separate from the caller-identity disclosure pair above:
+
+| Variable | Effect |
+|---|---|
+| `CALLE_API_KEY` | Bearer token sent as `Authorization: Bearer ...` on every request to the CALL-E API. Required only to place a live call: `--send` without it stops before any request goes out. The dry run and the mock rehearsal loop need no key beyond the mock's own `--api-key` (default `test`). |
+| `CALLE_BASE_URL` | Overrides the CALL-E base URL, default `https://api.heycall-e.com`. Set it, or pass `--base-url`, to point `place_call.py` at `scripts/mock_calle.py` during rehearsal. |
+
 ## Side Effects And Cancellation
 
-One outbound phone call per gated claim, plus one correction written into the claim record. Nothing in this directory places that call: the scripts build request bodies and print them. The user can withdraw a claim before the call is placed and no call happens; once a call is in flight it cannot be recalled, and the user is told that plainly rather than promised a cancel that does not exist. Anything that actually sends the request must set an idempotency key, or a network timeout becomes two calls to the same person. See [`references/safety.md`](references/safety.md).
+One outbound phone call per gated claim, plus one correction written into the claim record. `scripts/gate.py` and `scripts/demo_card.py` never open a socket: they build the request body and render it. `scripts/place_call.py` is the one live-call path in this directory — `--send` runs `create_call()`, which posts to `POST /v1/calls` and places a real call. Dry run is its default; nothing dials until `--send` is passed explicitly. The user can withdraw a claim before the call is placed and no call happens; once a call is in flight it cannot be recalled, and the user is told that plainly rather than promised a cancel that does not exist. `place_call.py` derives its idempotency key from the request body itself (`idempotency_key()`), so a retry after a timeout replays the same key instead of dialing the same person twice. See [`references/safety.md`](references/safety.md).
+
+## Troubleshooting
+
+- **`CALLE_API_KEY` not set, `--send` used.** `place_call.py` stops before sending anything: `set CALLE_API_KEY to place a live call. Run scripts/mock_calle.py and pass --base-url to exercise the whole loop without a credential.`
+- **Connection refused against the mock.** `scripts/mock_calle.py` isn't running, or `--base-url` doesn't match its `--port` (default `8787`). `request_json()` reports it as `could not reach <url>: <reason>`.
+- **CALL-E (or the mock) rejects the request body.** `create_call()` raises `HTTP <code> from POST <url>: <detail>`. The mock returns 422 with `missing required fields: task, recipients` when either is empty.
+- **A call that never reaches a terminal status.** `poll_until_terminal()` gives up after `POLL_TIMEOUT_SECONDS` (600s) and `place_call.py` prints `No terminal event within 600s. The claim is UNRESOLVED...`. Treat it the way `sweep_due()` does: unresolved, not unconfirmed-and-settled.
 
 ## Files
 
 | Path | What it is |
 | --- | --- |
 | `scripts/gate.py` | Triage, call construction, webhook validation, release rule |
+| `scripts/place_call.py` | The one script that opens a socket: sends the call (`--send`), polls to a terminal state, reconciles the re-fetched result |
+| `scripts/mock_calle.py` | Local stand-in for the CALL-E API; lets the send/poll/reconcile loop run end to end with no credential |
+| `scripts/demo_card.py` | Renders a claim as a before/after answer card; presentation only, no decision logic of its own |
 | `scripts/self_test.py` | No-network regression checks |
 | `assets/sample-claim.json` | Input fixture for `--input` |
 | `assets/sample-result.json` | Terminal result fixture for `--reconcile` |

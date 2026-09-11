@@ -373,7 +373,9 @@ def result_schema() -> dict[str, Any]:
     }
 
 
-def _embedded_v4(address: ipaddress._BaseAddress) -> ipaddress._BaseAddress:
+def _embedded_v4(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
     """Unwrap an IPv6 address that carries an IPv4 one inside it.
 
     `is_global` answers about the outer address, so `[64:ff9b::7f00:1]` (NAT64
@@ -507,9 +509,20 @@ def require_public_https(
 
 
 def build_request(
-    claim: Claim, claim_id: str, webhook_url: str | None = None
+    claim: Claim,
+    claim_id: str,
+    webhook_url: str | None = None,
+    *,
+    resolver: Callable[[str], Iterable[str]] | None = None,
 ) -> dict[str, Any]:
-    """Build the exact POST /v1/calls body. One call, one question."""
+    """Build the exact POST /v1/calls body. One call, one question.
+
+    `resolver` is forwarded to `require_public_https()` unchanged: this module
+    opens no sockets itself (see its docstring and `_host_is_public`), so the
+    DNS-rebinding check it performs is opt-in. Anything that actually sends the
+    request should supply one (references/safety.md); triage/dry-run callers
+    that never open a socket are free to leave it None.
+    """
     action, reason = decide(claim)
     if action != "gate":
         raise ClaimError(f"claim is not gateable: {action} ({reason})")
@@ -527,7 +540,7 @@ def build_request(
     if claim.region:
         body["recipients"][0]["region"] = claim.region
     if webhook_url:
-        body["webhook_url"] = require_public_https(webhook_url)
+        body["webhook_url"] = require_public_https(webhook_url, resolver=resolver)
     return body
 
 

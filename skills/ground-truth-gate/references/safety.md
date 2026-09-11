@@ -25,7 +25,7 @@ A gated claim places a real phone call to a real person who did not ask to be ca
 - The dry run path needs no credential at all, and it is the default. A missing key produces a printed request body, not a failed call.
 - Webhook endpoints must be HTTPS, and a delivery must be verified before it is trusted. CALL-E deliveries are unsigned, so the body alone is never evidence: re-fetch `GET /v1/calls/{id}` and write back from that. An unauthenticated webhook accepted at face value is a way to write a false correction into a record.
 - HTTPS alone is not enough. A webhook URL pointing at `localhost`, a private range, or a cloud metadata address makes the call provider fetch something inside a network boundary, so the receiver must be a public endpoint you control. `require_public_https()` refuses those destinations, refuses userinfo in the host, and refuses a bare origin: the path must carry at least 16 characters of unguessable secret, because that secret is the only thing standing in for a signature.
-- That check is syntactic by default. This skill opens no sockets, so a hostname that *resolves* into a private range still passes unless the caller supplies a `resolver`. Anything that actually sends the request should pass one.
+- That check is syntactic by default. `gate.py` opens no sockets, so a hostname that *resolves* into a private range still passes unless the caller supplies a `resolver`. `scripts/place_call.py` is what actually sends the request and should pass one.
 
 ## Boundaries the gate does not cross
 
@@ -39,7 +39,7 @@ A gated claim places a real phone call to a real person who did not ask to be ca
 
 - Side effects: one outbound phone call per gated claim, plus one correction written into the claim record.
 - Cancellation: the user can withdraw a claim before the call is placed, and then no call happens. Once a call is in flight it cannot be recalled, and the user is told that plainly rather than promised a cancel that does not exist.
-- Idempotency: the caller sets the idempotency key on the create request and reuses it, with byte-equivalent logical input, when retrying a timeout. The reference script builds a body and does not send it, so it sets no key. Anything that actually places the call must, or a network timeout becomes two calls to the same person.
+- Idempotency: the caller sets the idempotency key on the create request and reuses it, with byte-equivalent logical input, when retrying a timeout. `gate.py` builds a body and does not send it, so it sets no key. `scripts/place_call.py` is what actually places the call, and it derives the key from the request body itself (`idempotency_key()`) rather than generating one per invocation, so a retry after a timeout replays the same request instead of dialing the same person twice.
 - Exactly-once write back: the terminal webhook's top level event `id` is the key for processing side effects. Recording it before applying a correction is what stops a redelivered event from correcting the same claim twice.
 - Storage: the claim record holds the question, the provisional answer, the verdict, the quoted answer, the confidence input, the masked number, and timestamps. It does not hold the API key or the full number.
 - Every correction is visible to the user who received the provisional answer. A correction nobody sees did not correct anything.
