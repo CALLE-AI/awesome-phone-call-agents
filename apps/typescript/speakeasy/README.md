@@ -12,11 +12,11 @@ own language, saved to your history.
 guide for the runnable [Speakeasy application](https://github.com/yasaausman/Speakeasy).
 The application source, tests, and CI are maintained there under the MIT license.
 The instructions below target revision
-[`4796d93`](https://github.com/yasaausman/Speakeasy/tree/4796d934c30fad5ec45f9ae94c94c533e9b438de).
+[`c0ed346`](https://github.com/yasaausman/Speakeasy/tree/c0ed346ebe149a095538c1775e83b339da4eaa74).
 
-- [Full setup and architecture](https://github.com/yasaausman/Speakeasy/blob/4796d934c30fad5ec45f9ae94c94c533e9b438de/README.md)
-- [A real completed CALL-E call, redacted](https://github.com/yasaausman/Speakeasy/blob/4796d934c30fad5ec45f9ae94c94c533e9b438de/docs/sample-run.json)
-- [Upstream integration feedback we reported](https://github.com/yasaausman/Speakeasy/blob/4796d934c30fad5ec45f9ae94c94c533e9b438de/docs/CALLE-INTEGRATION-FEEDBACK.md)
+- [Full setup and architecture](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/README.md)
+- [Synthetic sample result (reserved fictional data)](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/docs/sample-run.json)
+- [Upstream integration feedback we reported](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/docs/CALLE-INTEGRATION-FEEDBACK.md)
 
 ## What it does
 
@@ -79,12 +79,15 @@ started with `npm run dev`.
   gate** (an explicit user "yes"), and only to the number the user provided.
 - **AI disclosure is non-optional** — every brief instructs the agent to identify
   itself as an AI assistant calling on the user's behalf.
-- **Single-call, not recurring.** Speakeasy does not create recurring jobs or
-  schedules, so there is nothing to cancel or roll back after a run; each request
-  is one confirmed call (or, for the two-call flow, one confirmed discovery call
-  and one confirmed booking call). A run in progress can be abandoned by starting
-  a new request; a placed call is not billed again.
+- **Side-effect limitation (important).** The confirm gate is the only control
+  point. Once `run_call` places a call it **cannot be cancelled or stopped from the
+  app** — CALL-E's MCP flow has no cancel operation, `get_call_run` is read-only,
+  and starting a new request only resets the app's view; it does **not** stop an
+  in-progress call or change whether that call counts against your call quota.
+  Speakeasy does not create recurring jobs or schedules, so there is nothing to
+  cancel later; each request is one confirmed call (or, for the two-call flow, one
+  confirmed discovery call and one confirmed booking call).
 - **Credentials** stay local: the CALL-E token is managed by the `calle` CLI, and
-  any provider key lives in a git-ignored `.env`. Sample data uses fictional
-  reserved numbers (`+1555…`) or a redacted number; no real numbers, recordings,
-  or transcripts are committed.
+  any provider key lives in a git-ignored `.env`. Documentation and samples use
+  only fictional reserved numbers (`+1-555-01xx`); no real numbers, call
+  recordings, transcripts, or identifiers are committed.
