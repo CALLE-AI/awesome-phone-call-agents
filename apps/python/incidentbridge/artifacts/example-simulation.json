@@ -1,0 +1,24 @@
+{
+  "mode": "simulate",
+  "creates_phone_call": false,
+  "scenario": "acknowledged",
+  "incident_id": "INC-2026-0810",
+  "structured_result": {
+    "right_support_desk": "yes",
+    "continued_after_ai_disclosure": "yes",
+    "incident_acknowledged": "yes",
+    "ticket_id": "SUP-4821",
+    "vendor_status": "investigating",
+    "eta_minutes": 45,
+    "workaround_available": "yes",
+    "workaround_summary": "Use the documented secondary ingestion endpoint.",
+    "callback_window": "Within 60 minutes",
+    "human_escalation_required": "no",
+    "evidence_summary": "Support acknowledged the outage and supplied a ticket and ETA."
+  },
+  "decision": {
+    "route": "vendor_acknowledged",
+    "reason": "The vendor acknowledged the incident and supplied a ticket identifier.",
+    "incident_closed": "false"
+  }
+}

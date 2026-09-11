@@ -1,0 +1,137 @@
+{
+  "_note": "Fictional data. The numbers are in the +1 555-0100..555-0199 range, which is reserved for fiction and belongs to nobody. The frame stands in for a public directory listing filtered by postcode.",
+  "subject": "Public transport in rural districts",
+  "seed": 20260803,
+  "sample_size": 12,
+  "additional_ethics": {
+    "state_purpose_and_duration": "The opening names the study, the topic and how long it takes."
+  },
+  "frame": [
+    { "id": "r01", "phone": "+15550101001", "stratum": "rural" },
+    { "id": "r02", "phone": "+15550101002", "stratum": "rural" },
+    { "id": "r03", "phone": "+15550101003", "stratum": "rural" },
+    { "id": "r04", "phone": "+15550101004", "stratum": "rural" },
+    { "id": "r05", "phone": "+15550101005", "stratum": "rural" },
+    { "id": "r06", "phone": "+15550101006", "stratum": "rural" },
+    { "id": "r07", "phone": "+15550101007", "stratum": "rural" },
+    { "id": "r08", "phone": "+15550101008", "stratum": "rural" },
+    { "id": "r09", "phone": "+15550101009", "stratum": "rural" },
+    { "id": "r10", "phone": "+15550101010", "stratum": "rural" },
+    { "id": "r11", "phone": "+15550101011", "stratum": "rural" },
+    { "id": "r12", "phone": "+15550101012", "stratum": "rural" },
+    { "id": "r13", "phone": "+15550101013", "stratum": "rural" },
+    { "id": "r14", "phone": "+15550101014", "stratum": "rural" },
+    { "id": "r15", "phone": "+15550101015", "stratum": "rural" },
+    { "id": "r16", "phone": "+15550101016", "stratum": "rural" },
+    { "id": "r17", "phone": "+15550101017", "stratum": "rural" },
+    { "id": "r18", "phone": "+15550101018", "stratum": "rural" },
+    { "id": "r19", "phone": "+15550101019", "stratum": "rural" },
+    { "id": "r20", "phone": "+15550101020", "stratum": "rural" }
+  ],
+  "fieldwork": {
+    "r05": {
+      "disposition": "completed",
+      "consent_given": true,
+      "responses": [
+        {
+          "question": "How often do you use public transport here?",
+          "raw": "Maybe once a week, when the car is with my wife.",
+          "category": "weekly"
+        },
+        {
+          "question": "What would have to change for you to use it more often?",
+          "raw": "The last bus back is at half past six. That is the whole problem.",
+          "category": "evening_service"
+        }
+      ]
+    },
+    "r08": {
+      "disposition": "completed",
+      "consent_given": true,
+      "responses": [
+        {
+          "question": "How often do you use public transport here?",
+          "raw": "Every working day, I do not have a licence.",
+          "category": "daily"
+        },
+        {
+          "question": "What would have to change for you to use it more often?",
+          "raw": "Nothing really, I already use it for everything. Sundays are thin though.",
+          "category": "weekend_service"
+        }
+      ]
+    },
+    "r17": {
+      "disposition": "consent_refused",
+      "consent_given": false,
+      "note": "Asked not to be surveyed. No questions were put."
+    },
+    "r12": {
+      "disposition": "no_answer",
+      "consent_given": false
+    },
+    "r03": {
+      "disposition": "completed",
+      "consent_given": true,
+      "withdrew": true,
+      "responses": [
+        {
+          "question": "How often do you use public transport here?",
+          "raw": "Rarely.",
+          "category": "rarely"
+        }
+      ],
+      "note": "Called back the next day and asked to be removed from the study."
+    },
+    "r13": {
+      "disposition": "broke_off",
+      "consent_given": true,
+      "note": "Ended the call during the second question. Partial answers were not kept."
+    },
+    "r20": {
+      "disposition": "busy",
+      "consent_given": false
+    },
+    "r15": {
+      "disposition": "completed",
+      "consent_given": true,
+      "responses": [
+        {
+          "question": "How often do you use public transport here?",
+          "raw": "Never. There is no stop in the village.",
+          "category": "never"
+        },
+        {
+          "question": "What would have to change for you to use it more often?",
+          "raw": "A stop. Anywhere within walking distance would do.",
+          "category": "coverage"
+        }
+      ]
+    },
+    "r11": {
+      "disposition": "no_answer",
+      "consent_given": false
+    },
+    "r06": {
+      "disposition": "completed",
+      "consent_given": true,
+      "responses": [
+        {
+          "question": "How often do you use public transport here?",
+          "raw": "A couple of times a month, for appointments in town.",
+          "category": "monthly"
+        },
+        {
+          "question": "What would have to change for you to use it more often?",
+          "raw": "It takes an hour and ten for what is twenty minutes by car.",
+          "category": "journey_time"
+        }
+      ]
+    },
+    "r18": {
+      "disposition": "ineligible",
+      "consent_given": true,
+      "note": "Moved out of the district last year; outside the population."
+    }
+  }
+}

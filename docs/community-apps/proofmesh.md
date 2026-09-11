@@ -56,7 +56,7 @@ The adapter is selected by the `CALL_PROVIDER` environment variable. The default
 
 ## Call side effects
 
-When live dispatch is fully enabled, approving a call plan causes ProofMesh to send an outbound call request to CALL-E, which places a real phone call to the recipient number on the plan. This can ring a real phone, cost money, and be answered by a person.
+Approval creates an approved call job; dispatch is a separate operator action. When live dispatch is fully enabled, dispatching that approved job sends an outbound request to CALL-E. This can ring a real phone, cost money, and be answered by a person.
 
 No other side effects are hidden: there are no background schedulers, no recurring jobs, and no automatic retries that place additional calls. Every dispatch is traceable to one operator approval in the audit timeline.
 
@@ -85,9 +85,9 @@ Operator sessions use short-lived JWT access tokens with separate refresh tokens
 
 ## Cancellation and duplicate-call protections
 
-- A call plan can be cancelled at any point before approval; cancellation is a terminal state recorded in the audit timeline.
-- Approval is single-use. Once a plan has been dispatched, re-approving it is rejected rather than dispatching a second call.
-- Dispatch is guarded by an atomic database transaction, so concurrent approval attempts cannot both reserve a slot.
+- Before dispatch, cancel the approved job to stop that job from being submitted. Once submitted, provider-side cancellation may not recall a call already in progress.
+- The workflow checks active jobs and rejects dispatch of jobs that are no longer approved. Approval and dispatch are separate operations; this reference does not claim approval tokens are permanently single-use.
+- The lifetime call ledger bounds dispatch attempts. This is not a guarantee of exactly-once execution across concurrent approval/dispatch requests or crashes; operate the demonstration serially and review ambiguous outcomes before another attempt.
 - Do-not-call entries and missing consent block plan creation before an operator can approve anything.
 - There are no recurring schedules to cancel, because ProofMesh does not create any.
 

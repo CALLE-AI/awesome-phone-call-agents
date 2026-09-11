@@ -1,0 +1,19 @@
+{
+  "name": "accesscall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node scripts for the accesscall skill: VPAT 2.4 insertion and transcript-recap parsing for phone-based accessibility intake.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "format-vpat": "node scripts/format-to-vpat.js",
+    "parse-recap": "node scripts/parse-recap.js"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "jszip": "^3.10.1",
+    "xml-js": "^1.6.11"
+  }
+}

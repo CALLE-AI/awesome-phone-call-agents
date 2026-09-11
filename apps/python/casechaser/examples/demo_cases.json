@@ -1,0 +1,32 @@
+[
+  {
+    "customer_name": "Alex Example",
+    "company": "Example Home Insurance",
+    "hotline": "+12125550100",
+    "region": "US",
+    "locale": "en-US",
+    "timezone_name": "America/New_York",
+    "case_type": "insurance_claim",
+    "reference": "EXAMPLE-CLAIM-0001",
+    "summary": "Water damage claim for a burst pipe on 12 August; assessor visited 19 August and approved the repair estimate of 4,200 dollars.",
+    "what_is_owed": "Reimbursement of 4,200 dollars to the customer's bank account.",
+    "opened_on": "2026-08-13",
+    "ivr_hints": "Menu: press 2 for claims, then 3 for an existing claim.",
+    "identity_facts": {"policy number": "EXAMPLE-POLICY-0001", "postcode on file": "EXAMPLE-POSTCODE"}
+  },
+  {
+    "customer_name": "Jordan Sample",
+    "company": "Example Broadband",
+    "hotline": "+13125550199",
+    "region": "US",
+    "locale": "en-US",
+    "timezone_name": "America/Chicago",
+    "case_type": "refund",
+    "reference": "EXAMPLE-REFUND-0002",
+    "summary": "Charged 140 dollars for equipment that was returned on 20 August with tracking proof of delivery on 22 August.",
+    "what_is_owed": "Full refund of 140 dollars to the original payment method.",
+    "opened_on": "2026-08-23",
+    "ivr_hints": "Press 1 for billing, then 4 for refunds.",
+    "identity_facts": {"account number": "EXAMPLE-ACCOUNT-0002", "service address postcode": "EXAMPLE-POSTCODE"}
+  }
+]

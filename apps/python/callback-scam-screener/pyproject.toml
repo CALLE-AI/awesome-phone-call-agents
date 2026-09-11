@@ -1,0 +1,28 @@
+[project]
+name = "calle-callback-scam-screener-app"
+version = "0.1.0"
+description = "Screens a suspicious callback-scam phone number with CALL-E before a human ever dials it."
+requires-python = ">=3.11"
+dependencies = [
+  # Some Windows environments (notably antivirus HTTPS-scanning features
+  # that install their own root CA) trip OpenSSL 3.x's strict X.509
+  # parsing on otherwise OS-trusted certificates. truststore defers to the
+  # OS's own certificate validation instead of certifi's bundled PEM list,
+  # which sidesteps that without weakening verification.
+  "truststore>=0.9.0",
+]
+
+[project.optional-dependencies]
+# Install only the one matching your --llm-provider choice (see
+# pipeline/llm_providers.py) — no reason to require both SDKs.
+anthropic = ["anthropic>=0.121.0"]
+gemini = ["google-genai>=1.0.0"]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

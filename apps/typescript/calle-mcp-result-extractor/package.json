@@ -1,0 +1,24 @@
+{
+  "name": "calle-mcp-result-extractor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Schema-validated structured results from CALL-E calls placed over MCP, which has no result_schema parameter of its own.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "cli": "node --import tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+    "@call-e/core": "^0.2.5",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

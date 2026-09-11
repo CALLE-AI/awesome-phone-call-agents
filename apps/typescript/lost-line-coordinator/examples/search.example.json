@@ -1,0 +1,60 @@
+{
+  "search_id": "search-0a1b2c3d4e5f",
+  "owner_has_authorized_search": true,
+  "owner_authorized_at": "2026-08-01T11:45:00Z",
+  "authorization_valid_until": "2026-08-01T13:00:00Z",
+  "claim_verification_detail_withheld": true,
+  "item": {
+    "category": "small backpack",
+    "color": "navy blue",
+    "brand": "Northstar",
+    "distinctive_features": [
+      "orange zipper pull",
+      "small silver bicycle patch on the front pocket"
+    ],
+    "lost_after": "2026-08-01T08:00:00Z",
+    "lost_before": "2026-08-01T11:30:00Z"
+  },
+  "locations": [
+    {
+      "id": "harbor-cafe",
+      "display_name": "Harbor Cafe",
+      "phone": "+12025550142",
+      "published_source": "https://example.com/harbor-cafe/contact",
+      "published_contact_confirmed": true,
+      "published_contact_verified_at": "2026-08-01T11:30:00Z",
+      "calling_hours_confirmed": true,
+      "region": "US",
+      "locale": "en-US"
+    },
+    {
+      "id": "central-ferry-desk",
+      "display_name": "Central Ferry Information Desk",
+      "phone": "+12025550171",
+      "published_source": "https://example.com/central-ferry/contact",
+      "published_contact_confirmed": true,
+      "published_contact_verified_at": "2026-08-01T11:30:00Z",
+      "calling_hours_confirmed": true,
+      "region": "US",
+      "locale": "en-US"
+    },
+    {
+      "id": "market-bookshop",
+      "display_name": "Market Bookshop",
+      "phone": "+12025550196",
+      "published_source": "https://example.com/market-bookshop/contact",
+      "published_contact_confirmed": true,
+      "published_contact_verified_at": "2026-08-01T11:30:00Z",
+      "calling_hours_confirmed": true,
+      "region": "US",
+      "locale": "en-US"
+    }
+  ],
+  "policy": {
+    "max_calls": 3,
+    "do_not_leave_voicemail": true,
+    "stop_after_strong_match": true,
+    "call_window_start": "2026-08-01T12:00:00Z",
+    "call_window_end": "2026-08-01T12:30:00Z"
+  }
+}

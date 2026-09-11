@@ -1,0 +1,88 @@
+{
+  "INV-1002": {
+    "outcome": "promise_to_pay",
+    "right_party_reached": "yes",
+    "promise_made": "yes",
+    "promised_amount": "4800.00",
+    "promised_date": "+7d",
+    "payment_method": "bank_transfer",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "We'll send the full four thousand eight hundred by bank transfer next Monday.",
+    "confidence": 0.94,
+    "transcript": [
+      [
+        "bot",
+        "This is an automated assistant calling on behalf of Northwind Supply Co about invoice INV-1002."
+      ],
+      [
+        "user",
+        "Right, that one slipped. We'll send the full four thousand eight hundred by bank transfer next Monday."
+      ],
+      [
+        "bot",
+        "So that is four thousand eight hundred dollars on the thirty-first of August. Is that correct?"
+      ],
+      [
+        "user",
+        "Yes, that's correct."
+      ]
+    ]
+  },
+  "INV-1007": {
+    "outcome": "promise_to_pay",
+    "right_party_reached": "yes",
+    "promise_made": "yes",
+    "promised_amount": "1500.00",
+    "promised_date": "+5d",
+    "payment_method": "bank_transfer",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "I can do the fifteen hundred on Saturday, I'll raise it today.",
+    "confidence": 0.91,
+    "transcript": [
+      [
+        "bot",
+        "This is an automated assistant calling on behalf of Northwind Supply Co about invoice INV-1007."
+      ],
+      [
+        "user",
+        "I can do the fifteen hundred on Saturday, I'll raise it today."
+      ],
+      [
+        "bot",
+        "Fifteen hundred dollars on the twenty-ninth of August. Correct?"
+      ],
+      [
+        "user",
+        "Correct."
+      ]
+    ]
+  },
+  "INV-1001": {
+    "outcome": "dispute",
+    "right_party_reached": "yes",
+    "promise_made": "no",
+    "promised_amount": "unknown",
+    "promised_date": "unknown",
+    "payment_method": "unknown",
+    "dispute_raised": "yes",
+    "dispute_reason": "They say the same delivery was invoiced twice in August.",
+    "evidence_quote": "We already paid for that delivery, you've billed us for it twice.",
+    "confidence": 0.89,
+    "transcript": [
+      [
+        "bot",
+        "This is an automated assistant calling on behalf of Northwind Supply Co about invoice INV-1001."
+      ],
+      [
+        "user",
+        "We already paid for that delivery, you've billed us for it twice."
+      ],
+      [
+        "bot",
+        "Understood. I won't ask for payment. A colleague will follow up on the duplicate."
+      ]
+    ]
+  }
+}

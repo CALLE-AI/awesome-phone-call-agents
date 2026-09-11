@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "request_id": "chicago-venue-demo",
+  "goal": "Find a private restaurant room in Chicago for 30 guests under $4,000.",
+  "constraints": [
+    "Friday evening",
+    "Private room",
+    "Thirty guests"
+  ],
+  "businesses": [
+    {
+      "business_id": "lakeside-table",
+      "name": "Lakeside Table",
+      "published_phone": "+12025550123",
+      "source_url": "https://example.com/lakeside-table",
+      "established_facts": [
+        {
+          "fact_id": "capacity",
+          "statement": "The private room seats up to 40 guests.",
+          "source_url": "https://example.com/lakeside-table/private-dining"
+        }
+      ],
+      "gaps": [
+        {
+          "gap_id": "availability",
+          "question": "Is the private room available Friday evening for 30 guests?"
+        },
+        {
+          "gap_id": "minimum-spend",
+          "question": "Is the food and beverage minimum at or below $4,000?"
+        }
+      ]
+    },
+    {
+      "business_id": "prairie-room",
+      "name": "Prairie Room",
+      "published_phone": "+12025550124",
+      "source_url": "https://example.com/prairie-room",
+      "established_facts": [],
+      "gaps": [
+        {
+          "gap_id": "availability",
+          "question": "Is a private room available Friday evening for 30 guests?"
+        }
+      ]
+    }
+  ]
+}

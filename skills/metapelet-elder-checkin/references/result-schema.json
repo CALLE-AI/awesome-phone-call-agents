@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "required": ["mood", "topics", "wants_repeat_call"],
+  "properties": {
+    "mood": {
+      "type": "string",
+      "description": "Short summary of the person's mood during the call (same language as the conversation)."
+    },
+    "topics": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Main conversation topics (2-5 short phrases)."
+    },
+    "wants_repeat_call": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"],
+      "description": "Whether the person expressed interest in another friendly call soon."
+    }
+  }
+}

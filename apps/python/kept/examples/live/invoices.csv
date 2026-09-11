@@ -1,0 +1,2 @@
+id,customer_id,currency,amount,due_date
+INV-1001,CUS-LIVE,USD,1250.00,2026-08-10

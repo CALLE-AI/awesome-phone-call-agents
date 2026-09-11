@@ -1,0 +1,9 @@
+[project]
+name = "countersignal-calle"
+version = "0.1.0"
+description = "Falsifiable customer-discovery calls with a frozen protocol and honest evidence denominator."
+requires-python = ">=3.11"
+dependencies = ["calle-ai==0.2.0"]
+
+[dependency-groups]
+dev = ["pytest>=9.0.0"]

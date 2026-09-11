@@ -1,0 +1,46 @@
+{
+  "_comment": "A clean confirmed outcome: the recipient answered, gave a definite answer, and CALL-E extracted every field the schema required with a high label and a high score. This is the only shape of payload that produces disposition=confirmed / lead_state=qualified.",
+  "id": "evt_fixture_success",
+  "type": "call.completed",
+  "created_at": "2026-08-05T14:32:11Z",
+  "data": {
+    "id": "call_fixture_success",
+    "object": "call_task",
+    "status": "completed",
+    "task": "Confirm the Thursday 3pm dental appointment.",
+    "task_completed": true,
+    "completion_confidence": { "score": 0.94, "label": "high" },
+    "structured_result": { "confirmed": "yes", "reschedule_requested": "no" },
+    "summary": "The patient confirmed the Thursday 3pm appointment and did not ask to reschedule.",
+    "evidence": ["Patient said 'yes, Thursday at three works'."],
+    "failure_code": null,
+    "failure_message": null,
+    "metadata": { "source_platform": "zapier", "correlation_id": "row-104" },
+    "created_at": "2026-08-05T14:30:02Z",
+    "completed_at": "2026-08-05T14:32:11Z",
+    "recipients": [
+      {
+        "phone": "+15550123456",
+        "status": "completed",
+        "attempts": [
+          {
+            "id": "att_1",
+            "phone": "+15550123456",
+            "status": "completed",
+            "started_at": "2026-08-05T14:30:05Z",
+            "completed_at": "2026-08-05T14:32:09Z",
+            "summary": "Appointment confirmed.",
+            "provider_call_id": "prov_1",
+            "failure_code": null,
+            "failure_message": null,
+            "transcript_turns": [
+              { "offset_seconds": 2, "speaker": "bot", "text": "Hi, this is an automated assistant calling from Dr. Chen's office to confirm your Thursday three pm appointment." },
+              { "offset_seconds": 9, "speaker": "user", "text": "Yes, Thursday at three works." },
+              { "offset_seconds": 13, "speaker": "bot", "text": "Great, you're all set. Goodbye." }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
