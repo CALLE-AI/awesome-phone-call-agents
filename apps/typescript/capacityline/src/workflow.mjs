@@ -7,6 +7,47 @@ export const requirement = {
   requiredCertifications: ["IATF 16949", "ISO 9001"],
 };
 
+export const officialCalleBaseUrl = "https://api.heycall-e.com";
+
+export function requireOfficialCalleBaseUrl(configured = process.env.CALLE_BASE_URL) {
+  const candidate = configured?.trim() || officialCalleBaseUrl;
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error("CALLE_BASE_URL must be the official CALL-E HTTPS origin.");
+  }
+  if (
+    url.origin !== officialCalleBaseUrl ||
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("CALLE_BASE_URL must be the official CALL-E HTTPS origin.");
+  }
+  return officialCalleBaseUrl;
+}
+
+export function parseLiveRecipients(raw) {
+  if (!raw) throw new Error("CAPACITYLINE_RECIPIENTS_JSON is required for live mode.");
+  const recipients = JSON.parse(raw);
+  if (!Array.isArray(recipients) || recipients.length < 1 || recipients.length > 8) {
+    throw new Error("Provide between one and eight authorized recipients.");
+  }
+  const e164 = /^\+[1-9]\d{7,14}$/;
+  if (recipients.some((item) => !item || typeof item.id !== "string" || !e164.test(item.phone))) {
+    throw new Error("Every recipient needs an id and valid E.164 phone number.");
+  }
+  if (new Set(recipients.map(({ phone }) => phone)).size !== recipients.length) {
+    throw new Error("Duplicate destination phone numbers are not allowed.");
+  }
+  return recipients;
+}
+
 export const recipientResultSchema = {
   type: "object",
   additionalProperties: false,

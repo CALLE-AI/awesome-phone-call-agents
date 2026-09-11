@@ -17,6 +17,8 @@ The default uses fictional reserved sample numbers, masks them in output, prints
 
 Live mode creates real outbound CALL-E calls and may incur charges. Use only business contacts who explicitly expect the test. Phone numbers and credentials are read from environment variables and are never written to the repository or printed.
 
+The example accepts only the official `https://api.heycall-e.com` base URL and rejects duplicate destination phone numbers before creating a task.
+
 ```bash
 export CALLE_API_KEY="calle_live_key"
 export CAPACITYLINE_CONFIRM_LIVE="YES"
