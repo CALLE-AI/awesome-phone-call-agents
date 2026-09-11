@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-11
 
-Implementation is in progress. MVP: **12/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **13/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-014](#spa-014), now that the authorized family workspace in SPA-013 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-015](#spa-015), now that the deterministic resilience and privacy gate in SPA-014 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -63,8 +63,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Done | [SPA-009](#spa-009), [SPA-010](#spa-010) |
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Done | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Done | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
-| [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Ready | [SPA-013](#spa-013) |
-| [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Backlog | [SPA-014](#spa-014) |
+| [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Done | [SPA-013](#spa-013) |
+| [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Ready | [SPA-014](#spa-014) |
 | [SPA-004](#spa-004) | Connect Twilio inbound SIP and SMS and pass the live phone gate | M3 | High | Backlog | [SPA-015](#spa-015) |
 | [SPA-016](#spa-016) | Optional: call a venue on the senior's behalf and return the result | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-004](#spa-004) |
@@ -288,15 +288,15 @@ Implementation notes and verification: The authenticated family workspace adds d
 
 Add focused automated integration tests for the complete MVP using fake providers by default.
 Acceptance criteria:
-- [ ] Cover duplicate/out-of-order webhooks, tool/API timeouts, disconnected realtime sessions and malformed CALL-E results.
-- [ ] Cover no answer, voicemail, SMS failure, scheduler retries and unknown dispatch without duplicate calls.
-- [ ] Test explicit consent, action authorization, E.164 validation, redaction and cross-account data isolation.
-- [ ] Capture safe correlation IDs and latency/outcome metrics; never log credentials or full sensitive transcripts by default.
-- [ ] Run typecheck, lint, production build, app tests and python scripts/validate_repository.py.
-- [ ] Verify clean install and production startup, unauthorized endpoint access, destination substitution, credential-origin rejection, untrusted HTML rendering and uncertainty recovery after restart.
-- [ ] Document residual risks and manual live checks separately from deterministic tests.
+- [x] Cover duplicate/out-of-order webhooks, tool/API timeouts, disconnected realtime sessions and malformed CALL-E results.
+- [x] Cover no answer, voicemail, SMS failure, scheduler retries and unknown dispatch without duplicate calls.
+- [x] Test explicit consent, action authorization, E.164 validation, redaction and cross-account data isolation.
+- [x] Capture safe correlation IDs and latency/outcome metrics; never log credentials or full sensitive transcripts by default.
+- [x] Run typecheck, lint, production build, app tests and python scripts/validate_repository.py.
+- [x] Verify clean install and production startup, unauthorized endpoint access, destination substitution, credential-origin rejection, untrusted HTML rendering and uncertainty recovery after restart.
+- [x] Document residual risks and manual live checks separately from deterministic tests.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: The deterministic suite now covers malformed and provider-controlled content, disconnected realtime state, HTML escaping and a strict safe-event schema in addition to the existing webhook ordering, timeout, authorization, consent, RLS, scheduler and uncertainty tests. Safe events contain only a validated correlation ID, bounded latency, coarse outcome, masked destination and bounded diagnostic code. A clean dependency install, production build/startup, signed-out page/API probes and repository validation pass without placing a call or sending an SMS. Manual provider checks and residual uncertainty behavior are recorded in [MVP verification and residual risks](verification.md).
 
 ### SPA-015
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-014 | Added safe workflow outcome metrics and focused malformed-provider, disconnected-session and untrusted-rendering tests; documented residual risks and made SPA-015 Ready. | Ninety-one offline tests, lint and typecheck passed. Clean install, production build/startup, unauthorized probes and repository validation passed without provider side effects. |
 | 2026-09-11 | SPA-013 | Added the authenticated family workspace, RLS-backed views, owner settings, permission-checked reminder cancellation and broader phone-text redaction; marked SPA-013 Done and SPA-014 Ready. | Eighty-seven offline tests, lint, typecheck and production build passed. Embedded PostgreSQL denied cross-account management; live signed-out page and endpoint checks exposed no private data. |
 | 2026-09-11 | SPA-012 | Added grounded terminal-call summaries, explicit action states, consent-gated persistence, atomic SMS reservation and honest incomplete/failure outcomes; marked SPA-012 Done and SPA-013 Ready. | Eighty-four offline tests, lint and typecheck passed. Embedded PostgreSQL verified consent, family RLS, retention deletion and one-winner SMS claiming without a live provider. |
 | 2026-09-11 | SPA-011 | Added provider-neutral SMS/CALL-E delivery, current preference enforcement, bounded definite-failure retries and a service-role-only Supabase enqueue/claim/finish transaction; marked SPA-011 Done and SPA-012 Ready. | Seventy-eight offline tests, lint, typecheck, production build and repository validation passed. The embedded PostgreSQL migration enqueued, claimed and completed a synthetic reminder without a live provider. |
