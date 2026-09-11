@@ -1,0 +1,11 @@
+.dev.vars
+.env
+node_modules/
+.wrangler/
+docs/video/*.mp4
+docs/video/*.m4a
+docs/video/*.mp3
+docs/video/wav/
+docs/video/s4_tts.json
+docs/video/_clone_s4.py
+docs/video/_fix_readme.py

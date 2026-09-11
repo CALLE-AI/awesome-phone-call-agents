@@ -1,0 +1,38 @@
+[
+ {
+  "id": "s1_title",
+  "text": "Small law firms lose clients in the intake form. Older clients, people at work, anyone reading a second language. They don't finish it. So we made the form three steps, and let the phone do the intake."
+ },
+ {
+  "id": "s2_form",
+  "text": "This is Not-a-Lawyer Intake. Step one: pick a topic. Real estate, a will, a trust, a lawsuit. That choice plans the call: a lawsuit intake asks who the other side is and what deadline is on the court papers; a will intake asks about family and an executor. Step two: leave your number. The interview language follows the phone's country, straight from CALL-E's region table, and the page says plainly what your number supports."
+ },
+ {
+  "id": "s3_submit",
+  "text": "Submit, and the page tells you exactly what happens next: your phone rings in about a minute, what the assistant will ask, and what the firm does afterward."
+ },
+ {
+  "id": "s4_call",
+  "text": "This is the real lawsuit call, recorded on the client's phone, abridged. Not legal advice comes first. Then the matter: the form said court papers had arrived; the client says no lawsuit yet, so the assistant records him as the one bringing it. Then the email, letter by letter."
+ },
+ {
+  "id": "s5_review",
+  "text": "Thirty seconds after the call, the staff console has this. Summary, the other parties for the conflict check, urgency, consent, transcript, and CALL-E's confidence score. Each topic gets its own column of fields, and a date picker places a reminder call in the client's language. Staff can also start an intake call from the desk, for a walk-in or a voicemail, and watch it land."
+ },
+ {
+  "id": "s6_bahasa",
+  "text": "Same number, different language. This is the Bahasa Indonesia call, also real, also on a US line. Adding a language is one row in a JSON file and one script block."
+ },
+ {
+  "id": "s7_remind",
+  "text": "One click schedules a consultation reminder call, in the client's language, with its own result schema: confirmed, or a reschedule request."
+ },
+ {
+  "id": "s8_limits",
+  "text": "One limit, stated plainly. CALL-E does not carry Spanish on US lines yet. We tried the locale, the task text, and the MCP planner; all three declined before dialing. The Spanish script is written and wired. Until it's enabled, those callers go to a human, and the form says so."
+ },
+ {
+  "id": "s9_arch",
+  "text": "No servers. Cloudflare Pages, a few Functions, KV, and the CALL-E API: a task and a result schema planned per matter type, webhooks, and idempotency keys. Repo and live link are in the description. This is Not-a-Lawyer Intake."
+ }
+]
