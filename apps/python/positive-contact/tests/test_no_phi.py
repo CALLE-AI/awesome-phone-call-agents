@@ -172,6 +172,23 @@ def test_the_call_script_forbids_recording_a_health_fact(event):
     assert "Give no medical advice" in text
 
 
+def test_a_callback_request_does_not_skip_the_medical_support_questions(event):
+    from positive_contact.script import render_task_text
+
+    text = render_task_text(
+        event,
+        first_name="Maria",
+        service_address_short="1200 block of Elm St",
+        locale="en-US",
+        tz_name="America/Los_Angeles",
+    )
+
+    assert "also requests a customer-support callback" in text
+    assert "recording the callback alone does not complete the support questions" in text
+    assert "ask once for the broad support route, urgency, and provider-contact permission" in text
+    assert "Never invent an answer" in text
+
+
 def test_medical_baseline_is_only_ever_an_enrollment_flag(event):
     from positive_contact.script import render_task_text
 
