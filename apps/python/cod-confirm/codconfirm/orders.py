@@ -6,6 +6,7 @@ JSON file for a live store is a matter of replacing `load` and `save`.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -73,6 +74,15 @@ def save(orders: Iterable[Order], path: Path | None = None) -> None:
     rows = [asdict(order) for order in orders]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+
+
+def source() -> str:
+    """Where the orders come from: the demo book here, or a live store.
+
+    `json` reads and writes the demo order book in this folder.
+    `woocommerce` reads a live store through `woo.py`.
+    """
+    return os.environ.get("STORE_SOURCE", "json").strip().lower() or "json"
 
 
 def pending(orders: Iterable[Order]) -> list[Order]:
