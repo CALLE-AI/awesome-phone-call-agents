@@ -9,6 +9,7 @@ export const CALLE_CALL_STATUSES = [
 ] as const;
 
 export type CalleCallStatus = (typeof CALLE_CALL_STATUSES)[number] | "unknown";
+export type CalleCallOutcome = "pending" | "completed" | "incomplete" | "failed" | "canceled" | "unknown";
 
 export interface CalleTranscriptTurn {
   readonly id: string;
@@ -20,6 +21,7 @@ export interface CalleTranscriptTurn {
 export interface CalleCallSnapshot {
   readonly callId: string;
   readonly status: CalleCallStatus;
+  readonly outcome: CalleCallOutcome;
   readonly createdAt?: string;
   readonly summary?: string;
   readonly taskCompleted?: boolean;
@@ -62,6 +64,12 @@ export function parseCalleCallSnapshot(value: unknown, now = Date.now): CalleCal
   const status = typeof root.status === "string" && CALLE_CALL_STATUSES.includes(
     root.status as (typeof CALLE_CALL_STATUSES)[number],
   ) ? root.status as (typeof CALLE_CALL_STATUSES)[number] : "unknown";
+  const taskCompleted = typeof root.task_completed === "boolean" ? root.task_completed : undefined;
+  const outcome: CalleCallOutcome = status === "queued" || status === "in_progress"
+    ? "pending"
+    : status === "completed"
+      ? taskCompleted === true ? "completed" : "incomplete"
+      : status;
   const transcript: CalleTranscriptTurn[] = [];
 
   for (const recipientValue of Array.isArray(root.recipients) ? root.recipients : []) {
@@ -94,11 +102,12 @@ export function parseCalleCallSnapshot(value: unknown, now = Date.now): CalleCal
   return {
     callId,
     status,
+    outcome,
     createdAt: typeof root.created_at === "string" && Number.isFinite(Date.parse(root.created_at))
       ? root.created_at
       : undefined,
     summary: boundedText(root.summary),
-    taskCompleted: typeof root.task_completed === "boolean" ? root.task_completed : undefined,
+    taskCompleted,
     transcript,
     updatedAt: new Date(now()).toISOString(),
   };

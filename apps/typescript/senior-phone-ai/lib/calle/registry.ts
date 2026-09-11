@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { withFileLock } from "../storage/file-lock";
 import { assertCalleCallId, parseCalleCallIds } from "./status";
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 
@@ -20,6 +21,7 @@ interface RegistryRecord {
 interface RegistryFile { readonly version: 1; readonly calls: RegistryRecord[] }
 
 const registryPath = join(process.cwd(), "data", "calle-call-registry.json");
+const registryLockPath = `${registryPath}.lock`;
 let mutation = Promise.resolve();
 
 async function readRegistry(): Promise<RegistryFile> {
@@ -46,7 +48,7 @@ async function mutate<T>(operation: (registry: RegistryFile) => Promise<T>): Pro
   mutation = new Promise<void>((resolve) => { release = resolve; });
   await previous;
   try {
-    return await operation(await readRegistry());
+    return await withFileLock(registryLockPath, async () => operation(await readRegistry()));
   } finally {
     release();
   }

@@ -19,9 +19,9 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 Last updated: 2026-09-10
 
-Implementation is in progress. MVP: **8/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **9/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-010](#spa-010), which is Ready after the confirmed one-time reminder workflow passed. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: finish [SPA-011](#spa-011), now that the CALL-E execution boundary in SPA-010 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -59,7 +59,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-007](#spa-007) | Add Supabase persistence, family authentication and data access controls | M2 | Medium | Done | [SPA-006](#spa-006) |
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Done | [SPA-007](#spa-007) |
-| [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | In progress | [SPA-007](#spa-007) |
+| [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | In progress | [SPA-009](#spa-009), [SPA-010](#spa-010) |
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Backlog | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
@@ -224,17 +224,17 @@ Added in-memory and Supabase reminder stores with authorized list/cancel operati
 
 Wrap CALL-E MCP behind planOutboundCall, executeOutboundCall and getOutboundCallResult.
 Acceptance criteria:
-- [ ] Verify current plan_call/run_call/get_call_run schemas and limitations before implementation; do not assume MCP and REST parity.
+- [x] Verify current plan_call/run_call/get_call_run schemas and limitations before implementation; do not assume MCP and REST parity.
 - [x] Restrict credential-bearing requests to verified provider origins, reject credential-leaking redirects and keep fake adapters isolated from production keys. Do not interpolate tool input into shell commands.
 - [x] Dispatch only an explicitly confirmed action to a validated E.164 destination; persist provider IDs and action identity.
 - [x] Validate structured results and treat provider content as untrusted.
-- [ ] Handle pending, completed, no-answer, voicemail, failure and unknown dispatch outcomes.
+- [x] Handle pending, completed, no-answer, voicemail, failure and unknown dispatch outcomes.
 - [x] Never blindly retry an uncertain dispatch; reconcile first and expose unresolved status.
-- [ ] Persist the intent before submission and retain the uncertainty hold across restarts, concurrent workers and new sessions; a process-local deduplication map is insufficient.
+- [x] Persist the intent before submission and retain the uncertainty hold across restarts, concurrent workers and new sessions; a process-local deduplication map is insufficient.
 - [x] Explain cancellation limits honestly, particularly once a call is in flight.
-- [ ] Include a local fake server/dry-run adapter; no default real outbound calls.
+- [x] Include a local fake server/dry-run adapter; no default real outbound calls.
 
-Implementation notes and verification: The local-only `/calls` operator page now accepts an E.164 destination and bounded purpose in the frontend, shows a masked no-side-effect review, and dispatches only after a separate explicit confirmation. There is no environment destination fallback. A local ignored registry persists an intent fingerprint before dispatch, records accepted provider IDs, prevents duplicate idempotency keys and blocks matching retries after an uncertain result without retaining the full destination or purpose. Calls appear automatically in a table that polls active rows and renders provider transcript/summary data as redacted React text. The proxy contacts only the fixed CALL-E API origin, rejects redirects, and keeps full provider identifiers and the API key server-side. SPA-010 remains In progress until MCP limitations, all terminal outcomes, cross-worker durability and a fake CALL-E create server are verified.
+Implementation notes and verification: The local-only `/calls` operator page accepts an E.164 destination and optional bounded purpose, shows a masked no-side-effect review, and dispatches only after a separate explicit confirmation. A local ignored registry persists an intent fingerprint before dispatch, records accepted provider IDs, blocks uncertain retries, and now uses an atomic permission-restricted file lock across local workers and restarts. Calls appear automatically in a table with redacted transcript and summary text. Published lifecycle states map to coarse pending, completed, incomplete, failed, canceled and unknown outcomes. Because CALL-E does not publish stable no-answer or voicemail enums, the app keeps those cases incomplete unless the bounded provider summary supplies context; it never branches on opaque failure strings. The fixed-origin offline fake provider exercises queued and terminal snapshots without credentials or network access. MCP and REST limitations and sources are recorded in [calle-integration.md](calle-integration.md). Seventy-one offline tests, lint, typecheck, the production build and repository validation pass.
 
 ### SPA-011
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-010 | Added documented MCP/REST boundaries, coarse terminal outcomes, an offline fixed-origin fake provider and a stale-lock-aware cross-worker file lock; marked SPA-010 Done and made SPA-011 next. | Seventy-one offline tests, lint, typecheck, production build and repository validation passed. CALL-E was not contacted and no call was placed. |
 | 2026-09-11 | SPA-010, SPA-011 | Made the outbound-call purpose optional for immediate and scheduled calls. Empty input is shown as no specific purpose during confirmation, while the provider receives only a general-conversation instruction. | Fifty-three offline tests, lint, typecheck, repository validation and browser inspection passed; no live call was scheduled or placed. |
 | 2026-09-11 | SPA-011 foundation | Added one-time scheduled CALL-E controls, explicit review/confirmation, encrypted local persistence, due-work claiming, status display and pre-dispatch cancellation. SPA-011 moved to In progress. | Fifty-two offline tests, lint, typecheck, production build, repository validation and browser inspection passed; no live call was scheduled or placed. |
 | 2026-09-11 | SPA-010 | Added frontend destination and purpose configuration with masked review and explicit live-call confirmation. Removed the environment destination fallback; accepted calls register automatically for the monitoring table, while uncertain matching dispatches are held. SPA-010 moved to In progress. | Fifty offline tests, lint, typecheck, production build and repository validation passed. The form and existing one-call table were inspected without placing a new call; unconfirmed/invalid/cross-origin requests were denied. |

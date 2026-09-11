@@ -290,7 +290,7 @@ export function CallMonitor() {
           <div className="call-table-wrap">
             <table className="call-table">
               <thead>
-                <tr><th>Started</th><th>Call</th><th>Status</th><th>Conversation</th><th>Summary</th></tr>
+                <tr><th>Started</th><th>Call</th><th>Status</th><th>Outcome</th><th>Conversation</th><th>Summary</th></tr>
               </thead>
               <tbody>
                 {calls.map((call) => (
@@ -298,6 +298,7 @@ export function CallMonitor() {
                     <td>{call.createdAt ? new Date(call.createdAt).toLocaleString() : "Pending"}</td>
                     <td><code>{call.callId}</code></td>
                     <td><strong className="status-pill">{call.status}</strong></td>
+                    <td><strong className="status-pill">{call.outcome}</strong></td>
                     <td>
                       {call.transcript.length ? (
                         <details>
@@ -321,8 +322,10 @@ export function CallMonitor() {
           </div>
         ) : <p className="empty-transcript">No calls have been registered by this application.</p>}
         <p className="fine-print">
-          CALL-E may withhold transcript text until a call finishes. This local view keeps transcript
-          text in memory only, masks phone-like text, and never exposes the API key to the browser.
+          CALL-E may withhold transcript text until a call finishes. Its public API does not publish
+          stable machine-readable no-answer or voicemail values, so those cases remain incomplete
+          unless the bounded provider summary explains more. This local view keeps transcript text
+          in memory only, masks phone-like text, and never exposes the API key to the browser.
         </p>
       </section>
     </main>
