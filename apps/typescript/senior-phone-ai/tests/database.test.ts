@@ -6,6 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 
 const MIGRATION = new URL("../supabase/migrations/202609100001_initial_senior_phone_ai.sql", import.meta.url);
+const SCHEDULER_MIGRATION = new URL("../supabase/migrations/202609110001_reminder_delivery_scheduler.sql", import.meta.url);
 const SEED = new URL("../supabase/seed.sql", import.meta.url);
 
 async function countRows(db: PGlite, table: string): Promise<number> {
@@ -33,6 +34,7 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
       $$;
     `);
     await db.exec(await readFile(MIGRATION, "utf8"));
+    await db.exec(await readFile(SCHEDULER_MIGRATION, "utf8"));
     await db.exec(await readFile(SEED, "utf8"));
 
     assert.equal(await countRows(db, "public.seniors"), 1);
@@ -71,6 +73,49 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
     `);
     assert.equal(privileges.rows[0]?.invite_select, false);
     assert.equal(privileges.rows[0]?.senior_insert, false);
+
+    await db.exec(`
+      insert into public.action_authorizations (
+        id, senior_id, principal_user_id, action, destination_e164, purpose,
+        state, expires_at, confirmed_at, consumed_at
+      ) values (
+        '60000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+        'create_reminder', '+12025550123', 'Synthetic reminder', 'consumed',
+        '2026-09-12T00:00:00Z', '2026-09-11T00:00:00Z', '2026-09-11T00:00:01Z'
+      );
+      insert into public.reminders (
+        id, senior_id, authorization_id, principal_user_id, idempotency_key,
+        destination_e164, message, timezone, scheduled_for, channel
+      ) values (
+        '70000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '60000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+        'reminder:database:one', '+12025550123', 'Synthetic reminder',
+        'Australia/Sydney', '2026-09-11T00:10:00Z', 'call'
+      );
+    `);
+    assert.equal(await countRows(db, "public.scheduled_deliveries"), 1);
+    const claim = await db.query<{ claim: { state: string; reminder: { id: string } } }>(`
+      select public.claim_due_reminder_delivery(
+        '2026-09-11T00:11:00Z'::timestamptz, 900
+      ) as claim
+    `);
+    assert.equal(claim.rows[0]?.claim.state, "claimed");
+    assert.equal(claim.rows[0]?.claim.reminder.id, "70000000-0000-4000-8000-000000000001");
+    const finish = await db.query<{ finished: boolean }>(`
+      select public.finish_reminder_delivery(
+        '70000000-0000-4000-8000-000000000001', 'completed', 'provider-safe'
+      ) as finished
+    `);
+    assert.equal(finish.rows[0]?.finished, true);
+    const state = await db.query<{ status: string }>(`
+      select status::text from public.reminders
+      where id = '70000000-0000-4000-8000-000000000001'
+    `);
+    assert.equal(state.rows[0]?.status, "completed");
   } finally {
     await db.close();
   }

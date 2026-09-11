@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { ActionAuthorizationStore, ActionRequest } from "../safety/authorization";
 import { assertStrictE164 } from "../safety/phone";
+import type { ReminderClaim, ReminderDeliveryStore } from "../scheduler/reminder-delivery";
+import { isIanaTimezone } from "./discovery";
 
 export type ReminderChannel = "sms" | "call";
 export type ReminderStatus = "pending" | "queued" | "in_progress" | "completed" | "failed" | "canceled" | "unknown";
@@ -56,6 +58,7 @@ function validate(request: ReminderRequest): void {
   if (request.message.trim() !== request.message || request.message.length < 1 || request.message.length > 500) {
     throw new Error("reminder message must be non-empty, bounded, and trimmed");
   }
+  if (!isIanaTimezone(request.timezone)) throw new Error("timezone must be a valid IANA timezone");
   if (!Number.isFinite(Date.parse(request.scheduledFor))) throw new Error("scheduledFor must be an ISO instant");
 }
 
@@ -63,7 +66,7 @@ function sameRequest(left: ReminderRequest, right: ReminderRequest): boolean {
   return JSON.stringify(reminderActionRequest(left)) === JSON.stringify(reminderActionRequest(right));
 }
 
-export class InMemoryReminderStore implements ReminderStore {
+export class InMemoryReminderStore implements ReminderStore, ReminderDeliveryStore {
   private readonly records = new Map<string, ReminderRecord>();
   constructor(
     private readonly canAccess: (seniorId: string, principalId: string) => boolean,
@@ -107,6 +110,26 @@ export class InMemoryReminderStore implements ReminderStore {
   setStatus(id: string, status: ReminderStatus): void {
     const record = this.records.get(id);
     if (!record) throw new Error("reminder does not exist");
+    this.records.set(id, { ...record, status });
+  }
+
+  claimNext(now: Date, maximumLatenessMs: number): ReminderClaim {
+    const record = [...this.records.values()]
+      .filter((item) => item.status === "pending" && Date.parse(item.scheduledFor) <= now.getTime())
+      .sort((left, right) => left.scheduledFor.localeCompare(right.scheduledFor))[0];
+    if (!record) return { state: "none" };
+    if (now.getTime() - Date.parse(record.scheduledFor) > maximumLatenessMs) {
+      this.records.set(record.id, { ...record, status: "failed" });
+      return { state: "expired", reminderId: record.id };
+    }
+    const claimed = { ...record, status: "in_progress" as const };
+    this.records.set(record.id, claimed);
+    return { state: "claimed", reminder: claimed };
+  }
+
+  finish(id: string, status: Extract<ReminderStatus, "queued" | "completed" | "failed" | "unknown">): void {
+    const record = this.records.get(id);
+    if (!record || record.status !== "in_progress") throw new Error("reminder delivery is not claimed");
     this.records.set(id, { ...record, status });
   }
 }

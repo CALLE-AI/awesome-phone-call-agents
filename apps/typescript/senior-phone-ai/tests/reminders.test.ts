@@ -43,6 +43,12 @@ test("changed or unconfirmed reminders fail closed", async () => {
   second.authorizations.propose(reminderActionRequest(base));
   await assert.rejects(second.service.create(base), /denied/);
   await assert.rejects(second.service.create(base), /reservation is canceled/);
+  await assert.rejects(second.service.create({
+    ...base,
+    authorizationId: "authorization-invalid-timezone",
+    idempotencyKey: "reminder:invalid-timezone",
+    timezone: "Sydney local time",
+  }), /valid IANA timezone/);
 });
 
 test("authorized cancellation wins only before delivery starts", async () => {

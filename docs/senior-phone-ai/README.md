@@ -17,11 +17,11 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 
 ## Current progress
 
-Last updated: 2026-09-10
+Last updated: 2026-09-11
 
-Implementation is in progress. MVP: **9/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **10/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: finish [SPA-011](#spa-011), now that the CALL-E execution boundary in SPA-010 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Next ticket: [SPA-012](#spa-012), now that durable reminder delivery in SPA-011 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -60,8 +60,8 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-008](#spa-008) | Add live news and local-event discovery | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-009](#spa-009) | Create, list and cancel confirmed reminders with timezone handling | M2 | Medium | Done | [SPA-007](#spa-007) |
 | [SPA-010](#spa-010) | Integrate CALL-E outbound planning, execution and result tracking | M2 | Medium | Done | [SPA-007](#spa-007) |
-| [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | In progress | [SPA-009](#spa-009), [SPA-010](#spa-010) |
-| [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Backlog | [SPA-007](#spa-007), [SPA-009](#spa-009) |
+| [SPA-011](#spa-011) | Schedule durable reminder delivery through SMS and CALL-E | M2 | Medium | Done | [SPA-009](#spa-009), [SPA-010](#spa-010) |
+| [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Ready | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Backlog | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Backlog | [SPA-013](#spa-013) |
 | [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Backlog | [SPA-014](#spa-014) |
@@ -242,15 +242,15 @@ Implementation notes and verification: The local-only `/calls` operator page acc
 
 Connect confirmed reminders to a durable host scheduler and one-time provider dispatch.
 Acceptance criteria:
-- [ ] Host scheduler owns recurrence; each scheduled run invokes exactly one call per intended call delivery.
+- [x] Host scheduler owns recurrence; each scheduled run invokes exactly one call per intended call delivery.
 - [x] Atomically claim due work and use durable idempotency to prevent duplicate jobs/calls across retries or concurrent workers.
-- [ ] Honor timezone, consent, cancellation, channel preferences and a documented late-run policy.
-- [ ] Support SMS and CALL-E reminder delivery with accurate status recording.
-- [ ] Reconcile uncertain dispatch instead of retrying blindly; bounded safe retries cover known retryable failures.
+- [x] Honor timezone, consent, cancellation, channel preferences and a documented late-run policy.
+- [x] Support SMS and CALL-E reminder delivery with accurate status recording.
+- [x] Reconcile uncertain dispatch instead of retrying blindly; bounded safe retries cover known retryable failures.
 - [x] Disabling/canceling stops future dispatch; already in-flight actions are described accurately.
-- [ ] Test scheduler restart, duplicate execution, cancellation race and provider failure without live calls.
+- [x] Test scheduler restart, duplicate execution, cancellation race and provider failure without live calls.
 
-Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Local worker claims now use the same atomic filesystem lock and durable idempotency boundary as immediate calls. An exact, constant-time checked server-only Bearer secret protects the host scheduler endpoint. Due calls run only within 15 minutes of the confirmed instant; older pending calls become `expired` instead of surprising the recipient later. Uncertain provider submission remains `unknown` without an automatic retry. SPA-011 remains In progress until recurring Supabase claims, SMS delivery, complete timezone/channel preference enforcement and fake-provider scheduler race/failure tests are complete.
+Implementation notes and verification: The local operator supports one-time CALL-E scheduling with browser-local time selection, masked review, separate confirmation, encrypted persistence, pending visibility and pre-dispatch cancellation. An exact server-only Bearer secret protects host scheduler runs. The provider-neutral reminder scheduler requires a current channel-preference policy, routes confirmed SMS and CALL-E deliveries, retries only explicit definite failures twice, and retains uncertain dispatch as `unknown`. It expires work more than 15 minutes late. Supabase reminder insertion enqueues one delivery automatically; service-role-only functions claim due rows with `FOR UPDATE SKIP LOCKED` and atomically finish both delivery and reminder records. Offline tests cover concurrent and restarted schedulers, duplicate prevention, cancellation, IANA timezones, preferences, late work, channel routing, bounded failure retries and uncertainty. Live Twilio SMS remains in final ticket SPA-004.
 
 ### SPA-012
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-011 | Added provider-neutral SMS/CALL-E delivery, current preference enforcement, bounded definite-failure retries and a service-role-only Supabase enqueue/claim/finish transaction; marked SPA-011 Done and SPA-012 Ready. | Seventy-eight offline tests, lint, typecheck, production build and repository validation passed. The embedded PostgreSQL migration enqueued, claimed and completed a synthetic reminder without a live provider. |
 | 2026-09-11 | SPA-011 | Added cross-worker schedule locking, an authenticated host-scheduler endpoint and a 15-minute late-run cutoff that expires missed calls instead of dispatching them late. | Seventy-three offline tests, lint, typecheck, production build and repository validation passed. No scheduled provider request or live call ran. |
 | 2026-09-11 | SPA-010 | Added documented MCP/REST boundaries, coarse terminal outcomes, an offline fixed-origin fake provider and a stale-lock-aware cross-worker file lock; marked SPA-010 Done and made SPA-011 next. | Seventy-one offline tests, lint, typecheck, production build and repository validation passed. CALL-E was not contacted and no call was placed. |
 | 2026-09-11 | SPA-010, SPA-011 | Made the outbound-call purpose optional for immediate and scheduled calls. Empty input is shown as no specific purpose during confirmation, while the provider receives only a general-conversation instruction. | Fifty-three offline tests, lint, typecheck, repository validation and browser inspection passed; no live call was scheduled or placed. |
