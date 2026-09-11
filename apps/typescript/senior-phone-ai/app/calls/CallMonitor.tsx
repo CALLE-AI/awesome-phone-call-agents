@@ -239,7 +239,10 @@ export function CallMonitor() {
               />
             </div>
           </div>
-          <small>Select the country code, then enter the local number. Spaces and a leading 0 are accepted where applicable.</small>
+          <small>
+            Select the country, then enter or paste the number. Local, +61, 0061 and 0011 61 formats
+            are corrected automatically when Australia is selected.
+          </small>
           <label htmlFor="purpose">Purpose of the call <span className="optional-label">(optional)</span></label>
           <textarea
             id="purpose"

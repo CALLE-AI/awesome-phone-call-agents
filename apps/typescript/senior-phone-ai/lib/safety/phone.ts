@@ -20,11 +20,26 @@ export function toE164FromNationalNumber(
   if (!/^\+[1-9][0-9]{0,2}$/.test(countryCallingCode)) {
     throw new Error("choose a valid country calling code");
   }
-  if (!/^[0-9\s().-]+$/.test(nationalNumber)) {
-    throw new Error("enter the local number using digits only");
+  const input = nationalNumber.trim();
+  if (!/^[+0-9\s().-]+$/.test(input) || (input.includes("+") && !input.startsWith("+"))) {
+    throw new Error("enter a phone number without letters or an extension");
   }
 
-  let digits = nationalNumber.replace(/[^0-9]/g, "");
+  const countryDigits = countryCallingCode.slice(1);
+  let digits = input.replace(/[^0-9]/g, "");
+  const internationalPrefix = input.startsWith("+")
+    ? ""
+    : ["0011", "011", "00"].find((prefix) => digits.startsWith(prefix));
+
+  if (input.startsWith("+") || internationalPrefix !== undefined) {
+    if (internationalPrefix) digits = digits.slice(internationalPrefix.length);
+    if (!digits.startsWith(countryDigits)) {
+      throw new Error("phone number country code does not match the selected country");
+    }
+    digits = digits.slice(countryDigits.length);
+  } else if (digits.startsWith(countryDigits) && digits.length >= countryDigits.length + 7) {
+    digits = digits.slice(countryDigits.length);
+  }
   if (removeTrunkPrefix && digits.startsWith("0")) digits = digits.slice(1);
   return assertStrictE164(`${countryCallingCode}${digits}`);
 }

@@ -47,9 +47,14 @@ test("strict E.164 validation rejects conversational and non-ASCII forms", () =>
 
 test("national phone input is normalized to E.164", () => {
   assert.equal(toE164FromNationalNumber("+61", "0449 852 021", true), "+61449852021");
+  assert.equal(toE164FromNationalNumber("+61", "+61 (0) 449 852 021", true), "+61449852021");
+  assert.equal(toE164FromNationalNumber("+61", "0061 449 852 021", true), "+61449852021");
+  assert.equal(toE164FromNationalNumber("+61", "0011 61 449 852 021", true), "+61449852021");
+  assert.equal(toE164FromNationalNumber("+61", "61-449-852-021", true), "+61449852021");
   assert.equal(toE164FromNationalNumber("+1", "(202) 555-0123"), "+12025550123");
   assert.throws(() => toE164FromNationalNumber("61", "0449852021", true));
-  assert.throws(() => toE164FromNationalNumber("+61", "+61 449 852 021", true));
+  assert.throws(() => toE164FromNationalNumber("+61", "+44 20 7946 0958", true));
+  assert.throws(() => toE164FromNationalNumber("+61", "0449 852 021 ext 2", true));
 });
 
 test("phone summaries and nested log text reveal only the last four digits", () => {
