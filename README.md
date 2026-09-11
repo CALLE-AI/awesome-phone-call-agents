@@ -153,6 +153,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [ActionBridge](https://actionbridge.vercel.app) - Human-controlled phone-work orchestration web app that turns a bounded goal into a reviewed CALL-E call plan, with explicit confirmation, status/events, structured results and evidence; the public demo is no-call by default.
 - [AfterCare](apps/python/aftercare/) - Consent-aware post-discharge CALL-E follow-ups with protocol schemas, dry-run by default, risk scoring, and a clinic UI.
 - [TeamLine](apps/typescript/teamline/) - Coach-authorized CALL-E workflow that gathers operational facts, pauses for a human decision, and communicates the approved outcome; sandbox/no-call mode is the default. [Demo](https://teamline-judge-console.netlify.app/teamline/demo) · [Video](https://youtu.be/2btXyqeA3Wg)
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
