@@ -243,14 +243,14 @@ Implementation notes and verification: The local-only `/calls` operator page acc
 Connect confirmed reminders to a durable host scheduler and one-time provider dispatch.
 Acceptance criteria:
 - [ ] Host scheduler owns recurrence; each scheduled run invokes exactly one call per intended call delivery.
-- [ ] Atomically claim due work and use durable idempotency to prevent duplicate jobs/calls across retries or concurrent workers.
+- [x] Atomically claim due work and use durable idempotency to prevent duplicate jobs/calls across retries or concurrent workers.
 - [ ] Honor timezone, consent, cancellation, channel preferences and a documented late-run policy.
 - [ ] Support SMS and CALL-E reminder delivery with accurate status recording.
 - [ ] Reconcile uncertain dispatch instead of retrying blindly; bounded safe retries cover known retryable failures.
-- [ ] Disabling/canceling stops future dispatch; already in-flight actions are described accurately.
+- [x] Disabling/canceling stops future dispatch; already in-flight actions are described accurately.
 - [ ] Test scheduler restart, duplicate execution, cancellation race and provider failure without live calls.
 
-Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Each due item is claimed before its single provider request and reuses its durable idempotency key. The page checks due work while open and catches up on the next check after a restart. SPA-011 remains In progress until the Supabase multi-worker claim path, production scheduler authentication, SMS delivery, late-run policy and fake-provider race/failure tests are complete.
+Implementation notes and verification: Added a local operator flow for one-time CALL-E scheduling with browser-local time selection, masked review, a separate explicit confirmation, pending schedule visibility and pre-dispatch cancellation. Schedule data survive a local server restart; destination and purpose are AES-GCM encrypted in an ignored permission-restricted registry. Local worker claims now use the same atomic filesystem lock and durable idempotency boundary as immediate calls. An exact, constant-time checked server-only Bearer secret protects the host scheduler endpoint. Due calls run only within 15 minutes of the confirmed instant; older pending calls become `expired` instead of surprising the recipient later. Uncertain provider submission remains `unknown` without an automatic retry. SPA-011 remains In progress until recurring Supabase claims, SMS delivery, complete timezone/channel preference enforcement and fake-provider scheduler race/failure tests are complete.
 
 ### SPA-012
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-011 | Added cross-worker schedule locking, an authenticated host-scheduler endpoint and a 15-minute late-run cutoff that expires missed calls instead of dispatching them late. | Seventy-three offline tests, lint, typecheck, production build and repository validation passed. No scheduled provider request or live call ran. |
 | 2026-09-11 | SPA-010 | Added documented MCP/REST boundaries, coarse terminal outcomes, an offline fixed-origin fake provider and a stale-lock-aware cross-worker file lock; marked SPA-010 Done and made SPA-011 next. | Seventy-one offline tests, lint, typecheck, production build and repository validation passed. CALL-E was not contacted and no call was placed. |
 | 2026-09-11 | SPA-010, SPA-011 | Made the outbound-call purpose optional for immediate and scheduled calls. Empty input is shown as no specific purpose during confirmation, while the provider receives only a general-conversation instruction. | Fifty-three offline tests, lint, typecheck, repository validation and browser inspection passed; no live call was scheduled or placed. |
 | 2026-09-11 | SPA-011 foundation | Added one-time scheduled CALL-E controls, explicit review/confirmation, encrypted local persistence, due-work claiming, status display and pre-dispatch cancellation. SPA-011 moved to In progress. | Fifty-two offline tests, lint, typecheck, production build, repository validation and browser inspection passed; no live call was scheduled or placed. |

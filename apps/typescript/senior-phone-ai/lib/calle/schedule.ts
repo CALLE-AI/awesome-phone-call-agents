@@ -4,10 +4,11 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { withFileLock } from "../storage/file-lock";
 import { createCalleCall } from "./client";
 import { type OutboundCallRequest, outboundCallPreview, validateOutboundCallRequest } from "./outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "./registry";
-import { type ScheduledCallStatus, type ScheduledCallSummary, validateScheduledFor } from "./schedule-types";
+import { scheduledCallDispatchDecision, type ScheduledCallStatus, type ScheduledCallSummary, validateScheduledFor } from "./schedule-types";
 
 interface SealedValue { readonly iv: string; readonly ciphertext: string; readonly tag: string }
 interface ScheduledCallRecord {
@@ -22,6 +23,7 @@ interface ScheduledCallRecord {
 interface ScheduleFile { readonly version: 1; readonly calls: ScheduledCallRecord[] }
 
 const schedulePath = join(process.cwd(), "data", "calle-call-schedule.json");
+const scheduleLockPath = `${schedulePath}.lock`;
 let mutation = Promise.resolve();
 
 function encryptionKey(secret: string): Buffer {
@@ -69,7 +71,7 @@ async function mutate<T>(operation: (schedule: ScheduleFile) => Promise<T>): Pro
   mutation = new Promise<void>((resolve) => { release = resolve; });
   await previous;
   try {
-    return await operation(await readSchedule());
+    return await withFileLock(scheduleLockPath, async () => operation(await readSchedule()));
   } finally {
     release();
   }
@@ -123,15 +125,20 @@ export async function cancelScheduledCall(id: string, secret: string): Promise<S
   });
 }
 
-async function claimDueCall(now: Date): Promise<ScheduledCallRecord | undefined> {
+async function claimDueCall(now: Date): Promise<{ record?: ScheduledCallRecord; expired: boolean } | undefined> {
   return mutate(async (schedule) => {
     const due = schedule.calls
-      .filter((call) => call.status === "pending" && call.scheduledFor <= now.toISOString())
+      .filter((call) => call.status === "pending" && scheduledCallDispatchDecision(call.scheduledFor, now) !== "not_due")
       .sort((left, right) => left.scheduledFor.localeCompare(right.scheduledFor))[0];
     if (!due) return undefined;
+    if (scheduledCallDispatchDecision(due.scheduledFor, now) === "expired") {
+      const expired = { ...due, status: "expired" as const };
+      await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? expired : call) });
+      return { expired: true };
+    }
     const claimed = { ...due, status: "claimed" as const };
     await writeSchedule({ version: 1, calls: schedule.calls.map((call) => call.id === due.id ? claimed : call) });
-    return claimed;
+    return { record: claimed, expired: false };
   });
 }
 
@@ -146,26 +153,32 @@ async function finishClaim(id: string, result: { status: "accepted"; callId: str
   });
 }
 
-export async function runDueScheduledCalls(secret: string, now = new Date()): Promise<{ processed: number }> {
+export async function runDueScheduledCalls(secret: string, now = new Date()): Promise<{ processed: number; expired: number }> {
   let processed = 0;
+  let expired = 0;
   for (;;) {
     const claimed = await claimDueCall(now);
-    if (!claimed) return { processed };
-    const request = open(claimed.sealedRequest, secret);
+    if (!claimed) return { processed, expired };
+    if (claimed.expired) {
+      expired += 1;
+      continue;
+    }
+    if (!claimed.record) throw new Error("scheduled call claim is invalid");
+    const request = open(claimed.record.sealedRequest, secret);
     try {
       const reservation = await reserveOutboundCall(request);
       if (reservation.state === "accepted" && reservation.callId) {
-        await finishClaim(claimed.id, { status: "accepted", callId: reservation.callId });
+        await finishClaim(claimed.record.id, { status: "accepted", callId: reservation.callId });
       } else if (reservation.state === "unknown") {
-        await finishClaim(claimed.id, { status: "unknown" });
+        await finishClaim(claimed.record.id, { status: "unknown" });
       } else {
         const result = await createCalleCall(request, secret);
         await recordOutboundCallResult(request.idempotencyKey, { state: "accepted", callId: result.callId });
-        await finishClaim(claimed.id, { status: "accepted", callId: result.callId });
+        await finishClaim(claimed.record.id, { status: "accepted", callId: result.callId });
       }
     } catch {
       await recordOutboundCallResult(request.idempotencyKey, { state: "unknown" }).catch(() => undefined);
-      await finishClaim(claimed.id, { status: "unknown" });
+      await finishClaim(claimed.record.id, { status: "unknown" });
     }
     processed += 1;
   }
