@@ -34,6 +34,30 @@ class ConfigError(Exception):
     """Configuration could not be read or written safely."""
 
 
+def check_base_id(value: str) -> str:
+    """Reject an identifier that is not an Airtable base.
+
+    Airtable's base, workspace and table ids differ only by a three-letter
+    prefix, and this tool asks for a base and a workspace in the same panel.
+    Storing the wrong one produces a 404 from a metadata endpoint much later,
+    which reads as a broken tool rather than a typo, so it is caught here.
+    """
+    value = (value or "").strip()
+    if not value:
+        return value
+    if value.startswith("app"):
+        return value
+    hint = {
+        "wsp": "that is a workspace id. The base id is the app… segment of a "
+               "base's URL, and if you have no base yet, use Create the base.",
+        "tbl": "that is a table id. The base id is the app… segment, which "
+               "comes before the table id in the URL.",
+        "pat": "that is an API token, not a base id.",
+        "rec": "that is a record id.",
+    }.get(value[:3], "an Airtable base id begins with app.")
+    raise ConfigError(f"{value[:12]}… is not a base id — {hint}")
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     airtable_token: str = ""
@@ -114,6 +138,7 @@ def load(env_path: Path | str = DEFAULT_ENV_PATH) -> Config:
 
 def save(config: Config, env_path: Path | str = DEFAULT_ENV_PATH) -> Path:
     """Write credentials to a 0600 file, preserving unrelated keys."""
+    check_base_id(config.airtable_base_id)
     path = Path(env_path)
     existing = parse_env(path.read_text(encoding="utf-8")) if path.exists() else {}
     existing.update(
@@ -132,6 +157,19 @@ def save(config: Config, env_path: Path | str = DEFAULT_ENV_PATH) -> Path:
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(body)
     os.chmod(path, 0o600)
+    return path
+
+
+def clear(env_path: Path | str = DEFAULT_ENV_PATH) -> Path:
+    """Remove every stored credential, leaving unrelated keys intact."""
+    path = Path(env_path)
+    existing = parse_env(path.read_text(encoding="utf-8")) if path.exists() else {}
+    for key in ALL_KEYS:
+        existing.pop(key, None)
+    body = "".join(f"{k}={v}\n" for k, v in existing.items() if v)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(body)
     return path
 
 

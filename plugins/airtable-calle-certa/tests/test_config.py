@@ -125,3 +125,60 @@ class FilePermissions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BaseIdValidation(unittest.TestCase):
+    """Base, workspace and table ids differ only by a three-letter prefix, and
+    the panel asks for two of them, so the wrong one must be caught at entry
+    rather than as a 404 from a metadata endpoint much later."""
+
+    def test_workspace_id_is_rejected_by_name(self):
+        with self.assertRaises(cfg.ConfigError) as ctx:
+            cfg.check_base_id("wspazut5mnbmwPrOT")
+        self.assertIn("workspace id", str(ctx.exception))
+        self.assertIn("Create the base", str(ctx.exception))
+
+    def test_table_and_token_ids_are_named_too(self):
+        self.assertIn("table id", str(self._err("tblAbc123")))
+        self.assertIn("token", str(self._err("pat_abc123")))
+
+    def _err(self, value):
+        try:
+            cfg.check_base_id(value)
+        except cfg.ConfigError as exc:
+            return exc
+        self.fail(f"{value} should have been rejected")
+
+    def test_a_real_base_id_passes(self):
+        self.assertEqual(cfg.check_base_id("appAbc123"), "appAbc123")
+
+    def test_empty_is_allowed_because_the_base_may_not_exist_yet(self):
+        self.assertEqual(cfg.check_base_id(""), "")
+
+    def test_save_refuses_to_store_a_workspace_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            with self.assertRaises(cfg.ConfigError):
+                cfg.save(cfg.Config(airtable_token="pat_x", airtable_base_id="wspBad"), env)
+            self.assertFalse(env.exists(), "nothing may be written on a rejected save")
+
+
+class Clearing(unittest.TestCase):
+    def test_clear_removes_every_credential(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            cfg.save(cfg.Config(airtable_token="pat_x", airtable_base_id="appX",
+                                calle_api_key="iams_x", requester_name="Acme"), env)
+            cfg.clear(env)
+            loaded = cfg.load(env)
+            self.assertFalse(loaded.airtable_token)
+            self.assertFalse(loaded.calle_api_key)
+            self.assertFalse(loaded.can_read_table)
+
+    def test_clear_keeps_unrelated_keys(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            env.write_text("SOMETHING_ELSE=keep\nAIRTABLE_TOKEN=pat_x\n")
+            cfg.clear(env)
+            self.assertIn("SOMETHING_ELSE=keep", env.read_text())
+            self.assertNotIn("AIRTABLE_TOKEN", env.read_text())

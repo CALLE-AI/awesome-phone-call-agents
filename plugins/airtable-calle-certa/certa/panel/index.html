@@ -404,6 +404,7 @@ footer .bad { color: var(--stop); }
     </div>
     <div class="connect-foot">
       <p class="privacy">Saved to a local file only you can read. Never written to your base, never logged, and never shown again — only the last four characters.</p>
+      <button class="quiet" id="disconnect">Disconnect</button>
       <button id="close-connect">Cancel</button>
       <button class="primary" id="save">Save and connect</button>
       <span class="say" id="setup-msg"></span>
@@ -582,7 +583,8 @@ function renderConfig(c) {
   $("s-key").textContent = c.calle_api_key || "";
   $("f-base").value = c.airtable_base_id || "";
   $("f-req").value = c.requester_name || "";
-  $("makebase").hidden = !(c.airtable_token && !c.airtable_base_id);
+  const baseLooksRight = (c.airtable_base_id || "").startsWith("app");
+  $("makebase").hidden = !(c.airtable_token && !baseLooksRight);
   $("perm").textContent = c.permission_warning || "";
   $("perm").className = c.permission_warning ? "bad" : "";
   renderSteps();
@@ -630,6 +632,20 @@ $("save").addEventListener("click", async () => {
     $("setup-msg").textContent = "";
     say(e.message, true);
   } finally { $("save").disabled = false; }
+});
+
+$("disconnect").addEventListener("click", async () => {
+  if (!confirm("Forget the stored Airtable and CALL-E credentials on this machine?\n\nCerta will fall back to sample data.")) return;
+  $("disconnect").disabled = true;
+  try {
+    renderConfig(await api("/api/disconnect", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    }));
+    $("f-base").value = ""; $("f-req").value = ""; $("f-ws").value = "";
+    $("setup-msg").textContent = "Disconnected";
+    await loadPlan();
+  } catch (e) { say(e.message, true); }
+  finally { $("disconnect").disabled = false; }
 });
 
 $("mkbase").addEventListener("click", async () => {

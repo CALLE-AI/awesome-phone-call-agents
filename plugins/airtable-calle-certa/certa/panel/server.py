@@ -183,7 +183,10 @@ class Panel:
             raise PanelError("nothing to save")
         # A token with no base is a legitimate half-configured state: the base
         # is created from that token, so requiring both here would deadlock.
-        cfg.save(merged, self.env_path)
+        try:
+            cfg.save(merged, self.env_path)
+        except cfg.ConfigError as exc:
+            raise PanelError(str(exc)) from exc
         self.reconfigure()
         return self.config_json()
 
@@ -295,6 +298,12 @@ class Panel:
         self.reconfigure()
         return dict(self.config_json(), created_base_id=base_id)
 
+    def disconnect(self) -> dict[str, Any]:
+        """Forget every stored credential and fall back to sample data."""
+        cfg.clear(self.env_path)
+        self.reconfigure()
+        return self.config_json()
+
     def audit_status(self) -> dict[str, Any]:
         status = self.audit.verify_chain()
         return {
@@ -405,6 +414,11 @@ def make_handler(panel: Panel):
                     return self._send(200, panel.apply_setup(body))
                 except PanelError as exc:
                     return self._send(400, {"error": str(exc)})
+
+            if parts.path == "/api/disconnect":
+                if body:
+                    return self._send(400, {"error": "this endpoint takes no fields"})
+                return self._send(200, panel.disconnect())
 
             if parts.path == "/api/create-base":
                 unexpected = set(body) - {"workspace_id"}
