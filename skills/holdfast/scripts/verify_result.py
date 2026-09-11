@@ -480,23 +480,26 @@ def verdict_for(field_name: str, value: object, transcript: str) -> dict:
                         "span": sentence[:220],
                     }
 
-    # 3) Plausible: same turn but a different sentence, or assistant-only.
-    for turn in turns:
-        if turn.speaker == "assistant":
-            continue
-        for sentence in turn.sentences():
-            tokens = sentence_tokens(sentence)
-            if tokens & hints:
+    # 3) Plausible: same turn but a different sentence (non-strict values
+    #    only; numeric/date fields never verify without their anchor), or
+    #    assistant-only support.
+    if not strict:
+        for turn in turns:
+            if turn.speaker == "assistant":
                 continue
-            found, matched_on, negated = find_value_in_sentence(value, sentence)
-            if found and not negated:
-                return {
-                    "value": value,
-                    "verdict": "plausible",
-                    "evidence": f"value found in the same turn but not in the sentence naming the field ('{matched_on}')",
-                    "speaker": turn.speaker,
-                    "span": sentence[:220],
-                }
+            for sentence in turn.sentences():
+                tokens = sentence_tokens(sentence)
+                if tokens & hints:
+                    continue
+                found, matched_on, negated = find_value_in_sentence(value, sentence)
+                if found and not negated:
+                    return {
+                        "value": value,
+                        "verdict": "plausible",
+                        "evidence": f"value found in the same turn but not in the sentence naming the field ('{matched_on}')",
+                        "speaker": turn.speaker,
+                        "span": sentence[:220],
+                    }
     for turn in turns:
         if turn.speaker != "assistant":
             continue
