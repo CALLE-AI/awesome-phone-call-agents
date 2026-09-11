@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/senior-phone-ai`](typescript/senior-phone-ai/) | TypeScript / Next.js | Consent-first browser Realtime search, authorized reminders and CALL-E actions, grounded post-call summaries, and a private family dashboard with a no-call default. |
 | [`typescript/clarity`](typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
 | [`python/audition-agent`](python/audition-agent/) | Python / React | Catalog and setup guide for producer-reviewed CALL-E role-disclosure callbacks, with upstream source and no-call verification. |
 | [`typescript/e-mploye-for-calle`](typescript/e-mploye-for-calle/) | TypeScript | Human-approved virtual employee for appointment, lead follow-up, and shift coordination workflows, with a fake-only public mode and opt-in CALL-E SDK integration. |

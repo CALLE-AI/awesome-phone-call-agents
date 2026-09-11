@@ -21,7 +21,7 @@ Last updated: 2026-09-11
 
 Implementation is in progress. MVP: **13/15 done**. Optional extensions: **0/4 done**.
 
-Next ticket: [SPA-015](#spa-015), now that the deterministic resilience and privacy gate in SPA-014 is complete. The Twilio voice/SMS gate remains [SPA-004](#spa-004) but runs last in the MVP sequence.
+Current ticket: [SPA-015](#spa-015). Deployment, demo and PR materials are prepared; hosted migration verification and approved live browser evidence remain. The Twilio voice/SMS gate remains [SPA-004](#spa-004) and runs last.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 
@@ -64,7 +64,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-012](#spa-012) | Create opt-in post-call summaries and SMS follow-up | M2 | Medium | Done | [SPA-007](#spa-007), [SPA-009](#spa-009) |
 | [SPA-013](#spa-013) | Build the minimal authorized family and carer dashboard | M2 | Medium | Done | [SPA-008](#spa-008), [SPA-011](#spa-011), [SPA-012](#spa-012) |
 | [SPA-014](#spa-014) | Verify resilience, privacy and end-to-end workflow behavior | M3 | Medium | Done | [SPA-013](#spa-013) |
-| [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | Ready | [SPA-014](#spa-014) |
+| [SPA-015](#spa-015) | Document deployment and run the polished Margaret MVP demo | M3 | Medium | In progress | [SPA-014](#spa-014) |
 | [SPA-004](#spa-004) | Connect Twilio inbound SIP and SMS and pass the live phone gate | M3 | High | Backlog | [SPA-015](#spa-015) |
 | [SPA-016](#spa-016) | Optional: call a venue on the senior's behalf and return the result | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-004](#spa-004) |
@@ -305,16 +305,16 @@ Implementation notes and verification: The deterministic suite now covers malfor
 Prepare operating documentation and a reproducible end-to-end demo.
 Acceptance criteria:
 - [ ] Document Next.js/Node hosting, apply and verify migrations against the configured hosted Supabase project, scheduler, secrets and non-SIP provider configuration; leave Twilio/SIP setup for SPA-004.
-- [ ] Document side effects, consent, cancellation/disable behavior, rollback, retention and troubleshooting.
+- [x] Document side effects, consent, cancellation/disable behavior, rollback, retention and troubleshooting.
 - [ ] Demonstrate browser realtime conversation → arbitrary live news/search → current local event → requested SMS → confirmed reminder → CALL-E reminder delivery → dashboard state.
 - [ ] Use current retrieved events; no hardcoded demo answers. Clearly label offline fake mode.
 - [ ] Run live SMS only with explicit test consent and configured recipients; collect redacted evidence of same-session browser search. The live telephone proof belongs to SPA-004.
-- [ ] Keep optional call-on-behalf outside the required MVP acceptance.
-- [ ] Prepare repository-facing documentation in English under apps/typescript/senior-phone-ai/ and docs/ as appropriate.
-- [ ] Review the full PR diff, relevant history, screenshots, video and linked public artifacts for credentials and personal data. Use number-free synthetic fixtures where possible; any full example number must be verified reserved fiction and rejected by live dispatch.
-- [ ] Add a factual app catalog entry, complete the PR template, and keep the title/body aligned with the actual scoped contribution. Make no clinical or production-readiness claims without evidence.
+- [x] Keep optional call-on-behalf outside the required MVP acceptance.
+- [x] Prepare repository-facing documentation in English under apps/typescript/senior-phone-ai/ and docs/ as appropriate.
+- [x] Review the full PR diff, relevant history, screenshots, video and linked public artifacts for credentials and personal data. Use number-free synthetic fixtures where possible; any full example number must be verified reserved fiction and rejected by live dispatch.
+- [x] Add a factual app catalog entry, complete the PR template, and keep the title/body aligned with the actual scoped contribution. Make no clinical or production-readiness claims without evidence.
 
-Implementation notes and verification: Not started.
+Implementation notes and verification: Added a no-Docker Node/Next.js deployment guide covering server-only secrets, ordered hosted Supabase migrations, RLS checks, scheduler architecture, disable/rollback behavior, retention and troubleshooting. Added separate offline and approved-live Margaret demo steps, with current retrieval required and explicit redaction/evidence cleanup. Added root and app catalog entries plus a PR draft aligned to `feat(apps): add Senior Phone AI`. Hosted migration application, live browser search evidence and any consented provider action remain intentionally unclaimed. See [deployment](deployment.md), [demo runbook](demo-runbook.md) and [pull request draft](pull-request.md).
 
 ### SPA-016
 
@@ -375,6 +375,7 @@ Implementation notes and verification: Not started.
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-11 | SPA-015 foundation | Prepared no-Docker deployment, rollback, scheduler and Margaret demo runbooks; added catalog entries and a scoped PR draft. SPA-015 is In progress pending hosted migration verification and approved live evidence. | Documentation and public artifacts are being validated without reading `.env.local` or invoking a provider. |
 | 2026-09-11 | SPA-014 | Added safe workflow outcome metrics and focused malformed-provider, disconnected-session and untrusted-rendering tests; documented residual risks and made SPA-015 Ready. | Ninety-one offline tests, lint and typecheck passed. Clean install, production build/startup, unauthorized probes and repository validation passed without provider side effects. |
 | 2026-09-11 | SPA-013 | Added the authenticated family workspace, RLS-backed views, owner settings, permission-checked reminder cancellation and broader phone-text redaction; marked SPA-013 Done and SPA-014 Ready. | Eighty-seven offline tests, lint, typecheck and production build passed. Embedded PostgreSQL denied cross-account management; live signed-out page and endpoint checks exposed no private data. |
 | 2026-09-11 | SPA-012 | Added grounded terminal-call summaries, explicit action states, consent-gated persistence, atomic SMS reservation and honest incomplete/failure outcomes; marked SPA-012 Done and SPA-013 Ready. | Eighty-four offline tests, lint and typecheck passed. Embedded PostgreSQL verified consent, family RLS, retention deletion and one-winner SMS claiming without a live provider. |
