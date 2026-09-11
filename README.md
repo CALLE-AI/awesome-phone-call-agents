@@ -145,7 +145,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [RELAY](https://github.com/eyadarshad/RELAY) - Autonomous multi-call business operations agent with a real-time web console that plans missions, queries suppliers via CALL-E, negotiates volume discounts, and enforces human approval before locking purchase orders.
+- [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
