@@ -334,15 +334,17 @@ export function CallMonitor() {
           <div className="call-table-wrap">
             <table className="call-table call-history-table">
               <thead>
-                <tr><th>Started</th><th>Call</th><th>Status</th><th>Outcome</th><th>Summary</th><th>Conversation</th></tr>
+                <tr><th>Started</th><th>Result</th><th>Summary</th><th>Conversation</th></tr>
               </thead>
               <tbody>
                 {calls.map((call) => (
                   <tr key={call.callId}>
                     <td>{call.createdAt ? new Date(call.createdAt).toLocaleString() : "Pending"}</td>
-                    <td><code>{call.callId}</code></td>
-                    <td><strong className="status-pill">{call.status}</strong></td>
-                    <td><strong className="status-pill">{call.outcome}</strong></td>
+                    <td>
+                      <strong className="status-pill">
+                        {call.status === call.outcome ? call.status : `${call.status} · ${call.outcome}`}
+                      </strong>
+                    </td>
                     <td className="operator-summary">{call.summary ?? "Not available"}</td>
                     <td>
                       {call.transcript.length ? (
