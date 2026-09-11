@@ -6,6 +6,8 @@ Before sending a heavy pallet, a dispatcher needs more than “we accept deliver
 
 > Experimental information-gathering tool. It does not approve dispatch or certify safe unloading. Reported equipment capacity and clearances require independent verification by qualified site personnel; the prototype cannot evaluate actual site conditions, load center, stability or the handling plan.
 
+**[Watch the demo video (2:39)](https://www.youtube.com/watch?v=Jp01KahMiQM)** — the actual incomplete official-hotline result and clearly labeled offline scenarios. Includes English captions and disclosed synthetic narration.
+
 ## A small, complete workflow
 
 1. Specify the receiving contact, pallet gross weight in kilograms, external width and height in millimeters, and dock/ground unloading mode.
