@@ -19,14 +19,15 @@ setup instructions.
 
 - **Places a real outbound phone call** via CALL-E once a human clicks "Approve & Call" — no
   call happens before that explicit approval step.
-- **Dry-run by default.** The call recipient is set via an uncommitted `.env.local` variable
+- **No callable recipient by default.** The call recipient is set via an uncommitted `.env.local` variable
   (`NEXT_PUBLIC_DRY_RUN_PHONE_NUMBER`); with no configuration it defaults to an invalid
   placeholder, so nothing can be called accidentally. Point it at your own number to test
-  safely before ever pointing it at a real support line.
+  only for an explicitly authorized real test call. Calling your own phone is
+  still a real outbound call, not a dry run, and may incur charges.
 - **No hidden recurring schedule.** Each case places at most one call; there's no
   polling/retry loop that places additional calls on its own.
-- **No cancellation once a call is placed** — a platform constraint of CALL-E's async,
-  task-in/structured-result-out model (no mid-call intervention), not a design gap. The only
+- **This integration does not implement mid-call cancellation.** Closing its UI
+  does not recall an already-submitted call. The implemented
   cancellation point is before clicking "Approve & Call."
 - **Phone numbers are handled in E.164** internally and masked in the UI (e.g.
   `(646) •••-••82`) wherever they're displayed, so the number never appears in full on
@@ -40,5 +41,5 @@ setup instructions.
 ## Setup & usage
 
 See the [full README](https://github.com/mflittle/fair-call#readme) in the linked repo for
-install steps, required secrets, and how to run a safe dry-run call to your own phone before
-trying anything live.
+install steps and required secrets. Use its no-call/unconfigured path for review.
+An optional test to your own authorized phone is a real call and requires explicit approval.
