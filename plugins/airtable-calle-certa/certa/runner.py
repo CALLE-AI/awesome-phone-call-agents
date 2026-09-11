@@ -42,6 +42,7 @@ from .calle import (
     interpret,
 )
 from .consent import authorize
+from .dialplan import UnsupportedRegion, resolve
 from .schema import DerivedSchema, SchemaError, derive_recipient_schema
 from .tasks import TASK_SPEC_VERSION, TaskError, build_task
 from .transport import Transport
@@ -153,10 +154,23 @@ def plan(
             skipped.append(Skipped(row, str(exc)))
             continue
 
+        # The number already says where it dials. Passing that on is not
+        # optional: CALL-E accepts a call with no region, dials it, and the
+        # carrier refuses it in zero seconds with a bare SIP 404.
+        try:
+            destination = resolve(contact.number.e164)
+        except UnsupportedRegion as exc:
+            skipped.append(Skipped(row, f"{row.request.request_id}: {exc}"))
+            continue
+
         try:
             task = build_task(contact, requester_name=requester_name)
             payload = build_call_payload(
-                [contact], derived=derived, requester_name=requester_name
+                [contact],
+                derived=derived,
+                requester_name=requester_name,
+                region=destination.region,
+                locale=destination.locale,
             )
         except (TaskError, Exception) as exc:  # noqa: BLE001 - reported, never raised past here
             skipped.append(Skipped(row, str(exc)))

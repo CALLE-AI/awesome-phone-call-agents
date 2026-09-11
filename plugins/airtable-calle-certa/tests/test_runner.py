@@ -280,5 +280,65 @@ class Reconciliation(Base):
         self.assertEqual(transport.created, [])
 
 
+class TestRegionReachesThePayload(unittest.TestCase):
+    """Regression: a real call to +91 with no region was refused as SIP 404.
+
+    CALL-E accepts a payload with no region, dials it, and the carrier drops
+    it in zero seconds with no transcript and no explanation. The number was
+    carrying the answer the whole time, so these tests assert it arrives.
+    """
+
+    def setUp(self):
+        self.transport = FixtureTransport(scenario())
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.audit = AuditLog(Path(self.tmp.name) / "audit.jsonl", fsync=False)
+
+    def client(self, records):
+        return FixtureAirtable(SCHEMA, records)
+
+    def test_every_planned_recipient_carries_a_region(self):
+        result = plan(
+            self.client([consented()]), table=TABLE, view=VIEW, requester_name=REQUESTER
+        )
+        self.assertTrue(result.planned)
+        for planned in result.planned:
+            for recipient in planned.payload["recipients"]:
+                self.assertIn("region", recipient, "a call would dial with no region")
+                self.assertIn("locale", recipient)
+
+    def test_region_matches_the_number_being_dialed(self):
+        result = plan(
+            self.client([consented()]), table=TABLE, view=VIEW, requester_name=REQUESTER
+        )
+        recipient = result.planned[0].payload["recipients"][0]
+        self.assertEqual(recipient["phones"], [SOURCED])
+        self.assertEqual(recipient["region"], "US")  # SOURCED is +1 555...
+
+    def test_indian_number_plans_as_in(self):
+        """The exact shape of the production failure, as a fixture."""
+        indian = "+911000000000"  # 1xx series: never a subscriber line
+        row = record(**{
+            FIELDS.sourced_number: indian,
+            FIELDS.consent_token: good_token(phone=indian),
+        })
+        result = plan(self.client([row]), table=TABLE, view=VIEW, requester_name=REQUESTER)
+        self.assertEqual(result.call_count, 1, result.skipped and result.skipped[0].reason)
+        self.assertEqual(result.planned[0].payload["recipients"][0]["region"], "IN")
+
+    def test_uncovered_country_is_skipped_before_any_call(self):
+        """Better to name the country than to spend a call discovering it."""
+        chinese = "+8613800138000"
+        row = record(**{
+            FIELDS.sourced_number: chinese,
+            FIELDS.consent_token: good_token(phone=chinese),
+        })
+        result = plan(self.client([row]), table=TABLE, view=VIEW, requester_name=REQUESTER)
+        self.assertEqual(result.call_count, 0)
+        self.assertEqual(len(result.skipped), 1)
+        self.assertIn("coverage", result.skipped[0].reason)
+        self.assertEqual(self.transport.created, [])
+
+
 if __name__ == "__main__":
     unittest.main()
