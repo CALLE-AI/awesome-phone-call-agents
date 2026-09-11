@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`python/holdfor-board`](python/holdfor-board/) | Python | Post-visit follow-up board for a GP practice: a check-in call's answers reach a human queue as a Review Item, the patient's own verbatim words travel with it, and no rebooking call exists without a prior human Release carrying a bounded date-and-mode envelope. Runs offline on a stored transcript fixture with no credentials. |
 | [`python/aftercare`](python/aftercare/) | Python | Consent-aware post-discharge CALL-E follow-ups with protocol schemas, dry-run by default, risk scoring, and a clinic UI. |
 | [`typescript/teamline`](typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
 | [`web/veyra`](web/veyra/) | TypeScript / Next.js / Python | Natural-language campaign builder with exact recipient review, operator-gated live dispatch, fail-closed reconciliation, and fake mode enabled by default. |
