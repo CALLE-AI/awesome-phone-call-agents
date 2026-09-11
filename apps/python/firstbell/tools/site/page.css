@@ -1811,10 +1811,49 @@ footer .source-link { margin-top: var(--space-3); }
  * believes the scene does not need the table; a judge who does not believe it needs it very
  * much. `details` is the browser's own answer to that and it costs no script, keeps the
  * table in the served HTML for the no-JavaScript gate, and is keyboard-reachable already. */
-.fold { margin: var(--space-4) 0 0; border-top: 1px solid var(--line); }
+/* A disclosure is a card, not a rule with text above it.
+ *
+ * It was a single hairline border-top and a line of label text, which reads as a divider
+ * that happens to be clickable rather than as a thing you open. Twelve of them down one
+ * page and a reader has no idea any of them contain anything. The card gives the closed
+ * state an edge and the open state a shadow, so the difference between "there is more
+ * here" and "here it is" is visible without reading the label.
+ *
+ * The chevron replaces the default marker because `list-style: none` is needed anyway to
+ * put the label and the indicator on opposite ends of the row, and a disclosure triangle
+ * cannot be moved there. It rotates rather than swapping glyph, so nothing reflows. */
+.fold {
+  margin: var(--space-4) 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--ink) 2%, transparent);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.fold[open] {
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--ink) 5%, transparent);
+  background: var(--paper);
+}
 .fold > summary {
-  cursor: pointer; padding: var(--space-3) 0;
+  cursor: pointer; padding: var(--space-2) 0;
   font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
+  font-weight: 500;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after {
+  content: "›";
+  font-size: 1.4em; line-height: 1; color: var(--ink-3);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
+.fold > .fold-body, .fold > p:not(:first-of-type) {
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  line-height: 1.65;
 }
 .fold > summary::marker { color: var(--ink-3); }
 .fold > summary:hover { color: var(--ink); }
@@ -1830,17 +1869,41 @@ footer .source-link { margin-top: var(--space-3); }
  * a reader deciding in thirty seconds scrolled every pixel of it before reaching the end.
  * Nothing is deleted. The bytes are all still served, which is what keeps the
  * no-JavaScript gate, an in-page find, and the contrast census whole. */
+/* The act-level disclosure gets the same card, one step larger, because it sits between
+ * arguments rather than inside one. */
 .act-fold {
-  margin: var(--space-5) 0 0;
-  border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--ink) 2%, transparent);
+  padding: var(--space-2) var(--space-4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.act-fold[open] {
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--ink) 5%, transparent);
+  background: var(--paper);
 }
 .act-fold > summary {
-  padding: var(--space-4) 0;
+  cursor: pointer; padding: var(--space-3) 0;
   font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
   font-weight: 500;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
-.act-fold[open] > summary { color: var(--ink); border-bottom: 1px solid var(--line); }
-.act-fold > .fold-body { padding-top: var(--space-4); }
+.act-fold > summary::-webkit-details-marker { display: none; }
+.act-fold > summary::after {
+  content: "›";
+  font-size: 1.4em; line-height: 1; color: var(--ink-3);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.act-fold[open] > summary { color: var(--ink); }
+.act-fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
+.act-fold > .fold-body {
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
 /* The disclosure is a block in the reading column, and the bands and splits inside it
  * were written expecting to be direct children of `.inner`. Nothing about their width
  * changes here; only their top margin, which would otherwise double the first gap. */
@@ -1900,7 +1963,7 @@ li[data-verdict="ours"] .filing-verdict { color: var(--resolved); }
  * Served at full width, which is the state a reader with no script gets: the two wrong
  * filings are already crossed out and the page reads correctly without a frame of motion. */
 .filing-name::after {
-  content: ""; position: absolute; left: -0.1em; right: -0.1em; top: 0.58em; height: 2px;
+  content: ""; position: absolute; left: -0.1em; right: -0.1em; top: 0.88em; height: 2px;
   background: var(--ink-2);
   transform-origin: left center;
   transition: transform var(--dur-enter) var(--ease-out);

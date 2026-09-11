@@ -37,7 +37,10 @@ function startScroll() {
   const lenis = new window.Lenis({ lerp: 0.1, smoothWheel: true });
   const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf); };
   requestAnimationFrame(raf);
-  document.querySelectorAll('.rail a[href^="#"]').forEach((a) => {
+  // Every in-page link, not just the rail's. The rail was wired because it is the obvious
+  // navigation, but an anchor in body prose jumped natively while Lenis was still running
+  // its own scroll, which reads as the page fighting itself. Same handler, wider net.
+  document.querySelectorAll('a[href^="#"]').forEach((a) => {
     a.addEventListener('click', (e) => {
       // A held modifier means the reader asked the browser for something, usually a new
       // tab. Swallowing it to run a smooth scroll takes that away with no way to get it

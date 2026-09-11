@@ -106,6 +106,7 @@ FIELD_LABEL = {
     "parent_confirmed_aware": "parent_confirmed_aware",
     "reason_category": "reason_category",
     "expected_return": "expected_return",
+    "spoke_with": "spoke_with",
 }
 
 

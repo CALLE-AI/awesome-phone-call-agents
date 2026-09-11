@@ -73,9 +73,14 @@
 }
 
 /* ---- what the call came back with ------------------------------------------------------ */
-.csc-fields { margin: 0; display: grid; gap: 2px; }
+.csc-fields { margin: 0; display: grid; gap: 6px; }
+/* Label left, value right, so four rows of different-length values still read as a column
+ * of values rather than as ragged text. `align-items` stays `baseline` and does not become
+ * `center`: the key is --size-1 and the value is larger, and centring two different type
+ * sizes on the box leaves their baselines a pixel or two apart, which is visible at this
+ * size and is the thing the eye reads as misaligned. */
 .csc-f {
-  display: flex; align-items: baseline; gap: var(--space-2);
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
   padding: 3px 0; border-top: 1px solid var(--line);
 }
 .csc-f dt {
@@ -115,8 +120,20 @@
 }
 /* A rule, not `text-decoration`, so it is the same weight as every other struck word on
  * this page and so it holds its contrast: the text under it stays at full ink. */
+/* 0.88em, and it was 0.56em.
+ *
+ * Measured rather than eyeballed. In Chrome at 14px with a 22.68px line box this font
+ * reports an ascent of 15px, a descent of 4px and an x-height of 7px, which puts the
+ * baseline 16.84px below the top of the box and the middle of the x-height at 13.34px.
+ * That is where a strike belongs, and it is where `text-decoration: line-through` draws
+ * one. The rule was centred at 8.84px, four and a half pixels high, so it crossed the
+ * tops of the lowercase letters instead of the middle of them.
+ *
+ * `top: 50%` was the obvious fix and it is the wrong one twice over: it centres on the
+ * line box rather than the x-height, which is still 2px high, and on `.filing-name` the
+ * `transform` it needs is already taken by the scaleX that animates the strike on. */
 .csc-struck::after {
-  content: ""; position: absolute; left: -0.08em; right: -0.08em; top: 0.56em;
+  content: ""; position: absolute; left: -0.08em; right: -0.08em; top: 0.88em;
   height: 2px; background: var(--ink-2);
 }
 .csc-v-ours .csc-v-say { color: var(--resolved); }
