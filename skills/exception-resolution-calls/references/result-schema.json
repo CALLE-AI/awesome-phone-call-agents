@@ -1,0 +1,102 @@
+{
+  "_schema_version": "supplier-exception.v2",
+  "recipient_result_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "received",
+      "po_status",
+      "ship_date",
+      "blocker",
+      "needs_human",
+      "spoke_with",
+      "escalation_reason"
+    ],
+    "properties": {
+      "received": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ],
+        "description": "Use yes ONLY when the supplier clearly confirms they received or acknowledged this purchase order. Use no when they clearly state they did not receive it. Use unknown when the call did not reach the right person, or the answer was hedged, second-hand, or unclear -- for example 'I think someone in logistics has it'."
+      },
+      "po_status": {
+        "type": "string",
+        "enum": [
+          "on_time",
+          "delayed",
+          "blocked",
+          "unknown"
+        ],
+        "description": "Current fulfilment status the supplier stated. Use on_time when they confirm the original schedule holds. Use delayed when they state it will ship later than agreed. Use blocked when they say it cannot proceed without something being resolved. Use unknown when the evidence is insufficient -- never infer a status from tone or from a polite acknowledgement."
+      },
+      "ship_date": {
+        "type": "string",
+        "description": "The expected ship date exactly as the supplier stated it, for example '2026-09-15', 'next Tuesday', or 'Friday'. Use the literal string 'unknown' when they did not give one. Do not estimate or infer a date."
+      },
+      "blocker": {
+        "type": "string",
+        "enum": [
+          "none",
+          "inventory",
+          "production",
+          "transport",
+          "administrative",
+          "unknown"
+        ],
+        "description": "The primary blocker the supplier explicitly named. Use none when they state there is no blocker. Use unknown when a delay exists but no cause was given. Do not guess a cause."
+      },
+      "needs_human": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ],
+        "description": "Use yes when the supplier asks to speak to a person, disputes the purchase order, raises pricing, payment terms, contract changes or any other commercial decision, or when a consequential decision is needed. Use no when the call completed as a routine status check."
+      },
+      "spoke_with": {
+        "type": "string",
+        "enum": [
+          "intended_contact",
+          "authorized_representative",
+          "wrong_person",
+          "unknown"
+        ],
+        "description": "Who you actually spoke to. Use intended_contact when the person confirms they are the named contact. Use authorized_representative when they say they are authorized to speak for the supplier about this purchase order. Use wrong_person when they say they are not the right person or cannot speak to this order. Use unknown when identity was never established, including when nobody answered clearly. Do not assume identity from the fact that somebody picked up."
+      },
+      "escalation_reason": {
+        "type": "string",
+        "enum": [
+          "none",
+          "wants_human",
+          "disputes_po",
+          "commercial_change",
+          "asked_not_to_be_called",
+          "unknown"
+        ],
+        "description": "Why a person is needed, if one is. Use asked_not_to_be_called when the recipient asks not to be contacted again or refuses further calls -- this suppresses future calls, so only use it when they say so. Use disputes_po when they dispute the order exists or its contents. Use commercial_change when they raise price, payment terms or contract changes. Use wants_human when they simply ask for a person. Use none when the call was a routine status check."
+      }
+    }
+  },
+  "result_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "suppliers_reached",
+      "suppliers_confirmed"
+    ],
+    "properties": {
+      "suppliers_reached": {
+        "type": "integer",
+        "description": "Number of suppliers with whom a conversation actually took place."
+      },
+      "suppliers_confirmed": {
+        "type": "integer",
+        "description": "Number of suppliers who clearly confirmed they received the purchase order referenced to them."
+      }
+    }
+  }
+}
