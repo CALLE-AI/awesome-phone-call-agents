@@ -1,0 +1,18 @@
+{
+  "purpose": "Confirm that the consenting tester can hear an accessibility message.",
+  "purpose_kind": "accessibility_test",
+  "phone": "+15555550100",
+  "recipient_source": "self",
+  "consent_basis": "self_test",
+  "ai_disclosure": "Hello, this is an automated AI test call.",
+  "timezone": "Asia/Seoul",
+  "allowed_window": {
+    "start_hour": 10,
+    "end_hour": 17
+  },
+  "max_attempts": 1,
+  "recording": false,
+  "retention_days": 0,
+  "locale": "en-US",
+  "region": "US"
+}

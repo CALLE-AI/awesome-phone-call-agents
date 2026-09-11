@@ -1,0 +1,247 @@
+# Safety boundaries for medical-adjacent phone workflows
+
+A phone agent asking a pharmacist about a medication sits close to several lines
+it must not cross. These rules are written for the pharmacy stock-check skill
+but apply to any health-adjacent calling workflow.
+
+---
+
+## The agent gathers information; it does not advise
+
+**In scope:** whether a named medication is in stock, how many units, price,
+whether a prescription is required, whether they will hold it, what the
+pharmacist said about alternatives.
+
+**Out of scope:** whether the user should take the medication, whether an
+alternative is equivalent, dosage guidance, interaction checks, or anything
+resembling clinical judgement.
+
+When a pharmacist suggests an alternative, report it as reported speech — *"the
+pharmacist mentioned they stock X"* — not as a recommendation. The distinction
+matters because a user acting on a substitute suggested by an automated system
+has been given advice nobody qualified reviewed.
+
+---
+
+## Never transact
+
+The agent does not order, reserve, pay for, or commit to collecting anything.
+"Can you hold it?" is a question. "Please hold it" is a commitment, and the
+agent is not authorised to make one.
+
+If a pharmacist offers to set stock aside, record the offer and its duration.
+Let the user decide.
+
+---
+
+## Not for emergencies
+
+A phone agent working through a list takes minutes per call. Someone who needs
+medication urgently should not be waiting on it.
+
+If the request suggests urgency — a missed critical dose, an acute reaction,
+distress — say plainly that this workflow is not appropriate and point toward
+emergency services or urgent care. Do not start calling.
+
+---
+
+## Prescription requirements are reported, never circumvented
+
+If a medication requires a prescription, that fact is part of the result. The
+agent must never suggest a way around it, ask a pharmacist to dispense without
+one, or imply the user has a prescription they have not confirmed.
+
+---
+
+## Uncertainty must survive to the user
+
+The user may travel somewhere while unwell on the strength of a result. That
+raises the cost of overconfidence well above the usual.
+
+- **Gate on completion before reporting anything.** A call that failed, hit
+  voicemail or was cut off can still carry a partially filled summary. If
+  `task_completed` isn't true and the run didn't reach `COMPLETED`, emit no
+  stock fields at all — report that the pharmacy could not be reached.
+- **Verification must outrank stock status in any ranking.** A low-confidence
+  "yes" appearing above a high-confidence "no" is the specific failure that
+  sends a sick person on a pointless journey. Rank verified results first,
+  then by stock.
+- Surface the confidence score. Do not average it away or hide it behind a tick.
+- Show low-confidence results as needing verification, not as facts.
+- Offer the transcript. Everything reported should be checkable against what was
+  actually said.
+- "Could not be reached" is a distinct outcome from "not in stock". Never
+  collapse them.
+
+## A dry run must not transmit anything
+
+If a workflow advertises a dry run, that has to mean nothing leaves the machine
+— no credentials read, no socket opened, no payload sent.
+
+Calling a planning or validation endpoint during a "dry run" transmits the
+recipient's phone number and, here, the medication someone is looking for. That
+is health-adjacent information about an identifiable person going to a third
+party, from a mode the user was told was inert. Validate and print locally
+instead.
+
+---
+
+## Privacy
+
+- Callers are told immediately that they are speaking to an automated
+  assistant.
+- Do not state the patient's name, condition, or any identifying detail to the
+  pharmacy. The medication and quantity are all that's needed.
+- Mask phone numbers in summaries and logs — pharmacy name plus last four
+  digits. This includes dry-run and debug output. Terminal text ends up in
+  shell scrollback, CI logs and screen recordings, none of which the person
+  whose number it is agreed to.
+
+- **The same applies to anything derived from the call.** It is easy to mask the
+  number you dialled and then print the conversation that number produced. A
+  provider's activity feed quotes speech as it happens; extracted fields like
+  "notes" and "alternative suggested" are lifted out of the same conversation.
+  A pharmacist who reads out a branch number has now put it in both.
+
+  Scrub free text on every output path, and withhold realtime speech unless the
+  operator asks for it. The pharmacist agreed to answer a question, not to have
+  their words logged.
+
+- **Redact by shape, not by field.** You cannot enumerate every field that might
+  contain a number, because the model decides what goes in them. Filter runs of
+  eight or more digits out of any free text on its way to a log or a terminal,
+  and leave prices, quantities and durations intact.
+- Transcripts contain a third party's voice. Store them under a retention policy
+  and do not publish them.
+
+---
+
+## Calling businesses responsibly
+
+- Identify as automated in the opening line, before asking anything. This is
+  both the ethical default and the practical one — it materially improves the
+  chance a pharmacist engages.
+- Keep calls short. A pharmacist is working.
+- One call per pharmacy per request. Retries are for no-answer, not for a
+  better answer.
+- Respect business hours for the recipient's region.
+- Accept "no" and end the call.
+
+---
+
+## No hidden recurring work
+
+This is a one-shot workflow. If a user wants a repeated check:
+
+- create the schedule explicitly, on request
+- state clearly how many calls it will place and how often
+- tell the user how to cancel, in the same message
+- never create a schedule as a side effect of a one-off request
+
+---
+
+## An uncertain call must never be retried automatically
+
+If a request to place a call was sent and the response was lost — a timeout, a
+crash, a dropped connection — you do not know whether the phone rang.
+
+Retrying is not the safe default. The safe default is to stop and say so. A
+duplicate call to a pharmacist costs money, wastes their time, and in a
+health-adjacent context looks like a malfunctioning system contacting a
+business repeatedly about a patient.
+
+Record the "about to dial" state *before* sending the request, so a lost
+response is distinguishable from a request that was never sent. Clearing that
+state requires a human deciding what happened — check the provider's dashboard,
+then either record the run or release the entry deliberately.
+
+The same reasoning applies to concurrency. Two processes that both read "no
+call in progress" will both dial. Claims must be atomic and locked, not
+best-effort.
+
+A file lock is necessary but not sufficient. Two coroutines inside one process
+share a pid, so a pid-based ownership check passes for both — and a batch that
+dispatches rows concurrently will dial a duplicated recipient twice. Track
+in-flight recipients in-process as well, and collapse duplicate rows before
+dispatch.
+
+## Credentials and recordings are owner-only
+
+Two kinds of file here are more sensitive than they look:
+
+- **The run ledger** holds confirmation tokens that authorise placing a call.
+- **Terminal run dumps** hold the full transcript of a conversation with a
+  third party who agreed to talk to an assistant, not to have their words
+  stored where anyone on the machine can read them.
+
+Write both with mode 0600, into a dedicated directory rather than the working
+directory, and add that directory to `.gitignore`.
+
+The two protections do different jobs and neither substitutes for the other.
+0600 stops other accounts on the machine reading a transcript. Ignoring stops
+the file reaching a public repository, which is the failure that actually
+happens — a token in a public repo is a token in a public repo, however
+short-lived, and permissions are irrelevant once it's pushed.
+
+## Authenticate as the account you meant to
+
+Credential caches accumulate: a second account, a different environment, a
+stale login. Picking one by sort order works right up until it doesn't, and the
+failure is silent — calls placed from the wrong number, billed to the wrong
+balance, attributed to the wrong party.
+
+Bind the token to the endpoint being called. If the correct one cannot be
+determined, stop and ask. Guessing which identity to act as is not a recoverable
+error once the phone has rung.
+
+A single cache is not self-evidently the right one. "There's only one" says
+nothing about which provider issued it — and a bearer token sent to an origin it
+wasn't issued for is a working credential handed to a stranger. That failure is
+quieter and worse than a call placed from the wrong account: nothing visibly
+goes wrong, and the disclosure has already happened.
+
+## Exclusion and reconciliation are different questions
+
+Recording "a call to this number about this thing is in progress" involves two
+questions that look like one, and answering them with a single key is a bug in
+whichever direction you resolve it.
+
+**"Should I dial this person?"** must be answered on recipient and purpose
+alone. Any configuration you add to that key — endpoint, account, region —
+becomes a way to make a live call invisible. Change the value, the key changes,
+the pending entry isn't found, and someone already on the phone gets rung again.
+
+**"Can I resume this plan?"** needs the whole configuration, because a plan or
+run id issued by one provider under one account means nothing under another.
+
+So the claim is coarse and the attempt is specific, nested beneath it. When the
+stored attempt doesn't match the current configuration, the safe action is
+neither: don't resume something you can't act on, and don't redial someone whose
+earlier call may still be running. Stop and surface it.
+
+Version the store. When claim keys change, previously written entries won't
+match anything you now compute, and an unmatched in-flight call reads as "never
+started".
+
+## Know whose call it is
+
+Namespacing on a credential cache directory is not the same as knowing the
+account. If the provider derives that directory from the server URL — CALL-E
+does — then re-authenticating as someone else on the same endpoint reuses it,
+and one account's unfinished run can be resumed with another's credentials.
+
+Derive identity from the account: an id recorded alongside the credential, or
+the subject claim of a token. If it cannot be established, unfinished state
+cannot be confirmed as yours. Fail closed on reconciliation rather than assuming
+— resuming a stranger's run, or redialling on the assumption that no call
+exists, are both worse than stopping.
+
+## Cost is a safety property
+
+Calls cost money and free allowances are small. A workflow that silently spends
+a user's balance has harmed them.
+
+- Count phones, not plans — one batch can spend N calls.
+- Check the budget for the whole request before dialling anything.
+- Default to dry-run; require an explicit flag for live calls.
+- Never re-dial to recover data already paid for.

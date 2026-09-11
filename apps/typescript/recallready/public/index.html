@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>RecallReady</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="RecallReady home">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <span>RecallReady</span>
+      </a>
+      <div class="mode"><span class="pulse"></span><span id="mode-label">Checking runtime…</span></div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <p class="eyebrow">PUBLIC RECALL DATA → ONE SAFE PHONE CALL → A CLEAR NEXT STEP</p>
+        <h1>A recall notice is only useful when you know <em>your item</em> qualifies.</h1>
+        <p class="lede">RecallReady finds the official record, previews exactly what an automated assistant will ask, and uses CALL‑E to turn a confusing hotline conversation into a structured remedy plan.</p>
+        <div class="trust-row">
+          <span>Official public records</span><span>Dry-run by default</span><span>No account or payment data</span><span>Human handoff for ambiguity</span>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="Recall verification workflow">
+        <nav class="steps" aria-label="Progress">
+          <button class="step active" data-step="1"><b>1</b><span>Find recall</span></button>
+          <button class="step" data-step="2"><b>2</b><span>Match item</span></button>
+          <button class="step" data-step="3"><b>3</b><span>Approve call</span></button>
+          <button class="step" data-step="4"><b>4</b><span>Remedy plan</span></button>
+        </nav>
+
+        <div class="panel" id="search-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">STEP 1</p><h2>Search official recall records</h2></div>
+            <span class="source-chip">Public U.S. recall API</span>
+          </div>
+          <form id="search-form" class="search-form">
+            <label for="query">Product type, brand, or name</label>
+            <div class="search-row">
+              <input id="query" name="query" autocomplete="off" placeholder="Try toddler tower, dresser, hand warmer…" value="toddler tower" />
+              <button class="primary" type="submit">Search recalls</button>
+            </div>
+          </form>
+          <p id="search-status" class="status" role="status"></p>
+          <div id="results" class="results"></div>
+        </div>
+
+        <div class="panel hidden" id="match-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">STEP 2</p><h2>Match the item without sharing private data</h2></div>
+            <button class="quiet" id="change-recall" type="button">Change recall</button>
+          </div>
+          <article id="selected-recall" class="selected"></article>
+          <form id="preview-form" class="form-grid">
+            <label>Model or exact product identifier<input id="model-number" required maxlength="60" placeholder="Printed on the product label" /></label>
+            <label>Date or batch code <span>(optional)</span><input id="date-code" maxlength="40" placeholder="Only if it is non-sensitive" /></label>
+            <fieldset>
+              <legend>Authorized demo route <span>(optional)</span></legend>
+              <p>For a safe contest demo, use a number you own or have explicit permission to call. It stays in server memory and is shown only masked.</p>
+              <label>Authorized test number<input id="demo-phone" inputmode="tel" autocomplete="off" placeholder="E.164 or U.S. number" /></label>
+              <label class="check"><input id="demo-consent" type="checkbox" /><span>I own this number or have explicit permission for this one test call.</span></label>
+            </fieldset>
+            <button class="primary" type="submit">Build call preview</button>
+          </form>
+          <p id="preview-status" class="status" role="status"></p>
+        </div>
+
+        <div class="panel hidden" id="approve-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">STEP 3</p><h2>Inspect before anything rings</h2></div>
+            <span class="source-chip caution">Single-use preview</span>
+          </div>
+          <div id="preview-card" class="preview-card"></div>
+          <div class="approval-box">
+            <p><strong>No hidden side effect.</strong> Mock mode never places a call. Live mode exists only when the server operator explicitly enables it and the user types the approval phrase.</p>
+            <label>Approval phrase<input id="approval-phrase" autocomplete="off" placeholder="CALL NOW" /></label>
+            <div class="button-row">
+              <button class="secondary" id="run-mock" type="button">Run safe mock</button>
+              <button class="primary" id="run-live" type="button">Place one CALL‑E call</button>
+            </div>
+          </div>
+          <p id="call-status" class="status" role="status"></p>
+        </div>
+
+        <div class="panel hidden" id="result-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">STEP 4</p><h2>A remedy plan—not a transcript dump</h2></div>
+            <span id="result-provider" class="source-chip"></span>
+          </div>
+          <div id="result-card" class="result-card"></div>
+          <button class="secondary" id="start-over" type="button">Check another item</button>
+        </div>
+      </section>
+
+      <section class="architecture">
+        <div><p class="kicker">WHY PHONE?</p><h2>The public record says what was recalled. The hotline resolves whether this exact item qualifies.</h2></div>
+        <ol>
+          <li><b>Ground</b><span>Fetch the authoritative model, hazard, remedy, and published contact.</span></li>
+          <li><b>Constrain</b><span>Preview a minimum-data script and refuse purchases, sensitive data, or safety claims.</span></li>
+          <li><b>Call</b><span>CALL‑E discloses automation and asks only the unanswered qualification questions.</span></li>
+          <li><b>Structure</b><span>Return eligibility, remedy, proof, deadline, confidence, and a safe next step.</span></li>
+        </ol>
+      </section>
+    </main>
+    <footer>RecallReady is not an emergency, medical, legal, or product-safety authority. Follow the official recall notice and manufacturer instructions.</footer>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

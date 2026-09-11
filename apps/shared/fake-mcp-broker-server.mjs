@@ -75,6 +75,7 @@ function normalizeOptions(options = {}) {
     noResources: Boolean(options.noResources),
     unauthorizedMcp: Boolean(options.unauthorizedMcp),
     brokerPendingFirst: Boolean(options.brokerPendingFirst),
+    statelessMcp: Boolean(options.statelessMcp),
   };
 }
 
@@ -166,11 +167,13 @@ export async function startFakeServer(options = {}) {
             },
           },
         },
-        {
-          headers: {
-            "mcp-session-id": MCP_SESSION_ID,
-          },
-        }
+        opts.statelessMcp
+          ? {}
+          : {
+              headers: {
+                "mcp-session-id": MCP_SESSION_ID,
+              },
+            }
       );
       return;
     }
@@ -181,7 +184,7 @@ export async function startFakeServer(options = {}) {
       return;
     }
 
-    if (req.headers["mcp-session-id"] !== MCP_SESSION_ID) {
+    if (!opts.statelessMcp && req.headers["mcp-session-id"] !== MCP_SESSION_ID) {
       jsonResponse(
         res,
         {

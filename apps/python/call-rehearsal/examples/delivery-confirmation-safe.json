@@ -1,0 +1,52 @@
+{
+  "name": "delivery-confirmation (after)",
+  "task": "You are calling on behalf of Northwind Logistics about tomorrow's delivery. First confirm you are speaking with the account holder; if the person who answers is someone else, do not discuss the order and end the call politely. Ask whether now is a good time before continuing, and stop if they decline. Ask whether the customer wants to keep the 09:00 to 12:00 window. If they want to decide later, offer to call back and record when. If voicemail or an answering machine picks up, leave no order details and end the call.",
+  "result_schema": {
+    "type": "object",
+    "properties": {
+      "call_status": {
+        "type": "string",
+        "description": "How the call ended: answered, voicemail, no_answer or line_busy."
+      },
+      "identity_verified": {
+        "type": "boolean",
+        "description": "Whether the account holder was confirmed to be on the line."
+      },
+      "consent_given": {
+        "type": "boolean",
+        "description": "Whether the callee agreed to continue with the call."
+      },
+      "confirmed": {
+        "type": "boolean",
+        "description": "Whether the account holder confirmed the delivery window."
+      },
+      "callback_requested": {
+        "type": "boolean",
+        "description": "Whether the callee asked to be called back instead of deciding now."
+      },
+      "notes": {
+        "type": "string",
+        "description": "Anything else the customer mentioned."
+      }
+    },
+    "required": ["call_status"]
+  },
+  "fields": {
+    "decision": "confirmed",
+    "reachability": "call_status",
+    "consent": "consent_given",
+    "identity": "identity_verified",
+    "deferral": "callback_requested"
+  },
+  "decision_rule": {
+    "expression": "confirmed == true and identity_verified == true and consent_given == true",
+    "on_true": {
+      "action": "dispatch the courier",
+      "side_effect": true
+    },
+    "on_false": {
+      "action": "hold the order and re-contact the customer",
+      "side_effect": false
+    }
+  }
+}

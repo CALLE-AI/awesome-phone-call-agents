@@ -1,0 +1,25 @@
+{
+  "schema_version": "2.0",
+  "approval_digest": "sha256:c4c1c83a935c6a372ebd7391e83a554bc9ee84b5c53a24f823bf3eed7d40842a",
+  "idempotency_key": "scope-signal:c4c1c83a935c6a372ebd7391e83a554b",
+  "status": "COMPLETED",
+  "run_id": "run-fictional-refusal",
+  "transcript": [
+    {"speaker": "callee", "text": "I am Casey Park, but I refuse to verify this project brief. Please do not call again."}
+  ],
+  "result": {
+    "contact_identity": {"value": "Casey Park", "quote": "I am Casey Park"},
+    "contact_role": {"value": "unknown", "quote": ""},
+    "decision_authority": {"value": "unknown", "quote": ""},
+    "deliverables": {"value": "unknown", "quote": ""},
+    "exclusions": {"value": "unknown", "quote": ""},
+    "budget_range_currency": {"value": "unknown", "quote": ""},
+    "payment_method": {"value": "unknown", "quote": ""},
+    "funding_or_deposit_status": {"value": "unknown", "quote": ""},
+    "payment_timing": {"value": "unknown", "quote": ""},
+    "deadline_timezone": {"value": "unknown", "quote": ""},
+    "access_prerequisites": {"value": "unknown", "quote": ""},
+    "acceptance_criteria": {"value": "unknown", "quote": ""},
+    "unresolved_risks": {"value": "unknown", "quote": ""}
+  }
+}

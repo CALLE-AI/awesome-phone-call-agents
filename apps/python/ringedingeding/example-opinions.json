@@ -1,0 +1,82 @@
+{
+  "_note": "Fictional data. The numbers are in the +1 555-0100..555-0199 range, which is reserved for fiction and belongs to nobody.",
+  "kind": "opinion",
+  "question": "Which caterer should we book for the summer party?",
+  "participants": [
+    {
+      "id": "ana",
+      "name": "Ana",
+      "phone": "+15550100101"
+    },
+    {
+      "id": "ben",
+      "name": "Ben",
+      "phone": "+15550100102"
+    },
+    {
+      "id": "cleo",
+      "name": "Cleo",
+      "phone": "+15550100103"
+    },
+    {
+      "id": "dara",
+      "name": "Dara",
+      "phone": "+15550100104"
+    },
+    {
+      "id": "emil",
+      "name": "Emil",
+      "phone": "+15550100105"
+    },
+    {
+      "id": "fay",
+      "name": "Fay",
+      "phone": "+15550100106"
+    }
+  ],
+  "answers": [
+    {
+      "participant_id": "ana",
+      "status": "completed",
+      "raw": "Green Table, definitely -- as long as they do the vegan option.",
+      "choice": "Green Table",
+      "conditions": [
+        "only if the vegan option is included"
+      ],
+      "reason": "They did the spring event and it went well."
+    },
+    {
+      "participant_id": "ben",
+      "status": "completed",
+      "raw": "I would say Hearth and Co. Their prices are more predictable.",
+      "choice": "Hearth and Co",
+      "reason": "Prices are more predictable."
+    },
+    {
+      "participant_id": "cleo",
+      "status": "completed",
+      "raw": "Green Table.",
+      "choice": "Green Table"
+    },
+    {
+      "participant_id": "dara",
+      "status": "completed",
+      "raw": "Hearth and Co, but only if they can come before six.",
+      "choice": "Hearth and Co",
+      "conditions": [
+        "only if they can set up before six"
+      ]
+    },
+    {
+      "participant_id": "emil",
+      "status": "completed",
+      "raw": "Honestly, I do not mind either way. You decide.",
+      "abstained": true
+    },
+    {
+      "participant_id": "fay",
+      "status": "busy",
+      "raw": ""
+    }
+  ]
+}

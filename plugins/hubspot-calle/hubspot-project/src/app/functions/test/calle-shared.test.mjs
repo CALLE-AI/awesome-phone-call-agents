@@ -293,7 +293,7 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
     request = { url, options };
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
     };
   };
 
@@ -326,6 +326,40 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
         portal_id: "12345",
       },
     });
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+  }
+});
+
+test("rejects a successful CALL-E response that is not a documented call task", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  global.fetch = async () => ({
+    ok: true,
+    status: 201,
+    text: async () => JSON.stringify({
+      id: "job_123",
+      object: "call_task",
+      status: "queued",
+    }),
+  });
+
+  try {
+    await assert.rejects(
+      () => createCallECall({
+        phone: "+15555550123",
+        task: "Confirm demo request.",
+        metadata: {},
+        idempotencyKey: "request-1",
+      }),
+      /documented CallTask response/,
+    );
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
@@ -396,8 +430,9 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
     return {
       ok: true,
       text: async () => JSON.stringify({
-        id: "call_123-+15555550123",
-        status: "queued for +15555550123",
+        id: "call_123",
+        object: "call_task",
+        status: "queued",
       }),
     };
   };
@@ -420,8 +455,8 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body.outputFields, {
-      call_id: "call_123-[phone]",
-      status: "queued for [phone]",
+      call_id: "call_123",
+      status: "queued",
       masked_phone: "[phone]",
       error: "",
     });
@@ -501,7 +536,7 @@ test("workflow handler fails closed unless consent and DNC are explicit", async 
     fetchCalls += 1;
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
     };
   };
 
@@ -629,8 +664,9 @@ test("card handler starts a CALL-E call from the current CRM record without HubS
     return {
       ok: true,
       text: async () => JSON.stringify({
-        id: "call_123-+15555550123",
-        status: "queued for +15555550123",
+        id: "call_123",
+        object: "call_task",
+        status: "queued",
       }),
     };
   };
@@ -653,8 +689,8 @@ test("card handler starts a CALL-E call from the current CRM record without HubS
     assert.deepEqual(response.body, {
       retry_same_intent: false,
       success: true,
-      call_id: "call_123-[phone]",
-      status: "queued for [phone]",
+      call_id: "call_123",
+      status: "queued",
       masked_phone: "[phone]",
       error: "",
     });
@@ -752,7 +788,7 @@ test("card handler trusts accountId and selected Contact propertiesToSend value"
     requests.push({ url: String(url), options });
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
     };
   };
 
@@ -803,7 +839,7 @@ test("card handler keeps idempotency stable per intent and distinct across inten
     idempotencyKeys.push(options.headers["idempotency-key"]);
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
     };
   };
 
@@ -850,7 +886,7 @@ test("card handler uses official private context without a HubSpot CRM fetch", a
     requests.push({ url: String(url), options });
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
     };
   };
 

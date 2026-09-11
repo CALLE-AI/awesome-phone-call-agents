@@ -1,0 +1,73 @@
+{
+  "drive_id": "drive-a1b2c3d4e5f6",
+  "operator_has_authorized_calls": true,
+  "operator_authorized_at": "2026-08-01T10:00:00Z",
+  "authorization_valid_until": "2026-08-01T13:00:00Z",
+  "donors": [
+    {
+      "id": "harbor-bakery",
+      "display_name": "Harbor Bakery",
+      "phone": "+12025550142",
+      "region": "US",
+      "locale": "en-US",
+      "pledge_ref": "PLEDGE-104",
+      "food_category": "baked goods",
+      "expected_units": 24,
+      "unit_name": "trays",
+      "expected_storage_mode": "ambient",
+      "automated_call_opt_in_confirmed": true,
+      "opt_in_recorded_at": "2026-07-30T09:00:00Z",
+      "opt_in_valid_until": "2026-08-01T13:00:00Z"
+    },
+    {
+      "id": "market-kitchen",
+      "display_name": "Market Kitchen",
+      "phone": "+12025550171",
+      "region": "US",
+      "locale": "en-US",
+      "pledge_ref": "PLEDGE-208",
+      "food_category": "prepared meals",
+      "expected_units": 12,
+      "unit_name": "crates",
+      "expected_storage_mode": "chilled",
+      "automated_call_opt_in_confirmed": true,
+      "opt_in_recorded_at": "2026-07-30T09:15:00Z",
+      "opt_in_valid_until": "2026-08-01T13:00:00Z"
+    },
+    {
+      "id": "garden-grocer",
+      "display_name": "Garden Grocer",
+      "phone": "+12025550196",
+      "region": "US",
+      "locale": "en-US",
+      "pledge_ref": "PLEDGE-319",
+      "food_category": "fresh produce",
+      "expected_units": 18,
+      "unit_name": "boxes",
+      "expected_storage_mode": "ambient",
+      "automated_call_opt_in_confirmed": true,
+      "opt_in_recorded_at": "2026-07-30T09:30:00Z",
+      "opt_in_valid_until": "2026-08-01T13:00:00Z"
+    }
+  ],
+  "pickup_slots": [
+    {
+      "id": "slot-early",
+      "starts_at": "2026-08-01T14:00:00Z",
+      "ends_at": "2026-08-01T15:00:00Z"
+    },
+    {
+      "id": "slot-late",
+      "starts_at": "2026-08-01T16:00:00Z",
+      "ends_at": "2026-08-01T17:00:00Z"
+    }
+  ],
+  "policy": {
+    "max_calls": 3,
+    "do_not_leave_voicemail": true,
+    "require_ai_disclosure": true,
+    "require_human_dispatch_review": true,
+    "call_window_start": "2026-08-01T12:00:00Z",
+    "call_window_end": "2026-08-01T13:00:00Z"
+  }
+}

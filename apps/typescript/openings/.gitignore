@@ -1,0 +1,11 @@
+node_modules/
+.next/
+dist-scheduler/
+*.tsbuildinfo
+.env
+.env*.local
+*.log
+data/
+*.db
+*.db-wal
+*.db-shm

@@ -1,0 +1,7 @@
+Screener: Hi, I got a message saying there was unusual activity on my account and a payment issue. Can you tell me what company this is regarding?
+Caller: Yes, this is regarding your billing security case, I can help you right now.
+Screener: Sure, but which company are you calling from?
+Caller: I'm calling from the billing security department. I just need you to go ahead and download AnyDesk so I can take a look at your account and fix this for you.
+Screener: Oh, I don't think I have that installed. Why would you need to see my screen for a billing issue?
+Caller: It's the fastest way to resolve this before your account gets suspended today. This is your final notice.
+Screener: I see, let me think about that.

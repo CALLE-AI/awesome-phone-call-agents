@@ -4,6 +4,15 @@ Thanks for contributing to Awesome Phone Call Agents.
 
 This repository collects portable phone-call Agent Skills, apps, provider adapters, scheduler recipes, automation patterns, and safety references for AI agents.
 
+## How contributions are reviewed
+
+We welcome small experimental examples and Hackathon demos. Follow the
+[community review and merge policy](docs/community-review-policy.md): a working
+fake/dry-run or manual verification path can be sufficient, production hardening is
+optional unless claimed, and only current Must Fix findings block merging. The policy
+also defines how synthetic examples, public project contacts, historical data, and
+author-reported evidence are assessed. Maintainers may help with small mechanical fixes.
+
 ## What belongs here
 
 Good contributions include:
@@ -44,11 +53,11 @@ Out of scope:
 Before opening a pull request, check that your contribution:
 
 - uses English-only repository-facing content
-- does not include secrets, tokens, private phone numbers, or personal data
+- does not expose secrets, tokens, private phone numbers, or third-party personal data; follow the review policy for synthetic examples and intentional public project contacts
 - clearly states what host or provider it supports
 - clearly describes side effects
 - has install or usage instructions
-- masks phone numbers in samples unless they are fictional reserved samples
+- masks real phone numbers in samples and prefers standards-reserved fictional numbers; clearly synthetic no-call fixtures are assessed under the review policy
 - includes cancellation or rollback behavior for recurring workflows
 - includes a dry-run, fake-server, or no-call path when it is runnable code
 - passes repository validation
@@ -93,17 +102,17 @@ python3 scripts/create_branch.py docs/git-naming-conventions
 
 ## Skill folder requirements
 
-A skill should be a directory with a required `SKILL.md` file.
-
-Recommended structure:
+Every skill must include these files to pass repository validation:
 
 ```text
 skills/example-skill/
 ├── SKILL.md
-├── references/
-├── scripts/
-└── assets/
+└── references/
+    ├── safety.md
+    └── examples.md
 ```
+
+Use `references/safety.md` for the workflow's safety rules and `references/examples.md` for usage examples. Additional reference files, `scripts/`, and `assets/` are optional; include them when the skill needs them.
 
 The frontmatter should include at least:
 

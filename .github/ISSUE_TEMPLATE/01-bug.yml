@@ -1,0 +1,97 @@
+name: Bug report
+description: Report reproducible unexpected behavior in CALL-E or this community repository.
+type: Bug
+labels:
+  - "status:needs-triage"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem.
+
+        Do not include API keys, OAuth tokens, confirmation tokens, private phone numbers,
+        personal data, call recordings, or private transcripts. Mask identifiers whenever
+        the exact value is not required for maintainers to correlate the report.
+
+        For a vulnerability or privacy exposure, follow the repository Security Policy
+        and provide only minimal public details.
+
+  - type: dropdown
+    id: affected_surface
+    attributes:
+      label: Affected surface
+      options:
+        - Developer API / SDK / Webhooks
+        - Goals / Goal Runs
+        - MCP / CLI
+        - Dashboard / Chat
+        - Calling / Routing
+        - Voice / Speech
+        - Billing / Account
+        - Documentation
+        - Community repository
+        - Other / Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Production or test, region, locale, package/API version, OS, and host where relevant.
+      placeholder: "Production; region IN; locale en-IN; API v0.6.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: State the broken behavior in one concise paragraph.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest safe sequence that reproduces the problem. Use redacted identifiers.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain whether this blocks use, creates incorrect data, causes cost, or creates real-world risk.
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Sanitized references
+      description: Add public docs, redacted request/response examples, or identifiers maintainers can inspect privately.
+
+  - type: checkboxes
+    id: privacy_check
+    attributes:
+      label: Public-data check
+      options:
+        - label: I removed secrets, tokens, private phone numbers, personal data, recordings, and private transcripts.
+          required: true

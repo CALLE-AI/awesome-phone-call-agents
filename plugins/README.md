@@ -32,3 +32,4 @@ Each plugin should document:
 | [`n8n-calle-api`](n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
 | [`@call-e/n8n-nodes-calle`](n8n-nodes-calle/) | n8n | Community node package for creating, waiting on, retrieving, and listing events for CALL-E AI-agent phone-call tasks. |
 | [`hubspot-calle`](hubspot-calle/) | HubSpot | Private static app with a direct-call workflow action and two explicitly confirmed CRM record App Cards; it does not write CALL-E state back to HubSpot. |
+| [`zapier-calle`](zapier-calle/) | Zapier | Zapier Platform CLI integration that places a CALL-E call, waits for the outcome through a Zapier callback URL, and returns a fail-closed disposition with the transcript, summary, and structured result. |

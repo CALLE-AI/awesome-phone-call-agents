@@ -1,0 +1,23 @@
+app = "openings"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  OPENINGS_STORE = "sqlite"
+  OPENINGS_DB_PATH = "/data/openings.db"
+  OPENINGS_DISABLE_SCHEDULER = "0"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# SQLite needs a single machine: a shared persistent volume and no multi-replica
+# concurrency. Scale horizontally by splitting watches, not by replicas.
+[[mounts]]
+  source = "openings_data"
+  destination = "/data"

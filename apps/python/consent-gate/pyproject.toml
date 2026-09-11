@@ -1,0 +1,12 @@
+[project]
+name = "calle-consent-gate"
+version = "0.1.0"
+description = "Consent-first preflight and audit layer for CALL-E phone agents"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+live = ["calle-ai==0.2.0"]
+
+[project.scripts]
+consent-gate = "consent_gate.__main__:main"
+
