@@ -3,6 +3,16 @@ import "./App.css";
 
 const API_URL = "https://cliniccall-api.onrender.com";
 
+function maskPhoneNumber(phone) {
+  if (!phone) return "No phone number";
+
+  const value = String(phone);
+
+  if (value.length <= 4) return "••••";
+
+  return `${value.slice(0, 4)}•••••${value.slice(-4)}`;
+}
+
 function App() {
   const [started, setStarted] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
@@ -1013,8 +1023,7 @@ function App() {
                       </h3>
 
                       <p>
-                        {patient.phone_number ||
-                          "No phone number"}
+                        {maskPhoneNumber(patient.phone_number)}
                       </p>
                     </div>
 
@@ -1258,7 +1267,7 @@ function App() {
                       {patient.name ||
                         `Patient #${patient.id}`}
                       {patient.phone_number
-                        ? ` — ${patient.phone_number}`
+                        ? ` — ${maskPhoneNumber(patient.phone_number)}`
                         : ""}
                     </option>
                   ))}
