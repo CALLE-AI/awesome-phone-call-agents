@@ -1,0 +1,1189 @@
+openapi: 3.1.0
+info:
+  title: Muster API
+  version: 0.0.0
+  description: >-
+    Versioned foundation readiness and evidence-backed observation lifecycle contracts. Observation
+    exposure requires an injected organization-scoped authorizer and approved dependencies; this
+    document does not define tenant authentication or claim provider or device compatibility.
+servers:
+  - url: /
+paths:
+  /api/v1/system/health:
+    get:
+      operationId: getSystemHealth
+      summary: Read aggregate system readiness
+      description: >-
+        Performs bounded, read-only PostgreSQL and job-backend probes. The operation never enqueues
+        work and never exposes component, topology, credential, timing, or exception details.
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: All required foundation dependencies are ready.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SystemHealthResponse" }
+              examples:
+                ready:
+                  value: { status: ready }
+        "404":
+          description: The route is unavailable or access is concealed by policy.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              examples:
+                notFound:
+                  value:
+                    error:
+                      code: not_found
+                      message: Resource not found
+                      correlationId: 32af9cc5-3c5b-4219-bff1-68341bd3cb29
+        "503":
+          description: At least one required dependency is degraded or the readiness deadline elapsed.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SystemHealthResponse" }
+              examples:
+                degraded:
+                  value: { status: degraded }
+  /api/v1/endpoints/{endpointId}/observations:
+    post:
+      operationId: requestObservation
+      summary: Request an evidence-backed endpoint observation
+      description: >-
+        Establishes or replays one organization-scoped operation. A newly established request does
+        not imply provider-call or evidence-extraction completion. A matching replay reports the
+        database-established current stage and terminal outcome. SIMULATED provenance is explicit
+        and does not establish provider or hardware compatibility.
+      tags: [Observations]
+      security:
+        - ObservationAuthorization: []
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ObservationRequest" }
+            examples:
+              manualWindow:
+                value: { pollWindowId: poll_window_2026_08_06_16 }
+      responses:
+        "202":
+          description: >-
+            A newly established request does not imply provider-call or evidence-extraction
+            completion. A matching replay reports the database-established current stage and
+            terminal outcome, while the operation remains queryable.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ObservationAcceptedResponse" }
+              examples:
+                accepted:
+                  value:
+                    contractVersion: "1"
+                    operationId: operation_opaque
+                    statusUrl: /api/v1/observations/operation_opaque
+                    stage: scheduled
+                    terminalOutcome: null
+                    acceptedAt: 2026-08-06T16:00:00.000Z
+                replayed:
+                  value:
+                    contractVersion: "1"
+                    operationId: operation_opaque
+                    statusUrl: /api/v1/observations/operation_opaque
+                    stage: terminal
+                    terminalOutcome: observation_recorded
+                    acceptedAt: 2026-08-06T16:00:00.000Z
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/ConcealedNotFound"
+        "409":
+          description: The idempotency key conflicts or a safely established operation was blocked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              examples:
+                conflict:
+                  value:
+                    error:
+                      code: conflict
+                      message: Request conflict
+                      correlationId: 5c5df0e1-00d6-4018-982b-9dc247f5728c
+                blocked:
+                  value:
+                    error:
+                      code: conflict
+                      message: Request conflict
+                      correlationId: 6eaa3d64-a1d0-4e22-85f3-81c394ec983e
+        "500":
+          $ref: "#/components/responses/UnexpectedError"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /api/v1/observations/{operationId}:
+    get:
+      operationId: getObservationOperation
+      summary: Read an authorized observation operation
+      description: >-
+        Returns the durable attempt stage, opaque evidence metadata, and nullable derived
+        observation. Provider or evidence failure is terminal with observation null.
+      tags: [Observations]
+      security:
+        - ObservationAuthorization: []
+      parameters:
+        - $ref: "#/components/parameters/OperationId"
+      responses:
+        "200":
+          description: The authorized operation projection.
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ObservationOperationResponse" }
+              examples:
+                scheduled:
+                  $ref: "#/components/examples/ScheduledObservation"
+                calling:
+                  $ref: "#/components/examples/CallingObservation"
+                extracting:
+                  $ref: "#/components/examples/ExtractingObservation"
+                complete:
+                  $ref: "#/components/examples/CompleteObservation"
+                incomplete:
+                  $ref: "#/components/examples/IncompleteObservation"
+                unknown:
+                  $ref: "#/components/examples/UnknownObservation"
+                invalid:
+                  $ref: "#/components/examples/InvalidObservation"
+                blocked:
+                  $ref: "#/components/examples/BlockedObservation"
+                noAnswer:
+                  $ref: "#/components/examples/NoAnswerObservation"
+                busy:
+                  $ref: "#/components/examples/BusyObservation"
+                providerFailure:
+                  $ref: "#/components/examples/ProviderFailureObservation"
+                evidenceUnavailable:
+                  $ref: "#/components/examples/EvidenceUnavailableObservation"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/ConcealedNotFound"
+        "500":
+          $ref: "#/components/responses/UnexpectedError"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /api/v1/fleet:
+    get:
+      operationId: getFleetHealth
+      summary: Read authorized fleet health
+      description: >-
+        Returns the organization-scoped canonical fleet projection. Operational state and
+        freshness are server-derived; unavailable incident or scheduler evidence is never
+        represented as healthy.
+      tags: [Fleet]
+      security:
+        - FleetAuthorization: []
+      responses:
+        "200":
+          description: The authorized bounded fleet projection.
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            Pragma: { $ref: "#/components/headers/Pragma" }
+            Expires: { $ref: "#/components/headers/Expires" }
+            X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FleetHealthResponse" }
+              examples:
+                fleet:
+                  value:
+                    contractVersion: "1"
+                    generatedAt: 2026-08-08T16:00:00.000Z
+                    schedulerHeartbeat:
+                      status: unavailable
+                      observedAt: null
+                      checkOutcome: null
+                      evidenceKind: foundation_health_job_completion
+                    endpoints:
+                      - endpointId: endpoint_opaque
+                        siteDisplayName: North campus
+                        endpointDisplayName: Boiler room monitor
+                        provenance: SIMULATED
+                        operationalState: not_observed
+                        freshness:
+                          status: not_observed
+                          observedAt: null
+                          expiresAt: null
+                          windowSeconds: 900
+                        lastAttempt: null
+                        lastCompleteObservation: null
+                        activeManualOperation: null
+                        incident: { status: unavailable }
+        "404":
+          $ref: "#/components/responses/ConcealedNotFound"
+        "500":
+          $ref: "#/components/responses/UnexpectedError"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+components:
+  securitySchemes:
+    FleetAuthorization:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Opaque organization-scoped authorization interpreted only by the injected fleet authorizer.
+    ObservationAuthorization:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: >-
+        Opaque organization-scoped authorization interpreted only by the injected request
+        authorizer. No credential format or tenant authentication mechanism is defined here.
+  parameters:
+    EndpointId:
+      name: endpointId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/OpaqueIdentifier" }
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/OpaqueIdentifier" }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+  headers:
+    Location:
+      description: Authorized status resource for the repository-established operation.
+      schema:
+        type: string
+        pattern: "^/api/v1/observations/[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    RetryAfter:
+      description: Bounded polling or retry guidance in seconds; not a production SLO.
+      schema:
+        type: string
+        pattern: "^[1-9][0-9]?$"
+    CacheControl:
+      description: Prevents caching lifecycle and readiness results.
+      schema: { type: string, const: "no-store, max-age=0" }
+    Pragma:
+      description: Prevents caching through HTTP/1.0 intermediaries.
+      schema: { type: string, const: no-cache }
+    Expires:
+      description: Marks the response as already expired.
+      schema: { type: string, const: "0" }
+    ContentTypeOptions:
+      description: Prevents content-type sniffing.
+      schema: { type: string, const: nosniff }
+  responses:
+    ValidationError:
+      description: The path, header, or body shape is invalid.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        Pragma: { $ref: "#/components/headers/Pragma" }
+        Expires: { $ref: "#/components/headers/Expires" }
+        X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            validation:
+              value:
+                error:
+                  code: validation_error
+                  message: Request validation failed
+                  correlationId: c6cab9c0-9977-4d6b-89f2-735e496789ee
+    ConcealedNotFound:
+      description: The route, resource, or authorization is unavailable and concealed.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        Pragma: { $ref: "#/components/headers/Pragma" }
+        Expires: { $ref: "#/components/headers/Expires" }
+        X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            notFound:
+              value:
+                error:
+                  code: not_found
+                  message: Resource not found
+                  correlationId: 32af9cc5-3c5b-4219-bff1-68341bd3cb29
+    DependencyUnavailable:
+      description: An operation dependency is unavailable; no state is invented.
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        Pragma: { $ref: "#/components/headers/Pragma" }
+        Expires: { $ref: "#/components/headers/Expires" }
+        X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            unavailable:
+              value:
+                error:
+                  code: dependency_unavailable
+                  message: Service unavailable
+                  correlationId: 459eb7a3-1e9b-4b54-988c-5132777b2a18
+    UnexpectedError:
+      description: An unexpected failure was concealed behind the closed safe error contract.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        Pragma: { $ref: "#/components/headers/Pragma" }
+        Expires: { $ref: "#/components/headers/Expires" }
+        X-Content-Type-Options: { $ref: "#/components/headers/ContentTypeOptions" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          examples:
+            unexpected:
+              value:
+                error:
+                  code: unexpected_error
+                  message: Unexpected error
+                  correlationId: 9a8f3862-4c46-4b19-9a83-093af2788b12
+  schemas:
+    OpaqueIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    Rfc3339Timestamp:
+      type: string
+      format: date-time
+    SystemHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded]
+          description: Aggregate readiness without dependency detail.
+    ObservationRequest:
+      type: object
+      additionalProperties: false
+      required: [pollWindowId]
+      properties:
+        pollWindowId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+    ObservationAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, operationId, statusUrl, stage, terminalOutcome, acceptedAt]
+      properties:
+        contractVersion: { type: string, const: "1" }
+        operationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        statusUrl:
+          type: string
+          pattern: "^/api/v1/observations/[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        stage: { type: string, enum: [scheduled, calling, extracting, terminal] }
+        terminalOutcome:
+          type: [string, "null"]
+          enum:
+            [
+              observation_recorded,
+              blocked,
+              no_answer,
+              busy,
+              provider_failed,
+              evidence_unavailable,
+              null,
+            ]
+        acceptedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+    ObservationAttempt:
+      type: object
+      additionalProperties: false
+      required: [trigger, provenance, acceptedAt, retryable]
+      properties:
+        trigger: { type: string, enum: [manual, scheduled] }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        acceptedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        retryable: { type: [boolean, "null"] }
+    ObservationEvidenceMetadata:
+      type: object
+      additionalProperties: false
+      required: [evidenceId, revision, providerRunId, provenance, sourceCompleteness, retainedAt]
+      properties:
+        evidenceId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        revision: { type: integer, minimum: 1 }
+        providerRunId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        sourceCompleteness: { type: string, enum: [complete, truncated, unknown] }
+        retainedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+    ObservationReading:
+      type: object
+      additionalProperties: false
+      required:
+        - zoneId
+        - ordinal
+        - disposition
+        - value
+        - spokenUnit
+        - normalizedUnit
+        - confidenceToken
+        - confidenceSemanticsVersion
+        - evidenceId
+        - evidenceRevisionId
+        - providerRunId
+        - adapterVersionId
+        - extractorVersionId
+        - evidenceAnchorIds
+        - sourceCapturedAt
+        - derivedAt
+      properties:
+        zoneId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        ordinal: { type: integer, minimum: 0 }
+        disposition:
+          type: string
+          enum: [grounded, missing, ambiguous, contradictory, reviewed_not_applicable, invalid]
+        value: { type: [string, "null"], maxLength: 128 }
+        spokenUnit: { type: [string, "null"], maxLength: 64 }
+        normalizedUnit: { type: [string, "null"], maxLength: 64 }
+        confidenceToken: { type: [string, "null"], maxLength: 64 }
+        confidenceSemanticsVersion: { type: [string, "null"], maxLength: 64 }
+        evidenceId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        evidenceRevisionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        providerRunId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        adapterVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        extractorVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        evidenceAnchorIds:
+          type: array
+          maxItems: 64
+          items: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        sourceCapturedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        derivedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+    VersionedObservation:
+      type: object
+      additionalProperties: false
+      required:
+        - observationId
+        - version
+        - predecessorObservationId
+        - quality
+        - provenance
+        - adapterVersionId
+        - extractorVersionId
+        - reconciliationPolicyVersion
+        - evidenceId
+        - readings
+        - createdAt
+      properties:
+        observationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        version: { type: integer, minimum: 1 }
+        predecessorObservationId:
+          oneOf:
+            - { $ref: "#/components/schemas/OpaqueIdentifier" }
+            - { type: "null" }
+        quality: { type: string, enum: [complete, partial, unknown, invalid] }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        adapterVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        extractorVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        reconciliationPolicyVersion: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        evidenceId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        readings:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: "#/components/schemas/ObservationReading" }
+        createdAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+    ObservationOperationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - contractVersion
+        - operationId
+        - resourceVersion
+        - stage
+        - terminal
+        - lastTransitionAt
+        - latestRevisionAt
+        - attempt
+        - terminalOutcome
+        - evidence
+        - observation
+        - recommendedAction
+      properties:
+        contractVersion: { type: string, const: "1" }
+        operationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        resourceVersion: { type: integer, minimum: 1 }
+        stage: { type: string, enum: [scheduled, calling, extracting, terminal] }
+        terminal: { type: boolean }
+        lastTransitionAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        latestRevisionAt:
+          oneOf:
+            - { $ref: "#/components/schemas/Rfc3339Timestamp" }
+            - { type: "null" }
+        attempt: { $ref: "#/components/schemas/ObservationAttempt" }
+        terminalOutcome:
+          type: [string, "null"]
+          enum:
+            [
+              observation_recorded,
+              blocked,
+              no_answer,
+              busy,
+              provider_failed,
+              evidence_unavailable,
+              null,
+            ]
+        evidence:
+          oneOf:
+            - { $ref: "#/components/schemas/ObservationEvidenceMetadata" }
+            - { type: "null" }
+        observation:
+          type: [object, "null"]
+          oneOf:
+            - { $ref: "#/components/schemas/VersionedObservation" }
+            - { type: "null" }
+        recommendedAction:
+          type: string
+          enum: [poll, none, review_incomplete_evidence, create_new_request_after_remediation]
+    FleetOperationalState:
+      type: string
+      enum: [unreachable, observation_incomplete, stale, not_observed, normal_observed]
+    FleetFreshness:
+      type: object
+      additionalProperties: false
+      required: [status, observedAt, expiresAt, windowSeconds]
+      properties:
+        status: { type: string, enum: [current, stale, not_observed, unavailable] }
+        observedAt:
+          oneOf:
+            - { $ref: "#/components/schemas/Rfc3339Timestamp" }
+            - { type: "null" }
+        expiresAt:
+          oneOf:
+            - { $ref: "#/components/schemas/Rfc3339Timestamp" }
+            - { type: "null" }
+        windowSeconds: { type: [integer, "null"], minimum: 60, maximum: 2592000 }
+    FleetLastAttempt:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          operationId,
+          resourceVersion,
+          trigger,
+          provenance,
+          acceptedAt,
+          lastTransitionAt,
+          stage,
+          terminalOutcome,
+          retryable,
+          observationQuality,
+        ]
+      properties:
+        operationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        resourceVersion: { type: integer, minimum: 1 }
+        trigger: { type: string, enum: [manual, scheduled] }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        acceptedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        lastTransitionAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        stage: { type: string, enum: [scheduled, calling, extracting, terminal] }
+        terminalOutcome:
+          type: [string, "null"]
+          enum:
+            [
+              observation_recorded,
+              blocked,
+              no_answer,
+              busy,
+              provider_failed,
+              evidence_unavailable,
+              null,
+            ]
+        retryable: { type: [boolean, "null"] }
+        observationQuality:
+          { type: [string, "null"], enum: [complete, partial, unknown, invalid, null] }
+    FleetLastCompleteObservation:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          observationId,
+          operationId,
+          version,
+          observedAt,
+          completedAt,
+          provenance,
+          evidenceId,
+          adapterVersionId,
+          extractorVersionId,
+          reconciliationPolicyVersion,
+        ]
+      properties:
+        observationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        operationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        version: { type: integer, minimum: 1 }
+        observedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        completedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        evidenceId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        adapterVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        extractorVersionId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        reconciliationPolicyVersion: { $ref: "#/components/schemas/OpaqueIdentifier" }
+    FleetActiveManualOperation:
+      type: object
+      additionalProperties: false
+      required: [operationId, resourceVersion, stage, acceptedAt]
+      properties:
+        operationId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        resourceVersion: { type: integer, minimum: 1 }
+        stage: { type: string, enum: [scheduled, calling, extracting] }
+        acceptedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+    FleetIncidentNone:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: none }
+    FleetIncidentOpen:
+      type: object
+      additionalProperties: false
+      required: [status, incidentId, openedAt, displayLabel, detailPath]
+      properties:
+        status: { type: string, const: open }
+        incidentId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        openedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        displayLabel: { type: string, minLength: 1, maxLength: 160 }
+        detailPath:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 512,
+            pattern: "^/(?!/)[^\\x00-\\x1F\\x7F\\\\]*$",
+          }
+    FleetIncidentUnavailable:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: unavailable }
+    FleetIncident:
+      oneOf:
+        - { $ref: "#/components/schemas/FleetIncidentNone" }
+        - { $ref: "#/components/schemas/FleetIncidentOpen" }
+        - { $ref: "#/components/schemas/FleetIncidentUnavailable" }
+    FleetSchedulerHeartbeat:
+      type: object
+      additionalProperties: false
+      required: [status, observedAt, checkOutcome, evidenceKind]
+      properties:
+        status: { type: string, enum: [current, stale, missing, unavailable] }
+        observedAt:
+          oneOf:
+            - { $ref: "#/components/schemas/Rfc3339Timestamp" }
+            - { type: "null" }
+        checkOutcome: { type: [string, "null"], enum: [ready, degraded, null] }
+        evidenceKind: { type: string, const: foundation_health_job_completion }
+    FleetEndpoint:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          endpointId,
+          siteDisplayName,
+          endpointDisplayName,
+          provenance,
+          operationalState,
+          freshness,
+          lastAttempt,
+          lastCompleteObservation,
+          activeManualOperation,
+          incident,
+        ]
+      properties:
+        endpointId: { $ref: "#/components/schemas/OpaqueIdentifier" }
+        siteDisplayName: { type: [string, "null"], minLength: 1, maxLength: 160 }
+        endpointDisplayName: { type: [string, "null"], minLength: 1, maxLength: 160 }
+        provenance: { type: string, enum: [SIMULATED, PROVIDER_OBSERVED] }
+        operationalState: { $ref: "#/components/schemas/FleetOperationalState" }
+        freshness: { $ref: "#/components/schemas/FleetFreshness" }
+        lastAttempt:
+          oneOf:
+            - { $ref: "#/components/schemas/FleetLastAttempt" }
+            - { type: "null" }
+        lastCompleteObservation:
+          oneOf:
+            - { $ref: "#/components/schemas/FleetLastCompleteObservation" }
+            - { type: "null" }
+        activeManualOperation:
+          oneOf:
+            - { $ref: "#/components/schemas/FleetActiveManualOperation" }
+            - { type: "null" }
+        incident: { $ref: "#/components/schemas/FleetIncident" }
+    FleetHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, generatedAt, schedulerHeartbeat, endpoints]
+      properties:
+        contractVersion: { type: string, const: "1" }
+        generatedAt: { $ref: "#/components/schemas/Rfc3339Timestamp" }
+        schedulerHeartbeat: { $ref: "#/components/schemas/FleetSchedulerHeartbeat" }
+        endpoints:
+          type: array
+          maxItems: 500
+          items: { $ref: "#/components/schemas/FleetEndpoint" }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, correlationId]
+          properties:
+            code:
+              type: string
+              enum:
+                [
+                  validation_error,
+                  not_found,
+                  conflict,
+                  access_denied,
+                  dependency_unavailable,
+                  unexpected_error,
+                ]
+            message:
+              type: string
+              maxLength: 128
+            correlationId:
+              type: string
+              format: uuid
+  examples:
+    ScheduledObservation:
+      value: &scheduled
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 1
+        stage: scheduled
+        terminal: false
+        lastTransitionAt: 2026-08-06T16:00:00.000Z
+        latestRevisionAt: null
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: null
+        terminalOutcome: null
+        evidence: null
+        observation: null
+        recommendedAction: poll
+    CallingObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 2
+        stage: calling
+        terminal: false
+        lastTransitionAt: 2026-08-06T16:00:04.000Z
+        latestRevisionAt: null
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: null
+        terminalOutcome: null
+        evidence: null
+        observation: null
+        recommendedAction: poll
+    ExtractingObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 3
+        stage: extracting
+        terminal: false
+        lastTransitionAt: 2026-08-06T16:00:08.000Z
+        latestRevisionAt: 2026-08-06T16:00:08.000Z
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: null
+        terminalOutcome: null
+        evidence: &evidence
+          evidenceId: evidence_opaque
+          revision: 1
+          providerRunId: provider_run_opaque
+          provenance: SIMULATED
+          sourceCompleteness: complete
+          retainedAt: 2026-08-06T16:00:08.000Z
+        observation: null
+        recommendedAction: poll
+    CompleteObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 4
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:12.000Z
+        latestRevisionAt: 2026-08-06T16:00:12.000Z
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: false
+        terminalOutcome: observation_recorded
+        evidence: *evidence
+        observation:
+          observationId: observation_opaque
+          version: 1
+          predecessorObservationId: null
+          quality: complete
+          provenance: SIMULATED
+          adapterVersionId: adapter_version_opaque
+          extractorVersionId: extractor_version_opaque
+          reconciliationPolicyVersion: reconciliation_policy_v1
+          evidenceId: evidence_opaque
+          readings:
+            - zoneId: zone-01
+              ordinal: 0
+              disposition: grounded
+              value: "71"
+              spokenUnit: degrees fahrenheit
+              normalizedUnit: degF
+              confidenceToken: reviewed
+              confidenceSemanticsVersion: confidence_v1
+              evidenceId: evidence_opaque
+              evidenceRevisionId: provider_revision_opaque
+              providerRunId: provider_run_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: [anchor_opaque]
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+          createdAt: 2026-08-06T16:00:11.000Z
+        recommendedAction: none
+    IncompleteObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 4
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:12.000Z
+        latestRevisionAt: 2026-08-06T16:00:12.000Z
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: false
+        terminalOutcome: observation_recorded
+        evidence: *evidence
+        observation:
+          observationId: observation_incomplete_opaque
+          version: 1
+          predecessorObservationId: null
+          quality: partial
+          provenance: SIMULATED
+          adapterVersionId: adapter_version_opaque
+          extractorVersionId: extractor_version_opaque
+          reconciliationPolicyVersion: reconciliation_policy_v1
+          evidenceId: evidence_opaque
+          readings:
+            - zoneId: zone-01
+              ordinal: 0
+              disposition: grounded
+              value: "71"
+              spokenUnit: degrees fahrenheit
+              normalizedUnit: degF
+              confidenceToken: reviewed
+              confidenceSemanticsVersion: confidence_v1
+              evidenceId: evidence_opaque
+              evidenceRevisionId: provider_revision_opaque
+              providerRunId: provider_run_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: [anchor_partial_opaque]
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+            - zoneId: zone-02
+              ordinal: 1
+              disposition: missing
+              value: null
+              spokenUnit: null
+              normalizedUnit: null
+              confidenceToken: null
+              confidenceSemanticsVersion: null
+              evidenceId: evidence_opaque
+              evidenceRevisionId: provider_revision_opaque
+              providerRunId: provider_run_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: []
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+          createdAt: 2026-08-06T16:00:11.000Z
+        recommendedAction: review_incomplete_evidence
+    UnknownObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_unknown_opaque
+        resourceVersion: 4
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:12.000Z
+        latestRevisionAt: 2026-08-06T16:00:12.000Z
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: false
+        terminalOutcome: observation_recorded
+        evidence:
+          evidenceId: evidence_unknown_opaque
+          revision: 1
+          providerRunId: provider_run_unknown_opaque
+          provenance: SIMULATED
+          sourceCompleteness: unknown
+          retainedAt: 2026-08-06T16:00:08.000Z
+        observation:
+          observationId: observation_unknown_opaque
+          version: 1
+          predecessorObservationId: null
+          quality: unknown
+          provenance: SIMULATED
+          adapterVersionId: adapter_version_opaque
+          extractorVersionId: extractor_version_opaque
+          reconciliationPolicyVersion: reconciliation_policy_v1
+          evidenceId: evidence_unknown_opaque
+          readings:
+            - zoneId: zone-01
+              ordinal: 0
+              disposition: missing
+              value: null
+              spokenUnit: null
+              normalizedUnit: null
+              confidenceToken: null
+              confidenceSemanticsVersion: null
+              evidenceId: evidence_unknown_opaque
+              evidenceRevisionId: provider_revision_unknown_opaque
+              providerRunId: provider_run_unknown_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: []
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+            - zoneId: zone-02
+              ordinal: 1
+              disposition: ambiguous
+              value: null
+              spokenUnit: null
+              normalizedUnit: null
+              confidenceToken: null
+              confidenceSemanticsVersion: null
+              evidenceId: evidence_unknown_opaque
+              evidenceRevisionId: provider_revision_unknown_opaque
+              providerRunId: provider_run_unknown_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: [anchor_unknown_opaque]
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+          createdAt: 2026-08-06T16:00:11.000Z
+        recommendedAction: review_incomplete_evidence
+    InvalidObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_invalid_opaque
+        resourceVersion: 4
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:12.000Z
+        latestRevisionAt: 2026-08-06T16:00:12.000Z
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: false
+        terminalOutcome: observation_recorded
+        evidence:
+          evidenceId: evidence_invalid_opaque
+          revision: 1
+          providerRunId: provider_run_invalid_opaque
+          provenance: SIMULATED
+          sourceCompleteness: complete
+          retainedAt: 2026-08-06T16:00:08.000Z
+        observation:
+          observationId: observation_invalid_opaque
+          version: 1
+          predecessorObservationId: null
+          quality: invalid
+          provenance: SIMULATED
+          adapterVersionId: adapter_version_opaque
+          extractorVersionId: extractor_version_opaque
+          reconciliationPolicyVersion: reconciliation_policy_v1
+          evidenceId: evidence_invalid_opaque
+          readings:
+            - zoneId: zone-01
+              ordinal: 0
+              disposition: invalid
+              value: null
+              spokenUnit: null
+              normalizedUnit: null
+              confidenceToken: null
+              confidenceSemanticsVersion: null
+              evidenceId: evidence_invalid_opaque
+              evidenceRevisionId: provider_revision_invalid_opaque
+              providerRunId: provider_run_invalid_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: [anchor_invalid_opaque]
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+            - zoneId: zone-02
+              ordinal: 1
+              disposition: missing
+              value: null
+              spokenUnit: null
+              normalizedUnit: null
+              confidenceToken: null
+              confidenceSemanticsVersion: null
+              evidenceId: evidence_invalid_opaque
+              evidenceRevisionId: provider_revision_invalid_opaque
+              providerRunId: provider_run_invalid_opaque
+              adapterVersionId: adapter_version_opaque
+              extractorVersionId: extractor_version_opaque
+              evidenceAnchorIds: []
+              sourceCapturedAt: 2026-08-06T16:00:07.000Z
+              derivedAt: 2026-08-06T16:00:11.000Z
+          createdAt: 2026-08-06T16:00:11.000Z
+        recommendedAction: review_incomplete_evidence
+    BlockedObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 2
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:01.000Z
+        latestRevisionAt: null
+        terminalOutcome: blocked
+        attempt:
+          trigger: manual
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: false
+        evidence: null
+        observation: null
+        recommendedAction: create_new_request_after_remediation
+    NoAnswerObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_no_answer_opaque
+        resourceVersion: 3
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:11.000Z
+        latestRevisionAt: null
+        terminalOutcome: no_answer
+        attempt:
+          trigger: scheduled
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: true
+        evidence: null
+        observation: null
+        recommendedAction: create_new_request_after_remediation
+    BusyObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_busy_opaque
+        resourceVersion: 3
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:11.000Z
+        latestRevisionAt: null
+        terminalOutcome: busy
+        attempt:
+          trigger: scheduled
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: true
+        evidence: null
+        observation: null
+        recommendedAction: create_new_request_after_remediation
+    ProviderFailureObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_opaque
+        resourceVersion: 3
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:11.000Z
+        latestRevisionAt: null
+        terminalOutcome: provider_failed
+        attempt:
+          trigger: scheduled
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: true
+        evidence: null
+        observation: null
+        recommendedAction: create_new_request_after_remediation
+    EvidenceUnavailableObservation:
+      value:
+        contractVersion: "1"
+        operationId: operation_evidence_unavailable_opaque
+        resourceVersion: 3
+        stage: terminal
+        terminal: true
+        lastTransitionAt: 2026-08-06T16:00:11.000Z
+        latestRevisionAt: null
+        terminalOutcome: evidence_unavailable
+        attempt:
+          trigger: scheduled
+          provenance: SIMULATED
+          acceptedAt: 2026-08-06T16:00:00.000Z
+          retryable: true
+        evidence: null
+        observation: null
+        recommendedAction: create_new_request_after_remediation
