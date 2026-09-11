@@ -1,0 +1,30 @@
+{
+  "id": "evt_fixture_failed_001",
+  "type": "call.failed",
+  "created_at": "2026-01-15T11:00:00Z",
+  "data": {
+    "id": "call_fixture_failed_001",
+    "status": "failed",
+    "created_at": "2026-01-15T10:59:00Z",
+    "completed_at": "2026-01-15T11:00:00Z",
+    "task": "Synthetic privacy task for a failed fictional call.",
+    "summary": "Synthetic privacy summary for a failed fictional call.",
+    "evidence": [
+      "Synthetic privacy evidence for a failed fictional call."
+    ],
+    "transcript": [
+      {
+        "speaker": "assistant",
+        "text": "Synthetic private failed-call transcript."
+      }
+    ],
+    "recipient": {
+      "phone": "+12025550123"
+    },
+    "metadata": {
+      "workflow": "webhook-result-receiver",
+      "workflow_id": "workflow_fixture_failed"
+    },
+    "structured_result": null
+  }
+}

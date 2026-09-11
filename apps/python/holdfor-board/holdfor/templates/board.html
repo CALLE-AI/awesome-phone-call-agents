@@ -1,0 +1,295 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{%- if (in_flight or rebooking_in_flight) and not open_item %}
+{#- Only while a call is in progress, and never behind an open sheet: a reload would
+    empty the half-filled Release form in front of her to update a count behind it.
+    A settled board sits still, which matters on a recording and matters more to
+    somebody reading a row when it reloads underneath her. No script: this page has
+    none and does not need one to wait. #}
+<meta http-equiv="refresh" content="4">
+{%- endif %}
+<title>HoldFor board</title>
+{% include "_style.html" %}
+
+<div class="page">
+
+<h1>Review queue</h1>
+<p class="sub">Post-visit check-ins. Nothing is booked until someone here releases it.</p>
+
+{% if request.query_params.get("placed") %}
+<p class="banner" style="background:var(--ok-soft);border-left-color:var(--ok);color:var(--ok)">
+  {{ request.query_params.get("placed") }} check-in call{{ "" if request.query_params.get("placed") == "1" else "s" }} placed.
+</p>
+{% endif %}
+
+{% if request.query_params.get("refused") %}
+<p class="banner">
+  That call was not placed: <strong>{{ request.query_params.get("refused") }}</strong>.
+  {%- if request.query_params.get("refused") in ("accepted", "reserved") %}
+  One is already on its way to this Appointment, and one is all it gets.
+  {%- endif %}
+  {%- if request.query_params.get("refused") == "no_booking_line" %}
+  Set <code>HOLDFOR_BOOKING_LINE</code> to the practice's appointments number. There is
+  no default, on purpose.
+  {%- endif %}
+</p>
+{% endif %}
+
+{% if pinned_clock %}
+{#- Loud on purpose. This is the app being told what day it is, which is the same
+    lever the tests use, and which decides whose call may go out. It is the one thing
+    on this page that is not true of the world, so it says so where nobody reading the
+    board — or watching a recording of it — could miss it. #}
+<p class="banner pinned">
+  <strong>The clock is pinned.</strong> This board is judged against
+  <strong>{{ pinned_clock.strftime("%A %d %B, %H:%M") }}</strong>, not the real time.
+  Whose call is due is decided by that clock. Unset <code>HOLDFOR_NOW</code> and
+  restart to use the real one.
+</p>
+{% endif %}
+
+<div class="counts">
+  <div><b>{{ today }}</b><span>Called today</span></div>
+  <div class="quiet"><b>{{ auto_closed }}</b><span>Closed, nothing needed</span></div>
+  <div class="you"><b>{{ needs_review }}</b><span>Need you</span></div>
+  {%- if declined %}
+  <div class="you"><b>{{ declined }}</b><span>Refused the call</span></div>
+  {%- endif %}
+  {%- if not_reached %}
+  <div class="quiet"><b>{{ not_reached }}</b><span>Not reached</span></div>
+  {%- endif %}
+  {%- if booked %}
+  <div class="done"><b>{{ booked }}</b><span>Booked</span></div>
+  {%- endif %}
+  {%- if in_flight %}
+  <div class="ringing"><b>{{ in_flight|length }}</b><span>On the phone</span></div>
+  {%- endif %}
+  <div class="budget"><b>{{ live_calls }} <em>of 20</em></b><span>Live calls used</span></div>
+  {%- if awaiting_reconciliation %}
+  <div class="you"><b>{{ awaiting_reconciliation }}</b><span>Awaiting reconciliation</span></div>
+  {%- endif %}
+</div>
+
+{% if awaiting_reconciliation %}
+<p class="banner">
+  {{ awaiting_reconciliation }} call{{ "" if awaiting_reconciliation == 1 else "s" }}
+  submitted without a confirmed outcome. A person must check these against the provider
+  before anything is retried.
+</p>
+{% endif %}
+
+{% if in_flight %}
+<section class="ringing">
+  <h2>On the phone now &middot; {{ in_flight|length }}</h2>
+  <ul>
+    {% for row in in_flight %}
+    <li>
+      <span class="name">{{ row.first_name }} {{ row.surname }}</span>
+      <span class="num">{{ row.phone_masked }}</span>
+      <span class="chip live">{{ "ringing" if row.state == "accepted" else "dialling" }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="note">This page updates itself every few seconds. Nothing is written until
+  the call ends, and there is nothing here to press again.</p>
+</section>
+{% endif %}
+
+{% if due %}
+<section class="due">
+  <h2>Due today &middot; {{ due|length }} not yet called</h2>
+  <ul>
+    {% for row in due %}
+    <li{% if row.yours %} class="yours"{% endif %}>
+      <span class="name">{{ row.first_name }} {{ row.surname }}</span>
+      <span class="for">{{ row.appointment_type }}, seen {{ row.seen_on }}</span>
+      <span class="num">{{ row.phone_masked }}</span>
+      {%- if row.yours %}<span class="chip handset">your phone</span>{% endif %}
+      <details class="confirm compact">
+        <summary><span class="caret">&#9656;</span> Call</summary>
+        <div class="confirm-body{% if live %} spends{% endif %}">
+          {%- if live %}
+          <p><strong>This rings {{ row.phone_masked }} for real</strong>{% if row.yours %},
+            which is the phone in your hand{% endif %}.</p>
+          <p class="cost real">{{ live_calls }} of 20 used &middot; {{ 20 - live_calls }} left
+            &middot; this spends 1</p>
+          {%- else %}
+          <p>Fake provider: <strong>no call will be placed</strong>. One Review Item
+            from a stored transcript.</p>
+          <p class="cost free">nothing is spent</p>
+          {%- endif %}
+          <form method="post" action="/checkins/{{ row.appointment_id }}" style="margin-top:.8rem">
+            <button class="primary" type="submit">
+              {%- if live %}Yes, ring {{ row.first_name }}{% else %}Run this one{% endif %}</button>
+          </form>
+        </div>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <details class="confirm">
+    <summary><span class="caret">&#9656;</span> Place all {{ due|length }} at once</summary>
+    <div class="confirm-body{% if live %} spends{% endif %}">
+      {%- if live %}
+      <p><strong>This places {{ due|length }} real phone call{{ "" if due|length == 1 else "s" }}</strong>
+        to the numbers above.</p>
+      <p class="cost real">{{ live_calls }} of 20 used &middot; {{ 20 - live_calls }} left
+        &middot; this spends {{ due|length }}</p>
+      {%- else %}
+      <p>The fake provider is in use, so <strong>no call will be placed</strong>. Each
+        Appointment gets one Review Item from a stored transcript.</p>
+      <p class="cost free">0 of 20 used &middot; nothing is spent</p>
+      {%- endif %}
+      <form method="post" action="/checkins" style="margin-top:.9rem">
+        <button class="primary" type="submit">
+          {%- if live %}Yes, place {{ due|length }} call{{ "" if due|length == 1 else "s" }}
+          {%- else %}Run {{ due|length }} check-in{{ "" if due|length == 1 else "s" }}{% endif %}
+        </button>
+      </form>
+    </div>
+  </details>
+
+  {%- if due_without_consent %}
+  <p class="gated">
+    {{ due_without_consent }} more {{ "is" if due_without_consent == 1 else "are" }} due
+    today and {{ "is" if due_without_consent == 1 else "are" }} not listed: consent to
+    call was not given, so no call is placed and none can be from here.
+  </p>
+  {%- endif %}
+</section>
+{% endif %}
+
+{% if items %}
+<div class="scroll">
+<table>
+  <thead>
+  <tr>
+    <th>Patient</th><th>Seen for</th><th>Feeling</th><th>Medication</th>
+    <th>Wants seen</th><th>Their words</th><th>Why it is here</th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+  <tr{% if item.stop_condition %} class="flagged{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}"{% endif %}>
+    <td class="who"><a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a></td>
+    <td class="seen-for">{{ item.appointment_type }}<span class="stamp">{{ item.seen_on }}</span></td>
+    <td>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
+        {%- else %}<span class="chip unanswered">not answered</span>{% endif %}</td>
+    <td>{% if item.medication_ok %}<span class="chip med {{ item.medication_ok }}">{{ item.medication_ok.replace("_", " ") }}</span>
+        {%- else %}<span class="chip unanswered">not answered</span>{% endif %}</td>
+    <td>{% if item.wants_seen %}<span class="chip seen {{ item.wants_seen }}">{{ item.wants_seen }}</span>
+        {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+      {%- if item.when_easier and item.when_easier != "not_asked" %}<span class="stamp">{{ item.when_easier }}s easier</span>{% endif %}</td>
+    <td class="words">
+      {%- if item.carried_words_text %}
+      <q>{{ item.carried_words_text }}</q><span class="stamp">turn {{ item.carried_words_turn }}</span>
+      {%- else %}<span class="nothing">nothing carried</span>{% endif %}
+    </td>
+    <td>
+      {%- if item.stop_condition %}<span class="chip stopped{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}">stopped · {{ item.stop_reason.replace("_", " ") }}</span>
+      {%- else %}<span class="chip state">{{ item.status.replace("_", " ") }}</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">
+  {%- if today %}Nothing needs you. All {{ today }} of today's calls closed on their own.
+  {%- elif in_flight %}Nothing to read yet. The call above has not ended.
+  {%- else %}No calls yet today. Press Call on a row above, or run
+  <code>python -m holdfor run-due</code>.{% endif %}
+</p>
+{% endif %}
+
+{% if settled %}
+<details class="settled">
+  <summary><span class="caret">&#9656;</span> Settled today &middot; {{ settled|length }}</summary>
+  <ul>
+    {% for item in settled %}
+    <li>
+      <a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a>
+      <span class="for">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
+      <span class="chip state">{{ item.status.replace("_", " ") }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="note">None of these needs a person. Listed so the call can still be read:
+  a count on its own says how many rang, not a word of what was said.</p>
+</details>
+{% endif %}
+
+{% if awaiting_call %}
+<h2>Released, awaiting the call</h2>
+<p class="note" style="max-width:46rem;margin-bottom:1rem">
+  A named Reviewer authorised each of these. Nothing has been dialled yet and nothing
+  will be until somebody runs it. One Release grants one call: pressing Run twice reads
+  the call that happened rather than making another one.
+</p>
+<div class="scroll">
+<table>
+  <thead>
+  <tr>
+    <th>Patient</th><th>Envelope</th><th>Words that may be spoken</th>
+    <th>Released by</th><th></th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for item in awaiting_call %}
+  <tr>
+    <td class="who"><a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a></td>
+    <td class="seen-for">{{ item.earliest_date }} to {{ item.latest_date }}
+      <span class="stamp">{{ item.time_of_day }} &middot; {{ item.mode.replace("_", " ") }}
+        {%- if item.clinician %} &middot; {{ item.clinician }}{% endif %}</span></td>
+    <td class="words">
+      {%- if item.approved_words %}<q>{{ item.approved_words }}</q>
+      {%- else %}<span class="nothing">nothing will be spoken</span>{% endif %}
+    </td>
+    <td>{{ item.reviewer_name }}</td>
+    <td>
+      {%- if item.rebooking_state %}<span class="chip state">{{ "ringing" if item.rebooking_state in ("reserved", "accepted") else item.rebooking_state.replace("_", " ") }}</span>
+      {%- else %}
+      <details class="confirm compact">
+        <summary><span class="caret">&#9656;</span> Run</summary>
+        <div class="confirm-body{% if live %} spends{% endif %}">
+          {%- if live %}
+          <p><strong>This rings the practice's booking line for real.</strong></p>
+          <p class="cost real">{{ live_calls }} of 20 used &middot; {{ 20 - live_calls }} left
+            &middot; this spends 1</p>
+          {%- else %}
+          <p>Fake provider: <strong>no call will be placed</strong>.</p>
+          <p class="cost free">nothing is spent</p>
+          {%- endif %}
+          <form method="post" action="/releases/{{ item.release_id }}/run" style="margin-top:.8rem">
+            <button class="primary" type="submit">
+              {%- if live %}Yes, place the call{% else %}Run it{% endif %}</button>
+          </form>
+        </div>
+      </details>
+      {%- endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+</div>
+
+{% if open_item %}
+{#- Outside `.page` on purpose: a fixed overlay inside a contained ancestor is
+    positioned against that ancestor instead of the viewport. The scrim is a link, so
+    clicking away from the sheet closes it without a line of script. #}
+<a class="scrim" href="/" aria-label="Close"></a>
+<aside class="sheet" aria-label="{{ open_item.first_name }} {{ open_item.surname }}">
+  <div class="shutbar">
+    <span class="where">Review item</span>
+    <a class="shut" href="/">Close &times;</a>
+  </div>
+  {% with item = open_item %}{% include "_item.html" %}{% endwith %}
+</aside>
+{% endif %}

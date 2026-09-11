@@ -1,0 +1,23 @@
+# Runtime state written by scripts/pharmacy_search.py. None of it belongs in
+# version control.
+#
+# The run ledger holds confirm_tokens, which authorise placing a call.
+# The run dumps hold call transcripts — a third party's recorded voice.
+# Both are written 0600, but a file being unreadable to other users is no
+# protection against being committed.
+
+.pharmacy_runs.json
+.pharmacy_runs.json.lock
+.pharmacy_runs.json.corrupt.*
+.pharmacy_budget.json
+.pharmacy_budget.json.lock
+
+call_runs/
+run_*.json
+
+# Your real recipient list. Keep real numbers out of version control — copy
+# scripts/pharmacies.csv and edit the copy.
+pharmacies.local.csv
+
+__pycache__/
+*.pyc

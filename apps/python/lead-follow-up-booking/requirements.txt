@@ -1,0 +1,11 @@
+calle-ai
+flask
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+python-dotenv
+requests
+openpyxl
+phonenumbers
+tzdata

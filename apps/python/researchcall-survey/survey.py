@@ -11,9 +11,14 @@ almost every way of getting it wrong flatters the result:
   reading of what was said.
 * Treating withdrawal as a flag rather than a deletion leaves the person in the
   data they asked to leave.
+* Asking for consent before the call has said it is automated puts the decision in
+  the wrong order: a person cannot meaningfully consent to being interviewed by a
+  machine if nobody told them a machine was on the line.
 
-So three things are structural here rather than configurable:
+So four things are structural here rather than configurable:
 
+    disclosure   the call states that it is automated before it asks anything
+                 else, including for consent
     consent      no question is asked before explicit consent is recorded
     withdrawal   removes the identifier and the number, and drops the record out
                  of every later denominator
@@ -25,7 +30,9 @@ in configuration does not have a consent requirement.
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/ellmos-ai/researchcall
+https://github.com/ellmos-ai/researchcall, field-tested live against the
+real CALL-E service on 2026-08-11 and 2026-08-22 -- see its README's "How We
+Tested" section.
 """
 
 from __future__ import annotations
@@ -44,7 +51,19 @@ from typing import Any, Sequence
 # Locked ethics
 # --------------------------------------------------------------------------------------
 
+# ``ai_disclosure_before_consent`` comes first in this dict on purpose, and not
+# only because ``merge_ethics`` treats every locked rule the same afterwards: an
+# automated caller has to say what it is before it asks for anything, consent
+# included. Consent obtained from someone who was never told they were talking to
+# a machine is not informed consent -- it is a question asked in the wrong order.
+# Like every other entry here, a study file may add rules of its own but cannot
+# redefine this one; a survey whose disclosure can be switched off in
+# configuration does not have a disclosure requirement.
 LOCKED_ETHICS: dict[str, str] = {
+    "ai_disclosure_before_consent": (
+        "The call states, before anything else and before it asks for consent, "
+        "that an automated assistant is calling."
+    ),
     "explicit_consent_before_questions": (
         "No question is asked before the person has consented in this call."
     ),
@@ -180,6 +199,11 @@ class Disposition(str, Enum):
     BROKE_OFF = "broke_off"
     NO_ANSWER = "no_answer"
     BUSY = "busy"
+    # A mailbox pickup is not a person declining and not a person absent for a
+    # different, unknown reason -- it is its own outcome, and collapsing it into
+    # either loses exactly the distinction ``Report.reached`` exists to keep. It
+    # is therefore treated like ``NO_ANSWER``/``BUSY`` below: nobody was reached.
+    VOICEMAIL = "voicemail"
     INELIGIBLE = "ineligible"
     NOT_ATTEMPTED = "not_attempted"
 

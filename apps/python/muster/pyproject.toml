@@ -1,0 +1,16 @@
+[project]
+name = "muster"
+version = "0.1.0"
+description = "Proof-of-life attestation by phone: grades what one call established, and never concludes a death."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+muster = "muster.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

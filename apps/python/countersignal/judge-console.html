@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CounterSignal — Judge Console</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#141414;background:#f4f3ef}*{box-sizing:border-box}body{margin:0}.shell{max-width:1180px;margin:0 auto;padding:28px}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#6b6b63}.title{font-size:38px;line-height:1.03;margin:7px 0 8px;letter-spacing:-.04em}.sub{max-width:760px;color:#5d5d57;line-height:1.55}.badge{border:1px solid #c9c6bc;border-radius:999px;padding:9px 12px;font-size:12px;font-weight:750;background:#fff;white-space:nowrap}.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:18px;margin-top:24px}.card{background:#fff;border:1px solid #d9d6cc;border-radius:16px;padding:18px;box-shadow:0 1px 0 rgba(0,0,0,.03)}.card h2{margin:0 0 13px;font-size:15px}.hyp{font-size:23px;line-height:1.25;letter-spacing:-.02em;margin:3px 0 14px}.meta{display:flex;gap:8px;flex-wrap:wrap}.pill{font:650 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:7px 9px;border-radius:999px;background:#efeee9}.questions{margin:14px 0 0;padding-left:22px;color:#40403b}.questions li{margin:7px 0}.rule{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.rule div,.metric{border:1px solid #e4e1d8;border-radius:12px;padding:12px}.rule b,.metric b{display:block;font-size:22px;letter-spacing:-.03em}.rule span,.metric span{font-size:11px;color:#73736b}.decision{margin-top:12px;padding:16px;border-radius:12px;background:#171717;color:white}.decision .value{font-size:21px;font-weight:800;margin-top:4px}.decision .why{font-size:11px;color:#bbb;margin-top:6px;line-height:1.45}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:18px}.evidence{margin-top:18px}.row{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:center;border-top:1px solid #ece9e1;padding:12px 2px}.row:first-child{border-top:0}.kind{font-weight:750;font-size:12px}.quote{font-size:13px;color:#44443f}.state{font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button{appearance:none;border:1px solid #c9c6bc;background:#fff;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}button:hover{background:#f2f1ec}.danger{border-color:#111;background:#111;color:#fff}.boundary{margin-top:18px;border-left:4px solid #111;padding:8px 0 8px 13px;font-size:13px;line-height:1.5}.code{font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#191919;color:#ededed;border-radius:12px;padding:13px;overflow:auto;white-space:pre-wrap}.callout{margin-top:12px;padding:12px;border-radius:12px;background:#f4f3ef;font-size:12px;line-height:1.5}.footer{margin:18px 0 4px;color:#77766e;font-size:12px}@media(max-width:850px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.top{display:block}.badge{display:inline-block;margin-top:14px}.row{grid-template-columns:90px 1fr}.state{grid-column:2;text-align:left}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div><div class="eyebrow">CounterSignal / Judge Console</div><h1 class="title">Try to kill the hypothesis.</h1><div class="sub">A frozen customer-discovery protocol where negative evidence is a first-class outcome. This deterministic reviewer mode uses the exact pre-registered SmallBet decision rule and never places a phone call.</div></div>
+    <div class="badge">Deterministic reviewer mode · NO CALL</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>PRE-REGISTERED EXPERIMENT</h2>
+      <div class="hyp">Permit-status ambiguity recurs often enough that contractors already spend operator time on a manual workaround.</div>
+      <div class="meta"><span class="pill">smallbet-permit-ops-v1</span><span class="pill">protocol a7229d00…b47a56</span><span class="pill">5 questions locked</span></div>
+      <ol class="questions">
+        <li>Tell me about the last time a permit status was unclear or did not match what your team expected.</li>
+        <li>What did your team do to resolve it?</li>
+        <li>Roughly how often has that kind of follow-up happened in the last month?</li>
+        <li>What happens operationally if nobody follows up?</li>
+        <li>Who or what currently keeps track of those exceptions?</li>
+      </ol>
+      <div class="boundary"><b>Experiment authority:</b> a call can contribute evidence. It cannot change the questions, rewrite a contradiction, or declare product-market fit.</div>
+    </section>
+
+    <aside class="card">
+      <h2>FROZEN DECISION RULE</h2>
+      <div class="rule"><div><b>8</b><span>min answered</span></div><div><b>5</b><span>support needed</span></div><div><b>3</b><span>contradictions weaken</span></div></div>
+      <div class="decision"><div class="eyebrow" style="color:#aaa">CURRENT DECISION</div><div class="value" id="decision">hypothesis_supported_under_rule</div><div class="why" id="why"></div></div>
+      <div class="controls"><button class="danger" onclick="add('disconfirming')">+ Contradiction</button><button onclick="add('nonresponse')">+ Voicemail</button><button onclick="add('supporting')">+ Supporting</button><button onclick="resetDemo()">Reset to 8 answered</button></div>
+      <div class="callout">Demo move: add voicemail first — answered stays 8. Then add three contradictions. CounterSignal must end at <b>hypothesis_weakened</b>, even though five supporting interviews remain in the ledger.</div>
+    </aside>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><b id="answered">8</b><span>answered denominator</span></div><div class="metric"><b id="supporting">5</b><span>supporting</span></div><div class="metric"><b id="disconfirming">0</b><span>disconfirming</span></div><div class="metric"><b id="nonresponse">0</b><span>nonresponse</span></div><div class="metric"><b id="invalid">0</b><span>invalid / ungrounded</span></div>
+  </div>
+
+  <section class="card evidence"><h2>EVIDENCE LEDGER</h2><div id="rows"></div></section>
+
+  <div class="grid">
+    <section class="card"><h2>CALL-E BOUNDARY</h2><div class="code">metadata.workflow_type = falsifiable_customer_discovery
+metadata.experiment_id = smallbet-permit-ops-v1
+metadata.protocol_hash = a7229d00ec935e760d5764572b142a33a062095db0df8c5f3f32c18b88b47a56
+
+result must bind to:
+✓ exact accepted CALL-E call id
+✓ exact reviewed recipient
+✓ exact protocol hash
+✓ recipient-side transcript quote
+
+refusal / voicemail / unreachable → nonresponse
+low-confidence / ungrounded / mismatched → invalid
+ambiguous provider outcome → outcome_unknown / NO BLIND REDIAL</div></section>
+    <section class="card"><h2>CLAIM BOUNDARY</h2><p style="line-height:1.6;margin:0;color:#44443f">The decision is a pre-registered operational rule, <b>not</b> a population-level statistical estimate. “Would take a follow-up” is never treated as demand. Silence never enters the answered denominator.</p><div class="callout"><b>Permission provenance:</b> the real dogfood run only dials respondents who affirmatively opt in to the AI interview. A public business number is not treated as permission.</div></section>
+  </div>
+  <div class="footer">Reviewer console only. Preset evidence is simulated and labeled by construction; live calls use the published CALL-E Python SDK behind independent permission, allowlist, reservation and execution gates.</div>
+</div>
+<script>
+const base=[
+ {b:'supporting',q:'“We call the city every week until someone clarifies it.”'},
+ {b:'supporting',q:'“Two people watch the portal and keep a spreadsheet.”'},
+ {b:'supporting',q:'“A coordinator owns the exceptions and follows up manually.”'},
+ {b:'supporting',q:'“If it stalls, somebody emails or calls until we know the next step.”'},
+ {b:'supporting',q:'“We already have a workaround because the portal alone is not enough.”'},
+ {b:'neutral',q:'“It happens, but only on unusual projects.”'},
+ {b:'neutral',q:'“There is follow-up, but I cannot say it is recurring enough to matter.”'},
+ {b:'neutral',q:'“Another team handles it, so I cannot validate the workload.”'}
+];
+let events=[];
+function sample(bucket){
+ if(bucket==='supporting')return {b:bucket,q:'“We have someone check the portal and call when it stalls.”'};
+ if(bucket==='disconfirming')return {b:bucket,q:'“That is not really a problem for us; the portal is usually enough.”'};
+ return {b:'nonresponse',q:'Voicemail reached — excluded from answered denominator.'};
+}
+function compute(){
+ const c={supporting:0,disconfirming:0,neutral:0,nonresponse:0,invalid:0};events.forEach(e=>c[e.b]++);
+ const answered=c.supporting+c.disconfirming+c.neutral;let d='collect_more';let why='Minimum answered denominator has not been reached.';
+ if(answered>=8){
+   if(c.disconfirming>=3){d='hypothesis_weakened';why='Three grounded contradictions reached the pre-registered weakening threshold.';}
+   else if(c.supporting>=5&&c.disconfirming===0){d='hypothesis_supported_under_rule';why='At least five supporting interviews, zero contradictions, and eight answered interviews.';}
+   else {d='inconclusive';why='The minimum denominator is met, but the frozen support or weakening rule is not.';}
+ }
+ ['supporting','disconfirming','nonresponse','invalid'].forEach(k=>document.getElementById(k).textContent=c[k]);
+ document.getElementById('answered').textContent=answered;document.getElementById('decision').textContent=d;document.getElementById('why').textContent=why;
+ document.getElementById('rows').innerHTML=events.map((e,i)=>`<div class="row"><div class="kind">Interview ${String(i+1).padStart(2,'0')}</div><div class="quote">${e.q}</div><div class="state">${e.b}</div></div>`).join('')||'<div class="quote">No evidence loaded.</div>';
+}
+function add(b){events.push(sample(b));compute()}function resetDemo(){events=[...base];compute()}resetDemo();
+</script>
+</body>
+</html>

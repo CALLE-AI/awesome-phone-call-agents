@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: callproof
+      POSTGRES_PASSWORD: ${CALLPROOF_DATABASE_PASSWORD:-callproof-development}
+      POSTGRES_DB: callproof_production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U callproof -d callproof_production"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  call_analyzer:
+    build: ./call_analyzer
+    environment: &analyzer_environment
+      # This stack is a local demo, so the shared development secret is fine here. Set
+      # CALL_ANALYZER_ENV to anything else and CALLPROOF_WEBHOOK_SECRET becomes required.
+      CALL_ANALYZER_ENV: development
+      CALL_ANALYZER_DATABASE_PATH: /data/call_analyzer.db
+      CALL_ANALYZER_QUEUE_MODE: rq
+      CALL_ANALYZER_QUEUE_NAME: callproof
+      CALL_ANALYZER_DELIVER_WEBHOOKS: "false"
+      CALLPROOF_WEBHOOK_SECRET: development-secret
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    volumes:
+      - analyzer_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  call_analyzer_worker:
+    build: ./call_analyzer
+    command: python -m call_analyzer.worker
+    environment: *analyzer_environment
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - analyzer_data:/data
+
+  rails:
+    build: ./rails
+    environment:
+      PGHOST: postgres
+      PGUSER: callproof
+      CALLPROOF_DATABASE_PASSWORD: ${CALLPROOF_DATABASE_PASSWORD:-callproof-development}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-callproof-development-only-secret-key-base-change-before-deploy}
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+      AGENTKIT_LLM_ADAPTER: fake
+      CALLPROOF_CALL_PROVIDER: fake
+      CALLPROOF_LIVE_CALLS: "false"
+      CALLPROOF_ANALYZER_ADAPTER: http
+      CALLPROOF_ANALYZER_URL: http://call_analyzer:8001
+      CALLPROOF_ANALYZER_CALLBACK_URL: https://rails.example.test/webhooks/call_analyzer
+      CALLPROOF_ANALYZER_WEBHOOK_SECRET: ${CALLPROOF_ANALYZER_WEBHOOK_SECRET:-development-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      call_analyzer:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:80/up"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  analyzer_data:
+  postgres_data:

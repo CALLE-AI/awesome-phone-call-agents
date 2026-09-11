@@ -1,0 +1,123 @@
+{
+  "version": "5.4.0",
+  "date": "2026-09-10",
+  "environment": "Clean staged app, installed local dependencies, isolated temporary SQLite database, fictional calls only",
+  "passed": 21,
+  "checks": [
+    {
+      "check": "Clean packaged Python launcher starts",
+      "passed": true,
+      "detail": {
+        "status": "ok",
+        "version": "5.4.0"
+      }
+    },
+    {
+      "check": "Packaged app HTML is served",
+      "passed": true
+    },
+    {
+      "check": "Security headers are served",
+      "passed": true
+    },
+    {
+      "check": "Fictional mode; live transport disabled",
+      "passed": true
+    },
+    {
+      "check": "Fresh temporary database seeds sample contacts",
+      "passed": true,
+      "detail": {
+        "sample_contact_count": 3
+      }
+    },
+    {
+      "check": "Asset served: /static/app.js",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/app.css",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/tutorial.html",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/tutorial.css",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/tutorial.js",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/walkthrough-data.js",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/media/demo-poster.jpg",
+      "passed": true
+    },
+    {
+      "check": "Asset served: /static/media/tutorial-poster.jpg",
+      "passed": true
+    },
+    {
+      "check": "Native-video byte range: demo",
+      "passed": true,
+      "detail": {
+        "status": 206,
+        "bytes": 1024
+      }
+    },
+    {
+      "check": "Native-video byte range: tutorial",
+      "passed": true,
+      "detail": {
+        "status": 206,
+        "bytes": 1024
+      }
+    },
+    {
+      "check": "Recorded-media hash: demo",
+      "passed": true
+    },
+    {
+      "check": "Media format and length: demo",
+      "passed": true,
+      "detail": {
+        "seconds": 161.933333,
+        "codec": "h264",
+        "dimensions": [
+          1600,
+          900
+        ]
+      }
+    },
+    {
+      "check": "Caption-led media has no audio track: demo",
+      "passed": true
+    },
+    {
+      "check": "Recorded-media hash: tutorial",
+      "passed": true
+    },
+    {
+      "check": "Media format and length: tutorial",
+      "passed": true,
+      "detail": {
+        "seconds": 261.3,
+        "codec": "h264",
+        "dimensions": [
+          1600,
+          900
+        ]
+      }
+    },
+    {
+      "check": "Caption-led media has no audio track: tutorial",
+      "passed": true
+    }
+  ]
+}

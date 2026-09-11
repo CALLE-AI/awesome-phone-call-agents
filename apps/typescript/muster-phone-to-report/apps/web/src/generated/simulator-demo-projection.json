@@ -1,0 +1,744 @@
+{
+  "schemaVersion": "simulator-demo-projection.v1",
+  "generatedFrom": "canonical deterministic replay",
+  "scenarios": [
+    {
+      "scenarioId": "synthetic-normal",
+      "revision": 2,
+      "label": "Normal four-zone greenhouse report",
+      "supportedModes": ["DETERMINISTIC_REPLAY", "LIVE_SMOKE"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Complete observation fixture",
+        "terminalState": "completed",
+        "policyConsequence": "No qualifying threshold event when evidence remains complete.",
+        "durationMs": 5100
+      },
+      "sourceEvidence": [
+        {
+          "sourceSpanId": "segment-01-full",
+          "segmentId": "segment-01",
+          "span": { "start": 0, "end": 54 },
+          "text": "This is a SIMULATED synthetic greenhouse phone report."
+        },
+        {
+          "sourceSpanId": "segment-02-full",
+          "segmentId": "segment-02",
+          "span": { "start": 0, "end": 75 },
+          "text": "Zone 1, North house air temperature, is 71.5 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-03-full",
+          "segmentId": "segment-03",
+          "span": { "start": 0, "end": 77 },
+          "text": "Zone 2, Propagation bench temperature, is 68.0 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-04-full",
+          "segmentId": "segment-04",
+          "span": { "start": 0, "end": 63 },
+          "text": "Zone 3, Greenhouse relative humidity, is 68 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-05-full",
+          "segmentId": "segment-05",
+          "span": { "start": 0, "end": 61 },
+          "text": "Zone 4, Irrigation reservoir level, is 82 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-06-full",
+          "segmentId": "segment-06",
+          "span": { "start": 0, "end": 76 },
+          "text": "Sound is normal. Power is mains available. Battery is normal. Output is off."
+        }
+      ],
+      "readings": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "value": "71.5",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-02-full"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "value": "68.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-03-full"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "value": "68",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-04-full"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "value": "82",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-05-full"]
+        }
+      ],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "values": ["71.5"],
+          "sourceSpanIds": ["segment-02-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "values": ["68.0"],
+          "sourceSpanIds": ["segment-03-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "values": ["68"],
+          "sourceSpanIds": ["segment-04-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "values": ["82"],
+          "sourceSpanIds": ["segment-05-full"],
+          "reasonCodes": []
+        }
+      ],
+      "observation": {
+        "outcome": "normal",
+        "quality": "complete",
+        "confidence": "High confidence"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "observation_recorded",
+        "evidence": "persisted",
+        "interpretation": "recorded",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": null
+    },
+    {
+      "scenarioId": "synthetic-abnormal",
+      "revision": 2,
+      "label": "Abnormal four-zone greenhouse report",
+      "supportedModes": ["DETERMINISTIC_REPLAY", "LIVE_SMOKE"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Threshold scenario fixture",
+        "terminalState": "completed",
+        "policyConsequence": "Grounded threshold evidence creates a simulated abnormal result.",
+        "durationMs": 5100
+      },
+      "sourceEvidence": [
+        {
+          "sourceSpanId": "segment-01-full",
+          "segmentId": "segment-01",
+          "span": { "start": 0, "end": 54 },
+          "text": "This is a SIMULATED synthetic greenhouse phone report."
+        },
+        {
+          "sourceSpanId": "segment-02-full",
+          "segmentId": "segment-02",
+          "span": { "start": 0, "end": 78 },
+          "text": "Zone 1, North house air temperature, is 95.0 degrees Fahrenheit, status ALARM."
+        },
+        {
+          "sourceSpanId": "segment-03-full",
+          "segmentId": "segment-03",
+          "span": { "start": 0, "end": 77 },
+          "text": "Zone 2, Propagation bench temperature, is 68.0 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-04-full",
+          "segmentId": "segment-04",
+          "span": { "start": 0, "end": 66 },
+          "text": "Zone 3, Greenhouse relative humidity, is 91 percent, status ALARM."
+        },
+        {
+          "sourceSpanId": "segment-05-full",
+          "segmentId": "segment-05",
+          "span": { "start": 0, "end": 62 },
+          "text": "Zone 4, Irrigation reservoir level, is 20 percent, status LOW."
+        },
+        {
+          "sourceSpanId": "segment-06-full",
+          "segmentId": "segment-06",
+          "span": { "start": 0, "end": 81 },
+          "text": "Sound alarm is active. Power is mains available. Battery is normal. Output is on."
+        }
+      ],
+      "readings": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "value": "95.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-02-full"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "value": "68.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-03-full"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "value": "91",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-04-full"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "value": "20",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-05-full"]
+        }
+      ],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "values": ["95.0"],
+          "sourceSpanIds": ["segment-02-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "values": ["68.0"],
+          "sourceSpanIds": ["segment-03-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "values": ["91"],
+          "sourceSpanIds": ["segment-04-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "values": ["20"],
+          "sourceSpanIds": ["segment-05-full"],
+          "reasonCodes": []
+        }
+      ],
+      "observation": {
+        "outcome": "abnormal",
+        "quality": "complete",
+        "confidence": "High confidence"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "observation_recorded",
+        "evidence": "persisted",
+        "interpretation": "recorded",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": null
+    },
+    {
+      "scenarioId": "synthetic-ambiguous",
+      "revision": 2,
+      "label": "Ambiguous four-zone greenhouse report",
+      "supportedModes": ["DETERMINISTIC_REPLAY", "LIVE_SMOKE"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Incomplete evidence fixture",
+        "terminalState": "completed",
+        "policyConsequence": "No operational decision is permitted.",
+        "durationMs": 5100
+      },
+      "sourceEvidence": [
+        {
+          "sourceSpanId": "segment-01-full",
+          "segmentId": "segment-01",
+          "span": { "start": 0, "end": 54 },
+          "text": "This is a SIMULATED synthetic greenhouse phone report."
+        },
+        {
+          "sourceSpanId": "segment-02-full",
+          "segmentId": "segment-02",
+          "span": { "start": 0, "end": 64 },
+          "text": "Zone 1, North house air temperature, is 71.5 degrees Fahrenheit."
+        },
+        {
+          "sourceSpanId": "segment-03-full",
+          "segmentId": "segment-03",
+          "span": { "start": 0, "end": 69 },
+          "text": "Zone 1, North house air temperature, is also 75.5 degrees Fahrenheit."
+        },
+        {
+          "sourceSpanId": "segment-04-full",
+          "segmentId": "segment-04",
+          "span": { "start": 0, "end": 77 },
+          "text": "Zone 2, Propagation bench temperature, is 68.0 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-05-full",
+          "segmentId": "segment-05",
+          "span": { "start": 0, "end": 63 },
+          "text": "Zone 3, Greenhouse relative humidity, is 68 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-06-full",
+          "segmentId": "segment-06",
+          "span": { "start": 0, "end": 61 },
+          "text": "Zone 4, Irrigation reservoir level, is 82 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-07-full",
+          "segmentId": "segment-07",
+          "span": { "start": 0, "end": 76 },
+          "text": "Sound is normal. Power is mains available. Battery is normal. Output is off."
+        }
+      ],
+      "readings": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "contradictory",
+          "value": null,
+          "normalizedUnit": null,
+          "confidence": null,
+          "sourceSpanIds": ["segment-02-full", "segment-03-full"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "value": "68.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-04-full"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "value": "68",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-05-full"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "value": "82",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-06-full"]
+        }
+      ],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "contradictory",
+          "values": ["71.5", "75.5"],
+          "sourceSpanIds": ["segment-02-full", "segment-03-full"],
+          "reasonCodes": ["CONFLICTING_CLAIMS"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "values": ["68.0"],
+          "sourceSpanIds": ["segment-04-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "values": ["68"],
+          "sourceSpanIds": ["segment-05-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "values": ["82"],
+          "sourceSpanIds": ["segment-06-full"],
+          "reasonCodes": []
+        }
+      ],
+      "observation": {
+        "outcome": "ambiguous",
+        "quality": "partial",
+        "confidence": "Low confidence"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "observation_recorded",
+        "evidence": "persisted",
+        "interpretation": "recorded",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": null
+    },
+    {
+      "scenarioId": "synthetic-no-answer",
+      "revision": 2,
+      "label": "No-answer four-zone greenhouse lifecycle",
+      "supportedModes": ["DETERMINISTIC_REPLAY"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Transport failure fixture",
+        "terminalState": "terminal-no-answer",
+        "policyConsequence": "No observation is fabricated from transport failure.",
+        "durationMs": 6000
+      },
+      "sourceEvidence": [],
+      "readings": [],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["evidence_not_produced"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["evidence_not_produced"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["evidence_not_produced"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["evidence_not_produced"]
+        }
+      ],
+      "observation": {
+        "outcome": "no-answer",
+        "quality": "not-produced",
+        "confidence": "Confidence unavailable"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "no_answer",
+        "evidence": "not-produced",
+        "interpretation": "not-run",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": null
+    },
+    {
+      "scenarioId": "synthetic-truncated",
+      "revision": 2,
+      "label": "Truncated four-zone greenhouse report",
+      "supportedModes": ["DETERMINISTIC_REPLAY", "LIVE_SMOKE"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Incomplete evidence fixture",
+        "terminalState": "completed",
+        "policyConsequence": "No operational decision is permitted.",
+        "durationMs": 5100
+      },
+      "sourceEvidence": [
+        {
+          "sourceSpanId": "segment-01-full",
+          "segmentId": "segment-01",
+          "span": { "start": 0, "end": 54 },
+          "text": "This is a SIMULATED synthetic greenhouse phone report."
+        },
+        {
+          "sourceSpanId": "segment-02-full",
+          "segmentId": "segment-02",
+          "span": { "start": 0, "end": 75 },
+          "text": "Zone 1, North house air temperature, is 72.0 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-03-full",
+          "segmentId": "segment-03",
+          "span": { "start": 0, "end": 77 },
+          "text": "Zone 2, Propagation bench temperature, is 67.5 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-04-full",
+          "segmentId": "segment-04",
+          "span": { "start": 0, "end": 80 },
+          "text": "The synthetic report ends unexpectedly before zones 3 and 4 or auxiliary status."
+        }
+      ],
+      "readings": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "value": "72.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-02-full"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "value": "67.5",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-03-full"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "missing",
+          "value": null,
+          "normalizedUnit": null,
+          "confidence": null,
+          "sourceSpanIds": []
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "missing",
+          "value": null,
+          "normalizedUnit": null,
+          "confidence": null,
+          "sourceSpanIds": []
+        }
+      ],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "values": ["72.0"],
+          "sourceSpanIds": ["segment-02-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "values": ["67.5"],
+          "sourceSpanIds": ["segment-03-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["SOURCE_TRUNCATED"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "missing",
+          "values": [],
+          "sourceSpanIds": [],
+          "reasonCodes": ["SOURCE_TRUNCATED"]
+        }
+      ],
+      "observation": {
+        "outcome": "truncated",
+        "quality": "partial",
+        "confidence": "Low confidence"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "observation_recorded",
+        "evidence": "persisted",
+        "interpretation": "recorded",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": null
+    },
+    {
+      "scenarioId": "synthetic-recovery",
+      "revision": 2,
+      "label": "Recovery-candidate four-zone greenhouse report",
+      "supportedModes": ["DETERMINISTIC_REPLAY", "LIVE_SMOKE"],
+      "provenance": {
+        "kind": "SIMULATED",
+        "mode": "DETERMINISTIC_REPLAY",
+        "compatibility": "simulator-tested"
+      },
+      "preRun": {
+        "category": "Recovery candidate fixture",
+        "terminalState": "completed",
+        "policyConsequence": "Human confirmation is required; no automatic closure.",
+        "durationMs": 5100
+      },
+      "sourceEvidence": [
+        {
+          "sourceSpanId": "segment-01-full",
+          "segmentId": "segment-01",
+          "span": { "start": 0, "end": 57 },
+          "text": "This is a SIMULATED synthetic greenhouse recovery report."
+        },
+        {
+          "sourceSpanId": "segment-02-full",
+          "segmentId": "segment-02",
+          "span": { "start": 0, "end": 75 },
+          "text": "Zone 1, North house air temperature, is 70.0 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-03-full",
+          "segmentId": "segment-03",
+          "span": { "start": 0, "end": 77 },
+          "text": "Zone 2, Propagation bench temperature, is 67.5 degrees Fahrenheit, status OK."
+        },
+        {
+          "sourceSpanId": "segment-04-full",
+          "segmentId": "segment-04",
+          "span": { "start": 0, "end": 63 },
+          "text": "Zone 3, Greenhouse relative humidity, is 66 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-05-full",
+          "segmentId": "segment-05",
+          "span": { "start": 0, "end": 61 },
+          "text": "Zone 4, Irrigation reservoir level, is 80 percent, status OK."
+        },
+        {
+          "sourceSpanId": "segment-06-full",
+          "segmentId": "segment-06",
+          "span": { "start": 0, "end": 76 },
+          "text": "Sound is normal. Power is mains available. Battery is normal. Output is off."
+        }
+      ],
+      "readings": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "value": "70.0",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-02-full"]
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "value": "67.5",
+          "normalizedUnit": "degF",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-03-full"]
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "value": "66",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-04-full"]
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "value": "80",
+          "normalizedUnit": "percent",
+          "confidence": "high",
+          "sourceSpanIds": ["segment-05-full"]
+        }
+      ],
+      "reconciliation": [
+        {
+          "zoneId": "zone-01",
+          "disposition": "grounded",
+          "values": ["70.0"],
+          "sourceSpanIds": ["segment-02-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-02",
+          "disposition": "grounded",
+          "values": ["67.5"],
+          "sourceSpanIds": ["segment-03-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-03",
+          "disposition": "grounded",
+          "values": ["66"],
+          "sourceSpanIds": ["segment-04-full"],
+          "reasonCodes": []
+        },
+        {
+          "zoneId": "zone-04",
+          "disposition": "grounded",
+          "values": ["80"],
+          "sourceSpanIds": ["segment-05-full"],
+          "reasonCodes": []
+        }
+      ],
+      "observation": {
+        "outcome": "recovery-candidate",
+        "quality": "complete",
+        "confidence": "High confidence"
+      },
+      "versions": {
+        "adapter": "simulator_adapter_v1",
+        "extractor": "extractor_version_deterministic_v1"
+      },
+      "dispositions": {
+        "transport": "observation_recorded",
+        "evidence": "persisted",
+        "interpretation": "recorded",
+        "idempotency": "canonical"
+      },
+      "recoveryPredecessor": {
+        "scenarioId": "synthetic-abnormal",
+        "revision": 2,
+        "simulationRunId": "demo-abnormal-predecessor"
+      }
+    }
+  ]
+}

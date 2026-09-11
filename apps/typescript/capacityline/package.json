@@ -1,0 +1,16 @@
+{
+  "name": "capacityline-calle-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-first CALL-E supply recovery workflow with dry-run default",
+  "scripts": {
+    "demo": "node src/index.mjs",
+    "dry-run": "node src/index.mjs",
+    "live": "node src/index.mjs --live",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0"
+  }
+}

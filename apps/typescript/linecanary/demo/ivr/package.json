@@ -1,0 +1,6 @@
+{
+  "name": "sample-dental-ivr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo IVR monitored by LineCanary. Deploy with: npx twilio-run deploy"
+}

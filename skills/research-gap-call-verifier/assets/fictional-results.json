@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "rgcv_0a74a12de57f031a443cbfc257e1002cd85fcd3e3ac0f7e7552765bc90a13b24",
+  "calls": [
+    {
+      "call_id": "call_af34573fc52f44a65122f975",
+      "idempotency_key": "rgcv_call_af34573fc52f44a65122f975ab3abfb22c54c4dd2461f3b3120c76f46b4fbcb9",
+      "recipient_e164": "+12025550123",
+      "provider_call_id": "fictional-call-001",
+      "status": "completed",
+      "answers": [
+        {
+          "gap_id": "availability",
+          "answer": "The room is available Friday evening.",
+          "callee_quote": "Yes, we still have that room open Friday evening."
+        },
+        {
+          "gap_id": "minimum-spend",
+          "answer": "The respondent could not confirm the minimum.",
+          "callee_quote": "I cannot confirm that; please call back later."
+        }
+      ]
+    },
+    {
+      "call_id": "call_bbf6f5bf93781ec0fd291710",
+      "idempotency_key": "rgcv_call_bbf6f5bf93781ec0fd291710d54a3303fadd9104608e1fb0763ea40b2e5bc3bd",
+      "recipient_e164": "+12025550124",
+      "provider_call_id": "fictional-call-002",
+      "status": "failed",
+      "answers": []
+    }
+  ]
+}
