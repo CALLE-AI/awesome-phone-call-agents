@@ -8,9 +8,11 @@ thing standing between a retry and a second call to a real person, kept the suit
 from __future__ import annotations
 
 import json
+import ssl
 
 import httpx
 import pytest
+import truststore
 
 from positive_contact.config import OFFICIAL_CALLE_BASE_URL
 from positive_contact.transports.base import TransportError
@@ -61,6 +63,26 @@ def submit(transport, **overrides):
     }
     payload.update(overrides)
     return transport.submit(**payload)
+
+
+def test_default_client_uses_the_operating_system_trust_store(monkeypatch):
+    seen: dict = {}
+
+    class StubClient:
+        def close(self) -> None:
+            pass
+
+    def build_client(**kwargs):
+        seen.update(kwargs)
+        return StubClient()
+
+    monkeypatch.setattr(httpx, "Client", build_client)
+    transport = CalleTransport("calle_test_key")
+
+    assert isinstance(seen["verify"], truststore.SSLContext)
+    assert seen["verify"].check_hostname is True
+    assert seen["verify"].verify_mode == ssl.CERT_REQUIRED
+    transport.close()
 
 
 # -- the request that goes on the wire --------------------------------------------

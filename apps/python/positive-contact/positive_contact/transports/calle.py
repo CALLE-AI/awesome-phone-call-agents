@@ -14,10 +14,12 @@ There is no cancel method here because CALL-E publishes no cancel endpoint. Afte
 
 from __future__ import annotations
 
+import ssl
 import time
 from typing import Callable
 
 import httpx
+import truststore
 
 from ..config import OFFICIAL_CALLE_BASE_URL
 from .base import CallSnapshot, SubmitResult, TransportError, parse_call_task
@@ -75,9 +77,14 @@ class CalleTransport:
         self.base_url = normalized
         self.webhook_url = webhook_url
         self._sleep = sleep
+        # Use the operating system trust store. On managed Macs, the CALL-E certificate
+        # chain may include an administrator-installed root that certifi cannot see even
+        # though the browser and curl trust it.
+        tls_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         self._client = httpx.Client(
             base_url=self.base_url,
             timeout=timeout_seconds,
+            verify=tls_context,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Accept": "application/json",
