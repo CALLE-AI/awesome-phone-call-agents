@@ -1,0 +1,229 @@
+{#- One Review Item, read the same way whether it fills a page or slides over the
+    board. Nothing here knows which: no `.page`, no back link, no <title>. The two
+    callers supply that, so the reviewer sees identical words either way. #}
+<h1>{{ item.first_name }} {{ item.surname }}</h1>
+<div class="hdr">
+  <span class="sub" style="margin:0">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
+  {%- if item.stop_condition %}
+  <span class="chip stopped{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}">
+    stopped · {{ item.stop_reason.replace("_", " ") }}</span>
+  {%- else %}
+  <span class="chip state">{{ item.status.replace("_", " ") }}</span>
+  {%- endif %}
+</div>
+
+<div class="split">
+  <section>
+    <h2>What they said</h2>
+    <div class="panel">
+      {% if turns %}
+        {% for turn in turns %}
+        <div class="turn {{ turn.speaker }}{% if turn.index in anchors.values() %} anchored{% endif %}">
+          <span class="idx">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="note" style="margin:0">No transcript stored for this call.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section>
+    <h2>What was recorded</h2>
+    <div class="panel">
+      <dl class="recorded">
+        <dt>Feeling</dt>
+        <dd>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "feeling" in anchors %}<span class="stamp">turn {{ anchors.feeling }}</span>{% endif %}</dd>
+
+        <dt>Medication</dt>
+        <dd>{% if item.medication_ok %}<span class="chip med {{ item.medication_ok }}">{{ item.medication_ok.replace("_", " ") }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "medication_ok" in anchors %}<span class="stamp">turn {{ anchors.medication_ok }}</span>{% endif %}</dd>
+
+        <dt>Wants to be seen</dt>
+        <dd>{% if item.wants_seen %}<span class="chip seen {{ item.wants_seen }}">{{ item.wants_seen }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "wants_seen" in anchors %}<span class="stamp">turn {{ anchors.wants_seen }}</span>{% endif %}</dd>
+
+        <dt>Easier time</dt>
+        <dd>{% if item.when_easier and item.when_easier != "not_asked" %}
+            <span class="chip when {{ item.when_easier }}">{{ item.when_easier }}</span>
+            {%- elif item.wants_seen == "yes" %}<span class="chip unanswered">not answered</span>
+            {%- else %}<span class="chip unanswered">not asked</span>{% endif %}
+          {%- if "when_easier" in anchors %}<span class="stamp">turn {{ anchors.when_easier }}</span>{% endif %}</dd>
+
+        <dt>Their words</dt>
+        <dd class="words">
+          {%- if item.carried_words_text %}
+          <q>{{ item.carried_words_text }}</q><span class="stamp">turn {{ item.carried_words_turn }}</span>
+          {%- else %}<span class="nothing">nothing carried</span>{% endif %}
+        </dd>
+      </dl>
+      {%- if item.answers_from == "transcript" %}
+      <p class="note read-back">
+        This board read these three out of the transcript. The call did not report
+        them: <code>call start</code> cannot carry a result schema, so a live call
+        comes back as words and a status. Each one is anchored to the turn it came
+        from &mdash; check it against what they said.
+      </p>
+      {%- endif %}
+    </div>
+  </section>
+</div>
+
+{% if rebooking_state %}
+{#- The other half. She authorised words and an envelope and the call left the
+    building; a status chip on its own cannot answer "what was it about". #}
+<section class="rebooking">
+  <h2>The call to the practice</h2>
+  <div class="panel">
+    <p class="note" style="margin:0 0 .9rem">
+      Placed on their behalf after a Release.
+      <span class="chip state">{{ rebooking_state.replace("_", " ") }}</span>
+    </p>
+    {%- if booked %}
+    <dl class="recorded booked">
+      <dt>Reception offered</dt>
+      <dd><b>{{ booked.date }}{% if booked.time %} at {{ booked.time }}{% endif %}</b>
+        <span class="stamp">turn {{ booked.turn }}</span></dd>
+      <dt>In their words</dt>
+      <dd class="words"><q>{{ booked.words }}</q></dd>
+    </dl>
+    <p class="note" style="margin:0 0 .9rem">
+      This is what was said on the call, not an appointment this board holds. Nothing
+      has told them the time. If you want them to know it, that is a call somebody makes.
+    </p>
+    {%- endif %}
+    {% if rebooking_turns %}
+      {% for turn in rebooking_turns %}
+      <div class="turn {{ turn.speaker }}">
+        <span class="idx">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="note" style="margin:0">No transcript stored for this call.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if item.stop_reason in red_flag_reasons %}
+{#- No Release here. The agent on the phone stopped rather than offer an appointment to
+    somebody describing chest pain; offering a Reviewer one button to have a second agent
+    ring reception about it would spend that refusal one layer up. `review.release`
+    refuses this too, so the form is not merely hidden. #}
+<section class="act">
+  <h2>This one is not for a machine</h2>
+  {%- if item.stop_reason == "red_flag_not_told" %}
+  <p class="banner" style="margin:0 0 1rem">
+    <b>They have not been told where to turn.</b> Something on the red-flag list was said
+    on this call, and no urgent number was spoken back to them afterwards. Nobody has
+    given them 111 or 999. Ring them now, before anything else on this board.
+  </p>
+  {%- else %}
+  <p class="note" style="max-width:52rem;margin:0 0 1rem">
+    The call stopped and read the Safety Line, so they have been told to ring 111, and
+    999 if it feels like an emergency. That is all it did. It offered no appointment and
+    made no judgement about what they said.
+  </p>
+  {%- endif %}
+  <p class="note" style="max-width:52rem">
+    There is no Release on a flagged call. A Rebooking Call would offer a routine
+    appointment to somebody who may need urgent care, and would carry their own words
+    about it to a receptionist. Ring them yourself, then record what you did.
+  </p>
+  <div class="actions">
+    <form method="post" action="/review-items/{{ item.id }}/manual">
+      <button class="primary" type="submit">Ring them myself</button>
+    </form>
+    <form method="post" action="/review-items/{{ item.id }}/close">
+      <button type="submit">Close, nothing needed</button>
+    </form>
+  </div>
+</section>
+{% else %}
+<form class="act" method="post" action="/review-items/{{ item.id }}/release">
+  <h2>Release</h2>
+  <p class="note" style="max-width:52rem">
+    This authorises one call to the practice's booking line on their behalf. The agent
+    accepts an offer inside the dates and times below and refuses anything outside
+    them. It will speak the words in the box and nothing else.
+    {%- if item.when_easier in ("morning", "afternoon") %}
+    <b>They said {{ item.when_easier }}s are easier</b>, so that is what the time below
+    starts on. The dates are still yours to choose, and nothing has asked them about
+    those.
+    {%- elif item.wants_seen == "yes" %}
+    Nothing was recorded about when they are free, so the times below are your judgement
+    rather than theirs.
+    {%- endif %}
+  </p>
+
+  <fieldset>
+    <legend>Booking envelope</legend>
+    <div class="row">
+      <label>Earliest date <input type="date" name="earliest_date" value="{{ today_iso }}" required></label>
+      <label>Latest date <input type="date" name="latest_date" value="{{ today_iso }}" required></label>
+    </div>
+    <div class="row three">
+      <label>Time of day
+        {#- Their own answer is the default, and you may change it. The same rule the
+            quote follows: this box starts from what they said rather than from what
+            somebody guessed on their behalf. #}
+        <select name="time_of_day">
+          <option value="any"{% if item.when_easier not in ("morning", "afternoon") %} selected{% endif %}>any</option>
+          <option value="morning"{% if item.when_easier == "morning" %} selected{% endif %}>morning</option>
+          <option value="afternoon"{% if item.when_easier == "afternoon" %} selected{% endif %}>afternoon</option>
+        </select>
+      </label>
+      <label>Appointment mode
+        <select name="mode">
+          <option value="any">any</option>
+          <option value="in_person">in person</option>
+          <option value="phone">phone</option>
+        </select>
+      </label>
+      <label>Clinician <input type="text" name="clinician" placeholder="any clinician"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Words that may be spoken</legend>
+    <label>
+      <textarea name="approved_words" placeholder="empty: nothing will be spoken"></textarea>
+    </label>
+    <p class="note" style="margin-top:.7rem">
+      {%- if item.carried_words_text %}
+      Their sentence is above, at turn {{ item.carried_words_turn }}. Copy in the part
+      reception may hear. This box starts empty on purpose: nothing is spoken unless you
+      put it here, and an empty Release is valid. Their own words may name a medicine, and
+      that is exactly what must not travel to a receptionist.
+      {%- else %}
+      Nothing was carried from this call, so there is nothing to approve. Leave this
+      empty.
+      {%- endif %}
+    </p>
+    <p class="note" style="margin-top:.5rem">
+      You may shorten what they said. You may not add to it: anything that is not part of
+      their own sentence is refused, because a receptionist would hear it as their words.
+    </p>
+  </fieldset>
+
+  <label style="max-width:22rem">Your name <input type="text" name="reviewer_name" required></label>
+  <p class="note" style="margin-top:.5rem">Recorded with the Release. A release always says who granted it.</p>
+
+  <div class="actions">
+    <button class="primary" type="submit">Release for rebooking</button>
+  </div>
+</form>
+
+<div class="actions">
+  <form method="post" action="/review-items/{{ item.id }}/close">
+    <button type="submit">Close, nothing needed</button>
+  </form>
+  <form method="post" action="/review-items/{{ item.id }}/manual">
+    <button type="submit">Ring them myself</button>
+  </form>
+</div>
+{% endif %}
