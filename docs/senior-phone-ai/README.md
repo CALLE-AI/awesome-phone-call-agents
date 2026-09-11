@@ -2,6 +2,10 @@
 
 This file is the source of truth for implementation tickets and progress. Update it as work changes; no external ticket service is required.
 
+## Current addition: personalized morning briefings
+
+The maintainer requested a CALL-E-only morning briefing workaround while same-call internet search remains unsupported by the public interface. The local `/briefings` workspace now supports per-senior location/timezone/interests, opt-in daily preparation, official benefits/retirement sources, evidence-backed saved call context, and health prompts from provided dates. See [morning-briefings.md](morning-briefings.md). This adapts the daily evidence/archive pattern from the maintainer's `hackthonTakeaway` project. It does not complete the original same-call search gate or enable recurring calls. Real profile enrollment, live briefing review and a separately confirmed telephone acceptance test remain pending.
+
 ## Project
 
 Build a phone-native AI assistant for seniors: ask, search, understand, remember and act through a normal phone call. Seniors do not need an app or browser. The web interface serves authorized family members and carers.

@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveBriefingTask } from "../briefings/store";
 
 import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } from "./status";
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
@@ -12,6 +13,7 @@ export async function createCalleCall(
   fetcher: typeof fetch = fetch,
 ): Promise<CalleCallSnapshot> {
   const validated = validateOutboundCallRequest(request);
+  const briefingTask = validated.briefingId ? await resolveBriefingTask(validated.briefingId) : undefined;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CREATE_CALL_TIMEOUT_MS);
   try {
@@ -23,9 +25,9 @@ export async function createCalleCall(
         "Idempotency-Key": validated.idempotencyKey,
       },
       body: JSON.stringify({
-        task: validated.purpose
+        task: briefingTask ?? (validated.purpose
           ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
-          : "Identify yourself as Senior Phone AI and have a general conversation with the recipient.",
+          : "Identify yourself as Senior Phone AI and have a general conversation with the recipient."),
         recipients: [{ phones: [validated.destinationE164] }],
         metadata: { application: "senior-phone-ai" },
       }),

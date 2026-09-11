@@ -56,7 +56,7 @@ async function mutate<T>(operation: (registry: RegistryFile) => Promise<T>): Pro
 
 function intentFingerprint(request: OutboundCallRequest): string {
   return createHash("sha256")
-    .update(JSON.stringify([request.destinationE164, request.purpose]))
+    .update(JSON.stringify(request.briefingId ? [request.destinationE164, request.purpose, request.briefingId] : [request.destinationE164, request.purpose]))
     .digest("hex");
 }
 

@@ -1,10 +1,20 @@
 # Senior Phone AI
 
+The next-phase [Vapi in-call search prototype](../../../docs/senior-phone-ai/vapi-live-search.md)
+provides an authenticated search callback and a tool configuration template.
+It requires Vapi account and HTTPS setup before live verification.
+
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
 This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters, Supabase persistence with family-scoped row-level access controls, and a local-only explicitly confirmed CALL-E outbound-call harness. It does not yet connect an inbound telephone or live SMS provider.
 
 ## Quick start
+
+### Personalized morning briefings
+
+Open `/briefings` to save separate senior profiles with confirmed country, locality, timezone, interests and personalization consent. Prepare current news, nearby activities and official benefits/retirement information before a call, review the dated evidence, then explicitly confirm one CALL-E briefing call. Optional health prompts use only provided dates and agreed clinician follow-up plans. The telephone conversation uses the saved briefing; it does not browse live.
+
+Daily preparation is opt-in per profile and runs while the local Next.js server remains running. It makes read-only searches, never automatic calls. See the [morning briefing guide](../../../docs/senior-phone-ai/morning-briefings.md) for setup, encryption, source policies, cancellation, recovery and production limitations.
 
 Use Node.js 22.9 or newer.
 

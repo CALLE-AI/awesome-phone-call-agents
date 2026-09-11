@@ -4,6 +4,7 @@ export interface OutboundCallRequest {
   readonly destinationE164: string;
   readonly purpose: string;
   readonly idempotencyKey: string;
+  readonly briefingId?: string;
 }
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
@@ -11,6 +12,7 @@ const PROHIBITED_PURPOSE = /\b(?:diagnos(?:e|is)|medication change|emergency|leg
 
 export function validateOutboundCallRequest(request: OutboundCallRequest): OutboundCallRequest {
   assertStrictE164(request.destinationE164);
+  if (request.briefingId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.briefingId)) throw new Error("invalid briefing identifier");
   if (!IDEMPOTENCY_KEY.test(request.idempotencyKey)) throw new Error("invalid idempotency key");
   if (request.purpose.trim() !== request.purpose || request.purpose.length > 300) {
     throw new Error("call purpose must be empty or a bounded, trimmed value");

@@ -28,7 +28,7 @@ export default function Home() {
           <strong>Local realtime harness available</strong>
           <span>
             Test browser audio at <a href="/realtime">/realtime</a>, or review and explicitly confirm a
-            CALL-E destination at <a href="/calls">/calls</a>. Messages and recurring jobs remain disabled.
+            CALL-E destination at <a href="/calls">/calls</a>. Prepare personalized morning information at <a href="/briefings">/briefings</a>. Messages and recurring calls remain disabled.
           </span>
         </div>
       </section>

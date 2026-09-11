@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createCalleCall } from "@/lib/calle/client";
+import { resolveBriefingTask } from "@/lib/briefings/store";
 import { outboundCallPreview, type OutboundCallRequest } from "@/lib/calle/outbound";
 import { recordOutboundCallResult, reserveOutboundCall } from "@/lib/calle/registry";
 import { getRuntimeMode, requireSecret } from "@/lib/config/server";
@@ -33,8 +34,10 @@ export async function POST(request: Request) {
       destinationE164: typeof body.destinationE164 === "string" ? body.destinationE164 : "",
       idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
       purpose: typeof body.purpose === "string" ? body.purpose : "",
+      briefingId: typeof body.briefingId === "string" ? body.briefingId : undefined,
     };
     outboundCallPreview(callRequest);
+    if (callRequest.briefingId) await resolveBriefingTask(callRequest.briefingId);
   } catch {
     return NextResponse.json({ error: "Confirmed call details are invalid" }, { status: 400, headers: noStoreHeaders });
   }
