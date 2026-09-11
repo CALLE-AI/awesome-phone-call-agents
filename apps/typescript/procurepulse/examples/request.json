@@ -1,0 +1,34 @@
+{
+  "id": "harbor-vine-basil-0911",
+  "item": "Fresh basil",
+  "specification": "Genovese basil, fresh bunches; no Thai basil",
+  "quantity": "20 kg",
+  "deadline": "today at 7:00 PM",
+  "substitutes": true,
+  "buyerBusiness": "Harbor & Vine",
+  "buyerName": "Jordan Lee, purchasing lead",
+  "timeZone": "America/Los_Angeles",
+  "vendors": [
+    {
+      "id": "riverside-produce",
+      "name": "Riverside Produce",
+      "phone": "+14155550142",
+      "region": "US",
+      "authorizationNote": "Existing approved supplier relationship"
+    },
+    {
+      "id": "northstar-foods",
+      "name": "Northstar Foods",
+      "phone": "+14155550178",
+      "region": "US",
+      "authorizationNote": "Existing approved supplier relationship"
+    },
+    {
+      "id": "golden-gate-supply",
+      "name": "Golden Gate Supply",
+      "phone": "+14155550193",
+      "region": "US",
+      "authorizationNote": "Existing approved supplier relationship"
+    }
+  ]
+}
