@@ -1,0 +1,3 @@
+{"clinic_id":"hcii-kapeeka","clinic_name":"Kapeeka HC II","nurse_name":"Jane","to_phones":["+256700000001"],"region":"UG","locale":"en-UG","metadata":{"district":"Nakaseke"}}
+{"clinic_id":"hciii-kasangombe","clinic_name":"Kasangombe HC III","nurse_name":null,"to_phones":["+256700000002"],"region":"UG","locale":"en-UG","metadata":{"district":"Nakaseke"}}
+{"clinic_id":"hcii-wobulenzi","clinic_name":"Wobulenzi HC II","nurse_name":"Peter","to_phones":["+256700000003"],"region":"UG","locale":"en-UG","metadata":{"district":"Luweero"}}
