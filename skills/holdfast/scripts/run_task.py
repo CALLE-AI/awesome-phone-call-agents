@@ -8,20 +8,30 @@ rendering -> (with --run, after explicit confirmation) one real CALL-E call
 
 Dry-run is the default; a real call happens only with --run, only after the
 exact preview is shown, and only with an explicit confirmation (--yes flag or
-an interactive "CALL" prompt). A pending-call ledger makes interruption
-recovery safe: a run that stops mid-call is resumed, never re-dialed.
+an interactive "CALL" prompt).
+
+Exactly-once dialing is enforced by a global ledger keyed on the task
+fingerprint (never on the output directory): a task with a call in flight is
+resumed, never re-dialed; a finished task re-dials only behind an explicit
+--retry confirmation; a start the provider confirmed but the runner could not
+account for is recorded "uncertain" and never re-dialed automatically.
 
 Usage:
     python3 run_task.py --task task.json                 # preview only
     python3 run_task.py --task task.json --run           # preview, confirm, one call
     python3 run_task.py --task task.json --run --yes     # non-interactive confirm
-    python3 run_task.py --task task.json --run --resume  # recover an in-flight call
+    python3 run_task.py --task task.json --run --retry   # new consent-gated call after a finished one
+    python3 run_task.py --task task.json --run --resume  # recover the in-flight call
     python3 run_task.py --report runs/<dir>              # re-verify a finished run
 
 Task JSON shape (see references/examples.md for a full sample):
     goal, callee (E.164), user_name, success_criteria[],
     authorization_scope {may_provide[], may_confirm[], must_not[]},
     optional: company, context{}, line_type, language, region
+
+Environment:
+    HOLDFAST_LEDGER   path of the global dialing ledger
+                      (default: ~/.cache/holdfast/ledger.json)
 """
 
 from __future__ import annotations
@@ -29,9 +39,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,7 +53,7 @@ MAP_LOOKUP = SKILL_DIR / "scripts" / "map_lookup.py"
 MAP_UPDATE = SKILL_DIR / "scripts" / "map_update.py"
 VERIFY = SKILL_DIR / "scripts" / "verify_result.py"
 
-E164_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
+E164_RE = re.compile(r"\+[1-9][0-9]{6,14}")
 TERMINAL = {"COMPLETED", "FAILED", "NO_ANSWER", "DECLINED", "CANCELED", "CANCELLED", "VOICEMAIL", "BUSY", "EXPIRED"}
 
 PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])(?:\+?[0-9](?:[0-9\s().\-]{8,}[0-9]))(?![A-Za-z0-9])")
@@ -129,7 +141,15 @@ def find_key(node: object, key: str) -> object | None:
 
 
 def run_calle(args: list[str]) -> dict:
-    proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
+    """Invoke the calle CLI. Timeouts and a missing binary fail closed with a
+    generic message: the command line (which contains the private goal text)
+    is never echoed."""
+    try:
+        proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, timeout=200)
+    except subprocess.TimeoutExpired:
+        fail("calle did not respond within 200s; state unknown. Do not redial: run calle call recover, then --resume")
+    except FileNotFoundError:
+        fail("calle CLI not found on PATH; install and authenticate it before --run")
     return load_json_flexible(proc.stdout + proc.stderr)
 
 
@@ -138,8 +158,10 @@ def validate_task(task: dict) -> list[str]:
     for field in ("goal", "callee", "user_name", "success_criteria", "authorization_scope"):
         if field not in task:
             problems.append(f"missing required field: {field}")
-    if "callee" in task and not E164_RE.match(str(task["callee"])):
-        problems.append("callee must be strict ASCII E.164 (for example +12025550123)")
+    if "callee" in task and not isinstance(task["callee"], str):
+        problems.append("callee must be a string")
+    elif "callee" in task and not E164_RE.fullmatch(str(task["callee"])):
+        problems.append("callee must be strict ASCII E.164 with no whitespace (for example +12025550123)")
     elif "callee" in task and not str(task["callee"]).isascii():
         problems.append("callee must contain ASCII digits only")
     scope = task.get("authorization_scope", {})
@@ -218,17 +240,30 @@ def render_instructions(task: dict, map_info: dict) -> str:
 
 
 def print_preview(task: dict, instructions: str, map_info: dict) -> None:
+    """Show the plan. Everything displayed here is masked; the unmasked
+    instructions exist only in memory and in the live CLI payload."""
+    targets = callee_variants(str(task["callee"]))
+    goal = mask_sensitive(str(task["goal"]), targets)
+    shown_instructions = mask_sensitive(instructions, targets)
     print("HoldFast plan preview (no call placed)")
     print(f"  Callee:       {mask_number(str(task['callee']))}")
-    print(f"  Goal:         {task['goal']}")
+    print(f"  Goal:         {goal}")
     print(f"  On behalf of: {task['user_name']}")
     print(f"  Map:          {'found (' + str(map_info.get('organization')) + ')' if map_info.get('found') else 'none; exploratory navigation'}")
     print(f"  Cost:         1 call credit; no cancel once started")
     print()
     print("--- call instructions that will be sent ---")
-    print(instructions)
+    print(shown_instructions)
     print("--- end ---")
-    print()
+
+
+def preview_text(task: dict, instructions: str, map_info: dict) -> str:
+    import io
+    import contextlib
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        print_preview(task, instructions, map_info)
+    return buffer.getvalue()
 
 
 def confirm_or_abort(out_dir: Path, yes: bool) -> dict:
@@ -243,10 +278,7 @@ def confirm_or_abort(out_dir: Path, yes: bool) -> dict:
         print("Confirmation supplied via --yes.")
     elif sys.stdin.isatty():
         answer = input("Type CALL to place this exact call (anything else aborts): ").strip()
-        if answer == "CALL":
-            consent = {"confirmed": True, "method": "interactive prompt", "confirmed_at": _now()}
-        else:
-            consent = {"confirmed": False, "method": "interactive prompt", "confirmed_at": _now()}
+        consent = {"confirmed": answer == "CALL", "method": "interactive prompt", "confirmed_at": _now()}
     else:
         consent = {"confirmed": False, "method": "none", "confirmed_at": _now()}
         print("No confirmation available (stdin is not interactive).", file=sys.stderr)
@@ -266,7 +298,65 @@ def _task_fingerprint(task: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def read_ledger(out_dir: Path) -> dict | None:
+def _callee_fingerprint(callee: str) -> str:
+    return hashlib.sha256(re.sub(r"\D", "", callee).encode("ascii")).hexdigest()
+
+
+# --------------------------------------------------------------------------
+# Global exactly-once ledger
+# --------------------------------------------------------------------------
+
+def ledger_path() -> Path:
+    override = os.environ.get("HOLDFAST_LEDGER")
+    if override:
+        return Path(override)
+    return Path.home() / ".cache" / "holdfast" / "ledger.json"
+
+
+def read_ledger() -> dict:
+    path = ledger_path()
+    if not path.exists():
+        return {"version": 1, "tasks": {}}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"version": 1, "tasks": {}, "corrupt": True}
+    data.setdefault("tasks", {})
+    return data
+
+
+def write_ledger_entry(fingerprint: str, **fields: object) -> dict:
+    """Atomically upsert one task entry in the global ledger."""
+    path = ledger_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ledger = read_ledger()
+    entry = dict(ledger["tasks"].get(fingerprint, {}))
+    entry.update(fields)
+    entry["updated_at"] = _now()
+    ledger["tasks"][fingerprint] = entry
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix="ledger-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(ledger, handle, indent=2)
+        os.replace(tmp_name, path)
+    finally:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+    return entry
+
+
+def ledger_entry(fingerprint: str) -> dict | None:
+    return read_ledger().get("tasks", {}).get(fingerprint)
+
+
+IN_FLIGHT_STATES = {"dialing", "in_flight", "uncertain"}
+
+
+# --------------------------------------------------------------------------
+# Per-run artifacts
+# --------------------------------------------------------------------------
+
+def read_local_ledger(out_dir: Path) -> dict | None:
     path = out_dir / "pending.json"
     if not path.exists():
         return None
@@ -276,7 +366,7 @@ def read_ledger(out_dir: Path) -> dict | None:
         return {"state": "unknown", "corrupt": True}
 
 
-def write_ledger(out_dir: Path, state: str, **fields: object) -> dict:
+def write_local_ledger(out_dir: Path, state: str, **fields: object) -> dict:
     path = out_dir / "pending.json"
     ledger: dict = {"state": state, "updated_at": _now()}
     if path.exists():
@@ -288,18 +378,6 @@ def write_ledger(out_dir: Path, state: str, **fields: object) -> dict:
     ledger.update(fields)
     path.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
     return ledger
-
-
-def ledger_blocks_new_call(out_dir: Path) -> dict | None:
-    """Return the ledger if a call may still be in flight; else None."""
-    ledger = read_ledger(out_dir)
-    if not ledger:
-        return None
-    if (out_dir / "final.json").exists():
-        return None
-    if ledger.get("state") in ("dialing", "in_flight", "unknown"):
-        return ledger
-    return None
 
 
 def propose_observation(final: dict) -> dict:
@@ -317,7 +395,7 @@ def propose_observation(final: dict) -> dict:
     transcript = str(find_key(final, "transcript") or "")
     ts_re = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s*")
     bot_lines = [line for line in transcript.splitlines() if re.search(r"\bBOT:", line)]
-    line_speakers = (re.sub(ts_re, "", line) for line in transcript.splitlines())
+    line_speakers = (ts_re.sub("", line) for line in transcript.splitlines())
     callee_lines = [
         line for line in line_speakers
         if line and not re.match(r"\s*BOT\s*:", line)
@@ -370,7 +448,7 @@ def propose_observation(final: dict) -> dict:
                     pressed.append(key)
 
     return {
-        "menu_options_observed": options[:12],
+        "menu_options_observed": options,
         "keys_reported_pressed": sorted(pressed),
         "keypress_claim": "none" if no_keypress_observed else ("reported" if pressed else "unknown"),
         "note": "menu options come from transcript prompts; keys come only from explicit press claims. "
@@ -392,11 +470,14 @@ def provider_destination(data: dict) -> str:
 def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     authorized = str(task["callee"])
     targets = callee_variants(authorized)
-    write_ledger(
-        out_dir,
-        "dialing",
-        task_fingerprint=_task_fingerprint(task),
-        callee_digits_sha256=hashlib.sha256(re.sub(r"\D", "", authorized).encode("ascii")).hexdigest(),
+    fingerprint = _task_fingerprint(task)
+    write_local_ledger(out_dir, "dialing", task_fingerprint=fingerprint)
+    write_ledger_entry(
+        fingerprint,
+        state="dialing",
+        task_fingerprint=fingerprint,
+        callee_digits_sha256=_callee_fingerprint(authorized),
+        out_dir=str(out_dir),
     )
     args = ["call", "start", "--to-phone", authorized, "--goal", instructions]
     if task.get("language"):
@@ -408,14 +489,26 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
         json.dumps(mask_sensitive(start, targets), indent=2), encoding="utf-8"
     )
     if not start.get("ok") or start.get("call_started") is not True:
-        write_ledger(out_dir, "never_started", detail="call start rejected by provider")
-        fail(f"call did not start: {json.dumps(start.get('error') or start, default=str)[:300]}")
+        detail = "call start rejected by provider"
+        write_local_ledger(out_dir, "never_started", detail=detail)
+        write_ledger_entry(fingerprint, state="never_started", detail=detail)
+        fail(f"call did not start: {mask_sensitive(json.dumps(start.get('error') or start, default=str)[:300], targets)}")
     dialed = provider_destination(start)
     if dialed and dialed != authorized:
-        write_ledger(out_dir, "never_started", detail="provider destination mismatch")
+        # The provider claims a call started, but not to the destination we
+        # authorized. This call is unaccounted for: never redial, recover.
+        run_id = find_key(start, "run_id")
+        write_local_ledger(out_dir, "uncertain", detail="provider destination mismatch", run_id=run_id)
+        write_ledger_entry(
+            fingerprint,
+            state="uncertain",
+            run_id=run_id,
+            detail="provider destination mismatch; do not redial; recover manually",
+        )
         fail(
             f"provider destination mismatch: authorized {mask_number(authorized)}, "
-            f"provider echoed {mask_number(dialed)}. Not polling; investigate before retrying."
+            f"provider echoed {mask_number(dialed)}. The provider may have started an unaccounted "
+            "call. Not polling, not redialing; run calle call recover and investigate."
         )
     (out_dir / "destination-check.json").write_text(
         json.dumps(
@@ -430,39 +523,53 @@ def do_run(task: dict, instructions: str, out_dir: Path) -> dict:
     )
     run_id = find_key(start, "run_id")
     if not run_id:
-        write_ledger(out_dir, "unknown", detail="call started but no run_id captured; recover manually via calle call recover")
+        write_local_ledger(out_dir, "uncertain", detail="call started but no run_id captured; recover manually via calle call recover")
+        write_ledger_entry(
+            fingerprint,
+            state="uncertain",
+            detail="call started but no run_id captured; do not redial; run calle call recover",
+        )
         fail("call started but no run_id found; check start.json and use calle call recover")
-    write_ledger(out_dir, "in_flight", run_id=run_id)
+    write_local_ledger(out_dir, "in_flight", run_id=run_id)
+    write_ledger_entry(fingerprint, state="in_flight", run_id=run_id)
     print(f"call started, run_id {run_id}; polling every 10s")
-    final = poll_until_terminal(str(run_id))
+    final = poll_until_terminal(str(run_id), targets)
     final = mask_sensitive(final, targets)
     (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
-    write_ledger(out_dir, "finished", run_id=run_id, terminal_status=str(find_key(final, "status") or "UNKNOWN"))
+    terminal_status = str(find_key(final, "status") or "UNKNOWN")
+    write_local_ledger(out_dir, "finished", run_id=run_id, terminal_status=terminal_status)
+    write_ledger_entry(fingerprint, state="finished", run_id=run_id, terminal_status=terminal_status)
     return final
 
 
-def do_resume(out_dir: Path) -> dict:
-    """Recover an interrupted run from its ledger. Never dials."""
-    ledger = read_ledger(out_dir)
-    if not ledger:
-        fail(f"no pending.json in {out_dir}; nothing to resume")
-    if (out_dir / "final.json").exists():
-        fail("final.json already exists for this run; use --report to re-verify it")
-    run_id = ledger.get("run_id")
+def do_resume(task: dict, out_dir: Path) -> dict:
+    """Recover an interrupted run from the global ledger. Never dials."""
+    fingerprint = _task_fingerprint(task)
+    entry = ledger_entry(fingerprint)
+    if not entry:
+        fail("no ledger entry for this exact task; nothing to resume (the ledger is keyed on the full task)")
+    if entry.get("state") not in IN_FLIGHT_STATES:
+        fail(f"ledger state for this task is {entry.get('state')}; nothing in flight to resume")
+    expected_callee = _callee_fingerprint(str(task["callee"]))
+    if entry.get("callee_digits_sha256") and entry["callee_digits_sha256"] != expected_callee:
+        fail("task destination does not match the ledger entry; refusing to resume a different call")
+    run_id = entry.get("run_id")
     if not run_id:
         fail(
             "ledger has no run_id (the call may have been lost before the id was recorded). "
             "Do not redial. Run: calle call recover   then re-run with --report on the saved artifact."
         )
     print(f"resuming in-flight call {run_id}; polling every 10s (no new call is placed)")
-    final = poll_until_terminal(str(run_id))
+    final = poll_until_terminal(str(run_id), [])
     final = mask_sensitive(final, [])
     (out_dir / "final.json").write_text(json.dumps(final, indent=2), encoding="utf-8")
-    write_ledger(out_dir, "finished", run_id=run_id, terminal_status=str(find_key(final, "status") or "UNKNOWN"))
+    terminal_status = str(find_key(final, "status") or "UNKNOWN")
+    write_local_ledger(out_dir, "finished", run_id=run_id, terminal_status=terminal_status, resumed=True)
+    write_ledger_entry(fingerprint, state="finished", run_id=run_id, terminal_status=terminal_status, resumed=True)
     return final
 
 
-def poll_until_terminal(run_id: str) -> dict:
+def poll_until_terminal(run_id: str, targets: list[str]) -> dict:
     for _ in range(36):
         time.sleep(10)
         status_out = run_calle(["call", "status", "--run-id", run_id])
@@ -470,7 +577,8 @@ def poll_until_terminal(run_id: str) -> dict:
         activity = find_key(status_out, "activity")
         if isinstance(activity, list) and activity:
             last = activity[-1]
-            print(f"  [{status}] {last.get('message', '')}")
+            message = mask_sensitive(str(last.get("message", "")), targets)
+            print(f"  [{status}] {message}")
         else:
             print(f"  [{status}]")
         if str(status).upper() in TERMINAL:
@@ -481,8 +589,9 @@ def poll_until_terminal(run_id: str) -> dict:
 def do_verify(final: dict, out_dir: Path, targets: list[str]) -> dict:
     proc = subprocess.run([sys.executable, str(VERIFY), "--result", str(out_dir / "final.json")], capture_output=True, text=True)
     report = json.loads(proc.stdout)
+    report = mask_sensitive(report, targets)
     (out_dir / "verification.json").write_text(
-        json.dumps(mask_sensitive(report, targets), indent=2), encoding="utf-8"
+        json.dumps(report, indent=2), encoding="utf-8"
     )
     return report
 
@@ -496,20 +605,22 @@ def print_report(task: dict, final: dict, report: dict) -> None:
     transcript = mask_sensitive(find_key(final, "transcript") or "Not available.", targets)
     print()
     print("[Outcome]")
-    print(report["overall"] if status == "COMPLETED" else f"failed: {status}")
+    print(mask_sensitive(str(report["overall"]), targets) if status == "COMPLETED" else f"failed: {status}")
     print()
     print("[What Happened]")
     print(str(summary)[:600])
     print()
     print("[Result Fields]")
     for name, field in report.get("fields", {}).items():
-        print(f"  {name}: {field['value']} ({field['verdict']})")
+        value = mask_sensitive(str(field["value"]), targets)
+        verdict = mask_sensitive(str(field["verdict"]), targets)
+        print(f"  {name}: {value} ({verdict})")
     if not report.get("fields"):
         print("  no structured fields to verify; read the transcript")
     print()
     print("[Details]")
     print(f"  Callee Number: {mask_number(str(task['callee']))}")
-    print(f"  Call id: {find_key(final, 'call_id') or 'Not available'}")
+    print(f"  Call id: {mask_sensitive(str(find_key(final, 'call_id') or 'Not available'), targets)}")
     print()
     print("[Transcript - untrusted call data]")
     print(str(transcript)[:3000])
@@ -521,7 +632,8 @@ def main() -> None:
     parser.add_argument("--task", help="task JSON file")
     parser.add_argument("--run", action="store_true", help="place one real call after preview+confirmation")
     parser.add_argument("--yes", action="store_true", help="explicit non-interactive confirmation for --run")
-    parser.add_argument("--resume", action="store_true", help="recover an in-flight call from its ledger; never dials")
+    parser.add_argument("--retry", action="store_true", help="allow a new consent-gated call when the ledger shows this task already finished one")
+    parser.add_argument("--resume", action="store_true", help="recover the in-flight call for this exact task; never dials")
     parser.add_argument("--report", help="re-verify an existing run directory")
     parser.add_argument("--out", type=Path, help="output directory for run artifacts")
     args = parser.parse_args()
@@ -546,6 +658,7 @@ def main() -> None:
     map_info = lookup_map(task)
     instructions = render_instructions(task, map_info)
     targets = callee_variants(str(task["callee"]))
+    fingerprint = _task_fingerprint(task)
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     slug = re.sub(r"[^a-z0-9]+", "-", str(task.get("company") or "task").lower()).strip("-")
@@ -557,9 +670,18 @@ def main() -> None:
     (out_dir / "instructions.txt").write_text(
         str(mask_sensitive(instructions, targets)), encoding="utf-8"
     )
+    (out_dir / "preview.txt").write_text(preview_text(task, instructions, map_info), encoding="utf-8")
 
+    if not args.run:
+        print_preview(task, instructions, map_info)
+        print()
+        print("To place this exact call once: python3 run_task.py --task <file> --run")
+        print(f"preview saved to {out_dir}")
+        return
+
+    entry = ledger_entry(fingerprint)
     if args.resume:
-        final = do_resume(out_dir)
+        final = do_resume(task, out_dir)
         report = do_verify(final, out_dir, targets)
         proposal = propose_observation(final)
         (out_dir / "observation-proposal.json").write_text(
@@ -567,22 +689,22 @@ def main() -> None:
         )
         print_report(task, final, report)
         return
-
-    if not args.run:
-        print_preview(task, instructions, map_info)
-        print(f"To place this exact call once: python3 run_task.py --task <file> --run")
-        print(f"preview saved to {out_dir}")
-        return
-
-    blocking_ledger = ledger_blocks_new_call(out_dir)
-    if blocking_ledger:
+    if entry and entry.get("state") in IN_FLIGHT_STATES:
         fail(
-            f"pending.json shows a call may still be in flight (state={blocking_ledger.get('state')}). "
-            "Refusing to place a second call. Use: python3 run_task.py --task <file> --run --resume "
-            f"--out {out_dir}"
+            f"the global ledger shows this exact task already has a call in flight "
+            f"(state={entry.get('state')}, run_id={entry.get('run_id')}). Refusing to place a "
+            "second call. Use: python3 run_task.py --task <file> --run --resume"
+        )
+    if entry and entry.get("state") == "finished" and not args.retry:
+        fail(
+            "the global ledger shows this exact task already placed one call "
+            f"(run_id={entry.get('run_id')}, status={entry.get('terminal_status')}). "
+            "Refusing to dial again without intent: use --resume to inspect, --report to "
+            "re-verify, or add --retry to place a new consent-gated call."
         )
 
     print_preview(task, instructions, map_info)
+    print()
     confirm_or_abort(out_dir, args.yes)
     print(f"placing one real call to {mask_number(str(task['callee']))} (artifacts: {out_dir})")
     final = do_run(task, instructions, out_dir)

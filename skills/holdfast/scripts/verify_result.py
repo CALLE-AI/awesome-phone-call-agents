@@ -2,22 +2,26 @@
 """Cross-check a CALL-E call's structured result against its transcript.
 
 The platform's completion flag is its own judgment, not evidence. This script
-marks each extracted field `verified` only when the transcript contains
-supporting text for it, and reports the call as verified / partially
-verified / unverified accordingly.
+marks each extracted field `verified` only when the transcript proves it, and
+reports the call as verified / partially verified / unverified accordingly.
 
-Field-level binding (not whole-transcript loose matching):
+Evidence model (fail-closed by design):
 
-- Each field is matched inside a *zone*: the transcript sentences that name
-  the field (or a known synonym) plus one sentence of context on each side.
-- Numeric and date-like fields verify only inside their zone. A number that
-  appears elsewhere in the transcript — another daypart, a timestamp, a
-  different reading — does not verify the field.
-- If the zone names the field but shows a different value of comparable
-  magnitude, the field is marked `contradicted` automatically.
-- If the transcript never names the field, non-numeric fields may still
-  verify on a strong global text match, but the verdict says the field name
-  was never spoken. Numeric/date fields do not get this fallback.
+- Provider status gate: `ok: false` or a non-COMPLETED status caps the whole
+  report at `unverified`, no matter how clean the fields look.
+- Speaker gate: only callee-side turns can prove a field. The assistant's
+  own turns ("BOT:") are claims, not evidence.
+- Field anchoring: a field verifies only in the transcript sentence that
+  names it (or a known synonym). Numbers or dates from neighboring
+  sentences, other dayparts, timestamps, or unrelated passages do not count.
+- Negation: a value inside a negated span ("not ready", "isn't held") is
+  not evidence; a negated span that denies the field is `contradicted`.
+- Typed values: alphanumeric references must appear literally; the
+  digit-sequence fallback applies only to values that are pure digits of
+  four or more digits.
+- Verdicts: `verified`, `plausible` (supportive but not conclusive; counts
+  as not verified), `contradicted`, `unverified`. Every non-trivial verdict
+  carries the supporting span and its speaker.
 - A human reviewer may still downgrade any field to `contradicted` with a
   reason; this script's `contradicted` verdicts are heuristics, not proof.
 
@@ -42,6 +46,13 @@ TRANSCRIPT_KEYS = ("transcript_turns", "transcriptTurns", "transcript")
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?;])\s+|\n+")
 TOKEN_SPLIT_RE = re.compile(r"[^a-z0-9]+")
+TURN_PREFIX_RE = re.compile(r"^\s*(?:\[[\d:]+\]\s*)?([A-Za-z]+)\s*:\s*")
+
+NEGATORS = {
+    "not", "no", "never", "isnt", "wasnt", "doesnt", "didnt", "hasnt",
+    "havent", "wont", "cant", "couldnt", "without", "unable", "neither",
+}
+UN_NEGATORS = {"unavailable", "unknown", "unconfirmed", "unverified", "unready"}
 
 DATE_LIKE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$|^\d{1,2}[/.]\d{1,2}([/.]\d{2,4})?$")
 
@@ -55,51 +66,64 @@ SPOKEN_DATE_RES = (
     re.compile(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+of\s+({MONTH_NAME_RE})\b", re.IGNORECASE),
 )
 
-
-def dates_in_text(text: str) -> set[tuple[int, int]]:
-    """(month, day) pairs spoken in the text, whatever the format."""
-    found: set[tuple[int, int]] = set()
-    for match in SPOKEN_DATE_RES[0].finditer(text):
-        found.add((MONTH_NAMES[match.group(1).lower()], int(match.group(2))))
-    for match in SPOKEN_DATE_RES[1].finditer(text):
-        found.add((MONTH_NAMES[match.group(2).lower()], int(match.group(1))))
-    return found
-
-
-def value_date_parts(value: object) -> tuple[int, int] | None:
-    text = str(value).strip()
-    match = re.match(r"^\d{4}-(\d{2})-(\d{2})", text)
-    if match:
-        return (int(match.group(1)), int(match.group(2)))
-    match = re.match(r"^(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?$", text)
-    if match:
-        return (int(match.group(1)), int(match.group(2)))
-    return None
-
 FIELD_HINT_SYNONYMS = {
     "high": ("high", "highs"),
     "low": ("low", "lows"),
     "temp": ("temperature", "temp"),
     "temperature": ("temperature", "temp"),
-    "status": ("status",),
+    "status": ("status", "ready", "available"),
     "forecast": ("forecast",),
     "summary": ("summary", "skies"),
     "ready": ("ready", "available", "filled"),
-    "pickup": ("pickup", "pick up", "ready"),
+    "pickup": ("pickup", "pick up", "ready", "held"),
     "ref": ("reference", "confirmation", "number", "ref"),
     "reference": ("reference", "confirmation", "number"),
     "confirmation": ("confirmation", "reference", "number"),
     "hours": ("hours", "open", "closing", "closings"),
     "balance": ("balance", "owed", "due"),
     "appointment": ("appointment", "scheduled", "visit"),
-    "date": ("date", "on"),
-    "time": ("time", "at", "am", "pm"),
+    "date": ("date",),
+    "time": ("time",),
 }
 
 GENERIC_FIELD_TOKENS = {
     "today", "tomorrow", "tonight", "current", "now", "value", "result",
-    "field", "the", "a", "an", "of", "for", "to", "and", "weather",
+    "field", "the", "a", "an", "of", "for", "to", "and", "weather", "by",
+    "f", "c",
 }
+
+DAYPART_TOKENS = {"today", "tonight", "tomorrow", "morning", "afternoon", "evening"}
+CALENDAR_DAYPARTS = {"today", "tonight", "tomorrow"}
+
+
+def field_daypart(field_name: str) -> str | None:
+    for token in TOKEN_SPLIT_RE.split(field_name.lower()):
+        if token in CALENDAR_DAYPARTS:
+            return token
+    return None
+
+NUMBER_WORDS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+    "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+    "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
+    "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+    "eighty": "80", "ninety": "90",
+}
+
+DECADE_WORDS = {"eighties": "8", "nineties": "9", "seventies": "7", "sixties": "6", "fifties": "5"}
+
+RANGE_MODIFIER_SPAN = {
+    "": (0, 9), None: (0, 9),
+    "mid": (3, 7), "middle": (3, 7),
+    "lower": (0, 3), "low": (0, 3),
+    "upper": (7, 9), "high": (7, 9),
+    "mid to upper": (3, 9), "mid to lower": (0, 7),
+}
+RANGE_RE = re.compile(r"\b(mid to upper|mid to lower|mid|lower|upper)\s+(\d0)s\b", re.IGNORECASE)
+BARE_RANGE_RE = re.compile(r"\b(\d0)s\b")
+DECADE_RANGE_RE = re.compile(r"\b(mid to upper|mid to lower|mid|lower|upper)?\s*(eighties|nineties|seventies|sixties|fifties)\b", re.IGNORECASE)
 
 
 def fail(message: str) -> None:
@@ -150,52 +174,6 @@ def digit_string(text: object) -> str:
     return re.sub(r"\D", "", str(text))
 
 
-NUMBER_WORDS = {
-    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
-    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
-    "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
-    "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
-    "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
-    "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
-    "eighty": "80", "ninety": "90",
-}
-
-DECADE_WORDS = {"eighties": "8", "nineties": "9", "seventies": "7", "sixties": "6", "fifties": "5"}
-
-RANGE_MODIFIER_SPAN = {
-    "": (0, 9), None: (0, 9),
-    "mid": (3, 7), "middle": (3, 7),
-    "lower": (0, 3), "low": (0, 3),
-    "upper": (7, 9), "high": (7, 9),
-    "mid to upper": (3, 9), "mid to lower": (0, 7),
-}
-RANGE_RE = re.compile(r"\b(mid to upper|mid to lower|mid|lower|upper)\s+(\d0)s\b", re.IGNORECASE)
-BARE_RANGE_RE = re.compile(r"\b(\d0)s\b")
-DECADE_RANGE_RE = re.compile(r"\b(mid to upper|mid to lower|mid|lower|upper)?\s*(eighties|nineties|seventies|sixties|fifties)\b", re.IGNORECASE)
-
-
-def ranges_in_text(text: str) -> list[tuple[int, int, str]]:
-    """Spoken temperature-style ranges: 'mid 80s' -> 83-87, 'lower nineties'
-    -> 90-93, plain '80s'/'eighties' -> 80-89. Returns (lo, hi, phrase)."""
-    ranges: list[tuple[int, int, str]] = []
-    for match in RANGE_RE.finditer(text):
-        mod, decade = match.group(1).lower(), match.group(2)
-        base = int(decade)
-        lo_off, hi_off = RANGE_MODIFIER_SPAN.get(mod, (0, 9))
-        ranges.append((base + lo_off, base + hi_off, match.group(0)))
-    for match in DECADE_RANGE_RE.finditer(text):
-        mod = (match.group(1) or "").lower() or None
-        base = int(DECADE_WORDS[match.group(2).lower()]) * 10
-        lo_off, hi_off = RANGE_MODIFIER_SPAN.get(mod, (0, 9))
-        ranges.append((base + lo_off, base + hi_off, match.group(0)))
-    covered = [r[:2] for r in ranges]
-    for match in BARE_RANGE_RE.finditer(text):
-        base = int(match.group(1))
-        if (base, base + 9) not in covered:
-            ranges.append((base, base + 9, match.group(0)))
-    return ranges
-
-
 def number_variants(value: object) -> set[str]:
     """Digit strings the value might appear as, including spelled-out forms."""
     digits = digit_string(value)
@@ -225,11 +203,17 @@ def is_numeric_like(value: object) -> bool:
     text = str(value).strip()
     if not text:
         return False
-    return bool(number_variants(text)) or bool(re.fullmatch(r"-?\d+(\.\d+)?", text))
+    if re.fullmatch(r"-?\d+(\.\d+)?", text):
+        return True
+    return any(v.isdigit() for v in number_variants(text))
 
 
 def is_date_like(value: object) -> bool:
     return bool(DATE_LIKE_RE.match(str(value).strip()))
+
+
+def is_pure_digit_value(value: object) -> bool:
+    return bool(re.fullmatch(r"\d{4,15}", str(value).strip()))
 
 
 def field_hints(field_name: str) -> set[str]:
@@ -246,43 +230,95 @@ def field_hints(field_name: str) -> set[str]:
     return hints
 
 
-def split_sentences(transcript: str) -> list[str]:
-    return [s for s in (s.strip() for s in SENTENCE_SPLIT_RE.split(transcript)) if s]
+# --------------------------------------------------------------------------
+# Turn and sentence model
+# --------------------------------------------------------------------------
+
+class Turn:
+    def __init__(self, raw: str, speaker: str, text: str):
+        self.raw = raw
+        self.speaker = speaker  # "assistant" | "callee" | "unknown"
+        self.text = text
+
+    def sentences(self) -> list[str]:
+        return [s for s in (s.strip() for s in SENTENCE_SPLIT_RE.split(self.text)) if s]
+
+
+def split_turns(transcript: str) -> list[Turn]:
+    turns: list[Turn] = []
+    for raw in transcript.splitlines():
+        if not raw.strip():
+            continue
+        match = TURN_PREFIX_RE.match(raw)
+        speaker_label = match.group(1).lower() if match else ""
+        text = TURN_PREFIX_RE.sub("", raw).strip()
+        if speaker_label in ("bot", "assistant", "ai", "agent"):
+            speaker = "assistant"
+        elif speaker_label in ("user", "callee", "human", "system", "recording", "ivr"):
+            speaker = "callee"
+        else:
+            speaker = "unknown"
+        turns.append(Turn(raw, speaker, text))
+    return turns
 
 
 def sentence_tokens(sentence: str) -> set[str]:
     return set(TOKEN_SPLIT_RE.split(normalize(sentence)))
 
 
-def zone_indices(sentences: list[str], hints: set[str]) -> list[int]:
-    hits = []
-    for i, sentence in enumerate(sentences):
-        tokens = sentence_tokens(sentence)
-        if tokens & hints:
-            hits.append(i)
-    zone: set[int] = set()
-    for i in hits:
-        zone.update(range(max(0, i - 1), min(len(sentences), i + 2)))
-    return sorted(zone)
+def negated_span(sentence: str, value_text: str) -> bool:
+    """True when the matched value sits inside a negated span."""
+    norm = normalize(sentence)
+    pos = norm.find(value_text)
+    if pos == -1:
+        return False
+    before = norm[max(0, pos - 48):pos]
+    return bool(re.search(
+        r"\b(no|not|never|isn't|wasn't|doesn't|didn't|hasn't|haven't|won't|can't|without|un\w+)\b",
+        before,
+    ))
 
 
-def value_in_text(value: object, text: str) -> tuple[bool, str | None]:
-    norm_text = normalize(text)
-    norm_value = normalize(value)
-    if norm_value and norm_value in norm_text:
-        pos = norm_text.find(norm_value)
-        excerpt = text[max(0, pos - 60): pos + len(str(value)) + 60].strip()
-        return True, excerpt
-    compact_value = compact(value)
-    if len(compact_value) >= 3 and compact_value in compact(text):
-        return True, f"value present with different spacing/spelling: {compact_value}"
-    for variant in number_variants(value):
-        if variant.isdigit():
-            if variant in digit_string(text):
-                return True, f"digit sequence {variant} present"
-        elif variant in norm_text:
-            return True, f"spoken form '{variant}' present"
-    return False, None
+def ranges_in_text(text: str) -> list[tuple[int, int, str]]:
+    """Spoken temperature-style ranges: 'mid 80s' -> 83-87, 'lower nineties'
+    -> 90-93, plain '80s'/'eighties' -> 80-89. Returns (lo, hi, phrase)."""
+    ranges: list[tuple[int, int, str]] = []
+    for match in RANGE_RE.finditer(text):
+        mod, decade = match.group(1).lower(), match.group(2)
+        base = int(decade)
+        lo_off, hi_off = RANGE_MODIFIER_SPAN.get(mod, (0, 9))
+        ranges.append((base + lo_off, base + hi_off, match.group(0)))
+    for match in DECADE_RANGE_RE.finditer(text):
+        mod = (match.group(1) or "").lower() or None
+        base = int(DECADE_WORDS[match.group(2).lower()]) * 10
+        lo_off, hi_off = RANGE_MODIFIER_SPAN.get(mod, (0, 9))
+        ranges.append((base + lo_off, base + hi_off, match.group(0)))
+    covered = [r[:2] for r in ranges]
+    for match in BARE_RANGE_RE.finditer(text):
+        base = int(match.group(1))
+        if (base, base + 9) not in covered:
+            ranges.append((base, base + 9, match.group(0)))
+    return ranges
+
+
+def dates_in_text(text: str) -> set[tuple[int, int]]:
+    found: set[tuple[int, int]] = set()
+    for match in SPOKEN_DATE_RES[0].finditer(text):
+        found.add((MONTH_NAMES[match.group(1).lower()], int(match.group(2))))
+    for match in SPOKEN_DATE_RES[1].finditer(text):
+        found.add((MONTH_NAMES[match.group(2).lower()], int(match.group(1))))
+    return found
+
+
+def value_date_parts(value: object) -> tuple[int, int] | None:
+    text = str(value).strip()
+    match = re.match(r"^\d{4}-(\d{2})-(\d{2})", text)
+    if match:
+        return (int(match.group(1)), int(match.group(2)))
+    match = re.match(r"^(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?$", text)
+    if match:
+        return (int(match.group(1)), int(match.group(2)))
+    return None
 
 
 def numbers_in_text(text: str) -> set[str]:
@@ -310,59 +346,213 @@ def comparable(value: object, other: str) -> bool:
     return len(digits) == len(other)
 
 
-def verdict_for(field_name: str, value: object, transcript: str) -> tuple[str, str | None]:
-    if value is None or isinstance(value, bool) or isinstance(value, (list, dict)):
-        return "unverified", "not automatically verifiable (null, boolean, or structured value)"
+def find_value_in_sentence(value: object, sentence: str) -> tuple[bool, str | None, bool]:
+    """Return (found, normalized_match, negated) for one sentence."""
+    norm_sentence = normalize(sentence)
+    norm_value = normalize(value)
+    matched_on: str | None = None
+    if norm_value and norm_value in norm_sentence:
+        matched_on = norm_value
+    else:
+        compact_value = compact(value)
+        # compact fallback only for genuinely alphanumeric-resistant matches;
+        # pure digit values skip it (digit fallback below handles those)
+        if not is_pure_digit_value(value) and len(compact_value) >= 4 and compact_value in compact(sentence):
+            matched_on = f"compact:{compact_value}"
+    if matched_on:
+        negated = negated_span(sentence, matched_on.split(":", 1)[-1] if matched_on.startswith("compact:") else norm_value)
+        return True, matched_on, negated
+    digits = digit_string(value)
+    if is_pure_digit_value(value) and len(digits) >= 4 and digits in digit_string(sentence):
+        return True, f"digits:{digits}", negated_span(sentence, digits)
+    for variant in number_variants(value):
+        if variant.isdigit():
+            continue  # covered by the pure-digit rule above
+        if re.search(rf"\b{re.escape(variant)}\b", norm_sentence):
+            return True, f"spoken:{variant}", negated_span(sentence, variant)
+    return False, None, False
 
-    sentences = split_sentences(transcript)
+
+def verdict_for(field_name: str, value: object, transcript: str) -> dict:
+    if value is None or isinstance(value, bool) or isinstance(value, (list, dict)):
+        return {
+            "value": value,
+            "verdict": "unverified",
+            "evidence": "not automatically verifiable (null, boolean, or structured value)",
+        }
+
     hints = field_hints(field_name)
     strict = is_numeric_like(value) or is_date_like(value)
-    zone = zone_indices(sentences, hints) if hints else []
+    turns = split_turns(transcript)
+    digits = digit_string(value)
+    daypart = field_daypart(field_name)
 
-    if zone:
-        zone_text = " ".join(sentences[i] for i in zone)
-        found, excerpt = value_in_text(value, zone_text)
-        if found:
-            return "verified", f"field named in transcript; value found in the same context: {excerpt}"
-        if strict:
+    # 1) Sentence-exact, callee-side, non-negated evidence: the sentence
+    #    naming the field also carries the value (literally, as a spoken
+    #    variant, as a containing range, or as a matching date). A sentence
+    #    anchored to a different daypart ("today" vs a "tomorrow" field)
+    #    never verifies the field.
+    for turn in turns:
+        if turn.speaker == "assistant":
+            continue
+        for sentence in turn.sentences():
+            tokens = sentence_tokens(sentence)
+            if not tokens & hints:
+                continue
+            if daypart and (tokens & (CALENDAR_DAYPARTS - {daypart})):
+                continue
             if is_date_like(value):
                 parts = value_date_parts(value)
-                if parts and parts in dates_in_text(zone_text):
-                    return "verified", f"date {value} matches a spoken date in the field's context"
-            digits = digit_string(value)
-            if digits.isdigit():
-                spoken_ranges = ranges_in_text(zone_text)
+                if parts and parts in dates_in_text(sentence) and not negated_span(sentence, str(value)):
+                    return {
+                        "value": value,
+                        "verdict": "verified",
+                        "evidence": f"date {value} matches a spoken date in the field's sentence",
+                        "speaker": turn.speaker,
+                        "span": sentence[:220],
+                    }
+                continue
+            found, matched_on, negated = find_value_in_sentence(value, sentence)
+            if found and not negated:
+                return {
+                    "value": value,
+                    "verdict": "verified",
+                    "evidence": f"field named in a callee turn; value matched ('{matched_on}')",
+                    "speaker": turn.speaker,
+                    "span": sentence[:220],
+                }
+            if strict and digits.isdigit():
                 n = int(digits)
-                for lo, hi, phrase in spoken_ranges:
-                    if lo <= n <= hi:
-                        return "verified", f"value {value} is consistent with the spoken range '{phrase}' ({lo}-{hi}) near the field name"
-                nearby_numbers = numbers_in_text(zone_text)
-            else:
-                nearby_numbers = numbers_in_text(zone_text)
-            contradictions = [
-                num for num in nearby_numbers
-                if digit_string(value) and num != digit_string(value) and comparable(value, num)
-            ]
-            if contradictions:
-                return (
-                    "contradicted",
-                    f"transcript names the field but gives {contradictions[0]} where the result claims {value}: {zone_text[:200]}",
-                )
-            return "unverified", "field named in transcript, but the claimed value does not appear near it"
-        # non-numeric field: allow a global match but say the field name was
-        # never spoken near it
-        found, excerpt = value_in_text(value, transcript)
-        if found:
-            return "verified", f"value found globally, not near the field name (weak match): {excerpt}"
-        return "unverified", "field named in transcript, but the claimed value appears nowhere"
+                for lo, hi, phrase in ranges_in_text(sentence):
+                    if lo <= n <= hi and not negated_span(sentence, phrase):
+                        return {
+                            "value": value,
+                            "verdict": "verified",
+                            "evidence": f"value {value} is consistent with the spoken range '{phrase}' ({lo}-{hi}) in the field's sentence",
+                            "speaker": turn.speaker,
+                            "span": sentence[:220],
+                        }
 
-    # No hint sentence at all.
+    # 2) Negated, contradicted, or wrong-daypart evidence in the field's own
+    #    sentence.
+    for turn in turns:
+        if turn.speaker == "assistant":
+            continue
+        for sentence in turn.sentences():
+            tokens = sentence_tokens(sentence)
+            if not tokens & hints:
+                continue
+            daypart_conflict = bool(daypart and (tokens & (CALENDAR_DAYPARTS - {daypart})))
+            found, matched_on, negated = find_value_in_sentence(value, sentence)
+            if found and negated:
+                return {
+                    "value": value,
+                    "verdict": "contradicted",
+                    "evidence": f"transcript denies the field value ('{matched_on}' appears in a negated span)",
+                    "speaker": turn.speaker,
+                    "span": sentence[:220],
+                }
+            if found and daypart_conflict:
+                return {
+                    "value": value,
+                    "verdict": "unverified",
+                    "evidence": f"value appears under a different daypart than the field's '{daypart}'; not evidence for this field",
+                    "speaker": turn.speaker,
+                    "span": sentence[:220],
+                }
+            if daypart_conflict:
+                continue
+            if strict:
+                if is_date_like(value):
+                    continue
+                if digits.isdigit():
+                    n = int(digits)
+                    in_range = any(lo <= n <= hi for lo, hi, _ in ranges_in_text(sentence))
+                    if in_range:
+                        continue
+                contradicted_number = contradicting_number_in_sentence(value, sentence)
+                if contradicted_number:
+                    return {
+                        "value": value,
+                        "verdict": "contradicted",
+                        "evidence": f"transcript names the field but gives {contradicted_number} where the result claims {value}",
+                        "speaker": turn.speaker,
+                        "span": sentence[:220],
+                    }
+
+    # 3) Plausible: same turn but a different sentence, or assistant-only.
+    for turn in turns:
+        if turn.speaker == "assistant":
+            continue
+        for sentence in turn.sentences():
+            tokens = sentence_tokens(sentence)
+            if tokens & hints:
+                continue
+            found, matched_on, negated = find_value_in_sentence(value, sentence)
+            if found and not negated:
+                return {
+                    "value": value,
+                    "verdict": "plausible",
+                    "evidence": f"value found in the same turn but not in the sentence naming the field ('{matched_on}')",
+                    "speaker": turn.speaker,
+                    "span": sentence[:220],
+                }
+    for turn in turns:
+        if turn.speaker != "assistant":
+            continue
+        for sentence in turn.sentences():
+            tokens = sentence_tokens(sentence)
+            if not tokens & hints:
+                continue
+            found, matched_on, negated = find_value_in_sentence(value, sentence)
+            if found and not negated:
+                return {
+                    "value": value,
+                    "verdict": "plausible",
+                    "evidence": f"only the assistant's own turn supports this field ('{matched_on}'); not independent evidence",
+                    "speaker": turn.speaker,
+                    "span": sentence[:220],
+                }
+
     if strict:
-        return "unverified", "field name never spoken in transcript; numeric/date values need field context"
-    found, excerpt = value_in_text(value, transcript)
-    if found:
-        return "verified", f"field name never spoken; value matched globally (weak match): {excerpt}"
-    return "unverified", "value not found in transcript"
+        return {
+            "value": value,
+            "verdict": "unverified",
+            "evidence": "no callee sentence names the field with this value; numeric/date fields require that anchor",
+        }
+    return {
+        "value": value,
+        "verdict": "unverified",
+        "evidence": "value not found in any callee turn",
+    }
+
+
+def contradicting_number_in_sentence(value: object, sentence: str) -> str | None:
+    digits = digit_string(value)
+    if not digits.isdigit():
+        return None
+    n = int(digits)
+    for lo, hi, phrase in ranges_in_text(sentence):
+        if lo <= n <= hi:
+            return None
+    for num in numbers_in_text(sentence):
+        if comparable(value, num):
+            return num
+    return None
+
+
+NON_TERMINAL_OK = {"COMPLETED"}
+
+
+def provider_blocks_verification(result: dict) -> str | None:
+    """Return a reason string when provider-level signals cap the report."""
+    ok = find_key(result, ("ok",))
+    if ok is False:
+        return "provider reported ok=false; the call output cannot be trusted"
+    status = find_key(result, ("status",))
+    if status is not None and str(status).upper() not in NON_TERMINAL_OK:
+        return f"call status is {status}, not COMPLETED; fields are not evidence of success"
+    return None
 
 
 def main() -> None:
@@ -382,6 +572,9 @@ def main() -> None:
     task_completed = bool(find_key(result, ("task_completed", "taskCompleted")))
 
     notes: list[str] = []
+    block = provider_blocks_verification(result)
+    if block:
+        notes.append(block)
     if not transcript:
         notes.append("no transcript found; nothing can be verified")
     if task_completed:
@@ -390,14 +583,15 @@ def main() -> None:
     fields: dict[str, dict] = {}
     if isinstance(structured, dict) and structured:
         for name, value in structured.items():
-            verdict, evidence = verdict_for(name, value, transcript)
-            fields[name] = {"value": value, "verdict": verdict, "evidence": evidence}
+            fields[name] = verdict_for(name, value, transcript)
     else:
         notes.append("no structured_result found; nothing extracted to verify")
 
     verified = sum(1 for f in fields.values() if f["verdict"] == "verified")
     contradicted = sum(1 for f in fields.values() if f["verdict"] == "contradicted")
-    if not fields:
+    if block:
+        overall = "unverified"
+    elif not fields:
         overall = "unverified"
     elif contradicted:
         overall = "contradicted"
