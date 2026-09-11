@@ -91,6 +91,9 @@ export async function POST(req: NextRequest) {
 
   const idempotencyKey = `payment-recovery:${callLog.id}:${callLog.attempt_number}`;
 
+  // Transition out of pending_confirmation immediately so duplicate clicks/POSTs are halted
+  callLogsTable.markInitiating(callLog.id);
+
   try {
     const call = await placeRecoveryCall({
       subscriber,
@@ -103,10 +106,16 @@ export async function POST(req: NextRequest) {
     callLogsTable.attachCalleCall(callLog.id, call.id);
     return NextResponse.json({ calleCallId: call.id, isMock: isCalleOfflineMock });
   } catch (err) {
+    // On any unconfirmed create outcome, mark attempt uncertain and reconciliation-only
+    callLogsTable.markUncertain(callLog.id, "Create outcome unconfirmed; marked uncertain for operator reconciliation");
+
     const message =
       err && typeof err === "object" && "message" in err
         ? String((err as { message: unknown }).message)
         : "CALL-E rejected the call request";
-    return NextResponse.json({ error: message }, { status: 422 });
+    return NextResponse.json(
+      { error: message, status: "uncertain", reconciliationOnly: true },
+      { status: 422 }
+    );
   }
 }

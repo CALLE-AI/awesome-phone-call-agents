@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { stripe } from "@/lib/stripe";
 import { callLogsTable, subscribersTable, webhookEventsTable } from "@/lib/db";
 import type { PaymentRecoveryDecision } from "@/lib/calle";
 import { MAX_CALL_ATTEMPTS, followUpDelayMinutes, fetchVerifiedCalleCall } from "@/lib/calle";
-import { maskPhone } from "@/lib/masking";
+import { deepSanitizeText } from "@/lib/masking";
+import { validateWebhookAuth } from "@/lib/auth";
 
 /**
  * Authoritative Webhook Receiver for CALL-E terminal call events.
- * 
- * SECURITY COMPLIANCE:
- * Webhook deliveries are treated as an untrusted public notification.
- * This route NEVER trusts, persists, exposes, or acts upon caller-supplied
- * transcript or structured result payloads.
- * Instead, it extracts the call ID, re-fetches the authoritative call object
- * directly from the authenticated CALL-E server API, and verifies completion
- * before executing any Stripe fulfillment actions.
+ *
+ * SECURITY & GOVERNANCE COMPLIANCE:
+ * 1. Authenticates webhook delivery using CALLE_WEBHOOK_SECRET. Fails closed if not configured.
+ * 2. Deduplicates webhook events via unique event ID.
+ * 3. Never trusts or acts upon caller-supplied transcript or result bodies.
+ * 4. Re-fetches the authoritative call object directly from the CALL-E server API.
+ * 5. Strictly binds the terminal result to the exact local call, stored recipient, and intent.
+ * 6. Keeps financial and subscription resolutions strictly ADVISORY until confirmed by human operator.
+ * 7. Deep-sanitizes all evidence and transcript data before storage.
  */
 export async function POST(req: NextRequest) {
+  // 1. Authenticate webhook signal
+  if (!validateWebhookAuth(req, process.env.CALLE_WEBHOOK_SECRET)) {
+    return NextResponse.json(
+      { error: "Unauthorized: Missing or invalid CALL-E webhook secret" },
+      { status: 401 }
+    );
+  }
+
   let event: { id?: string; type?: string; data?: { id?: string } };
   try {
     const rawBody = await req.text();
@@ -62,69 +71,65 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const subscriber = subscribersTable.get(callLog.subscriber_id);
+  if (!subscriber) {
+    return NextResponse.json({ error: "Subscriber record not found" }, { status: 404 });
+  }
+
+  // Exact Binding Verification: terminal result must match exact local call and stored destination
+  const recipientPhone =
+    verifiedCall.recipients?.[0]?.phones?.[0] ?? null;
+
+  if (recipientPhone && subscriber.phone && recipientPhone.trim() !== subscriber.phone.trim()) {
+    console.error(`[Webhook Security] Destination mismatch: verified ${recipientPhone} does not match stored ${subscriber.phone}`);
+    callLogsTable.completeByCalleCallId(callId, {
+      status: "failed",
+      decision: "unknown",
+      evidence: "Rejected: destination mismatch between provider record and stored subscriber.",
+      raw_result: deepSanitizeText(JSON.stringify(verifiedCall)),
+      action_taken: "Marked uncertain: provider destination did not match stored subscriber.",
+      recovered_cents: 0,
+    });
+    return NextResponse.json({ error: "Destination binding validation failed" }, { status: 422 });
+  }
+
   // Extract decision and evidence from verified server object only
   const structured = (verifiedCall.structuredResult || verifiedCall.recipients?.[0]?.structuredResult) as
     | { decision?: PaymentRecoveryDecision; evidence?: string }
     | null;
 
   const decision: PaymentRecoveryDecision = structured?.decision ?? "unknown";
-  const evidence = structured?.evidence ?? null;
-  const subscriber = subscribersTable.get(callLog.subscriber_id);
+  const evidence = deepSanitizeText(structured?.evidence ?? "");
 
-  let actionTaken: string | null = null;
+  // All financial/subscription decisions remain strictly ADVISORY pending human operator confirmation.
+  // Autonomous financial execution solely from structured call output is explicitly prevented.
+  let actionTaken: string;
   let actionLink: string | null = null;
-  let recoveredCents = 0;
+  const recoveredCents = 0; // Remains 0 until human operator executes charge
 
   if (decision === "retry_now") {
-    try {
-      // Deterministic idempotency key halts duplicate or conflicting side effects
-      const charge = await stripe.charges.create(
-        {
-          amount: subscriber?.amount_cents ?? 2900,
-          currency: "usd",
-          source: "tok_visa",
-          description: `Recover: Re-charge authorized by customer during verified CALL-E call (${callId})`,
-        },
-        { idempotencyKey: `recovery-charge-${callLog.id}` }
-      );
-
-      recoveredCents = subscriber?.amount_cents ?? 0;
-      actionTaken = `Payment of $${(recoveredCents / 100).toFixed(2)} settled on Stripe (${charge.id})`;
-    } catch (stripeErr) {
-      actionTaken = `Re-charge attempted: ${stripeErr instanceof Error ? stripeErr.message : "processing failed"}`;
-    }
+    actionTaken = "Advisory recommendation: Customer indicated affirmative retry consent. Awaiting human operator approval to execute charge.";
   } else if (decision === "update_card") {
-    const portalUrl = `https://billing.stripe.com/p/session/recover_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
-    actionLink = portalUrl;
-    const masked = maskPhone(subscriber?.phone ?? "");
-    actionTaken = `Dispatched SMS to ${masked} with secure card update link`;
+    actionLink = `https://billing.stripe.com/p/session/demo_recover_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    actionTaken = "Advisory recommendation: Customer requested card update self-service link. Ready for operator dispatch.";
   } else if (decision === "pause_subscription") {
-    actionTaken = "Subscription paused for 30 days per customer request";
+    actionTaken = "Advisory recommendation: Customer requested 30-day grace pause. Awaiting human operator approval.";
   } else if (decision === "no_answer") {
-    actionTaken = "Customer did not answer; evaluating follow-up eligibility";
+    actionTaken = "Customer unavailable; evaluating bounded follow-up eligibility.";
   } else {
-    actionTaken = "Ambiguous outcome; halted for human operator review";
+    actionTaken = "Uncertain/ambiguous outcome; preserved for human operator reconciliation.";
   }
 
-  // Persist authoritative result
+  // Persist authoritative, sanitized result
   callLogsTable.completeByCalleCallId(callId, {
     status: verifiedCall.status === "completed" ? "completed" : "failed",
     decision,
-    evidence,
-    raw_result: JSON.stringify(verifiedCall),
+    evidence: evidence || null,
+    raw_result: deepSanitizeText(JSON.stringify(verifiedCall)),
     action_taken: actionTaken,
     action_link: actionLink,
     recovered_cents: recoveredCents,
   });
-
-  const nextStatus =
-    decision === "retry_now" || decision === "update_card"
-      ? "active"
-      : decision === "pause_subscription"
-      ? "paused"
-      : "past_due";
-
-  subscribersTable.updateStatus(callLog.subscriber_id, nextStatus);
 
   // Enforce bounded no-answer follow-up policy
   if (decision === "no_answer") {
@@ -143,10 +148,9 @@ export async function POST(req: NextRequest) {
         scheduled_for: scheduledFor,
       });
     } else if (attemptsSoFar >= MAX_CALL_ATTEMPTS) {
-      // Strictly mark chain exhausted and log bounded termination
       console.log(`[Follow-up Safety] Bounded ceiling reached for chain ${callLog.chain_id} (${MAX_CALL_ATTEMPTS} attempts). No further retries.`);
     }
   }
 
-  return NextResponse.json({ ok: true, verified: true });
+  return NextResponse.json({ ok: true, verified: true, advisory: true });
 }

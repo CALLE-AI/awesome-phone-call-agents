@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callLogsTable, promoteDueScheduledCalls } from "@/lib/db";
 import { buildRecoveryCallTask } from "@/lib/calle";
 import { validateApiAuth } from "@/lib/auth";
-import { maskPhone } from "@/lib/masking";
+import { maskPhone, deepSanitizeText } from "@/lib/masking";
 
 export async function GET(req: NextRequest) {
   if (!validateApiAuth(req)) {
@@ -52,11 +52,18 @@ export async function GET(req: NextRequest) {
           recipient?.attempts?.[0]?.transcriptTurns ||
           [];
 
+        const sanitizedTurns = turns.map((turn: { offset_seconds?: number; speaker?: string; text?: string }) => ({
+          ...turn,
+          text: deepSanitizeText(turn.text ?? ""),
+        }));
+
         intelligence = {
-          summary: raw.summary || null,
+          summary: raw.summary ? deepSanitizeText(raw.summary) : null,
           completionConfidence: raw.completion_confidence || null,
-          evidenceList: Array.isArray(raw.evidence) ? raw.evidence : [],
-          transcriptTurns: turns,
+          evidenceList: Array.isArray(raw.evidence)
+            ? raw.evidence.map((e: string) => deepSanitizeText(String(e)))
+            : [],
+          transcriptTurns: sanitizedTurns,
         };
       } catch {}
     }

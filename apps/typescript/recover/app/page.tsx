@@ -277,9 +277,9 @@ function fmtMoney(cents: number): string {
 
 const EMPTY_FORM = { name: "", phone: "+12763229632", email: "", planName: "", amountDollars: "", region: "US", locale: "en-US" };
 
-// Same-origin dashboard requests are auto-authorized via sec-fetch-site header in dev.
-// Include the demo key explicitly so the dashboard works even in strict production-like mode.
-const AUTH_HEADERS = { "x-recover-key": "recover_demo_key_sec_9942" };
+// Attach configured API key header from environment if provided
+const CONFIGURED_KEY = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RECOVER_API_KEY?.trim() : "";
+const AUTH_HEADERS: Record<string, string> = CONFIGURED_KEY ? { "x-recover-key": CONFIGURED_KEY } : {};
 
 // ─── Main Dashboard ───────────────────────────────────────
 

@@ -1,47 +1,47 @@
 <div align="center">
   <img src="public/logo.png" alt="Recover Logo" width="120" />
   <h1>Recover — AI Voice Payment Recovery Agent</h1>
-  <p><strong>Built for the <a href="https://call-e.devpost.com/">CALL-E: &ldquo;Your Code Is Calling&rdquo; Hackathon</a></strong></p>
-  <p><em>Catches failed subscription payments the instant they decline — and calls customers live to get a real decision.</em></p>
+  <p><strong>Order / Exception Follow-Up Reference Application for the <a href="https://call-e.devpost.com/">CALL-E Hackathon</a></strong></p>
+  <p><em>Follows up with subscribers on failed billing charges to capture conversational decisions with strict human-in-the-loop safety gates.</em></p>
 </div>
 
 ---
 
-## 🎯 The Problem
+## 🎯 Purpose & Problem Statement
 
-Involuntary churn (failed cards) accounts for **20–40% of all SaaS subscription cancellations**. Every SaaS company sends dunning emails. Nobody reads them. Customers forget, subscriptions lapse, and revenue disappears silently.
+Involuntary billing failures (such as card expiration or temporary bank declines) often lead to silent subscription cancellations when automated dunning emails go unread.
 
-**Recover** turns that silent failure into a real-time conversation.
+**Recover** provides an interactive voice follow-up workflow powered by **CALL-E**:
+1. Captures a failed payment event.
+2. Formulates an outbound call task with a mandatory human safety gate.
+3. The AI agent conducts an outbound telephone conversation to clarify intent (`retry_now`, `update_card`, `pause_subscription`, or `no_answer`).
+4. Structures the customer decision and presents an **advisory resolution** for human operator review and execution.
 
 ---
 
-## 💡 How It Works
+## 💡 Workflow
 
 ```
-Stripe payment fails
+Subscription payment fails
       │
       ▼
-Recover catches the event instantly
+Recover records the exception
       │
       ▼
-AI agent calls the customer live (via CALL-E)
+Operator reviews task in Safety Gate & approves
       │
       ▼
-Customer says: "retry now" / "update card" / "pause"
+AI voice agent calls customer (via CALL-E)
       │
       ▼
-Recover executes the action automatically
+Customer decision captured: "retry now" / "update card" / "pause"
       │
       ▼
-Revenue saved. Subscription preserved.
+Authoritative webhook re-fetches & validates terminal result
+      │
+      ▼
+Outcome presented as ADVISORY resolution for human operator review
 ```
-
-**Key differentiators:**
-- **Real-time:** Call goes out within seconds of the failed charge, not 24h later
-- **Conversational:** Customer explains their situation in plain language — expired card, wrong bank, travelling, etc.
-- **Actionable:** Three structured outcomes (`retry_now`, `update_card`, `pause_subscription`) trigger real Stripe actions
-- **Safe:** Every call requires explicit operator confirmation before CALL-E dials a real number
-- **Persistent:** Missed calls auto-schedule follow-ups (up to 3 attempts) with full operator control
 
 ---
 
@@ -51,31 +51,31 @@ Revenue saved. Subscription preserved.
 ┌─────────────────────────────────────────────────────┐
 │                     Frontend                        │
 │  Next.js 16 App Router (React, TypeScript)          │
-│  - Live dashboard with 3-second auto-refresh        │
-│  - Metric cards: ARR recovered, at-risk, rate       │
-│  - Operator safety gate (confirm before each call)  │
-│  - Full call transcript + AI intelligence modal     │
+│  - Live dashboard with auto-refresh                 │
+│  - Metric cards: at-risk revenue & resolution rate  │
+│  - Operator safety gate (confirm before dialing)    │
+│  - Deep-sanitized call transcript modal             │
 └───────────────────────┬─────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────┐
 │                    API Layer                        │
 │  POST /api/stripe/simulate-failure  — demo trigger  │
-│  POST /api/stripe/webhook           — real webhooks │
-│  POST /api/calle/place-call         — place call    │
-│  POST /api/calle/cancel-call        — cancel call   │
+│  POST /api/stripe/webhook           — Stripe events │
+│  POST /api/calle/place-call         — confirmed dial│
+│  POST /api/calle/cancel-call        — cancel preview│
 │  POST /api/calle/pause-followups    — stop chain    │
-│  POST /api/calle/webhook            — receive result│
+│  POST /api/calle/webhook            — verify outcome│
 │  GET  /api/calls                    — call timeline │
 │  GET  /api/subscribers              — account list  │
-│  GET  /api/admin/metrics            — ROI summary   │
+│  GET  /api/admin/metrics            — summary data  │
 └───────────────────────┬─────────────────────────────┘
                         │
       ┌─────────────────┼─────────────────┐
       │                 │                 │
   ┌───▼───┐       ┌─────▼───┐      ┌─────▼──────┐
   │CALL-E │       │ Stripe  │      │  SQLite DB │
-  │Voice  │       │ Test    │      │ (WAL mode) │
-  │  API  │       │  Mode   │      └────────────┘
+  │Voice  │       │ (Test / │      │ (WAL mode) │
+  │  API  │       │  Mock)  │      └────────────┘
   └───────┘       └─────────┘
 ```
 
@@ -85,14 +85,13 @@ Revenue saved. Subscription preserved.
 
 | Feature | Description |
 |---------|-------------|
-| **Safety Gate** | Every call shows the exact task text CALL-E will receive. No phone rings without operator ✓. |
-| **ROI Dashboard** | Real-time metrics: ARR recovered, at-risk revenue, resolution rate, active interventions. |
-| **AI Transcripts** | Full turn-by-turn conversation replay with timestamps and confidence scores. |
-| **Follow-up Chains** | No answer? System auto-schedules up to 3 attempts, each requiring fresh confirmation. |
-| **Smart Decision Parsing** | CALL-E extracts `retry_now`, `update_card`, `pause_subscription`, or `no_answer` from natural conversation. |
-| **Automated Actions** | On `retry_now` → Stripe charge re-attempted. On `update_card` → Stripe Portal link dispatched. |
-| **Region-aware Calling** | Validates phone numbers against CALL-E's supported regions before allowing calls. |
-| **Judge Demo Mode** | "⚡ Load Demo Data" populates realistic completed calls with transcripts instantly. |
+| **Operator Safety Gate** | Displays the exact task text and masked destination that CALL-E will receive. No phone rings without human confirmation. |
+| **Server-Bound Destinations** | Client requests supply only an internal `callLogId`. The server looks up the authorized number from stored records. |
+| **Advisory Resolutions** | Customer recovery choices (`retry_now`, `update_card`, `pause_subscription`) remain strictly advisory for operator review rather than autonomously executing charges. |
+| **Authoritative Webhook Verification** | Webhooks trigger a direct re-fetch of the call object from CALL-E's API. Caller-supplied payloads are never trusted directly. |
+| **Bounded Follow-up Safety** | Unanswered calls auto-schedule up to 3 bounded follow-up attempts with operator pause controls. |
+| **PII Deep-Sanitization** | Phone numbers, emails, and provider transcripts are masked across all UI displays, APIs, and logs. |
+| **Zero-Credential Offline Mock** | Fully testable without live Stripe or CALL-E credentials via honest local mocks. |
 
 ---
 
@@ -100,8 +99,8 @@ Revenue saved. Subscription preserved.
 
 ### Prerequisites
 - Node.js 18+
-- CALL-E API key ([request at call-e.devpost.com](https://call-e.devpost.com/))
-- Stripe test-mode API keys
+- CALL-E API key ([request at call-e.devpost.com](https://call-e.devpost.com/)) or use offline mock mode
+- Stripe test-mode API keys (optional; offline mock provided)
 
 ### Setup
 
@@ -111,15 +110,7 @@ cd Recover
 npm install
 
 cp .env.example .env.local
-# Fill in your CALLE_API_KEY, STRIPE_SECRET_KEY, and APP_BASE_URL
-```
-
-### Exposing webhook endpoint for CALL-E (development)
-
-```bash
-# Forward CALL-E webhook to your local server
-npx ngrok http 3000
-# Paste the generated https:// URL into .env.local as APP_BASE_URL
+# Set your RECOVER_API_KEY, CALLE_API_KEY, STRIPE_SECRET_KEY, and APP_BASE_URL
 ```
 
 ### Running locally
@@ -131,31 +122,28 @@ npm run dev
 
 ---
 
-## 🔒 Security & Architecture Compliance
+## 🔒 Security & Architecture Standards
 
-Recover is built to meet rigorous production security standards:
-- **Authenticated REST APIs**: All administrative and operational endpoints require authorization (`x-recover-key` header or same-origin loopback).
-- **Server-Bound Destination Enforcement**: Outbound calls cannot be pointed to arbitrary numbers by the client; destination numbers are strictly bound to server-validated subscriber records and enforced to strict ASCII E.164.
-- **Authoritative Webhook Verification**: Webhooks are untrusted notifications. Recover never acts on or persists unverified caller-supplied transcripts/results—it re-fetches the authoritative call object directly from the CALL-E API before triggering Stripe actions.
-- **PII Masking**: Customer phone numbers (`+1 276-***-**32`) and emails (`a***x@example.com`) are masked in APIs, UI, logs, and telemetry.
-- **Conflict & Ambiguity Halting**: Duplicate subscriber creation and concurrent overlapping recovery calls are halted with `409 Conflict` to prevent double-charging or dual-dialing.
-- **Bounded Follow-up Safety**: Bounded ceiling of 3 attempts maximum with exponential backoff and operator pause controls.
-- **Honest Offline Demo Path**: Works completely out-of-the-box with zero live Stripe or CALL-E credentials. Both `npm run lint` and `npm run build` succeed cleanly in offline CI/CD pipelines.
+- **Fail-Closed API Authentication**: All REST endpoints require authorization (`x-recover-key` or Bearer token). The application strictly fails closed if `RECOVER_API_KEY` is omitted.
+- **Strict ASCII E.164 Enforcement**: Validates phone numbers strictly against the ASCII E.164 specification (`+[country][digits]`) and rejects non-ASCII or malformed input.
+- **Webhook Authentication**: Incoming webhooks verify configured secrets (`CALLE_WEBHOOK_SECRET` and `STRIPE_WEBHOOK_SECRET`) and reject unauthenticated deliveries with 401.
+- **Destination & Intent Binding**: Before accepting a terminal result, Recover validates that the provider record matches the exact local call ID and stored subscriber phone.
+- **Ambiguity & Conflict Halting**: Concurrent calls or duplicate subscriber creations halt with `409 Conflict`. Unconfirmed call attempts transition to an `uncertain` state for operator reconciliation.
 
 ---
 
 ## 🎬 Demo Flow (for judges)
 
 1. Open the dashboard at `localhost:3000`
-2. **Offline Simulation Ready**: If no API keys are provided, Recover runs an honest, fully interactive local simulation.
-3. Click **"⚡ Load Demo Data"** — see 3 realistic scenarios:
-   - ✅ **Sarah Jenkins** — Called, authorized retry, $490 recovered
-   - ✅ **Marcus Vance** — Called, requested card update link, SMS sent
-   - 🔄 **Elena Rostova** — Missed first call, follow-up queued for attempt 2
-4. Click **"🎙 Conversation"** on any completed call to see the full AI transcript + confidence score
-5. For a live or simulated flow: Add a subscriber → click "⚡ Simulate Stripe failure" → review the safety gate → click "Confirm & place call"
+2. **Offline Simulation**: If live keys are not configured, Recover runs in zero-credential simulation mode.
+3. Click **"⚡ Load Demo Data"** to view 3 standards-reserved scenarios:
+   - ✅ **Demo Customer Alpha** (`alpha@example.com`) — Reached, authorized retry advisory recommendation.
+   - ✅ **Demo Customer Beta** (`beta@example.org`) — Reached, self-service card update portal link prepared.
+   - 🔄 **Demo Customer Gamma** (`gamma@example.net`) — Missed initial attempt, bounded follow-up attempt 2 of 3 scheduled.
+4. Click **"🎙 Conversation"** on any completed call to inspect the sanitized turn-by-turn AI transcript.
+5. For an interactive test: Add a test subscriber → click **"⚡ Simulate Stripe failure"** → review the Safety Gate → click **"Confirm & place call"**.
 
-> **Note:** Live carrier calls use the official CALL-E developer test number (`+12763229632`) reserved for testing.
+> **Note:** Live carrier calls require the official CALL-E developer test number (`+12763229632`) reserved for testing.
 
 ---
 
@@ -175,45 +163,23 @@ npm run build
 
 ```
 app/
-  page.tsx                    — Full dashboard UI (client component)
+  page.tsx                    — Dashboard UI with Safety Gate & transcript viewer
   api/
-    stripe/simulate-failure/  — Demo: triggers a real Stripe test decline
-    stripe/webhook/           — Production: handles real Stripe invoice events
-    calle/place-call/         — Places a confirmed CALL-E voice call
-    calle/webhook/            — Receives CALL-E call result + transcript
-    calle/cancel-call/        — Discards a pending call preview
-    calle/pause-followups/    — Stops the follow-up chain for a subscriber
-    admin/metrics/            — ROI dashboard data
-    admin/demo-data/          — Judge demo dataset (seed / reset)
+    stripe/simulate-failure/  — Demo: triggers simulated card decline
+    stripe/webhook/           — Authenticated Stripe webhook receiver
+    calle/place-call/         — Places confirmed call with server-bound destination
+    calle/webhook/            — Authoritative CALL-E webhook receiver (advisory outcomes)
+    calle/cancel-call/        — Operator discard path for pending call previews
+    calle/pause-followups/    — Operator pause control for follow-up chains
+    admin/metrics/            — Dashboard telemetry summary
+    admin/demo-data/          — Standards-reserved judge demo dataset
 lib/
-  calle.ts                    — CALL-E SDK wrapper + task builder
-  db.ts                       — SQLite schema, queries, seed data
-  stripe.ts                   — Stripe client + test decline scenarios
+  auth.ts                     — Fail-closed authentication & strict E.164 validation
+  masking.ts                  — PII masking & transcript deep-sanitization
+  calle.ts                    — CALL-E SDK client & offline mock store
+  db.ts                       — SQLite database schema, queries, and seed data
+  stripe.ts                   — Stripe client & offline mock provider
 ```
-
----
-
-## 🌍 CALL-E Supported Regions
-
-Recover respects CALL-E's carrier network coverage. Phone numbers must be from one of these regions:
-
-🇺🇸 US · 🇨🇦 CA · 🇬🇧 GB · 🇦🇺 AU · 🇸🇬 SG · 🇲🇾 MY · 🇮🇳 IN · 🇦🇪 AE · 🇻🇳 VN · 🇩🇪 DE · 🇫🇷 FR · 🇲🇽 MX · 🇧🇷 BR · 🇮🇩 ID · 🇵🇭 PH · 🇰🇪 KE
-
----
-
-## 🏆 Hackathon Context
-
-Built for the **CALL-E: "Your Code Is Calling"** hackathon (Devpost, September 2026).
-
-**Category targeted:** Best Business / SaaS Agent  
-**Prize pool:** $10,000  
-**Judging criteria:** Impact, Technical difficulty, Originality, Applicability
-
-**Why Recover wins on each criterion:**
-- **Impact:** Recovers 20–40% of SaaS involuntary churn. Measurable, immediate, high-dollar ROI.
-- **Technical difficulty:** Real Stripe webhooks, structured LLM parsing, automated action execution, safety-gated human-in-the-loop, multi-attempt follow-up chains.
-- **Originality:** Dunning voice agents don't exist as a product. Email-only dunning is a solved (mediocre) problem. Voice is 10x more effective and 0x adopted.
-- **Applicability:** Every SaaS company has this problem today.
 
 ---
 

@@ -43,12 +43,18 @@ export function maskEmail(email: string): string {
 }
 
 /**
- * Masks a full name for display, preserving the first name and abbreviating the surname.
- * Example: "Sarah Jenkins" -> "Sarah J."
+ * Deep-sanitizes arbitrary text, transcripts, and provider evidence,
+ * removing any potential phone numbers and email addresses.
  */
-export function maskName(name: string): string {
-  if (!name || typeof name !== "string") return "Customer";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+export function deepSanitizeText(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  // Obscure email addresses
+  let sanitized = text.replace(/([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (_, user, domain) => {
+    return `${user[0]}••••@${domain}`;
+  });
+  // Obscure E.164 and localized phone numbers
+  sanitized = sanitized.replace(/\+?[1-9]\d{1,2}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, (match) => {
+    return maskPhone(match.replace(/[-.\s()]/g, ""));
+  });
+  return sanitized;
 }

@@ -1,31 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { subscribersTable, callLogsTable } from "@/lib/db";
-import { buildRecoveryCallTask } from "@/lib/calle";
-import { maskPhone } from "@/lib/masking";
+import { stripe } from "@/lib/stripe";
 
 /**
- * Production-ready Stripe Webhook receiver.
- * Listens for real subscription invoice failures (invoice.payment_failed).
+ * Stripe Webhook receiver for subscription payment failures (invoice.payment_failed).
  *
- * Conflict Handling: If an intervention is already active for this subscriber,
- * returns 409 and halts rather than creating a duplicate side effect.
+ * SECURITY & CONFLICT COMPLIANCE:
+ * 1. Fails closed without a configured STRIPE_WEBHOOK_SECRET and valid stripe-signature.
+ * 2. Halts ambiguous or duplicate concurrent interventions (409 Conflict).
+ * 3. Uses standards-reserved fictional identity defaults for unknown test subscribers.
  */
 export async function POST(req: NextRequest) {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { error: "Refused: STRIPE_WEBHOOK_SECRET is not configured on this server (fail closed)." },
+      { status: 401 }
+    );
+  }
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) {
+    return NextResponse.json(
+      { error: "Unauthorized: Missing stripe-signature header" },
+      { status: 401 }
+    );
+  }
+
+  const rawBody = await req.text();
+  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+
   try {
-    const rawBody = await req.text();
-    let event: { type?: string; data?: { object?: Record<string, unknown> } };
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret) as unknown as typeof event;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Signature verification failed";
+    return NextResponse.json({ error: `Stripe webhook signature rejected: ${msg}` }, { status: 401 });
+  }
 
-    try {
-      event = JSON.parse(rawBody);
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-    }
-
+  try {
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data?.object;
       const customerEmail = (invoice?.customer_email as string) || null;
-      const customerName = (invoice?.customer_name as string) || "Valued Subscriber";
+      const customerName = (invoice?.customer_name as string) || "Demo Customer";
       const amountCents = (invoice?.amount_due as number) || 2900;
       const failureReason =
         ((invoice?.last_payment_error as Record<string, string>)?.message) ||
@@ -42,11 +59,11 @@ export async function POST(req: NextRequest) {
         subscriber = {
           id: randomUUID(),
           name: customerName,
-          // Default to CALL-E test number; real subscribers will already exist in DB with their registered number.
+          // Standards-reserved CALL-E test number for demo recipients
           phone: "+12763229632",
           region: "US",
           locale: "en-US",
-          email: customerEmail || `unknown-${randomUUID().slice(0, 8)}@example.com`,
+          email: customerEmail || `demo-sub-${randomUUID().slice(0, 6)}@example.com`,
           plan_name: planName,
           amount_cents: amountCents,
           stripe_customer_id: (invoice?.customer as string) || null,
@@ -93,28 +110,16 @@ export async function POST(req: NextRequest) {
         scheduled_for: null,
       });
 
-      const rawPreview = buildRecoveryCallTask(subscriber, failureReason);
-      const preview = {
-        ...rawPreview,
-        recipient: {
-          ...rawPreview.recipient,
-          phone: maskPhone(rawPreview.recipient.phone),
-        },
-      };
-
       return NextResponse.json({
         received: true,
-        callLogId,
         subscriberId: subscriber.id,
-        preview,
+        callLogId,
       });
     }
 
-    return NextResponse.json({ received: true, ignored: event.type });
+    return NextResponse.json({ received: true, ignored: true });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Invalid Stripe webhook payload" },
-      { status: 400 }
-    );
+    const message = err instanceof Error ? err.message : "Internal error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

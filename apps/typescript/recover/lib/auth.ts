@@ -1,26 +1,31 @@
 import { NextRequest } from "next/server";
 
 /**
- * Standard API Key for Recover services.
- * Can be configured via RECOVER_API_KEY in .env.local,
- * defaults to a secure development token for demo access.
+ * Configured API Key for Recover services.
+ * Fails closed: Must be explicitly configured via RECOVER_API_KEY.
+ * No hardcoded published fallbacks or development bypasses permitted.
  */
-export const RECOVER_API_KEY = process.env.RECOVER_API_KEY || "recover_demo_key_sec_9942";
+export const RECOVER_API_KEY = process.env.RECOVER_API_KEY?.trim() || "";
 
 /**
  * Authenticates incoming API requests against the server authorization key.
+ * Strictly requires RECOVER_API_KEY to be configured; fails closed otherwise.
  * Accepts either:
  *  - Header: `x-recover-key: <key>`
  *  - Header: `Authorization: Bearer <key>`
  */
 export function validateApiAuth(req: NextRequest): boolean {
-  const authHeader = req.headers.get("authorization");
-  const customKeyHeader = req.headers.get("x-recover-key");
+  if (!RECOVER_API_KEY) {
+    // Fail closed: refusal to accept requests without an explicitly configured secret
+    return false;
+  }
 
+  const customKeyHeader = req.headers.get("x-recover-key");
   if (customKeyHeader && customKeyHeader.trim() === RECOVER_API_KEY) {
     return true;
   }
 
+  const authHeader = req.headers.get("authorization");
   if (authHeader) {
     const [scheme, token] = authHeader.split(" ");
     if (scheme?.toLowerCase() === "bearer" && token?.trim() === RECOVER_API_KEY) {
@@ -28,9 +33,39 @@ export function validateApiAuth(req: NextRequest): boolean {
     }
   }
 
-  // Allow same-origin browser requests in development if x-recover-key is omitted but sec-fetch-site is same-origin
-  const secFetchSite = req.headers.get("sec-fetch-site");
-  if (secFetchSite === "same-origin" && process.env.NODE_ENV !== "production") {
+  return false;
+}
+
+/**
+ * Authenticates incoming webhook signals against a configured webhook secret.
+ * Fails closed if the corresponding secret environment variable is missing or empty.
+ */
+export function validateWebhookAuth(req: NextRequest, expectedSecret: string | undefined): boolean {
+  if (!expectedSecret || !expectedSecret.trim()) {
+    // Fail closed if the webhook secret is not configured
+    return false;
+  }
+
+  const secret = expectedSecret.trim();
+  const headerSecret =
+    req.headers.get("x-calle-webhook-secret") ||
+    req.headers.get("x-webhook-secret") ||
+    req.headers.get("x-webhook-token");
+
+  if (headerSecret && headerSecret.trim() === secret) {
+    return true;
+  }
+
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const [scheme, token] = authHeader.split(" ");
+    if (scheme?.toLowerCase() === "bearer" && token?.trim() === secret) {
+      return true;
+    }
+  }
+
+  const queryToken = req.nextUrl.searchParams.get("token");
+  if (queryToken && queryToken.trim() === secret) {
     return true;
   }
 

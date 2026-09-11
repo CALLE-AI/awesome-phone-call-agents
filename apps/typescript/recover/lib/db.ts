@@ -178,6 +178,14 @@ export const callLogsTable = {
   attachCalleCall(id: string, calleCallId: string) {
     db.prepare("UPDATE call_logs SET calle_call_id = ?, status = 'in_progress' WHERE id = ?").run(calleCallId, id);
   },
+  markInitiating(id: string) {
+    db.prepare("UPDATE call_logs SET status = 'initiating' WHERE id = ?").run(id);
+  },
+  markUncertain(id: string, reason: string) {
+    db.prepare(
+      "UPDATE call_logs SET status = 'uncertain', action_taken = ?, completed_at = datetime('now') WHERE id = ?"
+    ).run(reason, id);
+  },
   cancel(id: string) {
     db.prepare("UPDATE call_logs SET status = 'canceled', completed_at = datetime('now') WHERE id = ?").run(id);
   },
@@ -312,41 +320,40 @@ export function seedDemoData() {
   const tMinus17h58m = new Date(now - (17 * 3600 + 58 * 60) * 1000).toISOString();
   const futureTime = new Date(now + 6 * 3600 * 1000).toISOString();
 
-  // Case 1: Sarah Jenkins - Recovered via Retry Now
-  // NOTE: Using the CALL-E team test number (+12763229632, US) for all demo
-  // subscribers since CALL-E's carrier coverage is region-limited and this
-  // is the number provided by the CALL-E team for building/testing.
-  const sub1Id = "sub_sarah_jenkins";
+  // Case 1: Demo Customer Alpha - Recovered via Retry Now
+  // NOTE: Using the CALL-E team test number (+12763229632, US) for demo subscribers
+  // as provided by the CALL-E platform documentation for building/testing.
+  const sub1Id = "sub_demo_alpha";
   subscribersTable.insert({
     id: sub1Id,
-    name: "Sarah Jenkins",
+    name: "Demo Customer Alpha",
     phone: "+12763229632",
     region: "US",
     locale: "en-US",
-    email: "sarah@apexdesign.co",
+    email: "alpha@example.com",
     plan_name: "Pro Enterprise",
     amount_cents: 49000,
-    stripe_customer_id: "cus_demo_sarah",
+    stripe_customer_id: "cus_demo_alpha",
     status: "active",
     followups_paused: 0,
     created_at: new Date(now - 86400000).toISOString(),
   });
 
-  const call1Id = "call_demo_sarah";
+  const call1Id = "call_demo_alpha";
   const call1RawResult = {
-    id: "calle_call_sarah_recovered",
+    id: "calle_call_alpha_recovered",
     object: "call_task",
     status: "completed",
-    summary: "Reached Sarah Jenkins regarding her Pro Enterprise annual renewal. Customer explained their corporate card had expired, verified that their new physical card has the same number with updated expiry, and authorized immediate retry. Charge was approved.",
+    summary: "Reached Demo Customer Alpha regarding Pro Enterprise renewal. Customer verified new card arrival and provided advisory authorization to retry the charge.",
     completion_confidence: { label: "high", score: 0.95 },
     evidence: [
-      "Customer confirmed identity as Sarah Jenkins.",
-      "Customer explained the renewal card had just arrived.",
-      "Customer explicitly authorized immediate retry on the phone."
+      "Customer confirmed identity as Customer Alpha.",
+      "Customer indicated the renewal card had just arrived.",
+      "Customer provided affirmative verbal confirmation for payment retry."
     ],
     structured_result: {
       decision: "retry_now",
-      evidence: "Customer stated: 'Yes! My new card arrived yesterday with the same number, just new expiry. Please retry the charge right now!'"
+      evidence: "Customer stated: 'Yes, my replacement card arrived with updated expiry. Please retry the charge.'"
     },
     recipients: [
       {
@@ -355,12 +362,12 @@ export function seedDemoData() {
         locale: "en-US",
         status: "completed",
         transcript_turns: [
-          { offset_seconds: 0, speaker: "bot", text: "Hi, is this Sarah Jenkins? I'm an AI billing assistant calling on behalf of Recover for your Pro Enterprise subscription." },
-          { offset_seconds: 4, speaker: "user", text: "Yes, this is Sarah. Did something happen with our account?" },
-          { offset_seconds: 8, speaker: "bot", text: "Nothing to worry about! The annual payment of $490.00 didn't go through because the card on file is expired. It's a routine fix. Would you like us to retry the charge now, send a secure link to update it, or pause for now?" },
-          { offset_seconds: 19, speaker: "user", text: "Oh perfect timing. Our new corporate card arrived yesterday—it's the exact same card number, just with a 2029 expiration date. Can you just retry it now?" },
-          { offset_seconds: 28, speaker: "bot", text: "I'll initiate that retry right away. You're completely squared away and your subscription remains fully active with zero disruption. Thank you Sarah, have a great day!" },
-          { offset_seconds: 36, speaker: "user", text: "Awesome, thanks for catching that before it shut off. Bye!" }
+          { offset_seconds: 0, speaker: "bot", text: "Hi, is this Customer Alpha? I am calling regarding your Pro Enterprise subscription." },
+          { offset_seconds: 4, speaker: "user", text: "Yes, speaking. Did something happen with our account renewal?" },
+          { offset_seconds: 8, speaker: "bot", text: "The annual payment did not go through because the card on file expired. Would you like us to retry the charge, provide a link to update it, or pause for now?" },
+          { offset_seconds: 19, speaker: "user", text: "Our replacement card arrived yesterday. You can retry the payment now." },
+          { offset_seconds: 28, speaker: "bot", text: "Thank you. I have recorded your confirmation for retry. An operator will review and process this shortly. Goodbye!" },
+          { offset_seconds: 36, speaker: "user", text: "Thank you, goodbye!" }
         ]
       }
     ]
@@ -372,48 +379,47 @@ export function seedDemoData() {
   `).run(
     call1Id,
     sub1Id,
-    "calle_call_sarah_recovered",
-    "Your card has expired.",
-    "Customer authorized immediate re-charge after confirming new card arrival.",
+    "calle_call_alpha_recovered",
+    "Card expired.",
+    "Customer authorized payment re-attempt after new card arrival.",
     JSON.stringify(call1RawResult),
-    "Stripe charge of $490.00 retried & settled (ch_3Pz79K2eZvKYlo2C)",
+    "Advisory retry approved by customer. Charge settled on Stripe (ch_mock_alpha_490)",
     call1Id,
     tMinus2h,
     tMinus1h55m
   );
 
-  // Case 2: Marcus Vance - Update Card Link Dispatched via SMS
-  const sub2Id = "sub_marcus_vance";
+  // Case 2: Demo Customer Beta - Self-Service Update Card Request
+  const sub2Id = "sub_demo_beta";
   subscribersTable.insert({
     id: sub2Id,
-    name: "Marcus Vance",
+    name: "Demo Customer Beta",
     phone: "+12763229632",
     region: "US",
     locale: "en-US",
-    email: "marcus@vancetech.io",
+    email: "beta@example.org",
     plan_name: "Growth Team",
     amount_cents: 12900,
-    stripe_customer_id: "cus_demo_marcus",
+    stripe_customer_id: "cus_demo_beta",
     status: "active",
     followups_paused: 0,
     created_at: new Date(now - 43200000).toISOString(),
   });
 
-  const call2Id = "call_demo_marcus";
+  const call2Id = "call_demo_beta";
   const call2RawResult = {
-    id: "calle_call_marcus_update_card",
+    id: "calle_call_beta_update_card",
     object: "call_task",
     status: "completed",
-    summary: "Spoke with Marcus Vance about a declined $129.00 charge. Marcus explained his department changed banks and requested an SMS with a direct self-service link to input their new Visa Business card.",
+    summary: "Spoke with Demo Customer Beta about declined charge. Customer requested a self-service link to input their new card details.",
     completion_confidence: { label: "high", score: 0.92 },
     evidence: [
       "Customer answered directly.",
-      "Customer requested a secure self-service link to be texted to their phone number.",
-      "Customer verified they would complete it within the hour."
+      "Customer requested self-service link for card update."
     ],
     structured_result: {
       decision: "update_card",
-      evidence: "Customer requested: 'We switched banks this week. Please text me the secure link and I will plug the new card in immediately.'"
+      evidence: "Customer requested: 'Please provide a self-service link and I will update our card details today.'"
     },
     recipients: [
       {
@@ -422,12 +428,12 @@ export function seedDemoData() {
         locale: "en-US",
         status: "completed",
         transcript_turns: [
-          { offset_seconds: 0, speaker: "bot", text: "Hello Marcus, I'm calling from Recover regarding your Growth Team subscription." },
-          { offset_seconds: 5, speaker: "user", text: "Hi there. Yes, what's this regarding?" },
-          { offset_seconds: 8, speaker: "bot", text: "Your recent subscription renewal of $129.00 was declined by the card issuer. We want to make sure your team doesn't lose access. Would you like to retry, get a secure text link to update your card, or pause the plan?" },
-          { offset_seconds: 21, speaker: "user", text: "We actually switched company banks yesterday so the old account is frozen. Could you text me the secure update link? I'll add the new card right now." },
-          { offset_seconds: 31, speaker: "bot", text: "I'm sending a secure card update link to your phone number right now. Once updated, your payment will automatically process. Thank you Marcus!" },
-          { offset_seconds: 38, speaker: "user", text: "Brilliant, got the text already. Appreciate the call." }
+          { offset_seconds: 0, speaker: "bot", text: "Hello Customer Beta, calling regarding your Growth Team subscription renewal." },
+          { offset_seconds: 5, speaker: "user", text: "Hello. Yes, what is this regarding?" },
+          { offset_seconds: 8, speaker: "bot", text: "Your recent renewal was declined. Would you like to retry, receive a secure link to update your card, or pause the plan?" },
+          { offset_seconds: 21, speaker: "user", text: "We changed banking providers. Could you provide a self-service link to add the new card?" },
+          { offset_seconds: 31, speaker: "bot", text: "A secure billing update link has been prepared. Thank you!" },
+          { offset_seconds: 38, speaker: "user", text: "Thank you, appreciate it." }
         ]
       }
     ]
@@ -439,43 +445,43 @@ export function seedDemoData() {
   `).run(
     call2Id,
     sub2Id,
-    "calle_call_marcus_update_card",
-    "Your card was declined.",
-    "Customer requested SMS card update link due to bank change.",
+    "calle_call_beta_update_card",
+    "Card was declined.",
+    "Customer requested self-service billing link.",
     JSON.stringify(call2RawResult),
-    "Dispatched SMS with secure Stripe Customer Portal link to +12763229632",
-    "https://billing.stripe.com/p/session/demo_recover_card_update_9823",
+    "Generated secure customer billing portal link for self-service card update",
+    "https://billing.stripe.com/p/session/demo_recover_card_update_beta",
     call2Id,
     tMinus45m,
     tMinus42m
   );
 
-  // Case 3: Elena Rostova - No Answer, Follow-Up Scheduled (Attempt 2 of 3)
-  const sub3Id = "sub_elena_rostova";
+  // Case 3: Demo Customer Gamma - No Answer, Follow-Up Scheduled (Attempt 2 of 3)
+  const sub3Id = "sub_demo_gamma";
   subscribersTable.insert({
     id: sub3Id,
-    name: "Elena Rostova",
+    name: "Demo Customer Gamma",
     phone: "+12763229632",
     region: "US",
     locale: "en-US",
-    email: "elena@nordicscale.com",
+    email: "gamma@example.net",
     plan_name: "Startup Scale",
     amount_cents: 8900,
-    stripe_customer_id: "cus_demo_elena",
+    stripe_customer_id: "cus_demo_gamma",
     status: "past_due",
     followups_paused: 0,
     created_at: new Date(now - 172800000).toISOString(),
   });
 
-  const chain3Id = "chain_demo_elena";
-  const call3aId = "call_demo_elena_1";
+  const chain3Id = "chain_demo_gamma";
+  const call3aId = "call_demo_gamma_1";
   const call3aRawResult = {
-    id: "calle_call_elena_attempt_1",
+    id: "calle_call_gamma_attempt_1",
     object: "call_task",
     status: "completed",
-    summary: "The call reached an automated voicemail system. No live person was available to speak with, so no billing decision could be gathered.",
+    summary: "The call reached an automated voicemail system. No live person was available to speak with.",
     completion_confidence: { label: "high", score: 0.89 },
-    evidence: ["Call reached voicemail system."],
+    evidence: ["Call reached automated voicemail system."],
     structured_result: {
       decision: "no_answer",
       evidence: ""
@@ -487,9 +493,9 @@ export function seedDemoData() {
         locale: "en-US",
         status: "completed",
         transcript_turns: [
-          { offset_seconds: 0, speaker: "bot", text: "Hello, is this Elena? Calling on behalf of Recover..." },
-          { offset_seconds: 4, speaker: "user", text: "Your call has been forwarded to an automated voice message system. At the tone, please record your message." },
-          { offset_seconds: 11, speaker: "bot", text: "This is an automated system. Ending call to reschedule follow-up." }
+          { offset_seconds: 0, speaker: "bot", text: "Hello, calling regarding your Startup Scale subscription renewal..." },
+          { offset_seconds: 4, speaker: "user", text: "The person you are calling is unavailable. Please leave a message after the tone." },
+          { offset_seconds: 11, speaker: "bot", text: "Automated recording detected. Ending call to schedule bounded follow-up." }
         ]
       }
     ]
@@ -497,12 +503,12 @@ export function seedDemoData() {
 
   db.prepare(`
     INSERT INTO call_logs (id, subscriber_id, calle_call_id, trigger_reason, status, decision, evidence, raw_result, action_taken, action_link, recovered_cents, chain_id, attempt_number, retry_of, scheduled_for, created_at, completed_at)
-    VALUES (?, ?, ?, ?, 'completed', 'no_answer', ?, ?, 'Customer missed call. Automated retry scheduled.', NULL, 0, ?, 1, NULL, NULL, ?, ?)
+    VALUES (?, ?, ?, ?, 'completed', 'no_answer', ?, ?, 'Customer unavailable on attempt 1. Bounded follow-up queued.', NULL, 0, ?, 1, NULL, NULL, ?, ?)
   `).run(
     call3aId,
     sub3Id,
-    "calle_call_elena_attempt_1",
-    "Your card has insufficient funds.",
+    "calle_call_gamma_attempt_1",
+    "Insufficient funds.",
     "Call reached voicemail system.",
     JSON.stringify(call3aRawResult),
     chain3Id,
@@ -511,14 +517,14 @@ export function seedDemoData() {
   );
 
   // Scheduled Attempt 2
-  const call3bId = "call_demo_elena_2";
+  const call3bId = "call_demo_gamma_2";
   db.prepare(`
     INSERT INTO call_logs (id, subscriber_id, calle_call_id, trigger_reason, status, decision, evidence, raw_result, action_taken, action_link, recovered_cents, chain_id, attempt_number, retry_of, scheduled_for, created_at, completed_at)
     VALUES (?, ?, NULL, ?, 'scheduled', NULL, NULL, NULL, 'Follow-up attempt 2 of 3 queued', NULL, 0, ?, 2, ?, ?, ?, NULL)
   `).run(
     call3bId,
     sub3Id,
-    "Your card has insufficient funds.",
+    "Insufficient funds.",
     chain3Id,
     call3aId,
     futureTime,

@@ -1,7 +1,7 @@
 <div align="center">
   <img src="logo.png" alt="Recover Logo" width="120" />
   <h1>Recover — AI Voice Payment Recovery Agent</h1>
-  <p><strong>Automating involuntary churn recovery using live CALL-E voice interventions and instant Stripe resolution.</strong></p>
+  <p><strong>Order / Exception Follow-Up Reference Application</strong></p>
   <p>🏆 <em>Submitted to: <a href="https://call-e.devpost.com/">CALL-E: &ldquo;Your Code Is Calling&rdquo; Hackathon</a></em> &nbsp;·&nbsp; 📦 <em><a href="https://github.com/rehna-jp/Recover">Source Repository</a></em></p>
 </div>
 
@@ -9,13 +9,13 @@
 
 ## ⚡ Overview
 
-When a credit card fails on a SaaS subscription, conventional dunning systems send automated emails that get lost in spam or ignored, resulting in **20–40% involuntary customer churn**.
+When a recurring payment method fails on a subscription, passive automated emails often go unread.
 
-**Recover** turns passive email dunning into an immediate, conversational voice intervention. Powered by **CALL-E**, Recover dials the customer within seconds of a Stripe failure, understands why the payment failed (expired card, fraud block, travel), and captures an immediate decision:
-1. **Retry Now**: Automatically re-attempts the charge via Stripe API.
-2. **Update Card**: Immediately texts a secure Stripe Customer Billing Portal link.
-3. **Pause Subscription**: Grants a 30-day grace period while maintaining account retention.
-4. **No Answer**: Intelligently schedules capped follow-ups with full human-in-the-loop oversight.
+**Recover** provides an exception follow-up workflow powered by **CALL-E**. It contacts the subscriber with a human-in-the-loop safety gate, clarifies their situation in natural conversation, and gathers an advisory resolution:
+1. **Retry Now**: Captures customer authorization to re-attempt the charge for human operator approval.
+2. **Update Card**: Prepares a self-service customer billing portal link.
+3. **Pause Subscription**: Records customer request for a 30-day grace period.
+4. **No Answer**: Intelligently schedules capped follow-ups (maximum 3 attempts) with operator pause controls.
 
 ---
 
@@ -32,7 +32,7 @@ When a credit card fails on a SaaS subscription, conventional dunning systems se
 │       Recover Dashboard        │
 │    (Operator Safety Gate)      │
 └───────────────┬────────────────┘
-                │ Confirmed by operator
+                │ Confirmed by human operator
                 ▼
 ┌────────────────────────────────┐
 │           CALL-E API           │
@@ -45,12 +45,12 @@ When a credit card fails on a SaaS subscription, conventional dunning systems se
 │       Customer Decision        │
 │  retry_now / update / pause    │
 └───────────────┬────────────────┘
-                │ Structured Webhook
+                │ Authenticated & Verified Webhook
                 ▼
 ┌────────────────────────────────┐
-│       Automated Actions        │
-│  • Stripe charge retry         │
-│  • Billing portal SMS dispatch │
+│      Advisory Resolutions      │
+│  • Human operator confirmation │
+│  • Self-service portal link    │
 │  • SQLite telemetry & metrics  │
 └────────────────────────────────┘
 ```
@@ -60,13 +60,12 @@ When a credit card fails on a SaaS subscription, conventional dunning systems se
 ## 🎯 Key Features
 
 - **Operator Safety Gate**: No voice call is placed without explicit operator confirmation showing the exact natural-language task instruction being sent to CALL-E.
-- **Server-Bound Destination & E.164**: Enforces strict ASCII E.164 and server-bound destination lookups so callers cannot inject arbitrary target numbers.
-- **Authoritative Webhook Verification**: Untrusted webhooks trigger an authoritative re-fetch against CALL-E before performing any Stripe retries or follow-ups.
-- **PII Masking**: Customer phone numbers and emails are masked across UI, API, logs, and telemetry.
-- **Closed-Loop Fulfillment**: Connects CALL-E call outcomes directly to the Stripe API (`stripe.charges.create`, hosted portal sessions) to immediately settle delinquent balances.
-- **Transcript & Intelligence Modal**: Replays complete turn-by-turn conversations with speaker timestamps (`bot` vs `user`), sentiment summaries, and decision confidence scores.
-- **Honest Offline Demo & Judge Mode**: Operates seamlessly offline with zero live credentials, pre-seeded with judge demo scenarios using the reserved CALL-E test number (`+12763229632`).
-- **Dark-Mode Command Center**: Crafted with modern typography, glowing metric cards, custom SVG icons, and real-time ARR recovery tracking.
+- **Server-Bound Destination & Strict ASCII E.164**: Enforces strict ASCII E.164 and server-bound destination lookups so callers cannot inject arbitrary target numbers.
+- **Advisory Financial Actions**: Financial retries and subscription adjustments remain advisory until confirmed by a human operator; calls do not autonomously execute card charges.
+- **Authoritative Webhook Verification**: Untrusted webhooks trigger an authoritative re-fetch against CALL-E before recording outcomes.
+- **PII Deep-Sanitization**: Customer phone numbers, emails, and provider transcripts are sanitized across UI, API, logs, and telemetry.
+- **Transcript & Intelligence Modal**: Replays turn-by-turn conversations with speaker timestamps (`bot` vs `user`), summaries, and confidence scores.
+- **Honest Offline Demo & Judge Mode**: Operates seamlessly offline with zero live credentials, pre-seeded with standards-reserved demo fixtures (`example.com/org/net`).
 
 ---
 
@@ -82,9 +81,13 @@ npm install
 ### 2. Environment Variables
 Create `.env.local`:
 ```env
+RECOVER_API_KEY=your_recover_secret
+NEXT_PUBLIC_RECOVER_API_KEY=your_recover_secret
 CALLE_API_KEY=your_calle_api_key
 APP_BASE_URL=https://your-domain.ngrok-free.app
+CALLE_WEBHOOK_SECRET=your_calle_webhook_secret
 STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 ### 3. Run Locally
