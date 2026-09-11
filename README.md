@@ -138,6 +138,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`metapelet-elder-checkin`](skills/metapelet-elder-checkin/) - Consent-based outbound wellbeing check-in for older adults using the MetaPelet non-medical companion persona; returns mood, topics, and repeat-call interest.
 - [`standby`](skills/standby/) - Fill one open shift from a standby roster with a strictly sequential call cascade that stops at the first acceptance, so a single slot cannot be double-booked; handles no-answer retry passes, callbacks, quiet hours, a shift-start cutoff, and holds the cascade for human reconciliation when a call cannot be read.
 - [`service-dispatch-call`](skills/service-dispatch-call/) - Service dispatch workflow that asks a vendor about availability, ETA, and cost, returns a schema-validated result, and routes any commitment to human approval.
+- [`veyra-campaign-planner`](skills/veyra-campaign-planner/) - Turns a plain-language outbound process into an approval-ready Veyra campaign brief, reviews the generated workflow, and gates live dispatch behind an exact recipient preview.
 - [`calle-script-advisor`](skills/calle-script-advisor/) - Drafts and lints CALL-E call task text and result schemas for clarity, safety, and extraction quality before a call is placed.
 - [`research-gap-call-verifier`](skills/research-gap-call-verifier/) - Turns cited business research into an approval-gated no-call preview, then reconciles CALL-E-compatible results without mistaking voicemail, refusal, or failure for a verified fact.
 - [`scope-signal`](skills/scope-signal/) - Previews and reconciles one authorized CALL-E project-brief verification call, producing transcript-evidenced GO, CAUTION, or NO-GO guidance while leaving acceptance to a human.
@@ -159,6 +160,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [TeamLine](apps/typescript/teamline/) - Coach-authorized CALL-E workflow that gathers operational facts, pauses for a human decision, and communicates the approved outcome; sandbox/no-call mode is the default. [Demo](https://teamline-judge-console.netlify.app/teamline/demo) · [Video](https://youtu.be/2btXyqeA3Wg)
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
 - [OneReach service follow-up](apps/typescript/onereach-service-followup/) - Turns an authorized CALL-E service appointment conversation into a validated Operations handoff, with a no-call default and standalone public integration example.
+- [Veyra](apps/web/veyra/) - Converts a plain-language outbound process into an editable, approval-gated CALL-E campaign with fake mode enabled by default.
 
 - [Audition Agent](apps/python/audition-agent/) - Producer-reviewed CALL-E role-disclosure calls that collect performer interest, callback availability, and unanswered questions, with a no-call verification path.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
@@ -174,6 +176,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`apps/typescript/teamline`](apps/typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
+| [`apps/web/veyra`](apps/web/veyra/) | TypeScript / Next.js / Python | Natural-language campaign builder with exact recipient review, operator-gated live dispatch, fail-closed reconciliation, and fake mode enabled by default. |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
