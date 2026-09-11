@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RouteReady · Dispatcher</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="dispatcher">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">RR</span>
+        <div>
+          <strong>RouteReady</strong>
+          <small id="place">The delivery route that calls ahead</small>
+        </div>
+      </div>
+      <div class="now">
+        <span id="mode" class="badge sim">Ready</span>
+        <span id="clock" class="clock">--:--</span>
+      </div>
+      <div class="controls">
+        <label>
+          Speed
+          <select id="speed">
+            <option value="0.4">Slow</option>
+            <option value="0.75" selected>Normal</option>
+            <option value="1.5">Fast</option>
+            <option value="3">Very fast</option>
+          </select>
+        </label>
+        <button id="run-sim" class="primary">Run simulated day</button>
+        <button id="run-live">Run live day…</button>
+        <button id="stop">Stop</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section id="map" aria-label="Route map"></section>
+      <aside class="panel">
+        <section class="card" id="call"></section>
+        <section class="card">
+          <h2>Same day, with and without calls</h2>
+          <table id="kpis" class="kpis"></table>
+        </section>
+        <section class="card">
+          <h2>Route</h2>
+          <ol id="route" class="stops"></ol>
+        </section>
+        <section class="card">
+          <h2>Decisions</h2>
+          <ol id="log" class="log"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <dialog id="live-dialog">
+      <form id="live-form" method="dialog">
+        <h2>Run a live day</h2>
+        <p>These stops are called for real through CALL-E. Every other stop keeps its scripted customer.</p>
+        <ul id="live-targets" class="targets"></ul>
+        <label class="field">
+          Start token (printed in the terminal when the server started)
+          <input id="live-token" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="consent">
+          <input type="checkbox" id="live-consent" />
+          <span id="live-consent-text"></span>
+        </label>
+        <p class="error" id="live-error" role="alert"></p>
+        <menu>
+          <button value="cancel" formnovalidate>Cancel</button>
+          <button value="start" class="danger">Place live calls</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script type="module" src="/dispatcher.js"></script>
+  </body>
+</html>

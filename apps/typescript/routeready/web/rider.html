@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1220" />
+    <title>RouteReady · Rider</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="rider-page">
+    <header class="rider-top">
+      <span class="brand-small"><span class="logo">RR</span> RouteReady</span>
+      <span id="r-clock" class="clock">--:--</span>
+      <button id="voice" type="button">🔈 Voice off</button>
+    </header>
+    <div id="banner" class="banner" hidden>Route updated</div>
+    <main id="card" class="rider-card" aria-live="polite"></main>
+    <footer id="then" class="then"></footer>
+    <script type="module" src="/rider.js"></script>
+  </body>
+</html>
