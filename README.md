@@ -150,9 +150,11 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`concord-policy-audit`](skills/concord-policy-audit/) - Calls the branches an operator owns, judges each spoken answer against a written policy rubric compiled into the CALL-E result schema, and returns a branch-level gap register that carries no field capable of identifying the person who answered.
 - [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured information for RDN review and referral follow-up. See [`docs/rdn-intake-referral.md`](docs/rdn-intake-referral.md) for documentation and synthetic validation examples.
 - [`recall-outreach`](skills/recall-outreach/) - Calls affected customers about a product recall using only organisation-approved wording, routes every unapproved question to a human, and reports call completion and recall resolution as separate measures so a completed call is never counted as a completed return.
+- [`kol-ivr-route`](skills/kol-ivr-route/) - Verifies healthcare claim-status phone call results against the question asked, payer-side field evidence, destination identity, and an independent IVR route receipt before downstream use.
 
 ### Apps
 
+- [Kol](apps/typescript/kol/) - Evidence-gated healthcare claim-status calls with strict CALL-E structured results, independent route receipts, a fail-closed verifier, and a 640-case no-call adversarial evaluation.
 - [AfterCare](apps/python/aftercare/) - Consent-aware post-discharge CALL-E follow-ups with protocol schemas, dry-run by default, risk scoring, and a clinic UI.
 - [TeamLine](apps/typescript/teamline/) - Coach-authorized CALL-E workflow that gathers operational facts, pauses for a human decision, and communicates the approved outcome; sandbox/no-call mode is the default. [Demo](https://teamline-judge-console.netlify.app/teamline/demo) · [Video](https://youtu.be/2btXyqeA3Wg)
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
@@ -170,6 +172,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/typescript/teamline`](apps/typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
