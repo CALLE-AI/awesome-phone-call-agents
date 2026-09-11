@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "fixed-disclosure",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 0.96,
+    "summary": "The fixed outbound reminder states the required cancellation-fee disclosure and confirms attendance in this sanitized example.",
+    "evidence": {
+      "mentions": ["attendance confirmed for thursday", "a cancellation fee applies if you cancel within 24 hours"]
+    }
+  }
+}

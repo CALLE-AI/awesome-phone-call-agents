@@ -1,0 +1,13 @@
+{
+  "name": "dvmx-human-guided-call-router",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "node src/demo.js",
+    "test": "node --test"
+  }
+}

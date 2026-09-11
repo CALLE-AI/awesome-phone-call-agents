@@ -1,0 +1,8 @@
+PASS: A clear goal produces an optional button but is not implicitly selected or saved
+PASS: Selecting a goal is local only; optional suggestions are above the free-text box
+PASS: Typing, clearing text and editing facts never silently retain or restore consent
+PASS: Goal controls and free text reflow without horizontal overflow at four viewport widths
+PASS: Draft restoration does not restore goal selection or authorization (storage fixture)
+PASS: Confirm goal saves the exact goal without creating a coordination run or making calls
+PASS: Only the separate Find help action starts inquiries; helpers still need plan approval
+7 browser checks passed
