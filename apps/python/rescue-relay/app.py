@@ -7,11 +7,14 @@ Live configurations are local-only; public demos use fictional data/mock calls.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import json
 import logging
 import os
 import re
+import secrets
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager, closing
@@ -46,6 +49,8 @@ CALL_MODE = os.getenv("CALL_MODE", "mock").strip().lower()
 ENABLE_LIVE_CALLS = os.getenv("ENABLE_LIVE_CALLS", "false").lower() == "true"
 CALLE_API_KEY = os.getenv("CALLE_API_KEY", "").strip()
 APP_ENV = os.getenv("APP_ENV", "local").lower()
+BASIC_AUTH_USERNAME = os.getenv("BASIC_AUTH_USERNAME", "").strip()
+BASIC_AUTH_PASSWORD = os.getenv("BASIC_AUTH_PASSWORD", "")
 if CALL_MODE not in {"mock", "live"}:
     raise ValueError("CALL_MODE must be mock or live")
 MAX_CONTACTS = min(50, max(1, int(os.getenv("MAX_CONTACTS_PER_RUN", "12"))))
@@ -383,9 +388,39 @@ app = FastAPI(title="Rescue Relay", version="5.6.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
+def valid_basic_authorization(header: str) -> bool:
+    """Authenticate without logging or exposing the configured credentials."""
+    scheme, separator, token = header.partition(" ")
+    if not separator or scheme.lower() != "basic" or not token:
+        return False
+    try:
+        decoded = base64.b64decode(token, validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return False
+    username, separator, password = decoded.partition(":")
+    if not separator:
+        return False
+    username_ok = secrets.compare_digest(username.encode(), BASIC_AUTH_USERNAME.encode())
+    password_ok = secrets.compare_digest(password.encode(), BASIC_AUTH_PASSWORD.encode())
+    return username_ok & password_ok
+
+
+def auth_error(detail: str, status_code: int, *, challenge: bool = False) -> JSONResponse:
+    headers = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
+    if challenge:
+        headers["WWW-Authenticate"] = 'Basic realm="Rescue Relay", charset="UTF-8"'
+    return JSONResponse({"detail": detail}, status_code=status_code, headers=headers)
+
+
 @app.middleware("http")
 async def safe_local_runtime(request: Request, call_next):
     path = request.url.path
+    auth_required = APP_ENV == "production"
+    if path != "/health" and auth_required:
+        if not BASIC_AUTH_USERNAME or not BASIC_AUTH_PASSWORD:
+            return auth_error("Authentication is not configured.", 503)
+        if not valid_basic_authorization(request.headers.get("authorization", "")):
+            return auth_error("Authentication required.", 401, challenge=True)
     if path.startswith("/api/"):
         if CALL_MODE == "live":
             # No operator lock. This prototype is intentionally local-only in live

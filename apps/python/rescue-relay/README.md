@@ -24,9 +24,11 @@ python run.py
 
 Open **http://127.0.0.1:8000**. Choose **Try the demo** and follow the prompts. This creates fictional contact records and fills an editable report; it does not submit the report for you. The complete written guide is [TUTORIAL.md](TUTORIAL.md).
 
-Public product test: https://rescue-relay.onrender.com — a shared, mock-only Render Free service with no CALL-E or LLM credentials.
+Public product test: https://rescue-relay.onrender.com — a mock-only Render Free service with no CALL-E or LLM credentials. HTTP Basic protects every route except `/health`; reviewer credentials are supplied privately in the Devpost testing instructions.
 
 For a new installation, copy `.env.example` to `.env` to customise settings. Do not overwrite an existing `.env` or database when upgrading. 5.6.0 adds a default-empty decision-results field, retaining the earlier original-request ledger and provider fields through additive migrations. Back up the stopped database before upgrading.
+
+`APP_ENV=production` fails closed unless both `BASIC_AUTH_USERNAME` and `BASIC_AUTH_PASSWORD` are set. Authentication is enforced before static files, run/transcript reads, or editable-data endpoints. Keep these credentials in environment configuration; they are never returned by the API or included in frontend assets.
 
 ## Watch the app
 

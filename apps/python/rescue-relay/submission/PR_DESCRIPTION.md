@@ -37,6 +37,8 @@ Public video: https://www.youtube.com/watch?v=GcaoplYcIh0
 
 Public mock-only product test: https://rescue-relay.onrender.com
 
+The hosted service uses fail-closed HTTP Basic authentication on every route except the minimal `/health` readiness endpoint. Credentials are stored only in Render and Devpost’s private testing instructions; none appear in Git, the API configuration response, or frontend assets.
+
 The 2:55 v5.6 product demonstration uses the running application, fictional test contacts and prices in USD. The complete app folder includes the chapter player, guide and both rendered MP4s; `scripts/record_tutorial.py` reproduces the current short cut. The longer tutorial is retained as historical supplementary material. Media may be moved to public release assets if maintainers prefer, provided the player links are updated together.
 
-The Render service uses the $0 Free plan, fictional shared data, `CALL_MODE=mock`, `ENABLE_LIVE_CALLS=false`, and no CALL-E or LLM credentials.
+The Render service uses the $0 Free plan, fictional data, `CALL_MODE=mock`, `ENABLE_LIVE_CALLS=false`, and no CALL-E or LLM credentials.

@@ -60,7 +60,7 @@ Proofread the live-verification status, team details and any optional-model desc
 
 ## Optional public demo hosting
 
-The mock-only public product test is deployed on Render Free at https://rescue-relay.onrender.com. Its `/health` endpoint reports v5.6.0. No CALL-E or LLM credential is configured.
+The mock-only public product test is deployed on Render Free at https://rescue-relay.onrender.com. HTTP Basic protects every route except `/health`, which reports v5.6.0. Reviewer credentials are stored only in Render and Devpost’s private testing instructions. No CALL-E or LLM credential is configured.
 
 **Do not deploy a live-key-enabled server publicly.** This app has no account system, workspace isolation or public-abuse controls. A public demo is a shared fictional sandbox; visitors can edit the same contacts and reports. It is not a private incident-reporting service.
 
@@ -75,6 +75,8 @@ LLM_MODEL=
 LLM_API_KEY=
 LLM_FALLBACK=true
 APP_ENV=production
+BASIC_AUTH_USERNAME=<private reviewer username>
+BASIC_AUTH_PASSWORD=<private generated password>
 HOST=0.0.0.0
 PORT=8000
 DATABASE_PATH=/data/demo.db
@@ -88,6 +90,7 @@ A container definition is supplied; it now includes all Python modules needed at
 docker build -t rescue-relay:5.6.0 .
 docker run --rm -p 127.0.0.1:8000:8000 \
   -e APP_ENV=production -e CALL_MODE=mock -e ENABLE_LIVE_CALLS=false \
+  -e BASIC_AUTH_USERNAME=reviewer -e BASIC_AUTH_PASSWORD='<generated-secret>' \
   -e CALLE_API_KEY= -e LLM_BASE_URL= -e LLM_MODEL= -e LLM_API_KEY= \
   -v rescue-relay-demo:/data rescue-relay:5.6.0
 ```
