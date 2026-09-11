@@ -150,6 +150,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`concord-policy-audit`](skills/concord-policy-audit/) - Calls the branches an operator owns, judges each spoken answer against a written policy rubric compiled into the CALL-E result schema, and returns a branch-level gap register that carries no field capable of identifying the person who answered.
 - [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured information for RDN review and referral follow-up. See [`docs/rdn-intake-referral.md`](docs/rdn-intake-referral.md) for documentation and synthetic validation examples.
 - [`recall-outreach`](skills/recall-outreach/) - Calls affected customers about a product recall using only organisation-approved wording, routes every unapproved question to a human, and reports call completion and recall resolution as separate measures so a completed call is never counted as a completed return.
+- [`powerback-outage-welfare-call`](skills/powerback-outage-welfare-call/) - Triaged batch of consent-first outage welfare calls to households on mains-powered life-support equipment, ranked by equipment criticality and remaining battery, returning a five-bucket board that separates dispatch from human follow-up; refusals and low-confidence calls never become results.
 
 ### Apps
 
