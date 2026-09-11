@@ -71,6 +71,23 @@ class _FakeClient:
 # ---- pure handle_submit/handle_get, no HTTP ----
 
 
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "192.0.2.10", "public.example"])
+def test_live_webhook_refuses_non_loopback_before_opening_socket(host, monkeypatch):
+    def unexpected_server(*args, **kwargs):
+        raise AssertionError("must reject the bind before constructing an HTTP server")
+
+    monkeypatch.setattr("ringfence.webhook.ThreadingHTTPServer", unexpected_server)
+    with pytest.raises(ValueError, match="loopback-only"):
+        create_server(host=host, live=True)
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
+def test_live_webhook_accepts_loopback_without_opening_socket(host, monkeypatch):
+    marker = object()
+    monkeypatch.setattr("ringfence.webhook.ThreadingHTTPServer", lambda *args: marker)
+    assert create_server(host=host, live=True) is marker
+
+
 def test_post_case_dry_run_never_dials_and_status_is_previewed(tmp_path: Path):
     store = CaseStore()
     log = SecurityEventLog(tmp_path / "security_events.jsonl")

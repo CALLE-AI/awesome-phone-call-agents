@@ -442,7 +442,7 @@ python -m ringfence.demo_server --host 0.0.0.0 --port "$PORT"
 |---|---|---|
 | `ringfence case submit --file case.json` | Dry run. Renders the disclosure-first call script, resolves the dial target, validates the case. **No call placed, no credits spent.** | `--live --confirm-live` together — **both required, no override.** `CALLE_API_KEY` must also be set. |
 | `ringfence case resolve --from-fixtures DIR` | Reads local JSON only. No network call, no API key needed. | N/A — read-only. |
-| `POST /cases` (webhook) | Dry run, unless the server itself was started with `--live --confirm-live`. | Start `ringfence.webhook` with `--live --confirm-live`. |
+| `POST /cases` (webhook) | Dry run, unless the server itself was started with `--live --confirm-live`. | Start `ringfence.webhook` with `--live --confirm-live`; live mode is loopback-only. Do not expose it through a public proxy. |
 | `ringfence_submit_case` (MCP) | Dry run. | Pass `live=True` **and** `confirm_live=True` together in the same tool call — omitting either keeps it a preview. |
 | `GET /cases/{id}` / `ringfence_get_case` | Read-only lookup of a stored recommendation. | N/A. |
 | `ringfence case audit` / `case report-index` | Reads local JSON only, writes a report file. No network call. | N/A — read-only. |

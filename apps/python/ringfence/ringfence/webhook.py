@@ -287,6 +287,8 @@ def create_server(
     store stays in-memory only. Pass a path to make it durable: cases
     survive a server restart, and one already dialed is never re-dialed.
     """
+    if live and host not in {"127.0.0.1", "localhost", "::1"}:
+        raise ValueError("Live webhook is loopback-only; do not expose it through a public bind or proxy.")
     if store is None:
         ledger = CaseLedger(ledger_path) if ledger_path is not None else None
         store = CaseStore(ledger)
