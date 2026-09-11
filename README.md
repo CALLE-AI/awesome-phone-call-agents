@@ -150,6 +150,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`concord-policy-audit`](skills/concord-policy-audit/) - Calls the branches an operator owns, judges each spoken answer against a written policy rubric compiled into the CALL-E result schema, and returns a branch-level gap register that carries no field capable of identifying the person who answered.
 - [`rdn-intake-referral`](skills/rdn-intake-referral/) - Consent-based outbound healthcare nutrition intake that collects structured information for RDN review and referral follow-up. See [`docs/rdn-intake-referral.md`](docs/rdn-intake-referral.md) for documentation and synthetic validation examples.
 - [`recall-outreach`](skills/recall-outreach/) - Calls affected customers about a product recall using only organisation-approved wording, routes every unapproved question to a human, and reports call completion and recall resolution as separate measures so a completed call is never counted as a completed return.
+- [`supply-chain-supplier-status`](skills/supply-chain-supplier-status/) - Autonomous outbound phone calls to suppliers to verify purchase order fulfillment, capture delay causes, calculate financial risk, and sync procurement records.
 
 ### Apps
 
@@ -165,6 +166,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
+- [Supply Chain Supplier Status Agent](https://github.com/mohSadiq90/call-e-hackathon) - Autonomous enterprise phone agent for supplier purchase order fulfillment verification, root cause delay capture, penalty estimation, and ERP dashboard sync with zero-credit mock simulation.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
