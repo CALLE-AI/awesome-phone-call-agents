@@ -13,6 +13,11 @@ Application source, tests, and MIT license live there. The instructions below
 target revision
 [`399425553451`](https://github.com/nexoraoneio/SUPPLYCALL_AI/tree/399425553451b3539e7baf0b7708714c4a22d949).
 
+Implementation and live-verification statements are author-reported for that
+revision, not independently verified production guarantees. Review this entry
+through the no-call checks below; no private deployment or live-call evidence is
+required for this catalog contribution.
+
 - [Application repository](https://github.com/nexoraoneio/SUPPLYCALL_AI)
 - [CALL-E integration notes](https://github.com/nexoraoneio/SUPPLYCALL_AI/blob/399425553451b3539e7baf0b7708714c4a22d949/docs/CALLE-INTEGRATION.md)
 - [Architecture](https://github.com/nexoraoneio/SUPPLYCALL_AI/blob/399425553451b3539e7baf0b7708714c4a22d949/ARCHITECTURE.md)
