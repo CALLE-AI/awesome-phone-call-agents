@@ -50,7 +50,7 @@ export function BatchResultCard({
 
       <ol className="flex flex-col gap-4">
         {ordered.map((item) => (
-          <PlaceCard key={item.recipient.id} item={item} isBest={item.recipient.id === outcome.bestId} />
+          <PlaceCard key={item.recipient.id} item={item} isBest={item.recipient.id === outcome.bestId} rankKey={outcome.rankKey} />
         ))}
       </ol>
     </section>
@@ -58,7 +58,9 @@ export function BatchResultCard({
 }
 
 // The winner is marked by its border alone; the per-field pills carry the status.
-function PlaceCard({ item, isBest }: { item: BatchItemResult; isBest: boolean }) {
+function PlaceCard({ item, isBest, rankKey }: { item: BatchItemResult; isBest: boolean; rankKey?: string }) {
+  const rankField = rankKey ? item.outcome.fields.find((f) => f.key === rankKey) : undefined;
+  const rankValue = rankField && rankField.value !== null && rankField.value !== "" ? String(rankField.value) : null;
   return (
     <li
       className={`rounded-xl border bg-card p-4 ${isBest ? "border-verified ring-1 ring-verified" : "border-border"}`}
@@ -68,7 +70,14 @@ function PlaceCard({ item, isBest }: { item: BatchItemResult; isBest: boolean })
           {item.recipient.label}
           {isBest && <span className="ml-2 text-sm font-semibold text-verified">Best pick</span>}
         </h3>
-        <span className="font-mono text-sm text-muted-foreground">{item.recipient.phone}</span>
+        <div className="flex items-baseline gap-3">
+          {rankValue && (
+            <span className={`text-xl font-medium ${rankField?.status === "verified" ? "text-foreground" : "text-muted-foreground line-through decoration-caution"}`} title={rankField?.status === "verified" ? "verified on the call" : "not confirmed on the call"}>
+              {rankValue}
+            </span>
+          )}
+          <span className="font-mono text-sm text-muted-foreground">{item.recipient.phone}</span>
+        </div>
       </div>
       {item.outcome.unreachable && (
         <p className="mt-2 text-sm">
@@ -81,10 +90,10 @@ function PlaceCard({ item, isBest }: { item: BatchItemResult; isBest: boolean })
           return (
             <div key={field.key} className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <dt className="font-semibold">{humanize(field.key)}</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{humanize(field.key)}</dt>
                 <VerificationChip status={field.status === "verified" ? "verified" : "unverified"} />
               </div>
-              <dd className="mt-0.5">{value}</dd>
+              <dd className="mt-0.5 text-xl font-medium leading-tight text-foreground">{value}</dd>
               {field.status === "verified" && field.quotes[0] && (
                 <EvidenceQuote text={field.quotes[0].text} value={value} size="sm" />
               )}

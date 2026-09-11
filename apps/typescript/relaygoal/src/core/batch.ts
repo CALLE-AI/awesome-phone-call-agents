@@ -35,6 +35,8 @@ export interface RankSpec {
 export interface BatchOutcome {
   items: BatchItemResult[];
   rankedBy: string;
+  /** The field the ranking compared on (e.g. "price"), so a UI can surface it per place. */
+  rankKey?: string;
   /** Recipient id of the recommended pick, or null when none can be confirmed. */
   bestId: string | null;
   reason: string;
@@ -65,7 +67,7 @@ export async function runVerifiedBatch(
   }
 
   const { bestId, reason } = reconcile(items, req.rank);
-  return { items, rankedBy: req.rank.describe, bestId, reason };
+  return { items, rankedBy: req.rank.describe, ...(req.rank.compareKey ? { rankKey: req.rank.compareKey } : {}), bestId, reason };
 }
 
 function verifiedValue(item: BatchItemResult, key: string): string | null {

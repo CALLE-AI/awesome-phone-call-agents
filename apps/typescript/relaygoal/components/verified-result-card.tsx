@@ -80,8 +80,8 @@ export function VerifiedResultCard({
       <header className="border-b border-border p-5">
         <p className="text-sm font-medium text-muted-foreground">Result</p>
         <h2 id="result-heading" className="text-2xl">{presetLabel}</h2>
-        <p className={`mt-2 flex items-center gap-1.5 font-semibold ${TONE[status.tone]}`}>
-          <StatusIcon icon={status.icon} />
+        <p className={`mt-2 flex items-start gap-1.5 font-semibold ${TONE[status.tone]}`}>
+          <span className="mt-1 flex-none"><StatusIcon icon={status.icon} /></span>
           <span>{status.text}</span>
         </p>
       </header>
@@ -158,10 +158,10 @@ function FieldRow({
   return (
     <div className="px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <dt className="font-semibold">{humanize(field.key)}</dt>
+        <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{humanize(field.key)}</dt>
         <VerificationChip status={field.status === "verified" ? "verified" : "unverified"} />
       </div>
-      <dd className="mt-1 text-lg">{value}</dd>
+      <dd className="mt-0.5 text-2xl font-medium leading-tight text-foreground">{value}</dd>
 
       {field.status === "verified" && quote && !sameSentenceAs && (
         <EvidenceQuote text={quote.text} value={value} onCite={() => onCiteQuote(quote.offsetSeconds)} />

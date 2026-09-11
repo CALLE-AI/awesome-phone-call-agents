@@ -35,9 +35,9 @@ export function CallStatusTimeline({
               aria-current={state === "current" ? "step" : undefined}
               className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-semibold ${
                 state === "done"
-                  ? "bg-verified text-verified-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : state === "current"
-                    ? "bg-primary text-primary-foreground"
+                    ? "border-2 border-primary bg-card text-primary"
                     : "bg-muted text-muted-foreground"
               }`}
             >
