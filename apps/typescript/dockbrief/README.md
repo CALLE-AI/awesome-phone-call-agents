@@ -62,7 +62,9 @@ The live path requires `CALLE_API_KEY` in the process environment, an authorized
 
 ## Verification and current limits
 
-The reproducible scenarios use synthetic conversations and are explicitly labeled as fixtures. They demonstrate application behavior, not customer deployment or a successful telephone connection. **No live telephone test has been completed for this contribution yet.** Live execution evidence, if obtained, must be documented separately with its date and exact scope.
+The reproducible scenarios use synthetic conversations and are explicitly labeled as fixtures. They demonstrate application behavior, not customer deployment.
+
+**One real integration call reached CALL-E's official US test hotline on September 11, 2026.** The provider marked the call completed and `taskCompleted: true`, but the requested `questionnaireOutcome` was `incomplete`. The hotline did not have the requested receiving facts; all five required checks stayed unknown and DockBrief reported “Needs confirmation.” See the [sanitized live-test evidence](docs/live-test.md) for exact timestamps, the official authorization source and short actual transcript excerpts. This was a fictional questionnaire to the sponsor's test hotline, not a customer or warehouse test. The SDK's `user` speaker role identifies the receiving side and does not prove that a human answered.
 
 This is a local hackathon prototype, not production dispatch software. It has no field measurements, equipment certification, logistics integration, customer trial, measured savings or demonstrated accuracy rate. Quoted language can still be ambiguous. A reviewer must inspect the original context and resolve unknowns.
 

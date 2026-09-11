@@ -74,27 +74,27 @@ function valuesInText(name: FactName, text: string): string[] {
 }
 export function assess(input: Input, call: Call | undefined): Assessment {
   const checks: Check[] = [];
-  const notes = ['This brief is not dispatch approval or a safety certification. A qualified operator must verify load center, equipment derating, floor/route limits, clearance margin and site conditions.', 'CALL-E extraction and transcripts can be wrong. Review the cited human statements before acting. Unrecognized phrasing remains unverified.'];
+  const notes = ['This brief is not dispatch approval or a safety certification. A qualified operator must verify load center, equipment derating, floor/route limits, clearance margin and site conditions.', 'CALL-E extraction and transcripts can be wrong. Review the cited recipient statements before acting. The SDK user role identifies the receiving side; it does not prove a human answered. Unrecognized phrasing remains unverified.'];
   const candidate = call?.recipients.length === 1 ? call.recipients[0] : undefined;
   const recipient = candidate?.phones.length === 1 && candidate.phones[0] === input.site.phone ? candidate : undefined;
-  const transcripts = recipient?.attempts.flatMap(a => a.transcriptTurns.filter(t => t.speaker === 'user').map((t, i) => ({ text: t.text, source: `${a.id} / human turn ${i + 1}${t.offset_seconds === null ? '' : ` / ${t.offset_seconds}s`}` }))) ?? [];
+  const transcripts = recipient?.attempts.flatMap(a => a.transcriptTurns.filter(t => t.speaker === 'user').map((t, i) => ({ text: t.text, source: `${a.id} / recipient turn ${i + 1}${t.offset_seconds === null ? '' : ` / ${t.offset_seconds}s`}` }))) ?? [];
   const isCompleted = call?.status === 'completed' && call.taskCompleted === true && recipient?.status === 'completed' && call.structuredResult?.questionnaireOutcome === 'answered';
   for (const name of FACTS) {
     if ((name === 'dockAvailable' && input.load.unloadingMode !== 'dock') || (name === 'groundAvailable' && input.load.unloadingMode !== 'ground')) continue;
     const required = name === 'forkliftCapacityKg' ? input.load.grossKg : name === 'doorWidthMm' ? input.load.widthMm : name === 'doorHeightMm' ? input.load.heightMm : null;
     const unit = name === 'forkliftCapacityKg' ? 'kg' : 'mm';
-    const check: Check = { name, label: labels[name], outcome: 'unknown', expected: required === null ? 'yes' : `at least ${required} ${unit}`, observed: 'unknown', quote: null, source: null, reason: 'No verified human evidence.' };
+    const check: Check = { name, label: labels[name], outcome: 'unknown', expected: required === null ? 'yes' : `at least ${required} ${unit}`, observed: 'unknown', quote: null, source: null, reason: 'No supported recipient evidence.' };
     if (call?.status !== 'completed' || recipient?.status !== 'completed') { check.reason = 'No completed recipient call is available for this condition.'; checks.push(check); continue; }
     const raw = recipient?.structuredResult?.[name];
     if (!object(raw) || typeof raw.value !== 'string' || typeof raw.quote !== 'string' || !raw.quote.trim() || raw.quote.length > 800 || raw.value === 'unknown') { checks.push(check); continue; }
     const fact = raw as unknown as Fact;
     const source = transcripts.find(t => t.text.includes(fact.quote));
-    if (!source) { check.reason = 'The quote does not occur in a human transcript turn.'; checks.push(check); continue; }
+    if (!source) { check.reason = 'The quote does not occur in a recipient transcript turn.'; checks.push(check); continue; }
     const strip = (s: string) => s.trim().replace(/[.!]+$/, '').trim();
     const pattern = numberPatterns[name] ?? boolPatterns[name]!;
     const wholeStatement = new RegExp(`^(?:${pattern.source})$`, 'i');
-    if (strip(source.text) !== strip(fact.quote) || !wholeStatement.test(strip(source.text))) { check.reason = 'The full human statement includes context or phrasing this conservative parser cannot verify. Review the original transcript.'; checks.push(check); continue; }
-    if (transcripts.some(t => mentions[name].test(t.text) && !wholeStatement.test(strip(t.text)))) { check.reason = 'Another human statement qualifies or discusses this condition without a clear supported value. Review the full transcript.'; checks.push(check); continue; }
+    if (strip(source.text) !== strip(fact.quote) || !wholeStatement.test(strip(source.text))) { check.reason = 'The full recipient statement includes context or phrasing this conservative parser cannot verify. Review the original transcript.'; checks.push(check); continue; }
+    if (transcripts.some(t => mentions[name].test(t.text) && !wholeStatement.test(strip(t.text)))) { check.reason = 'Another recipient statement qualifies or discusses this condition without a clear supported value. Review the full transcript.'; checks.push(check); continue; }
     if (uncertain.test(source.text) || /\b(not|no)\b/i.test(source.text) && required !== null) { check.reason = 'The source contains uncertainty, a qualification or negation; verify manually.'; checks.push(check); continue; }
     const values = valuesInText(name, fact.quote);
     const entireValues = transcripts.flatMap(t => valuesInText(name, t.text));
