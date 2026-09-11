@@ -1,0 +1,19 @@
+{
+  "+12025550147": {
+    "status": "answered",
+    "still_coming": true,
+    "eta_minutes": 6,
+    "released": false,
+    "confirmation_quote": "Yes, six minutes, I can see the block."
+  },
+  "+14155550188": {
+    "status": "answered",
+    "still_coming": true,
+    "eta_minutes": 20,
+    "released": false,
+    "confirmation_quote": "Still coming but it will be twenty minutes."
+  },
+  "+16175550101": {
+    "status": "no_answer"
+  }
+}
