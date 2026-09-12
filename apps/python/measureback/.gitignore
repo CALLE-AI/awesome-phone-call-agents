@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.state/
+.venv/
+artifacts/
+node_modules/
+.DS_Store
+.devpost-hackathon-state.json
+devpost-submission.md
+output/
