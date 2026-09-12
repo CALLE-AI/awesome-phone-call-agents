@@ -518,66 +518,39 @@ p {
  * `hyphens: auto` is here and is not load-bearing. With a dictionary in the reader's own
  * profile it closes a gap or two; on the fresh profile a gate run gets it does nothing.
  * It costs a declaration and can only help. */
-@media (min-width: 52rem) {
-  /* `:where()` on both lists, so neither can beat the other on specificity and the order
-   * they are written in is the order that decides. Written the obvious way, `p.lede` at
-   * (0,1,1) beat a (0,0,2) rule meant to override it, and four paragraphs stayed justified
-   * with a 24.9px hole in them. */
-  :where(
-    .inner > p,
-    .band > p,
-    .claim > p,
-    .fold > p,
-    .fold-body > p,
-    p.note, p.dim,
-    p.money-why, p.money-foot, p.money-key-foot,
-    p.closes,
-    p.lane-note, p.scene-note, p.hero-foot, p.hero-turn, p.take-why,
-    p.queue-foot, p.queue-clockless, p.verify-say, p.mrn-say
-  ) {
-    text-align: justify;
-    text-justify: inter-word;
-    hyphens: auto;
-  }
-
-  /* Quoting an identifier is not what decides this, and a rule that said so was built,
-   * measured and thrown away. `p:has(code)` left the two longest paragraphs on the page
-   * ragged, 23 lines each, over one `<code>` apiece: `.money-key-foot` justifies without a
-   * single loose line and `.closes` opens one, on the line that carries two file paths.
-   * Photographed rather than counted, both read better justified than ragged.
-   *
-   * What does decide it is whether a line has words to spread the stretch across. A
-   * `.hard` paragraph opened a 46.2px word space and a `.band-count` 41.6px, and neither
-   * of them holds a token worth blaming: `.hard` is `text-wrap: balance`, which picks
-   * short lines on purpose, and justification then pulls every one of them out to the full
-   * box. Balanced display type and two-line notes are ragged below for that reason, and
-   * the list is by name because no selector can count lines. */
-
-  /* Ragged by name. Narrow cells, balanced display type, and labels. */
-  :where(
-    p.eyebrow, p.pull,
-    p.minute-say, p.minute-claim, p.minute-eyebrow, p.q-head, p.q-tried, p.q-todo,
-    p.q-when, p.path-why, p.path-k, p.path-lead, p.mut-code, p.mut-plain,
-    p.limit, p.hard, p.band-count, p.duet-line,
-    /* A lede is two or three lines of display type. Justify it and the stretch all lands
-     * on the one full line: "Every safety rule is verified against simulated failures."
-     * opened a 24.9px word space, seven times its own natural one, which is the exact
-     * complaint a ragged edge was supposed to be causing. Justification needs lines to
-     * spread the stretch across, and a short paragraph does not have them. `.stakes` is
-     * here for the same reason in a 416px column. */
-    p.lede, p.stakes,
-    p.take-run, p.take-h, p.further-k, p.money-n, p.money-what, p.read-why,
-    p.queue-said, p.tally-head, p.tally-alt, p.mrn-hint, p.nav-note, p.stakes-src,
-    p.standfirst,
-    /* The two plates are four lines of provenance carrying six mono tokens between
-     * them. Justified, the first line held `abfb3f9 plus uncommitted changes` and
-     * nothing else that would fit, and the words on it stood 25.2px apart. */
-    .plate-royal p
-  ) {
-    text-align: left;
-    hyphens: manual;
-  }
+/* Every paragraph, justified.
+ *
+ * This was a list of classes, twice, and the lists were the argument: some paragraphs
+ * justified well and some opened holes, so the ones that opened holes stayed ragged. The
+ * page read as two typographies and the mixture was more obvious than either. So the rule
+ * is the whole element now, at every width.
+ *
+ * Two things have to come with it, because justification is the thing they were tuned
+ * against. `text-wrap: balance` picks short lines deliberately and justify then pulls each
+ * of them out to the full box: measured at 46.2px between words on a two-line claim, which
+ * is the worst gap on the page and was entirely self-inflicted. Balance is gone from the
+ * paragraph classes below. And a line whose next word is an unbreakable file path has
+ * nowhere to give, which is a real cost and a visible one on `.closes`; `overflow-wrap:
+ * anywhere` and `word-break: break-all` were both measured against it and moved the gap by
+ * nothing at all, because Chrome only breaks a word to stop it overflowing, never to fill a
+ * justified line. The cost is accepted rather than hidden behind a second typography. */
+p {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
 }
+/* A line of code is not prose and a table cell is not a sentence: stretching the spaces in
+ * either one moves a value away from the label it belongs to. These carry words in a
+ * column, not paragraphs in a measure. */
+p.mut-code,
+p.take-run,
+p.q-tried, p.q-todo, p.q-when,
+p.tally-head, p.tally-alt,
+p.money-n, p.band-count {
+  text-align: left;
+  hyphens: manual;
+}
+
 p.lede {
   font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.4rem);
   line-height: 1.45;
@@ -1094,7 +1067,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   padding-top: var(--space-3);
   border-top: var(--marker) solid var(--live-mark);
   max-width: min(var(--measure), 68rem);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 /* A single-line statement the act stands behind, set between body prose and a pull quote.
    Smaller than `.pull` on purpose: three of these in one act at pull size would be three
@@ -1104,7 +1077,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   font-size: clamp(1.15rem, 1rem + 0.5vw, 1.4rem);
   line-height: 1.32; color: var(--ink);
   margin: var(--space-4) 0; max-width: var(--measure);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .pull-who {
@@ -1399,7 +1372,7 @@ footer .source-link { margin-top: var(--space-3); }
    * that sets the prose, and `pretty` is the wrong style for a label that has to survive
    * wrapping on a phone. `balance` is what the other four labels on this page are set to,
    * and this is the only one of the five that needed saying twice. */
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 /* The whole screen has one sentence on it. Everything else up here is a label on a real
  * object, and the object is the argument.
@@ -2508,7 +2481,7 @@ button[data-copy][data-copied]::after {
   font-family: var(--display); font-weight: 400;
   font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.65rem);
   line-height: 1.2; letter-spacing: -0.01em;
-  color: var(--ink); text-wrap: balance;
+  color: var(--ink); text-wrap: pretty;
   border-left: var(--marker) solid var(--undetermined);
   padding-left: calc(var(--inset) - var(--marker));
 }
@@ -3373,7 +3346,7 @@ button, .replay, [data-copy] {
   line-height: 1.28;
   letter-spacing: -0.008em;
   color: var(--ink);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .minute-say {
