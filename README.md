@@ -291,6 +291,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
+- [Doot](https://github.com/kirmada1509/doot) - Caller-first shelter and respite coordination demo with explicit synthetic holds and a separate, opt-in CALL-E call to an authorized human answerer. See the [setup and safety notes](docs/community-apps/doot.md).
 
 ### Plugins
 
