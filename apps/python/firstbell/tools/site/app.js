@@ -56,15 +56,50 @@ function startScroll() {
       const target = document.querySelector(href);
       if (!target) return;
       e.preventDefault();
+      // The top of the document is a position, not an element offset. `#act-00` begins at
+      // zero and the topbar clearance below is a clearance from something above it, so
+      // subtracting 76px there scrolls to -76 and the browser clamps it to 0 after the
+      // tween has already spent its duration going nowhere. Scrolling to the number
+      // directly is the one case where the offset is wrong rather than merely unneeded.
+      const toTop = href === '#act-00' || target.offsetTop === 0;
+      // Where the target sits in the document, with the stickiness taken off it first.
+      //
+      // Act 00 is `position: sticky`, and a block inside it reports a rect pinned to
+      // wherever the reader already is. `scrollTo(element)` reads exactly that rect, so
+      // "the simulator" resolved to 88px clicked from the top of the page and to 3,977px
+      // clicked from the foot of it: one link, two destinations, decided by nothing the
+      // reader did. An offsetTop chain does not help, because Chrome reports the stuck
+      // offset there too -- `#act-00` measures 74 at rest and 4,003 once it is stuck.
+      //
+      // Setting the sticky ancestors static for the length of one statement is the only
+      // reading that is exact, and it is a reading, not a change: the property is put back
+      // in the same task, before any style or paint the reader could see.
+      const docTop = (() => {
+        const stuck = [];
+        for (let node = target; node; node = node.parentElement) {
+          if (getComputedStyle(node).position === 'sticky') {
+            stuck.push([node, node.style.position]);
+            node.style.position = 'static';
+          }
+        }
+        const y = target.getBoundingClientRect().top + window.scrollY;
+        for (const [node, was] of stuck) node.style.position = was;
+        return y;
+      })();
       // A duration and an easing, not the instance lerp. `scrollTo` with neither falls
       // back to `lerp: 0.1`, which is an asymptotic approach: it covers most of the
-      // distance quickly and then crawls at the target without ever quite arriving. Over
-      // the jumps this page offers, nine acts apart, that reads as the page dragging
-      // rather than navigating. A bounded tween arrives, and a reader can tell it has.
-      lenis.scrollTo(target, {
-        offset: -76,
-        duration: 0.7,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      // distance quickly and then crawls at the target without ever quite arriving. The
+      // exponential that replaced it was the same shape with a floor: 1.001 - 2^-10t
+      // still spends its last fifth of the duration inside a pixel of the target, which
+      // over jumps nine acts apart reads as the page dragging rather than navigating.
+      //
+      // A cubic ease-out reaches the target exactly at t = 1 and its derivative goes to
+      // zero there, so it lands rather than stopping, and 0.38s is short enough that a
+      // reader who clicked the rail is already reading before they would think to wait.
+      lenis.scrollTo(toTop ? 0 : Math.max(0, docTop - 76), {
+        offset: 0,
+        duration: 0.38,
+        easing: (t) => 1 - Math.pow(1 - t, 3),
       });
       // The hash never moved, so the address bar could not be copied or shared and the
       // back button had nothing to go back to.
