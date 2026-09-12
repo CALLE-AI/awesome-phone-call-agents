@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Dial",
+    "slug": "dial",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "dial",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#f4f7fb",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dial.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Dial uses your location to find businesses near you to call. It is only read when you start a task.",
+        "NSMicrophoneUsageDescription": "Dial uses the microphone only if you choose to dictate a task."
+      }
+    },
+    "android": {
+      "package": "com.dial.app",
+      "adaptiveIcon": { "backgroundColor": "#f4f7fb" },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Dial uses your location to find businesses near you to call."
+        }
+      ]
+    ],
+    "experiments": { "typedRoutes": false }
+  }
+}
