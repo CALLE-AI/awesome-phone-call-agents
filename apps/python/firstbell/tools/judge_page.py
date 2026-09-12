@@ -1998,8 +1998,9 @@ def _money_key_block(f: dict) -> str:
         # catch.
         '<p class=money-key-foot>The sample is every call pooled in '
         '<code>evidence/recorded-calls.json</code>, which '
-        f'is the one denominator on this page nobody chose, and these {how_many} rates '
-        'are per answered call, because one of those calls reached nobody. '
+        f'is the sample this page was fixed on before any of it was measured, and these '
+        f'{how_many} rates are per answered call, because one of those calls reached '
+        'nobody. '
         + widest +
         # Which of them to quote, in the card rather than eighty lines below it. A district
         # buyer read this block, counted four money figures across the page and could not
@@ -3508,14 +3509,24 @@ def build(has_audio: bool, repo_url: str | None = None,
         # It was here as well, in full, about nine hundred words above its own restatement,
         # which is the single clearest case of the repetition a reader complained about: the
         # same claim twice inside one act with the evidence for it in between.
+        #
+        # What a reader gets in the first second is the claim. How the claim was made is a
+        # method, and a method read before the thing it supports is scaffolding: the lead
+        # here used to open on the shape of a table row, three sentences before saying what
+        # the table was for. The method is all still served, one click away, which is the
+        # same arrangement act 04 and act 08 use.
+        '<p class=lede>Every safety rule is verified against simulated failures.</p>',
+        '<details class=fold><summary>How each rule is checked, and the defect it '
+        'found</summary><div class=fold-body>'
         '<p>Each row is a change made to working code to check that a specific test '
         'notices. Every one was reverted and the suite returned to green. The number beside '
-        'a row is how many tests failed while the change was in.</p>',
+        'a row is how many tests failed while the change was in.</p>'
         '<div class=note>Number 18 found a live defect rather than confirming a rule. '
         '<code>reached_production_api</code> was computed from the configured base URL '
         'alone. A run whose every attempt died at the transport layer would still have '
-        'published that it reached production.</div>',
-        mutation_distribution(muts),
+        'published that it reached production.</div>'
+        + mutation_distribution(muts) +
+        '</div></details>',
         '</div><div class=artifact>',
         FOLD_OPEN,
         '<div class=scrollbox tabindex=0 role=region '
@@ -3533,9 +3544,19 @@ def build(has_audio: bool, repo_url: str | None = None,
                     f'<td><p class=mut-plain>{esc(LEAD_MUTATIONS[num])}</p>'
                     f'<p class=mut-code>{esc_code(change)}</p></td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
-    body.append('</tbody></table>')
+    # The first scrollbox ends with the first table. The rest used to sit inside it, which
+    # put a bordered card inside a box that scrolls sideways: at 390 the card measured
+    # 302px and the table inside it 549px, so 247px of rows were drawn past the card's own
+    # right edge before the scrollbox clipped them. A card its content hangs out of reads
+    # as a broken card. Each table gets its own scrolling region instead, and each region
+    # is an inline-size container, so both tables size to the column they are actually in.
+    body.append('</tbody></table></div>')
     body.append(
         f'<details class=fold><summary>The other {len(rest)}, in the same shape</summary>'
+        '<div class=fold-body>'
+        '<div class=scrollbox tabindex=0 role=region '
+        'aria-label="The rest of the changes made on purpose, with the number of tests '
+        'that noticed. Scrolls sideways on a narrow screen.">'
         '<table class=mutations>'
         '<caption class=visually-hidden>The rest of the changes, in the same shape: what was altered, and how many tests noticed.</caption>'
         '<thead><tr><th scope=col>#</th><th scope=col>the change</th>'
@@ -3543,9 +3564,9 @@ def build(has_audio: bool, repo_url: str | None = None,
     for num, change, caught in rest:
         body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
-    body.append('</tbody></table></details>')
+    body.append('</tbody></table></div></div></details>')
     body.append(FOLD_SHUT)
-    body.append('</div></div></div>')
+    body.append('</div></div>')
     # The first sentence of the claim above, word for word. It closes the act at full width
     # rather than sitting in the 26rem claim column, where the display face would break one
     # sentence over six lines.
@@ -3580,8 +3601,12 @@ def build(has_audio: bool, repo_url: str | None = None,
         ("Record the identifier the vendor is keyed on",
          "The id an API returns and the id its billing page shows are not always the same "
          "one. Recording only the first makes a receipt uncheckable by anyone outside the "
-         "repository that wrote it."),
-        ("Break a rule to prove a test catches it",
+         "repository that wrote it.",
+         ""),
+        ("Make the safety rules prove themselves",
+         "Deterministic safety triage guarantees no unconfirmed call slips through: a call "
+         "that came back without a confirmed answer is owned by a person, not closed by a "
+         "model.",
          f"{len(_muts)} deliberate changes, each reverted, each recorded with the number of "
          f"tests that failed. {_uncaught_line}"),
     ]
@@ -3604,9 +3629,18 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<div class=act-num>06</div><h2 id=h-06>Two things worth taking, whatever you are building.</h2>',
         '<div class=plate-royal><div class=takes>',
     ]
-    for i, (title, text) in enumerate(takes, 1):
+    # Third element per card: the working behind the claim, behind a closed disclosure.
+    # A take-away is read in the second a reader passes it, and a card that opens on a
+    # count of deliberate code changes is asking them to hold a method before they have
+    # the point. `<details>` is a sibling of the paragraph rather than inside it, because
+    # a `<p>` cannot contain flow content and a browser closes it at the tag.
+    for i, (title, text, working) in enumerate(takes, 1):
         body.append(f'<div class=take><div class=take-n>{i:02d}</div>'
-                    f'<h3 class=take-t>{esc(title)}</h3><p>{text}</p></div>')
+                    f'<h3 class=take-t>{esc(title)}</h3><p>{text}</p>'
+                    + (f'<details class=fold><summary>How that is checked</summary>'
+                       f'<div class=fold-body><p>{working}</p></div></details>'
+                       if working else '')
+                    + '</div>')
     body.append('</div></div>')
     add(act("06", "Two things to take", "".join(body), margin=True))
 
@@ -3696,9 +3730,11 @@ def build(has_audio: bool, repo_url: str | None = None,
                    '<p>The offline path runs the same SDK code the live one does. Nothing '
                    'here places a telephone call.</p>'),
         '<div class=act-num>08</div><h2 id=h-08>Run the whole thing with no account.</h2>',
-        '<p>No API key, no signup. The local double is mounted as an '
-        '<code>httpx</code> transport underneath a real '
-        '<code>calle.CalleClient</code>.</p>',
+        # The offer, and nothing else. How the offline path is wired is the answer to a
+        # question a reader only has after they have decided to run it, so it moved into
+        # the fold below with the run it describes.
+        '<p class=lede>Test our verified system offline right now, with no API key and no '
+        'account.</p>',
         # The directory, because neither line runs from the root of a fresh clone and
         # the page said nothing about where to be. The same defect the take-away card had,
         # on the command this act is named after.
@@ -3713,6 +3749,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         # was the only thing telling a reader why the block below was empty. The block
         # ships whole now, so the instruction is about the optional part.
         FOLD_OPEN,
+        # The mechanism only. The conclusion it supports is already in the margin note at
+        # the head of this act, and the two used to sit two lines apart saying one thing
+        # twice.
+        '<p class=dim>The local double is mounted as an <code>httpx</code> transport '
+        'underneath a real <code>calle.CalleClient</code>.</p>',
         '<p class=dim>Produced by running exactly that when this page was built, and it '
         'is all below. Watch it run to see the rows land one at a time.</p>',
         # The interactive surface, and the evidence, are one element. `console.js` reads
