@@ -1489,8 +1489,9 @@ def video_link_markup(video_url: str | None) -> str:
     The running time is read rather than written. It said 2 min 53 here for a fortnight,
     and a re-render made the cut five seconds longer and this line wrong, along with the
     same figure in the README and in this docstring. The film is not in the repository, so
-    `make-receipt.py` measures the file and writes `evidence/film.json` beside RECEIPT.md,
-    and this reads that.
+    the script that renders it measures the finished file and writes `evidence/film.json`,
+    and this reads that. There is no `make-receipt.py`: this line named one for a while,
+    which sent a reader looking for a script that was never here.
     """
     if not video_url:
         return ""      # and the fact in act 08. See `where_it_lives`.
