@@ -16,7 +16,7 @@ answer "why is this case not being called?" without anybody reading a log.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -653,6 +653,29 @@ class Orchestrator:
             self.reconcile(int(row["id"]))
             resumed.append(int(row["id"]))
         return resumed
+
+    def purge_expired_transcripts(self, now: datetime | None = None) -> int:
+        """Delete transcripts past the retention period.
+
+        Run at startup rather than on a timer: the app is a single process an
+        office starts in the morning, and a retention policy that only runs when
+        a scheduler happens to fire is a retention policy that does not run.
+
+        The outcome, the disposition and the audit trail survive. The words do
+        not.
+        """
+        moment = now or self.clock()
+        cutoff = moment - timedelta(days=self.config.transcript_retention_days)
+        purged = self.store.purge_transcripts(cutoff.isoformat(timespec="seconds"))
+        if purged:
+            self.store.record_event(
+                "retention.purged",
+                reason=(
+                    f"Deleted {purged} transcript(s) older than "
+                    f"{self.config.transcript_retention_days} days"
+                ),
+            )
+        return purged
 
     def _store_result(self, attempt_id: int, snapshot: Mapping[str, Any], classification) -> None:
         """Persist the result, sanitised at the ingestion boundary."""

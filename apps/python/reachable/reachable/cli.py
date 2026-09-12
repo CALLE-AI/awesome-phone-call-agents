@@ -138,6 +138,20 @@ def cmd_replay(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def cmd_purge_transcripts(args: argparse.Namespace) -> int:
+    """Delete transcripts past the retention period. Outcomes survive."""
+    try:
+        orc = _orchestrator()
+    except ConfigError as exc:
+        return _fail(str(exc))
+    purged = orc.purge_expired_transcripts()
+    print(
+        f"  purged {purged} transcript(s) older than "
+        f"{orc.config.transcript_retention_days} days"
+    )
+    return 0
+
+
 # ----------------------------------------------------------------- live setup
 
 
@@ -261,6 +275,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("replay", help="replay scenarios end to end with no network")
     p.add_argument("scenario", nargs="*")
     p.set_defaults(func=cmd_replay)
+
+    p = sub.add_parser(
+        "purge-transcripts", help="delete transcripts past the retention period"
+    )
+    p.set_defaults(func=cmd_purge_transcripts)
 
     p = sub.add_parser(
         "live-contact",

@@ -104,6 +104,12 @@ def create_app(
     orc = orchestrator or build_orchestrator(config)
     if orchestrator is None:
         orc.import_data()
+        # Retention runs at startup. A policy that only runs when a scheduler
+        # happens to fire is a policy that does not run.
+        orc.purge_expired_transcripts()
+        # And anything left in flight by a previous process is reconciled by
+        # reading it back, never by dialling again.
+        orc.resume()
     app.state.orchestrator = orc
     app.state.report = None
 
