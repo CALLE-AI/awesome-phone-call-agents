@@ -78,11 +78,15 @@ def _run_byok(job_id: str, lead: dict, api_key: str, goal_id: str) -> None:
     except Exception as exc:
         # Return only a coarse provider category; never expose raw exceptions or request data.
         response = getattr(exc, "response", None)
-        status_code = getattr(response, "status_code", None)
+        status_code = getattr(exc, "status_code", None) or getattr(response, "status_code", None)
         if status_code in (401, 403):
             message = "CALL-E rejected the API key (HTTP %s). Check that the key is active and belongs to this account." % status_code
         elif status_code == 404:
             message = "CALL-E could not find that Goal ID (HTTP 404). Check that the Goal is published and belongs to this account."
+        elif status_code == 402:
+            message = "CALL-E rejected the request (HTTP 402). Check account credits or billing status."
+        elif status_code == 429:
+            message = "CALL-E rate-limited this request (HTTP 429). Wait a moment and try again."
         elif status_code in (400, 422):
             message = "CALL-E rejected the request (HTTP %s). Check the Goal variables and E.164 phone number." % status_code
         elif status_code is not None:
