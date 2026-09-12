@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -162,6 +163,66 @@ class MaskingTests(LedgeredTestCase):
     def test_mask_number_keeps_last_four(self):
         self.assertEqual(run_task.mask_number("+12025550123"), "+1******0123")
 
+    def test_masks_phone_numbers_in_keys_and_numeric_values(self):
+        payload = {
+            "+12025550123": "destination key",
+            "numeric_destination": 12025550123,
+        }
+        rendered = json.dumps(run_task.mask_sensitive(payload, []))
+        self.assertNotIn("12025550123", rendered)
+
+
+class RouteTrustTests(LedgeredTestCase):
+    def test_only_exact_fresh_human_reviewed_route_is_consumed(self):
+        task = fixture("judge-parts-task.json")
+        today = datetime.now(timezone.utc).date()
+        stale = {
+            "goal": task["goal"],
+            "path": [{"keypress": "9", "meaning": "stale route"}],
+            "confidence": "observed",
+            "human_reviewed": True,
+            "last_observed": (today - timedelta(days=31)).isoformat(),
+        }
+        wrong_goal = {
+            "goal": "Place a new parts order",
+            "path": [{"keypress": "8", "meaning": "sales"}],
+            "confidence": "observed",
+            "human_reviewed": True,
+            "last_observed": today.isoformat(),
+        }
+        unreviewed = {
+            "goal": task["goal"],
+            "path": [{"keypress": "7", "meaning": "unreviewed route"}],
+            "confidence": "observed",
+            "human_reviewed": False,
+            "last_observed": today.isoformat(),
+        }
+        trusted = {
+            "goal": task["goal"],
+            "path": [{"keypress": "1", "meaning": "existing order status"}],
+            "confidence": "observed",
+            "human_reviewed": True,
+            "observations": 2,
+            "last_observed": today.isoformat(),
+        }
+        map_info = {
+            "found": True,
+            "organization": "example-parts-distributor",
+            "known_paths": [stale, wrong_goal, unreviewed, trusted],
+        }
+        selected, _ = run_task.reusable_route(task, map_info, today=today)
+        self.assertEqual(selected, trusted)
+        rendered = run_task.render_instructions(task, map_info)
+        self.assertIn("press 1 for existing order status", rendered)
+        self.assertNotIn("press 9", rendered)
+        self.assertNotIn("press 7", rendered)
+
+        selected, reason = run_task.reusable_route(
+            task, {**map_info, "known_paths": [stale, wrong_goal, unreviewed]}, today=today
+        )
+        self.assertIsNone(selected)
+        self.assertIn("no exact-goal, fresh, human-reviewed route", reason)
+
 
 class ObservationProposalTests(LedgeredTestCase):
     def test_multi_menu_fixture_does_not_crash(self):
@@ -201,9 +262,11 @@ class VerifyResultTests(LedgeredTestCase):
         report = self.verify("call-success.json")
         self.assertEqual(report["overall"], "partially verified")
         self.assertEqual(report["fields"]["refill_status"]["verdict"], "verified")
-        self.assertEqual(report["fields"]["pickup_by"]["verdict"], "verified")
+        # "held until September 18" never states a year, and the expected
+        # value carries one: supportive but not conclusive.
+        self.assertEqual(report["fields"]["pickup_by"]["verdict"], "plausible")
         self.assertEqual(report["fields"]["ready_today"]["verdict"], "unverified")
-        for name in ("refill_status", "pickup_by"):
+        for name in ("refill_status",):
             self.assertIn("speaker", report["fields"][name])
             self.assertIn("span", report["fields"][name])
 
@@ -227,6 +290,24 @@ class VerifyResultTests(LedgeredTestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["overall"], "unverified")
 
+    def test_provider_lifecycle_uses_only_authoritative_envelopes(self):
+        metadata_only = {"ok": True, "metadata": {"status": "COMPLETED"}}
+        self.assertIn("authoritative", verify_result.provider_blocks_verification(metadata_only))
+
+        conflict = {
+            "ok": True,
+            "status": "IN_PROGRESS",
+            "result": {"status": "COMPLETED"},
+        }
+        self.assertIn("not COMPLETED", verify_result.provider_blocks_verification(conflict))
+
+        completed_with_domain_status = {
+            "ok": True,
+            "status": "COMPLETED",
+            "result": {"status": "FAILED"},
+        }
+        self.assertIsNone(verify_result.provider_blocks_verification(completed_with_domain_status))
+
 
 class AdversarialVerifierTests(LedgeredTestCase):
     """Each sample must NOT come back verified; several have a definite
@@ -244,7 +325,9 @@ class AdversarialVerifierTests(LedgeredTestCase):
     def test_adjacent_field_number_does_not_verify(self):
         transcript = "USER: Friday. Highs in the mid 80s. Lows near 60."
         self.assertEqual(self.verdict("tomorrow_high_f", 60, transcript), "contradicted")
-        self.assertEqual(self.verdict("tomorrow_low_f", 60, transcript), "verified")
+        # "Lows near 60" is approximate ("near") and never says tomorrow:
+        # supportive at best, never verified.
+        self.assertNotEqual(self.verdict("tomorrow_low_f", 60, transcript), "verified")
 
     def test_assistant_self_report_is_not_evidence(self):
         v = self.verdict(
@@ -425,12 +508,209 @@ class RunnerGateTests(LedgeredTestCase):
         self.assertEqual(fake.invocation_count(), calls, "uncertain calls must not be redialed")
 
 
+class RunnerIntegrityTests(LedgeredTestCase):
+    """Adversarial probes for exactly-once, fail-closed state, and privacy."""
+
+    def test_concurrent_confirmed_runs_dial_exactly_once(self):
+        import threading
+        fake = FakeCalle(self.tmp, {"ok": True, "call_started": True, "run_id": "RUN-RACE"})
+        results = []
+
+        def launch(out_name):
+            out = self.tmp / out_name
+            out.mkdir()
+            results.append(
+                self.run_runner(
+                    ["--task", str(self.task_file), "--run", "--yes", "--out", str(out)],
+                    fake.env(),
+                )
+            )
+
+        threads = [threading.Thread(target=launch, args=(f"race{i}",)) for i in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        starts = sum(
+            1 for line in fake.log.read_text(encoding="utf-8").splitlines()
+            if line.startswith("invoked: call start")
+        ) if fake.log.exists() else 0
+        self.assertEqual(starts, 1, "two concurrently confirmed runs must produce one provider start")
+        self.assertEqual(
+            sorted(proc.returncode for proc in results), [0, 1],
+            "one run wins the reservation, the other backs off",
+        )
+
+    def test_corrupt_ledger_fails_closed_without_dialing(self):
+        ledger = self.tmp / "ledger.json"
+        ledger.write_text("{not json", encoding="utf-8")
+        fake = FakeCalle(self.tmp, {"ok": True, "call_started": True, "run_id": "X"})
+        out = self.out("corrupt")
+        proc = self.run_runner(
+            ["--task", str(self.task_file), "--run", "--yes", "--out", str(out)],
+            fake.env(),
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(fake.invocation_count(), 0, "a corrupt ledger must never reach the provider")
+        self.assertEqual(ledger.read_text(encoding="utf-8"), "{not json", "corrupt ledger must not be overwritten")
+
+    def test_list_ledger_fails_closed_with_a_controlled_error(self):
+        ledger = self.tmp / "ledger.json"
+        ledger.write_text("[]", encoding="utf-8")
+        fake = FakeCalle(self.tmp, {"ok": True, "call_started": True, "run_id": "X"})
+        out = self.out("list-ledger")
+        proc = self.run_runner(
+            ["--task", str(self.task_file), "--run", "--yes", "--out", str(out)],
+            fake.env(),
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(fake.invocation_count(), 0)
+        self.assertIn("expected a JSON object", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertEqual(ledger.read_text(encoding="utf-8"), "[]")
+
+    def test_provider_start_response_matrix(self):
+        callee = fixture("task.json")["callee"]
+        matrix = [
+            # (start response, expected state, may_dial_again_without_retry)
+            ({"ok": False, "call_started": True, "run_id": "R-OKF", "to_phone": callee}, "finished", False),
+            ({"call_started": True, "run_id": "R-NOOK", "to_phone": callee}, "finished", False),
+            ({"ok": True, "run_id": "R-NOFLAG"}, "uncertain", False),
+            ({"ok": True, "call_started": False}, "never_started", True),
+            ({"ok": False, "call_started": False, "run_id": "R-CONFLICT"}, "uncertain", False),
+            ({
+                "ok": True,
+                "call_started": True,
+                "run_id": "R-OUTER",
+                "result": {"run_id": "R-INNER"},
+            }, "uncertain", False),
+            ({"ok": True, "call_started": True, "run_id": "R-AMB", "to_phones": [callee, "+13034944221"]}, "uncertain", False),
+        ]
+        for start, expected_state, may_redial in matrix:
+            with self.subTest(start=start):
+                sub = self.tmp / f"matrix-{expected_state}-{start.get('run_id', 'x')}"
+                sub.mkdir()
+                fake = FakeCalle(sub, start)
+                out = sub / "out"
+                out.mkdir()
+                env = fake.env()
+                # read the same ledger file the runner subprocess will use
+                os.environ["HOLDFAST_LEDGER"] = env["HOLDFAST_LEDGER"]
+                proc = self.run_runner(
+                    ["--task", str(self.task_file), "--run", "--yes", "--out", str(out)], env
+                )
+                entry = run_task.ledger_entry(run_task._task_fingerprint(fixture("task.json")))
+                self.assertEqual(entry["state"], expected_state)
+                if expected_state == "finished":
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    self.assertEqual(entry.get("run_id"), start.get("run_id"))
+                else:
+                    self.assertNotEqual(proc.returncode, 0)
+                calls_after_first = fake.invocation_count()
+                out2 = sub / "out2"
+                out2.mkdir()
+                proc = self.run_runner(
+                    ["--task", str(self.task_file), "--run", "--yes", "--out", str(out2)], env
+                )
+                if may_redial:
+                    # never_started means the provider asserts no call was
+                    # placed, so a fresh confirmed attempt may dial again
+                    # (the repeated rejection still fails the run itself).
+                    self.assertGreater(fake.invocation_count(), calls_after_first)
+                else:
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertEqual(
+                        fake.invocation_count(), calls_after_first,
+                        f"state {expected_state} must block a redial",
+                    )
+
+    def test_fingerprint_ignores_criteria_order(self):
+        task = fixture("task.json")
+        reordered = dict(task)
+        reordered["success_criteria"] = list(reversed(task["success_criteria"]))
+        self.assertEqual(
+            run_task._task_fingerprint(task), run_task._task_fingerprint(reordered),
+            "re-ordering the same intent must not mint a new identity",
+        )
+
+    def test_resume_validates_binding_before_writing_artifacts(self):
+        fingerprint = run_task._task_fingerprint(fixture("task.json"))
+        run_task.write_ledger_entry(fingerprint, state="in_flight", run_id="RUN-X")
+        other = dict(fixture("task.json"))
+        other["goal"] = "A different errand entirely."
+        other_file = self.tmp / "other-task.json"
+        other_file.write_text(json.dumps(other), encoding="utf-8")
+        fake = FakeCalle(self.tmp, {"ok": True, "call_started": True, "run_id": "RUN-X"})
+        out = self.out("resume-binding")
+        proc = self.run_runner(
+            ["--task", str(other_file), "--run", "--resume", "--out", str(out)], fake.env()
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse((out / "task.json").exists(), "a failed resume must not write plan artifacts")
+
+    def test_forbidden_secret_keys_fail_before_any_artifact(self):
+        for index, key in enumerate((
+            "api_token", "apiToken", "cardNumber", "userPassword", "securityPin",
+        )):
+            with self.subTest(key=key):
+                task = fixture("task.json")
+                task["context"] = dict(task["context"], **{key: "never-store-this"})
+                secret_file = self.tmp / f"secret-task-{index}.json"
+                secret_file.write_text(json.dumps(task), encoding="utf-8")
+                provider_dir = self.tmp / f"secret-provider-{index}"
+                provider_dir.mkdir()
+                fake = FakeCalle(provider_dir, {
+                    "ok": True, "call_started": True, "run_id": "X",
+                })
+                out = self.out(f"secrets-{index}")
+                proc = self.run_runner(
+                    ["--task", str(secret_file), "--out", str(out)], fake.env()
+                )
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(fake.invocation_count(), 0)
+                self.assertIn("forbidden key", proc.stderr)
+                self.assertFalse((out / "task.json").exists(), "forbidden input must not reach artifacts")
+
+    def test_resume_masks_short_e164_in_final_artifact(self):
+        task = fixture("task.json")
+        task["callee"] = "+1234567"
+        task_file = self.tmp / "short-task.json"
+        task_file.write_text(json.dumps(task), encoding="utf-8")
+        status = {
+            "ok": True, "status": "COMPLETED",
+            "to_phone": "+1234567",
+            "summary": "The line for +1234567 answered with a recorded message.",
+        }
+        sub = self.tmp / "short"
+        sub.mkdir()
+        fake = FakeCalle(sub, {}, status)
+        os.environ["HOLDFAST_LEDGER"] = fake.env()["HOLDFAST_LEDGER"]
+        fingerprint = run_task._task_fingerprint(task)
+        run_task.write_ledger_entry(
+            fingerprint,
+            state="in_flight",
+            run_id="RUN-SHORT",
+            callee_digits_sha256=run_task._callee_fingerprint(task["callee"]),
+        )
+        out = sub / "out"
+        out.mkdir()
+        proc = self.run_runner(
+            ["--task", str(task_file), "--run", "--resume", "--out", str(out)], fake.env()
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        final_text = (out / "final.json").read_text(encoding="utf-8")
+        self.assertNotIn("+1234567", final_text)
+        self.assertNotIn("1234567", proc.stdout)
+
+
 class EvidenceChainTests(LedgeredTestCase):
     """One task through the whole safe path with a single provider start."""
 
     def test_chain_task_to_map_proposal(self):
-        start = {"ok": True, "call_started": True, "run_id": "CHAIN-1", "to_phone": fixture("task.json")["callee"]}
-        status = fixture("call-success.json")
+        judge_task = fixture("judge-parts-task.json")
+        self.task_file.write_text(json.dumps(judge_task), encoding="utf-8")
+        start = {"ok": True, "call_started": True, "run_id": "CHAIN-1", "to_phone": judge_task["callee"]}
+        status = fixture("judge-parts-result.json")
         status["ok"] = True
         status["status"] = "COMPLETED"
         status["structuredContent"]["run_id"] = "CHAIN-1"
@@ -444,7 +724,7 @@ class EvidenceChainTests(LedgeredTestCase):
 
         task = json.loads((out / "task.json").read_text(encoding="utf-8"))
         self.assertNotIn("12025550123", json.dumps(task))
-        fingerprint = run_task._task_fingerprint(fixture("task.json"))
+        fingerprint = run_task._task_fingerprint(judge_task)
         local = json.loads((out / "pending.json").read_text(encoding="utf-8"))
         self.assertEqual(local["task_fingerprint"], fingerprint)
         self.assertEqual(local["run_id"], "CHAIN-1")
@@ -470,6 +750,9 @@ class EvidenceChainTests(LedgeredTestCase):
         proposal = json.loads((out / "observation-proposal.json").read_text(encoding="utf-8"))
         self.assertIn("press 1", " | ".join(proposal["menu_options_observed"]))
         self.assertEqual(proposal["keys_reported_pressed"], ["1"])
+        packet = (out / "result-packet.txt").read_text(encoding="utf-8")
+        self.assertIn("[PROVEN] shipping_status: shipped", packet)
+        self.assertIn("[NOT PROVEN] tracking_number: ZX-9081", packet)
 
 
 class MapUpdateTests(LedgeredTestCase):
@@ -481,6 +764,28 @@ class MapUpdateTests(LedgeredTestCase):
         )
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("disallowed keys", proc.stderr)
+
+    def test_observed_route_starts_unreviewed(self):
+        maps = self.tmp / "maps"
+        observation = {
+            "goal": fixture("judge-parts-task.json")["goal"],
+            "observed_path": [
+                {"prompt_summary": "orders menu", "keypress": "1", "meaning": "existing order"}
+            ],
+            "date": date.today().isoformat(),
+        }
+        proc = subprocess.run(
+            [
+                sys.executable, str(MAP_UPDATE),
+                "--company", "example-parts-distributor",
+                "--observation", "-",
+                "--maps-dir", str(maps),
+            ],
+            input=json.dumps(observation), capture_output=True, text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        saved = json.loads((maps / "example-parts-distributor.json").read_text(encoding="utf-8"))
+        self.assertIs(saved["known_paths"][0]["human_reviewed"], False)
 
 
 class RepoRootCommandTests(LedgeredTestCase):
@@ -513,6 +818,24 @@ class RepoRootCommandTests(LedgeredTestCase):
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["overall"], "partially verified")
+
+    def test_judge_result_packet_from_repo_root(self):
+        proc = subprocess.run(
+            [
+                sys.executable, "skills/holdfast/scripts/run_task.py",
+                "--task", "skills/holdfast/tests/fixtures/judge-parts-task.json",
+                "--inspect-result", "skills/holdfast/tests/fixtures/judge-parts-result.json",
+            ],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("HOLDFAST RESULT PACKET", proc.stdout)
+        self.assertIn("CALL COMPLETED", proc.stdout.upper())
+        self.assertIn("[PROVEN] shipping_status: shipped", proc.stdout)
+        self.assertIn("[PROVEN] estimated_arrival: Tuesday", proc.stdout)
+        self.assertIn("[NOT PROVEN] tracking_number: ZX-9081", proc.stdout)
+        self.assertIn("transcript evidence decides what is usable", proc.stdout.lower())
+        self.assertNotIn("12025550123", proc.stdout)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,33 @@
+{
+  "goal": "Confirm whether parts order PX-204 has shipped, when it will arrive, and whether any item is backordered.",
+  "callee": "+12025550123",
+  "user_name": "Sam",
+  "company": "example-parts-distributor",
+  "context": {
+    "order_reference": "PX-204",
+    "business_name": "Sam's Auto Repair"
+  },
+  "success_criteria": [
+    "shipping_status",
+    "estimated_arrival",
+    "backorder_status",
+    "tracking_number"
+  ],
+  "authorization_scope": {
+    "may_provide": [
+      "order_reference",
+      "business_name"
+    ],
+    "may_confirm": [
+      "the existing order details read back by the representative"
+    ],
+    "must_not": [
+      "change or cancel the order",
+      "accept a paid upgrade or substitute",
+      "make a payment"
+    ]
+  },
+  "line_type": "unknown",
+  "language": "English",
+  "region": "US"
+}

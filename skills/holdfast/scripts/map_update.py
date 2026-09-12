@@ -92,10 +92,21 @@ def update_path(m: dict, obs: dict) -> str:
                 entry["observations"] = entry.get("observations", 1) + 1
                 entry["last_observed"] = today
                 entry["confidence"] = "observed"
+                # An automated observation can never approve itself for a
+                # future live call. A human must review the new evidence.
+                entry["human_reviewed"] = False
                 return "path confirmed"
             entry["confidence"] = "stale"
+            entry["human_reviewed"] = False
     m["known_paths"].append(
-        {"goal": goal, "path": path, "confidence": "observed", "observations": 1, "last_observed": today}
+        {
+            "goal": goal,
+            "path": path,
+            "confidence": "observed",
+            "human_reviewed": False,
+            "observations": 1,
+            "last_observed": today,
+        }
     )
     return "path recorded"
 

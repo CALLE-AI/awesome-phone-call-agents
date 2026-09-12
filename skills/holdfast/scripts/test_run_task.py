@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -38,6 +39,20 @@ def task():
 
 
 class RunnerSafetyTests(unittest.TestCase):
+    def setUp(self):
+        # Keep the global dialing ledger inside a temp file so the suite is
+        # hermetic: no ~/.cache writes, no state leaking between runs.
+        self._ledger_tmp = tempfile.TemporaryDirectory(prefix="holdfast-legacy-")
+        self._old_ledger = os.environ.get("HOLDFAST_LEDGER")
+        os.environ["HOLDFAST_LEDGER"] = str(Path(self._ledger_tmp.name) / "ledger.json")
+
+    def tearDown(self):
+        if self._old_ledger is None:
+            os.environ.pop("HOLDFAST_LEDGER", None)
+        else:
+            os.environ["HOLDFAST_LEDGER"] = self._old_ledger
+        self._ledger_tmp.cleanup()
+
     def assert_masked(self, value):
         text = str(value)
         self.assertNotIn(PHONE, text)
