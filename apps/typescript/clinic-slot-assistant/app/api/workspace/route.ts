@@ -3,6 +3,7 @@ import { load, save } from '../../../lib/store';
 import { advanceDemo, audit, createCall, decide, isActive, newWorkspace, reconcileInterruptedCalls, WorkflowError, type CreateInput, type Workspace } from '../../../lib/model';
 import { sameOrigin } from '../../../lib/request-guard';
 import { applyProviderResult, getProviderCall, settings, startProviderCall } from '../../../lib/calle';
+import { publicDemoEnabled } from '../../../lib/public-demo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ function response(state: Workspace, id: string, req: NextRequest) {
 function failure(error: unknown) { return NextResponse.json({error: error instanceof WorkflowError ? error.message : 'Unable to update the workspace. Your saved state has been retained.'}, {status: error instanceof WorkflowError ? error.status : 500}); }
 export async function GET(req: NextRequest) {
   try {
+    if (publicDemoEnabled()) throw new WorkflowError('The public demo saves fictional activity in your browser. Server workspace access is disabled.', 403);
     const id = session(req); const state = load(id);
     const advanced = advanceDemo(state);
     if (reconcileInterruptedCalls(state) || advanced) save(id, state);
@@ -24,6 +26,7 @@ export async function GET(req: NextRequest) {
 }
 export async function POST(req: NextRequest) {
   try {
+    if (publicDemoEnabled()) throw new WorkflowError('Server actions and real calls are disabled in the public demo.', 403);
     if (!sameOrigin(req.headers.get('origin'), req.headers.get('host'))) throw new WorkflowError('This request must come from the application.', 403);
     if (!req.cookies.get(cookie)) throw new WorkflowError('Reload the workspace before continuing.', 409);
     const text = await req.text();

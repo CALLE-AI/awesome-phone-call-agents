@@ -34,6 +34,25 @@ The server binds to loopback. This is a single-process local prototype, not a pr
 
 State survives refresh and server restart in `.data/sessions/`, keyed by an HttpOnly SameSite cookie. The directory is ignored by Git. Do not put real patient information into the prototype. Deleting the session cookie creates a new workspace; live call history must be reconciled in CALL-E before any repeated test.
 
+## Public demo on Vercel
+
+**[Open the public interactive demo](https://clinic-slot-assistant.vercel.app/)** — no login or credentials required; all calls are simulated.
+
+Import this GitHub repository into Vercel as a Next.js project. The checked-in `vercel.json` runs `npm run build:demo`; no environment variables, API keys, phone numbers, or database are needed. Use Node.js 22.x or newer.
+
+The public build stores a small journal of fictional actions in each visitor's browser localStorage. Refresh preserves that visitor's progress. **Reset demo** clears it and creates new appointment dates. Clearing browser storage also resets the demo. Visitors do not share a workspace, and no real patient records can be entered. If browser storage is blocked, enable it for the site to use the demo.
+
+Public mode is baked into the build; Vercel also forces it independently. Both server workspace endpoints reject requests before reading local files or settings, and the CALL-E adapter is disabled. Even accidentally configured credentials cannot enable live calls on Vercel. Do not add credentials to Vercel. The live-testing code remains available only for the explicitly approved local workflow below.
+
+To preview this same public build locally:
+
+```sh
+npm run build:demo
+npm start
+```
+
+Run `npm run build` again to restore a regular local build. Public hosting demonstrates scripted outcomes; it does not claim that the hosted site makes CALL-E calls. The local adapter and its setup instructions are included so judges can inspect or reproduce the integration with their own consenting volunteer.
+
 ## Connect CALL-E for one real test
 
 1. Create or sign in to your account at https://dashboard.heycall-e.com/ and obtain an API key.

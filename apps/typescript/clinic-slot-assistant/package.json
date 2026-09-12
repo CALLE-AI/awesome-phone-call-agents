@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3210",
     "build": "next build",
+    "build:demo": "node scripts/build-demo.mjs",
     "start": "next start --hostname 127.0.0.1 --port 3210",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts"

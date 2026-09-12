@@ -1,7 +1,9 @@
 import { CalleClient, type Call as ProviderCall } from '@call-e/calle';
 import { type Call, type Settings, type Slot, WorkflowError, slotDate, slotTime } from './model';
+import { demoSettings, publicDemoEnabled } from './public-demo';
 
 export function settings(): Settings {
+  if (publicDemoEnabled()) return demoSettings();
   const phone = process.env.CALLE_TEST_PHONE?.trim() ?? '';
   const hasApiKey = Boolean(process.env.CALLE_API_KEY?.trim());
   const hasTestPhone = /^\+91[6-9]\d{9}$/.test(phone);
@@ -9,6 +11,7 @@ export function settings(): Settings {
   return {liveReady: hasApiKey && hasTestPhone && liveEnabled, liveEnabled, hasApiKey, hasTestPhone, testPhoneHint: hasTestPhone ? `+91 •••••• ${phone.slice(-4)}` : '', testPhone: hasTestPhone ? phone : ''};
 }
 function client() {
+  if (publicDemoEnabled()) throw new WorkflowError('CALL-E requests are disabled in the public demo.', 403);
   if (!process.env.CALLE_API_KEY?.trim()) throw new WorkflowError('CALL-E is not connected.', 503);
   return new CalleClient({
     apiKey: process.env.CALLE_API_KEY.trim(),

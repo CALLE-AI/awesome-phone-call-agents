@@ -26,3 +26,13 @@ The user supplied a CALL-E API key, stored only in the ignored local `.env.local
 The user subsequently approved a real English-language call using a fictional appointment and local transcript retention. The first attempt reached screening and returned `can_attend: unknown`. After the user explicitly asked to be called again, one second call connected to the volunteer and returned `can_attend: yes`. The transcript shows explicit acceptance of the fictional time. Staff review and the final fictional booking action were verified in the UI. No real clinic system was changed and no phone number was purchased.
 
 Raw provider evidence is saved under the ignored `.data/evidence/` folder and is excluded from the source bundle. A provider task status remained `queued` while its recipient was already `in_progress`; the adapter now reflects the active recipient, with a regression test.
+
+## Public Vercel build verification
+
+- `npm test`: 21 tests passed, including browser persistence, separate visitor workspaces, malformed storage recovery, rejected live actions, and public server/SDK rejection even when live environment variables are populated with test-only fixtures.
+- `npm run typecheck` and `npm run build:demo`: passed.
+- The built public API returned HTTP 403 for both GET and POST before accessing server state. The build was started without a runtime public flag, verifying the build-time guard remains effective.
+- Scanned all 11 emitted public static files against the private CALL-E key and volunteer number and token patterns: no matches.
+- Browser walkthrough verified a scripted acceptance, required staff confirmation and persistence after reload. No real call was created during deployment testing.
+
+The public deployment at https://clinic-slot-assistant.vercel.app/ returned HTTP 200 without authentication. Both GET and POST to its workspace endpoint returned 403. A deployed acceptance simulation, staff confirmation and persistence after reload were verified in the browser.
