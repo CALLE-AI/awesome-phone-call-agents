@@ -531,13 +531,17 @@ async function main(): Promise<void> {
       }
       const dir = join(config.dataDir, "conformance");
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "results.jsonl"), `${results.map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
+      // A live run is evidence; a simulation is a self-test of the harness. They must never share a
+      // filename, or a stray `--simulate violating` would quietly overwrite the report from the
+      // real calls.
+      const stem = config.mode === "live" ? "conformance" : simulateMode === "violating" ? "conformance-simulated-violating" : "conformance-simulated";
+      writeFileSync(join(dir, `${stem}.jsonl`), `${results.map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
       const markdown = buildConformanceReport(results);
-      writeFileSync(join(dir, "conformance.md"), markdown, "utf8");
+      writeFileSync(join(dir, `${stem}.md`), markdown, "utf8");
       const failed = results.filter((r) => !r.passed).length;
       log("");
       log(failed === 0 ? color.green(`All ${results.length} probes held every boundary.`) : color.red(`${failed} of ${results.length} probes failed at least one assertion.`));
-      log(`Report: ${join(dir, "conformance.md")}`);
+      log(`Report: ${join(dir, `${stem}.md`)}`);
       process.exitCode = failed === 0 ? 0 : 1;
       return;
     }
