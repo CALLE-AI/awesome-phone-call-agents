@@ -1,0 +1,29 @@
+{
+  "id": "dhaka-demo-day",
+  "city": "Dhaka",
+  "timezone": "Asia/Dhaka",
+  "shiftStart": "10:00",
+  "merchant": "RouteReady Demo Shop",
+  "note": "Fictional customers and reserved 555-01xx numbers. Coordinates are public map points, not real customer addresses.",
+  "hub": {"id": "hub", "label": "Dhanmondi hub", "lat": 23.7461, "lng": 90.3742},
+  "stops": [
+    {"id": "s1", "customer": "Ayesha", "label": "House 4, Road 9A", "lat": 23.7478, "lng": 90.3705, "phone": "+15555550101", "codAmount": 850, "serviceMinutes": 4, "windowEnd": 120, "firstTime": false, "gated": false},
+    {"id": "s2", "customer": "Rahim", "label": "House 12, Road 5, Kalabagan", "lat": 23.7508, "lng": 90.381, "phone": "+15555550102", "codAmount": 1250, "serviceMinutes": 4, "windowEnd": 150, "firstTime": true, "gated": false},
+    {"id": "s3", "customer": "Nadia", "label": "Green Tower, Road 2", "lat": 23.7392, "lng": 90.3832, "phone": "+15555550103", "codAmount": 2100, "serviceMinutes": 6, "windowEnd": 150, "firstTime": false, "gated": true},
+    {"id": "s4", "customer": "Tanvir", "label": "House 7, Jigatola", "lat": 23.7356, "lng": 90.3751, "phone": "+15555550104", "codAmount": 640, "serviceMinutes": 4, "windowEnd": 180, "firstTime": true, "gated": false},
+    {"id": "s5", "customer": "Farzana", "label": "House 21, Road 12A", "lat": 23.7443, "lng": 90.3688, "phone": "+15555550105", "codAmount": 1800, "serviceMinutes": 4, "windowEnd": 240, "firstTime": false, "gated": false},
+    {"id": "s6", "customer": "Imran", "label": "Lake View Apartments, Road 27", "lat": 23.7532, "lng": 90.3721, "phone": "+15555550106", "codAmount": null, "serviceMinutes": 5, "windowEnd": 210, "firstTime": false, "gated": true},
+    {"id": "s7", "customer": "Sabrina", "label": "House 3, Block C, Lalmatia", "lat": 23.7601, "lng": 90.3698, "phone": "+15555550107", "codAmount": 990, "serviceMinutes": 4, "windowEnd": 240, "firstTime": true, "gated": false},
+    {"id": "s8", "customer": "Karim", "label": "House 15, Asad Avenue", "lat": 23.7626, "lng": 90.3632, "phone": "+15555550108", "codAmount": 1500, "serviceMinutes": 4, "windowEnd": 240, "firstTime": false, "gated": false}
+  ],
+  "truth": {
+    "s1": {"readyAt": 0, "reached": "yes", "readiness": "ready_now", "readyClock": "", "handoff": "in_person", "cash": "yes", "landmark": "", "quote": "Yes, I'm home, come any time."},
+    "s2": {"readyAt": 45, "reached": "yes", "readiness": "within_15_min", "readyClock": "", "handoff": "in_person", "cash": "yes", "landmark": "Opposite the pharmacy", "quote": "I'm at the market, I need about fifteen more minutes."},
+    "s3": {"readyAt": 0, "reached": "yes", "readiness": "ready_now", "readyClock": "", "handoff": "guard_or_neighbor", "cash": "yes", "landmark": "Blue gate next to the mosque", "quote": "I'm home now, the guard at the blue gate will let you in."},
+    "s4": {"readyAt": 0, "reached": "no", "readiness": "unknown", "readyClock": "", "handoff": "unknown", "cash": "unknown", "landmark": "", "quote": ""},
+    "s5": {"readyAt": 180, "reached": "yes", "readiness": "later_today", "readyClock": "13:00", "handoff": "in_person", "cash": "yes", "landmark": "", "quote": "I'm out until one o'clock, please come after that."},
+    "s6": {"readyAt": 0, "reached": "yes", "readiness": "ready_now", "readyClock": "", "handoff": "guard_or_neighbor", "cash": "not_applicable", "landmark": "Leave it with the guard at the lobby", "quote": "I'm in a meeting but the lobby guard can take it."},
+    "s7": {"readyAt": null, "reached": "yes", "readiness": "not_today", "readyClock": "", "handoff": "none", "cash": "unknown", "landmark": "", "quote": "I'm out of town today, can you bring it tomorrow?"},
+    "s8": {"readyAt": 0, "reached": "yes", "readiness": "ready_now", "readyClock": "", "handoff": "in_person", "cash": "yes", "landmark": "Brown building behind the school", "quote": "Yes, I'm here, it's the brown building behind the school."}
+  }
+}

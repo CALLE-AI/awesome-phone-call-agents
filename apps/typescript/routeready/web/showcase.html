@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RouteReady · the delivery route that calls ahead</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --lime: #d7f35a;
+        --ink: #0e1014;
+        --muted: #6b7280;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        gap: 48px;
+        padding: 40px clamp(24px, 5vw, 72px);
+        background: radial-gradient(120% 120% at 0% 0%, #eef4d8 0%, #f2f3ef 45%, #e9ece4 100%);
+        color: var(--ink);
+        font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+      }
+      .intro {
+        max-width: 440px;
+      }
+      .mark {
+        display: inline-block;
+        background: var(--ink);
+        color: var(--lime);
+        border-radius: 16px;
+        padding: 10px 14px;
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      h1 {
+        font-size: clamp(34px, 3.4vw, 50px);
+        line-height: 1.05;
+        margin: 22px 0 14px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      p.lead {
+        font-size: 18px;
+        line-height: 1.5;
+        color: #33383f;
+        margin: 0 0 22px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 24px;
+        display: grid;
+        gap: 10px;
+      }
+      li {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      li b {
+        display: grid;
+        place-items: center;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--lime);
+        font-size: 13px;
+      }
+      .foot {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .phones {
+        display: flex;
+        gap: 28px;
+        margin-left: auto;
+      }
+      .phone {
+        width: 390px;
+        height: min(844px, 88vh);
+        border: 11px solid #101216;
+        border-radius: 46px;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 40px 80px rgb(16 20 25 / 0.28);
+      }
+      .phone iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      .phone.second {
+        align-self: flex-end;
+      }
+      @media (max-width: 1400px) {
+        .phone.second {
+          display: none;
+        }
+      }
+      @media (max-width: 1000px) {
+        body {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 28px;
+        }
+        .phones {
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="intro">
+      <span class="mark">ROUTE<br />READY</span>
+      <h1>The delivery route that calls ahead.</h1>
+      <p class="lead">
+        While the rider is still riding, RouteReady phones the next customers through CALL-E and re-orders the remaining stops around
+        what they say.
+      </p>
+      <ul>
+        <li><b>1</b><span>One line, one call at a time: the soonest stop the rider reaches in 6 to 45 minutes.</span></li>
+        <li><b>2</b><span>An answer only counts when the customer's own words back it, so voicemail and receptionists change nothing.</span></li>
+        <li><b>3</b><span>"I need 15 minutes" moves that stop later, "not today" takes the trip off the route.</span></li>
+      </ul>
+      <p class="foot">Open the rider app on a phone at <strong>/app</strong>. Press Start the day on either phone.</p>
+    </section>
+    <div class="phones">
+      <div class="phone"><iframe src="/app?tab=route" title="RouteReady rider app, route"></iframe></div>
+      <div class="phone second"><iframe src="/app?tab=calls" title="RouteReady rider app, calls"></iframe></div>
+    </div>
+    <script>
+      if (window.innerWidth < 760) location.replace("/app");
+    </script>
+  </body>
+</html>
