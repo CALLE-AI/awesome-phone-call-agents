@@ -295,7 +295,7 @@
   .playground .csc-f { padding: 2px 0; }
   /* The board takes the height the two cards leave, rather than sitting in a fixed box
    * with the column empty under it. */
-  .playground .morning-compact .mrn-stage { height: 380px; }
+  .playground .morning-compact .mrn-stage { height: 470px; }
 }
 /* Three lines of display type is a paragraph, not a heading, which is why this was cut to
  * body size. Body size was too far the other way: the one sentence carrying the argument

@@ -225,7 +225,14 @@ MORNING_CSS = """
  * pushes the thing under it off the fold. 300px keeps the board, its hint and the line
  * under it inside one screen with the audio instrument above them. */
 .morning-compact { max-width: none; margin: 0; padding: 0; }
-.morning-compact .mrn-stage { margin-bottom: var(--space-1); height: 232px; }
+/* 300px, not 232. The board is framed so that no rotation the drag allows takes it out
+ * of the canvas, and the pose that costs the most is a quarter turn: the long axis of an
+ * eight-by-six grid lies up the short side of the frame and needs a third more height than
+ * width. In a 16:9 box that headroom has to come out of the board, which is why it filled
+ * 40% of its frame at rest and read as shrunken. A squarer box pays for the headroom in
+ * page height instead, and the board comes back up. The height is the lever, not the
+ * camera. */
+.morning-compact .mrn-stage { margin-bottom: var(--space-1); height: 300px; }
 .morning-compact .mrn-stage canvas,
 .morning-compact .mrn-flat { height: 100%; width: 100%; object-fit: contain; }
 .morning-compact .eyebrow { margin-bottom: var(--space-2); }

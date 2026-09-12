@@ -408,6 +408,26 @@ function dragToTurn(stage, group, onFirstDrag, onPitch) {
  * box is a cuboid spanning a flat grid from the ground to the top of the tower, so four of
  * its corners sit in empty air above the far corners of the board and project outside the
  * frame while every drawn tile is comfortably inside it. */
+/* Is this board worth drawing this frame?
+ *
+ * Both scenes ran their loop for the whole life of the page, on every device, whether or
+ * not the reader was anywhere near them. Two WebGL renders a frame is the page's largest
+ * idle cost: on a 4x-throttled CPU the idle frame was 19.0ms with nothing happening on
+ * screen at all, and on a phone that is battery spent on a board nine acts above the
+ * reader's thumb. The observer carries a 200px margin so the board is already turning
+ * before it scrolls in, and a hidden tab stops both of them outright.
+ *
+ * The loop keeps running; only the work inside it is skipped. Stopping the loop would mean
+ * restarting it from an event handler, and a scene that has to be woken is a scene that can
+ * fail to wake. */
+function whileOnScreen(stage) {
+  if (!('IntersectionObserver' in window)) return () => true;
+  let near = false;
+  new IntersectionObserver((entries) => { near = entries[entries.length - 1].isIntersecting; },
+    { rootMargin: '200px 0px' }).observe(stage);
+  return () => near && document.visibilityState !== 'hidden';
+}
+
 function poseSetter(group, onPose) {
   return (turn, pitch) => {
     if (turn !== undefined && turn !== null) group.rotation.y = turn;
@@ -576,7 +596,7 @@ async function mount(THREE) {
    * out of flow to break the loop measured 0.18188, which is worse again. The bands stay. */
   const stageHeight = () => {
     const w = stage.clientWidth || 720;
-    return [w, Math.round(Math.min(520, Math.max(340, w * 0.56)))];
+    return [w, Math.round(Math.min(620, Math.max(300, w * 0.86)))];
   };
   const [W, H] = stageHeight();
 
@@ -826,7 +846,9 @@ async function mount(THREE) {
   // the escalation. See `inWaves`.
   const waves = inWaves([ground, towerShade], rings.map((r) => r.mesh));
 
+  const drawable = whileOnScreen(stage);
   const draw = () => {
+    if (!drawable()) { requestAnimationFrame(draw); clock.getDelta(); return; }
     const dt = Math.min(clock.getDelta(), 0.1);
     elapsed += dt;
     if (!(hovered !== -1 || onTower)) group.rotation.y += autoSpin;
@@ -890,7 +912,14 @@ async function mount(THREE) {
     clock: clockAt,
     pitch: () => +group.rotation.x.toFixed(4),
     pitchRange: [PITCH_MIN, PITCH_MAX],
-    pose: poseSetter(group, fit),
+    // Renders on the spot. The loop above skips frames while the board is off
+    // screen, and every tool that poses this board photographs it immediately
+    // afterwards, so a pose that only set the rotation would be photographed one
+    // frame too early or not at all.
+    pose: (() => {
+      const set = poseSetter(group, fit);
+      return (turn, pitch) => { set(turn, pitch); renderer.render(scene, camera); };
+    })(),
     probe: () => litPixels(renderer, scene, camera),
   };
 }
@@ -926,7 +955,7 @@ async function mountCutoff(THREE) {
   if (!rows.length || !cutoff) return;
 
   const W = stage.clientWidth || 720;
-  const H = Math.round(Math.min(520, Math.max(340, W * 0.56)));
+  const H = Math.round(Math.min(620, Math.max(300, W * 0.86)));
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1132,7 +1161,7 @@ async function mountCutoff(THREE) {
   const fit = framer(THREE, camera, group, framed, { x: 0, y: 0.68, z: 0.78 });
   const resize = () => {
     const w = stage.clientWidth || W;
-    const h = Math.round(Math.min(520, Math.max(340, w * 0.56)));
+    const h = Math.round(Math.min(620, Math.max(300, w * 0.86)));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     fit();
@@ -1146,7 +1175,9 @@ async function mountCutoff(THREE) {
   // The shafts that fit are already up. Then what goes through the plane, then the marks
   // on it, then the sheet and its rim, then the ground and the light it throws.
   const waves = inWaves(shafts, marks, [glass, rimLines], [glow, floor]);
+  const drawable = whileOnScreen(stage);
   const draw = () => {
+    if (!drawable()) { requestAnimationFrame(draw); clock.getDelta(); return; }
     elapsed += Math.min(clock.getDelta(), 0.1);
     if (!REDUCED) {
       group.rotation.y += autoSpin;
@@ -1176,7 +1207,14 @@ async function mountCutoff(THREE) {
     turn: () => +group.rotation.y.toFixed(4),
     pitch: () => +group.rotation.x.toFixed(4),
     pitchRange: [PITCH_MIN, PITCH_MAX],
-    pose: poseSetter(group, fit),
+    // Renders on the spot. The loop above skips frames while the board is off
+    // screen, and every tool that poses this board photographs it immediately
+    // afterwards, so a pose that only set the rotation would be photographed one
+    // frame too early or not at all.
+    pose: (() => {
+      const set = poseSetter(group, fit);
+      return (turn, pitch) => { set(turn, pitch); renderer.render(scene, camera); };
+    })(),
     calls: () => renderer.info.render.calls,
     triangles: () => renderer.info.render.triangles,
     probe: () => litPixels(renderer, scene, camera),
