@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/macrodial`](typescript/macrodial/) | TypeScript / Node | No-call review of MacroDial's governed CALL-E playbook/task schema and persisted synthetic outcome transitions; includes hosted Auto Config and Smart Data Loader workflow documentation. |
 | [`typescript/kol`](typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`typescript/speakeasy`](typescript/speakeasy/) | TypeScript / iOS | Multilingual "AI makes the call for you": speak a task in your language, confirm the read-back, then CALL-E places the English call with a live transcript and narrates the outcome back in your language; front-loaded preferences and a speculative two-call flow avoid holds; fake-transport no-call mode by default. |
 | [`python/holdfor-board`](python/holdfor-board/) | Python | Post-visit follow-up board for a GP practice: a check-in call's answers reach a human queue as a Review Item, the patient's own verbatim words travel with it, and no rebooking call exists without a prior human Release carrying a bounded date-and-mode envelope. Runs offline on a stored transcript fixture with no credentials. |
