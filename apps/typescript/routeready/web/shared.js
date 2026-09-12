@@ -11,11 +11,18 @@ export function onSnapshot(handler) {
   return source;
 }
 
+export async function post(path, body = {}) {
+  const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error ?? `Request failed (${response.status})`);
+  return data;
+}
+
 export const STATUS = {
-  planned: "Not called",
-  calling: "Calling",
+  planned: "Not called yet",
+  calling: "Calling now",
   confirmed: "Confirmed",
-  unverified: "Unverified",
+  unverified: "No answer",
   revisit: "Revisit later",
   removed: "Not today",
   delivered: "Delivered",

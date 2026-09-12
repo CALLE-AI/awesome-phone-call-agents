@@ -1,4 +1,4 @@
-// RouteReady web server: dispatcher console at /, rider screen at /rider.
+// RouteReady web server: the rider app at /app, a two-phone showcase at /.
 // Simulated days need no credentials. Live calls are off unless configured,
 // and a live day can only be started with the token printed at startup.
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { loadDay } from "../core/day.js";
 import { maskPhone } from "../core/phone.js";
 import { loadLiveConfig } from "./config.js";
-import { RunController, type Mode } from "./run.js";
+import { PACES, RunController, type Mode, type Pace } from "./run.js";
 
 try {
   process.loadEnvFile(".env");
@@ -17,13 +17,16 @@ try {
 }
 
 const WEB_DIR = new URL("../../web/", import.meta.url);
+const HTML = "text/html; charset=utf-8";
+const JS = "text/javascript; charset=utf-8";
 const PAGES: Record<string, [file: string, type: string]> = {
-  "/": ["dispatcher.html", "text/html; charset=utf-8"],
-  "/rider": ["rider.html", "text/html; charset=utf-8"],
-  "/dispatcher.js": ["dispatcher.js", "text/javascript; charset=utf-8"],
-  "/rider.js": ["rider.js", "text/javascript; charset=utf-8"],
-  "/shared.js": ["shared.js", "text/javascript; charset=utf-8"],
-  "/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/": ["showcase.html", HTML],
+  "/app": ["app.html", HTML],
+  "/rider": ["app.html", HTML],
+  "/app.js": ["app.js", JS],
+  "/screens.js": ["screens.js", JS],
+  "/shared.js": ["shared.js", JS],
+  "/app.css": ["app.css", "text/css; charset=utf-8"],
 };
 const CONSENT = "Every live number belongs to me or to someone who agreed to take these calls.";
 
@@ -58,18 +61,28 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   if (request.method === "POST" && path === "/api/run") {
     const body = await readJson(request);
     const mode: Mode = body.mode === "live" ? "live" : "simulate";
-    const speed = clamp(Number(body.speed) || 0.75, 0.1, 5);
     if (mode === "live") {
       if (!live.config) return sendJson(response, 400, { error: `Live mode unavailable: ${live.problem}` });
       if (!sameSecret(String(body.token ?? ""), startToken)) return sendJson(response, 403, { error: "Wrong start token." });
       if (body.consent !== CONSENT) return sendJson(response, 400, { error: "Confirm that every live number agreed to take these calls." });
     }
     try {
-      await controller.start(mode, speed);
+      await controller.start(mode, parsePace(body.pace));
     } catch (error) {
       return sendJson(response, 409, { error: (error as Error).message });
     }
     sendJson(response, 200, { ok: true, mode });
+    return;
+  }
+  if (request.method === "POST" && (path === "/api/pause" || path === "/api/resume")) {
+    controller.setPaused(path === "/api/pause");
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+  if (request.method === "POST" && path === "/api/pace") {
+    const body = await readJson(request);
+    controller.setPace(parsePace(body.pace));
+    sendJson(response, 200, { ok: true });
     return;
   }
   if (request.method === "POST" && path === "/api/stop") {
@@ -78,6 +91,10 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     return;
   }
   sendJson(response, 404, { error: "Not found" });
+}
+
+function parsePace(value: unknown): Pace {
+  return typeof value === "string" && value in PACES ? (value as Pace) : "normal";
 }
 
 function dayForScreens() {
@@ -137,19 +154,15 @@ function sameSecret(given: string, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 server.listen(port, host, () => {
   const base = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
-  console.log(`RouteReady running`);
-  console.log(`  Dispatcher console: ${base}/`);
-  console.log(`  Rider screen:       ${base}/rider`);
+  console.log("RouteReady running");
+  console.log(`  Showcase (two phones): ${base}/`);
+  console.log(`  Rider app:             ${base}/app`);
   if (live.config) {
     const targets = [...live.config.targets].map(([stopId, target]) => `${stopId} -> ${maskPhone(target.phone)} (${target.region})`);
     console.log(`  Live calls: ON for ${targets.join(", ")}; other stops stay scripted`);
-    console.log(`  Live start token:   ${startToken}`);
+    console.log(`  Live start token:      ${startToken}`);
   } else {
     console.log(`  Live calls: off (${live.problem}). Simulated days work without credentials.`);
   }

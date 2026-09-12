@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadDay } from "../src/core/day.js";
 import { ScriptedPort } from "../src/calle/ports.js";
-import { runDay, type EngineOptions } from "../src/engine/engine.js";
+import { RouteEngine, runDay, type EngineOptions } from "../src/engine/engine.js";
 
 const { day, travel } = loadDay();
 
@@ -36,11 +36,18 @@ describe("RouteEngine on the demo day", () => {
         open++;
         called.push(event.stopId);
       }
-      if (event.type === "call_result" || event.type === "call_error") open--;
+      if (event.type === "call_result" || (event.type === "call_error" && event.final)) open--;
       most = Math.max(most, open);
     }
     expect(most).toBe(1);
     expect(new Set(called).size).toBe(called.length);
+  });
+
+  it("starts no call while calls are held", async () => {
+    const engine = new RouteEngine(calledDay("test-hold"));
+    engine.holdCalls = true;
+    for (let now = 0; now <= 20; now += 0.25) await engine.advance(now);
+    expect(engine.metrics.calls).toBe(0);
   });
 
   it("changes nothing for a customer who did not answer", async () => {
