@@ -1895,7 +1895,11 @@ footer .source-link { margin-top: var(--space-3); }
   .duet > .lane:last-child  { transform: rotateY(-5deg) translateZ(-15px); }
   .duet > .lane {
     transform-style: preserve-3d;
-    transition: transform var(--dur-enter) var(--ease-out);
+    /* 140ms, not the 240 the enter token carries. A panel that takes a quarter of a second
+     * to acknowledge the pointer reads as a panel that did not notice it: an entrance
+     * animation and a hover response are different jobs and this was using the entrance
+     * curve for both. The shadow layer below fades on the same clock. */
+    transition: transform 140ms var(--ease-out);
     /* Both lanes are promoted for the whole time the 3D layout is on, rather than at the
      * moment the pointer arrives. Measured on a 4x-throttled CPU: promoting on hover cost
      * a 212ms first frame, because the browser was rasterising a panel that holds a
@@ -1915,19 +1919,33 @@ footer .source-link { margin-top: var(--space-3); }
     border-radius: inherit; pointer-events: none;
     box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25);
     opacity: 0;
-    transition: opacity var(--dur-enter) var(--ease-out);
+    transition: opacity 140ms var(--ease-out);
   }
   /* The active lane comes forward rather than merely squaring up. 20px at a perspective
    * of 1400 is a scale of 1400/1380 = 1.0145: a 420px panel grows by six pixels, inside a
    * 40px gutter, so the pair can never touch. */
-  .duet > .lane:hover,
-  .duet > .lane:focus-within,
+  /* Playing and pointed at are two different states and they used to be one.
+   *
+   * A lane whose call is running carried `translateZ(20px)`, and so did a lane under the
+   * pointer. While the scene plays, which is most of the time a reader spends in this act,
+   * the panel was already at the hover position: moving the pointer on to it changed
+   * nothing, and a panel that does not answer the pointer reads as a panel that is broken.
+   * Measured rather than guessed: the computed transform at rest and the computed transform
+   * after a real mouse move were the same matrix, to the digit.
+   *
+   * So playing squares the panel up and lifts it a little; the pointer lifts it the rest of
+   * the way and brings the shadow to full. 24px at a perspective of 1400 is a scale of
+   * 1.0174, which grows a 420px panel by seven pixels inside a 40px gutter. */
   .duet > .lane[data-live="on"] {
-    transform: rotateY(0deg) translateZ(20px);
+    transform: rotateY(0deg) translateZ(10px);
+  }
+  .duet > .lane[data-live="on"]::after { opacity: 0.5; }
+  .duet > .lane:hover,
+  .duet > .lane:focus-within {
+    transform: rotateY(0deg) translateZ(24px);
   }
   .duet > .lane:hover::after,
-  .duet > .lane:focus-within::after,
-  .duet > .lane[data-live="on"]::after { opacity: 1; }
+  .duet > .lane:focus-within::after { opacity: 1; }
   /* The head and the field row sit off the face of the panel, which is what makes the tilt
    * read as depth rather than as a skewed image. The transcript stays flat on the panel:
    * it is the one part a reader has to read a paragraph of, and text on a plane tilted
