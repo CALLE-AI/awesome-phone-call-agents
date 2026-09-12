@@ -25,7 +25,7 @@ TRANSCRIPT = [
 ]
 
 # --- redaction ---
-check("redacts email", "[email hidden]" in redact("mail me at jo@x.com please"))
+check("redacts email", "[email hidden]" in redact("mail me at jo@example.com please"))
 check("redacts phone", "[number hidden]" in redact("call 555-123-4567 back"))
 check("leaves clean text alone", redact("Is it ready?") == "Is it ready?")
 
