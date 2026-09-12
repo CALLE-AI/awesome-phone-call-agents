@@ -9,35 +9,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
 <style>
   /* Atkinson Hyperlegible: designed by the Braille Institute for low-vision
-     readers. Chosen on purpose, not for looks. Palette is calm cyan + health
-     green on light, deliberately not the default AI purple/pink gradient. */
+     readers. Chosen on purpose, not for looks. Palette is a warm near-black
+     with a single amber accent: no purple, no cyan, no gradients. */
   :root {
-    --bg: #ECFEFF;          /* calm cyan-tinted background */
-    --ink: #0B3B47;         /* deep teal ink, ~13:1 on bg */
-    --muted-ink: #3F6470;   /* ~5.3:1 on bg */
-    --card: #FFFFFF;
-    --primary: #0E7490;     /* cyan-700 */
-    --primary-ink: #FFFFFF;
-    --accent: #047857;      /* green-700, for confirmed answers */
-    --line: #C6E9F0;
-    --you-bg: #0E7490;
-    --you-ink: #FFFFFF;
-    --agent-bg: #E6F6FA;    /* our AI, cool */
-    --agent-ink: #0B3B47;
-    --them-bg: #F1F5E9;     /* the other party, warm-neutral so the two sides read apart */
-    --them-ink: #26331A;
-    --note-ink: #3F6470;
-    --ok: #047857;
-    --hold: #B45309;        /* amber-700 for non-answers */
+    /* Full dark, warm ink (not the usual slate/navy AI dark). One restrained
+       amber accent. No gradients anywhere. */
+    --bg: #16130E;          /* warm near-black */
+    --ink: #F3EEE4;         /* warm off-white, ~14:1 on bg */
+    --muted-ink: #A99F8C;   /* warm grey, ~6:1 on bg */
+    --card: #1F1B14;        /* raised warm panel */
+    --primary: #E0A82E;     /* amber accent (the one color) */
+    --primary-ink: #16130E; /* near-black text on amber */
+    --accent: #7BB661;      /* muted sage for a confirmed answer */
+    --line: #342E22;        /* hairline on dark */
+    --you-bg: #E0A82E;      /* the user's own words carry the accent */
+    --you-ink: #16130E;
+    --agent-bg: #262019;    /* our AI: warm raised */
+    --agent-ink: #F3EEE4;
+    --them-bg: #14201C;     /* the business: cool-shifted so the sides read apart */
+    --them-ink: #DCE9E1;
+    --note-ink: #A99F8C;
+    --ok: #7BB661;
+    --hold: #E0A82E;        /* amber for anything needing a person */
     --radius: 14px;
-    --shadow: 0 1px 2px rgba(11,59,71,.06), 0 8px 24px rgba(11,59,71,.08);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #08222A; --ink: #E7F6FA; --muted-ink: #9DC2CC; --card: #0E2E38;
-      --line: #1C4753; --agent-bg: #123846; --agent-ink: #E7F6FA;
-      --them-bg: #253018; --them-ink: #EAF3DD; --note-ink: #9DC2CC;
-    }
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -112,11 +107,11 @@
   <main class="wrap">
     <header>
       <svg class="mark" width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="RelayMe logo">
-        <rect width="44" height="44" rx="12" fill="#0E7490"/>
+        <rect width="44" height="44" rx="12" fill="#E0A82E"/>
         <!-- a speech line turning into text lines: the relay idea -->
-        <path d="M12 16h14a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-6l-4 4v-4h-4a2 2 0 0 1-2-2v-9a3 3 0 0 1 3-3z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
-        <line x1="16" y1="20.5" x2="26" y2="20.5" stroke="#67E8F9" stroke-width="2" stroke-linecap="round"/>
-        <line x1="16" y1="24" x2="23" y2="24" stroke="#67E8F9" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 16h14a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-6l-4 4v-4h-4a2 2 0 0 1-2-2v-9a3 3 0 0 1 3-3z" fill="none" stroke="#16130E" stroke-width="2.2" stroke-linejoin="round"/>
+        <line x1="16" y1="20.5" x2="26" y2="20.5" stroke="#16130E" stroke-width="2" stroke-linecap="round"/>
+        <line x1="16" y1="24" x2="23" y2="24" stroke="#16130E" stroke-width="2" stroke-linecap="round"/>
       </svg>
       <div>
         <h1>RelayMe</h1>
@@ -125,10 +120,10 @@
     </header>
 
     <div class="legend" aria-hidden="true">
-      <span><i class="swatch" style="background:#0E7490"></i> You</span>
-      <span><i class="swatch" style="background:#E6F6FA"></i> Your AI on the call</span>
-      <span><i class="swatch" style="background:#F1F5E9"></i> The business</span>
-      <span><i class="swatch" style="background:transparent"></i> RelayMe notes</span>
+      <span><i class="swatch" style="background:#E0A82E"></i> You</span>
+      <span><i class="swatch" style="background:#262019"></i> Your AI on the call</span>
+      <span><i class="swatch" style="background:#14201C"></i> The business</span>
+      <span><i class="swatch" style="background:#16130E"></i> RelayMe notes</span>
     </div>
 
     <div class="scenarios" role="group" aria-label="Example call outcomes">
