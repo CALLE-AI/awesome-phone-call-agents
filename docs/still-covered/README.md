@@ -8,6 +8,18 @@
 This is the long-form guide: the evidence the design rests on, the architecture, the failure
 semantics, and how to reproduce every number in the demo. The app README is the short version.
 
+![The dashboard during a campaign: calls going out, the live ledger stream underneath, and an empty
+worklist because nothing is proposed until a call settles](images/dashboard-mid-campaign.png)
+
+*Mid-campaign. Twelve calls placed, the ledger streaming underneath, and the worklist still empty -
+nothing is proposed about anybody until their call settles.*
+
+![The dashboard after a campaign: outcome counts, the worklist, and a card per person showing what
+they said and what happens next](images/dashboard-complete.png)
+
+*After. Every person has an outcome, a reason, their own words as evidence, and a next action -
+and every favourable outcome is waiting on a caseworker's Review button.*
+
 ---
 
 ## 1. The problem

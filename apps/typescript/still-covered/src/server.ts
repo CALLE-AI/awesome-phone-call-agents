@@ -315,7 +315,11 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/registries") {
-        json(res, 200, { registries: listSampleRegistries(ctx.registryDir), canDrill: Boolean(ctx.startDrill) && ctx.config.mode === "dry-run" });
+        // Two different reasons a drill cannot be started from the browser, and the operator
+        // deserves to know which one applies: live mode refuses on purpose; `run --keep-server`
+        // simply has no drill runner attached.
+        const drillReason = ctx.config.mode !== "dry-run" ? "live mode" : !ctx.startDrill ? "not available here" : null;
+        json(res, 200, { registries: listSampleRegistries(ctx.registryDir), canDrill: drillReason === null, drillReason });
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/campaigns") {

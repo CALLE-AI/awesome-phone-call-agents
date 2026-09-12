@@ -142,7 +142,7 @@
     const showBanner = !state.running && (failed > 0 || pendingCalls > 0);
     $("banner").hidden = !showBanner;
     if (showBanner) $("banner").textContent = `Incomplete: ${pendingCalls} call(s) still pending, ${failed} task(s) not accepted by CALL-E. Nothing is inferred about people who were never dialled. Run: still-covered resume --campaign-id ${state.campaign ? state.campaign.id : ""}`;
-    $("aware").innerHTML = answered ? `<div class="big">${k.awareNo} of ${answered}</div><div class="l">people who answered had <b>not</b> heard of the rule before this call. In Arkansas in 2018, a third never had, and 18,000 lost coverage.</div>` : `<div class="l">Awareness appears here as people answer.</div>`;
+    $("aware").innerHTML = answered ? `<div class="big">${k.awareNo} of ${answered}</div><div class="l">people who answered had <b>not</b> heard of the rule before this call. In Arkansas in 2018, about a third of those subject to the requirement had never heard of it, and 18,000 lost coverage in seven months (Sommers et al., NEJM 2019).</div>` : `<div class="l">Awareness appears here as people answer.</div>`;
     const outcomes = [["May qualify for an exemption", k.likelyExempt, "var(--green)"], ["May already meet the rule", k.likelyMeets, "var(--teal)"], ["At risk", k.atRisk, "var(--red)"], ["Needs a navigator's review", k.needsReview, "var(--yellow)"], ["Cleared by state data", k.cleared, "#16a085"], ["Not screened yet", notScreened, "var(--grey)"]];
     const max = Math.max(1, ...outcomes.map((o) => o[1] || 0));
     const ex = state.exemptionCounts || [];
@@ -179,7 +179,7 @@
     try {
       const r = await api("/api/registries"); const body = await r.json();
       $("registry").innerHTML = (body.registries || []).map((n) => `<option value="${esc(n)}">${esc(n.replace("enrollees.", "").replace(".csv", ""))} list</option>`).join("");
-      if (!body.canDrill) { $("start").disabled = true; $("start").textContent = "Drills disabled (live mode)"; }
+      if (!body.canDrill) { $("start").disabled = true; $("start").textContent = `Drills disabled (${esc(body.drillReason || "not available here")})`; }
     } catch (e) { /* ignore */ }
     try {
       const r = await api("/api/campaigns"); const body = await r.json();
