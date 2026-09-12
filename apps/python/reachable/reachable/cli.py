@@ -304,7 +304,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _use_utf8_output() -> None:
+    """Make stdout and stderr carry the masking character on any console.
+
+    Masked numbers are rendered with an ellipsis. A Windows console defaults to
+    a legacy code page, which turns that into a replacement character and makes
+    the validation report look corrupted -- the first thing somebody trying this
+    app is likely to run. Reconfiguring is cheap; falling back quietly is fine
+    where the stream does not support it.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):  # pragma: no cover - exotic streams
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _use_utf8_output()
     args = build_parser().parse_args(argv)
     return int(args.func(args))
 

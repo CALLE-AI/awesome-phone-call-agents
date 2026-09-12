@@ -173,3 +173,17 @@ def test_live_contact_without_yes_requires_typing_the_contact_id(tmp_path, monke
     assert code == 1
     assert "Nothing was changed" in capsys.readouterr().out
     assert "+447700900218" in (tmp_path / "contacts.csv").read_text(encoding="utf-8")
+
+
+def test_cli_output_survives_a_legacy_console_encoding(capsys, monkeypatch, tmp_path):
+    """The masking character must not turn into a replacement character.
+
+    A Windows console defaults to a legacy code page. Without this, the very
+    first command somebody runs prints a validation report that looks corrupted.
+    """
+    monkeypatch.setenv("REACHABLE_DATA_DIR", str(APP_ROOT / "sample_data"))
+    monkeypatch.setenv("REACHABLE_DB", str(tmp_path / "enc.sqlite3"))
+    assert main(["import"]) == 0
+    out = capsys.readouterr().out
+    assert "…182" in out
+    assert "\ufffd" not in out
