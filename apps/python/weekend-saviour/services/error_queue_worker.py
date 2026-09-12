@@ -56,11 +56,11 @@ def process_error_queue(resolution_queue_push_func):
             "jira_history": jira_history,
             "playbook_details": playbook,
             "oncall_engineer": oncall_data["engineer"],
-            "shift_info": oncall_data.get("shift_name", "Weekend On-Call Shift")
+            "shift_info": oncall_data.get("shift_name", "Weekend On-Call Shift"),
         }
 
         logger.info(f"📋 [Error Queue Worker] Formatted resultSchema for '{incident_id}':")
-        logger.info(f"   On-Call Engineer: {result_schema['oncall_engineer']['name']} ({result_schema['oncall_engineer']['phone']})")
+        logger.info(f"   On-Call Engineer: {result_schema['oncall_engineer']['name']} ({result_schema['oncall_engineer']['phone']}) ({result_schema['oncall_engineer']['locale']}) ({result_schema['oncall_engineer']['region']})")
         logger.info(f"   Source Roster: {result_schema['oncall_engineer']['source']}")
         logger.info(f"   Jira History: {len(result_schema['jira_history'])} ticket(s)")
         logger.info(f"   Playbook Match: {result_schema['playbook_details']['title']}")

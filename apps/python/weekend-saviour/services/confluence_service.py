@@ -7,7 +7,8 @@ logger = logging.getLogger("airflow.task")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), '..', 'config', 'oncall_config.json')
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), '..', 'config', 'india_oncall_config.json')
+# CONFIG_FILE_US = os.path.join(os.path.dirname(__file__), '..', 'config', 'us_oncall_config.json')
 PLAYBOOK_FILE = os.path.join(os.path.dirname(__file__), '..', 'playbook', 'playbook.json')
 
 def fetch_confluence_playbook(error_message: str):
@@ -60,7 +61,7 @@ def fetch_confluence_playbook(error_message: str):
         "source": "default_fallback"
     }
 
-def get_on_call_engineer():
+def get_weekend_on_call_engineer():
     """
     Checks Confluence Team Calendar for the on-call person for the day.
     If unable to find on-call details (or if env vars missing), reads local config/oncall_config.json file.
@@ -84,9 +85,11 @@ def get_on_call_engineer():
                 return {
                     "shift_name": "Confluence Team Calendar On-Call",
                     "engineer": {
-                        "name": data.get("oncall_name", "Alex Morgan"),
-                        "phone": data.get("oncall_phone", "+1-555-0199"),
-                        "email": data.get("oncall_email", "alex.morgan@retailcorp.com"),
+                        "name": data.get("oncall_name", "Santhosh"),
+                        "phone": data.get("oncall_phone", "+919003939495"),
+                        "email": data.get("oncall_email", "sandyinspires@icloud.com"),
+                        "locale":"en_US",
+                        "region":"US",
                         "source": "confluence_team_calendar_api"
                     }
                 }
@@ -105,22 +108,10 @@ def get_on_call_engineer():
             logger.error(f"[Confluence Service] Error reading local oncall config file: {err}")
 
     # Default fallback
-    return {
-        "shift_name": "Sunday Night CDT On-Call Roster",
-        "engineer": {
-            "name": "Alex Morgan",
-            "role": "Senior Data Platform Engineer",
-            "phone": "+1-555-0199",
-            "email": "alex.morgan@retailcorp.com",
-            "source": "default_fallback"
-        }
-    }
-
-# Alias for backwards compatibility
-get_weekend_on_call_engineer = get_on_call_engineer
+    return config.oncall_config
 
 if __name__ == "__main__":
     pb = fetch_confluence_playbook("table daily_store_inventory_agg has no column named inventory_status")
-    oncall = get_on_call_engineer()
+    oncall = get_weekend_on_call_engineer()
     logger.info(f"Playbook: {pb}")
     logger.info(f"OnCall: {oncall}")
