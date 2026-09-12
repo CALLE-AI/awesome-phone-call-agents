@@ -18,10 +18,9 @@ resolution payloads on the same rule.
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
-from client import mask_phone
+from client import _OBVIOUS_SECRET, _PHONE_IN_TEXT, mask_phone
 from compliance.models import PreCallDecision
 from evidence.engine import ReasoningResult
 from evidence.model import Case, Evidence
@@ -113,11 +112,10 @@ def cases_payload(cases: tuple[Case, ...]) -> dict[str, Any]:
 # silently the next time a rule is written the same way - every reason
 # this module emits is scrubbed by the same function.
 #
-# Same shape as client.PHONE_PATTERN and [0-9] for the same reason: for a
+# Shared with client.PHONE_PATTERN and [0-9] for the same reason: for a
 # str pattern \d matches every Unicode decimal digit, so a number written
 # in Arabic-Indic or fullwidth digits would slip past a \d version of
 # this and reach the client intact.
-_PHONE_IN_TEXT = re.compile(r"\+[1-9][0-9]{6,14}")
 
 
 def sanitize_reason(text: str, max_chars: int = MAX_TEXT_CHARS) -> str:
@@ -193,36 +191,79 @@ ALLOWED_RESULT_KEYS = (
     "manipulation_attempt_note",
 )
 
+_RESULT_ENUMS = {
+    "subject_intent": {"confirmed", "cancelled", "uncertain", "unknown"},
+    "answered_by": {"human", "voicemail", "ivr", "unknown"},
+}
+_PROVIDER_STATUSES = {"queued", "in_progress", "completed", "failed", "canceled"}
 
-def call_payload(resolution: Resolution) -> dict[str, Any]:
+
+def _provider_text(value: str) -> str:
+    return sanitize_reason(_OBVIOUS_SECRET.sub("[redacted]", value))
+
+
+def call_projection(call: dict[str, Any] | None, placed: bool) -> dict[str, Any]:
     """Three facts and the structured result. Nothing else from the
     provider response crosses this line.
 
-    Resolution.call is the raw object: it carries the recipient's number
+    `call` is the raw provider object: it carries the recipient's number
     in the clear, every transcript turn, the 3.6k-character hardened
     task (which embeds the case's call_task_hint), per-attempt provider
     ids, and free-text summaries. None of that is projected here, and
     the omission is enforced by naming what is included rather than by
     listing what is not - a field added upstream is excluded by default.
-    """
-    call = resolution.call
-    if call is None:
-        return {"placed": resolution.call_placed, "provider_status": None, "result": None}
 
-    raw_result = call.get("structured_result") or {}
-    result = {
-        key: (_text(value) if isinstance(value, str) else value)
-        for key, value in raw_result.items()
-        if key in ALLOWED_RESULT_KEYS
-    } or None
+    Takes the raw object rather than a Resolution so that a caller
+    holding only a partial view - a call in progress, say - projects it
+    through this same allowlist instead of a second copy of it. Two
+    copies of a security boundary can drift; one cannot.
+    """
+    if call is None:
+        return {"placed": placed, "provider_status": None, "result": None}
+
+    raw_result = call.get("structured_result")
+    result: dict[str, Any] = {}
+    if isinstance(raw_result, dict):
+        for key in ALLOWED_RESULT_KEYS:
+            value = raw_result.get(key)
+            if key in _RESULT_ENUMS:
+                if isinstance(value, str) and value in _RESULT_ENUMS[key]:
+                    result[key] = value
+            elif key == "manipulation_attempt_detected":
+                if type(value) is bool:
+                    result[key] = value
+            elif isinstance(value, str):
+                result[key] = _provider_text(value)
+    status = call.get("status")
 
     return {
-        "placed": resolution.call_placed,
-        "provider_status": _text(str(call.get("status")), MAX_IDENTIFIER_CHARS)
-        if call.get("status") is not None
-        else None,
-        "result": result,
+        "placed": placed,
+        "provider_status": status if isinstance(status, str) and status in _PROVIDER_STATUSES else None,
+        "result": result or None,
     }
+
+
+def call_payload(resolution: Resolution) -> dict[str, Any]:
+    return call_projection(resolution.call, resolution.call_placed)
+
+
+def case_summary(case: Case) -> dict[str, Any]:
+    """The three case fields a resolution carries, as opposed to the
+    fuller catalog entry case_metadata() builds. No phone number here at
+    all, masked or otherwise: a resolution never needs one.
+    """
+    return {
+        "name": _text(case.name),
+        "use_case": _text(case.use_case),
+        "decision_options": {str(k): _text(str(v)) for k, v in case.decision_options.items()},
+    }
+
+
+def call_decision_label(reasoning: ReasoningResult) -> str:
+    """A label for the engine's own boolean, and only that. It restates
+    decision_critical; it never recomputes it.
+    """
+    return "CALL_JUSTIFIED" if reasoning.decision_critical else "NO_CALL_NEEDED"
 
 
 def verdict_payload(verdict: Verdict | None) -> dict[str, Any] | None:
@@ -260,16 +301,10 @@ def resolution_payload(
         "id": _text(resolution_id, MAX_IDENTIFIER_CHARS),
         "state": _text(state, MAX_IDENTIFIER_CHARS),
         "mode": _text(mode, MAX_IDENTIFIER_CHARS),
-        "case": {
-            "name": _text(resolution.case.name),
-            "use_case": _text(resolution.case.use_case),
-            "decision_options": {
-                str(k): _text(str(v)) for k, v in resolution.case.decision_options.items()
-            },
-        },
+        "case": case_summary(resolution.case),
         "evidence": [evidence_item(item) for item in resolution.case.evidence.items],
         "reasoning": reasoning_payload(resolution.reasoning),
-        "call_decision": "CALL_JUSTIFIED" if resolution.reasoning.decision_critical else "NO_CALL_NEEDED",
+        "call_decision": call_decision_label(resolution.reasoning),
         "compliance": compliance_payload(
             resolution.compliance,
             resolution.applicable_compliance,

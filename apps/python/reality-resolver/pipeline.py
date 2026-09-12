@@ -26,7 +26,7 @@ whatever the underlying layer already raised.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any
 
@@ -61,14 +61,21 @@ class ResolutionRefused(Exception):
     """
 
 
+class ProviderCallFailedError(RuntimeError):
+    """CALL-E accepted the request but ended the call technically."""
+
+    def __init__(self, status: str) -> None:
+        self.status = status
+        super().__init__(f"CALL-E call ended with provider status {status!r}")
+
+
 @dataclass(frozen=True)
 class ResolutionRequest:
     """Everything the pipeline needs, with no argparse dependency.
 
-    base_url/execute/allow_live are named exactly as client.py's
+    base_url/execute/allow_live/api_key are named exactly as client.py's
     resolve_api_key() reads them, so this object can be handed to it
-    directly - that function is duck-typed on those three attributes and
-    stays unmodified.
+    directly.
     """
 
     case_path: str
@@ -76,6 +83,19 @@ class ResolutionRequest:
     execute: bool = False
     allow_live: bool = False
     authorize_destination: str | None = None
+    # A CALL-E credential for this one resolution, or None to fall back to
+    # the CALLE_API_KEY environment variable - which is what the CLI does,
+    # unchanged. It exists so a caller handling several resolutions at
+    # once never has to write to os.environ: that is shared mutable state,
+    # and two concurrent runs would be able to swap each other's
+    # credentials through it.
+    #
+    # repr=False because a frozen dataclass renders every field by
+    # default, and this one is a secret - any log line, exception message
+    # or debugger frame that rendered the request would carry it. It is
+    # also never copied into Resolution (see that class: eleven fields,
+    # none of them this one), so it cannot reach a serializer or a store.
+    api_key: str | None = field(default=None, repr=False)
     phone_override: str | None = None
     now_utc: datetime | None = None
     poll_interval_seconds: float = 2.0
@@ -346,6 +366,13 @@ def resolve(request: ResolutionRequest, observer: Observer | None = None) -> Res
         on_warn=observer.on_poll_warning,
     )
     observer.on_call_completed(final_call)
+
+    provider_status = final_call.get("status")
+    if provider_status in {"failed", "canceled"}:
+        # A provider failure is transport state, never a subject intent.
+        # Do not let reconciliation turn it into a business cancellation
+        # or an ambiguous answer.
+        raise ProviderCallFailedError(provider_status)
 
     structured_result = final_call.get("structured_result")
     verdict = reconcile(structured_result, case.decision_options, case.evidence)

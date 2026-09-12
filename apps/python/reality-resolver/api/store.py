@@ -129,10 +129,48 @@ class ResolutionStore:
             while len(self._entries) > self._max:
                 self._entries.popitem(last=False)
 
-    def get(self, resolution_id: str) -> dict[str, Any]:
+    def update(self, resolution_id: str, patch: dict[str, Any]) -> None:
+        """Merge `patch` into an existing entry's top-level keys.
+
+        Shallow on purpose: every key a progress event touches - state,
+        reasoning, compliance, call, verdict - is replaced whole, because
+        that is how the publisher builds them. A deep merge would let a
+        half-built nested object survive underneath a newer one.
+
+        Deliberately does not move the entry to the end. put() does,
+        because inserting is what defines FIFO position; updating is not
+        a reinsertion, and treating it as one would let a resolution that
+        keeps reporting progress outlive older entries indefinitely. The
+        consequence is real and accepted here rather than hidden: a long
+        run can be evicted while it is still going. Protecting in-flight
+        work belongs with a model of in-flight work, which does not exist
+        yet.
+
+        Raises for an unknown id, like get() - an update has nothing to
+        merge into, and silently creating an entry would invent a
+        resolution nobody started.
+        """
         with self._lock:
             try:
-                return self._entries[resolution_id]
+                entry = self._entries[resolution_id]
+            except KeyError:
+                raise ResolutionNotFoundError(resolution_id) from None
+            entry.update(patch)
+
+    def get(self, resolution_id: str) -> dict[str, Any]:
+        """A consistent snapshot, not the live entry.
+
+        The copy is the point. A resolution running on a worker keeps
+        calling update() on its entry, so handing out the stored dict
+        would let a reader serialize it while it changes underneath -
+        producing a payload that is half one state and half the next.
+        Taken under the lock, a shallow copy is enough: update() replaces
+        whole top-level values and never edits a nested object in place,
+        so the references captured here cannot shift afterwards.
+        """
+        with self._lock:
+            try:
+                return dict(self._entries[resolution_id])
             except KeyError:
                 raise ResolutionNotFoundError(resolution_id) from None
 
