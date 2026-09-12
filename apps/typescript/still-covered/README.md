@@ -2,6 +2,14 @@
 
 **A phone screener that finds the people who are exempt from the new Medicaid work requirement and do not know it.**
 
+In January 2027 the United States begins requiring most adults on public health coverage to prove,
+every month, that they work or study enough hours to keep it. Most of the people who will lose
+coverage already satisfy the rule or are exempt from it. They will lose it because nobody told them
+they had to prove anything.
+
+Medicaid is that public health coverage: roughly 70 million people in the United States, the largest
+health programme in the country.
+
 Starting 1 January 2027, most adults aged 19-64 on Medicaid must show 80 hours a month of work,
 school, volunteering or job training - or about $580 a month in earnings - to keep their coverage
 (P.L. 119-21 section 71119; CMS interim final rule CMS-2454-IFC, June 2026). Nine categories of
@@ -229,8 +237,20 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 ## Tests
 
 ```
-npm run check   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test        # 46 tests, no network
+npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
+npm test               # 46 tests, no network
+npm run test:failures  # just the failure semantics - every test name is a guarantee
+```
+
+```
+✔ a transient 429 on create is retried and the campaign finishes normally
+✔ an outage marks people not attempted: nobody gets a letter, a navigator call or a verdict they did not earn
+✔ an invalid request is not retried
+✔ resume re-places refused tasks with the same keys and reaches the same end state
+✔ a call that has not finished is left awaiting, never guessed, and resume settles it
+✔ resuming a finished campaign places no new call and creates no duplicate work
+✔ follow-up calls back someone who asked for a better time, at most three calls in total, then a letter
+✔ someone who asked not to be called again is never called again
 ```
 
 The suite covers the classifier's fail-closed order, the rule and state validators, registry parsing

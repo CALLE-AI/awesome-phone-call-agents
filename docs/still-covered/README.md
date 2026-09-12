@@ -25,6 +25,14 @@ answers support.*
 
 ## 1. The problem
 
+**In one sentence, for anyone who has never heard of Medicaid:** in January 2027 the United States
+begins requiring most adults on its public health coverage programme - about 70 million people, the
+country's largest - to prove every month that they work or study enough hours to keep it, and most of
+the people who will lose coverage already satisfy that rule or are formally exempt from it. They will
+lose it because nobody told them there was anything to prove.
+
+The rest of this section is the detail behind that sentence.
+
 From 1 January 2027, most adults aged 19-64 enrolled in Medicaid must demonstrate 80 hours a month
 of work, education, volunteering or job training - or roughly $580 a month in earnings - to keep
 their coverage. The requirement comes from P.L. 119-21 section 71119, with implementation detail in
