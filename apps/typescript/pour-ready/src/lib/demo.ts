@@ -30,7 +30,7 @@ function completedCall(
   return {
     role,
     callId: 'demo-' + role,
-    maskedPhone: 'DEMO LINE',
+    maskedPhone: 'Demo line',
     status: 'completed',
     result: coordinationResult,
     taskCompleted: true,
@@ -56,7 +56,7 @@ export function queuedDemoCalls(): CallSnapshot[] {
   return ROLES.map((role) => ({
     role,
     callId: 'demo-' + role,
-    maskedPhone: 'DEMO LINE',
+    maskedPhone: 'Demo line',
     status: 'queued',
     result: null,
     taskCompleted: null,
