@@ -53,6 +53,16 @@ python app.py --live --lead examples/synthetic_lead.json --output result.json
 
 The API key is read from the environment and is never stored in the lead file or result output.
 
+### Browser demo
+
+Run the small Flask wrapper for a browser-based preview:
+
+```bash
+python web.py
+```
+
+The browser UI is preview-only unless `DEMO_ENABLE_LIVE=true`, `DEMO_PHONE` is set to an authorized test number, and `DEMO_OPERATOR_TOKEN` is configured. Public visitors cannot supply arbitrary destination numbers. The live endpoint accepts one server-side test destination and requires the operator token in `X-Demo-Token`.
+
 ## Lead format
 
 ```json

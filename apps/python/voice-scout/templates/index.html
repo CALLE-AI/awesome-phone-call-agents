@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Scout</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #0c1220; color: #e8eefc; }
+    main { max-width: 860px; margin: 0 auto; padding: 36px 20px 60px; }
+    .card { background: #151f33; border: 1px solid #2a3a5d; border-radius: 14px; padding: 22px; margin-top: 20px; }
+    h1 { margin: 0 0 8px; font-size: 32px; } h2 { font-size: 20px; }
+    p { color: #aebbd4; line-height: 1.55; }
+    label { display: block; margin: 16px 0 6px; color: #cbd7ee; font-weight: 600; }
+    input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #344a74; border-radius: 8px; background: #0c1527; color: #fff; padding: 11px; font: inherit; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { border: 0; border-radius: 8px; padding: 11px 16px; margin: 18px 8px 0 0; background: #4f8cff; color: white; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #2d3d5d; } button:disabled { opacity: .55; cursor: wait; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #09101d; padding: 16px; border-radius: 8px; color: #bfe0ff; }
+    .notice { border-left: 3px solid #f0b44d; padding-left: 12px; } .small { font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Voice Scout</h1>
+  <p>AI phone qualification for small businesses. Configure the workflow for websites, IT, insurance, staffing, consulting, home services, or another business need.</p>
+  <div class="card notice"><strong>Safe demo:</strong> preview mode never places a call. The live demo, when enabled, can call only the server-side authorized test number and requires operator authorization. The assistant identifies itself as automated.</div>
+  <div class="card">
+    <h2>Business context</h2>
+    <label for="business_name">Business name</label><input id="business_name" value="Northside Bicycle Repair">
+    <label for="industry">Industry</label><input id="industry" value="Bicycle repair">
+    <label for="company_size">Company size</label><input id="company_size" value="small">
+    <label for="workflow">Current workflow</label><textarea id="workflow">Phone calls and web inquiries are handled by the owner.</textarea>
+    <label for="pain_points">Known pain points</label><textarea id="pain_points">Missed calls during repair appointments.</textarea>
+    <button id="preview" class="secondary">Preview — no call</button>
+    {% if live_enabled %}<button id="live">Place authorized demo call</button>{% endif %}
+    <p class="small">This demo does not accept arbitrary destination numbers. Results are intended for human review.</p>
+  </div>
+  <div class="card"><h2>Result</h2><pre id="result">Run a preview to see the structured handoff.</pre></div>
+</main>
+<script>
+  const data = () => ({ business_name: business_name.value, industry: industry.value, company_size: company_size.value, workflow: workflow.value, pain_points: pain_points.value });
+  async function run(path, headers={}) {
+    result.textContent = 'Working…';
+    const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json', ...headers}, body:JSON.stringify(data())});
+    const body = await r.json(); result.textContent = JSON.stringify(body, null, 2);
+  }
+  preview.onclick = () => run('/api/preview');
+  const live = document.getElementById('live');
+  if (live) live.onclick = () => { const token = prompt('Operator token:'); if (token) run('/api/live', {'X-Demo-Token': token}); };
+</script>
+</body>
+</html>
