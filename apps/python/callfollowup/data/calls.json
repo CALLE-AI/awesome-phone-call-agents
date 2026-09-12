@@ -1,0 +1,13 @@
+[
+  {
+    "contact_name": "CALL-E Test Customer",
+    "phone_number": "+12763229632",
+    "call_goal": "You are calling on behalf of CallFollowUp, a customer follow-up service. Follow up with the customer about their recent inquiry. Ask whether they are still interested, understand their needs, and determine the appropriate next action. Be polite and concise. At the end, capture the customer's outcome, important notes, next action, and whether a callback is needed.",
+    "status": "completed",
+    "outcome": "Reached an AI hotline rather than the customer; customer follow-up could not be completed.",
+    "notes": "The answering party identified itself as an AI voice agent for a hotline, could not verify any recent inquiry, and could not connect the call further.",
+    "next_action": "Obtain the correct customer contact details before attempting follow-up again.",
+    "callback_at": "",
+    "call_id": "call_6oqQZtqdpdOA_dAqMGDo1w"
+  }
+]
