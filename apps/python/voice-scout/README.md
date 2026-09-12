@@ -46,8 +46,8 @@ python app.py --demo
 python app.py --lead examples/synthetic_lead.json
 
 # Live call only after explicit review and approval
-export CALLE_API_KEY='[your key]'
-export CALLE_GOAL_ID='[published goal id]'
+export CALLE_API_KEY
+export CALLE_GOAL_ID
 python app.py --live --lead examples/synthetic_lead.json --output result.json
 ```
 
