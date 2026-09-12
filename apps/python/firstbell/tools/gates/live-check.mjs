@@ -27,10 +27,20 @@ console.log(`acts rendered: ${await page.$$eval("section.act", (e) => e.length)}
 console.log(`Lenis: ${await page.evaluate(() => Boolean(window.Lenis))}`);
 console.log(`board mounted: ${await page.evaluate(() => Boolean(window.__morning))}` +
             `  draw calls: ${await page.evaluate(() => (window.__morning ? window.__morning.calls() : 0))}`);
-for (const href of ["#act-04", "#act-00", "#simulator"]) {
+// `#simulator` was in this list until the masthead stopped repeating what the rail already
+// carried. The id is still on the page, because a deep link somebody saved should keep
+// working, but nothing links to it any more and a click test needs a link. The loop says so
+// rather than throwing on a null, which is what it used to do.
+for (const href of ["#act-04", "#act-00", "#act-08"]) {
   await page.evaluate(() => window.scrollTo(0, 5000));
   await new Promise((r) => setTimeout(r, 700));
-  await page.evaluate((h) => document.querySelector(`a[href="${h}"]`).click(), href);
+  const clicked = await page.evaluate((h) => {
+    const a = document.querySelector(`a[href="${h}"]`);
+    if (!a) return false;
+    a.click();
+    return true;
+  }, href);
+  if (!clicked) { console.log(`click ${href.padEnd(11)} NO LINK ON THE PAGE`); continue; }
   await new Promise((r) => setTimeout(r, 1500));
   const s = await page.evaluate((h) => {
     const el = document.getElementById(h.slice(1));
