@@ -329,8 +329,13 @@ def test_the_annual_saving_is_stated_after_the_calls_are_paid_for():
     assert f"${net:,.0f}" in doc.replace("**", ""), (
         f"the document annualises the saving without paying for the calls. At ${price:,.2f} "
         f"a call and {a_year:,.0f} calls a year the figure is ${net:,.0f}")
-    assert (f"The ${price:,.2f} is subtracted here because the loss at the other end is "
-            "stated net") in doc, (
+    # The sentence gained a clause when CALL-E started metering: it now says which rate the
+    # arithmetic above was built on before it says why that rate is netted out. What this
+    # asks for is the reason, which is the half that makes the two ends comparable, so it
+    # names the figure and the reason and lets the sentence around them change.
+    assert f"${price:,.2f}" in doc and (
+        "is subtracted here because the loss at the other end is "
+        "stated net") in doc, (
         "the document nets out the call cost without saying why it does, and the reason is "
         "the only thing that makes the two ends of the band comparable")
 

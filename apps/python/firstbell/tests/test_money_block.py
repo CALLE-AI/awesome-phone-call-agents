@@ -255,7 +255,12 @@ def test_a_run_that_answered_nothing_does_not_kill_the_page_build():
     )
     # The other two figures in the cell are not properties of this run and have to survive
     # it: the price came off a billing panel and the headline ceiling off the demo run.
-    assert "billed" in markup and "one month" in markup
+    #
+    # This asked for "one month", which was the flat reading's own window. The band leads
+    # with the metered rate now, so it asks for the platform's word for the rate it
+    # replaced instead: a band that quotes today's price without saying a price changed is
+    # the thing worth failing over.
+    assert "billed" in markup and "Legacy pricing" in markup
 
 
 def test_a_run_with_one_answered_call_still_states_the_bound():

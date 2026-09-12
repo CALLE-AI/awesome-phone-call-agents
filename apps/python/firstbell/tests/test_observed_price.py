@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import pytest
 import subprocess
 import sys
 from pathlib import Path
@@ -572,3 +573,72 @@ def test_the_rejection_count_agrees_everywhere_it_is_printed():
     assert int(accepted.group(1)) + in_block == int(attempts.group(1)), (
         f"{accepted.group(1)} accepted plus {in_block} rejected is not the "
         f"{attempts.group(1)} attempts section 4 claims")
+
+
+PERIOD = PRICE["observed_metered_period"]
+
+
+def test_the_whole_period_reconciles_against_what_was_granted():
+    """1,100 credits in, 820 out, 280 left, and the two rates add up to the 820.
+
+    The flat block could not say this and said so. This one can: the panel prints a period
+    total and a balance, the file records both, and the only way both are right is if the
+    two rates' rows sum to the total and the grants cover it.
+    """
+    metered, legacy = PERIOD["metered_rate"], PERIOD["legacy_rate"]
+    granted = sum(g["credits"] for g in PRICE["funding"]["grants"])
+    assert granted == PRICE["funding"]["total_credits"] == 1100
+    assert legacy["rows"] * legacy["credits_each"] == legacy["credits"] == 65
+    assert metered["credits"] + legacy["credits"] == PERIOD["period_cost_credits"] == 820
+    assert metered["rows"] + legacy["rows"] == PERIOD["billed_events"] == 32
+    assert granted - PERIOD["period_cost_credits"] == PERIOD["balance_credits"] == 280
+    rate = PERIOD["credit_to_usd"]
+    assert abs(PERIOD["period_cost_credits"] * rate - PERIOD["period_cost_usd"]) < 0.005
+    assert abs(PERIOD["balance_credits"] * rate - PERIOD["balance_usd"]) < 0.005
+
+
+def test_the_metered_rows_are_the_rows_the_summary_describes():
+    """Every published statistic about the spread is recomputed from the rows themselves."""
+    metered = PERIOD["metered_rate"]
+    rows = metered["credits_sorted"]
+    assert rows == sorted(rows), "the published row list is not sorted, so the median is not"
+    assert len(rows) == metered["rows"]
+    assert sum(rows) == metered["credits"]
+    assert min(rows) == metered["min_credits"] == metered["floor_credits"]
+    assert max(rows) == metered["max_credits"]
+    assert rows.count(metered["floor_credits"]) == metered["rows_at_the_floor"]
+    assert rows[len(rows) // 2] == metered["median_credits"]
+    assert abs(sum(rows) / len(rows) - metered["mean_credits"]) < 0.01
+    assert abs(sum(rows) / len(rows) * PERIOD["credit_to_usd"] - metered["mean_usd"]) < 0.005
+    assert PERIOD["spread_usd"] == [min(rows) * PERIOD["credit_to_usd"],
+                                    max(rows) * PERIOD["credit_to_usd"]]
+
+
+def test_nothing_on_this_account_was_bought():
+    """The prices in this file are what a granted account was charged, and it says so.
+
+    A reader who takes $0.40 a call as a market price is reading one account funded by two
+    grants. The file has to carry that next to the figure, because it is the first thing a
+    district's finance office would ask and the entry cannot answer it later.
+    """
+    funding = PRICE["funding"]
+    assert funding["paid_by_the_author_usd"] == 0.0
+    assert len(funding["grants"]) == 2
+    assert sum(g["usd"] for g in funding["grants"]) == 11.0
+    for grant in funding["grants"]:
+        assert abs(grant["usd"] * 100 - grant["credits"]) < 0.5, (
+            f"{grant['at']} credits and dollars disagree at one cent a credit")
+    assert "200 free calls" in funding["grants"][1]["what"], (
+        "the challenge grant was issued as a call count, and that count is what dates it")
+
+
+def test_the_page_leads_with_the_rate_the_account_pays_now():
+    """The flat rate is history and the page has to say which is which."""
+    page = APP / "out" / "index.html"
+    if not page.exists():
+        pytest.skip("the built page is not on this machine")
+    html = page.read_text(encoding="utf-8")
+    metered = PERIOD["metered_rate"]
+    assert f'${metered["mean_usd"]:,.2f}' in html
+    assert "Legacy pricing" in html, (
+        "the page quotes a price without naming the rate CALL-E retired under it")

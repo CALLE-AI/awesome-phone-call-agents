@@ -55,13 +55,23 @@ def test_the_dateline_counts_match_the_pooled_call_file() -> None:
 
 
 def test_the_dateline_price_is_the_price_the_account_was_billed() -> None:
-    observed = json.loads(PRICE.read_text(encoding="utf-8"))["observed"]
-    stated = {label: value for value, label in cells()}
-    assert "a call, billed" in stated, "the dateline no longer carries the price"
-    assert stated["a call, billed"] == f'${observed["per_call_usd"]:.2f}', (
-        f'the first screen says {stated["a call, billed"]} a call and '
-        f'evidence/observed-price.json records {observed["per_call_usd"]}, read off the '
-        "usage panel on " + observed["read_at"])
+    """The dateline quotes the rate the account is charged now, not the one it was.
+
+    This asserted the flat $0.05 until CALL-E metered the account and started labelling
+    those rows `Legacy pricing` on its own panel. A first screen quoting a retired rate is
+    the failure this suite exists to catch, so the assertion moved to the current reading
+    rather than the wording being relaxed: the label still has to name its denominator, and
+    the figure still has to be the file's.
+    """
+    price = json.loads(PRICE.read_text(encoding="utf-8"))["observed_metered_period"]
+    metered = price["metered_rate"]
+    label = f'a call, mean of {metered["rows"]}'
+    stated = {lab: value for value, lab in cells()}
+    assert label in stated, "the dateline no longer carries the price, or not its count"
+    assert stated[label] == f'${metered["mean_usd"]:.2f}', (
+        f'the first screen says {stated[label]} a call and '
+        f'evidence/observed-price.json records {metered["mean_usd"]}, read off the '
+        "usage panel on " + price["read_at"])
 
 
 def test_the_dateline_is_derived_and_not_written_out() -> None:
@@ -80,8 +90,9 @@ def test_the_dateline_is_derived_and_not_written_out() -> None:
         out = dict(real(run))
         out["pooled"] = dict(out["pooled"])
         out["pooled"]["calls"] = out["pooled"]["calls"] + 7
-        out["price"] = dict(out["price"])
-        out["price"]["per_call_usd"] = 0.99
+        out["price_now"] = dict(out["price_now"])
+        out["price_now"]["metered_rate"] = dict(out["price_now"]["metered_rate"])
+        out["price_now"]["metered_rate"]["mean_usd"] = 0.99
         return out
 
     run = {"calls_placed": 1, "items": []}

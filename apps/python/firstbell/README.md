@@ -34,7 +34,7 @@ and nothing here is a screenshot.
 | Claim | Check it |
 |---|---|
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
-| A call costs $0.05 and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call**, thirteen events, $0.65 over a month ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
+| A call costs $0.40 on the meter and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call** for thirteen events, $0.65 over a month, and its panel now calls that rate legacy; the nineteen rows since ran $0.06 to $1.36, **$0.40 a call** on average ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv` prints four endings for four rows: a reason on record, the platform refusing Spanish, nobody answered, and a guardian the telephone cannot reach. Then `examples/absences-siblings.csv`, which places two calls for four rows |
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 358 rows, each with the change made and the number of tests that noticed |
@@ -315,11 +315,16 @@ it is the reason `--funding-rate` exists and is off by default: explaining an ab
 not make a student present, so this app claims none of it unless a district passes its own
 rate with a source.
 
-One of the two missing numbers arrived. CALL-E publishes no price per call, so this entry
-priced its own account instead: thirteen billed events at **$0.05 a call**, $0.65 over the
-month from 7 August to 7 September 2026, read off the usage panel on 7 September
-([`evidence/observed-price.json`](evidence/observed-price.json)). Against the $0.35 ceiling
-that is a little over seven times the headroom. Three things it does not settle are written
+One of the two missing numbers arrived, and then it moved. CALL-E publishes no price per
+call, so this entry priced its own account instead: thirteen billed events at **$0.05 a
+call**, $0.65 over the month from 7 August to 7 September 2026, read off the usage panel on
+7 September ([`evidence/observed-price.json`](evidence/observed-price.json)). Against the
+$0.35 ceiling that is a little over seven times the headroom. CALL-E has since moved the
+dashboard to credits and labels those thirteen rows **Legacy pricing** itself. The nineteen
+rows it has billed since ran 6 to 136 credits, **$0.06 to $1.36 a call** and $0.40 on
+average, which is below the ceiling rather than seven times under it. Nothing on this
+account was ever paid for: a $1.00 sign-up credit and a $10.00 challenge grant issued as 200
+free calls funded all 32 of them, and at today's rate that grant is worth 25 calls. Three things it does not settle are written
 down in the same file: it is one account's billing on hackathon credit rather than a price
 CALL-E stands behind, every observed call ran between 35 seconds and 1 minute 50 so these
 rows cannot tell a flat price per call from a per-minute price rounded up to a two-minute
@@ -1224,24 +1229,24 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 849 tests collected
+python -m pytest tests/ -q          # 853 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**849 is the number collected, and two different pairs add up to it.** Some of these gates
+**853 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the call recordings, which are held
 outside the tree because the maintainer of this list requires that, a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **810 passed, 39
-skipped**. The thirty-nine name what is missing rather than passing quietly:
-thirty-five want a built page, four of those thirty-five also wanting its
+A clean checkout of this commit into an empty directory reports **813 passed, 40
+skipped**. The forty name what is missing rather than passing quietly:
+thirty-six want a built page, four of those thirty-six also wanting its
 Content-Security-Policy, three want a gate report, and one is a run whose rows are all of
 one kind, so the ordering it would check proves nothing. Build the page and run the gates and
-the same suite reports **847 passed, 2 skipped**. Both pairs are measured, both add up to
-849, and the difference between them is what a reader has on their disk.
+the same suite reports **851 passed, 2 skipped**. Both pairs are measured, both add up to
+853, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 809 and 40.
+The very first run in a fresh clone reports one more skip and one fewer pass, 812 and 41.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on

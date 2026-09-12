@@ -1,5 +1,5 @@
 {
- "_comment": "What CALL-E actually billed this account, read off the account's own usage page. These are first-party observations and not a published price, so they are here rather than in statistics.json, which holds figures with a public URL a reader can open. A district must confirm its own pricing before relying on any of it. There are two dated readings and they do not agree: `observed` is the flat 2026-09-04 period and `observed_metered` is the 2026-09-11 run, which billed between eight and fifteen times as much per call. Neither supersedes the other, because each is a true readout of the period it names, and the difference between them is the finding. tests/test_observed_price.py fails if the README or the page quotes a different number, and tools/money_across_runs.py puts the flat one beside the ceiling the run derives.",
+ "_comment": "What CALL-E actually billed this account, read off the account's own usage page. These are first-party observations and not a published price, so they are here rather than in statistics.json, which holds figures with a public URL a reader can open. A district must confirm its own pricing before relying on any of it. There are three dated readings and they do not agree: `observed` is the flat 2026-09-04 period, `observed_metered` is the 2026-09-11 benchmark run, and `observed_metered_period` is the whole account history to 2026-09-12, read after CALL-E moved the dashboard to credits. None supersedes another, because each is a true readout of the period it names, and the difference between them is the finding. `funding` records where the money came from, which is not this author. tests/test_observed_price.py fails if the README or the page quotes a different number, and tools/money_across_runs.py puts the flat one beside the ceiling the run derives.",
  "observed": {
   "read_at": "2026-09-07",
   "account": "the author's own CALL-E account, created for this hackathon",
@@ -28,7 +28,7 @@
   "That $0.05 is CALL-E's price. CALL-E publishes no per-call price and this is one account's billing readout, on hackathon credit, in one month.",
   "That the price is per call rather than per minute. Every observed call is under two minutes, so a flat $0.05 a call and a per-minute price rounded up to a two-minute minimum produce the same thirteen rows. Distinguishing them needs one call over two minutes, and this account has none.",
   "That the price holds at volume, in another country, or outside a credit grant. Every row read IN, and the account was funded by a $1.00 top-up and a hackathon credit.",
-  "That $0.05 is still the price. Four calls placed on 2026-09-11 from the same account, the same software and to the same country billed 41 to 75 credits each, against 5 credits a call in this period. The change is observed and unexplained: the dashboard shows no rate card, no line-item breakdown and no effective date, so a repricing, the end of a promotional rate and an account tier change all fit it equally."
+  "That $0.05 is still the price. CALL-E's own panel now labels those thirteen rows `Legacy pricing`. The nineteen rows billed since run 6 to 136 credits each, $0.06 to $1.36, against 5 credits a call in that period. The change is observed and unexplained: the dashboard shows no rate card, no line-item breakdown and no effective date, so a repricing, the end of a promotional rate and an account tier change all fit it equally."
  ],
  "why_it_is_here": "The entry published a ceiling for months and said, correctly, that no saving could be claimed because CALL-E publishes no price. A ceiling with no price beside it is a number a buyer cannot use. This is the price side, measured rather than assumed, with the three things it cannot tell anybody written down next to it.",
  "observed_metered": {
@@ -97,5 +97,86 @@
   "Why the level changed. The dashboard shows no rate card, no line-item breakdown and no effective date, so a repricing, the end of a promotional or hackathon rate, and an account tier change all fit the same two readings.",
   "That either rate holds at volume, in another country, or outside a credit grant. Both readings are one account, one destination, four and thirteen events."
  ],
- "what_a_buyer_cannot_do": "Plan. An account cannot plan against a price it can only discover by spending, and cannot detect a change in it except by reading a balance. At 5 credits a call the desk time this project removes was worth several times the call. At 41 to 75 credits it is not: the twelve calls recorded on 2026-09-04 remove $0.39 a call gross and $0.08 net of the safeguarding work the same run creates, against a call now costing $0.41 to $0.75. That is the feedback, and it is the one item on this list a per-call cost field in the call object would close outright."
+ "what_a_buyer_cannot_do": "Plan. An account cannot plan against a price it can only discover by spending, and cannot detect a change in it except by reading a balance. At 5 credits a call the desk time this project removes was worth several times the call. At a mean of 40 credits it is not: the twelve calls recorded on 2026-09-04 remove $0.39 a call gross and $0.08 net of the safeguarding work the same run creates, against a call that now costs $0.40 on average and reached $1.36 once. The grant says the same thing from the other side: $10.00 was issued as 200 calls and buys 25 at the rate the account is charged today. That is the feedback, and it is the one item on this list a per-call cost field in the call object would close outright.",
+ "funding": {
+  "paid_by_the_author_usd": 0.0,
+  "note": "Nothing on this account was bought. Both top-ups are grants and the account has never had a card on it, which is worth stating next to every figure in this file: the prices below are what a granted account was charged, and a district paying its own invoice may be charged differently.",
+  "grants": [
+   {
+    "at": "2026-09-03",
+    "usd": 1.0,
+    "credits": 100,
+    "what": "the credit CALL-E puts on a new account at sign-up"
+   },
+   {
+    "at": "2026-09-09",
+    "usd": 10.0,
+    "credits": 1000,
+    "what": "the challenge grant. Applied for on a form, approved, and described as 200 free calls. 200 calls for $10.00 is $0.05 a call, so the grant was sized at the flat rate `observed` records. Under the metered rate the same $10.00 bought 25 calls at the mean of `observed_metered_period`, and the grant's own denomination is the clearest evidence that the level moved."
+   }
+  ],
+  "total_credits": 1100
+ },
+ "observed_metered_period": {
+  "read_at": "2026-09-12",
+  "account": "the same account as `observed` and `observed_metered`, read whole",
+  "surface": "the Usage panel of the CALL-E dashboard at dashboard.heycall-e.com/account/billing, Date Range 2026-08-12 to 2026-09-12, all four pages of rows",
+  "denominated_in": "credits",
+  "credit_to_usd": 0.01,
+  "billed_events": 32,
+  "period_cost_credits": 820,
+  "period_cost_usd": 8.2,
+  "balance_credits": 280,
+  "balance_usd": 2.8,
+  "balance_reconciles": "1,100 credits granted, 820 settled, 280 left. Every row on all four pages was added: the four page totals are 391, 369, 50 and 10, which is the 820 the panel prints for the period, and 1,100 - 820 = 280, which is the balance it prints. Nothing is unaccounted for.",
+  "legacy_rate": {
+   "rows": 13,
+   "credits_each": 5,
+   "credits": 65,
+   "usd": 0.65,
+   "label_on_the_panel": "Legacy pricing",
+   "dated": "2026-09-04",
+   "note": "The panel now labels these rows `Legacy pricing` itself. That is CALL-E's own word for the rate this repository quoted for a week, and it is why $0.05 is written here as history rather than as a price."
+  },
+  "metered_rate": {
+   "rows": 19,
+   "credits": 755,
+   "usd": 7.55,
+   "min_credits": 6,
+   "max_credits": 136,
+   "mean_credits": 39.74,
+   "mean_usd": 0.4,
+   "median_credits": 41,
+   "median_usd": 0.41,
+   "rows_at_the_floor": 7,
+   "floor_credits": 6,
+   "credits_sorted": [
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    27,
+    34,
+    41,
+    41,
+    47,
+    47,
+    61,
+    68,
+    68,
+    68,
+    75,
+    136
+   ],
+   "note": "Seven of the nineteen billed 6 credits and nothing billed less, so 6 reads as a floor rather than a measurement. The spread above it is 27 to 136 credits, which is $0.27 to $1.36 for one call to one parent from one account in one country."
+  },
+  "spread_usd": [
+   0.06,
+   1.36
+  ],
+  "why_this_reading_exists": "`observed_metered` reads four calls from one benchmark run. This reads every row the account has, which is the smallest set that can say what a call costs on average rather than what four calls cost. It also catches the rows placed after that run: the panel now holds 32 events where the run block knew about 17."
+ }
 }

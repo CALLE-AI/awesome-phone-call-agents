@@ -13,8 +13,9 @@ is living in is what the first week of a pilot measures, and nothing published b
 week can settle it.
 
 **And the price side moved under all of it.** These calls were billed at $0.05 each across
-the month of usage one account had on 2026-09-04. Four calls placed on 2026-09-11 from the
-same account to the same country billed $0.41 to $0.75 each, metered rather than flat. Both
+the month of usage one account had on 2026-09-04. CALL-E now labels those rows `Legacy
+pricing` on the panel itself. The nineteen calls billed since, from the same account to the
+same country, ran $0.06 to $1.36 each, metered rather than flat, and average $0.40. Both
 readings are in [`evidence/observed-price.json`](../evidence/observed-price.json) with the
 three things neither can settle, and §10 of
 [`CALLE_FEEDBACK_REPORT.md`](../CALLE_FEEDBACK_REPORT.md) shows the balance closing on both.

@@ -51,8 +51,10 @@ printed in them.
 
 For a district of 10,000 students that is roughly 277 calls on a school morning and 49,895 in
 a year. Against the $0.08 a call this software's own recorded calls support, about **$4,000
-a year of desk time removed**, and the calls themselves cost $0.05 each on the one month of
-billing this account has, so about **$1,500** once they are paid for. Against the $0.70 a
+a year of desk time removed**, and the calls themselves cost $0.05 each on the month of
+billing this account had before CALL-E started metering them, so about **$1,500** once they
+are paid for. At the $0.40 a call the nineteen metered rows average, the same volume costs
+about $20,000 and the saving is gone: that is the pilot's first finding, not a footnote. Against the $0.70 a
 call the widest reading of those same calls produces, where every escalated call is priced
 as a callback, about **$34,900 spent** rather than saved, and that figure already has the
 call cost inside it. A board paper should carry both ends, because which end a district
@@ -67,8 +69,8 @@ and the net per-call figure drops from $0.59 to $0.08. Nothing about the volume 
 changed is what this software refuses to close, and a district reading a saving needs to
 know it is reading the number after that refusal rather than before it.
 
-The $0.05 is subtracted here because the loss at the other end is stated net, and the two
-were not comparable: the saving was gross and the cost was not, which ran in this entry's
+The $0.05 is the rate the arithmetic above was built on, and it is subtracted here because
+the loss at the other end is stated net, and the two were not comparable: the saving was gross and the cost was not, which ran in this entry's
 favour on the one page a board reads. On the reproducible demo run the same arithmetic is
 $0.35 a call before the call cost and $0.30 after it.
 

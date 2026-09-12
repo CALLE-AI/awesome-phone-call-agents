@@ -1071,6 +1071,10 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "comes from tools/gates/gate-report.json. The report is written by the browser "
         "suite and deliberately not committed, so on a clean checkout there is nothing to "
         "cross-check against",
+    "test_the_page_leads_with_the_rate_the_account_pays_now":
+        "reads out/index.html to check that the price on the page is the metered one and "
+        "that the retired rate is named as retired. The page is built from receipts held "
+        "outside this repository, so on a clean checkout there is nothing to read",
     "_page":
         "reads out/index.html to check the counts the page spells out in a sentence against "
         "the data those sentences describe. The page is built from receipts that are "

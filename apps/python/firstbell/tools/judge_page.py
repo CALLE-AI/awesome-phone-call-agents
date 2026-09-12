@@ -1398,51 +1398,60 @@ def quickstart_markup() -> str:
 
 
 def nav_markup(repo_url: str | None, video_url: str | None) -> str:
-    """Four places on this page, and the one place off it, on the bar.
+    """What the rail cannot reach, and nothing the rail already holds.
 
     The masthead was 250px of black carrying a word and a sentence, and both objects a
     reviewer can touch started under it. A bar does that job in 56px and holds the
     destinations as well, which is the other half of what those pixels should have been
     buying.
 
-    Every anchor here resolves to an element on this page, so the bar is never a row of
-    dead affordances. The pull request is the exception and it is a build input: linked
-    when `--repo-url` is given and absent otherwise, on the rule the rest of this file
-    follows, which is that a link to an unpushed branch is worse than no link.
+    What it must not hold is a second copy of the rail. This bar carried "The problem"
+    against act 01, which the rail lists as "01 What the school knew"; "Live audio"
+    against a block 48px below the fold, so pressing it moved the page by less than its
+    own height; and "3D simulator" beside a button in the row underneath reading "A whole
+    morning, in 3D", which is a different destination wearing the same words. Three
+    navigations, overlapping, is the reason a reader cannot tell what any one of them is
+    for.
+
+    So the three surfaces are split by what they answer. The rail answers "where am I in
+    the argument" and lists the nine acts. The row under the hero answers "what can I do
+    right now" and holds one action. This bar answers "what else is there", which is
+    everything that is not an act: the other page, the plugin section below them, and the
+    two build inputs. A destination appears on exactly one of the three.
+
+    The film and the pull request are linked when `--video-url` and `--repo-url` are
+    given and absent otherwise, on the rule the rest of this file follows: a link to an
+    unpushed branch or an unpublished file is worse than no link.
     """
     out = [
-        '<a class=nav-link href="#act-01">The problem</a>',
-        '<a class=nav-link href="#calls">Live audio</a>',
-        '<a class=nav-link href="#simulator">3D simulator</a>',
-        '<a class=nav-link href="#verify">Proof</a>',
+        '<a class=nav-link href="the-morning.html">A whole morning, in 3D</a>',
+        '<a class=nav-link href="#plugin">The n8n plugin</a>',
     ]
+    if video_url:
+        out.append(f'<a class=nav-link href="{html.escape(video_url, quote=True)}" '
+                   f'rel="noopener">Watch the demo, {_film_running_time()}</a>')
     if repo_url:
         out.append(f'<a class="nav-link nav-cta" href="{html.escape(repo_url, quote=True)}" '
                    'rel="noopener">GitHub PR</a>')
-    return '<nav class=nav-acts aria-label="Sections of this page">' + "".join(out) + '</nav>'
+    return '<nav class=nav-acts aria-label="Everything on this entry that is not an act">' + "".join(out) + '</nav>'
 
 
 def play_bar_markup(repo_url: str | None, video_url: str | None) -> str:
-    """The row of actions directly under the two objects.
+    """One action, directly under the two objects a reader has just met.
 
-    Three of these are true on every build: the offline run, the whole morning, and the
-    workflow that ships without this app. The film and the pull request join them on the
-    build that carries their URLs and are absent otherwise, so the row never offers a
-    button that goes nowhere.
+    It was five, and four of them were somewhere else on the page as well: the whole
+    morning and the plugin are on the masthead bar, and "Run it yourself, no account" sat
+    under a rail already reading "08 Run it yourself". A row of five where four are
+    repeats reads as a page that does not know what it wants a reader to press.
+
+    What survives is the one thing that is an action rather than a destination, and the
+    one a reviewer with no account can take immediately. The film and the pull request
+    are destinations and live on the bar; the arguments are acts and live on the rail.
     """
-    out = []
-    if video_url:
-        out.append(f'<a class="play-act play-act--lead" '
-                   f'href="{html.escape(video_url, quote=True)}" rel="noopener">'
-                   f'Watch the demo, {_film_running_time()}</a>')
-    if repo_url:
-        out.append(f'<a class="play-act play-act--lead" '
-                   f'href="{html.escape(repo_url, quote=True)}" rel="noopener">'
-                   'The pull request</a>')
-    out.append('<a class=play-act href="#act-08">Run it yourself, no account</a>')
-    out.append('<a class=play-act href="the-morning.html">A whole morning, in 3D</a>')
-    out.append('<a class=play-act href="#plugin">The n8n plugin</a>')
-    return '<div class=play-bar>' + "".join(out) + '</div>'
+    del repo_url, video_url
+    return ('<div class=play-bar>'
+            '<a class=play-act href="#act-08">Run it yourself, no account</a>'
+            '</div>')
 
 
 def nav_note_markup(repo_url: str | None, video_url: str | None) -> str:
@@ -1702,7 +1711,8 @@ def topline_markup(run: dict) -> str:
         (pooled["calls"], "real calls"),
         (pooled["answered"], "answered"),
         (pooled["escalated"], "escalated to a person"),
-        (f'${price["per_call_usd"]:.2f}', "a call, billed"),
+        (f'${f["price_now"]["metered_rate"]["mean_usd"]:.2f}',
+         f'a call, mean of {f["price_now"]["metered_rate"]["rows"]}'),
     )
     items = "".join(f'<li><b>{esc(value)}</b> {esc(label)}</li>' for value, label in cells)
     return (f'<ul class=topline aria-label="What this page is built on, measured">'
@@ -1840,6 +1850,10 @@ def money_facts(run: dict) -> dict:
 
     return {
         "price": observed()["observed"],
+        # The flat block above is history and the panel now says so: it labels those
+        # rows `Legacy pricing` itself. Every surface that quotes a price reads this
+        # one, so the page cannot go on leading with a rate the platform retired.
+        "price_now": observed()["observed_metered_period"],
         "demo": demo_row(),
         "sis": figures["chccs-sis-renewal"],
         "enrolment": figures["chccs-enrolment"],
@@ -1908,9 +1922,13 @@ def _money_key_block(f: dict) -> str:
         # said it could not tell which one this entry stood behind. Smallest reproducible
         # saving, then the cost the widest reading prices out to, then what was actually
         # billed. All three derived.
-        billed = ("" if price is None else
-                  f'The calls themselves were billed at ${price:,.2f} each on the one '
-                  'month of usage this account has. ')
+        now = (f.get("price_now") or {}).get("metered_rate") or {}
+        billed = ("" if price is None or not now else
+                  f'The calls themselves were billed at a mean of '
+                  f'${now["mean_usd"]:,.2f} each over the {now["rows"]} rows CALL-E has '
+                  f'charged since it repriced, and at ${price:,.2f} each on the '
+                  f'{{}} before it, which its panel now calls legacy. '.format(
+                      f.get("price", {}).get("billed_events", "")))
         # Which figure to quote is "the smaller one", and until 2026-09-11 the smaller one
         # was also the reproducible one, so a single clause could carry both reasons. That
         # stopped being true when the safeguarding rule widened: the recorded calls now
@@ -1922,8 +1940,9 @@ def _money_key_block(f: dict) -> str:
         if pooled_net <= demo:
             lead = (
                 f'Quote the ${pooled_net:,.2f} above rather than the demo run&#8217;s '
-                f'${demo:,.2f}: it is the smaller of the two, and its denominator is the '
-                'one on this page nobody chose. The demo run is the figure one command '
+                f'${demo:,.2f}: it is the smaller of the two, and it is measured over '
+                'every call this page publishes rather than over a run. The demo run is '
+                'the figure one command '
                 'reproduces, and it is the higher of the two, so it is not the one to '
                 'quote. ')
         else:
@@ -2065,13 +2084,15 @@ def money_markup(run: dict) -> str:
         '</div>',
 
         '<div class=money-cell>',
-        f'<p class=money-n>${f["price"]["per_call_usd"]:,.2f}</p>',
+        f'<p class=money-n>${f["price_now"]["metered_rate"]["mean_usd"]:,.2f}</p>',
         # The qualification travels with the number now. The derivation behind it moved
         # behind the disclosure below, and a figure that reads as a saving with its
         # "ceiling" one click away is the defect `_money_key_block` was written about: a
         # reviewer read the label and not the qualification eighty lines under it.
-        f'<p class=money-what>a call, billed. The desk time one call removes is worth at '
-        f'most ${f["demo"]["net_ceiling"]:,.2f}: a ceiling, not a saving</p>',
+        f'<p class=money-what>a call on the meter, averaged over the '
+        f'{f["price_now"]["metered_rate"]["rows"]} CALL-E has billed since it repriced. '
+        f'The desk time one call removes is worth at most '
+        f'${f["demo"]["net_ceiling"]:,.2f}: a ceiling, not a saving</p>',
         # Three endings here as well, and the third one is why this is a branch rather
         # than a format string. A run that placed calls and answered none has no
         # escalation rate: the denominator is zero, so `bound` and `worst_at_three` are
@@ -2084,13 +2105,23 @@ def money_markup(run: dict) -> str:
         # Ten rows were read and thirteen is what the total divides into. The card
         # printed the thirteen as though it had been counted, which is an inference
         # dressed as an observation on the surface a judge reads first.
-        why(f'${f["price"]["per_call_usd"]:,.2f} a call',
-            f'CALL-E publishes no price. The left figure is what it '
-            f'billed this account: {f["price"]["call_rows_read"]} rows on the usage panel, '
-        f'every one at ${f["price"]["per_call_usd"]:,.2f}. The one month of usage totals '
-        f'${f["price"]["period_total_usd"]:,.2f}, which divides by that exactly, so '
-        f'{f["price"]["billed_events"]} events were priced the same. That '
-        f'count is a division, not a row count. The right figure is '
+        why(f'${f["price_now"]["metered_rate"]["mean_usd"]:,.2f} a call',
+            f'CALL-E publishes no price, and the one it charges moved while this page was '
+            f'being written. The left figure is the mean of the '
+            f'{f["price_now"]["metered_rate"]["rows"]} rows it has billed this account '
+            f'since it moved the dashboard to credits: '
+            f'${f["price_now"]["metered_rate"]["min_credits"] / 100:,.2f} to '
+            f'${f["price_now"]["metered_rate"]["max_credits"] / 100:,.2f} a call, with '
+            f'{f["price_now"]["metered_rate"]["rows_at_the_floor"]} of them at the '
+            f'${f["price_now"]["metered_rate"]["floor_credits"] / 100:,.2f} floor. The '
+            f'{f["price"]["billed_events"]} rows before that were '
+            f'${f["price"]["per_call_usd"]:,.2f} each, '
+            f'${f["price"]["period_total_usd"]:,.2f} over a month, and CALL-E&#8217;s own '
+            f'panel now labels them <b>Legacy pricing</b>. Nothing on this account was '
+            f'bought: the '
+            f'${f["price_now"]["period_cost_usd"]:,.2f} it has spent came out of two '
+            f'grants worth $11.00, and the larger one was issued as 200 free calls, which '
+            f'is $0.05 each and buys 25 at the rate above. The right figure is '
         f'the demo run: {f["demo"]["attempts_removed"]} of '
         f'{f["demo"]["attempts_billed"]} attempts came off a desk at '
         f'${f["desk"].hourly:,.2f} an hour at three minutes each, less the safeguarding '
