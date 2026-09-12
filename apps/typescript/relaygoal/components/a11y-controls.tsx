@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 
 type Prefs = {
-  dark: boolean;
+  light: boolean;
   hc: boolean;
   textsize: "normal" | "large" | "xlarge";
   motion: "normal" | "reduced";
 };
 
 const KEY = "relaygoal-a11y";
-const DEFAULTS: Prefs = { dark: false, hc: false, textsize: "normal", motion: "normal" };
+const DEFAULTS: Prefs = { light: false, hc: false, textsize: "normal", motion: "normal" };
 
 function apply(p: Prefs) {
   const el = document.documentElement;
-  el.classList.toggle("dark", p.dark);
+  el.classList.toggle("light", p.light);
   el.classList.toggle("hc", p.hc);
   if (p.textsize === "normal") el.removeAttribute("data-textsize");
   else el.setAttribute("data-textsize", p.textsize);
@@ -55,10 +55,11 @@ export function A11yControls() {
   const sizes: Prefs["textsize"][] = ["normal", "large", "xlarge"];
 
   return (
-    <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1" role="group" aria-label="Display settings">
-      <span className="sr-only">Display</span>
-      <Toggle pressed={prefs.dark} onClick={() => update({ dark: !prefs.dark })} label={prefs.dark ? "Switch to light theme" : "Switch to dark theme"}>
-        {prefs.dark ? "Light" : "Dark"}
+    <div className="inline-flex items-center gap-2.5">
+      <span className="hidden font-mono text-[0.7rem] uppercase tracking-[0.16em] text-muted-foreground sm:inline" aria-hidden="true">Display</span>
+      <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1" role="group" aria-label="Display settings">
+      <Toggle pressed={prefs.light} onClick={() => update({ light: !prefs.light })} label={prefs.light ? "Switch to dark theme" : "Switch to light theme"}>
+        {prefs.light ? "Dark" : "Light"}
       </Toggle>
       <Toggle pressed={prefs.hc} onClick={() => update({ hc: !prefs.hc })} label="High contrast">
         Contrast
@@ -81,6 +82,7 @@ export function A11yControls() {
       >
         Motion
       </Toggle>
+      </div>
     </div>
   );
 }
@@ -104,7 +106,7 @@ function Toggle({
       title={label}
       onClick={onClick}
       className={`min-h-8 rounded-md px-2.5 py-1 text-sm font-semibold transition-colors ${
-        pressed ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent"
+        pressed ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-accent"
       }`}
     >
       {children}

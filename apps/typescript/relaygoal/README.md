@@ -2,7 +2,9 @@
 
 **For people who can't use the phone.** Type the goal; a CALL-E agent makes the whole call; you get back a captioned transcript and a **verified result** in which every answer is bound to the exact words the other party said, or is honestly marked *not confirmed, call them yourself*.
 
-Built for Deaf, hard-of-hearing and speech-disabled callers, and for the advocates and agencies who make calls on their behalf today by hand. The user is never on the line. RelayGoal is a task relay and an auxiliary aid (ADA / AODA "communication support"), not a telecommunications relay service and not an interpreter replacement.
+Built for Deaf, hard-of-hearing and speech-disabled callers, and for the advocates and agencies who make calls on their behalf today by hand. The user is never on the line. RelayGoal is a communication-support / task-assistant tool — **not** a telecommunications relay service (TRS) and **not** an interpreter replacement.
+
+*The same verified-call engine works for anyone making a routine call they'd rather not — confirming an order, comparing vendor quotes — but RelayGoal leads with the people who have no other way to make the call at all.*
 
 - **Live no-login demo:** https://call-e-2026.vercel.app (dry-run path, no key needed, fictional numbers only)
 - **Runtime:** TypeScript · Next.js 15 · `@call-e/calle` 0.7 server SDK (optional, live path)
@@ -44,7 +46,7 @@ The raw outcome is kept outside the repository; no live transcript is committed.
 
 ### Measured on the fixture set (`npm run eval`, zero calls)
 
-> 9 fixture calls (19 answer fields) + 54 adversarial mutations (114 fields): **0 false verifications, 0 unsound quotes; 14/14 answers the other party actually stated were marked verified.** Known limit: with two answers in one sentence, swapping their values was caught 3/17 times (quote grounding cannot separate facts inside a single sentence; the highlighted span in the UI is the user's check).
+> **Precision:** 0 false verifications and 0 unsound quotes across 9 fixture calls (19 answer fields) + 54 adversarial mutations (114 fields). **Recall:** 14 of 14 answers the other party actually stated were marked verified. **Honest limit:** with two answers in one sentence, swapping their values was caught 3 of 17 times — quote grounding cannot separate two facts inside one sentence, so the card shows the quote for the user to check, never a confidence score.
 
 The six mutations are: fabricated value, transcript dropped, task not completed, confidence collapsed, supporting sentence moved into the agent's mouth, call failed. The swap limit is reported deliberately: it is the honest boundary of transcript-quote grounding, and the reason the card shows the quote rather than asking for trust.
 
@@ -110,7 +112,7 @@ Two verticals run on the one core with only a schema and framing swapped: the ac
 
 ## Accessibility of the app itself
 
-Atkinson Hyperlegible body type, visible focus rings, skip link, `aria-live` captions during the call, verification states carried by icon + text (never color alone), dark and high-contrast themes, text-size and reduced-motion controls in the header, keyboard-operable evidence links.
+Targets **WCAG 2.2 AA**. Geist body type with a Fraunces display face (17px base, 1.6 line-height); visible 3px focus rings and a skip link; `aria-live` live captions during the call; verification states carried by **icon + shape + text, never colour alone** (colourblind-safe — verified / blue, not-confirmed / amber, unreachable / red); a warm-obsidian default theme plus a warm-bone light theme and a dedicated high-contrast mode; text-size (17 / 19 / 21 px) and reduced-motion controls; fully keyboard-operable evidence links and display toggles.
 
 ## License
 

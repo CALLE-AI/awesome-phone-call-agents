@@ -187,10 +187,10 @@ export function runEval(cases: EvalCase[], options: VerifyOptions = {}): EvalRep
 /** One-paragraph, publishable summary of a report. */
 export function summarize(r: EvalReport): string {
   return (
-    `${r.fixtures} fixture calls (${r.fixtureFields} answer fields) + ${r.mutations} adversarial mutations ` +
-    `(${r.mutationFields} fields): ${r.falseVerifications} false verifications, ${r.unsoundVerifications} unsound quotes; ` +
-    `${r.groundedRecalled}/${r.groundedInFixtures} answers the other party actually stated were marked verified. ` +
-    `Known limit: with two answers in one sentence, swapping their values was caught ${r.swapDiagnostic.swapsCaught}/${r.swapDiagnostic.swappedFields} times ` +
-    `(quote grounding cannot separate facts inside a single sentence; the highlighted span in the UI is the user's check).`
+    `Precision: ${r.falseVerifications} false verifications and ${r.unsoundVerifications} unsound quotes across ` +
+    `${r.fixtures} fixture calls (${r.fixtureFields} answer fields) + ${r.mutations} adversarial mutations (${r.mutationFields} fields). ` +
+    `Recall: ${r.groundedRecalled} of ${r.groundedInFixtures} answers the other party actually stated were marked verified. ` +
+    `Honest limit: with two answers in one sentence, swapping their values was caught ${r.swapDiagnostic.swapsCaught} of ${r.swapDiagnostic.swappedFields} times — ` +
+    `quote grounding cannot separate two facts inside one sentence, so the card shows the quote for the user to check, never a confidence score.`
   );
 }

@@ -7,6 +7,7 @@ import { CallStatusTimeline, type CallStage } from "@/components/call-status-tim
 import { VerifiedResultCard } from "@/components/verified-result-card";
 import { TranscriptPanel } from "@/components/transcript-panel";
 import { BatchResultCard } from "@/components/batch-result-card";
+import { Hero } from "@/components/hero";
 import type { VerifiedOutcome, TranscriptTurn } from "@/src/core/types";
 import type { BatchOutcome } from "@/src/core/batch";
 
@@ -98,28 +99,18 @@ export default function Home() {
 
   return (
     <>
-      <div className="brand-rail" aria-hidden="true" />
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-6">
-        <header className="mb-7 border-b border-border pb-6 sm:grid sm:grid-cols-[1fr_auto] sm:items-start sm:gap-x-6">
-          <div className="flex items-center gap-3 sm:col-start-1">
-            <BrandMark />
-            <h1 className="text-3xl sm:text-[2.5rem]">
-              Relay<span className="text-primary">Goal</span>
-            </h1>
+      <Hero />
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-8 sm:px-6">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">Make a call</p>
+            <p className="mt-1.5 max-w-2xl text-lg text-muted-foreground">
+              Pick an errand and we place the call, or compare several places at once. Every number shown is a
+              reserved-fictional 555 number; the demo runs dry unless the live path is opted in.
+            </p>
           </div>
-          <p className="mt-4 max-w-3xl text-balance text-xl leading-snug sm:col-start-1 sm:text-2xl">
-            For people who can&apos;t use the phone. Type the goal, the agent makes the whole call, and you get
-            proof of exactly what was said.
-          </p>
-          <p className="mt-2 hidden max-w-3xl text-muted-foreground sm:col-start-1 sm:block">
-            Built for Deaf, hard-of-hearing and speech-disabled callers, and for the advocates and agencies who
-            make calls on their behalf. You are never on the line. Every answer comes back tied to the words
-            that were actually spoken, or honestly marked as not confirmed.
-          </p>
-          <div className="mt-5 sm:col-start-2 sm:row-start-1 sm:mt-0 sm:justify-self-end">
-            <A11yControls />
-          </div>
-        </header>
+          <A11yControls />
+        </div>
 
         <main
           id="main"
@@ -178,8 +169,8 @@ export default function Home() {
           <p>
             Built on <span className="font-semibold text-foreground">CALL-E</span> goal-driven tasks with structured
             extraction. This demo runs on a mocked call path (no real numbers dialed); the live CALL-E SDK path is an
-            explicit opt-in. Every number shown is a reserved-fictional 555-01xx number. RelayGoal is a task relay and
-            an auxiliary aid, not a substitute for an interpreter.
+            explicit opt-in. Every number shown is a reserved-fictional 555-01xx number. RelayGoal is a
+            communication-support tool, not a telecommunications relay service and not an interpreter replacement.
           </p>
         </footer>
       </div>
@@ -187,30 +178,26 @@ export default function Home() {
   );
 }
 
-// Brand mark: a phone handset relayed into a verified check — the whole product in one tile.
-function BrandMark() {
-  return (
-    <span className="brand-mark flex h-11 w-11 flex-none items-center justify-center rounded-xl shadow-sm" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
-        <path
-          d="M5.2 4.4a1.4 1.4 0 0 1 1.9-.2l1.7 1.3c.5.4.6 1 .4 1.6l-.5 1.3c-.1.4 0 .8.3 1.1l2.6 2.6c.3.3.7.4 1.1.3l1.3-.5c.6-.2 1.2-.1 1.6.4l1.3 1.7c.5.6.4 1.5-.2 2l-1 .9c-.9.8-2.1 1-3.2.5-2.2-1-4.2-2.5-5.9-4.2S3.3 9.6 2.4 7.4c-.5-1.1-.3-2.4.6-3.1z"
-          fill="currentColor"
-        />
-        <path d="M15.5 6.2l1.8 1.8 3.4-3.6" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  );
-}
 
 function BatchProgress({ label }: { label: string }) {
   return (
-    <section aria-labelledby="batch-progress-heading" className="rounded-xl border border-border bg-surface p-5">
-      <h2 id="batch-progress-heading" className="text-lg">Calling several places for you…</h2>
-      <p className="mt-1 text-muted-foreground" aria-live="polite">{label || "Placing the calls and comparing what each one says."}</p>
-      <div className="mt-4 flex gap-1.5" aria-hidden="true">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary [animation-delay:200ms]" />
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary [animation-delay:400ms]" />
+    <section aria-labelledby="batch-progress-heading" className="call-live p-6 sm:p-7">
+      <p className="call-live-eyebrow mb-1.5">Live calls</p>
+      <h2 id="batch-progress-heading" className="text-2xl" style={{ color: "var(--hero-fg)", fontFamily: "var(--font-display)" }}>
+        Calling several places for you
+      </h2>
+      <p className="mt-1 max-w-md" style={{ color: "var(--hero-dim)" }} aria-live="polite">
+        {label || "Placing the calls and comparing what each one says."}
+      </p>
+      <div className="mt-7 flex flex-col items-center gap-2.5">
+        <div className="waveform waveform-xl w-full max-w-sm" aria-hidden="true">
+          {[0, 120, 240, 60, 300, 180, 90, 210, 150, 30, 260, 100, 320, 80, 200, 140].map((d, i) => (
+            <span key={i} style={{ animationDelay: `${d}ms` }} />
+          ))}
+        </div>
+        <p className="font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--hero-dim)" }}>
+          Calling all places
+        </p>
       </div>
     </section>
   );
@@ -275,7 +262,7 @@ function SampleReceipt() {
         </div>
         <div className="px-5 py-3.5">
           <p className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Refill ready</p>
-          <p className="mt-0.5 text-2xl font-semibold text-foreground">Yes</p>
+          <p className="num-clean mt-0.5 text-2xl font-semibold text-foreground">Yes</p>
           <div className="mt-2.5 overflow-hidden rounded-lg border border-border bg-ledger">
             <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
               <span className="text-verified"><svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor"><path d="M7.5 13.5 3.8 9.8l1.4-1.4 2.3 2.3 6-6 1.4 1.4z" /></svg></span>

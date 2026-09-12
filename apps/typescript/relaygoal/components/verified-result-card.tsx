@@ -197,7 +197,7 @@ function FieldRow({
         <dt className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{humanize(field.key)}</dt>
         <VerificationChip status={field.status === "verified" ? "verified" : "unverified"} />
       </div>
-      <dd className="mt-1 text-2xl font-semibold leading-tight text-foreground">{value}</dd>
+      <dd className="num-clean mt-1 text-2xl font-semibold leading-tight text-foreground">{value}</dd>
 
       {field.status === "verified" && quote && !sameSentenceAs && (
         <div className="mt-3 overflow-hidden rounded-lg border border-border bg-ledger">

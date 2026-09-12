@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const prefInit = `(function(){try{
   var p = JSON.parse(localStorage.getItem('relaygoal-a11y')||'{}');
   var el = document.documentElement;
-  if(p.dark) el.classList.add('dark');
+  if(p.light) el.classList.add('light');
   if(p.hc) el.classList.add('hc');
   if(p.textsize) el.setAttribute('data-textsize', p.textsize);
   if(p.motion) el.setAttribute('data-motion', p.motion);
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
         <script dangerouslySetInnerHTML={{ __html: prefInit }} />

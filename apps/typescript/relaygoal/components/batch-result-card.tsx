@@ -90,7 +90,7 @@ function PlaceCard({ item, isBest, rankKey }: { item: BatchItemResult; isBest: b
           <h3 className="text-lg">{item.recipient.label}</h3>
           <div className="flex items-baseline gap-3">
             {rankValue && (
-              <span className={`text-xl font-semibold ${rankField?.status === "verified" ? "text-foreground" : "text-muted-foreground"}`} title={rankField?.status === "verified" ? "verified on the call" : "not confirmed on the call"}>
+              <span className={`num-clean text-xl font-semibold ${rankField?.status === "verified" ? "text-foreground" : "text-muted-foreground"}`} title={rankField?.status === "verified" ? "verified on the call" : "not confirmed on the call"}>
                 {sentence(rankValue)}
                 {rankField?.status !== "verified" && <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-caution-foreground">unconfirmed</span>}
               </span>
@@ -112,7 +112,7 @@ function PlaceCard({ item, isBest, rankKey }: { item: BatchItemResult; isBest: b
                   <dt className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{humanize(field.key)}</dt>
                   <VerificationChip status={field.status === "verified" ? "verified" : "unverified"} />
                 </div>
-                <dd className="mt-0.5 text-xl font-semibold leading-tight text-foreground">{value}</dd>
+                <dd className="num-clean mt-0.5 text-xl font-semibold leading-tight text-foreground">{value}</dd>
                 {field.status === "verified" && field.quotes[0] && (
                   <EvidenceQuote text={field.quotes[0].text} value={value} offsetSeconds={field.quotes[0].offsetSeconds} size="sm" />
                 )}
