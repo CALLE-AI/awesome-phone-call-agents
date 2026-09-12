@@ -102,7 +102,7 @@ No credentials, no network, no phone call:
 
 ```bash
 npm install
-npm test        # 46 tests
+npm test        # 47 tests
 npm run plan    # who gets cleared without a call, the wave order, the exact call task
 npm run demo    # full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard on http://127.0.0.1:4800
@@ -180,10 +180,13 @@ enrollees.csv ──▶ registry ──▶ ex parte clear ──▶ priority ─
   explanation, the awareness question, and all nine exemptions with their question text, their order,
   their age gates and their documentation checklists. Changing the rule is a JSON edit, not a code
   change - which is the point, because states are still writing their own variations.
-- **`states/example-state.json`** carries everything that differs by state: the calling
-  organisation, how to report hours, the navigator line, and a voicemail script that is validated at
-  load time to **not** mention Medicaid (a message on a shared answering machine should not disclose
-  someone's coverage).
+- **`states/*.json`** carries everything that differs by state: the calling organisation, how to
+  report hours, the navigator line, and a voicemail script that is validated at load time to **not**
+  mention Medicaid (a message on a shared answering machine should not disclose someone's coverage).
+  Two states ship. `second-state` is one that did not adopt self-attestation, so it asks for
+  documents; run `npm run sc -- plan --state second-state` and the entire call re-renders from that
+  one file. A test asserts the two produce different call text, that neither state's wording leaks
+  into the other's call, and that the federal policy questions stay word-for-word identical in both.
 - **`src/tasks.ts`** renders the call task: privacy-first opening, the identity check, the
   explanation, only the questions this person still needs, three permitted closings, and the
   boundaries the agent may not cross.
@@ -238,7 +241,7 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 46 tests, no network
+npm test               # 47 tests, no network
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 

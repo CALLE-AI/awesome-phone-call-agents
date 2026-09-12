@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { planWaves, scoreEnrollee } from "../src/priority.js";
 import { loadEnrollees } from "../src/registry.js";
-import { checklistFor, clearedByData, loadRules, loadState, questionsFor, validateRules, validateState, type Rules } from "../src/rules.js";
+import { checklistFor, clearedByData, listStates, loadRules, loadState, questionsFor, validateRules, validateState, type Rules } from "../src/rules.js";
 import { assertSupportedSchema, SCREENING_RESULT_SCHEMA } from "../src/schemas.js";
 import { renderScreeningTask } from "../src/tasks.js";
 import { ASKABLE_CODES, type Enrollee } from "../src/types.js";
@@ -101,4 +101,30 @@ test("the soonest coverage checks and the highest paperwork risk go first", () =
   assert.equal(maria.daysToCheck, 139);
   assert.ok(maria.factors.includes("prefers a language other than English"));
   assert.ok(maria.factors.includes("lost coverage over paperwork before"));
+});
+
+test("every state file that ships validates, and a different state changes the whole call without a code change", () => {
+  const ids = listStates();
+  assert.ok(ids.length >= 2, "at least two states ship, so adaptability is demonstrated and not merely claimed");
+  for (const id of ids) {
+    loadState(id); // throws on a missing field, a bad start_date, or a voicemail that names Medicaid
+  }
+
+  const second = loadState("second-state");
+  const person = byId("e001");
+  const a = renderScreeningTask(rules, state, person, "2026-09-14");
+  const b = renderScreeningTask(rules, second, person, "2026-09-14");
+
+  assert.notEqual(a, b);
+  for (const line of [second.caller_org, second.voicemail, second.report_how, second.navigator_line, second.self_attestation_note]) {
+    assert.ok(b.includes(line), `the second state's own wording reaches the call: ${line.slice(0, 40)}`);
+    assert.ok(!a.includes(line), "and does not leak into the first state's call");
+  }
+  // The policy questions are federal, so they must be identical across states.
+  for (const code of ASKABLE_CODES) {
+    const question = rules.exemptions.find((e) => e.code === code)?.question;
+    if (question) {
+      assert.equal(a.includes(question), b.includes(question), `${code} is asked the same way in both states`);
+    }
+  }
 });

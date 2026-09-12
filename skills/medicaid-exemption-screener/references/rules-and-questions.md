@@ -118,6 +118,19 @@ Copy `states/example-state.json`, edit it, and run with `--state <id>` or `SC_ST
 state's exemption list differs from the federal baseline, copy `rules/federal-2027.json`, edit the
 `exemptions` array, and pass `--rules`.
 
+Two states ship, and the second exists to prove this is real rather than claimed:
+
+```bash
+npm run sc -- plan --state second-state
+```
+
+`second-state` is a state that did **not** adopt self-attestation. Its caller organisation, callback
+number, navigator line, voicemail, reporting channels and closing advice are all different, and the
+entire call re-renders from that one JSON file with no code change. A test asserts that every state
+file on disk validates, that the two produce different call text, that each state's own wording
+reaches its own call and does not leak into the other's — and that the federal *policy questions* are
+worded identically in both, because those come from the rules file, not the state file.
+
 Run `plan` afterwards and read the rendered task aloud. That is the review step: the task text is
 generated from these two files and nothing else, so if it sounds wrong, the fix is in the JSON.
 

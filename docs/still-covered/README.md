@@ -192,6 +192,33 @@ review), `report_hours`, `navigator_callback`, `mail_letter`, `correction_call`,
 
 Nothing in this system changes anyone's coverage, and it is not able to.
 
+### 3.6 The policy is data, and a second state proves it
+
+Nothing about the rule is compiled in. `rules/federal-2027.json` holds the hours threshold, the
+plain-language explanation, the awareness question, and all nine exemptions with their wording,
+their order, their age gates and their documentation checklists. `states/*.json` holds everything
+that varies by state: who is calling, how to report, the navigator line, the voicemail, and the
+closing advice about documentation.
+
+That is easy to claim and cheap to fake, so two states ship. `second-state` is a state that did
+**not** adopt self-attestation:
+
+```bash
+npm run sc -- plan --state second-state
+```
+
+Different calling organisation, different callback and navigator numbers, a different voicemail,
+different reporting channels — the MyBenefits app, post, or a county office rather than a website —
+and a closing that tells people to expect to produce a document. The entire call re-renders from that
+one JSON file, with no code change and no new branch in the renderer.
+
+A test holds it in place: every state file on disk must validate, the two must produce different call
+text, each state's own wording must reach its own call and must **not** leak into the other's, and
+the federal policy questions must be worded identically in both — because those come from the rules
+file, not the state file. That last assertion is the important one. Local variation is allowed to
+change how a state introduces itself and what it asks people to bring. It is not allowed to quietly
+reword the question that decides whether somebody keeps their health coverage.
+
 ## 4. What it would cost a state
 
 The obvious objection to phoning people is that phoning people is expensive. It is worth doing the
@@ -292,7 +319,7 @@ No credentials, no network, no phone call:
 ```bash
 cd apps/typescript/still-covered
 npm install
-npm test        # 46 tests
+npm test        # 47 tests
 npm run plan    # who is cleared without a call, the wave order, the rendered task
 npm run demo    # the full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard at http://127.0.0.1:4800
@@ -314,7 +341,7 @@ account and no credits.
 
 ## 8. Test coverage
 
-46 tests, no network:
+47 tests, no network:
 
 - `classify.test.ts` - the fail-closed order, including medical frailty needing both answers, and the
   overclaim check surviving a confidence downgrade.
