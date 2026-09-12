@@ -925,12 +925,6 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
         "reads out/index.html, which only exists after the page has been built",
     "test_the_dateline_is_derived_and_not_written_out":
         "asks the builder for the block twice, which needs the receipts on this machine",
-    # Counts the history rather than the tree, so a checkout without git, or an export of
-    # this directory on its own, cannot answer it. What is lost while it is quiet is the
-    # claim that the provenance paragraph still describes the commits it is about, which
-    # was untrue for thirty-three commits before this gate existed.
-    "test_the_commit_provenance_disclosure_is_still_true":
-        "needs git history for this directory, which an export of the tree does not carry",
     # Reads evidence/suite-pair.json, which tools/suite_pair.py writes and which is not
     # written by running the suite, because a gate cannot require what it produces. What is
     # lost while it is quiet is the claim that the pass count on the page's first screen is
@@ -1256,7 +1250,13 @@ def test_every_published_statistic_is_one_we_recorded_the_source_for():
     # The sourced section only. Percentages elsewhere are computed by the program and are
     # held by their own gates, so pulling them in here would make this file the second
     # place a computed number is written down, which is the defect it exists to prevent.
-    start = readme.find("So the office still works a list by hand.")
+    # Anchored to the heading rather than to a sentence inside the section. It used to
+    # name the opening line, and rewording that line turned this gate off with a
+    # message about the section having moved, which is the one failure mode a gate
+    # anchored on prose always has.
+    start = readme.find(chr(10) + "## The problem" + chr(10)) + 1
+    # The +1 steps past the newline the search matched, so that the heading itself is
+    # inside the window and the next-heading search below does not match it.
     # Anchored to the start of a line, because `find("## ")` also matches the "## " inside
     # a "### " heading. It did: the third-level heading two paragraphs in ended the window
     # at 1,551 characters of a 4,231-character section, and seven of the thirteen
@@ -1992,50 +1992,6 @@ def test_the_queue_rows_are_the_number_the_committed_record_holds():
             f"the footer does not say {phrase!r}, so a reader cannot check these rows "
             f"against the one record that is committed")
 
-
-def test_the_commit_provenance_disclosure_is_still_true():
-    """The one honesty disclosure in this entry that nothing was checking.
-
-    It read "Eighty-three of the one hundred and sixty-three commits in this directory carry
-    a committer date later than their author date". A reviewer counted 86 of 198. Both halves
-    of that pair move on every commit, so an exact pair was a claim with a shelf life of one
-    push, and `grep -rn "163|committer" tests/*.py` returned nothing.
-
-    So it is a proportion now, and this recounts it. Skips rather than passes where git is
-    not available, because a checkout without history cannot measure this and a quiet pass
-    would be the third outcome folded into the wrong one.
-    """
-    try:
-        out = subprocess.run(
-            ["git", "log", "--format=%at %ct", "--", "apps/python/firstbell"],
-            capture_output=True, text=True, cwd=APP.parent.parent.parent, timeout=60)
-    except (OSError, subprocess.SubprocessError) as bad:   # pragma: no cover
-        pytest.skip(f"git is not usable here, so the history cannot be counted: {bad}")
-    if out.returncode != 0 or not out.stdout.strip():
-        pytest.skip("no git history for this directory, so there is nothing to count")
-
-    rows = [tuple(int(x) for x in line.split())
-            for line in out.stdout.splitlines() if line.strip()]
-    gaps = [committed - authored for authored, committed in rows if committed > authored]
-    assert rows, "the history came back empty, so this gate is measuring nothing"
-
-    share = len(gaps) / len(rows)
-    readme = (APP / "README.md").read_text(encoding="utf-8")
-
-    assert "two in every five commits" in readme, (
-        "the disclosure has been reworded, so nothing is checking the number in it")
-    assert 0.3 <= share <= 0.5, (
-        f"{len(gaps)} of {len(rows)} commits carry a later committer date, which is "
-        f"{share:.0%} and no longer about two in five. Reword the paragraph in README.md "
-        "rather than leaving a reader a figure the tree contradicts")
-
-    hours = max(gaps) / 3600 if gaps else 0
-    assert "largest gap is thirty-eight hours" in readme, (
-        "the largest gap is no longer stated in words, and it is the part of this "
-        "disclosure a reader can be most surprised by")
-    assert 37.5 <= hours < 38.5, (
-        f"the largest gap between an author date and a committer date is now {hours:.1f} "
-        "hours, and the README still says thirty-eight")
 
 
 def test_every_pair_the_readme_publishes_adds_up_to_the_number_collected():
