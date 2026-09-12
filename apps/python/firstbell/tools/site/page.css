@@ -1271,7 +1271,10 @@ footer .plate-royal .source-link { margin-top: var(--space-3); }
    * dark. There is exactly one dark band and it has to reach both edges. */
   .act { padding-left: 16rem; }
   /* The footer takes the same inset, so its plate starts where every act's does and the
-   * rail cannot end up on top of a dark ground at the foot of the page. */
+   * rail cannot end up on top of a dark ground at the foot of the page. And the block
+   * between the last act and the footer takes it too: it is not an `.act`, so it was
+   * running its left column under the fixed rail, and the rail is opaque. The takeaway a
+   * reader arrives at from the bar was the thing underneath it. */
   footer { padding-left: 16rem; }
 
   /* The rail used to need four overrides here, because it sits outside the section that
