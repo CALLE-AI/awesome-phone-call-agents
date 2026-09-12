@@ -4,6 +4,7 @@ import { useState } from "react";
 import { A11yControls } from "@/components/a11y-controls";
 import { GoalComposer, type CallRequest } from "@/components/goal-composer";
 import { CallStatusTimeline, type CallStage } from "@/components/call-status-timeline";
+import { CallOverlay } from "@/components/call-overlay";
 import { VerifiedResultCard } from "@/components/verified-result-card";
 import { TranscriptPanel } from "@/components/transcript-panel";
 import { BatchResultCard } from "@/components/batch-result-card";
@@ -146,7 +147,13 @@ export default function Home() {
             {status === "idle" && <IdlePanel />}
 
             {busy && kind === "single" && (
-              <CallStatusTimeline stage={status as CallStage} captions={captions} phoneMasked={meta.phoneMasked} />
+              <>
+                {/* Desktop keeps the inline timeline; small screens get the full-screen call takeover. */}
+                <div className="hidden lg:block">
+                  <CallStatusTimeline stage={status as CallStage} captions={captions} phoneMasked={meta.phoneMasked} />
+                </div>
+                <CallOverlay stage={status as CallStage} captions={captions} phoneMasked={meta.phoneMasked} />
+              </>
             )}
             {busy && kind === "batch" && <BatchProgress label={meta.presetLabel} />}
 

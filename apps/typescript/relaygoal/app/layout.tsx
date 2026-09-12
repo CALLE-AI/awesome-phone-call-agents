@@ -1,10 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PwaRegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
   title: "RelayGoal — the call, made for you. With proof.",
   description:
     "Type a goal; RelayGoal makes the whole phone call and hands you back a verified answer grounded in the exact words that were said. Built for Deaf, hard-of-hearing, and speech-disabled callers.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "RelayGoal",
+  appleWebApp: { capable: true, title: "RelayGoal", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+// Standalone-friendly viewport: fill to the display edges so the full-screen call view
+// can paint under a notch, and paint the obsidian theme colour behind the status bar.
+export const viewport: Viewport = {
+  themeColor: "#15110e",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 // Apply saved accessibility preferences before paint (no flash of wrong theme).
@@ -32,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <a href="#main" className="skip-link">Skip to main content</a>
         {children}
+        <PwaRegister />
       </body>
     </html>
   );
