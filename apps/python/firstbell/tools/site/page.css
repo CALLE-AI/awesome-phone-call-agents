@@ -2723,9 +2723,26 @@ button[data-copy][data-copied]::after {
 /* The mark on a row this software closed while learning nothing. Small, and not red:
    it is a link to the explanation, not an error badge, and the row really is what the
    receipt recorded. */
+/* The same 24px reach, for the two links that are a line of their own rather than a word
+ * inside a sentence. A target inside a sentence is exempt from WCAG 2.5.8 and these are
+ * not: `closed on nothing` is the whole of its cell and the heading link in a take is a
+ * line on its own. They measured 15 and 18px tall against the 24 a thumb needs.
+ *
+ * The take heading takes an overlay and the row flag takes padding, for a reason worth
+ * recording: an overlay on the row flag hit-tested as the cell below it. The flag sits at
+ * the foot of its cell, the next row is later in the document, and an absolutely positioned
+ * box with no z-index loses to anything painted after it. Padding cannot lose that way
+ * because it is part of the element, and the negative margin gives the space back, so the
+ * table's rows are where they were. */
+/* Padding here too, and for the same reason the flag has it: the overlay measured right at
+ * 320 to 1024, where the heading wraps and is already tall enough, and measured wrong at
+ * every width where it fits on one line. Vertical padding on an inline box does not change
+ * the line box, so this grows the target and moves no text. */
+.take-h > a:only-child { padding-block: 4px; }
 .row-flag {
   display: block;
-  margin-block-start: 0.25rem;
+  padding-block: 5px;
+  margin-block: calc(0.25rem - 5px) -5px;
   font-size: var(--size-1);
   line-height: 1.25;
   color: var(--ink-2);
@@ -2876,6 +2893,15 @@ button[data-copy][data-copied]::after {
    * element that paints `cursor: pointer` without being reachable by Tab, and a <label>
    * is not focusable. Clicking the words still toggles it; the browser does that. */
   cursor: pointer;
+  position: relative;
+}
+/* 15px of ink, 24px of target. WCAG 2.5.8 asks for 24 by 24 and a checkbox drawn that big
+ * is a checkbox that looks like a button, so the box a thumb hits is a pseudo-element and
+ * the box an eye sees is the one above. Nothing is painted, so nothing moves: the scroll
+ * walk reads boxes that hold text and this one holds none. */
+.cs-motion::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 24px; height: 24px; transform: translate(-50%, -50%);
 }
 .cs-motion:checked {
   background: var(--ink);

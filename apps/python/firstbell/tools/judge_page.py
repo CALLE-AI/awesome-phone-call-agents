@@ -3296,6 +3296,11 @@ def build(has_audio: bool, repo_url: str | None = None,
         f'be chosen afterwards. All {_spelled(total - agree)} mismatches are the speaker '
         'saying different things in the two calls, which a person recalling their own '
         'script from memory will do.</p>',
+        # Four columns of scenario names do not fit 320px, and an iPhone SE is still a
+        # phone a parent owns. The box is the one the mutation tables already use, so the
+        # table keeps its shape and the screen decides how much of it is on show.
+        '<div class=scrollbox tabindex=0 role=region '
+        'aria-label="Every scenario, in both languages, with whether the two calls agreed">'
         '<table class=pairs>'
         '<caption class=visually-hidden>Each scenario performed once in English and once in Tamil, with whether the two calls agreed on every enumerated field.</caption>'
         '<thead><tr><th scope=col>scenario</th><th scope=col>en-IN</th>'
@@ -3312,7 +3317,7 @@ def build(has_audio: bool, repo_url: str | None = None,
                     f'<td class=mono>{esc(row["en"])}</td>'
                     f'<td class=mono>{esc(row["ta"])}</td>'
                     f'<td class="agree {cls}">{same}/{of_row}</td></tr>')
-    body.append('</tbody></table></details>')
+    body.append('</tbody></table></div></details>')
     add(act("02", "Both languages", "".join(body), "act-2"))
 
     # ---- Act 3: three endings
