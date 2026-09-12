@@ -28,7 +28,7 @@ Scores inbound product enquiries (captured via a WhatsApp sales AI into Supabase
 2. Extract a product keyword and variant (e.g. size/phase) from free-text product_asked
 3. Look up the real sell price from the price sheet, matched by token, not exact phrase
 4. Score against category/price/recency/disqualifier rules
-5. For qualifying leads, call CALL-E's plan_call, review the plan, then run_call
+5. 5. For qualifying leads, the operator manually runs CALL-E's plan_call via the CLI, reviews the confirm_summary, then runs run_call. This script identifies who to call; it does not itself invoke CALL-E.
 
 ## Qualification rule (example, tune to your own product line)
 IF (category = "Distribution Board" AND value >= 35000)
