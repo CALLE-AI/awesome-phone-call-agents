@@ -1,12 +1,12 @@
 {
   "what_this_is": "Measured facts about the demo film, which is not in this repository. The file is held outside it and no public link is published here until there is one to publish. The numbers are what ffprobe and a loudness pass read off the finished file, written by the render script that produced it, in the same run that writes the receipt beside the film. That script is outside this repository too, for the same reason the film is, so this file is the whole of what a reader here can check: the hash below identifies the exact file the numbers were taken from.",
   "why_it_is_here": "Three surfaces carried a running time typed by hand and a re-render moved the cut by five seconds, so all three were wrong at once.",
-  "seconds": 178.0,
-  "running_time": "2:58.0",
-  "spoken_running_time": "2 minutes 58",
-  "shots": 21,
-  "carrying_sound_percent": 37,
-  "narration_recorded": false,
-  "integrated_lufs": -14.0,
-  "sha256": "8b37e4012b4271018bd87a2f84ede6cc56a9e007158ccdbd046d32eedf19812d"
+  "seconds": 129.9,
+  "running_time": "2:09.9",
+  "spoken_running_time": "2 minutes 10",
+  "shots": 6,
+  "carrying_sound_percent": 100,
+  "narration_recorded": true,
+  "integrated_lufs": -16.7,
+  "sha256": "d45cc833e7a50d4bd3e4b7fcc0721f1cdd69bf16e4917b654192bd4e8c71f491"
 }

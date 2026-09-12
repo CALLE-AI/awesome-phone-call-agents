@@ -13,7 +13,7 @@ pip install -r requirements.txt
 python -m firstbell --work-file examples/absences.csv
 ```
 
-There is a demo film, 2 minutes 58, and every voice in it is from a real call this software
+There is a demo film, 2 minutes 10, and every voice in it is from a real call this software
 placed. Its running time, byte size and hash are measured into
 [`evidence/film.json`](evidence/film.json) rather than typed. The public link is in the
 submission form rather than here, because a link to an unpublished video is worse than no
