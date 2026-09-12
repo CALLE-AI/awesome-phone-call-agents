@@ -3,107 +3,135 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RelayMe — your call, as text</title>
+<title>RelayMe — your phone call, read as text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
 <style>
+  /* Atkinson Hyperlegible: designed by the Braille Institute for low-vision
+     readers. Chosen on purpose, not for looks. Palette is calm cyan + health
+     green on light, deliberately not the default AI purple/pink gradient. */
   :root {
-    --bg: #0f1220;
-    --panel: #171a2b;
-    --ink: #f4f5fb;         /* ~15:1 on --bg */
-    --muted: #b9bed6;        /* ~7:1 on --bg  */
-    --you: #2f6df6;          /* user bubble */
-    --you-ink: #ffffff;
-    --agent: #253052;        /* our AI on the call */
-    --them: #2a2f45;         /* the other party */
-    --relayme: #1e2740;      /* app narration */
-    --ok: #38c172;
-    --warn: #f6c344;
-    --stop: #ff6b6b;
-    --line: #2b3150;
-    --radius: 16px;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --bg: #ECFEFF;          /* calm cyan-tinted background */
+    --ink: #0B3B47;         /* deep teal ink, ~13:1 on bg */
+    --muted-ink: #3F6470;   /* ~5.3:1 on bg */
+    --card: #FFFFFF;
+    --primary: #0E7490;     /* cyan-700 */
+    --primary-ink: #FFFFFF;
+    --accent: #047857;      /* green-700, for confirmed answers */
+    --line: #C6E9F0;
+    --you-bg: #0E7490;
+    --you-ink: #FFFFFF;
+    --agent-bg: #E6F6FA;    /* our AI, cool */
+    --agent-ink: #0B3B47;
+    --them-bg: #F1F5E9;     /* the other party, warm-neutral so the two sides read apart */
+    --them-ink: #26331A;
+    --note-ink: #3F6470;
+    --ok: #047857;
+    --hold: #B45309;        /* amber-700 for non-answers */
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(11,59,71,.06), 0 8px 24px rgba(11,59,71,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #08222A; --ink: #E7F6FA; --muted-ink: #9DC2CC; --card: #0E2E38;
+      --line: #1C4753; --agent-bg: #123846; --agent-ink: #E7F6FA;
+      --them-bg: #253018; --them-ink: #EAF3DD; --note-ink: #9DC2CC;
+    }
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font-family: var(--font); line-height: 1.5;
-    display: flex; justify-content: center; padding: 24px 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: clamp(16px, 4vw, 48px);
   }
-  .phone {
-    width: 100%; max-width: 420px; background: var(--panel);
-    border: 1px solid var(--line); border-radius: 28px; overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,.45);
-  }
-  header {
-    padding: 18px 20px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: center; gap: 12px;
-  }
-  .logo {
-    width: 40px; height: 40px; border-radius: 12px; flex: none;
-    background: linear-gradient(135deg, #2f6df6, #7c4dff);
-    display: grid; place-items: center; font-weight: 800; font-size: 18px;
-  }
-  header h1 { font-size: 17px; margin: 0; }
-  header p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
-  .scenarios {
-    display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px;
-    border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02);
-  }
+  .wrap { width: 100%; max-width: 760px; }
+
+  /* Header: real logomark, product name, and the one-line thesis. */
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .mark { flex: none; }
+  h1 { font-size: clamp(22px, 3.5vw, 30px); margin: 0; letter-spacing: -0.01em; }
+  .thesis { margin: 2px 0 0; color: var(--muted-ink); font-size: 15px; }
+
+  /* Legend so a first-time viewer knows who is who in the thread. */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 18px 0 10px; font-size: 13px; color: var(--muted-ink); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line); }
+
+  /* Scenario switcher, styled as a segmented control, not pill soup. */
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 16px; }
   .scenarios button {
-    font: inherit; font-size: 12.5px; color: var(--ink);
-    background: #202744; border: 1px solid var(--line);
-    padding: 6px 11px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 14px; color: var(--ink); background: var(--card);
+    border: 1.5px solid var(--line); padding: 8px 14px; border-radius: 10px;
+    cursor: pointer; transition: border-color .15s, background .15s, color .15s;
   }
-  .scenarios button[aria-pressed="true"] {
-    background: var(--you); border-color: var(--you); color: var(--you-ink); font-weight: 600;
-  }
-  .thread {
-    padding: 18px 16px; display: flex; flex-direction: column; gap: 12px;
-    min-height: 420px; max-height: 62vh; overflow-y: auto;
-  }
-  .row { display: flex; flex-direction: column; max-width: 84%; }
+  .scenarios button:hover { border-color: var(--primary); }
+  .scenarios button:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+  .scenarios button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); font-weight: 700; }
+
+  /* The conversation surface. */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .callbar { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted-ink); }
+  .callbar .live { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); position: relative; }
+  .callbar .live::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); opacity: .45; animation: pulse 1.8s ease-out infinite; }
+  @keyframes pulse { 0% { transform: scale(.6); opacity: .5; } 100% { transform: scale(1.5); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .callbar .live::after { animation: none; } }
+
+  .thread { display: flex; flex-direction: column; gap: 12px; padding: 20px 18px; max-height: 60vh; overflow-y: auto; }
+  .row { display: flex; flex-direction: column; max-width: 86%; }
   .row.you { align-self: flex-end; align-items: flex-end; }
   .row.agent, .row.them, .row.relayme { align-self: flex-start; }
-  .who { font-size: 11px; color: var(--muted); margin: 0 6px 3px; letter-spacing: .02em; }
-  .bubble {
-    padding: 10px 13px; border-radius: var(--radius); font-size: 14.5px;
-    white-space: pre-wrap; word-wrap: break-word;
-  }
-  .you .bubble { background: var(--you); color: var(--you-ink); border-bottom-right-radius: 5px; }
-  .agent .bubble { background: var(--agent); border-bottom-left-radius: 5px; }
-  .them .bubble { background: var(--them); border-bottom-left-radius: 5px; }
-  .relayme .bubble {
-    background: var(--relayme); color: var(--muted); font-size: 13.5px;
-    border: 1px dashed var(--line);
-  }
-  .outcome {
-    margin: 4px 16px 18px; padding: 12px 14px; border-radius: 12px;
-    font-size: 13.5px; display: flex; align-items: center; gap: 10px;
-  }
-  .outcome .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-  .outcome.answered { background: rgba(56,193,114,.12); border: 1px solid var(--ok); }
-  .outcome.answered .dot { background: var(--ok); }
-  .outcome.partial, .outcome.refused, .outcome.voicemail, .outcome.no_answer,
-  .outcome.wrong_number, .outcome.needs_human {
-    background: rgba(246,195,68,.10); border: 1px solid var(--warn);
-  }
-  .outcome.partial .dot, .outcome.refused .dot, .outcome.voicemail .dot,
-  .outcome.no_answer .dot, .outcome.wrong_number .dot, .outcome.needs_human .dot { background: var(--warn); }
-  footer { padding: 12px 16px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
-  .load { margin-top: 8px; }
-  .load label { color: var(--muted); }
+  .who { font-size: 12px; color: var(--muted-ink); margin: 0 4px 4px; font-weight: 700; }
+  .bubble { padding: 11px 14px; border-radius: var(--radius); font-size: 15.5px; white-space: pre-wrap; word-wrap: break-word; }
+  .you .bubble { background: var(--you-bg); color: var(--you-ink); border-bottom-right-radius: 4px; }
+  .agent .bubble { background: var(--agent-bg); color: var(--agent-ink); border-bottom-left-radius: 4px; }
+  .them .bubble { background: var(--them-bg); color: var(--them-ink); border-bottom-left-radius: 4px; }
+  .relayme .bubble { background: transparent; color: var(--note-ink); font-style: italic; padding: 2px 6px; font-size: 14px; }
+
+  /* Outcome banner: green for a real answer, amber for everything that needs a human. */
+  .outcome { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-top: 1px solid var(--line); font-size: 15px; }
+  .outcome .badge { flex: none; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 9px; border-radius: 999px; }
+  .outcome.answered .badge { background: var(--accent); color: #fff; }
+  .outcome:not(.answered) .badge { background: var(--hold); color: #fff; }
+
+  footer { margin-top: 20px; color: var(--muted-ink); font-size: 13.5px; }
+  footer .file { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  footer label { color: var(--ink); font-weight: 700; }
+  input[type=file] { font: inherit; font-size: 13px; margin-top: 6px; }
+  a { color: var(--primary); }
 </style>
 </head>
 <body>
-  <main class="phone" aria-label="RelayMe conversation">
+  <main class="wrap">
     <header>
-      <div class="logo" aria-hidden="true">R</div>
+      <svg class="mark" width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="RelayMe logo">
+        <rect width="44" height="44" rx="12" fill="#0E7490"/>
+        <!-- a speech line turning into text lines: the relay idea -->
+        <path d="M12 16h14a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-6l-4 4v-4h-4a2 2 0 0 1-2-2v-9a3 3 0 0 1 3-3z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+        <line x1="16" y1="20.5" x2="26" y2="20.5" stroke="#67E8F9" stroke-width="2" stroke-linecap="round"/>
+        <line x1="16" y1="24" x2="23" y2="24" stroke="#67E8F9" stroke-width="2" stroke-linecap="round"/>
+      </svg>
       <div>
         <h1>RelayMe</h1>
-        <p>Your phone call, as a text thread</p>
+        <p class="thesis">Your phone call, read as text. No operator, no waiting on the line.</p>
       </div>
     </header>
 
-    <div class="scenarios" role="group" aria-label="Demo scenarios">
+    <div class="legend" aria-hidden="true">
+      <span><i class="swatch" style="background:#0E7490"></i> You</span>
+      <span><i class="swatch" style="background:#E6F6FA"></i> Your AI on the call</span>
+      <span><i class="swatch" style="background:#F1F5E9"></i> The business</span>
+      <span><i class="swatch" style="background:transparent"></i> RelayMe notes</span>
+    </div>
+
+    <div class="scenarios" role="group" aria-label="Example call outcomes">
       <button data-scn="answered" aria-pressed="true">Answered</button>
       <button data-scn="hedged" aria-pressed="false">Unsure</button>
       <button data-scn="refused" aria-pressed="false">Refused</button>
@@ -111,139 +139,132 @@
       <button data-scn="wrong_number" aria-pressed="false">Wrong number</button>
     </div>
 
-    <div class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation, newest at the bottom"></div>
-    <div id="outcome"></div>
+    <div class="card">
+      <div class="callbar"><span class="live" aria-hidden="true"></span> <span id="callbar-text">Call to Maple Street Pharmacy</span></div>
+      <div class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation, newest at the bottom"></div>
+      <div id="outcome"></div>
+    </div>
 
     <footer>
-      No one hears you and you never sit through the call. RelayMe speaks, listens,
-      and shows you every word here. It reports what was said, never a guess.
-      <div class="load">
-        <label for="file">Load a result JSON: </label>
-        <input id="file" type="file" accept="application/json" aria-label="Load a RelayMe result JSON file" />
+      No one hears you, and you never sit through the call. RelayMe speaks,
+      listens, and shows every word here. It reports what was said, never a guess.
+      <div class="file">
+        <label for="file">See a real result:</label><br />
+        <input id="file" type="file" accept="application/json" aria-label="Load a RelayMe result JSON file produced by the client" />
+        <div style="margin-top:6px">Load JSON from <code>client.py --emit-thread-json</code>.</div>
       </div>
     </footer>
   </main>
 
 <script>
-// Embedded demo threads so the page opens with zero setup. The Python client
-// emits this exact shape via --emit-thread-json for real (or mock) calls.
 const SCENARIOS = {
   answered: {
-    outcome: "answered",
-    outcome_text: "Answer: the prescription is ready for pickup, any time before 8 PM today.",
+    business: "Maple Street Pharmacy",
+    outcome: "answered", badge: "Answered",
+    outcome_text: "The prescription is ready for pickup, any time before 8 PM today.",
     messages: [
       {role:"you", text:"Is my prescription at Maple Street Pharmacy ready for pickup?"},
-      {role:"relayme", text:"I'll call Maple Street Pharmacy, say I'm an AI assistant calling for you, and ask that. You'll see everything said here."},
-      {role:"relayme", text:"Calling Maple Street Pharmacy\u2026"},
+      {role:"relayme", text:"I'll call and say I'm an AI assistant calling for you. You'll see everything said here."},
       {role:"agent", text:"Hi, I'm an AI assistant calling for someone who can't use the phone. Is the prescription for Jordan Rivera ready for pickup?"},
       {role:"them", text:"Let me check\u2026 yes, it's ready at the pickup counter."},
       {role:"agent", text:"Roughly what time today can they collect it?"},
-      {role:"them", text:"Any time before we close at 8 PM."},
-      {role:"relayme", text:"Here's your answer:"},
-      {role:"relayme", text:"Yes. It's ready at the pickup counter, any time before 8 PM today."}
+      {role:"them", text:"Any time before we close at 8 PM."}
     ]
   },
   hedged: {
-    outcome: "partial",
-    outcome_text: "I got part of an answer, but no confirmed yes. A person may need to follow up.",
+    business: "Maple Street Pharmacy",
+    outcome: "partial", badge: "Needs a person",
+    outcome_text: "Staff were unsure and couldn't confirm. I did not record a yes.",
     messages: [
-      {role:"you", text:"Is my prescription at Maple Street Pharmacy ready?"},
-      {role:"relayme", text:"I'll call and ask, and show you everything said here."},
-      {role:"relayme", text:"Calling Maple Street Pharmacy\u2026"},
+      {role:"you", text:"Is my prescription ready?"},
       {role:"agent", text:"Is the prescription for Jordan Rivera ready for pickup?"},
       {role:"them", text:"Um, I think so? The pharmacist stepped out, I can't be sure right now."},
-      {role:"agent", text:"Understood. I won't record that as confirmed."},
-      {role:"relayme", text:"I got part of an answer, but not all of it:"},
-      {role:"relayme", text:"Staff were unsure and couldn't confirm. I did not record a yes."}
+      {role:"agent", text:"Understood. I won't record that as confirmed."}
     ]
   },
   refused: {
-    outcome: "refused",
-    outcome_text: "They wouldn't answer that over the phone. A person may need to follow up.",
+    business: "Maple Street Pharmacy",
+    outcome: "refused", badge: "Needs a person",
+    outcome_text: "They won't share that over the phone. The patient must come in with ID.",
     messages: [
       {role:"you", text:"Is my prescription ready?"},
-      {role:"relayme", text:"Calling Maple Street Pharmacy\u2026"},
       {role:"agent", text:"Is the prescription for Jordan Rivera ready for pickup?"},
       {role:"them", text:"We can't share prescription information with an automated system. The patient needs to come in with ID."},
-      {role:"agent", text:"Understood. Thank you, I'll pass that along."},
-      {role:"relayme", text:"They wouldn't answer that over the phone. A person may need to follow up."}
+      {role:"agent", text:"Understood. Thank you, I'll pass that along."}
     ]
   },
   voicemail: {
-    outcome: "voicemail",
-    outcome_text: "It went to voicemail. No one answered live and I left no private details.",
+    business: "Maple Street Pharmacy",
+    outcome: "voicemail", badge: "No one live",
+    outcome_text: "It went to voicemail. No one answered live, and I left no private details.",
     messages: [
       {role:"you", text:"Is my prescription ready?"},
-      {role:"relayme", text:"Calling Maple Street Pharmacy\u2026"},
       {role:"them", text:"You've reached Maple Street Pharmacy. We're closed. Leave a message after the tone."},
-      {role:"agent", text:"Thank you, I'll try again during opening hours."},
-      {role:"relayme", text:"It went to voicemail, so no one answered live. I didn't leave any private details."}
+      {role:"agent", text:"Thank you, I'll try again during opening hours."}
     ]
   },
   wrong_number: {
-    outcome: "wrong_number",
+    business: "the number you gave",
+    outcome: "wrong_number", badge: "Wrong number",
     outcome_text: "That reached the wrong place, so I stopped. Please check the number.",
     messages: [
       {role:"you", text:"Is my prescription ready at Maple Street Pharmacy?"},
-      {role:"relayme", text:"Calling the number you gave\u2026"},
       {role:"agent", text:"Hi, is this Maple Street Pharmacy?"},
       {role:"them", text:"No, this is a private residence. Wrong number."},
-      {role:"agent", text:"Sorry to bother you. I'll stop here."},
-      {role:"relayme", text:"That number reached the wrong place, so I stopped. Please check the number."}
+      {role:"agent", text:"Sorry to bother you. I'll stop here."}
     ]
   }
 };
 
-const WHO = { you:"You", relayme:"RelayMe", agent:"Agent on the call", them:"They said" };
+const WHO = { you:"You", relayme:"RelayMe", agent:"Your AI on the call", them:"They said" };
 
 function render(data) {
+  document.getElementById("callbar-text").textContent = "Call to " + (data.business || "the business");
   const thread = document.getElementById("thread");
   thread.innerHTML = "";
   (data.messages || []).forEach(m => {
     const row = document.createElement("div");
     row.className = "row " + m.role;
-    const who = document.createElement("div");
-    who.className = "who";
-    who.textContent = WHO[m.role] || m.role;
+    if (m.role !== "you") {
+      const who = document.createElement("div");
+      who.className = "who"; who.textContent = WHO[m.role] || m.role;
+      row.appendChild(who);
+    }
     const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.textContent = m.text;
-    if (m.role !== "you") row.appendChild(who);
+    bubble.className = "bubble"; bubble.textContent = m.text;
     row.appendChild(bubble);
     thread.appendChild(row);
   });
   const out = document.getElementById("outcome");
   const oc = data.outcome || "needs_human";
+  out.className = "outcome " + (oc === "answered" ? "answered" : "hold");
+  out.setAttribute("role", "status");
   out.innerHTML = "";
-  const box = document.createElement("div");
-  box.className = "outcome " + oc;
-  box.setAttribute("role", "status");
-  const dot = document.createElement("span");
-  dot.className = "dot"; dot.setAttribute("aria-hidden", "true");
-  const txt = document.createElement("span");
-  txt.textContent = data.outcome_text || oc;
-  box.appendChild(dot); box.appendChild(txt);
-  out.appendChild(box);
+  const badge = document.createElement("span");
+  badge.className = "badge"; badge.textContent = data.badge || oc;
+  const txt = document.createElement("span"); txt.textContent = data.outcome_text || oc;
+  out.appendChild(badge); out.appendChild(txt);
   thread.scrollTop = thread.scrollHeight;
 }
 
-function selectScenario(name, btn) {
+function select(name, btn) {
   document.querySelectorAll(".scenarios button").forEach(b =>
     b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
   render(SCENARIOS[name]);
 }
 
-document.querySelectorAll(".scenarios button").forEach(btn => {
-  btn.addEventListener("click", () => selectScenario(btn.dataset.scn, btn));
-});
+document.querySelectorAll(".scenarios button").forEach(btn =>
+  btn.addEventListener("click", () => select(btn.dataset.scn, btn)));
 
 document.getElementById("file").addEventListener("change", (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
+  const f = e.target.files[0]; if (!f) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try { render(JSON.parse(reader.result)); }
-    catch { alert("That file is not valid RelayMe thread JSON."); }
+    try {
+      const d = JSON.parse(reader.result);
+      d.badge = d.badge || (d.outcome === "answered" ? "Answered" : "Needs a person");
+      render(d);
+    } catch { alert("That file is not valid RelayMe thread JSON."); }
   };
   reader.readAsText(f);
 });
