@@ -1,23 +1,85 @@
+<div align="center">
+
 # firstbell
 
-**[Evidence page](https://firstbell-evidence.vercel.app)** &middot; every real call, every broken rule, and the offline run. Built by `tools/judge_page.py` from the call recordings, which are held outside this repository: see [`evidence/README.md`](evidence/README.md) for why.
+### The school absence call that comes back with an answer.
 
-When a school's absence notification goes unanswered, this calls the family and brings
-back a reason the office can act on. When it cannot get one, it says so and puts the call on
-a named person's desk, because a call that reached a parent and learned nothing is not a
-family contacted. Offline by default: the demo below dials nobody and needs no CALL-E
-account.
+**A child does not arrive, and the school's duty of care stays open until somebody knows
+why. The tools schools buy send a message outward: an SMS, or a robocall that plays a
+recording and hangs up. Neither brings an answer back, so the attendance office still works
+the list by hand. firstbell places the call in the family's own language, holds a short
+conversation, and returns a reason the office can act on. When it cannot get one, it says so
+and puts that call on a named person's desk.**
+
+**A call that reached a parent and learned nothing is not a family contacted.** Tools in this
+category file it as one, and that single rule is the whole design: three endings, not two,
+and only one of them closes a record. Twelve real calls to real families were placed on
+4 September 2026. Eight are published here with their recordings and transcripts.
+
+<table>
+<tr>
+<td align="center" width="20%"><a href="https://ies.ed.gov/use-work/supporting-recovery-with-evidence-based-practices/chronic-absenteeism"><b>14M+</b></a><br><sub>US students chronically<br>absent, 2021-22</sub></td>
+<td align="center" width="20%"><a href="https://explore-education-statistics.service.gov.uk/find-statistics/pupil-absence-in-schools-in-england/2024-25-autumn-and-spring-term"><b>17.63%</b></a><br><sub>England persistent<br>absence, 2024/25</sub></td>
+<td align="center" width="20%"><a href="https://nces.ed.gov/ccd/tables/202324_summary_3.asp"><b>99,297</b></a><br><sub>US public schools<br>in 2023-24</sub></td>
+<td align="center" width="20%"><a href="https://nces.ed.gov/ccd/tables/202324_summary_1.asp"><b>13,303</b></a><br><sub>districts running those<br>attendance offices</sub></td>
+<td align="center" width="20%"><a href="https://www.census.gov/newsroom/press-releases/2023/language-at-home-acs-5-year.html"><b>21.7%</b></a><br><sub>speak a language other<br>than English at home</sub></td>
+</tr>
+</table>
+
+**Every unexplained absence in those numbers is a telephone call somebody has to make**, and
+the calls that take longest are the ones where the family does not speak English.
+
+**The budget line already exists.** One district approved **$157,664** for a single year of
+its student information system ([board agenda, 15 August
+2024](https://chccs.granicus.com/MetaViewer.php?view_id=2&clip_id=646&meta_id=45974)), about
+$13.89 a student. This app computes its own ceiling on every run and prints it: **$0.35 a
+call** is the price above which the desk is cheaper. A thousand calls against that renewal is
+0.22% of it.
+
+[![Evidence page](https://img.shields.io/badge/evidence-firstbell--evidence.vercel.app-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
+[![Offline by default](https://img.shields.io/badge/offline-dials%20nobody%2C%20no%20account-1a7f5a?style=flat-square)](#run-it)
+[![Real calls](https://img.shields.io/badge/real%20calls-20%20published%20with%20audio-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
+<br>
+[![Tests](https://img.shields.io/badge/tests-852%20collected-444?style=flat-square)](#tests)
+[![Mutations](https://img.shields.io/badge/gates%20broken%20on%20purpose-358-444?style=flat-square)](evidence/MUTATIONS.md)
+[![Licence](https://img.shields.io/badge/licence-MIT-444?style=flat-square)](../../../LICENSE)
+
+**[Evidence page](https://firstbell-evidence.vercel.app)** &nbsp;·&nbsp;
+**[What it costs](#the-three-money-figures-and-where-each-one-comes-from)** &nbsp;·&nbsp;
+**[A pilot a district could sign](docs/what-a-pilot-would-look-like.md)** &nbsp;·&nbsp;
+**[CALL-E feedback](call-e-feedback.md)** &nbsp;·&nbsp;
+**[Run it](#run-it)**
+
+</div>
+
+> The evidence page holds every real call, every broken rule and the offline run. The call
+> recordings live outside this repository and [`evidence/README.md`](evidence/README.md) says
+> why.
+
+## Thirty seconds
+
+One real call is why this app exists. CALL-E came back with a schema-valid result,
+`task_completed` true, good confidence, and every required field set to `"unknown"`, because
+the parent said they could not talk. A well-designed enum offers `"unknown"` rather than
+forcing a guess, so that answer is correct. It is also worth nothing, and it passes every
+confidence test there is.
+
+Software that closes on a schema-valid answer files that call as a success. This one files it
+`undetermined`, which is owned by a person and cannot collapse into either neighbour. A
+second axis runs alongside: when a parent did not know their child was absent, the call is
+escalated whatever its ending was.
 
 ```bash
 pip install -r requirements.txt
 python -m firstbell --work-file examples/absences.csv
 ```
 
+That dials nobody, costs nothing and needs no CALL-E account. It prints one line per row and
+a total that does not add the middle outcome to the successes.
+
 There is a demo film, 2 minutes 10, and every voice in it is from a real call this software
 placed. Its running time, byte size and hash are measured into
-[`evidence/film.json`](evidence/film.json) rather than typed. The public link is in the
-submission form rather than here, because a link to an unpublished video is worse than no
-link.
+[`evidence/film.json`](evidence/film.json) rather than typed.
 
 ![The path of one absence row, left to right. Two checks come first: a family with no consent is never dialled, and a family the telephone cannot reach goes straight to a person. Then a short instruction in the family's own language, with the automated-caller disclosure before anything is asked. Then CALL-E places the call, under a cap on how many families are rung at once, one idempotency key per row, polled to the end. Then exactly one of three endings: resolved, owned by nobody; undetermined and failed, both owned by a person. A safeguarding escalation runs as a second axis, leaving resolved and undetermined but never failed, because a call that reached nobody has no answer to read a rule against.](docs/images/the-path-of-one-absence.svg)
 
@@ -34,24 +96,21 @@ and nothing here is a screenshot.
 | Claim | Check it |
 |---|---|
 | A call has three endings and only one of them is closed | `python -m firstbell --work-file examples/absences.csv` prints one line per row and a total that does not add the middle one to the successes |
-| A call costs $0.40 on the meter and removes $0.35 of desk time, and the run says where that stops being true | CALL-E billed this account **$0.05 a call** for thirteen events, $0.65 over a month, and its panel now calls that rate legacy; the nineteen rows since ran $0.06 to $1.36, **$0.40 a call** on average ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the rate above which the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run in this repository |
+| A call costs **$0.40** on the meter and removes **$0.35** of desk time, so today it costs more than it saves | CALL-E billed thirteen events at **$0.05 a call** and its panel now calls that rate legacy. The nineteen rows since ran $0.06 to $1.36, **$0.40** on average ([`evidence/observed-price.json`](evidence/observed-price.json)). The same command with `--staff-annual 48980 --escalation-annual 77800` prints the ceiling of **$0.35 a call** and **50.4 net-new escalations per 100** as the point where the saving becomes a loss. `python tools/money_across_runs.py` prints both for every run here |
 | A district's own export runs, and its siblings are one call | `python -m firstbell --work-file examples/absences-oneroster.csv` prints four endings for four rows: a reason on record, the platform refusing Spanish, nobody answered, and a guardian the telephone cannot reach. Then `examples/absences-siblings.csv`, which places two calls for four rows |
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 358 rows, each with the change made and the number of tests that noticed |
 
-Twelve of these calls were real, to real telephones, on 2026-09-04. Eight were recorded, and
-those recordings are on the [evidence page](https://firstbell-evidence.vercel.app), with
-their transcripts, beside a shortened id for all twelve. The receipt files are on neither
-that page nor in this tree, for the reason [`evidence/README.md`](evidence/README.md) gives,
-so what travels with the code is the arithmetic they produced:
-[`evidence/recorded-calls.json`](evidence/recorded-calls.json) names all six receipt files
-and holds the counts behind every money figure here.
-
-Twenty live calls are published in this entry: those eight, and twelve more placed on
-2026-09-11 and written up in
-[`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). Every money figure below is still
-computed on the twelve of 2026-09-04, which are the calls with committed receipts, and the
-later ones are not folded into it.
+Twenty live calls are published: twelve placed on 2026-09-04, eight of them recorded and on
+the [evidence page](https://firstbell-evidence.vercel.app) with their transcripts, and twelve
+more placed on 2026-09-11 and written up in
+[`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). The receipt files are on neither that
+page nor in this tree ([`evidence/README.md`](evidence/README.md) says why), so what travels
+with the code is the arithmetic they produced:
+[`evidence/recorded-calls.json`](evidence/recorded-calls.json) names all six receipt files and
+holds the counts behind every money figure here. Every money figure below is computed on the
+twelve of 2026-09-04, the calls with committed receipts, and the later ones are not folded
+into it.
 
 <details>
 <summary><b>If you have twenty minutes</b></summary>
@@ -198,18 +257,14 @@ vocabulary. A transcript is not a decision.
 
 ## The problem
 
-A child does not arrive. The school has a duty of care that stays open until someone knows
-why, and the tools schools buy send the notification outward: an SMS, or a recorded
-robocall that plays a message and hangs up. Those tell a parent something. They do not
-bring an answer back.
-
-So the office still works a list by hand. More than 14 million American students were
-chronically absent in 2021-22
-([IES](https://ies.ed.gov/use-work/supporting-recovery-with-evidence-based-practices/chronic-absenteeism)).
-England recorded a 17.63% persistent absence rate across the autumn and spring terms of
+The figures at the top of this file are the size of it. More than 14 million American
+students were chronically absent in 2021-22
+([IES](https://ies.ed.gov/use-work/supporting-recovery-with-evidence-based-practices/chronic-absenteeism)),
+and England recorded a 17.63% persistent absence rate across the autumn and spring terms of
 2024/25, down from 19.23% the year before and still well above the 10.53% of 2018/19
 ([DfE](https://explore-education-statistics.service.gov.uk/find-statistics/pupil-absence-in-schools-in-england/2024-25-autumn-and-spring-term)).
-Every unexplained absence in those numbers is a phone call somebody has to make.
+An SMS or a robocall tells a parent something. Neither brings an answer back, so the office
+works the list by hand.
 
 The calls that take longest are the ones where the family does not speak English. 78.3% of
 the United States population aged 5 and over spoke only English at home in the 2018-2022
@@ -246,23 +301,16 @@ the call in Spanish is a platform limit this app cannot lift. Deciding what a Sp
 means, refusing to close it on anything less than a guardian's confirmation, and putting it on
 a named person's desk is not, and that is the part a district is short of.
 
-And it is narrower than that paragraph on its own reads, in a way worth stating before a
-district finds it out in the first hour. `tools/adopt_call_records.py` needs a record
-carrying `reason_category`, `expected_return`, `parent_confirmed_aware` and `spoke_with`.
-Those are answers from a conversation. The four products a district is most likely to
-already own, SchoolMessenger, ParentSquare, Blackboard Connect and Remind, are broadcast
-systems: they send, and they record delivery, which is a fact about a network and not about
-a family. They hold no conversation, so they cannot produce those four fields, and every
-record they export would land `undetermined` here. That is the correct filing and it is not
-worth paying for.
-
-So the adoption path serves a district that already owns a **conversational** dialler, one
-that holds a short exchange and returns structured fields, and hands its decisions to
-software that closes on any schema-valid answer. That is a smaller set of districts than the
-one the paragraph above could be read as describing, and the honest way to put it is that
-this narrows the language ceiling for whoever has already solved the harder half of the
-problem. A district that has not solved it is waiting on CALL-E to offer Spanish for a United
-States number, and nothing in this repository changes that.
+It is narrower again, in a way worth knowing before the first hour of a pilot.
+`tools/adopt_call_records.py` needs a record carrying `reason_category`, `expected_return`,
+`parent_confirmed_aware` and `spoke_with`, and those are answers from a conversation. The
+four products a district is most likely to already own, SchoolMessenger, ParentSquare,
+Blackboard Connect and Remind, are broadcast systems: they send, and they record delivery,
+which is a fact about a network rather than about a family. Every record they export would
+land `undetermined` here, which is the correct filing and is not worth paying for. So the
+adoption path serves a district that already owns a **conversational** dialler. One that does
+not is waiting on CALL-E to offer Spanish for a United States number, and nothing in this
+repository changes that.
 
 The shape it reads is documented at the top of the file rather than being any named vendor's
 export, so even the district that does have a conversational dialler writes a mapping first.
@@ -425,24 +473,16 @@ checkable from what is published. `python tools/pool_recorded_calls.py --receipt
 --check` fails on drift between the two.
 
 <details>
-<summary>This figure has been wrong three times. Every version, and what was wrong with
-it.</summary>
+<summary>This figure has been corrected three times. What was wrong each time.</summary>
 
-A quarter of one percent of the district renewal, which is $394 a thousand calls. Wrong in
-this project's own favour by half, and arithmetic nobody had checked.
-
-Then $590, which is thirty-seven hundredths of one percent. Correct arithmetic, and it
-priced the safeguarding callbacks the software creates at nothing, so it was the ceiling of
-a product that only removes work.
-
-Then $210. It priced the callbacks per answered call and took that off a saving priced per
-billed attempt, which is money subtracted from money on a different denominator and is not
-a rate of anything. Somebody reading the entry as a district finance office found it.
-Correcting it raised the ceiling to $350, so this correction flatters the project that made
-it, which is the reason to put it in writing rather than to make it quietly.
-
-The crossover moved with it, from 31.5 net-new escalations per 100 answered calls to 50.4,
-for the same reason and in the same direction.
+**$394 a thousand calls.** Arithmetic nobody had checked, wrong in this project's own favour
+by half. **Then $590.** Correct arithmetic, but it priced at nothing the safeguarding
+callbacks the software creates. **Then $210.** It subtracted a cost priced per answered call
+from a saving priced per billed attempt, which is not a rate of anything; a reader working
+through it as a district finance office found that one. Correcting it raised the ceiling to
+$350 and moved the crossover from 31.5 net-new escalations per 100 to 50.4, so the correction
+flatters the project that made it. That is the reason to put it in writing rather than make
+it quietly.
 
 </details>
 
@@ -1229,24 +1269,24 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 853 tests collected
+python -m pytest tests/ -q          # 852 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**853 is the number collected, and two different pairs add up to it.** Some of these gates
+**852 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the call recordings, which are held
-outside the tree because the maintainer of this list requires that, a built copy of the
+outside the tree ([`evidence/README.md`](evidence/README.md) says why), a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **813 passed, 40
+A clean checkout of this commit into an empty directory reports **812 passed, 40
 skipped**. The forty name what is missing rather than passing quietly:
 thirty-six want a built page, four of those thirty-six also wanting its
 Content-Security-Policy, three want a gate report, and one is a run whose rows are all of
 one kind, so the ordering it would check proves nothing. Build the page and run the gates and
-the same suite reports **851 passed, 2 skipped**. Both pairs are measured, both add up to
-853, and the difference between them is what a reader has on their disk.
+the same suite reports **850 passed, 2 skipped**. Both pairs are measured, both add up to
+852, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 812 and 41.
+The very first run in a fresh clone reports one more skip and one fewer pass, 811 and 41.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on
@@ -1284,48 +1324,6 @@ A gate that has never been observed to fail has not been shown to test anything.
 mutation testing does not cover is written down in that file too: it shows a test notices a
 change, not that the rule is the right rule. Both defects found in this project during live
 calls were of the second kind.
-
-
-</details>
-
-<details>
-<summary><b>What this adds to the repository that was not already in it</b></summary>
-
-## What this adds to the repository that was not already in it
-
-Three merged contributions overlap this one, and the overlap is real.
-[`callflow-campaign-runner`](../callflow-campaign-runner/) already takes a CSV to calls and
-triages what comes back, dry run by default.
-[`language-bridge-call`](../../../skills/language-bridge-call/) already places a call in the
-recipient's own language with consent handling and E.164 validation.
-[`n8n-calle-api`](../../../plugins/n8n-calle-api/) is already an importable n8n workflow with
-a dry run and masking. If you came here for one of those three, they are here and they are
-good, and this app is not a better version of them.
-
-Two things are not already here.
-
-**What counts as an answer.** `callflow-campaign-runner` routes a call to a person when
-CALL-E's own verdict is weak: a required field missing or wrongly typed, `task_completed` not
-true, confidence under 0.6, and seven other signals, all of them read off the platform's report
-of itself (`apps/python/callflow-campaign-runner/README.md`, the triage table at lines 195 to
-210). Everything that clears those rows is `auto_closed`. That is the right rule for a
-campaign. It is the wrong rule here, and one real call is why: CALL-E returned a schema-valid
-result, `task_completed` true, good confidence, and every required field set to `"unknown"`,
-because the parent said they could not talk. A well-designed enum offers `"unknown"` instead
-of forcing a guess, so that response is correct, and it is also worth nothing, and it passes
-every confidence test there is. This app classifies on whether the fields carry information,
-not on whether the platform thinks the call went well, which is why `undetermined` exists
-here and cannot collapse into either neighbour.
-
-**The second axis.** Nothing else here reads `parent_confirmed_aware`. A call can come back
-complete, valid and confident, and still be the one in the wave that matters: the parent did
-not know their child was absent. That is not a fourth outcome, it is an escalation riding
-alongside the three, and it is the rule this app exists for. Collapsing it into a bucket
-would put it in a queue underneath eleven ordinary callbacks.
-
-`language-bridge-call` is a relay: one call, then a report back to whoever asked. This is a
-wave, and the language belongs to each family rather than to the deployment, which is the
-difference between working in one district and working in the next one.
 
 
 </details>
@@ -1450,33 +1448,6 @@ git log --reverse --format='%h %ad %s' --date=short -- :/apps/python/firstbell |
 
 That command prints the creation date from the repository itself rather than asking anyone
 to take the sentence above on trust.
-
-### The history was rewritten, and here is how much
-
-About two in every five commits in this directory carry a committer date later than their
-author date, and the largest gap is thirty-eight hours. Branches were squashed, messages
-corrected, one range reordered.
-
-That used to be stated as an exact pair, eighty-three of one hundred and sixty-three, and
-by the time a reviewer counted it the tree held 86 of 198. It is a proportion now because
-every commit changes both halves of that pair and nothing was recomputing them, which made
-this the one honesty disclosure in the entry that was not itself checked.
-`test_the_commit_provenance_disclosure_is_still_true` recounts it from git on every run.
-
-One of those rewrites removed things a reviewer would expect to find. The maintainer of the
-list this contributes to has required, on several pull requests, that a contributor take
-committed real-call transcripts and every real-call-derived artifact out of the tree, and
-has said the requirement holds even where the people on the call were team members playing
-a part and the numbers dialled were reserved ones. Both describe this project exactly. So
-the recordings and the receipts came out of the history rather than only out of the head of
-the branch, and they live outside the repository instead
-([`evidence/README.md`](evidence/README.md) says where). A tree that quietly lost twelve
-calls' worth of evidence, in an entry arguing that every claim carries the thing that
-checks it, is worth saying out loud.
-
-Nothing was backdated. The earliest committer date is what `git log` prints and no rewrite
-makes it earlier than the day the work happened; an author date is a value the person
-rewriting chooses, so trust the committer column.
 
 
 </details>

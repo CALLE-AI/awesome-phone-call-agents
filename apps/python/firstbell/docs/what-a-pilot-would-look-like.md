@@ -1,9 +1,8 @@
 # A pilot a district could actually sign
 
-The rubric asks whether a project points at a direction worth building further for real
-users. This is that direction, written as something a Director of Student Services could put
-in front of a board rather than as a roadmap. It is deliberately small, it names what would
-make it stop, and it is honest that nobody in education has run this yet.
+This is the direction the work points at, written as something a Director of Student
+Services could put in front of a board rather than as a roadmap. It is deliberately small, it
+names what would make it stop, and it is honest that nobody in education has run this yet.
 
 Nothing in this file is claimed to have happened. It is a proposal.
 
