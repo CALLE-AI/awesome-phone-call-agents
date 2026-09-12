@@ -1,0 +1,45 @@
+{
+  "name": "dial",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dial — tell it what you need done in the real world; it finds who to contact, calls them, and returns the verified result.",
+  "workspaces": [
+    "packages/*",
+    "apps/api",
+    "apps/worker",
+    "apps/web"
+  ],
+  "engines": { "node": ">=20.11" },
+  "scripts": {
+    "build:packages": "node scripts/build-packages.mjs",
+    "build:api": "npm run build -w @dial/api",
+    "build:worker": "npm run build -w @dial/worker",
+    "build:web": "npm run build -w @dial/web",
+    "build:mobile": "npm --prefix apps/mobile run build",
+    "build": "npm run build:packages && npm run build:api && npm run build:worker && npm run build:web",
+    "dev:api": "npm run dev -w @dial/api",
+    "dev:worker": "npm run dev -w @dial/worker",
+    "dev:web": "npm run dev -w @dial/web",
+    "dev:mobile": "npm --prefix apps/mobile run start",
+    "db:check": "npm run db:check -w @dial/api",
+    "db:migrate": "npm run db:migrate -w @dial/api",
+    "seed": "npm run seed -w @dial/api",
+    "test": "npm run test --workspaces --if-present",
+    "integration-test": "npm run test -w @dial/api",
+    "e2e": "node scripts/e2e.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "calle:verify": "npm run calle:verify -w @dial/api"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "prettier": "^3.3.3",
+    "eslint": "^9.12.0",
+    "@eslint/js": "^9.12.0",
+    "typescript-eslint": "^8.8.0",
+    "vitest": "^2.1.2",
+    "tsx": "^4.19.1"
+  }
+}
