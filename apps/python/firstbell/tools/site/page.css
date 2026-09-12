@@ -479,9 +479,18 @@ h3 {
  * dictionary in the reader's own Chrome profile; with one present it moved 2 of 29 wide
  * paragraphs at 390, and on the fresh profile every gate run and most first-time readers
  * get, it moved none. */
+/* Flush left, one measure, and a leading set here rather than inherited. `body` runs at
+ * 1.62 because that leading also lands on table bodies, labels and the mono blocks, where
+ * a looser line opens gaps between rows. Running prose wants the looser one, so it is set
+ * on the element that holds running prose and nowhere else. `letter-spacing: 0` pins what
+ * is already inherited: it is here so a later tracking rule on an ancestor cannot reach
+ * body copy, which is the one place on this page tracking must not be applied. */
 p {
   margin: 0 0 1.1rem;
   max-width: var(--measure);
+  text-align: left;
+  line-height: 1.65;
+  letter-spacing: 0;
   text-wrap: pretty;
 }
 p.lede {
@@ -1044,6 +1053,11 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   --line-strong: var(--royal-line);
   --link:        var(--royal-ink-2);
   --focus:       var(--royal-ink-2);
+  /* A card on this ground is a lift off the royal, never the paper card. Without this a
+   * disclosure inside the plate paints `oklch(1 0 0)` under type that has already flipped
+   * to near-white, which is the same defect this stylesheet already records twice: a token
+   * that does not flip on a surface that does. */
+  --card:        color-mix(in oklch, var(--royal-ink) 7%, var(--royal));
 }
 
 /* ---- the margin column ------------------------------------------------------------------
@@ -1805,25 +1819,28 @@ footer .source-link { margin-top: var(--space-3); }
 @media (min-width: 52rem) {
   .duet {
     grid-template-columns: 1fr 1fr; gap: var(--space-5);
-    perspective: 1600px;
+    perspective: 1400px;
     perspective-origin: 50% 35%;
     transform-style: preserve-3d;
   }
   /* Angled in, and lifted when it is the one being played. `:focus-within` is in the list
    * because a reader on a keyboard tabbing into a lane's transcript is reading that lane,
    * and the panel should come to them the same way it does for a mouse. */
-  .duet > .lane:first-child { transform: rotateY(4deg) translateZ(-20px); }
-  .duet > .lane:last-child  { transform: rotateY(-4deg) translateZ(-20px); }
+  .duet > .lane:first-child { transform: rotateY(5deg) translateZ(-15px); }
+  .duet > .lane:last-child  { transform: rotateY(-5deg) translateZ(-15px); }
   .duet > .lane {
     transform-style: preserve-3d;
     transition: transform var(--dur-enter) var(--ease-out),
                 box-shadow var(--dur-enter) var(--ease-out);
   }
+  /* The active lane comes forward rather than merely squaring up. 20px at a perspective
+   * of 1400 is a scale of 1400/1380 = 1.0145: a 420px panel grows by six pixels, inside a
+   * 40px gutter, so the pair can never touch. */
   .duet > .lane:hover,
   .duet > .lane:focus-within,
   .duet > .lane[data-live="on"] {
-    transform: rotateY(0deg) translateZ(0);
-    box-shadow: -1px 0 0 0 var(--line-strong), 16px 18px 40px -24px rgba(0, 0, 0, 0.28);
+    transform: rotateY(0deg) translateZ(20px);
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25);
   }
   /* The head and the field row sit off the face of the panel, which is what makes the tilt
    * read as depth rather than as a skewed image. The transcript stays flat on the panel:
@@ -1840,20 +1857,35 @@ footer .source-link { margin-top: var(--space-3); }
 @media (prefers-reduced-motion: reduce) {
   .duet, .duet > .lane, .duet > .lane > * { transform: none !important; perspective: none; }
 }
+/* A panel, not a margin rule with text beside it. The left stroke stays, because it is the
+ * element that goes gold while the lane's call is running and a fill cannot: it has to
+ * clear 3:1 on paper as a graphic. What is new is the ground and the edge around it, so
+ * the two conversations read as two objects a reader can compare rather than as two runs
+ * of text under one heading.
+ *
+ * There is deliberately no `backdrop-filter` here. Nothing sits behind these panels except
+ * flat paper, so a blur would change no pixel; and a non-initial `backdrop-filter` forces
+ * `transform-style` to compute to `flat`, which would drop the head, the fields and the
+ * waveform out of the lane's 3D context and undo the depth the block above builds. A
+ * translucent ground gives the same read at none of that cost.
+ *
+ * The horizontal padding is the load-bearing number, and it was measured the hard way.
+ * `.lane-k` is `white-space: nowrap` and `parent_confirmed_aware` needs half a lane, so
+ * 6px taken off this content box once put `expected_return` over the transcript beneath
+ * it: 19 text-on-text collisions on the scroll walk. The fields grid below is `auto-fit`
+ * now and drops to one column before it can overflow, which is what makes a padded panel
+ * safe at all; the scroll walk is still the thing that says so. */
 .lane {
   display: grid;
   grid-template-rows: auto auto auto 1fr;   /* head, wave, fields, transcript takes the rest */
   gap: var(--space-2);
   min-width: 0;
-  /* The one component that does not take the shared inset, and it was measured the hard
-   * way. `.lane-k` is `white-space: nowrap` and the comment below already records that
-   * `parent_confirmed_aware` needs half a lane, so the 6px the shared inset takes off this
-   * content box is 6px the fields do not have: it put `expected_return` over the transcript
-   * underneath it, 19 text-on-text collisions on the scroll walk. The stroke is the
-   * converged width and the padding hands back exactly what the wider stroke took, so the
-   * content box is the one the four fields were fitted to. */
-  padding-left: calc(var(--space-3) - 1px);
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) - 1px);
+  background: color-mix(in oklch, var(--card) 95%, transparent);
+  border: 1px solid var(--line-strong);
   border-left: var(--marker) solid var(--line);
+  border-radius: 12px;
+  transition: border-color 0.2s ease;
 }
 /* The same rule the register uses, for the same reason: while this lane's call is running,
  * the mark ties the waveform to the language label above it. It is a stroke and never a
@@ -1878,8 +1910,13 @@ footer .source-link { margin-top: var(--space-3); }
  * comment below already said `parent_confirmed_aware` does not fit in a third of a lane and
  * broke mid-word; half a lane is the first width it fits in, and 2x2 is what four fields
  * want anyway. */
+/* Two columns while two columns fit, one the moment they do not. `repeat(2, minmax(0, 1fr))`
+ * keeps two columns at any width and lets the nowrap label run out of its cell, which is
+ * the mechanism behind the 19 collisions recorded above. `auto-fit` with a floor makes the
+ * grid give up the second column instead of overflowing, so the panel can carry padding. */
 .lane-fields {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
   gap: var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--line);
@@ -1897,6 +1934,10 @@ footer .source-link { margin-top: var(--space-3); }
   font-family: var(--mono); font-size: var(--size-0); color: var(--lit-ink-3);
   white-space: nowrap;
 }
+/* A chip once the value is in, and loose text while it is not. The difference between a
+ * field that has been answered and a field that is waiting is the whole of what this act
+ * asks a reader to watch, and it was carried by a 5px node alone. The chip is drawn on the
+ * committed state only, so a lane mid-call is visibly a lane with holes in it. */
 .lane-v {
   font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
   font-weight: 500; overflow-wrap: anywhere;
@@ -1907,9 +1948,20 @@ footer .source-link { margin-top: var(--space-3); }
   .lane-fields { grid-template-columns: 1fr; }
   .lane-f { display: flex; align-items: baseline; gap: var(--space-2); }
 }
-/* Waiting, not empty. A dotted rule under the mark says a value is expected here, which an
- * empty cell does not. --live-mark is a stroke and carries no word, so it stays legal. */
-.lane-v[data-at="pending"] { color: var(--lit-ink-3); border-bottom: 1px dotted var(--live-mark); }
+/* Waiting, not empty. A dashed edge round the chip says a value is expected here, which an
+ * empty cell does not. --live-mark is a stroke and carries no word, so it stays legal.
+ *
+ * The border is 1px in both states and the padding is the same in both, so the chip is the
+ * same box whether the field has been answered or not. That is not decoration: app.js
+ * rewinds each lane to pending and plays it forward, so a chip that is taller in one state
+ * than the other moves everything under the duet every time a field lands. It did, by 3px,
+ * and the layout-shift gate read 0.00237 against a ceiling of 0.001. */
+.lane-v[data-at="pending"] {
+  color: var(--lit-ink-3);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--live-mark);
+}
 
 /* A node per field, so the four of them read as a row of states rather than four words.
  *
@@ -1922,14 +1974,25 @@ footer .source-link { margin-top: var(--space-3); }
  * smallest type on the screen, the ratio drops below 4.5, and nothing about the CSS looks
  * wrong. The dot has no word in it, so 3:1 is the bar it has to clear and it clears it as a
  * filled mark in --live-mark. */
-.lane-v { position: relative; padding-left: 0.95em; }
+/* One chip geometry for both states, set here rather than on either state. */
+.lane-v {
+  position: relative;
+  display: inline-block;
+  padding: 0.1em 0.5em 0.1em 0.95em;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
 .lane-v::before {
-  content: ""; position: absolute; left: 0; top: 0.52em;
+  content: ""; position: absolute; left: 0.42em; top: 0.62em;
   width: 6px; height: 6px; border-radius: 50%;
   border: 1px solid var(--ink-3); background: transparent;
   transition: background var(--dur-tick) var(--ease-out),
               box-shadow var(--dur-tick) var(--ease-out),
               border-color var(--dur-tick) var(--ease-out);
+}
+.lane-v[data-at="committed"] {
+  background: color-mix(in oklch, var(--ink) 4%, transparent);
+  border-color: var(--line);
 }
 .lane-v[data-at="committed"]::before { background: var(--ink-3); border-color: var(--ink-3); }
 .lane-fields[data-live="on"] .lane-v[data-at="committed"]::before {
@@ -1989,23 +2052,31 @@ footer .source-link { margin-top: var(--space-3); }
  * The chevron replaces the default marker because `list-style: none` is needed anyway to
  * put the label and the indicator on opposite ends of the row, and a disclosure triangle
  * cannot be moved there. It rotates rather than swapping glyph, so nothing reflows. */
+/* The card sits on `--card` rather than on a tint of `--ink`, so a disclosure reads as a
+ * surface laid on the page instead of a smudge of it. `--card` is re-declared on every
+ * ground that flips its ink, which is what keeps a fold on the royal plate from painting
+ * a white box under near-white type. A fold whose ground does not flip would inherit the
+ * paper card and be right anyway. */
 .fold {
   margin: var(--space-4) 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in oklch, var(--ink) 2%, transparent);
-  padding: var(--space-2) calc(var(--inset) - 1px);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--card) 98%, transparent);
+  /* 1.25rem of air inside the card; the horizontal figure is the shared inset less the
+   * border, so the label starts on the same vertical as the prose above the card rather
+   * than one pixel inside it. */
+  padding: 1.25rem calc(var(--inset) - 1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .fold[open] {
   border-color: var(--line-strong);
-  box-shadow: 0 4px 12px color-mix(in oklch, var(--ink) 5%, transparent);
-  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 .fold > summary {
-  cursor: pointer; padding: var(--space-2) 0;
-  font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
-  font-weight: 500;
+  cursor: pointer; padding: var(--space-1) 0;
+  font-family: var(--ui); font-size: 0.95rem; color: var(--ink);
+  font-weight: 600;
   list-style: none;
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
@@ -2017,9 +2088,17 @@ footer .source-link { margin-top: var(--space-3); }
 }
 .fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
 .fold > .fold-body, .fold > p:not(:first-of-type) {
-  padding-top: var(--space-3);
-  margin-top: var(--space-2);
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
   border-top: 1px solid var(--line);
+  line-height: 1.65;
+}
+/* Secondary ink for the prose inside a small fold, and only there. `.act-fold` holds most
+ * of an act -- its tables, its money block, its own headings -- and dimming that whole
+ * subtree would take the body copy of four acts down a step for no reason. A `.fold` holds
+ * the working behind a claim already made, which is what secondary ink is for. */
+.fold > .fold-body > p, .fold > p:not(:first-of-type) {
+  color: var(--ink-2);
   line-height: 1.65;
 }
 .fold > summary::marker { color: var(--ink-3); }
@@ -2041,20 +2120,20 @@ footer .source-link { margin-top: var(--space-3); }
 .act-fold {
   margin: var(--space-5) 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in oklch, var(--ink) 2%, transparent);
-  padding: var(--space-2) calc(var(--inset) - 1px);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--card) 98%, transparent);
+  padding: 1.25rem calc(var(--inset) - 1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .act-fold[open] {
   border-color: var(--line-strong);
-  box-shadow: 0 4px 12px color-mix(in oklch, var(--ink) 5%, transparent);
-  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 .act-fold > summary {
-  cursor: pointer; padding: var(--space-3) 0;
-  font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
-  font-weight: 500;
+  cursor: pointer; padding: var(--space-2) 0;
+  font-family: var(--ui); font-size: 0.95rem; color: var(--ink);
+  font-weight: 600;
   list-style: none;
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
@@ -2067,8 +2146,8 @@ footer .source-link { margin-top: var(--space-3); }
 .act-fold[open] > summary { color: var(--ink); }
 .act-fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
 .act-fold > .fold-body {
-  padding-top: var(--space-4);
-  margin-top: var(--space-2);
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
   border-top: 1px solid var(--line);
 }
 /* The disclosure is a block in the reading column, and the bands and splits inside it
@@ -3062,6 +3141,11 @@ button, .replay, [data-copy] {
   --line-strong: var(--royal-line);
   --link:        var(--royal-ink-2);
   --focus:       var(--royal-ink-2);
+  /* A card on this ground is a lift off the royal, never the paper card. Without this a
+   * disclosure inside the plate paints `oklch(1 0 0)` under type that has already flipped
+   * to near-white, which is the same defect this stylesheet already records twice: a token
+   * that does not flip on a surface that does. */
+  --card:        color-mix(in oklch, var(--royal-ink) 7%, var(--royal));
 }
 .masthead .wordmark   { color: var(--royal-ink); }
 .masthead .standfirst { color: var(--royal-ink-2); }
