@@ -2563,8 +2563,13 @@ def takeaway_markup() -> str:
     items = []
     for title, href, why, command, count in rows:
         head = (f'<a href="{href}">{esc(title)}</a>' if href else esc(title))
+        # The bar's link reads "The n8n plugin" and used to land on the block, whose first
+        # item is the other takeaway: a reader who clicked it arrived at a heading about
+        # `calle_double` and had to find the n8n row themselves. The id goes on the row it
+        # names.
+        at = ' id=plugin' if "n8n" in title else ''
         items.append(
-            f'<li><p class=take-h>{head}</p>'
+            f'<li{at}><p class=take-h>{head}</p>'
             f'<p class=take-why>{esc(why)}</p>'
             f'<p class=take-run><code>{esc(command)}</code> '
             f'<span class=take-n>{esc(count)}</span></p></li>')
@@ -2583,6 +2588,13 @@ def further_markup() -> str:
     reach, which is the correct thing for them to have done.
     """
     return (
+        # Two levels, the way an act and the footer are built. The section used to be
+        # the padded box and the reading column at once, so it had no column cap: its
+        # content ran 1,128px wide at 1440 where every act runs 1,088, and 1,608px at
+        # 1920 where every act still runs 1,088. It started 20px left of every other
+        # column and finished 20px right of it, and at 1920 it cleared the fixed rail
+        # by 16px.
+        '<div class=further-band>'
         '<section class="further inner inner-margin" aria-labelledby=h-further>'
         '<p class=further-k>Where to go next</p>'
         '<h2 class=further-lead id=h-further>Everything this rests on, and how to leave '
@@ -2590,14 +2602,14 @@ def further_markup() -> str:
         # Out of the fold, because the bar links to it. What ships as an importable
         # workflow rather than as this app is the reusable half of the entry, and a
         # button pointing at a closed disclosure is a button that answers nothing.
-        + '<div id=plugin>' + takeaway_markup() + '</div>'
+        + '<div id=takeaways>' + takeaway_markup() + '</div>'
         + '<details class="fold act-fold"><summary>Every document, and every outside '
           'figure with its publisher</summary><div class=fold-body>'
         + doc_pages.index_markup()
         + '<p class=further-k>The outside figures, and who published them</p>'
         + sources_markup()
         + '</div></details>'
-        + '</section>'
+        + '</section></div>'
     )
 
 

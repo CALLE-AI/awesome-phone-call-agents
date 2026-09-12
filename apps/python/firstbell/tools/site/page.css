@@ -1199,7 +1199,13 @@ html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
-footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var(--ui); font-size: var(--size-3); }
+footer {
+  padding: 3rem var(--gutter) 5rem; color: var(--ink-3);
+  font-family: var(--ui); font-size: var(--size-3);
+  /* The same ground and the same layer as `.further` above, and for the same
+   * reason: the stuck hero reaches the bottom of the document too. */
+  position: relative; z-index: 2; background: var(--paper);
+}
 /* The provenance block closes the page on the royal, which gives the document an ending
  * instead of letting it run out of cream. Same plate, same inner column, same rule about
  * never reaching the rail. */
@@ -2806,7 +2812,31 @@ button[data-copy][data-copied]::after {
  * So this is the one block on the page whose links leave it. It sits after the last act
  * because it is what a reader does next, not part of the argument, and it is set in the
  * page's own inks so it does not read as a footer of afterthoughts. */
-.further { border-top: 2px solid var(--ink); padding-top: var(--space-4); }
+/* Opaque, and in front, for the same reason every act is.
+ *
+ * Act 0 is `position: sticky` and sticks for the whole length of `main`, so it is still
+ * painted at the foot of the document with everything else on top of it. Every `.act` sets
+ * its own ground and its own stacking, which is what keeps the hero out of them. This block
+ * is not an act and set neither, so the last screen of the page was the hero's playground
+ * showing through it: a reader who clicked "The n8n plugin" in the bar landed on the right
+ * scroll position and saw act 0's own cards, which is what made the link look broken. */
+.further-band {
+  position: relative; z-index: 2; background: var(--paper);
+  padding-inline: var(--gutter);
+}
+/* The rail inset is repeated here rather than joined to the one at :1272, because this rule
+ * is 1,500 lines later and any shorthand in it would win the tie and wipe the inset. The
+ * block sat 100px left of every act until it did, which is what a padding shorthand costs
+ * when it is read after the thing it is meant to agree with. */
+@media (min-width: 72rem) { .further-band { padding-left: 16rem; } }
+/* The column, at the width every other column on the page runs at. The rule goes with it:
+ * at full bleed it was a 2px black bar from edge to edge, crossing under the fixed rail and
+ * reading as a divider between the page and nothing. Across the column it is a section
+ * break, which is the job it was doing. */
+.further {
+  max-width: 68rem; margin: 0 auto;
+  border-top: 1px solid var(--ink); padding-top: var(--space-4);
+}
 .further-k {
   font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-2);
