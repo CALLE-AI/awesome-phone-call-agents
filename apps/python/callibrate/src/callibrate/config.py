@@ -55,6 +55,19 @@ class Settings(BaseSettings):
     #: phoned will phone the same small charity every morning.
     minimum_call_interval_days: int = Field(default=1, ge=0, le=30)
 
+    # -- Who may ask for a call -----------------------------------------------
+    #: Whether a visitor with no account may start a verification. Left unset,
+    #: the deployment answers for itself: open while the pilot line is
+    #: answering, closed once CALL-E can dial a real number, because an
+    #: anonymous request on a live deployment spends call capacity somebody
+    #: else authorised.
+    allow_public_verification: bool | None = None
+    #: How many verifications anonymous visitors may cause in one UTC day. The
+    #: per-address limiter only slows a single caller down; this bounds the
+    #: whole deployment, which is the number that matters when addresses are
+    #: cheap.
+    public_verification_daily_limit: int = Field(default=25, ge=1, le=1000)
+
     # -- Demonstration directory ----------------------------------------------
     bootstrap_sample_data: bool = True
     #: The number the seeded demonstration provider answers on. Set this to a
@@ -123,6 +136,13 @@ class Settings(BaseSettings):
     @property
     def live_calling(self) -> bool:
         return self.caller_mode == "calle"
+
+    @property
+    def public_verification(self) -> bool:
+        """Whether an anonymous visitor may cause a call on this deployment."""
+        if self.allow_public_verification is None:
+            return not self.live_calling
+        return self.allow_public_verification
 
 
 def password_hash(password: str, *, salt: bytes | None = None) -> str:

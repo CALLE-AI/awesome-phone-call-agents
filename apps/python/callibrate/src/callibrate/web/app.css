@@ -620,7 +620,13 @@ dialog::backdrop { background: rgba(5, 7, 11, 0.7); backdrop-filter: blur(3px); 
 
 /* Guided walkthrough (?demo=1): caption rail, spotlight ring, title cards. */
 .demo-caption, .demo-spotlight, .demo-card { border: 0; padding: 0; margin: 0; background: transparent; overflow: visible; }
-.demo-caption::backdrop, .demo-spotlight::backdrop, .demo-card::backdrop { background: transparent; }
+/* A popover is in the top layer, so it gets a ::backdrop, and the dialog rule
+   above blurs everything painted beneath it. The walkthrough keeps three of
+   them open at once over the working interface, so the filter has to go as
+   well as the wash. */
+.demo-caption::backdrop, .demo-spotlight::backdrop, .demo-card::backdrop {
+  background: transparent; backdrop-filter: none;
+}
 .demo-caption:popover-open {
   /* A dialog defaults to width: fit-content, which quietly ignores inset. */
   position: fixed; inset: auto 0 0 0; width: 100%; max-width: none; box-sizing: border-box;

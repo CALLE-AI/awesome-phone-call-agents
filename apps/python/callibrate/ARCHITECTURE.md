@@ -81,11 +81,17 @@ close their own characters to the word pass; two times only make a range if the
 words between them join them; a bare closing hour is promoted by twelve only
 when that repairs an impossible range and leaves a plausible working day, so
 `ten until one` is afternoon and `seven until seven` stays unreadable and goes
-to a person.
+to a person. One sentence also has to describe one session: a record value is a
+single range over a set of days, so `Tuesdays ten to twelve and Thursdays one to
+three` produces no candidate at all rather than a collapsed one.
 
 `evidence/readback.py` then looks for the exchange a confirmed change claims
-happened: the provider says it, the assistant says the whole of it back, the
-provider agrees without hedging or correcting. All three, in that order.
+happened: the provider says it, the assistant says the whole of it and no more
+than it back, the provider agrees without hedging or correcting. All three, in
+that order. Both readers take their vocabulary and their two scanners from
+`evidence/spoken.py`, deliberately: if the proposer could see a day or a clock
+time the corroborator could not, a value could be built out of half a sentence
+and then read back as though it were the whole of it.
 
 ## The transaction boundary
 

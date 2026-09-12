@@ -10,13 +10,19 @@ Nothing here asks a model anything. It reads the recorded transcript and looks
 for the exchange the report claims happened, which is three turns in order:
 
 1. the **provider** says the new thing, in their own words;
-2. the **assistant** says the whole value back to them;
+2. the **assistant** says the whole value back to them, and nothing the value
+   does not hold;
 3. the **provider** agrees, without hedging or correcting.
 
 All three are required, and the order is required. Two of them are not enough:
 an assistant that reads out what the record already holds and gets "the phone
 number is right, but the hours moved" has been corrected, not confirmed, and a
 value nobody said first is a value the caller brought to the call itself.
+
+The second condition is two-sided on purpose. A readback that says more than the
+value is agreed to as a whole and recorded in part, so "Tuesdays ten to twelve
+and Thursdays one to three" is a faithful readback of a conversation and not a
+readback of `TU,TH 10:00-12:00`.
 
 Three properties are deliberate.
 
@@ -44,6 +50,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from callibrate.evidence.spoken import DAY_FORMS, clock_times_in, day_codes_in, words
+
 # Words a provider uses to agree. Matched whole, so "correctly" and "no" inside
 # "nothing" do not count.
 AFFIRMATIONS = frozenset({
@@ -64,16 +72,6 @@ HESITATIONS = frozenset({
     "but", "though", "however", "except", "changed", "change", "moved", "moves",
     "instead", "different", "new", "update", "updated", "correction",
 })
-
-DAY_FORMS: dict[str, frozenset[str]] = {
-    "MO": frozenset({"mo", "mon", "monday", "mondays"}),
-    "TU": frozenset({"tu", "tue", "tues", "tuesday", "tuesdays"}),
-    "WE": frozenset({"we", "wed", "weds", "wednesday", "wednesdays"}),
-    "TH": frozenset({"th", "thu", "thur", "thurs", "thursday", "thursdays"}),
-    "FR": frozenset({"fr", "fri", "friday", "fridays"}),
-    "SA": frozenset({"sa", "sat", "saturday", "saturdays"}),
-    "SU": frozenset({"su", "sun", "sunday", "sundays"}),
-}
 
 NUMBER_WORDS: dict[int, frozenset[str]] = {
     0: frozenset({"0", "zero", "midnight"}),
@@ -137,10 +135,6 @@ class ReadbackEvidence:
         return f"{field}: readback {verdict} in the transcript ({self.reason})"
 
 
-def _words(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
-
-
 def _time_forms(hour: str, minute: str) -> frozenset[str]:
     """Surface forms a spoken clock time can take, in 24 and 12 hour readings."""
     hour_value = int(hour)
@@ -179,10 +173,10 @@ def value_evidence_groups(field: str, value: str) -> list[frozenset[str]]:
         return [frozenset({text.lower(), "closed", "ended", "stopped", "suspended", "inactive"})]
 
     distinctive = [
-        word for word in _words(text)
+        word for word in words(text)
         if word not in STOPWORDS and (len(word) > 3 or word.isdigit())
     ]
-    return [frozenset({word}) for word in distinctive] or [frozenset(_words(text))]
+    return [frozenset({word}) for word in distinctive] or [frozenset(words(text))]
 
 
 def _hits(groups: list[frozenset[str]], spoken: set[str]) -> int:
@@ -198,8 +192,43 @@ def _covered(hits: int, total: int, field: str) -> bool:
     return hits >= max(1, round(total * FREE_TEXT_COVERAGE))
 
 
+def _says_only(text: str, value: str) -> bool:
+    """Whether a schedule readback names nothing the value does not hold.
+
+    Coverage asks whether the parts of the value are somewhere in the utterance,
+    and an utterance can satisfy that while saying considerably more. "Tuesdays
+    ten to twelve and Thursdays one to three" contains every part of
+    `TU,TH 10:00-12:00`, and a provider agreeing with it has not agreed to that:
+    they have agreed to a Thursday afternoon the value turns into a Tuesday
+    morning. So a day or a clock time the value does not hold makes the readback
+    a different statement, and a different statement is not a readback.
+
+    Times are compared on the twelve hour dial, because "one in the afternoon"
+    and `13:00` are the same time said two ways, and the reader that hears the
+    sentence is the one the proposer used.
+    """
+    match = SCHEDULE_VALUE.fullmatch((value or "").strip())
+    if not match:
+        return True
+    days, open_hour, open_minute, close_hour, close_minute = match.groups()
+    expected_days = set(days.split(","))
+    expected_times = {
+        (int(open_hour) % 12, int(open_minute)),
+        (int(close_hour) % 12, int(close_minute)),
+    }
+    spoken_times = {(hour % 12, minute) for _, hour, minute in clock_times_in(text)}
+    return not (set(day_codes_in(text)) - expected_days) and not (spoken_times - expected_times)
+
+
+def _reads_back(text: str, field: str, groups: list[frozenset[str]], value: str) -> bool:
+    """Whether one utterance says the whole of a value and nothing beyond it."""
+    if not _covered(_hits(groups, set(words(text))), len(groups), field):
+        return False
+    return field != "schedule" or _says_only(text, value)
+
+
 def _affirms(text: str) -> bool:
-    spoken = set(_words(text))
+    spoken = set(words(text))
     return bool(spoken & AFFIRMATIONS) and not (spoken & HESITATIONS)
 
 
@@ -209,9 +238,9 @@ def corroborate(
     """Look for the readback exchange a `read_back_confirmed` flag claims happened.
 
     The provider has to have said the new thing first, the assistant has to have
-    said the whole value back after that, and the provider has to have agreed
-    after that. All three quotes are kept so a curator reviewing the change reads
-    the same exchange the machine relied on.
+    said the whole value back after that and nothing the value does not hold, and
+    the provider has to have agreed after that. All three quotes are kept so a
+    curator reviewing the change reads the same exchange the machine relied on.
     """
     if not new_value:
         return ReadbackEvidence(False, "there is no value to have read back")
@@ -245,7 +274,7 @@ def corroborate(
             index
             for index, (role, text) in enumerate(turns)
             if role in {"provider", "seeker"}
-            and _hits(groups, set(_words(text))) >= max(1, (len(groups) + 1) // 2)
+            and _hits(groups, set(words(text))) >= max(1, (len(groups) + 1) // 2)
         ),
         None,
     )
@@ -255,15 +284,19 @@ def corroborate(
             "no provider turn states this value, so it did not come from the provider",
         )
 
-    # 2. The assistant says the whole of it back, after that.
+    # 2. The assistant says the whole of it back, and no more than it, after that.
     best = 0
+    said_more = False
     for index in range(source + 1, len(turns)):
         role, text = turns[index]
         if role != "assistant":
             continue
-        hits = _hits(groups, set(_words(text)))
+        hits = _hits(groups, set(words(text)))
         best = max(best, hits)
         if not _covered(hits, len(groups), field):
+            continue
+        if field == "schedule" and not _says_only(text, new_value):
+            said_more = True
             continue
         # 3. The provider agrees with the readback, and does not correct it.
         reply = next(
@@ -286,6 +319,12 @@ def corroborate(
                 spoken,
             )
 
+    if said_more:
+        return ReadbackEvidence(
+            False,
+            "the assistant's readback named a day or a time this value does not hold, so "
+            "agreeing with the readback is not agreeing with the value",
+        )
     if best:
         return ReadbackEvidence(
             False,
@@ -302,13 +341,13 @@ def quote_supported(transcript: list[dict[str, str]], quote: str) -> bool:
     against what the transcript records the provider saying, so `explicitly_confirmed`
     stops being a claim the model makes about itself.
     """
-    distinctive = [word for word in _words(quote) if word not in STOPWORDS and len(word) > 3]
+    distinctive = [word for word in words(quote) if word not in STOPWORDS and len(word) > 3]
     if not distinctive:
         return False
     for turn in transcript:
         if str(turn.get("role")) not in {"provider", "seeker"}:
             continue
-        spoken = set(_words(str(turn.get("text", ""))))
+        spoken = set(words(str(turn.get("text", ""))))
         hits = sum(1 for word in distinctive if word in spoken)
         if hits >= max(1, round(len(distinctive) * FREE_TEXT_COVERAGE)):
             return True
@@ -326,7 +365,7 @@ def covers_value(text: str, field: str, value: str) -> bool:
     groups = value_evidence_groups(field, value)
     if not groups:
         return False
-    return _covered(_hits(groups, set(_words(text))), len(groups), field)
+    return _reads_back(text, field, groups, value)
 
 
 def affirms(text: str) -> bool:

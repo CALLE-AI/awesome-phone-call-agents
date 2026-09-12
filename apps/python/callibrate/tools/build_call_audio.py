@@ -5,9 +5,8 @@ and the point of this product is that a phone call happened. So each turn of
 each pilot script is rendered as its own clip, in a different voice per speaker,
 through a 300-3400 Hz band-pass so it sounds like a line rather than a podcast.
 
-The manifest records the measured length of every clip. The console uses it to
-reveal each line as it is spoken, and the film's narration track splices the
-same clips in at the same offsets, so what is on screen and what is in the
+The manifest records the measured length of every clip, and the console uses it
+to reveal each line as it is spoken, so what is on screen and what is in the
 speakers cannot drift apart.
 
     python tools/build_call_audio.py

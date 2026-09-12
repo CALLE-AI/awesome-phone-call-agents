@@ -135,6 +135,28 @@ CASES: list[tuple[str, Authority, CallOutcome, list[dict[str, str]]]] = [
         ),
     ),
     (
+        "two sessions in one sentence, read back faithfully",
+        Authority.REVIEW,
+        CallOutcome.COMPLETED,
+        turns(
+            ("bot", DISCLOSURE + " We publish Wednesdays nine until twelve. Is that still right?"),
+            ("user", "Tuesdays ten to twelve and Thursdays one to three."),
+            ("bot", "So that is Tuesdays ten to twelve and Thursdays one to three, correct?"),
+            ("user", "Yes, that is right."),
+        ),
+    ),
+    (
+        "readback that adds a day and a time",
+        Authority.REVIEW,
+        CallOutcome.COMPLETED,
+        turns(
+            ("bot", DISCLOSURE + " Is Wednesday nine until twelve still right?"),
+            ("user", "It moved to ten until one."),
+            ("bot", "So Wednesdays ten in the morning until one in the afternoon, and Thursdays two until four?"),
+            ("user", "Yes."),
+        ),
+    ),
+    (
         "hedged volunteer",
         Authority.REVIEW,
         CallOutcome.COMPLETED,

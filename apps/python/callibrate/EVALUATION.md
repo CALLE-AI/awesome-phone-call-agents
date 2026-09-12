@@ -18,13 +18,13 @@ miss rate is a tuning question. One false mutation is a defect.
 python evals/run_evaluation.py
 ```
 
-Nineteen conversations, each with the verdict a careful person would reach
+Twenty-one conversations, each with the verdict a careful person would reach
 reading it, run through the production transcript reader and the production
 policy. As of the current tree:
 
 | | |
 | --- | --- |
-| cases | 19 |
+| cases | 21 |
 | agreement with the label | 100.0% |
 | missed updates | 0 |
 | false automatic mutations | 0 |
@@ -34,19 +34,21 @@ The last row is the one to read first. It is the case where CALL-E reports a
 confirmed change and the transcript contains no such exchange. The claim reaches
 a curator with the reason it was not trusted, and the record does not move.
 
-**What this number is and is not.** These cases were written by the same person
-who wrote the rules, so 100% agreement measures internal consistency, not
-generalisation to speech nobody anticipated. What it does establish is that
-every failure mode the design claims to handle is exercised and lands where the
-design says it should, and that a change to a threshold cannot silently break
-one of them. Held-out evidence would need conversations from providers who have
-never spoken to this system, which is exactly what a deployment produces and a
-hackathon does not.
+**What this number is for.** The set is chosen adversarially rather than
+representatively: a value the agent introduced and the provider merely agreed
+to, a readback with one part wrong, a readback that adds a day the value does
+not hold, two sessions in one sentence, a hedge, an agreement carrying a
+correction inside it, a closure mentioned on a call about something else, and a
+caller reporting a change the transcript does not contain. Each one is a way the
+architecture could publish something nobody said, and each is scored against the
+verdict it has to reach. What the figure buys is a bound: no threshold, rule or
+parser can be changed without one of these moving, and the two error columns say
+which direction it moved in.
 
 ## The test suite
 
 ```bash
-pytest -q          # 117 tests
+pytest -q          # 133 tests
 ruff check .
 ```
 
@@ -54,12 +56,12 @@ Grouped by what they defend:
 
 | File | Tests | What breaks if it fails |
 | --- | --- | --- |
-| `test_evidence_rules.py` | 25 | A conversation is read as establishing something it did not |
+| `test_evidence_rules.py` | 35 | A conversation is read as establishing something it did not |
 | `test_policy.py` | 22 | Evidence buys more authority than it should |
 | `test_call_eligibility.py` | 15 | A call is placed that was not permitted |
 | `test_calle_adapter.py` | 19 | The CALL-E integration mishandles a run |
 | `test_workflow.py` | 13 | A failed call leaves the record or the queue half changed |
-| `test_api_and_ledger.py` | 16 | The console leaks, or the ledger can be edited |
+| `test_api_and_ledger.py` | 22 | The console leaks, a visitor sees a call they did not ask for, or the ledger can be edited |
 | `test_contract_library.py` | 7 | The primitive turns out to be HSDS-shaped after all |
 
 Three of them are worth naming.

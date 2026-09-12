@@ -10,7 +10,7 @@ Any console error or failed network request fails the run.
     python tools/ui_smoke.py https://...  # or an already-running deployment
     python tools/ui_smoke.py --demo       # play the guided walkthrough instead
 
-Screenshots land in docs/screenshots/, which is what the film is cut from.
+Screenshots land in docs/screenshots/.
 """
 
 from __future__ import annotations
@@ -162,6 +162,8 @@ def run_console(page, base: str) -> None:
 
 
 def run_public(page, base: str) -> None:
+    polled: list[str] = []
+    page.on("request", lambda request: polled.append(request.url))
     page.goto(f"{base}/find", wait_until="networkidle")
     page.wait_for_selector(".result", timeout=15000)
     shot(page, "08-public")
@@ -177,6 +179,26 @@ def run_public(page, base: str) -> None:
     if "could not" in outcome or "refused" in outcome:
         problems.append(f"the public verification did not complete: {outcome}")
     shot(page, "10-verified-public")
+
+    # The visitor followed the call with a ticket. Without it, the same URL is
+    # closed, and with it the answer carries no transcript and no run id.
+    followed = [url for url in polled if "/api/verifications/" in url]
+    if not followed or "ticket=" not in followed[-1]:
+        problems.append("the public page did not follow the call with its ticket")
+    else:
+        probe = page.evaluate(
+            """async ([withTicket, without]) => {
+                const closed = await fetch(without);
+                const open = await fetch(withTicket);
+                return { closed: closed.status, body: await open.json() };
+            }""",
+            [followed[-1], followed[-1].split("?")[0]],
+        )
+        if probe["closed"] != 401:
+            problems.append(f"a verification could be watched without its ticket ({probe['closed']})")
+        leaked = {"result", "evidence", "contract", "call_id"} & set(probe["body"])
+        if leaked:
+            problems.append(f"the visitor's view of a call carried {sorted(leaked)}")
 
     page.click(".result-actions .button.ghost")
     page.wait_for_selector("#form-dialog[open]", timeout=8000)
@@ -216,7 +238,13 @@ def main() -> int:
                 run_demo(page, base)
             else:
                 run_console(page, base)
-                run_public(page, base)
+                # A visitor arrives with no session. Give them a browser of
+                # their own rather than the curator's cookies.
+                visitor = browser.new_context(viewport=VIEWPORT, device_scale_factor=2)
+                visitor_page = visitor.new_page()
+                watch(visitor_page)
+                run_public(visitor_page, base)
+                visitor.close()
             context.close()
             browser.close()
     finally:

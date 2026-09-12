@@ -853,7 +853,7 @@
 
       const facts = el("div", "facts");
       const verification = state.verifications[service.id];
-      const applied = verification && verification.result ? (verification.result.applied || []) : [];
+      const applied = verification ? (verification.applied || (verification.result && verification.result.applied) || []) : [];
       const change = applied.find((item) => item.field === "schedule");
       const hours = el("div", "fact");
       hours.append(el("span", "k", "Opening hours"));
@@ -925,7 +925,7 @@
         "The provider said something a person has to look at, so nothing here has been changed. Call ahead before you travel.";
     } else if (job.state === "refused" || job.state === "failed") {
       body.classList.add("stopped");
-      body.textContent = job.error || "The call could not be made. Nothing has been changed.";
+      body.textContent = job.error || job.detail || "The call could not be made. Nothing has been changed.";
     } else {
       body.textContent = job.detail;
     }
@@ -940,9 +940,10 @@
       });
       state.verifications[serviceId] = job;
       paintResults();
+      const follow = `/api/verifications/${encodeURIComponent(job.task_id)}${job.ticket ? `?ticket=${encodeURIComponent(job.ticket)}` : ""}`;
       const timer = setInterval(async () => {
         try {
-          const update = await api(`/api/verifications/${encodeURIComponent(job.task_id)}`);
+          const update = await api(follow);
           state.verifications[serviceId] = update;
           if (["verified", "review", "failed", "refused"].includes(update.state)) {
             clearInterval(timer);

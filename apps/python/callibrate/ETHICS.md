@@ -31,6 +31,21 @@ cheapest to fail.
 
 A refusal is written to the ledger as `call.refused` with its reason.
 
+## Who may ask
+
+The gates decide whether a number may be called. A separate question is who may
+spend that permission, because *Verify before I go* is the one thing in the
+product a stranger can press. A deployment that can dial a real number takes
+anonymous requests only when its operator has said so
+(`CBR_ALLOW_PUBLIC_VERIFICATION=true`); otherwise a visitor's press is refused
+before a task exists, and a curator runs the call from the queue instead. Where
+the route is open, a deployment-wide daily budget bounds the anonymous crowd, on
+top of a per-address limiter that only ever slowed one caller down.
+
+What a visitor is told afterwards is the record's own new value and a sentence
+of progress. The transcript names a person who answered a phone, and it is read
+by curators, not by whoever pressed the button.
+
 ## During the call
 
 The instruction CALL-E is given is generated from the contract, shown in full in

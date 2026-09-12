@@ -84,6 +84,10 @@ class Job:
     result: dict[str, Any] | None = None
     error: str = ""
     login_url: str = ""
+    #: Handed to whoever asked for this verification and to nobody else. Task
+    #: ids are guessable, so this is what lets a visitor follow the call they
+    #: asked for without letting them watch calls they did not.
+    ticket: str = field(default_factory=lambda: secrets.token_urlsafe(24))
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -98,6 +102,26 @@ class Job:
             "error": self.error,
             "login_url": self.login_url,
         }
+
+    def as_public_json(self, *, ticket: bool = False) -> dict[str, Any]:
+        """What a visitor may see: progress, and the record's own new value.
+
+        Never the transcript, the evidence, the CALL-E run id or the contract.
+        Those name a person on the other end of a phone call, and they stay
+        behind a session the way `/api/runs/{run_id}` always has.
+        """
+        payload: dict[str, Any] = {
+            "task_id": self.task_id,
+            "service_id": self.service_id,
+            "state": self.state,
+            "detail": self.detail,
+            "caller": self.caller,
+            "started_at": self.started_at,
+            "applied": list((self.result or {}).get("applied") or []),
+        }
+        if ticket:
+            payload["ticket"] = self.ticket
+        return payload
 
 
 class JobRegistry:
@@ -150,6 +174,37 @@ class WindowLimiter:
             return False
         bucket.append(now)
         return True
+
+
+class DailyBudget:
+    """A deployment-wide cap on the calls anonymous visitors may cause in a day.
+
+    The per-address limiter is a courtesy, because addresses are cheap. This is
+    the control that bounds what an anonymous crowd can spend of the call
+    capacity an operator authorised.
+    """
+
+    def __init__(self, maximum: int):
+        self.maximum = maximum
+        self.day = ""
+        self.spent = 0
+
+    def _roll(self) -> None:
+        today = datetime.now(UTC).date().isoformat()
+        if today != self.day:
+            self.day, self.spent = today, 0
+
+    def allow(self) -> bool:
+        self._roll()
+        if self.spent >= self.maximum:
+            return False
+        self.spent += 1
+        return True
+
+    @property
+    def remaining(self) -> int:
+        self._roll()
+        return max(self.maximum - self.spent, 0)
 
 
 class RequestBodyLimitMiddleware:
@@ -255,6 +310,25 @@ def current_user(request: Request, *, role: str | None = None) -> dict[str, Any]
         if not secrets.compare_digest(supplied, user["csrf_token"]):
             raise HTTPException(403, "invalid CSRF token")
     return user
+
+
+def signed_in_user(request: Request) -> dict[str, Any] | None:
+    """The user behind this request, or None.
+
+    A signed-in mutation still needs its CSRF token: a missing session is
+    anonymous, a bad token is refused.
+    """
+    try:
+        return current_user(request)
+    except HTTPException as error:
+        if error.status_code == 401:
+            return None
+        raise
+
+
+def holds_ticket(request: Request, job: Job) -> bool:
+    supplied = request.headers.get("x-verification-ticket") or request.query_params.get("ticket", "")
+    return bool(supplied) and secrets.compare_digest(supplied, job.ticket)
 
 
 # --------------------------------------------------------------------------- #
@@ -583,23 +657,51 @@ async def start_verification(request: Request) -> JSONResponse:
 
 
 async def verification_status(request: Request) -> JSONResponse:
-    """Follow one verification. Public, because the public can start one."""
+    """Follow one verification.
+
+    A session sees the run: the evidence, the verdict and the CALL-E run id.
+    The visitor who asked for the call follows it with the ticket they were
+    given, and sees progress and whatever the directory now says in public.
+    Nobody else sees either.
+    """
     task_id = request.path_params["task_id"]
     job = request.app.state.jobs.get(task_id)
     if not job:
         raise HTTPException(404, "no verification is running for that task")
-    return JSONResponse(job.as_json())
+    if signed_in_user(request):
+        return JSONResponse(job.as_json())
+    if holds_ticket(request, job):
+        return JSONResponse(job.as_public_json())
+    raise HTTPException(
+        401, "follow this verification with the ticket it was requested with, or sign in"
+    )
 
 
 async def verify_now(request: Request) -> JSONResponse:
     """"Verify before I go": a visitor asks for a record to be checked, now.
 
     This is the shortest path in the product from a person's doubt to a phone
-    ringing. It is rate limited, it creates exactly one task per record, and it
-    goes through the same eligibility gate as everything else.
+    ringing, and the one route where somebody with no account can spend call
+    capacity an operator authorised. So it is bounded four ways: the five
+    eligibility gates decide whether the call may happen at all, a per-address
+    limiter slows one caller down, a deployment-wide daily budget bounds the
+    anonymous crowd, and a deployment that can dial a real number takes
+    anonymous requests only when its operator has said so in as many words.
     """
+    try:
+        user = signed_in_user(request)
+    except HTTPException:
+        # A session that did not send its CSRF token is not a curator here. It
+        # is a visitor, held to exactly what a visitor may do, which is all this
+        # route was ever for: the public page carries no session of its own.
+        user = None
+    settings: Settings = request.app.state.settings
+    if not user and not settings.public_verification:
+        raise HTTPException(
+            401, "this deployment accepts verification requests from signed-in curators only"
+        )
     ip = request.client.host if request.client else "unknown"
-    if not request.app.state.verify_limiter.allow(ip):
+    if not user and not request.app.state.verify_limiter.allow(ip):
         return json_error("too many verification requests; try again shortly", 429, code="rate_limited")
     payload = await parse_model(request, VerifyNowRequest)
     store: Store = request.app.state.store
@@ -610,7 +712,15 @@ async def verify_now(request: Request) -> JSONResponse:
     registry: JobRegistry = request.app.state.jobs
     running = registry.running_for(payload.service_id)
     if running:
-        return JSONResponse(running.as_json(), status_code=202)
+        seen = running.as_json() if user else running.as_public_json(ticket=True)
+        return JSONResponse(seen, status_code=202)
+
+    if not user and not request.app.state.public_budget.allow():
+        return json_error(
+            "the public verification budget for today is spent; a curator can still run this one",
+            429,
+            code="budget_spent",
+        )
 
     try:
         task_id, created = request_verification(
@@ -633,7 +743,7 @@ async def verify_now(request: Request) -> JSONResponse:
             request.app, job, None, "Somebody is about to travel to this service and asked us to check."
         )
     )
-    return JSONResponse(job.as_json(), status_code=202)
+    return JSONResponse(job.as_json() if user else job.as_public_json(ticket=True), status_code=202)
 
 
 # --------------------------------------------------------------------------- #
@@ -656,7 +766,7 @@ async def public_service(request: Request) -> JSONResponse:
     if not service:
         raise HTTPException(404, "service not found")
     job = request.app.state.jobs.running_for(service["id"])
-    return JSONResponse({"service": service, "verification": job.as_json() if job else None})
+    return JSONResponse({"service": service, "verification": job.as_public_json() if job else None})
 
 
 async def accept_referral(request: Request) -> JSONResponse:
@@ -768,6 +878,10 @@ async def system_info(request: Request) -> JSONResponse:
             # The count, never the numbers. An allowlist is an access control,
             # not a directory.
             "allowlisted_numbers": len(settings.allowlist),
+            "public_verification": settings.public_verification,
+            "public_verifications_left_today": (
+                request.app.state.public_budget.remaining if settings.public_verification else 0
+            ),
             "directory_name": settings.directory_name,
             "demonstration_directory": settings.bootstrap_sample_data,
             "pilot_scenarios": PilotLineCaller.scenarios(),
@@ -868,6 +982,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app.state.login_limiter = WindowLimiter(settings.login_attempts_per_minute)
     app.state.public_limiter = WindowLimiter(20)
     app.state.verify_limiter = WindowLimiter(6)
+    app.state.public_budget = DailyBudget(settings.public_verification_daily_limit)
     app.state.calle_pending = None
     app.state.web_dir = web_dir
     app.state.logger = logging.getLogger("callibrate.api")

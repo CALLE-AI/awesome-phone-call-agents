@@ -26,7 +26,15 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from callibrate.evidence.readback import AFFIRMATIONS, DAY_FORMS, HESITATIONS, _words
+from callibrate.evidence.readback import AFFIRMATIONS, HESITATIONS
+from callibrate.evidence.spoken import (
+    DAY_ORDER,
+    DAY_TOKEN,
+    clock_times_in,
+    day_codes_in,
+    day_mentions_in,
+    words,
+)
 from callibrate.privacy import redact_pii
 
 #: Words that make a *statement* uncertain. Deliberately much narrower than
@@ -54,21 +62,6 @@ SPEAKER_ROLES = {
     "recipient": "provider",
     "provider": "provider",
 }
-
-WORD_TO_HOUR = {
-    "midnight": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
-    "noon": 12, "midday": 12,
-}
-WORD_TO_MINUTE = {
-    "oclock": 0, "sharp": 0, "fifteen": 15, "quarter": 15, "thirty": 30, "half": 30,
-    "fortyfive": 45, "forty": 40, "fifty": 50, "ten": 10, "twenty": 20, "five": 5,
-}
-
-DAY_TOKEN = {form: code for code, forms in DAY_FORMS.items() for form in forms}
-DAY_ORDER = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
-
-CLOCK = re.compile(r"\b(\d{1,2})[:.h](\d{2})\b")
 
 STOP_PHRASES = (
     "stop calling", "take us off", "do not call", "don't call", "remove us from",
@@ -140,72 +133,9 @@ def normalize_turns(raw_turns: list[dict[str, Any]], *, redact: bool = True) -> 
     return turns
 
 
-#: Words that make two clock times a range rather than two separate mentions.
 #: Words that join two clock times into one span. "and" is here because "we
 #: open nine and close twelve" is a range; a comma alone is not.
 RANGE_MARKERS = frozenset({"to", "til", "till", "until", "through", "thru", "and", "between"})
-
-
-def _times_in(text: str) -> list[tuple[int, int, int]]:
-    """Every clock time in a sentence as (position, hour, minute), in order.
-
-    Digits win where they exist, and the characters they occupy are then closed
-    to the word pass: without that, "close 12:30" is read as a 12:30 and then
-    again as a 12 and a 30, and the sentence acquires times nobody said.
-    """
-    lowered = text.lower()
-    found: list[tuple[int, int, int]] = []
-    consumed: list[tuple[int, int]] = []
-    for match in CLOCK.finditer(lowered):
-        hour, minute = int(match.group(1)), int(match.group(2))
-        if hour < 24 and minute < 60:
-            found.append((match.start(), hour, minute))
-            consumed.append((match.start(), match.end()))
-
-    words = re.findall(r"[a-z0-9]+", lowered)
-    positions: list[int] = []
-    cursor = 0
-    for word in words:
-        index = lowered.find(word, cursor)
-        positions.append(index)
-        cursor = index + len(word)
-
-    index = 0
-    while index < len(words):
-        word = words[index]
-        position = positions[index]
-        if any(start <= position < stop for start, stop in consumed):
-            index += 1
-            continue
-        hour = WORD_TO_HOUR.get(word)
-        if hour is None and word.isdigit() and 0 <= int(word) <= 23 and len(word) <= 2:
-            hour = int(word)
-        if hour is None:
-            index += 1
-            continue
-        minute = 0
-        step = 1
-        for offset, nxt in enumerate(words[index + 1 : index + 4]):
-            if nxt in {"thirty", "half"}:
-                minute, step = 30, offset + 2
-                break
-            if nxt in {"fifteen", "quarter"}:
-                minute, step = 15, offset + 2
-                break
-            if nxt in {"forty", "fortyfive"}:
-                minute, step = 45, offset + 2
-                break
-            if nxt.isdigit() and len(nxt) == 2 and int(nxt) < 60:
-                minute, step = int(nxt), offset + 2
-                break
-        tail = " ".join(words[index : index + 6])
-        if re.search(r"\b(pm|afternoon|evening|night)\b", tail) and hour < 12:
-            hour += 12
-        elif re.search(r"\b(am|morning)\b", tail) and hour == 12:
-            hour = 0
-        found.append((position, hour, minute))
-        index += step
-    return sorted(found)
 
 
 def _is_a_range(text: str, first_end: int, second_start: int) -> bool:
@@ -215,27 +145,52 @@ def _is_a_range(text: str, first_end: int, second_start: int) -> bool:
     and a stray numeral, and reading it as 01:00-10:00 would publish nonsense.
     """
     between = text.lower()[first_end:second_start]
-    words = re.findall(r"[a-z]+", between)
+    spoken = re.findall(r"[a-z]+", between)
     # "Tuesdays at ten and Thursdays at two" names two separate sessions, not a
     # span. A day word between the two times is the cheapest way to see that.
-    if any(word in DAY_TOKEN for word in words):
+    if any(word in DAY_TOKEN for word in spoken):
         return False
     if any(marker in between for marker in ("-", "–", "—")):
         return True
-    return any(word in RANGE_MARKERS for word in words)
+    return any(word in RANGE_MARKERS for word in spoken)
 
 
-def _days_in(text: str) -> list[str]:
-    seen: list[str] = []
-    for word in _words(text):
-        code = DAY_TOKEN.get(word)
-        if code and code not in seen:
-            seen.append(code)
-    if re.search(r"\b(weekday|weekdays)\b", text.lower()):
-        for code in ("MO", "TU", "WE", "TH", "FR"):
-            if code not in seen:
-                seen.append(code)
-    return sorted(seen, key=DAY_ORDER.index)
+def _sessions(text: str, times: list[tuple[int, int, int]]) -> list[dict[str, int]]:
+    """The utterance cut where a day word starts describing a different session.
+
+    "Tuesdays ten to twelve and Thursdays one to three" is two sessions, and the
+    cut is the day word that arrives after a time: what precedes it belongs to
+    the range it introduced, and what follows it belongs to another one. Each
+    piece is counted rather than kept, because the only question asked here is
+    whether the sentence describes exactly one range.
+    """
+    events: list[tuple[int, str]] = [(position, "day") for position, _ in day_mentions_in(text)]
+    events += [(position, "time") for position, _, _ in times]
+    blocks: list[dict[str, int]] = [{"days": 0, "times": 0}]
+    for _, kind in sorted(events):
+        if kind == "day" and blocks[-1]["times"]:
+            blocks.append({"days": 0, "times": 0})
+        blocks[-1]["days" if kind == "day" else "times"] += 1
+    return blocks
+
+
+def names_more_than_one_session(text: str) -> bool:
+    """Whether a sentence describes hours a single range cannot hold.
+
+    Two sessions in one utterance, or a day named outside the range the times
+    belong to. `spoken_schedule` refuses both, and the refusal is worth saying
+    out loud: the provider did state their hours, and the reason the record did
+    not move is that this reader will not choose which half of the sentence to
+    keep.
+    """
+    times = clock_times_in(text)
+    if len(times) < 2:
+        return False
+    blocks = _sessions(text, times)
+    timed = [block for block in blocks if block["times"]]
+    if len(timed) != 1 or timed[0]["times"] != 2:
+        return True
+    return bool(timed[0]["days"]) and sum(block["days"] for block in blocks) != timed[0]["days"]
 
 
 def spoken_schedule(text: str, *, default_days: list[str] | None = None) -> str | None:
@@ -245,11 +200,18 @@ def spoken_schedule(text: str, *, default_days: list[str] | None = None) -> str 
     is supplied by the caller as `default_days`. A sentence with fewer than two
     readable times, two times that are not joined as a range, or a range that
     ends before it starts, produces no candidate at all.
+
+    It also has to describe *one* session. A record value is one range over a
+    set of days, so "Tuesdays ten to twelve and Thursdays one to three" has no
+    candidate to give: reading the first two times and both days would publish
+    Thursday as ten to twelve, which is a change the provider never stated. Two
+    sessions in one sentence go to a curator whole.
     """
-    times = _times_in(text)
-    if len(times) < 2:
+    times = clock_times_in(text)
+    if len(times) < 2 or names_more_than_one_session(text):
         return None
-    days = _days_in(text) or list(default_days or [])
+
+    days = day_codes_in(text) or list(default_days or [])
     if not days:
         return None
 
@@ -278,18 +240,18 @@ def contains_any(text: str, phrases: tuple[str, ...]) -> str:
 
 
 def is_affirmation(text: str) -> bool:
-    spoken = set(_words(text))
+    spoken = set(words(text))
     return bool(spoken & AFFIRMATIONS) and not (spoken & HESITATIONS)
 
 
 def is_hedged(text: str) -> bool:
     """Whether a provider stating a value sounded unsure of it."""
-    return bool(set(_words(text)) & UNCERTAINTY)
+    return bool(set(words(text)) & UNCERTAINTY)
 
 
 def is_correction(text: str) -> bool:
     """Whether a reply disagrees with what was just said to it."""
-    return bool(set(_words(text)) & {"no", "not", "nope", "wrong", "isn", "wasn"})
+    return bool(set(words(text)) & {"no", "not", "nope", "wrong", "isn", "wasn"})
 
 
 def disclosure_spoken(turns: list[NormalizedTurn]) -> bool:

@@ -47,6 +47,7 @@ from callibrate.evidence.transcript import (
     contains_any,
     disclosure_spoken,
     is_hedged,
+    names_more_than_one_session,
     spoken_schedule,
 )
 
@@ -364,6 +365,17 @@ def build_evidence(
             unresolved.append(
                 "the phone number was discussed but the stored transcript masks it, so it "
                 "cannot be checked from the record"
+            )
+            continue
+        if field == "schedule" and any(
+            names_more_than_one_session(turn.text) for turn in _provider_turns(turns)
+        ):
+            # The call did settle the hours. It settled more of them than one
+            # range can hold, and picking a half is the mutation this system
+            # exists to refuse, so the whole sentence goes to a person.
+            unresolved.append(
+                "the provider described more than one session in one sentence and a record "
+                "value holds a single range, so the hours were not read from it"
             )
             continue
         unresolved.append(f"nothing in the call settles {contract.field_label(field)}")

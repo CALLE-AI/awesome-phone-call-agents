@@ -31,10 +31,13 @@ def sign_in(client: TestClient) -> str:
     return response.json()["csrf_token"]
 
 
-def wait_for(client: TestClient, task_id: str, timeout: float = 20.0) -> dict:
+def wait_for(client: TestClient, task_id: str, timeout: float = 20.0, ticket: str = "") -> dict:
     deadline = time.time() + timeout
+    query = f"?ticket={ticket}" if ticket else ""
     while time.time() < deadline:
-        payload = client.get(f"/api/verifications/{task_id}").json()
+        response = client.get(f"/api/verifications/{task_id}{query}")
+        assert response.status_code == 200, response.json()
+        payload = response.json()
         if payload["state"] in {"verified", "review", "failed", "refused"}:
             return payload
         time.sleep(0.1)
@@ -118,9 +121,108 @@ def test_verify_before_i_go_is_public_and_produces_the_same_transaction(client):
     )
     assert response.status_code == 202
     job = response.json()
-    finished = wait_for(client, job["task_id"])
+    assert job["ticket"]
+    finished = wait_for(client, job["task_id"], ticket=job["ticket"])
     assert finished["state"] in {"verified", "review"}
-    assert finished["result"]["call_id"]
+    # The same transaction a curator would have run: the record itself moved.
+    pantry = client.get("/api/directory/services/svc_food").json()["service"]
+    assert (pantry["opens_at"], pantry["closes_at"]) == ("10:00", "13:00")
+
+
+def test_a_visitor_is_told_what_changed_and_never_what_was_said(client):
+    """The evidence names a person on a phone call. It stays behind a session."""
+    job = client.post(
+        "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
+    ).json()
+    finished = wait_for(client, job["task_id"], ticket=job["ticket"])
+    assert finished["applied"][0]["field"] == "schedule"
+    assert not {"result", "evidence", "contract", "call_id", "error", "login_url"} & set(finished)
+    assert "10:00" not in str(finished.get("detail", ""))
+
+    sign_in(client)
+    seen = client.get(f"/api/verifications/{job['task_id']}").json()
+    assert seen["result"]["evidence"]["transcript"]
+    assert seen["result"]["call_id"]
+
+
+def test_a_verification_cannot_be_watched_by_somebody_who_did_not_ask_for_it(client):
+    """Task ids are guessable. The ticket is what makes them not worth guessing."""
+    job = client.post(
+        "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
+    ).json()
+    assert client.get(f"/api/verifications/{job['task_id']}").status_code == 401
+    assert client.get(f"/api/verifications/{job['task_id']}?ticket=guess").status_code == 401
+    assert client.get(f"/api/verifications/{job['task_id']}?ticket={job['ticket']}").status_code == 200
+    wait_for(client, job["task_id"], ticket=job["ticket"])
+
+
+def test_the_public_record_page_reports_progress_and_never_the_call(client):
+    """The badge that says a call is happening is not a window into the call."""
+    job = client.app.state.jobs.start("task_shelter", "svc_shelter", "pilot-line")
+    job.result = {
+        "applied": [{"field": "schedule", "old": "MO 19:00-07:00", "new": "MO 18:00-07:00"}],
+        "call_id": "call_not_for_visitors",
+        "evidence": {"transcript": [{"text": "the shelter coordinator gave her name"}]},
+    }
+    public = client.get("/api/directory/services/svc_shelter").json()["verification"]
+    assert set(public) == {"task_id", "service_id", "state", "detail", "caller", "started_at", "applied"}
+    assert public["applied"][0]["new"] == "MO 18:00-07:00"
+    assert "call_not_for_visitors" not in str(public)
+    assert "coordinator" not in str(public)
+
+
+def test_a_session_that_sends_no_csrf_token_is_served_as_a_visitor(client):
+    """The public page carries no session of its own, and a curator browsing it
+    still has the cookie. It gets a visitor's answer, not a 403 and not the run."""
+    sign_in(client)
+    response = client.post(
+        "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
+    )
+    assert response.status_code == 202
+    job = response.json()
+    assert job["ticket"] and "result" not in job
+    wait_for(client, job["task_id"], ticket=job["ticket"])
+
+
+def test_a_deployment_that_can_dial_will_not_take_an_anonymous_request(settings, store):
+    """An anonymous request spends call capacity somebody else authorised."""
+    live = settings.model_copy(
+        update={"caller_mode": "calle", "call_allowlist": "+15550101101"}
+    )
+    assert live.public_verification is False
+    with TestClient(create_app(live, store)) as client:
+        refused = client.post(
+            "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
+        )
+        assert refused.status_code == 401
+        sign_in(client)
+        assert client.get("/api/system").json()["public_verification"] is False
+    # An operator who wants the public path on a dialling deployment says so.
+    assert live.model_copy(update={"allow_public_verification": True}).public_verification is True
+
+
+def test_the_public_budget_refuses_a_call_the_address_limiter_would_allow(settings, store):
+    """Two different records, one address with five requests still in hand, and
+    the deployment budget is what stops the second call."""
+    bounded = settings.model_copy(update={"public_verification_daily_limit": 1})
+    with TestClient(create_app(bounded, store)) as client:
+        first = client.post(
+            "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
+        )
+        assert first.status_code == 202
+        spent = client.post(
+            "/api/verify-now", json={"service_id": "svc_legal", "fields": ["schedule"]}
+        )
+        assert spent.status_code == 429
+        assert spent.json()["error"]["code"] == "budget_spent"
+        # A curator is not spending the public budget and is never refused by it.
+        csrf = sign_in(client)
+        allowed = client.post(
+            "/api/tasks/task_legal/verify", json={}, headers={"X-CSRF-Token": csrf}
+        )
+        assert allowed.status_code == 202
+        wait_for(client, first.json()["task_id"], ticket=first.json()["ticket"])
+        wait_for(client, "task_legal")
 
 
 def test_a_reported_failure_becomes_a_priority_call_in_the_same_request(client):

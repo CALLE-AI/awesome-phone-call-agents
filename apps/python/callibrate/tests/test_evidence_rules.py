@@ -13,7 +13,12 @@ import pytest
 from callibrate.calling.models import CallOutcome
 from callibrate.contracts.models import EvidenceRequirements, VerificationContract
 from callibrate.evidence.reconcile import build_evidence
-from callibrate.evidence.transcript import normalize_turns, speaker_role, spoken_schedule
+from callibrate.evidence.transcript import (
+    names_more_than_one_session,
+    normalize_turns,
+    speaker_role,
+    spoken_schedule,
+)
 from tests.conftest import turns
 
 
@@ -71,6 +76,41 @@ def test_spoken_hours_become_a_canonical_value(sentence, expected):
 def test_a_sentence_that_cannot_be_read_produces_no_candidate(sentence):
     """No candidate means a curator, which is the correct failure direction."""
     assert spoken_schedule(sentence, default_days=["WE"]) is None
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # The first two times and both days would publish Thursday as ten to
+        # twelve, which is the sentence's Tuesday and nobody's Thursday.
+        "Tuesdays ten to twelve and Thursdays one to three.",
+        "We are open ten to twelve and again one to three.",
+        "Tuesdays ten to twelve, Thursdays closed.",
+        "Mondays and Wednesdays nine to twelve, Fridays two to four.",
+    ],
+)
+def test_more_than_one_session_in_a_sentence_produces_no_candidate(sentence):
+    """A record value holds one range, so half a sentence is never the answer."""
+    assert spoken_schedule(sentence, default_days=["WE"]) is None
+    assert names_more_than_one_session(sentence)
+
+
+@pytest.mark.parametrize(
+    ("sentence", "expected"),
+    [
+        ("Tuesdays and Thursdays ten to twelve.", "TU,TH 10:00-12:00"),
+        ("Ten to twelve on Tuesdays and Thursdays.", "TU,TH 10:00-12:00"),
+        ("Weekdays nine to five.", "MO,TU,WE,TH,FR 09:00-17:00"),
+    ],
+)
+def test_one_range_over_several_days_is_still_one_session(sentence, expected):
+    assert spoken_schedule(sentence, default_days=["WE"]) == expected
+    assert not names_more_than_one_session(sentence)
+
+
+def test_the_pronoun_we_is_not_wednesday():
+    """The pronoun in "we open ten until one" is not a day of the week."""
+    assert spoken_schedule("We open ten until one.", default_days=["MO"]) == "MO 10:00-13:00"
 
 
 # ------------------------------------------------------------------ evidence
@@ -169,6 +209,45 @@ def test_a_closure_mentioned_on_a_call_about_hours_is_never_dropped(contract):
     )
     status = [claim for claim in evidence.claims if claim.field == "status"]
     assert status and status[0].removes_service
+
+
+def test_two_sessions_read_back_faithfully_still_change_nothing(contract):
+    """The readback is accurate, the provider agrees, and the record holds one range.
+
+    This is the shape that would publish a false change if the reader kept the
+    first two times: the provider says Thursday afternoon, the agent says
+    Thursday afternoon, and only the candidate has lost it. There is no
+    candidate, and the curator is told which sentence was not read.
+    """
+    evidence = read(
+        contract,
+        turns(
+            ("bot", "This is an automated assistant. We publish Wednesdays nine until twelve. Is that still right?"),
+            ("user", "Tuesdays ten to twelve and Thursdays one to three."),
+            ("bot", "So that is Tuesdays ten to twelve and Thursdays one to three, correct?"),
+            ("user", "Yes, that is right."),
+        ),
+    )
+    assert not [claim for claim in evidence.claims if claim.field == "schedule"]
+    assert not evidence.confirmations
+    assert any("more than one session" in question for question in evidence.unresolved_questions)
+
+
+def test_a_readback_that_adds_a_day_and_a_time_is_not_a_readback(contract):
+    """Every part of the value is in the utterance, and so is a Thursday nobody has."""
+    evidence = read(
+        contract,
+        turns(
+            ("bot", "This is an automated assistant. Is Wednesday nine until twelve still right?"),
+            ("user", "It moved to ten until one."),
+            ("bot", "So Wednesdays ten in the morning until one in the afternoon, and Thursdays two until four?"),
+            ("user", "Yes."),
+        ),
+    )
+    claim = evidence.claims[0]
+    assert claim.proposed_value == "WE 10:00-13:00"
+    assert not claim.read_back_confirmed
+    assert "does not hold" in claim.evidence_note
 
 
 def test_a_stop_request_is_a_safety_event(contract):

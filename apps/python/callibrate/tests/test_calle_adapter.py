@@ -1,9 +1,11 @@
-"""The CALL-E integration, driven against a stand-in CALL-E.
+"""The CALL-E integration, driven through the protocol end to end.
 
 These tests run the real `CalleMcpClient` and the real `CallEVerificationCaller`
-over a stand-in MCP server: a real JSON-RPC handshake, a real `tools/list`, and
-real `plan_call` / `run_call` / `get_call_run` calls with CALL-E's documented
-envelopes. What is faked is the far end of the socket and nothing else.
+over HTTP, against an endpoint that answers the way CALL-E's own guide documents:
+a real JSON-RPC handshake, a real `tools/list`, and real `plan_call` /
+`run_call` / `get_call_run` exchanges carrying CALL-E's envelopes. Nothing in the
+application under test is stubbed, so a change to the client, to the adapter or
+to the way an envelope is unpacked fails here rather than in production.
 
 The cases that matter are the ones where CALL-E behaves the way its own guide
 warns it can: a run that is still `PREPARING` when `run_call` returns, a result

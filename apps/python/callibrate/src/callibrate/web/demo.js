@@ -1,13 +1,10 @@
 /* The guided walkthrough at /?demo=1.
    The product drives itself: every click, every spotlight and every caption is
-   the real console doing real work against the real API. Nothing is mocked and
-   nothing is added in post except a fade and the narration track.
+   the real console doing real work against the real API. Nothing is mocked.
 
-   The script lives here, and `demo_video/narrate.py` reads it out of the running
-   page rather than keeping a second copy, so the words on screen and the words
-   in the speakers are the same words. `window.__CBR_TIMING` (injected by the
-   recorder) paces each beat to the length of its own narration clip; without it
-   the walkthrough estimates a readable pace and runs live. */
+   The script lives here, and one caption is one beat. `window.__CBR_TIMING`, if
+   something injects it, paces each beat to a length of its own; without it the
+   walkthrough estimates a readable pace and runs live. */
 
 (() => {
   "use strict";
@@ -46,6 +43,12 @@
   // and the body class carries the walkthrough's own furniture.
   document.documentElement.classList.add("demo-running");
   document.body.classList.add("demo-running");
+
+  // The first beat's card, and the cover the walkthrough opens behind.
+  const OPENING = [
+    "Callibrate calls the source.",
+    "A directory tells you where help should be. Callibrate makes sure that is still true.",
+  ];
 
   function say(text) {
     caption.querySelector("p").textContent = text;
@@ -122,8 +125,17 @@
   function highlight(selector) {
     const target = typeof selector === "string" ? document.querySelector(selector) : selector;
     if (!target) return false;
-    const box = target.getBoundingClientRect();
+    let box = target.getBoundingClientRect();
     if (!box.width || !box.height) return false;
+    // The caption rail owns the bottom of the window. Anything it would sit over
+    // is scrolled clear of it first, or the ring is drawn around something
+    // nobody watching can see. The page carries the room to do it: the demo
+    // stylesheet pads the workspace and the public shell for exactly this.
+    const floor = (caption.matches(":popover-open") ? caption.getBoundingClientRect().top : innerHeight) - 18;
+    if (box.bottom > floor && box.height < floor - 18) {
+      scrollBy(0, box.bottom - floor);
+      box = target.getBoundingClientRect();
+    }
     spotlight.style.top = `${box.top - 6}px`;
     spotlight.style.left = `${box.left - 6}px`;
     spotlight.style.width = `${box.width + 12}px`;
@@ -203,16 +215,12 @@
   const script = [
     {
       caption:
-        "A directory can tell you where help should be. It cannot tell you whether that is still true.",
-      run: async () =>
-        showCard(
-          "A directory tells you where help should be.",
-          "It cannot tell you whether that is still true.",
-        ),
+        "Callibrate keeps a community directory true. It telephones the organisation with CALL-E, listens for proof that a value has changed, and corrects the listing only when the call proves it, so what somebody reads is what the provider just said.",
+      run: async () => showCard(...OPENING),
     },
     {
       caption:
-        "Meridian Community Pantry. Wednesdays, nine until twelve. Nobody has confirmed that with anybody for ninety-one days, and in June the pantry moved to ten until one.",
+        "Here is one record it looks after. Meridian Community Pantry. Wednesdays, nine until twelve. Nobody has confirmed that with anybody for ninety-one days, and in June the pantry moved to ten until one.",
       run: async () => {
         hideCard();
         await window.callibrate.showPublicView();
@@ -226,7 +234,13 @@
       run: async () => {
         await click("[data-verify]");
         await waitFor(".verify-strip");
-        highlight(".verify-strip");
+        // The strip grows as the call moves through its steps, and the results
+        // list is repainted under it, so the ring is measured again rather than
+        // left around the shape the strip used to be.
+        for (let index = 0; index < 7; index += 1) {
+          highlight(".verify-strip");
+          await sleep(900);
+        }
       },
     },
     {
@@ -392,6 +406,11 @@
     finished: false,
     play,
   };
+
+  // Up before the first beat, and before the sign-in the walkthrough drives
+  // itself through: a recording that opens earlier than beat one catches the
+  // title card rather than the console flashing past.
+  showCard(...OPENING);
 
   if (window.__CBR_DEMO_MANUAL !== true) {
     window.addEventListener("load", () => setTimeout(play, 400));
