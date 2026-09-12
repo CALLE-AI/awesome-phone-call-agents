@@ -9,7 +9,7 @@ So it is measured. Every receipt under `--receipts` carries CALL-E's own turn of
 the last offset in a transcript is when the conversation stopped. That is the wall time a
 worker was occupied, and a worker occupied is a worker not dialling the next family.
 
-    python tools/throughput.py --receipts D:/calle-workshop/receipts --pupils 500
+    python tools/throughput.py --receipts PATH/TO/RECEIPTS --pupils 500
 
 The poll interval is added once per call, because a worker asks `calls.get` every two
 seconds and in the worst case the call ended just after it asked. That is the whole of the

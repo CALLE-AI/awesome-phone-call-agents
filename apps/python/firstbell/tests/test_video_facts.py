@@ -162,7 +162,6 @@ def test_the_video_is_never_handed_a_whole_call_identifier():
 
     receipts = next(
         (base for base in (Path(os.environ.get("FIRSTBELL_RECEIPTS") or "nowhere"),
-                           Path("D:/calle-workshop/receipts"),
                            APP / "evidence" / "receipts")
          if base.is_dir()),
         None,

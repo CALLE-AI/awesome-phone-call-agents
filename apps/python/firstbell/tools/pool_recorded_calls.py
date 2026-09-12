@@ -24,7 +24,7 @@ point of that receipt is that a second run of the same work file places no call.
 the receipts would count those two twice and print twelve calls as fourteen, which is the
 class of arithmetic this whole directory exists to catch.
 
-    python tools/pool_recorded_calls.py --receipts D:/calle-workshop/receipts
+    python tools/pool_recorded_calls.py --receipts PATH/TO/RECEIPTS
 
 Run it with no argument and it reads `FIRSTBELL_RECEIPTS`. Without either it prints what is
 committed and exits, so the default is never a silent rewrite.

@@ -111,7 +111,7 @@ def test_the_readme_block_is_what_the_tool_prints_now():
     import subprocess
     import sys
 
-    receipts = Path(os.environ.get("FIRSTBELL_RECEIPTS", "D:/calle-workshop/receipts"))
+    receipts = Path(os.environ.get("FIRSTBELL_RECEIPTS") or (APP / "evidence" / "receipts"))
     if not receipts.is_dir() or not any(receipts.glob("*.json")):
         pytest.skip(f"no receipts under {receipts}, so the published block cannot be "
                     "compared against a measurement")

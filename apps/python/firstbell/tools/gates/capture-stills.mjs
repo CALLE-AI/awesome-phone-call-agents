@@ -28,7 +28,18 @@ const APP = join(HERE, "..", "..");
 const SHOTS = join(HERE, "shots");
 mkdirSync(SHOTS, { recursive: true });
 
-const PYTHON = "D:/calle/.venv/Scripts/python.exe";
+// Whoever runs this supplies the interpreter. FIRSTBELL_PYTHON wins; otherwise a venv
+// beside the app or beside the repository is used if one is there; otherwise whatever
+// `python` the PATH resolves. A path to one machine's venv baked in here ran nowhere else.
+const PYTHON = (() => {
+  if (process.env.FIRSTBELL_PYTHON) return process.env.FIRSTBELL_PYTHON;
+  const rel = process.platform === "win32" ? "Scripts/python.exe" : "bin/python";
+  for (const base of [APP, join(APP, ".."), join(APP, "..", "..", "..")]) {
+    const candidate = join(base, ".venv", rel);
+    if (existsSync(candidate)) return candidate;
+  }
+  return process.platform === "win32" ? "python.exe" : "python3";
+})();
 
 const CHROME_CANDIDATES = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",

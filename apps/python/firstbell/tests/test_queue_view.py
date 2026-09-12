@@ -16,6 +16,7 @@ to the program: same rule, same order, same count.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,7 +30,10 @@ RECEIPT = "06-locale-matched-pairs.json"
 
 
 def _run() -> dict:
-    for base in (Path("D:/calle-workshop/receipts"), APP / "evidence" / "receipts"):
+    # The receipts are held outside this repository. Point FIRSTBELL_RECEIPTS at them;
+    # with no variable set this falls back to whatever the repository itself carries.
+    external = os.environ.get("FIRSTBELL_RECEIPTS")
+    for base in ([Path(external)] if external else []) + [APP / "evidence" / "receipts"]:
         path = base / RECEIPT
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
