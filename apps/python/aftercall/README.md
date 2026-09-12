@@ -1,4 +1,4 @@
-# AfterCare
+# AfterCare Call
 
 AfterCare is a post-discharge care coordinator that uses CALL-E to conduct
  consent-aware follow-up calls, collect structured patient-reported recovery information,
