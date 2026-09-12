@@ -13,8 +13,10 @@ from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com"
-E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$", re.ASCII)
+PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])\+?[0-9][0-9 ().-]{6,}[0-9](?![A-Za-z0-9])", re.ASCII)
 TERMINAL_STATUSES = {"completed", "failed", "canceled", "cancelled"}
+SAFE_OUTCOMES = {"resolved", "needs_human", "declined", "unreached"}
 MAX_SLACK_AGE_SECONDS = 300
 MAX_BODY_BYTES = 64_000
 
@@ -38,7 +40,7 @@ def parse_command(text: str) -> dict[str, str]:
         raise ValueError("Use: [preview|run] +E164_PHONE | call goal")
     phone, goal = (part.strip() for part in raw.split("|", 1))
     if not E164_RE.fullmatch(phone):
-        raise ValueError("Phone must be E.164, for example +15551234567")
+        raise ValueError("Phone must be ASCII E.164, for example +12025550123")
     if not goal or len(goal) > 400:
         raise ValueError("Goal must contain 1-400 characters")
     return {"mode": mode, "phone": phone, "goal": goal}
@@ -108,13 +110,9 @@ def build_call_payload(phone: str, goal: str) -> dict[str, Any]:
 
 def calle_base_url(value: str | None) -> str:
     base = (value or DEFAULT_CALLE_BASE_URL).rstrip("/")
-    parsed = urlparse(base)
-    local = parsed.hostname in {"127.0.0.1", "localhost"}
-    if parsed.scheme == "https":
-        return base
-    if local and parsed.scheme == "http" and os.getenv("CALLE_ALLOW_INSECURE_LOCALHOST") == "1":
-        return base
-    raise ValueError("CALLE_BASE_URL must be HTTPS (localhost HTTP is test-only)")
+    if base != DEFAULT_CALLE_BASE_URL:
+        raise ValueError("CALL-E requests must use the approved API origin")
+    return base
 
 
 def request_json(
@@ -133,6 +131,16 @@ def request_json(
         return {"raw": text}
 
 
+def provider_safe_summary(value: Any) -> str:
+    """Bound untrusted provider text before it reaches Slack."""
+    if not isinstance(value, str):
+        return "No structured summary returned."
+    ascii_text = value.encode("ascii", "replace").decode("ascii")
+    printable = "".join(char if char.isprintable() else " " for char in ascii_text)
+    masked = PHONE_LIKE_RE.sub("[phone redacted]", printable)
+    return masked[:500] or "No structured summary returned."
+
+
 def safe_result(call: dict[str, Any], phone: str) -> dict[str, Any]:
     structured = call.get("structured_result")
     if not isinstance(structured, dict):
@@ -141,12 +149,15 @@ def safe_result(call: dict[str, Any], phone: str) -> dict[str, Any]:
             structured = recipients[0].get("structured_result")
     if not isinstance(structured, dict):
         structured = {}
+    raw_status = str(call.get("status") or "unknown").lower()
+    status = raw_status if raw_status in TERMINAL_STATUSES | {"poll_timeout"} else "unknown"
+    raw_outcome = structured.get("outcome")
+    outcome = raw_outcome if raw_outcome in SAFE_OUTCOMES else "needs_human"
     return {
-        "call_id": str(call.get("id") or call.get("call_id") or "unknown"),
-        "status": str(call.get("status") or "unknown"),
+        "status": status,
         "phone": mask_phone(phone),
-        "outcome": structured.get("outcome", "unknown"),
-        "summary": structured.get("summary", "No structured summary returned."),
+        "outcome": outcome,
+        "summary": provider_safe_summary(structured.get("summary")),
     }
 
 
@@ -159,6 +170,7 @@ def run_calle(
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     phone, goal = command["phone"], command["goal"]
+    base_url = calle_base_url(base_url)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -206,7 +218,7 @@ def execute_and_respond(form: dict[str, str], command: dict[str, str]) -> None:
             form,
             command,
             os.environ["CALLE_API_KEY"],
-            calle_base_url(os.getenv("CALLE_BASE_URL")),
+            calle_base_url(None),
         )
         post_slack_result(form["response_url"], result)
     except Exception as exc:  # result channel must fail closed, not disappear
@@ -281,7 +293,7 @@ class SlackBridgeHandler(BaseHTTPRequestHandler):
             return
         try:
             validate_response_url(form.get("response_url", ""))
-            calle_base_url(os.getenv("CALLE_BASE_URL"))
+            calle_base_url(None)
         except ValueError as exc:
             self._write(200, slack_message(f"Live run blocked: {exc}"))
             return
