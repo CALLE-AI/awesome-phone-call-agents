@@ -1,0 +1,41 @@
+{
+  "name": "@muster/simulator-host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "live-demo:webhook:start": "node dist/cli/persistent-demo-webhook-main.js",
+    "live-demo:database:dispose": "node dist/cli/live-demo-database-main.js dispose",
+    "live-demo:database:start": "node dist/cli/live-demo-database-main.js start",
+    "live-smoke:prepare:verify": "node dist/cli/live-smoke-prepare-verification-main.js",
+    "live-smoke:prepare": "node --import @muster/observability/register-simulator-host dist/cli/guarded-live-smoke-main.js prepare",
+    "live-smoke:run": "node --import @muster/observability/register-simulator-host dist/cli/guarded-live-smoke-main.js run",
+    "live-smoke:cleanup": "node --import @muster/observability/register-simulator-host dist/cli/guarded-live-smoke-main.js cleanup",
+    "preflight": "node --import @muster/observability/register-simulator-host dist/cli/live-smoke-preflight-main.js",
+    "start": "node --import @muster/observability/register-simulator-host dist/main.js"
+  },
+  "dependencies": {
+    "@muster/application": "0.0.0",
+    "@muster/contracts": "0.0.0",
+    "@muster/domain": "0.0.0",
+    "@muster/infrastructure-calle": "0.0.0",
+    "@muster/infrastructure-jobs": "0.0.0",
+    "@muster/infrastructure-local-evidence": "0.0.0",
+    "@muster/infrastructure-postgres": "0.0.0",
+    "@muster/infrastructure-twilio-simulator": "0.0.0",
+    "@muster/observability": "0.0.0",
+    "@muster/testing": "0.0.0",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.3"
+  }
+}

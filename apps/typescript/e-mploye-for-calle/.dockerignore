@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.vercel
+.env
+.env.*
+!.env.example
+data/*.json
+graphify-out
+*.log
+output
+*.tgz

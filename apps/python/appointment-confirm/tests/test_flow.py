@@ -155,7 +155,13 @@ class FlowTests(unittest.TestCase):
                     ]
                 )
             self.assertEqual(rc, 0)
-            self.assertEqual(oct(dest.stat().st_mode)[-3:], "600")
+            # THE MODE IS A POSIX FACT AND ONLY THERE. Windows has no owner
+            # permission bits, `st_mode` comes back 0o666 whatever the file was
+            # created with, so this line fails on every Windows machine and
+            # says nothing about the code. The rest of the case, including the
+            # refusal to overwrite, still runs everywhere.
+            if os.name == "posix":
+                self.assertEqual(oct(dest.stat().st_mode)[-3:], "600")
             with patch("sys.stderr", StringIO()):
                 rc = cli.main(
                     [

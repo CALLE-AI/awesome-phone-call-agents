@@ -1,0 +1,20 @@
+{
+  "name": "@muster/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit --pretty false && vite build",
+    "build:demo": "corepack pnpm --filter @muster/api-client build && tsc -p tsconfig.json --noEmit --pretty false && vite build --mode demo"
+  },
+  "dependencies": {
+    "@muster/api-client": "0.0.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.3",
+    "vite": "8.2.0"
+  }
+}
