@@ -32,4 +32,4 @@ guide for [AfterCare app](https://github.com/frasfras/after-call).
   
 ## Default call demonstration
 
-- For The [demo](https://aftercare.ai.studio/#/demo) enter who to call and about what
+- For The [demo](https://aftercare.ai.studio/demo) enter who to call and about what
