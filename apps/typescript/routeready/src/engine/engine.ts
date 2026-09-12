@@ -28,8 +28,9 @@ export type EngineEvent =
   | { type: "leg"; at: number; from: string; to: string; arriveAt: number }
   | { type: "call_started"; at: number; stopId: string; callId: string; live: boolean; reason: string }
   | { type: "call_line"; at: number; stopId: string; line: LiveLine }
-  | { type: "call_result"; at: number; stopId: string; verified: boolean; note: string }
-  | { type: "call_error"; at: number; stopId: string; message: string }
+  | { type: "call_result"; at: number; stopId: string; verified: boolean; note: string; plan: StopPlan["kind"] | null }
+  /** `final` is false for a failed status check while the call is still going. */
+  | { type: "call_error"; at: number; stopId: string; message: string; final: boolean }
   | { type: "reordered"; at: number; before: string[]; after: string[]; savedMinutes: number; because: string }
   | { type: "delivered"; at: number; stopId: string; waited: number }
   | { type: "failed_attempt"; at: number; stopId: string; reason: string }
@@ -106,6 +107,10 @@ export class RouteEngine {
   /** Point the rider last reached (hub or stop id). */
   at: string;
   leg: Leg | null = null;
+  /** What the rider is doing at a door, while there. */
+  door: { stopId: string; readyAt: number; until: number; failed: boolean } | null = null;
+  /** While true no new call starts; screens set it briefly so each answer can be read. */
+  holdCalls = false;
   private busyUntil = 0;
   private serving: { stopId: string; waited: number } | null = null;
   private inFlight: InFlight | null = null;
@@ -180,6 +185,7 @@ export class RouteEngine {
         continue;
       }
       if (this.now < this.busyUntil) return;
+      this.door = null;
       if (this.serving) {
         const { stopId, waited } = this.serving;
         this.serving = null;
@@ -210,9 +216,11 @@ export class RouteEngine {
       const waited = Math.max(0, readyAt - arrivedAt);
       this.busyUntil = arrivedAt + waited + state.stop.serviceMinutes;
       this.serving = { stopId, waited };
+      this.door = { stopId, readyAt: arrivedAt + waited, until: this.busyUntil, failed: false };
       return;
     }
     this.busyUntil = arrivedAt + FAILED_ATTEMPT_MINUTES;
+    this.door = { stopId, readyAt: arrivedAt, until: this.busyUntil, failed: true };
     state.status = "failed";
     this.metrics.failedAttempts++;
     const reason =
@@ -229,7 +237,7 @@ export class RouteEngine {
 
   private async startCallIfDue(): Promise<void> {
     const { routeCall, day, runId, language } = this.options;
-    if (!routeCall || this.inFlight) return;
+    if (!routeCall || this.inFlight || this.holdCalls) return;
     const etas = this.etas();
     if (this.leg) etas.delete(this.leg.to); // the rider is already on the way
     const candidates = [...etas].map(([id, eta]) => ({ stop: this.state(id).stop, eta, called: this.state(id).called }));
@@ -270,7 +278,7 @@ export class RouteEngine {
       // The call may or may not have been placed; it is never redialled.
       state.status = "unverified";
       state.note = "call not confirmed; never redialled";
-      this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: (error as Error).message });
+      this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: (error as Error).message, final: true });
     }
   }
 
@@ -281,7 +289,13 @@ export class RouteEngine {
     try {
       update = await flight.port.poll(flight.callId, this.now);
     } catch (error) {
-      this.emit({ type: "call_error", at: this.now, stopId: flight.stopId, message: `status check failed, retrying: ${(error as Error).message}` });
+      this.emit({
+        type: "call_error",
+        at: this.now,
+        stopId: flight.stopId,
+        message: `status check failed, retrying: ${(error as Error).message}`,
+        final: false,
+      });
       return;
     }
     for (const line of update.lines) this.emit({ type: "call_line", at: line.at, stopId: flight.stopId, line });
@@ -297,7 +311,7 @@ export class RouteEngine {
     if (!gate.verified || !stillAhead) {
       state.status = stillAhead ? "unverified" : state.status;
       state.note = gate.verified ? "answer arrived after the rider got there" : gate.reason;
-      this.emit({ type: "call_result", at: this.now, stopId: flight.stopId, verified: false, note: state.note });
+      this.emit({ type: "call_result", at: this.now, stopId: flight.stopId, verified: false, note: state.note, plan: null });
       return;
     }
 
@@ -312,7 +326,7 @@ export class RouteEngine {
     } else {
       state.status = "confirmed";
     }
-    this.emit({ type: "call_result", at: this.now, stopId: flight.stopId, verified: true, note: state.note });
+    this.emit({ type: "call_result", at: this.now, stopId: flight.stopId, verified: true, note: state.note, plan: state.plan.kind });
     this.replan(`${state.stop.customer}: "${answer.quote_in_english || answer.customer_quote}"`);
   }
 

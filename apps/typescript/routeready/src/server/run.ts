@@ -2,7 +2,7 @@ import { CalleClient } from "@call-e/calle";
 import type { LoadedDay } from "../core/day.js";
 import { maskPhone } from "../core/phone.js";
 import { minutesToClock } from "../core/readiness.js";
-import type { GeoPoint } from "../core/types.js";
+import type { GeoPoint, Stop } from "../core/types.js";
 import { LivePort, ScriptedPort, type LiveLine } from "../calle/ports.js";
 import { describeEvent } from "../engine/describe.js";
 import { RouteEngine, runDay, type CallTarget, type DayMetrics, type EngineEvent } from "../engine/engine.js";
@@ -15,26 +15,69 @@ export interface LiveConfig {
 }
 
 export type Mode = "simulate" | "live";
+export type Pace = "slow" | "normal" | "fast";
 
-interface CallCard {
+/**
+ * Day minutes per real second: while the rider rides, and while a scripted
+ * call plays, slow enough that every line of the conversation can be read.
+ */
+export const PACES: Record<Pace, { riding: number; calling: number }> = {
+  slow: { riding: 0.25, calling: 0.08 },
+  normal: { riding: 0.5, calling: 0.12 },
+  fast: { riding: 1.2, calling: 0.3 },
+};
+/** Live calls run in real time, so a call is never shown shorter than it was. */
+const REAL_TIME = 1 / 60;
+/** Pause after a scripted answer before the next call starts, so its effect can be read. */
+const ANSWER_HOLD_MS = 3500;
+/** Real time holds this long after a live call ends, so its result stays on screen. */
+const LIVE_RESULT_HOLD_MS = 12_000;
+const TICK_MS = 250;
+const CALL_HISTORY = 12;
+
+export interface CallCard {
   stopId: string;
+  customer: string;
   live: boolean;
   maskedPhone: string;
   reason: string;
+  startedAt: string;
   lines: { speaker: LiveLine["speaker"]; text: string }[];
   result: string | null;
   verified: boolean | null;
 }
 
+export interface Toast {
+  id: number;
+  tone: "route" | "avoided";
+  title: string;
+  detail: string;
+}
+
 /** Everything the screens need, pushed several times a second. Phone numbers are always masked. */
 export interface Snapshot {
+  started: boolean;
   mode: Mode;
+  pace: Pace;
+  paused: boolean;
   liveAvailable: boolean;
   running: boolean;
   done: boolean;
   clock: string;
+  /** Plain-language line for what the rider is doing right now. */
+  story: { title: string; detail: string };
   /** `from` is where the current leg started, or where the rider stands. */
-  rider: { lat: number; lng: number; moving: boolean; from: string; target: string | null };
+  rider: {
+    lat: number;
+    lng: number;
+    moving: boolean;
+    from: string;
+    target: string | null;
+    progress: number;
+    remainingKm: number | null;
+    remainingMinutes: number | null;
+    arriveClock: string | null;
+  };
   order: string[];
   routeVersion: number;
   stops: {
@@ -50,33 +93,31 @@ export interface Snapshot {
     handoff: string;
     cash: string;
     codAmount: number | null;
+    firstTime: boolean;
+    gated: boolean;
   }[];
-  call: CallCard | null;
-  /** The call before the current one, kept on screen so its result is not lost when the next call starts. */
-  previousCall: CallCard | null;
+  /** Newest first; the first card is on the line while its result is null. */
+  calls: CallCard[];
+  toast: Toast | null;
   log: { clock: string; kind: string; text: string }[];
   metrics: DayMetrics;
   baseline: DayMetrics | null;
 }
-
-const TICK_MS = 250;
-/** Day minutes per real second while a live call is in flight: real time, so a call is never shortened. */
-const REAL_TIME = 1 / 60;
-/** Real time also holds this long after a live call ends, so its result stays on screen. */
-const LIVE_RESULT_HOLD_MS = 12_000;
 
 /** Owns one running day at a time and drives its clock for the screens. */
 export class RunController {
   private engine: RouteEngine | null = null;
   private baseline: DayMetrics | null = null;
   private mode: Mode = "simulate";
-  private speed = 0.75;
+  private pace: Pace = "normal";
+  private paused = false;
   private running = false;
   private loop: Promise<void> | null = null;
-  private call: CallCard | null = null;
-  private previousCall: CallCard | null = null;
-  /** Real clock time when the last live call ended. */
-  private liveResultAt = 0;
+  private calls: CallCard[] = [];
+  private holdUntil = 0;
+  private liveHoldUntil = 0;
+  private toast: Toast | null = null;
+  private toastCount = 0;
   private log: Snapshot["log"] = [];
   private routeVersion = 0;
   private readonly subscribers = new Set<(snapshot: Snapshot) => void>();
@@ -87,11 +128,8 @@ export class RunController {
   ) {}
 
   get liveCallInFlight(): boolean {
-    return this.call !== null && this.call.live && this.call.result === null;
-  }
-
-  private get realTime(): boolean {
-    return this.liveCallInFlight || Date.now() - this.liveResultAt < LIVE_RESULT_HOLD_MS;
+    const current = this.calls[0];
+    return current !== undefined && current.live && current.result === null;
   }
 
   subscribe(listener: (snapshot: Snapshot) => void): () => void {
@@ -100,8 +138,7 @@ export class RunController {
     return () => this.subscribers.delete(listener);
   }
 
-  /** Starts a new day. `speed` is day minutes per real second between calls. */
-  async start(mode: Mode, speed: number): Promise<void> {
+  async start(mode: Mode, pace: Pace): Promise<void> {
     if (this.liveCallInFlight) throw new Error("A live call is still in progress. Wait for it to finish before starting again.");
     if (mode === "live" && !this.live) throw new Error("Live mode is not configured on this server.");
     this.running = false;
@@ -124,10 +161,12 @@ export class RunController {
       },
     });
     this.mode = mode;
-    this.speed = speed;
-    this.call = null;
-    this.previousCall = null;
-    this.liveResultAt = 0;
+    this.pace = pace;
+    this.paused = false;
+    this.calls = [];
+    this.holdUntil = 0;
+    this.liveHoldUntil = 0;
+    this.toast = null;
     this.log = [];
     this.routeVersion = 0;
     for (const event of this.engine.events) this.record(event);
@@ -140,20 +179,32 @@ export class RunController {
     this.running = false;
   }
 
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.broadcast();
+  }
+
+  setPace(pace: Pace): void {
+    this.pace = pace;
+    this.broadcast();
+  }
+
   snapshot(): Snapshot {
     const { day } = this.loaded;
     const engine = this.engine;
     const etas = engine?.etas() ?? new Map<string, number>();
     const clock = (minutes: number) => minutesToClock(minutes, day.shiftStart);
     return {
+      started: engine !== null,
       mode: this.mode,
+      pace: this.pace,
+      paused: this.paused,
       liveAvailable: this.live !== null,
       running: this.running,
       done: engine?.done ?? false,
       clock: clock(engine?.now ?? 0),
-      rider: engine
-        ? this.riderPosition(engine)
-        : { lat: day.hub.lat, lng: day.hub.lng, moving: false, from: day.hub.id, target: null },
+      story: this.story(engine),
+      rider: this.rider(engine),
       order: engine ? [...(engine.leg ? [engine.leg.to] : []), ...engine.order] : day.stops.map((stop) => stop.id),
       routeVersion: this.routeVersion,
       stops: day.stops.map((stop) => {
@@ -172,14 +223,24 @@ export class RunController {
           handoff: state?.answer?.handoff ?? "unknown",
           cash: state?.answer?.cod_cash_ready ?? "unknown",
           codAmount: stop.codAmount,
+          firstTime: stop.firstTime,
+          gated: stop.gated,
         };
       }),
-      call: this.call,
-      previousCall: this.previousCall,
+      calls: this.calls,
+      toast: this.toast,
       log: this.log.slice(-80),
       metrics: engine?.metrics ?? emptyMetrics(),
       baseline: this.baseline,
     };
+  }
+
+  private rate(): number {
+    if (this.paused) return 0;
+    const now = Date.now();
+    if (this.liveCallInFlight || now < this.liveHoldUntil) return REAL_TIME;
+    const calling = this.calls[0] !== undefined && this.calls[0].result === null;
+    return calling || now < this.holdUntil ? PACES[this.pace].calling : PACES[this.pace].riding;
   }
 
   private async run(engine: RouteEngine): Promise<void> {
@@ -187,9 +248,9 @@ export class RunController {
     while (this.running && !engine.done) {
       await sleep(TICK_MS);
       const now = Date.now();
-      const rate = this.realTime ? REAL_TIME : this.speed;
-      const minute = engine.now + ((now - last) / 1000) * rate;
+      const minute = engine.now + ((now - last) / 1000) * this.rate();
       last = now;
+      engine.holdCalls = now < this.holdUntil || now < this.liveHoldUntil;
       try {
         await engine.advance(minute);
       } catch (error) {
@@ -204,31 +265,86 @@ export class RunController {
 
   private record(event: EngineEvent): void {
     const { day } = this.loaded;
+    const customer = (id: string) => day.stops.find((stop) => stop.id === id)?.customer ?? id;
+    const openCard = (stopId: string) => this.calls.find((card) => card.stopId === stopId && card.result === null);
+
     if (event.type === "call_started") {
       const target = this.live?.targets.get(event.stopId);
       const phone = event.live && target ? target.phone : (day.stops.find((stop) => stop.id === event.stopId)?.phone ?? "");
-      if (this.call) this.previousCall = this.call;
-      this.call = { stopId: event.stopId, live: event.live, maskedPhone: maskPhone(phone), reason: event.reason, lines: [], result: null, verified: null };
+      this.calls.unshift({
+        stopId: event.stopId,
+        customer: customer(event.stopId),
+        live: event.live,
+        maskedPhone: maskPhone(phone),
+        reason: event.reason,
+        startedAt: minutesToClock(event.at, day.shiftStart),
+        lines: [],
+        result: null,
+        verified: null,
+      });
+      this.calls.length = Math.min(this.calls.length, CALL_HISTORY);
     }
-    if (event.type === "call_line" && this.call?.stopId === event.stopId) addLine(this.call.lines, event.line);
-    if ((event.type === "call_result" || event.type === "call_error") && this.call?.stopId === event.stopId) {
-      this.call.result = event.type === "call_result" ? event.note : event.message;
-      this.call.verified = event.type === "call_result" ? event.verified : false;
-      if (this.call.live) this.liveResultAt = Date.now();
+    if (event.type === "call_line") {
+      const card = openCard(event.stopId);
+      if (card) addLine(card.lines, event.line);
+      return;
     }
-    if (event.type === "reordered") this.routeVersion++;
-    if (event.type === "call_line") return;
+    if (event.type === "call_result" || (event.type === "call_error" && event.final)) {
+      const card = openCard(event.stopId);
+      if (card) {
+        card.result = event.type === "call_result" ? event.note : event.message;
+        card.verified = event.type === "call_result" ? event.verified : false;
+        if (card.live) this.liveHoldUntil = Date.now() + LIVE_RESULT_HOLD_MS;
+        else this.holdUntil = Date.now() + ANSWER_HOLD_MS;
+      }
+      if (event.type === "call_result" && (event.plan === "remove" || event.plan === "revisit")) {
+        this.showToast("avoided", "Wasted trip avoided", `${customer(event.stopId)}: ${event.note}`);
+      }
+    }
+    if (event.type === "reordered") {
+      this.routeVersion++;
+      this.showToast("route", `Route updated · saves ${Math.max(1, Math.round(event.savedMinutes))} min`, event.because);
+    }
     const text = describeEvent(event, day);
     if (text) this.log.push({ clock: minutesToClock(event.at, day.shiftStart), kind: event.type, text });
   }
 
-  private riderPosition(engine: RouteEngine): Snapshot["rider"] {
-    const { day, raw } = this.loaded;
-    const point = (id: string): GeoPoint => (id === day.hub.id ? day.hub : (day.stops.find((stop) => stop.id === id) ?? day.hub));
-    if (!engine.leg) {
-      const here = point(engine.at);
-      return { lat: here.lat, lng: here.lng, moving: false, from: engine.at, target: engine.order[0] ?? null };
+  private showToast(tone: Toast["tone"], title: string, detail: string): void {
+    this.toast = { id: ++this.toastCount, tone, title, detail };
+  }
+
+  private story(engine: RouteEngine | null): Snapshot["story"] {
+    const { day } = this.loaded;
+    const clock = (minutes: number) => minutesToClock(minutes, day.shiftStart);
+    if (!engine) return { title: "Ready when you are", detail: `${day.stops.length} stops in ${day.city} · starts ${day.shiftStart}` };
+    if (engine.done) return { title: "Route complete", detail: `Finished at ${clock(engine.metrics.finishedAt ?? engine.now)}` };
+    if (engine.door) {
+      const stop = this.stopById(engine.door.stopId);
+      if (engine.door.failed) return { title: `Nobody ready at ${stop.customer}'s door`, detail: "Failed attempt, moving on" };
+      if (engine.now < engine.door.readyAt) {
+        return { title: `Waiting for ${stop.customer}`, detail: `Ready in about ${Math.ceil(engine.door.readyAt - engine.now)} min` };
+      }
+      return { title: `Delivering to ${stop.customer}`, detail: stop.codAmount === null ? "Prepaid order" : `Collecting Tk ${stop.codAmount}` };
     }
+    if (engine.leg) {
+      const rider = this.rider(engine);
+      return {
+        title: `Riding to ${this.stopById(engine.leg.to).customer}`,
+        detail: `${(rider.remainingKm ?? 0).toFixed(1)} km · ${Math.ceil(rider.remainingMinutes ?? 0)} min · arrives ${rider.arriveClock}`,
+      };
+    }
+    return { title: "Planning the route", detail: "" };
+  }
+
+  private rider(engine: RouteEngine | null): Snapshot["rider"] {
+    const { day, raw, travel } = this.loaded;
+    const point = (id: string): GeoPoint => (id === day.hub.id ? day.hub : (day.stops.find((stop) => stop.id === id) ?? day.hub));
+    const still = (id: string, target: string | null) => {
+      const here = point(id);
+      return { lat: here.lat, lng: here.lng, moving: false, from: id, target, progress: 0, remainingKm: null, remainingMinutes: null, arriveClock: null };
+    };
+    if (!engine) return still(day.hub.id, null);
+    if (!engine.leg) return still(engine.at, engine.order[0] ?? null);
     const { from, to, departAt, arriveAt } = engine.leg;
     const shape = raw.shapes[`${from}>${to}`] ?? [
       [point(from).lat, point(from).lng],
@@ -236,7 +352,23 @@ export class RunController {
     ];
     const progress = Math.min(1, Math.max(0, (engine.now - departAt) / Math.max(arriveAt - departAt, 1e-6)));
     const [lat, lng] = alongShape(shape, progress);
-    return { lat, lng, moving: true, from, target: to };
+    return {
+      lat,
+      lng,
+      moving: true,
+      from,
+      target: to,
+      progress,
+      remainingKm: (travel.meters(from, to) / 1000) * (1 - progress),
+      remainingMinutes: Math.max(0, arriveAt - engine.now),
+      arriveClock: minutesToClock(arriveAt, day.shiftStart),
+    };
+  }
+
+  private stopById(id: string): Stop {
+    const stop = this.loaded.day.stops.find((candidate) => candidate.id === id);
+    if (!stop) throw new Error(`Unknown stop: ${id}`);
+    return stop;
   }
 
   private broadcast(): void {

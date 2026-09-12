@@ -14,10 +14,10 @@ Each time something changes on the route:
 
 1. **Arrival times.** The engine projects when the rider reaches every remaining stop in the current order, using road travel times.
 2. **Pick one call.** There is one phone line, so at most one call is in flight. The next call goes to the soonest stop the rider will reach in 6 to 45 minutes that has not been called today. Each customer is called at most once a day.
-3. **Call through CALL-E.** `client.calls.create` places a disclosed AI call with the order reference, the arrival time, the cash amount and a strict `recipientResultSchema` (see [Result schema](#result-schema)). The idempotency key is `routeready:<run>:<stop>`, so a retried request can never dial twice. `calls.get` and `calls.listEvents` stream the conversation to the dispatcher while it happens.
+3. **Call through CALL-E.** `client.calls.create` places a disclosed AI call with the order reference, the arrival time, the cash amount and a strict `recipientResultSchema` (see [Result schema](#result-schema)). The idempotency key is `routeready:<run>:<stop>`, so a retried request can never dial twice. `calls.get` and `calls.listEvents` stream the conversation into the rider app while it happens.
 4. **Evidence gate.** An answer may change the route only if the call completed, it reached the planned number, the customer was reached, their own words are quoted, they said when, and CALL-E's completion confidence is medium or high. Anything else is recorded as unverified and changes nothing.
 5. **Re-order.** A branch-and-bound search tries every order of the remaining stops (up to nine) with each customer's ready time as the earliest delivery time, and keeps the cheapest: finish time plus twice the minutes past any promised window, plus a small penalty per moved stop so the route never flips for a trivial gain. Ties keep the current order.
-6. **Rider instruction.** The rider screen shows the next stop, whether the customer is ready, the landmark they gave, the cash to collect, and announces route changes by voice.
+6. **Rider instruction.** The rider app shows one instruction: the next stop, whether the customer is ready, the landmark they gave and the cash to collect, with a message on screen whenever the route changes.
 
 | Customer said | Route effect |
 | --- | --- |
@@ -36,10 +36,10 @@ cd apps/typescript/routeready
 npm install
 npm test          # re-ordering checked against exhaustive search, evidence gate, answer rules, engine, schema sync
 npm run sim       # the demo day twice, without calls and with RouteReady, then a comparison
-npm start         # web app: dispatcher at http://127.0.0.1:3000/, rider screen at /rider
+npm start         # rider app at http://127.0.0.1:3000/app, two-phone showcase at http://127.0.0.1:3000/
 ```
 
-In the web app, press **Run simulated day**. The demo day is a fictional Dhaka route with eight stops, reserved `+1 555-01xx` numbers and scripted customers. `npm run sim` prints the same comparison:
+In the app, press **Start the day**. The demo day is a fictional Dhaka route with eight stops, reserved `+1 555-01xx` numbers and scripted customers. `npm run sim` prints the same comparison:
 
 | | Without calls | With RouteReady |
 | --- | --- | --- |
@@ -51,16 +51,20 @@ In the web app, press **Run simulated day**. The demo day is a fictional Dhaka r
 
 The two runs share the same ground truth for every customer; only what the route knows differs.
 
+## Pace
+
+A day is meant to be watched. Scripted calls play out line by line over about seventeen seconds, each answer holds for a few seconds before the next call starts, and route changes appear as a message on the rider's screen. Slow, Normal and Fast set how fast the riding between calls runs, and the day can be paused at any time.
+
 ## Live calls (opt-in)
 
 Live calls are off unless all of the following are true:
 
 1. `.env` (git-ignored) contains `ROUTEREADY_LIVE=1`, a server-side `CALLE_API_KEY`, and `LIVE_TARGETS` mapping stops to numbers you own or whose owners agreed, for example `LIVE_TARGETS=s2=+1XXXXXXXXXX@US,s3=+1XXXXXXXXXX@US`. Stops without a target keep scripted customers, so a demo can mix a few real calls into the simulated day.
-2. The operator presses **Run live day**, types the start token printed in the terminal, and ticks the consent statement.
+2. The rider app's **Start with live calls** button asks for the start token printed in the terminal and the consent statement.
 
 Copy `.env.example` to `.env` to start. The API key never reaches the browser, every number on screen and in logs is masked, and the server binds to `127.0.0.1` unless `HOST` says otherwise; even then a live day cannot start without the token.
 
-While a live call is in flight the day clock drops to real time, so a call is never shown shorter than it was.
+While a live call is in flight the day clock drops to real time, so a call is never shown shorter than it was, and it holds there for twelve seconds afterwards so the result stays on screen.
 
 **Region note.** As of 12 September 2026 CALL-E rejects outbound calls to Bangladesh numbers in both English and Bengali (`422 call_not_ready`) and staff recommend US destinations or the official US test hotline for integration tests ([call-e-integrations#98](https://github.com/CALLE-AI/call-e-integrations/issues/98)). The demo day is set in Dhaka, but live targets must currently be US, Singapore or Australia numbers.
 
@@ -70,7 +74,7 @@ While a live call is in flight the day clock drops to real time, so a call is ne
 
 Author-reported result against CALL-E's US test hotline: accepted immediately, ringing after about 60 seconds, a 54-second conversation, final result after 137 seconds. The hotline is an AI receptionist, so CALL-E correctly returned `reached_recipient: "no"` and `readiness: "unknown"`, and the gate would leave the route unchanged, even though CALL-E also reported `taskCompleted: true` with high confidence.
 
-Also author-reported: a live day in the dispatcher with one stop mapped to the same hotline streamed the conversation into the live call card while it happened (4 to 23 transcript lines over about two minutes, with the day clock in real time), classified the receptionist's answer as unverified, and left the route unchanged.
+Also author-reported: a live day in the app with one stop mapped to the same hotline streamed the conversation into the live call card while it happened (4 to 23 transcript lines over about two minutes, with the day clock in real time), classified the receptionist's answer as unverified, and left the route unchanged.
 
 ## Result schema
 
@@ -115,7 +119,7 @@ src/core/     arrival times, call picker, evidence gate, answer rules, re-orderi
 src/calle/    call task text and result schema; live (CALL-E SDK) and scripted call ports
 src/engine/   the day loop and event descriptions
 src/server/   web server, run controller and live-mode configuration
-web/          dispatcher console and rider screen
+web/          the rider app (route, stops, calls, today) and the two-phone showcase page
 fixtures/     the Dhaka demo day and its saved road data
 scripts/      smoke call, simulation and road-data download
 tests/        unit and engine tests

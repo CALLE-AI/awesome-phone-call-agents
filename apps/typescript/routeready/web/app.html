@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#0e1014" />
+    <title>RouteReady</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="story" id="story">
+        <strong id="story-title">Loading…</strong>
+        <span id="story-detail"></span>
+      </div>
+      <button class="icon-btn" id="pause" type="button" title="Pause" aria-label="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5" /><rect x="14" y="5" width="4" height="14" rx="1.5" /></svg>
+      </button>
+    </header>
+
+    <div class="toast" id="toast" role="status"><strong id="toast-title"></strong><span id="toast-detail"></span></div>
+
+    <section class="screen active" id="screen-route">
+      <div id="map"></div>
+      <div class="sheet" id="route-sheet"></div>
+    </section>
+    <section class="screen scroll" id="screen-stops"></section>
+    <section class="screen scroll" id="screen-calls"></section>
+    <section class="screen scroll" id="screen-today"></section>
+
+    <nav class="tabbar" id="tabbar">
+      <button type="button" data-tab="route" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 20 3 17V4l6 3 6-3 6 3v13l-6 3-6-3Z" /><path d="M9 7v13M15 4v13" />
+        </svg>
+        <span class="label">Route</span>
+      </button>
+      <button type="button" data-tab="stops">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+        </svg>
+        <span class="label">Stops</span>
+      </button>
+      <button type="button" data-tab="calls">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+        </svg>
+        <span class="label">Calls</span>
+      </button>
+      <button type="button" data-tab="today">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+        </svg>
+        <span class="label">Today</span>
+      </button>
+    </nav>
+
+    <div class="start" id="start" hidden>
+      <div class="hero">
+        <div class="mark">ROUTE<br />READY</div>
+        <div class="scoot">🛵</div>
+      </div>
+      <div class="pitch">
+        <h1>Your route calls ahead.</h1>
+        <p id="start-sub">Loading the day…</p>
+        <button class="cta" id="start-sim" type="button"><span>Start the day</span><span>→</span></button>
+        <button class="ghost" id="start-live" type="button">Start with live calls</button>
+      </div>
+      <div class="seg" id="pace">
+        <button type="button" data-pace="slow">Slow</button>
+        <button type="button" data-pace="normal" class="active">Normal</button>
+        <button type="button" data-pace="fast">Fast</button>
+      </div>
+      <p class="note" id="start-note"></p>
+    </div>
+
+    <div class="modal" id="live-modal" hidden>
+      <div class="panel">
+        <h3>Place real calls</h3>
+        <p class="muted" id="live-targets"></p>
+        <label>Start token (printed in the terminal)<input id="live-token" autocomplete="off" spellcheck="false" /></label>
+        <label class="consent"><input type="checkbox" id="live-consent" /><span id="live-consent-text"></span></label>
+        <p class="error" id="live-error"></p>
+        <div class="buttons">
+          <button type="button" id="live-cancel">Cancel</button>
+          <button type="button" class="danger" id="live-go">Call for real</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
