@@ -44,7 +44,7 @@ def test_valid_numbers_pass_unchanged(number):
         ("+44(0)7700900123", "brackets"),
         ("+0447700900123", "country code starts with zero"),
         ("+4477009", "too short"),
-        ("+4470070090012345", "too long"),
+        ("+4416329600012345", "too long"),
         ("+", "no digits"),
         ("", "empty"),
         ("   ", "whitespace only"),
@@ -114,6 +114,7 @@ def test_drama_range_detection():
     assert is_drama_number("+447700900000")
     assert is_drama_number("+447700900999")
     assert is_drama_number("+447700900123")
-    assert not is_drama_number("+447700901000")
-    assert not is_drama_number("+447911123456")
+    # Reserved landline range: outside the mobile fixture range, still unable to ring.
+    assert not is_drama_number("+441632960123")
+    assert not is_drama_number("+12025550123")  # US 555 reserved range
     assert not is_drama_number("+12025550123")

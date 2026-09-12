@@ -142,7 +142,7 @@ def test_live_contact_refuses_an_invalid_number(tmp_path, capsys):
 def test_live_contact_refuses_an_unknown_contact(tmp_path, capsys):
     write_contacts(tmp_path)
     code = main(
-        ["live-contact", "--contact", "C-9999", "--number", "+447911123456",
+        ["live-contact", "--contact", "C-9999", "--number", "+441632960123",
          "--data-dir", str(tmp_path), "--yes"]
     )
     assert code == 2
@@ -152,22 +152,22 @@ def test_live_contact_refuses_an_unknown_contact(tmp_path, capsys):
 def test_live_contact_swaps_the_number_and_masks_it_in_output(tmp_path, capsys):
     write_contacts(tmp_path)
     code = main(
-        ["live-contact", "--contact", "C-2090", "--number", "+447911123456",
+        ["live-contact", "--contact", "C-2090", "--number", "+441632960123",
          "--data-dir", str(tmp_path), "--yes"]
     )
     assert code == 0
     out = capsys.readouterr().out
-    assert "…456" in out
-    assert "+447911123456" not in out  # never echoed in full
+    assert "…123" in out
+    assert "+441632960123" not in out  # never echoed in full
     assert "put the fictional number back" in out
-    assert "+447911123456" in (tmp_path / "contacts.csv").read_text(encoding="utf-8")
+    assert "+441632960123" in (tmp_path / "contacts.csv").read_text(encoding="utf-8")
 
 
 def test_live_contact_without_yes_requires_typing_the_contact_id(tmp_path, monkeypatch, capsys):
     write_contacts(tmp_path)
     monkeypatch.setattr("builtins.input", lambda _: "wrong")
     code = main(
-        ["live-contact", "--contact", "C-2090", "--number", "+447911123456",
+        ["live-contact", "--contact", "C-2090", "--number", "+441632960123",
          "--data-dir", str(tmp_path)]
     )
     assert code == 1

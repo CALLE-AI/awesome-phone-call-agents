@@ -13,11 +13,17 @@ import re
 #: CallTaskRecipientRequest.phones in OpenAPI 0.7.0.
 E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 
-#: UK numbers reserved by Ofcom for drama and fiction: +447700900000 to
-#: +447700900999, which is a fixed prefix plus exactly three digits. No fixture
-#: may contain a number outside this range, because a fixture number must never
-#: be able to ring a real subscriber.
+#: UK mobile numbers reserved by Ofcom for drama and fiction: +447700900000 to
+#: +447700900999, a fixed prefix plus exactly three digits. Every fixture
+#: contact uses this range, because a fixture number must never be able to ring
+#: a real subscriber.
 DRAMA_RE = re.compile(r"^\+447700900[0-9]{3}$")
+
+#: Ofcom also reserves landline ranges for drama, including 01632 960000-960999.
+#: Kept separate from DRAMA_RE because the fixture range in docs/SAFETY.md is the
+#: mobile one; this exists so tests that need a number *outside* the fixture
+#: range still use one that cannot ring.
+RESERVED_LANDLINE_RE = re.compile(r"^\+441632960[0-9]{3}$")
 
 
 class InvalidPhoneNumber(ValueError):
@@ -68,8 +74,19 @@ def is_e164(raw: str | None) -> bool:
 
 
 def is_drama_number(raw: str | None) -> bool:
-    """True for Ofcom's reserved drama range, which can never reach a subscriber."""
+    """True for Ofcom's reserved drama mobile range, which can never ring."""
     return bool(DRAMA_RE.match((raw or "").strip()))
+
+
+def is_reserved_number(raw: str | None) -> bool:
+    """True for any Ofcom range reserved for drama and fiction.
+
+    Broader than :func:`is_drama_number`: used by the repository-hygiene test to
+    assert that no number anywhere in the app could reach a real subscriber,
+    including in tests that deliberately need a number outside the fixture range.
+    """
+    value = (raw or "").strip()
+    return bool(DRAMA_RE.match(value) or RESERVED_LANDLINE_RE.match(value))
 
 
 def mask(raw: str | None) -> str:

@@ -427,9 +427,17 @@ def test_4_no_transport_is_reachable_without_passing_the_guards():
     assert callers == ["orchestrator.py"]
 
     text = (SOURCE / "orchestrator.py").read_text(encoding="utf-8")
-    block = text[text.index("def place_call") : text.index("def _refuse")]
-    assert block.index("policy.evaluate(") < block.index("self.client.create(")
-    assert block.index("reserve_key(") < block.index("self.client.create(")
+    place = text[text.index("def place_call") : text.index("def _reserve")]
+    reserve = text[text.index("def _reserve") : text.index("def _refuse")]
+
+    # place_call reserves before it dials, and nothing else.
+    assert place.index("self._reserve(") < place.index("self.client.create(")
+
+    # The reservation itself evaluates the guards, then reserves the key, then
+    # writes the attempt row -- and never touches a transport.
+    assert reserve.index("policy.evaluate(") < reserve.index("reserve_key(")
+    assert reserve.index("reserve_key(") < reserve.index("create_attempt(")
+    assert "client.create" not in reserve
 
 
 def test_4_the_dry_run_client_raises_rather_than_silently_not_dialling():

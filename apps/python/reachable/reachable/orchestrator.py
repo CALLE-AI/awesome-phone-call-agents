@@ -15,6 +15,7 @@ answer "why is this case not being called?" without anybody reading a log.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -92,6 +93,15 @@ class Orchestrator:
     #: The calling-window guard is time-of-day sensitive, so a wall clock would
     #: make behaviour depend on when somebody happens to run it.
     clock: Callable[[], datetime] = _utc_now
+    #: Serialises the guard-check-then-reserve critical section.
+    #:
+    #: Without it, concurrent requests can all pass guard 6 before any of them
+    #: writes an attempt row, and only the UNIQUE constraint on the idempotency
+    #: key stops a second dial -- by raising an IntegrityError the operator sees
+    #: as a 500, with no way to tell whether a call happened. The lock makes the
+    #: outcome deterministic rather than constraint-dependent. It is held for the
+    #: reservation only, never across the network call.
+    _lock: threading.RLock = field(default_factory=threading.RLock, repr=False, compare=False)
 
     # ------------------------------------------------------------------ ids
 
@@ -424,6 +434,51 @@ class Orchestrator:
         now: datetime | None = None,
     ) -> CallOutcome:
         """Guards, then reserve, then dial. Never the other way round."""
+        with self._lock:
+            reserved = self._reserve(case_id, confirmed=confirmed, actor=actor, now=now)
+        if isinstance(reserved, CallOutcome):
+            return reserved
+        request, attempt_id, workflow = reserved
+
+        # The network call happens outside the lock. The attempt row already
+        # exists, so guard 6 blocks anybody else on this case while it runs.
+        try:
+            handle = self.client.create(request)
+        except CallSubmissionUnknown as exc:
+            # The call may already have happened. Reconciled by reading it back,
+            # never by dialling again.
+            self.store.update_attempt(attempt_id, state=AttemptState.SUBMISSION_UNKNOWN.value)
+            self._advance(
+                case_id,
+                workflow,
+                cc.CCEvent.SUBMISSION_UNKNOWN
+                if workflow is Workflow.CONTACT_CHECK
+                else pf.PFEvent.SUBMISSION_UNKNOWN,
+            )
+            self.store.record_event(
+                "call.submission_unknown",
+                reason=f"Submission unknown ({exc}); reconciling, not redialling",
+                case_id=case_id,
+            )
+            return CallOutcome(False, detail=str(exc), attempt_id=attempt_id)
+        except CallError as exc:
+            self.store.update_attempt(attempt_id, state=AttemptState.NEEDS_HUMAN.value)
+            self._to_human(case_id, f"Call submission refused: {exc}")
+            return CallOutcome(False, detail=str(exc), attempt_id=attempt_id)
+
+        self.store.update_attempt(
+            attempt_id, state=AttemptState.ACCEPTED.value, call_id=handle.call_id
+        )
+        return CallOutcome(True, attempt_id=attempt_id, call_id=handle.call_id)
+
+    def _reserve(
+        self, case_id: str, *, confirmed: bool, actor: str, now: datetime | None
+    ):
+        """Guards, then reserve, then write the attempt. Caller holds the lock.
+
+        Returns a CallOutcome on refusal, or (request, attempt_id, workflow) when
+        the call may proceed.
+        """
         case = self._case(case_id)
         workflow = Workflow(case["workflow"])
         moment = now or self.clock()
@@ -460,7 +515,7 @@ class Orchestrator:
             destination=contact.phone_e164,
         )
         try:
-            self.store.reserve_key(
+            fresh = self.store.reserve_key(
                 key,
                 workflow=workflow,
                 case_id=case_id,
@@ -471,6 +526,23 @@ class Orchestrator:
         except LedgerConflict as exc:
             self._to_human(case_id, str(exc))
             return CallOutcome(False, NoCallReason.IDEMPOTENCY_KEY_USED, str(exc))
+
+        if not fresh:
+            # This exact intent is already reserved, so a call for it has already
+            # been submitted. Honouring the return value rather than ignoring it
+            # is what turns a duplicate request into a named refusal instead of a
+            # unique-constraint crash.
+            self.store.record_decision(
+                NoCallReason.CALL_IN_PROGRESS.value,
+                "hold",
+                case_id=case_id,
+                pupil_id=pupil.pupil_id,
+                contact_id=contact.contact_id,
+                detail="this authorisation was already submitted",
+            )
+            return CallOutcome(
+                False, NoCallReason.CALL_IN_PROGRESS, "this authorisation was already submitted"
+            )
 
         attempt_id = self.store.create_attempt(
             case_id=case_id,
@@ -495,35 +567,7 @@ class Orchestrator:
             contact_id=contact.contact_id,
             actor=actor,
         )
-
-        try:
-            handle = self.client.create(request)
-        except CallSubmissionUnknown as exc:
-            # The call may already have happened. Reconciled by reading it back,
-            # never by dialling again.
-            self.store.update_attempt(attempt_id, state=AttemptState.SUBMISSION_UNKNOWN.value)
-            self._advance(
-                case_id,
-                workflow,
-                cc.CCEvent.SUBMISSION_UNKNOWN
-                if workflow is Workflow.CONTACT_CHECK
-                else pf.PFEvent.SUBMISSION_UNKNOWN,
-            )
-            self.store.record_event(
-                "call.submission_unknown",
-                reason=f"Submission unknown ({exc}); reconciling, not redialling",
-                case_id=case_id,
-            )
-            return CallOutcome(False, detail=str(exc), attempt_id=attempt_id)
-        except CallError as exc:
-            self.store.update_attempt(attempt_id, state=AttemptState.NEEDS_HUMAN.value)
-            self._to_human(case_id, f"Call submission refused: {exc}")
-            return CallOutcome(False, detail=str(exc), attempt_id=attempt_id)
-
-        self.store.update_attempt(
-            attempt_id, state=AttemptState.ACCEPTED.value, call_id=handle.call_id
-        )
-        return CallOutcome(True, attempt_id=attempt_id, call_id=handle.call_id)
+        return request, attempt_id, workflow
 
     def _refuse(
         self, case_id, workflow, pupil, contact, decision, request
