@@ -200,7 +200,13 @@
   margin: 0; flex: 1 1 22rem; min-width: 0;
   font-size: var(--size-2); line-height: 1.45;
 }
+/* Pushed to the right edge once there is a right edge to push to. The bar is a flex row of
+ * wordmark, sentence and links; the sentence stops growing at its own 30rem measure, so
+ * with two links left in the bar the last 350px of a 1216px plate was empty dark ground and
+ * the links floated in the middle of it. Below 52rem the row wraps and the links get a line
+ * of their own, where flush left is right. */
 .nav-acts { display: flex; gap: var(--space-2); flex-wrap: wrap; order: 3; }
+@media (min-width: 52rem) { .nav-acts { margin-inline-start: auto; } }
 .nav-act {
   display: inline-block; padding: 6px 12px;
   font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
