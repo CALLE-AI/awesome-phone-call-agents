@@ -289,7 +289,11 @@ def _published_call_total() -> int:
 
     Deliberately not `_recorded_call_total()`. That one reads the money denominator, frozen
     at the twelve calls the cost model was computed on, and a board claiming twelve while
-    the page plays twenty is the page contradicting its own audio player.
+    the page carries twenty transcripts is the page contradicting its own register.
+
+    This counts transcripts, which is what the sentence it feeds says. It is not the count
+    of recordings: `WITHHELD_AUDIO` holds back four, so sixteen of these twenty have a clip
+    a reader can play. Anything that pairs this number with the word audio is wrong.
     """
     return len(transcripts()["calls"])
 
@@ -1245,8 +1249,10 @@ def security_headers(*pages: str) -> list[dict[str, str]]:
     """Every response header the deployment sets, in the order they are written out."""
     return [
         {"key": "Content-Security-Policy", "value": content_security_policy(*pages)},
-        # The deployment serves the page, six document pages, two modules and eight audio
-        # clips, every one with a correct type. Nothing here needs a browser to guess.
+        # Every file the deployment serves goes out under a correct type: the pages, the
+        # modules and the call clips alike. Nothing here needs a browser to guess. The
+        # counts used to be written into this sentence and all three of them drifted,
+        # because a comment is not rebuilt when the directory it describes changes.
         {"key": "X-Content-Type-Options", "value": "nosniff"},
         # A judge arrives from a submission form or a private document. The referrer would
         # hand this page the address of whichever of those it was, so it is not sent.
