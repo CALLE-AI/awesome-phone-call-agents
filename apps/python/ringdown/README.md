@@ -567,12 +567,21 @@ The API key travels on every request, so `--base-url` and `--mcp-url` are trust 
 conveniences: a mistyped host would otherwise carry the key to whoever answers. Each is pinned to
 its own exact live URL before any client is built, which is a string comparison and not a host
 match, so `https://api.heycall-e.com:8443`, `https://api.heycall-e.com/../evil` and
-`https://someone:secret@api.heycall-e.com` are all refused the same way an unknown domain is. The
+`https://someone:secret@api.heycall-e.com` are all refused the same way an unknown domain is — and
+the last of those is refused before the scheme is examined, because the refusal that names the
+scheme interpolates the URL and the one that names the userinfo deliberately does not. The
 pin travels with the client rather than with the caller, so swapping the two flags cannot send the
 API key to the MCP endpoint or the MCP token to the REST one: each is refused before a socket
 opens.
 Plain `http` is refused outright except on loopback, and loopback is served the throwaway
 credential rather than the live one, so the fake never sees a real key.
+
+There is a third pinned endpoint, and it is the tightest of the three: `suggest-mapping` has no flag
+for the model host at all, so the only place it can reach is the constant in its source. Its key
+travels in a header rather than a query string, a redirect is refused rather than followed, and the
+subcommand exits 30 without opening a socket when the key is absent. The payload you name does leave
+your network, which is the one cost here that no pin removes, and the reason drafting a mapping is a
+separate opt-in subcommand rather than a fallback inside `adapt`.
 
 Webhooks are not used. The provider's deliveries carry no secret, no timestamp and no signature,
 and an unsigned delivery proves nothing about its sender, so Ringdown polls instead of trusting
@@ -595,6 +604,12 @@ task text. The quotes in those three fields are therefore neutralised where the 
 not where the incident is parsed: `clean_text` also validates `id`, which feeds the idempotency
 key, and moving that key would place a different call. `severity` needs no such treatment — it is
 an enum. Neither does `runbook_url`, which must already be a single URL with no spaces.
+
+The `script` field is data that reaches the filesystem, and it is contained rather than trusted. It
+names a file **inside the incident's own directory**: an absolute path or a `../` walk is refused
+before the file is opened, and the refusal names the directory rather than the path that was asked
+for, so the error cannot be used to learn which paths exist. What it loads still has to pass
+`validate_task_template`, so a file that is not a call script is refused on its contents as well.
 
 The rotation file is not in that trust boundary. `contact.name` is interpolated into the same
 quoted question and is left as it is, because the rotation is an operator file written alongside
