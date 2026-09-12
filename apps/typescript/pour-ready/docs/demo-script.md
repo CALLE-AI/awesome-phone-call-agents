@@ -1,5 +1,13 @@
 # Three-minute demo script
 
+## Scope note
+
+The current recording plan is dry-run only. There is no authorized live call in
+this build, so no live-call excerpt is recorded or claimed. If an authorized
+live call is captured later, add it as a separately labeled segment and update
+the Devpost packet at the same time. Keep every label accurate: a fixture path
+is described as fixture.
+
 ## 0:00–0:30 — The failure mode
 
 "A concrete pour is an expensive chain of verbal commitments. The schedule can
@@ -16,16 +24,17 @@ Open **Preview call plan**. Point out that every role receives a bounded,
 role-specific checklist. Show the automated-assistant disclosure and the
 authority boundary.
 
-Keep dry-run selected for the repeatable path. For the separately recorded
-authorized live excerpt, show the four masked destinations and the explicit
-authorization checkbox before submitting.
+Keep dry-run selected. Optionally show the live-mode panel to explain the
+gating, and say plainly that the live path is not part of this recording.
 
 ## 1:10–1:45 — CALL-E at runtime
 
 Start the run. The four cards move through queued, calling, and completed.
-For a real excerpt, use a controlled actor and let the audience hear the
-disclosure plus one bounded confirmation. Never display an unmasked number or
-API credential.
+
+Say that this is the deterministic fixture path: no credential is read and no
+call is placed. Point to the code path in `src/lib/calle-server.ts` or the test
+suite as the evidence that CALL-E is imported and called for real, rather than
+showing a call that did not happen.
 
 ## 1:45–2:30 — Reveal the contradiction
 
@@ -51,9 +60,11 @@ customer interview until it has actually happened.
 
 ## Recording checklist
 
-- Use only controlled actors or an opted-in participant.
-- Keep public live mode disabled.
-- Mask every phone and secret.
-- Capture one short real-call excerpt after authorization.
-- Rehearse on fixtures first; reserve call credits for the final takes.
-- Mention that submitted calls cannot be canceled from this client.
+- Keep the recorded path dry-run, and label it as such on screen and in speech.
+- Never display an unmasked number or an API credential.
+- Do not imply that the fixture path is a live call. Show the runtime integration
+  through code or tests instead.
+- If a live call is authorized later, record it separately, label it as live, and
+  revise this script and the Devpost packet before publishing.
+- Rehearse on fixtures first so the recorded takes stay inside three minutes.
+- Mention that a submitted live call cannot be canceled from this client.
