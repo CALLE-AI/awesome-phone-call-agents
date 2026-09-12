@@ -3,6 +3,7 @@
 CallBridge adds a consented AI phone check-in around a creative-project workflow. The first example integration is Aura Manager, an AI workspace for creative projects. That website integration is proposed, not deployed by this contribution.
 
 - Repository: [Senseiglobal/callbridge-connect](https://github.com/Senseiglobal/callbridge-connect)
+- Public demo: [callbridge-connect.onrender.com](https://callbridge-connect.onrender.com/) — fictional inputs and no phone calls; free hosting can sleep and reset samples.
 - License: MIT
 - Runtime: Python 3.12+, React/TypeScript, Node.js 22+, Bun; optional Docker.
 - CALL-E integration: official public `calle-ai` Python SDK (`calls.create`, `calls.get`).
@@ -55,6 +56,6 @@ Local pilot storage retains the full phone number privately for dialing; API lis
 
 ## Verification and boundaries
 
-Local verification: 18 no-call backend tests, TypeScript typecheck and production frontend build. Tests use fake providers and mocked Firestore reads, including coverage for the general creative-project profile and legacy deadline inputs. Live CALL-E call evidence, public hosting, and the owner's demo video remain pending at contribution time. Sample previews are labelled and never counted as real completed calls.
+Local verification: 18 no-call backend tests, TypeScript typecheck and production frontend build. Tests use fake providers and mocked Firestore reads, including coverage for the general creative-project profile and legacy deadline inputs. The Docker app was deployed on Render's Free plan on September 12, 2026; its hosted fictional create → preview → resolve workflow and no-call health flags were verified. Live CALL-E call evidence and the owner's demo video remain pending. Sample previews are labelled and never counted as real completed calls.
 
 This is a single-operator hackathon MVP. SQLite needs persistent storage and one service instance for a live pilot. Optional Firestore requires appropriate Google credentials/IAM and has not been verified against a real cloud project. No real-customer, revenue or conversion-improvement claim is made. Not intended for emergency, medical, legal, financial, political or collections workflows.
