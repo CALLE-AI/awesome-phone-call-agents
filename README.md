@@ -37,6 +37,7 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 ## Table of Contents
 
 - [Community contributions](#community-contributions)
+- [Ivy Tendril](https://github.com/Ivy-Interactive/Ivy-Tendril) - Open-source agentic software factory with an amazing UI that handles parallel Git worktrees for you, complete with programmatic verifications and fast review loops.
 - [Why this repository exists](#why-this-repository-exists)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
