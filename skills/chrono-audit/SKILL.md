@@ -22,6 +22,15 @@ Do not use this skill to:
 - Dial phone numbers extracted from the PR text itself (always consult an internal directory).
 - Force confirmation when an authorizer denies or hedges a claim.
 
+## Enterprise Tool Suite
+
+CHRONO-AUDIT provides a full verification ecosystem for autonomous agents:
+
+1. **`telephony-sudo` CLI Sandbox Interceptor**: Intercepts high-blast-radius terminal commands (e.g. `DROP DATABASE`, `terraform destroy`) executed by agents (Devin, Claude Code), freezes execution, dials the designated human authorizer with an anti-spoofing challenge nonce, and unfreezes only upon affirmative verbal confirmation.
+2. **`git voice-blame`**: Inspects Git commits or repository lines to display immutable cryptographic voice provenance cards (HMAC-SHA256 signatures, recording hashes, caller timestamps) stored in Git notes.
+3. **Model Context Protocol (MCP) Server**: Exposes standard MCP tools (`telephony_verify_action`, `audit_pr_verbal_claims`, `voice_blame_commit`) directly to Claude Code, Cursor, and ChatGPT agents.
+4. **Voice-to-Diff Healing**: When an authorizer verbally modifies a plan (e.g., "keep table until Q3 migration"), CHRONO-AUDIT synthesizes a git patch reflecting the spoken amendment.
+
 ## Setup & Configuration
 
 ```bash
@@ -32,10 +41,27 @@ python demo/dress_rehearsal.py             # confirm execution in zero-cost offl
 
 To enable live telephony: install `calle-ai`, set `CALLE_API_KEY`, and set `CHRONO_AUDIT_DRESS_REHEARSAL=false`. Consult `references/safety.md` before initiating live calls.
 
+### CLI & Tools Usage
+
+```bash
+# Agent CLI privilege gate
+python scripts/telephony_sudo.py --cmd "DROP TABLE legacy_users;" --authorizer "@sarah_dba"
+
+# Voice provenance audit
+python scripts/git_voice_blame.py --commit HEAD
+
+# Start Model Context Protocol (MCP) server for Claude Code / Cursor
+python -m chrono_audit.mcp_server
+
+# Launch Web Verification Console
+python scripts/serve_ui.py --port 8080
+```
+
 ## Safety & Governance
 
 This skill initiates telephone calls to human contacts when live mode is enabled. Dress rehearsal mode is the default and simulates realistic interview responses without placing calls. For complete governance rules, anti-spoofing controls, and rate-limiting guidelines, see `references/safety.md`.
 
 ## Verification Examples
 
-For end-to-end trace walkthroughs of denied authorizations, multi-hop delegation chains, and unreachable authorizer handling, see `references/examples.md`.
+For end-to-end trace walkthroughs of denied authorizations, multi-hop delegation chains, `telephony-sudo` command freezes, and `git voice-blame` provenance, see `references/examples.md`.
+

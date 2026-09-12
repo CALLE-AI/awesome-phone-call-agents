@@ -59,3 +59,52 @@ These examples illustrate the three core audit outcomes of `chrono-audit`.
 ### Verdict
 - **Status**: `NEEDS_HUMAN_REVIEW`
 - **CI Gate**: Escalated to repository maintainers for manual intervention.
+
+---
+
+## Example 4: Agent CLI Privilege Escalation (`telephony-sudo`)
+
+Autonomous coding agents (e.g. Claude Code, Devin) executing commands with high blast radius are intercepted in real-time.
+
+### Terminal Interception
+```bash
+python scripts/telephony_sudo.py \
+  --cmd "DROP DATABASE prod_accounts;" \
+  --authorizer "@sarah_dba" \
+  --reason "DB migration cleanup"
+```
+
+### Trace & Enforcement
+- Process execution immediately suspended (SIGSTOP / freeze).
+- CALL-E dials `@sarah_dba`'s verified phone number with dynamic liveness challenge nonce.
+- Authorizer denies authorization verbally.
+- `telephony-sudo` unfreezes and issues `SIGKILL` (Exit Code 1) terminating destructive command.
+
+---
+
+## Example 5: Cryptographic Voice Provenance (`git voice-blame`)
+
+Inspect historical commits or file lines to verify voice clearances and cryptographic HMAC-SHA256 signatures.
+
+### Inspection Command
+```bash
+python scripts/git_voice_blame.py --commit 3d8a11b90c
+```
+
+### Provenance Output
+```text
+=== CHRONO-AUDIT: Git Voice Blame Provenance ===
+Commit: 3d8a11b90c
+Author: Autonomous SWE Agent <agent@example.net>
+Subject: Change access pattern for regional shard token routing
+
+[VOICE ATTESTATION DETECTED]
+Attestation ID  : attest_3d8a11b90c
+Authorizer      : The architect (+1 206 555 0148)
+Signature       : HMAC-SHA256:d8f72a19c43b0e1e...
+Status          : VALID (Untampered)
+Recording Hash  : sha256:4a5de800fd2ff808cacda22ddb0fce48514953c...
+Stored Ref      : refs/notes/chrono-audit
+================================================
+```
+
