@@ -65,12 +65,9 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
 
 Use this Agent Skills folder pattern:
 
+
 ```text
-skill-name/
-├── SKILL.md
-├── references/
-├── scripts/
-└── assets/
+- **[MediCall](https://github.com/RafalW3bCraft/medicall)** — Pre-arrival care coordination powered by CALL-E. Places outbound calls to confirm appointments, collects patient-reported changes with consent, and routes outcomes through a deterministic policy engine (`ROUTINE` / `HUMAN_REVIEW` / `ESCALATION`). Evidence-linked staff handoff card for every review outcome. No LLM in the decision path. · [SKILL.md](https://github.com/RafalW3bCraft/medicall/blob/main/SKILL.md)
 ```
 
 ### App directory template
