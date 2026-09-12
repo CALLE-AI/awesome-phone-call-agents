@@ -77,7 +77,7 @@ python -m firstbell --work-file examples/absences.csv
 That dials nobody, costs nothing and needs no CALL-E account. It prints one line per row and
 a total that does not add the middle outcome to the successes.
 
-There is a demo film, 2 minutes 22. The greeting is a recording of me, every
+There is a demo film, 2 minutes 44. The greeting is a recording of me, every
 other line is a voice clone of the same speaker, and the call you hear in it is the parent's
 own voice from the recording CALL-E returned. Its running time, loudness and hash are
 measured into [`evidence/film.json`](evidence/film.json) rather than typed.
