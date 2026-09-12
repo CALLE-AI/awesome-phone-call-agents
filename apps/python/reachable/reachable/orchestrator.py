@@ -381,8 +381,18 @@ class Orchestrator:
         scope = (
             case["trigger_date"] if workflow is Workflow.PATTERN_FOLLOWUP else case["term_id"]
         )
+        # The ordinal of the human authorisation this call runs under. Attempts
+        # are only created after guard 2 has seen a confirmation, so the count
+        # of prior attempts for this contact *is* the count of prior
+        # authorisations. It is stable for the whole of one dial: the attempt
+        # row is written after the key is derived.
+        authorisation = self.store.attempts_for_contact(case_id, contact.contact_id) + 1
         key = policy.idempotency_key(
-            workflow, pupil_id=pupil.pupil_id, contact_id=contact.contact_id, scope=scope
+            workflow,
+            pupil_id=pupil.pupil_id,
+            contact_id=contact.contact_id,
+            scope=scope,
+            authorisation=authorisation,
         )
         request = CallRequest(
             task=task,

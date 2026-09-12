@@ -253,11 +253,15 @@ Guard 1 is necessary and not sufficient — guard 2 is the reason.
 
 Idempotency keys, reserved in an append-only ledger **before** dialling:
 
-- pattern follow-up: `(trigger_date, pupil_id, contact_id)`
-- contact check: `(term_id, contact_id)`
+- pattern follow-up: `(trigger_date, pupil_id, contact_id, authorisation)`
+- contact check: `(term_id, contact_id, authorisation)`
 
 Derived from the authorised intent, never from the attempt
-([`SOURCES.md` §1.6](SOURCES.md#16-idempotency)).
+([`SOURCES.md` §1.6](SOURCES.md#16-idempotency)). The `authorisation` ordinal is
+what makes the "attempts remain" branches below reachable: it advances only when
+a person authorises that household to be rung again, so every network retry of
+one authorisation reuses one key. See
+[`SAFETY.md` §6](SAFETY.md#6-idempotency).
 
 ---
 

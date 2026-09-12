@@ -60,22 +60,40 @@ ALLOWED = Decision(True)
 
 
 def idempotency_key(
-    workflow: Workflow, *, pupil_id: str, contact_id: str, scope: str
+    workflow: Workflow,
+    *,
+    pupil_id: str,
+    contact_id: str,
+    scope: str,
+    authorisation: int,
 ) -> str:
     """Derive the key from the authorised intent, never from the attempt.
 
-    Pattern follow-up: (trigger date, pupil, contact).
-    Contact check:     (term, contact).
+    Pattern follow-up: (trigger date, pupil, contact, authorisation).
+    Contact check:     (term, contact, authorisation).
+
+    ``authorisation`` is the ordinal of the human decision that this specific
+    call may happen, not a retry counter. It advances only when a person
+    authorises the household to be rung again -- which is genuinely a new
+    authorised intent, and is exactly what the reference guidance means by
+    deriving the key from the authorisation rather than the attempt.
+
+    Without it the two documents contradict each other: the state machine
+    returns a case to a ready state after voicemail so a further attempt may be
+    authorised, while a key over (term, contact) alone is already reserved, so
+    guard 9 refuses forever and the attempt budget is dead configuration.
 
     Anti-patterns that silently disable the protection, and are therefore
     impossible here: a fresh UUID, a hash of the clock, a hash of payload plus
-    clock, one identifier per attempt. If a retry can produce a different key
-    there is no idempotency, and the provider is right to dial again.
+    clock, one identifier per network retry. Retrying the *same* authorisation
+    always produces the same key, so a timeout or a crash cannot dial twice.
     """
+    if authorisation < 1:
+        raise ValueError("an idempotency key requires a real authorisation ordinal")
     if workflow is Workflow.PATTERN_FOLLOWUP:
-        intent = f"pattern:{scope}:{pupil_id}:{contact_id}"
+        intent = f"pattern:{scope}:{pupil_id}:{contact_id}:{authorisation}"
     else:
-        intent = f"contact-check:{scope}:{contact_id}"
+        intent = f"contact-check:{scope}:{contact_id}:{authorisation}"
     digest = hashlib.sha256(intent.encode("utf-8")).hexdigest()[:32]
     return f"reachable:{digest}"
 

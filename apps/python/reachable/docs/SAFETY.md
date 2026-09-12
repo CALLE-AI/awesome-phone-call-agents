@@ -222,10 +222,25 @@ One authorised intent produces at most one call.
 
 Keys, derived from the authorised intent and never from the attempt:
 
-- **Pattern follow-up:** `(trigger_date, pupil_id, contact_id)`
-- **Contact check:** `(term_id, contact_id)`
+- **Pattern follow-up:** `(trigger_date, pupil_id, contact_id, authorisation)`
+- **Contact check:** `(term_id, contact_id, authorisation)`
 
-Each is **reserved in an append-only ledger before dialling**. Order, without
+`authorisation` is the ordinal of the human decision that this specific call may
+happen. It is **not** a retry counter: it advances only when a person authorises
+that household to be rung again, which is genuinely a new authorised intent.
+Every network retry of the *same* authorisation reuses the same key, so a
+timeout, a crash or a replay can never dial twice.
+
+> **Why the ordinal is there.** Without it these keys contradict
+> [`STATE_MACHINE.md`](STATE_MACHINE.md), which returns a case to a ready state
+> after voicemail so that a further attempt may be authorised. A key over
+> `(term, contact)` alone is already reserved at that point, so guard 9 would
+> refuse forever, `REACHABLE_MAX_ATTEMPTS` would be dead configuration, and the
+> transition would be a dead end. The ordinal is the smallest change that keeps
+> both documents true, and it keeps "a human must decide to ring that household
+> again" explicit rather than accidental.
+
+Each key is **reserved in an append-only ledger before dialling**. Order, without
 exception: write the reservation, commit, place the call, update from the
 authoritative terminal read. A record that only exists after success is not a
 record — a call accepted but never reported would leave no trace for the next
@@ -233,9 +248,9 @@ attempt to collide with.
 
 Anti-patterns that silently disable the protection, and are therefore forbidden:
 a fresh UUID per call, a hash of the clock, a hash of payload plus clock, one
-identifier per attempt. If a retry can produce a different key, there is no
-idempotency and the provider is behaving correctly when it dials again
-([`SOURCES.md` §1.6](SOURCES.md#16-idempotency)).
+identifier per *network* attempt. If retrying one authorisation can produce a
+different key, there is no idempotency and the provider is behaving correctly
+when it dials again ([`SOURCES.md` §1.6](SOURCES.md#16-idempotency)).
 
 The ledger outlives the case it guards, so a redelivered webhook after cleanup
 cannot produce a second call.

@@ -469,3 +469,89 @@ def test_retention_actually_deletes_transcripts_and_keeps_the_outcome(live, fake
 def test_retention_runs_at_dashboard_startup():
     text = (SOURCE / "web" / "app.py").read_text(encoding="utf-8")
     assert "purge_expired_transcripts()" in text
+
+
+# ===========================================================================
+# Idempotency: one authorisation, one call -- and a retry is a new authorisation
+# ===========================================================================
+
+
+def test_retrying_one_authorisation_always_reuses_the_same_key():
+    """A timeout, a crash or a replay must never dial twice."""
+    from reachable.policy import idempotency_key
+
+    first = idempotency_key(
+        Workflow.CONTACT_CHECK,
+        pupil_id="P-1041",
+        contact_id="C-2088",
+        scope="2026-autumn",
+        authorisation=1,
+    )
+    again = idempotency_key(
+        Workflow.CONTACT_CHECK,
+        pupil_id="P-1041",
+        contact_id="C-2088",
+        scope="2026-autumn",
+        authorisation=1,
+    )
+    assert first == again
+
+
+def test_a_new_authorisation_is_a_new_key():
+    from reachable.policy import idempotency_key
+
+    def key(**over):
+        base = dict(
+            pupil_id="P-1041", contact_id="C-2088", scope="2026-autumn", authorisation=1
+        )
+        base.update(over)
+        return idempotency_key(Workflow.CONTACT_CHECK, **base)
+
+    assert key() != key(authorisation=2)
+    assert key() != key(contact_id="C-2089")
+    assert key() != key(scope="2027-spring")
+
+
+def test_an_authorisation_ordinal_below_one_is_refused():
+    from reachable.policy import idempotency_key
+
+    with pytest.raises(ValueError):
+        idempotency_key(
+            Workflow.CONTACT_CHECK,
+            pupil_id="P",
+            contact_id="C",
+            scope="s",
+            authorisation=0,
+        )
+
+
+def test_voicemail_then_a_retry_dials_once_more_and_then_stops(live, fake_state):
+    """The transition the docs promise, now reachable, and still capped."""
+    live.start_contact_check()
+    case_id = "CC-2026-autumn-C-2088"
+
+    first, *_ = live.build_request(case_id)
+    fake_state.queue(first.idempotency_key, "voicemail")
+    one = live.place_call(case_id, confirmed=True, now=SCHOOL_DAY_IN_WINDOW)
+    live.reconcile(one.attempt_id)
+    assert live.store.case(case_id)["state"] == "CC_READY"
+
+    second, *_ = live.build_request(case_id)
+    assert second.idempotency_key != first.idempotency_key
+    fake_state.queue(second.idempotency_key, "clean_identity")
+    two = live.place_call(case_id, confirmed=True, now=SCHOOL_DAY_IN_WINDOW)
+    assert two.placed
+    live.reconcile(two.attempt_id)
+    assert live.store.case(case_id)["state"] == "CC_VERIFIED"
+
+    third = live.place_call(case_id, confirmed=True, now=SCHOOL_DAY_IN_WINDOW)
+    assert not third.placed
+    assert third.reason is NoCallReason.ATTEMPT_BUDGET_SPENT
+
+
+def test_the_key_is_stable_across_a_preview_and_the_dial_it_previews(live):
+    """What the office is shown is what gets reserved."""
+    live.scan_register()
+    preview = live.preview(IVY_CASE)
+    request, *_ = live.build_request(IVY_CASE)
+    assert preview.idempotency_key == request.idempotency_key
