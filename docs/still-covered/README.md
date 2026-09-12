@@ -184,7 +184,48 @@ review), `report_hours`, `navigator_callback`, `mail_letter`, `correction_call`,
 
 Nothing in this system changes anyone's coverage, and it is not able to.
 
-## 4. Building honestly on CALL-E
+## 4. What it would cost a state
+
+The obvious objection to phoning people is that phoning people is expensive. It is worth doing the
+arithmetic, because the arithmetic is the reason this is worth building rather than just worth
+saying.
+
+**The one real price point we have.** The Kern Health Systems / Careforce deployment reported by
+KFF Health News (4 August 2026) placed roughly 800,000 calls to 387,000 members in 30+ languages for
+about $370,000. That is **about $0.46 a call**, or roughly $0.96 per member reached, for AI voice
+outreach at scale in a Medicaid population.
+
+**A worked example.** Everything below is arithmetic on stated assumptions, not a claim about any
+real state's budget:
+
+| | |
+| --- | --- |
+| Enrollees due for a coverage check in a cohort | 100,000 |
+| Cleared by the state's own data, never called *(15%, our sample rate)* | 15,000 |
+| People actually called | 85,000 |
+| Calls placed *(1.2 per person, allowing for the redial)* | 102,000 |
+| At $0.46 a call | **≈ $47,000** |
+
+For that, the state gets a screened answer for every person its own data could not settle, in their
+own language, plus a measured number for how many of them had never heard of the rule.
+
+**What has to be true for that to pay for itself.** If even 5% of those 85,000 are exempt or already
+compliant *and* would otherwise have been disenrolled for paperwork, that is 4,250 people who keep
+coverage, at about **$11 each**. The Arkansas finding is that the share of at-risk people who are
+already working or already exempt is not 5% but most of them, so 5% is a deliberately pessimistic
+floor on the yield, not a projection.
+
+Set against that: every procedural disenrollment produces re-enrollment churn, uncompensated care,
+and a caseworker re-processing the same person months later. GAO's work on Georgia Pathways
+documented administrative spending that dwarfed the benefits actually paid, most of it going into
+processing and chasing paperwork. The comparison is not "calls versus nothing" — it is calls versus
+paying to remove someone and then paying again to put them back.
+
+**And the honest caveat.** The per-call figure is somebody else's deployment, our 15% ex parte rate
+comes from a 13-person sample registry, and the 5% yield is an assumption we invented. These numbers
+justify running a measured pilot against the current mailing. They do not substitute for one.
+
+## 5. Building honestly on CALL-E
 
 The platform has real constraints. Designing around them rather than pretending they do not exist is
 most of the engineering.
@@ -207,7 +248,7 @@ most of the engineering.
 drives a total outage and asserts that all 11 people land in `operator_review` and nothing else - no
 letters, no navigator calls, no verdicts.
 
-## 5. Safety
+## 6. Safety
 
 Summarized here; the full list is
 [`references/safety.md`](../../skills/medicaid-exemption-screener/references/safety.md).
@@ -236,7 +277,7 @@ Summarized here; the full list is
   (FCC DA 23-62); an AI voice is an "artificial" voice under the TCPA (FCC 24-17), so the call
   identifies itself as automated in its first sentence.
 
-## 6. Reproducing the demo
+## 7. Reproducing the demo
 
 No credentials, no network, no phone call:
 
@@ -263,7 +304,7 @@ replay, webhook delivery, thirteen behavioural scenarios and injectable failures
 against it, so the whole system - including the failure paths - is verifiable by a judge with no
 account and no credits.
 
-## 7. Test coverage
+## 8. Test coverage
 
 46 tests, no network:
 
@@ -283,7 +324,7 @@ account and no credits.
 `npm run check` runs `tsc --noEmit` under `strict` plus `noUncheckedIndexedAccess` and
 `exactOptionalPropertyTypes`.
 
-## 8. Limitations
+## 9. Limitations
 
 Said plainly, because a judge will find them anyway:
 
@@ -296,7 +337,7 @@ Said plainly, because a judge will find them anyway:
   community-outreach items exist for, and why "not reached" is reported as a first-class outcome
   rather than folded into a success rate.
 
-## 9. Sources
+## 10. Sources
 
 - Sommers BD, Goldman AL, Blendon RJ, Orav EJ, Epstein AM. "Medicaid Work Requirements - Results
   from the First Year in Arkansas." *N Engl J Med* 2019;381:1073-1082.
