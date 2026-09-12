@@ -59,7 +59,7 @@
   preview.onclick = () => post('/api/preview', data());
   const live = document.getElementById('live');
   if (live) live.onclick = async () => {
-    if (!confirm.checked) { result.textContent = 'Confirm permission to call the number first.'; return; }
+    if (!document.getElementById('confirm').checked) { result.textContent = 'Confirm permission to call the number first.'; return; }
     const body = await post('/api/live', {...data(), api_key:value('api_key'), goal_id:value('goal_id'), confirm:true});
     if (!body.job_id) return;
     let tries = 0;
