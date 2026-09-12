@@ -18,13 +18,14 @@
     button.secondary { background: #2d3d5d; } button:disabled { opacity: .55; cursor: wait; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #09101d; padding: 16px; border-radius: 8px; color: #bfe0ff; }
     .notice { border-left: 3px solid #f0b44d; padding-left: 12px; } .small { font-size: 13px; }
+    .live { border-color: #775a26; }
   </style>
 </head>
 <body>
 <main>
   <h1>Voice Scout</h1>
   <p>AI phone qualification for small businesses. Configure the workflow for websites, IT, insurance, staffing, consulting, home services, or another business need.</p>
-  <div class="card notice"><strong>Safe demo:</strong> preview mode never places a call. The live demo, when enabled, can call only the server-side authorized test number and requires operator authorization. The assistant identifies itself as automated.</div>
+  <div class="card notice"><strong>Before a live call:</strong> use a CALL-E key and Goal ID that you own, enter a number you own or have permission to call, and confirm the call. Your key is used temporarily for this run and is not saved by this demo.</div>
   <div class="card">
     <h2>Business context</h2>
     <label for="business_name">Business name</label><input id="business_name" value="Northside Bicycle Repair">
@@ -32,22 +33,43 @@
     <label for="company_size">Company size</label><input id="company_size" value="small">
     <label for="workflow">Current workflow</label><textarea id="workflow">Phone calls and web inquiries are handled by the owner.</textarea>
     <label for="pain_points">Known pain points</label><textarea id="pain_points">Missed calls during repair appointments.</textarea>
+    <label for="phone">Phone number for preview/live call (E.164)</label><input id="phone" value="+15550000000">
     <button id="preview" class="secondary">Preview — no call</button>
-    {% if live_enabled %}<button id="live">Place authorized demo call</button>{% endif %}
-    <p class="small">This demo does not accept arbitrary destination numbers. Results are intended for human review.</p>
   </div>
+  {% if live_enabled %}
+  <div class="card live">
+    <h2>Bring your own CALL-E key — live demo</h2>
+    <label for="api_key">CALL-E API key</label><input id="api_key" type="password" autocomplete="off" placeholder="Used temporarily; never stored">
+    <label for="goal_id">Published CALL-E Goal ID</label><input id="goal_id" placeholder="goal_...">
+    <label><input id="confirm" type="checkbox" style="width:auto"> I own or have permission to call this number, and understand this places a real call.</label>
+    <button id="live">Place one live call</button>
+    <p class="small">The demo accepts one live job per request, limits concurrent calls, masks phone numbers in results, and expires job state after a short period.</p>
+  </div>
+  {% endif %}
   <div class="card"><h2>Result</h2><pre id="result">Run a preview to see the structured handoff.</pre></div>
 </main>
 <script>
-  const data = () => ({ business_name: business_name.value, industry: industry.value, company_size: company_size.value, workflow: workflow.value, pain_points: pain_points.value });
-  async function run(path, headers={}) {
+  const value = id => document.getElementById(id)?.value || '';
+  const data = () => ({ business_name:value('business_name'), industry:value('industry'), company_size:value('company_size'), workflow:value('workflow'), pain_points:value('pain_points'), phone:value('phone') });
+  async function post(path, payload) {
     result.textContent = 'Working…';
-    const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json', ...headers}, body:JSON.stringify(data())});
-    const body = await r.json(); result.textContent = JSON.stringify(body, null, 2);
+    const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const body = await r.json(); result.textContent = JSON.stringify(body, null, 2); return body;
   }
-  preview.onclick = () => run('/api/preview');
+  preview.onclick = () => post('/api/preview', data());
   const live = document.getElementById('live');
-  if (live) live.onclick = () => { const token = prompt('Operator token:'); if (token) run('/api/live', {'X-Demo-Token': token}); };
+  if (live) live.onclick = async () => {
+    if (!confirm.checked) { result.textContent = 'Confirm permission to call the number first.'; return; }
+    const body = await post('/api/live', {...data(), api_key:value('api_key'), goal_id:value('goal_id'), confirm:true});
+    if (!body.job_id) return;
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries++;
+      const r = await fetch('/api/live/' + encodeURIComponent(body.job_id));
+      const status = await r.json(); result.textContent = JSON.stringify(status, null, 2);
+      if (['completed','error'].includes(status.status) || tries > 180) clearInterval(timer);
+    }, 2000);
+  };
 </script>
 </body>
 </html>
