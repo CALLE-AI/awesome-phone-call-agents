@@ -146,7 +146,15 @@ pytest apps/python/weekend-saviour/tests/test_flow.py
 Start the Flask webhook server on port `7071`:
 
 ```bash
-python apps/python/weekend-saviour/flask_app/app.py
+python ./apps/python/weekend-saviour/flask_app/app.py
+```
+
+Run with live auto-reload enabled:
+
+```bash
+FLASK_DEBUG=1 python ./apps/python/weekend-saviour/flask_app/app.py
+# Or via flask CLI
+python -m flask --app ./apps/python/weekend-saviour/flask_app/app.py run --reload --port 7071 --host 0.0.0.0
 ```
 
 **Health Check Endpoint:**
