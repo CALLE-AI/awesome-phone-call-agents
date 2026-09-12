@@ -11,13 +11,16 @@ from ringdown.__main__ import CONFIRMATION, main
 from ringdown.exits import (
     EXIT_ACKNOWLEDGED,
     EXIT_DECLINED,
+    EXIT_LEDGER,
     EXIT_UNKNOWN,
     EXIT_UNRESOLVED,
     EXIT_UNVERIFIED,
     EXIT_USAGE,
 )
-from ringdown.audit import append_record
+from ringdown.audit import LedgerError, append_record
 from ringdown.calle import LIVE_BASE_URL, LIVE_MCP_URL, RestClient
+from ringdown.pagerduty import NoteResult
+from ringdown.task import CALL_TASK
 from tests.data import ALICE, BEN, CARLA, EXAMPLES, example_body, write_json
 
 ROTATION = str(EXAMPLES / "rotation.example.json")
@@ -70,7 +73,7 @@ def test_preview_never_touches_the_network(incident_file, capsys):
 
 def test_the_bare_command_prints_help_instead_of_guessing(capsys):
     assert main([]) == EXIT_USAGE
-    assert "{preview,run,verify,adapt}" in capsys.readouterr().out
+    assert "{preview,run,verify,adapt,suggest-mapping}" in capsys.readouterr().out
 
 
 def test_run_without_the_confirmation_phrase_places_no_call(serving, incident_file, tmp_path):
@@ -418,3 +421,210 @@ def test_a_rewritten_verdict_with_a_relinked_chain_still_fails_verify_ledger(
     out = capsys.readouterr().out
     assert "hash matches its content" in out
     assert "does not follow from the recorded attempts (declined)" in out
+
+
+@pytest.mark.parametrize("vendor", ["pagerduty", "opsgenie"])
+def test_a_vendor_alert_survives_the_whole_adapt_and_preview_path(vendor, tmp_path, capsys):
+    out = tmp_path / "incident.json"
+    assert main(
+        [
+            "adapt",
+            "--payload", str(EXAMPLES / f"{vendor}.example.json"),
+            "--mapping", str(EXAMPLES / f"{vendor}-mapping.example.json"),
+            "--out", str(out),
+        ]
+    ) == EXIT_ACKNOWLEDGED
+    capsys.readouterr()
+
+    assert main(["preview", "--incident", str(out), "--rotation", ROTATION]) == EXIT_ACKNOWLEDGED
+    printed = capsys.readouterr().out
+    assert "p2" in printed
+    assert "checkout p99 latency above 3s" in printed
+
+
+def test_suggest_mapping_without_a_key_asks_nobody_and_guesses_nothing(monkeypatch, capsys):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    code = main(["suggest-mapping", "--payload", str(EXAMPLES / "opsgenie.example.json")])
+
+    assert code == EXIT_USAGE
+    assert "GEMINI_API_KEY is not set" in capsys.readouterr().out
+
+
+def test_a_run_without_the_pagerduty_flag_notifies_nobody(serving, incident_file, tmp_path, capsys):
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    _run(server.base_url, incident_file, ledger, "--confirm", CONFIRMATION)
+
+    assert "PagerDuty" not in capsys.readouterr().out
+    assert "notified" not in ledger.read_text()
+
+
+def test_a_run_asked_to_notify_pagerduty_without_credentials_still_settles(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.delenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", raising=False)
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _run(
+        server.base_url,
+        incident_file,
+        ledger,
+        "--confirm", CONFIRMATION,
+        "--pagerduty-note",
+        "--pagerduty-url", server.base_url,
+    )
+
+    assert code == EXIT_ACKNOWLEDGED
+    assert "the run is unaffected" in capsys.readouterr().out
+    assert "notified" not in ledger.read_text()
+
+
+def test_the_live_pagerduty_token_is_never_read_for_a_note_against_the_local_fake(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.delenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", raising=False)
+    monkeypatch.setenv("PAGERDUTY_TOKEN", "pd_live_token")
+    monkeypatch.setenv("PAGERDUTY_FROM", "oncall@example.com")
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _run(
+        server.base_url,
+        incident_file,
+        ledger,
+        "--confirm", CONFIRMATION,
+        "--pagerduty-note",
+        "--pagerduty-url", server.base_url,
+    )
+
+    assert code == EXIT_ACKNOWLEDGED
+    printed = capsys.readouterr().out
+    assert "RINGDOWN_FAKE_PAGERDUTY_TOKEN is not set" in printed
+    assert "pd_live_token" not in printed
+    assert "notified" not in ledger.read_text()
+
+
+def test_a_pagerduty_token_is_refused_against_the_url_of_the_other_channel(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("PAGERDUTY_TOKEN", "pd_live_token")
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _run(
+        server.base_url,
+        incident_file,
+        ledger,
+        "--confirm", CONFIRMATION,
+        "--pagerduty-note",
+        "--pagerduty-url", LIVE_BASE_URL,
+    )
+
+    assert code == EXIT_ACKNOWLEDGED
+    printed = capsys.readouterr().out
+    assert "refusing to notify PagerDuty" in printed
+    assert "pd_live_token" not in printed
+    assert "notified" not in ledger.read_text()
+
+
+def test_a_pagerduty_note_that_cannot_be_delivered_never_changes_the_exit_code(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", "pd_test_token")
+    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_FROM", "ops@example.com")
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _run(
+        server.base_url,
+        incident_file,
+        ledger,
+        "--confirm", CONFIRMATION,
+        "--pagerduty-note",
+        "--pagerduty-url", server.base_url,
+    )
+
+    assert code == EXIT_ACKNOWLEDGED
+    assert "PagerDuty note on" in capsys.readouterr().out
+    written = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert [record for record in written if record["type"] == "notified"]
+    assert main(["verify", "--ledger", str(ledger)]) == EXIT_UNRESOLVED
+
+
+
+
+def test_a_note_the_ledger_refuses_to_record_never_changes_the_exit_code(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", "pd_test_token")
+    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_FROM", "ops@example.com")
+    monkeypatch.setattr(
+        "ringdown.__main__.post_note",
+        lambda *_, **__: NoteResult(False, "http 400 " + "x" * 200),
+    )
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _run(
+        server.base_url,
+        incident_file,
+        ledger,
+        "--confirm", CONFIRMATION,
+        "--pagerduty-note",
+        "--pagerduty-url", server.base_url,
+    )
+
+    out = capsys.readouterr().out
+    assert code == EXIT_ACKNOWLEDGED
+    assert "the PagerDuty note could not be recorded" in out
+    assert "ledger 4 records" in out
+
+
+def test_a_ledger_that_fails_after_a_call_reports_the_verdict_and_exits_fifty(
+    serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+    def flaky(path: Path, record: dict) -> None:
+        if record["type"] == "verdict":
+            raise LedgerError(f"cannot open the ledger at {path}: No space left on device")
+        append_record(path, record)
+
+    monkeypatch.setattr("ringdown.__main__.append_record", flaky)
+
+    code = _run(server.base_url, incident_file, ledger, "--confirm", CONFIRMATION)
+
+    out = capsys.readouterr().out
+    assert code == EXIT_LEDGER
+    assert "verdict acknowledged  owner a.okafor" in out
+    assert "No space left on device" in out
+    assert len(server.created) == 1
+
+
+def test_a_second_use_case_runs_on_the_same_binary(capsys):
+    code = main(
+        [
+            "preview",
+            "--incident", str(EXAMPLES / "sla-breach.example.json"),
+            "--rotation", ROTATION,
+        ]
+    )
+    printed = capsys.readouterr().out
+
+    assert code == EXIT_ACKNOWLEDGED
+    assert "service level has been breached" in printed
+    assert "How many minutes" in printed
+    assert "on-call page" not in printed
+
+
+def test_a_call_script_the_engine_cannot_use_is_refused_as_a_usage_error(tmp_path, capsys):
+    (tmp_path / "s.txt").write_text(CALL_TASK.replace("How many minutes", "How long"))
+    body = {**example_body("sla-breach"), "script": "s.txt"}
+    incident = write_json(tmp_path, "incident.json", body)
+
+    code = main(["preview", "--incident", str(incident), "--rotation", ROTATION])
+
+    assert code == EXIT_USAGE
+    assert "never asks how many minutes" in capsys.readouterr().out

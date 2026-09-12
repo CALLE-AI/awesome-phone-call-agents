@@ -12,26 +12,28 @@ from urllib.parse import urlparse
 from ringdown import report
 from ringdown.adapter import adapt
 from ringdown.audit import (
+    LedgerError,
     append_record,
     attempt_record,
     chain_checks,
     head,
     intent_record,
+    notified_record,
     verdict_record,
     verification_record,
 )
 from ringdown.calle import (
-    LIVE_BASE_URL,
-    LIVE_MCP_URL,
     McpClient,
     RestClient,
     UntrustedHost,
     assert_trusted_url,
+    host_of,
     is_loopback,
 )
 from ringdown.escalate import Attempt, LadderResult, run_ladder
 from ringdown.exits import (
     EXIT_ACKNOWLEDGED,
+    EXIT_LEDGER,
     EXIT_UNKNOWN,
     EXIT_USAGE,
     reconcile,
@@ -49,7 +51,9 @@ from ringdown.incident import (
     resolve_ladder,
     unstaffed_scopes,
 )
+from ringdown.pagerduty import LIVE_URLS as PAGERDUTY_LIVE, LIVE_US, note_text, post_note
 from ringdown.script import call_payload, call_task, idempotency_key
+from ringdown.suggest import MODEL, suggest_mapping
 from ringdown.checks import Check, all_checks, render_blocks
 from ringdown.verify import verify_ladder
 
@@ -76,8 +80,10 @@ def _parser() -> argparse.ArgumentParser:
     run = with_files("run")
     run.add_argument("--ledger", type=Path, required=True)
     run.add_argument("--confirm", default="")
-    run.add_argument("--base-url", default=LIVE_BASE_URL)
-    run.add_argument("--mcp-url", default=LIVE_MCP_URL)
+    run.add_argument("--base-url", default=RestClient.LIVE)
+    run.add_argument("--mcp-url", default=McpClient.LIVE)
+    run.add_argument("--pagerduty-note", action="store_true")
+    run.add_argument("--pagerduty-url", default=LIVE_US)
 
     verify = commands.add_parser("verify")
     verify.add_argument("--ledger", type=Path, required=True)
@@ -86,6 +92,10 @@ def _parser() -> argparse.ArgumentParser:
     adapt_command.add_argument("--payload", type=Path, required=True)
     adapt_command.add_argument("--mapping", type=Path, required=True)
     adapt_command.add_argument("--out", type=Path)
+
+    suggest = commands.add_parser("suggest-mapping")
+    suggest.add_argument("--payload", type=Path, required=True)
+    suggest.add_argument("--out", type=Path)
     return parser
 
 
@@ -127,8 +137,8 @@ def run(args: argparse.Namespace) -> int:
     if args.confirm != CONFIRMATION:
         emit(f"refusing to place calls without --confirm {CONFIRMATION!r}")
         return EXIT_USAGE
-    base_url = assert_trusted_url(args.base_url, LIVE_BASE_URL)
-    mcp_url = assert_trusted_url(args.mcp_url, LIVE_MCP_URL)
+    base_url = assert_trusted_url(args.base_url, RestClient.LIVE)
+    mcp_url = assert_trusted_url(args.mcp_url, McpClient.LIVE)
     rest_host = urlparse(base_url).hostname or ""
     mcp_host = urlparse(mcp_url).hostname or ""
     if is_loopback(base_url) and is_loopback(mcp_url):
@@ -143,46 +153,91 @@ def run(args: argparse.Namespace) -> int:
     emit(*report.header_lines(incident, rungs, start))
 
     total = len(rungs)
+    placed: list[str] = []
 
     def watch(position: int, rung: Rung, attempt: Attempt | None) -> None:
         if attempt is None:
             emit(report.attempt_header(position, total, rung))
             return
-        append_record(args.ledger, attempt_record(attempt, incident.id))
         emit(*report.attempt_lines(attempt, incident.policy), "")
+        if attempt.call_id:
+            placed.append(attempt.call_id)
+        append_record(args.ledger, attempt_record(attempt, incident.id))
 
     def announce(attempt_id: str, key: str, rung: Rung) -> None:
         append_record(args.ledger, intent_record(incident.id, attempt_id, key, rung))
 
-    result = run_ladder(
-        RestClient(base_url, api_key),
-        incident,
-        rungs,
-        log=lambda line: emit(report.progress_line(line)),
-        watch=watch,
-        announce=announce,
-    )
-    append_record(args.ledger, verdict_record(incident.id, result))
-    emit(*report.verdict_lines(result))
-
-    checks: list[Check] = []
-    if verifiable(result.verdict, result.placed):
-        mcp = McpClient(mcp_url, mcp_key)
-        checks = _verify(mcp, incident, result, start)
-        append_record(
-            args.ledger,
-            verification_record(incident.id, checks, rest_host=rest_host, mcp_host=mcp_host),
+    try:
+        result = run_ladder(
+            RestClient(base_url, api_key),
+            incident,
+            rungs,
+            log=lambda line: emit(report.progress_line(line)),
+            watch=watch,
+            announce=announce,
         )
+        emit(*report.verdict_lines(result))
+        append_record(args.ledger, verdict_record(incident.id, result))
 
-    code = settle(result.verdict, result.placed, checks)
-    if code == EXIT_UNKNOWN:
-        emit(*report.unknown_lines(result))
-    elif code == EXIT_USAGE:
-        emit(*report.NOTHING_PLACED)
-    elif code in report.ADVICE and result.verdict == "acknowledged":
-        emit("", *report.ADVICE[code])
-    emit("", *report.ledger_lines(*head(args.ledger), result))
-    return code
+        checks: list[Check] = []
+        if verifiable(result.verdict, result.placed):
+            mcp = McpClient(mcp_url, mcp_key)
+            checks = _verify(mcp, incident, result, start)
+            append_record(
+                args.ledger,
+                verification_record(incident.id, checks, rest_host=rest_host, mcp_host=mcp_host),
+            )
+
+        code = settle(result.verdict, result.placed, checks)
+        if code == EXIT_UNKNOWN:
+            emit(*report.unknown_lines(result))
+        elif code == EXIT_USAGE:
+            emit(*report.NOTHING_PLACED)
+        elif code in report.ADVICE and result.verdict == "acknowledged":
+            emit("", *report.ADVICE[code])
+        if args.pagerduty_note:
+            _notify_pagerduty(args.pagerduty_url, args.ledger, incident.id, result, code)
+        emit("", *report.ledger_lines(*head(args.ledger), result))
+        return code
+    except LedgerError as error:
+        emit(f"error: {error}")
+        return EXIT_LEDGER if placed else EXIT_USAGE
+
+
+def _notify_pagerduty(
+    url: str, ledger: Path, incident_id: str, result: LadderResult, code: int
+) -> None:
+    if not result.placed:
+        emit("no call was placed, so PagerDuty was not notified")
+        return
+    try:
+        pinned = assert_trusted_url(url, PAGERDUTY_LIVE)
+        token = _credential(pinned, "PAGERDUTY_TOKEN", "RINGDOWN_FAKE_PAGERDUTY_TOKEN")
+        sender = _credential(pinned, "PAGERDUTY_FROM", "RINGDOWN_FAKE_PAGERDUTY_FROM")
+        if not token or not sender:
+            emit("skipping the PagerDuty note; the run is unaffected")
+            return
+        content = note_text(result, code, *head(ledger))
+        written = post_note(pinned, token, sender, incident_id, content)
+        append_record(
+            ledger,
+            notified_record(
+                incident_id,
+                host=host_of(pinned),
+                delivered=written.delivered,
+                detail=written.detail,
+            ),
+        )
+    except UntrustedHost as error:
+        emit(f"refusing to notify PagerDuty: {error}")
+        return
+    except IncidentError as error:
+        emit(f"the PagerDuty note could not be recorded: {error}; the run is unaffected")
+        return
+    emit(
+        f"PagerDuty note on {incident_id}: "
+        + ("written" if written.delivered else f"not written ({written.detail})")
+    )
 
 
 def verify(args: argparse.Namespace) -> int:
@@ -193,19 +248,42 @@ def verify(args: argparse.Namespace) -> int:
     return reconcile(EXIT_ACKNOWLEDGED, checks)
 
 
-def adapt_command(args: argparse.Namespace) -> int:
-    mapped = adapt(read_json(args.payload, "payload"), read_json(args.mapping, "field mapping"))
-    parse_incident(mapped)
-    rendered = json.dumps(mapped, indent=2, sort_keys=True)
-    if args.out is None:
+def _rendered(body: dict, out: Path | None, *notes: str) -> int:
+    rendered = json.dumps(body, indent=2, sort_keys=True)
+    if out is None:
         emit(rendered)
-        return EXIT_ACKNOWLEDGED
-    args.out.write_text(rendered + "\n")
-    emit(f"wrote {args.out}")
+    else:
+        out.write_text(rendered + "\n")
+        emit(f"wrote {out}", *notes)
     return EXIT_ACKNOWLEDGED
 
 
-COMMANDS = {"preview": preview, "run": run, "verify": verify, "adapt": adapt_command}
+def adapt_command(args: argparse.Namespace) -> int:
+    mapped = adapt(read_json(args.payload, "payload"), read_json(args.mapping, "field mapping"))
+    parse_incident(mapped)
+    return _rendered(mapped, args.out)
+
+
+def suggest_command(args: argparse.Namespace) -> int:
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        emit("GEMINI_API_KEY is not set in the environment; refusing to guess a mapping")
+        return EXIT_USAGE
+    payload = read_json(args.payload, "payload")
+    emit(f"asking {MODEL} for a mapping; {args.payload} leaves this machine")
+    mapping = suggest_mapping(payload, api_key)
+    return _rendered(
+        mapping, args.out, "read it before you dial with it: the model chose those paths."
+    )
+
+
+COMMANDS = {
+    "preview": preview,
+    "run": run,
+    "verify": verify,
+    "adapt": adapt_command,
+    "suggest-mapping": suggest_command,
+}
 
 
 def main(argv: Sequence[str] | None = None) -> int:

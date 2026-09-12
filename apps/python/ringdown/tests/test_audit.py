@@ -15,6 +15,7 @@ from ringdown.audit import (
     chain_checks,
     head,
     intent_record,
+    notified_record,
     sealed,
     verdict_record,
     verification_record,
@@ -26,24 +27,9 @@ from ringdown.checks import all_ok, contradicted
 from ringdown.escalate import Attempt, LadderResult
 from ringdown.incident import IncidentError
 from ringdown.extract import extract
-from tests.data import ALICE, LADDER
+from tests.data import ALICE, EXTRACTION, LADDER, an_attempt
 
-EXTRACTION = extract(parse_turns(scenarios.answer_ack(ALICE.name, "alice").turns))
 GOLDEN = Path(__file__).resolve().parent / "golden"
-
-
-def an_attempt(**overrides) -> Attempt:
-    fields = {
-        "rung": LADDER[0],
-        "key": "rd-inc-1-primary-1-abc123def456",
-        "attempt_id": "inc-1/primary/1",
-        "verdict": "not_acknowledged",
-        "reason": "no_answer",
-        "call_id": "call_fake1",
-        "snapshot": snapshot_from({"id": "call_fake1", "status": "failed"}),
-        "extraction": EXTRACTION,
-    }
-    return Attempt(**{**fields, **overrides})
 
 
 SAW_IT = [(True, "run for Alice Okafor reports no acknowledgement")]
@@ -67,6 +53,29 @@ def read_lines(path) -> list[dict]:
 
 def write_back(path, records) -> None:
     path.write_text("".join(canonical_json(record) + "\n" for record in records))
+
+
+def test_no_record_carries_a_float_the_browser_port_cannot_reseal():
+    attempt = an_attempt()
+    records = [
+        intent_record("inc-1", attempt.attempt_id, attempt.key, LADDER[0]),
+        attempt_record(attempt, "inc-1"),
+        verdict_record("inc-1", LadderResult("acknowledged", (attempt,))),
+        verification_record("inc-1", SAW_IT, rest_host="rest.example", mcp_host="mcp.example"),
+        notified_record("inc-1", host="api.pagerduty.com", delivered=True, detail="http 201"),
+    ]
+
+    floats = [
+        (record["type"], name)
+        for record in records
+        for name, value in record.items()
+        if isinstance(value, float)
+    ]
+
+    assert not floats, (
+        f"{floats} would be sealed as 15.0 by Python and as 15 by docs/ledger.js, so the site "
+        "would paint a red seal over an intact ledger. See ceiling 20."
+    )
 
 
 def test_a_run_writes_one_attempt_record_a_verdict_and_a_verification(tmp_path):
@@ -199,6 +208,50 @@ def test_an_unreadable_ledger_line_is_a_failed_check_not_a_crash(tmp_path):
 def test_a_ledger_path_in_a_missing_directory_is_a_usage_error_not_a_traceback(tmp_path):
     with pytest.raises(IncidentError, match="cannot open the ledger"):
         append_record(tmp_path / "missing" / "ledger.jsonl", {"type": "note"})
+
+
+def test_a_ledger_that_is_not_utf8_is_a_failed_check_not_a_crash(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    write_run(ledger)
+    ledger.write_bytes(ledger.read_bytes() + b"\xff\n")
+
+    checks = chain_checks(ledger)
+
+    assert len(checks) == 1
+    assert checks[0][0] is False
+    assert "cannot be read" in checks[0][1]
+
+
+def test_a_ledger_path_that_is_a_directory_is_a_failed_check_not_a_crash(tmp_path):
+    checks = chain_checks(tmp_path)
+
+    assert len(checks) == 1
+    assert checks[0][0] is False
+    assert "cannot be read" in checks[0][1]
+
+
+def test_a_verification_whose_counts_are_not_numbers_is_a_failed_check_not_a_crash(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    write_run(ledger, checks=[(None, "the second channel said nothing")])
+    records = read_lines(ledger)
+    records[2]["total"] = "3"
+    ledger.write_text("\n".join(canonical_json(record) for record in records) + "\n")
+
+    checks = chain_checks(ledger)
+
+    assert (False, "record 3 reports check counts that are not numbers") in checks
+
+
+def test_a_position_field_that_is_not_a_number_does_not_break_appending(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    write_run(ledger)
+    records = read_lines(ledger)
+    records[-1]["seq"] = "3"
+    ledger.write_text("\n".join(canonical_json(record) for record in records) + "\n")
+
+    append_record(ledger, {"type": "note"})
+
+    assert read_lines(ledger)[-1]["seq"] == 4
 
 
 def test_a_valid_json_line_that_is_not_an_object_is_a_failed_check_not_a_crash(tmp_path):

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
+SPEAKERS = frozenset({"bot", "user"})
 STATUS_MAP = {
     "COMPLETED": "completed",
     "FAILED": "failed",
@@ -62,7 +63,12 @@ def parse_turns(raw: Any) -> tuple[Turn, ...]:
     for entry in raw:
         if not isinstance(entry, dict):
             continue
-        speaker = "user" if entry.get("speaker") == "user" else "bot"
+        speaker = str(entry.get("speaker", "")).strip().lower()
+        if speaker not in SPEAKERS:
+            raise ValueError(
+                f"a transcript turn names {entry.get('speaker')!r} as its speaker, "
+                f"and only {' and '.join(sorted(SPEAKERS))} can be told apart"
+            )
         turns.append(Turn(speaker=speaker, text=str(entry.get("text", ""))))
     return tuple(turns)
 
