@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "tool_name": "get_call_run",
+  "structuredContent": {
+    "run_id": "FIXTURE-NOKEY-1",
+    "status": "COMPLETED",
+    "result": {
+      "summary": "The call reached a recorded forecast line, not a human. Menu prompts heard: for the coastal forecast, press 1; for the mountain forecast, press 2. No key press was recorded; the line proceeded to the default coastal forecast.",
+      "transcript": "[00:00:03] USER: Welcome to the Example Weather recorded line. For the coastal forecast, press 1. For the mountain forecast, press 2.\n[00:00:20] USER: Here is the coastal forecast for today. Skies clearing by afternoon. Highs in the mid 70s."
+    }
+  }
+}
