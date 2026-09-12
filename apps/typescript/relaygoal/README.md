@@ -114,6 +114,8 @@ Two verticals run on the one core with only a schema and framing swapped: the ac
 
 Targets **WCAG 2.2 AA**. Geist body type with a Fraunces display face (17px base, 1.6 line-height); visible 3px focus rings and a skip link; `aria-live` live captions during the call; verification states carried by **icon + shape + text, never colour alone** (colourblind-safe — verified / blue, not-confirmed / amber, unreachable / red); a warm-obsidian default theme plus a warm-bone light theme and a dedicated high-contrast mode; text-size (17 / 19 / 21 px) and reduced-motion controls; fully keyboard-operable evidence links and display toggles.
 
+**Installable, phone-native.** RelayGoal is a PWA (web app manifest + service worker + offline shell) that installs to the home screen and opens standalone. On a phone the live call **takes over the whole screen** — a voice-made-visible waveform and large, high-contrast captions of the other party's words, so the call lives where calls live and every word is readable without ever being heard. Desktop keeps the inline call timeline.
+
 ## License
 
 MIT
