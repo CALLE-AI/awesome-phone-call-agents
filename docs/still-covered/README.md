@@ -8,17 +8,18 @@
 This is the long-form guide: the evidence the design rests on, the architecture, the failure
 semantics, and how to reproduce every number in the demo. The app README is the short version.
 
-![The dashboard during a campaign: calls going out, the live ledger stream underneath, and an empty
-worklist because nothing is proposed until a call settles](images/dashboard-mid-campaign.png)
+![The dashboard after a campaign: one headline number for how many people had never heard of the
+rule, then the outcome breakdown, the caseworker queue, and a card for every person](images/dashboard-complete.png)
 
-*Mid-campaign. Twelve calls placed, the ledger streaming underneath, and the worklist still empty -
-nothing is proposed about anybody until their call settles.*
+*One number leads, because one number is the argument: five of the eight people who answered had
+never heard of the rule. Everything below it is a queue for a human.*
 
-![The dashboard after a campaign: outcome counts, the worklist, and a card per person showing what
-they said and what happens next](images/dashboard-complete.png)
+![A person's detail panel showing every reason the classifier reached its verdict, the correction
+required because the agent overclaimed, and four verbatim quotes](images/dashboard-person.png)
 
-*After. Every person has an outcome, a reason, their own words as evidence, and a next action -
-and every favourable outcome is waiting on a caseworker's Review button.*
+*Select anyone and the dashboard shows its working: every reason the code reached that verdict, the
+person's own words, and - here - the correction call queued because the agent said more than the
+answers support.*
 
 ---
 

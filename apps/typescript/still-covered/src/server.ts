@@ -310,7 +310,9 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
           json(res, 404, { error: "no active campaign" });
           return;
         }
-        res.writeHead(200, { "content-type": "text/markdown; charset=utf-8", "cache-control": "no-store" });
+        // text/plain, not text/markdown: browsers download the latter, and the dashboard's
+        // "Outreach report" button should show the report, not drop a file in Downloads.
+        res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
         res.end(buildReport(ledger.projection));
         return;
       }
