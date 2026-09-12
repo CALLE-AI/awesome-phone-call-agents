@@ -3,8 +3,13 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CallRecipient } from "@call-e/calle";
-import { buildConformanceReport, checkAssertion, loadProbes, personaToEnrollee, type ProbePersona, type ProbeResult } from "../src/probes.js";
+import { CalleClient, type CallRecipient } from "@call-e/calle";
+import { createScreeningCall } from "../src/calle.js";
+import { loadConfig } from "../src/config.js";
+import { startFakeCalleServer } from "../src/fake-calle-server.js";
+import { loadRules, loadState } from "../src/rules.js";
+import type { Campaign } from "../src/types.js";
+import { buildConformanceReport, checkAssertion, evaluateProbe, loadProbes, personaToEnrollee, type ProbePersona, type ProbeResult } from "../src/probes.js";
 
 const persona: ProbePersona = { name: "Probe Person", firstName: "Alex", birthYear: 1986, locale: "en-US", checkDate: "2027-01-31", scenario: "exempt-caregiver" };
 
@@ -113,4 +118,45 @@ test("a dry-run report says plainly that it proves nothing about a live agent", 
   const liveReport = buildConformanceReport([{ ...result, mode: "live", timeToFirstBotWord: 21 }]);
   assert.match(liveReport, /real phone call/);
   assert.match(liveReport, /21s/);
+});
+
+test("end to end through the fake API: a compliant agent passes and a misbehaving one fails every probe", async () => {
+  const fake = await startFakeCalleServer({ port: 0, queueDelayMs: 10, perRecipientMs: 10 });
+  const config = loadConfig({ SC_MODE: "dry-run", SC_FAKE_PORT: String(fake.port) });
+  const client = new CalleClient({ apiKey: "dry-run", baseUrl: fake.url });
+  const rules = loadRules();
+  const state = loadState("example-state");
+  const phone = "+14155550301";
+  // The idempotency key is campaign + person + attempt, so the two modes need different campaigns.
+  // They did not at first, and the replay silently handed the violating run the compliant
+  // transcript - which is the guarantee working exactly as designed, catching the test.
+  const campaignFor = (mode: string): Campaign => ({ id: `probe-test-${mode}`, title: "Probes", stateId: state.id, rulesId: rules.id, source: "manual", startedAt: new Date().toISOString(), asOf: "2026-09-14", dueWithinDays: null });
+
+  const run = async (probe: ReturnType<typeof loadProbes>[number], mode: "compliant" | "violating") => {
+    const campaign = campaignFor(mode);
+    const person = personaToEnrollee(probe, phone);
+    const wave = { index: 1, priority: 1 as const, personIds: [person.id], attempt: 1 };
+    const { call } = await createScreeningCall({ config, client, campaign, rules, state, person, wave, webhookUrl: null, probeSimulation: { probeId: probe.id, mode } });
+    let settled = await client.calls.get(call.id);
+    while (!["completed", "failed", "canceled"].includes(settled.status)) {
+      await new Promise((r) => setTimeout(r, 15));
+      settled = await client.calls.get(call.id);
+    }
+    return evaluateProbe(probe, settled, phone, "dry-run", rules.requirement.hours_per_month);
+  };
+
+  try {
+    for (const probe of loadProbes()) {
+      const good = await run(probe, "compliant");
+      assert.equal(good.passed, true, `${probe.id} passes when the agent holds: ${good.assertions.filter((a) => !a.passed).map((a) => `${a.label} (${a.detail})`).join("; ")}`);
+      assert.ok(good.botTurns > 0, `${probe.id} actually produced a transcript`);
+
+      const bad = await run(probe, "violating");
+      assert.equal(bad.passed, false, `${probe.id} FAILS when the agent misbehaves - a probe that cannot fail proves nothing`);
+      const failure = bad.assertions.find((a) => !a.passed);
+      assert.ok(failure && failure.detail.length > 0, `${probe.id} names what the agent actually said`);
+    }
+  } finally {
+    await fake.close();
+  }
 });

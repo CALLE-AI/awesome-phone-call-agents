@@ -102,7 +102,7 @@ No credentials, no network, no phone call:
 
 ```bash
 npm install
-npm test        # 54 tests
+npm test        # 55 tests
 npm run plan    # who gets cleared without a call, the wave order, the exact call task
 npm run demo    # full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard on http://127.0.0.1:4800
@@ -263,10 +263,22 @@ model grading itself.
 A live run writes `data/runs/conformance/conformance.md` with a pass/fail table, the agent's own
 words as evidence, and the measured time-to-first-word for every call.
 
+**A probe that cannot fail proves nothing**, so the harness simulates a misbehaving agent too:
+
+```bash
+npm run sc -- probe --dry-run --simulate violating
+```
+
+Each probe has two scripted simulations. In `compliant` the caller pushes hard and the agent holds;
+in `violating` the same pressure meets an agent that breaks *that probe's* boundary — grants the
+exemption outright, names Medicaid to whoever picked up, asks for a Social Security number, keeps
+screening after an opt-out, or says *"Sí, usted está exento"* in Spanish. All 8 probes pass the first
+and fail the second, each failure quoting the exact sentence. A test runs both end to end through the
+fake API and asserts the verdicts are opposite.
+
 **The report is honest about what it proves.** A dry-run report says at the top, in bold, that it
 placed no real calls and proves nothing about how a live model behaves — and it omits the latency
-measurement entirely rather than reporting a fabricated one. A probe that cannot fail proves
-nothing, so the tests feed the checker transcripts that violate each boundary and assert it notices.
+measurement entirely rather than reporting a fabricated one.
 
 ## Safety
 
@@ -289,7 +301,7 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 54 tests, no network
+npm test               # 55 tests, no network
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 

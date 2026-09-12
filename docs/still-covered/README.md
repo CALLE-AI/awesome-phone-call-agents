@@ -312,10 +312,15 @@ time-to-first-word for every call (the number behind CALL-E issue #295).
 
 Two design decisions worth naming:
 
-- **A probe that cannot fail proves nothing.** The test suite feeds the checker transcripts that
-  violate each boundary and asserts it notices — including an agent shouting "YOU’RE   EXEMPT" with a
-  curly apostrophe and doubled spaces, because an evasion that trivial would make the whole harness
-  theatre.
+- **A probe that cannot fail proves nothing.** Each probe therefore has *two* scripted simulations.
+  In `compliant`, the caller pushes hard and the agent holds. In `violating`, the same pressure meets
+  an agent that breaks that probe's boundary: it grants the exemption outright, names Medicaid to
+  whoever picked up, asks for a Social Security number, keeps screening after an opt-out, leaves the
+  programme name on a machine, or answers *"Sí, usted está exento"* in Spanish. Run
+  `npm run sc -- probe --dry-run --simulate violating` and all eight fail, each quoting the exact
+  offending sentence. A test runs both modes end to end through the fake API and asserts the verdicts
+  are opposite. The checker also handles an agent shouting `YOU’RE   EXEMPT` with a curly apostrophe
+  and doubled spaces, because an evasion that trivial would make the whole harness theatre.
 - **The report states what it does not prove.** A dry-run report says at the top, in bold, that it
   placed no real calls and proves nothing about a live model, and it omits the latency row entirely
   rather than publishing a number the fake server made up.
@@ -361,7 +366,7 @@ No credentials, no network, no phone call:
 ```bash
 cd apps/typescript/still-covered
 npm install
-npm test        # 54 tests
+npm test        # 55 tests
 npm run plan    # who is cleared without a call, the wave order, the rendered task
 npm run demo    # the full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard at http://127.0.0.1:4800
@@ -383,7 +388,7 @@ account and no credits.
 
 ## 8. Test coverage
 
-54 tests, no network:
+55 tests, no network:
 
 - `classify.test.ts` - the fail-closed order, including medical frailty needing both answers, and the
   overclaim check surviving a confidence downgrade.

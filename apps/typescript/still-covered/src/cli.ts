@@ -70,6 +70,8 @@ Options
   --keep-server           Keep the dashboard running after run finishes
   --now                   follow-up: ignore due times
   --only <probe-id>       probe: run a single probe
+  --simulate <mode>       probe, dry-run only: "compliant" (default) or "violating" to prove the
+                          harness reports a failure when the agent misbehaves
 `);
   process.exit(2);
 }
@@ -283,6 +285,7 @@ async function main(): Promise<void> {
       drill: { type: "boolean", default: false },
       now: { type: "boolean", default: false },
       only: { type: "string" },
+      simulate: { type: "string" },
       quiet: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
@@ -490,6 +493,15 @@ async function main(): Promise<void> {
       const fake = await ensureFakeServer(config, log, true);
       const client = createCalleClient(config);
       const asOf = typeof values["as-of"] === "string" ? values["as-of"] : todayIn(config.timeZone);
+      const rawSimulate = typeof values["simulate"] === "string" ? values["simulate"] : "compliant";
+      if (rawSimulate !== "compliant" && rawSimulate !== "violating") {
+        throw new Error(`--simulate must be "compliant" or "violating", got ${rawSimulate}`);
+      }
+      // Only meaningful in dry-run: on a real call the agent behaves however it behaves.
+      const simulateMode: "compliant" | "violating" | null = config.mode === "dry-run" ? rawSimulate : null;
+      if (simulateMode === "violating") {
+        log(color.yellow("Simulating a MISBEHAVING agent: every probe below is expected to FAIL. A harness that cannot report a failure is decoration."));
+      }
       const results: ProbeResult[] = [];
       const rl = config.mode === "live" ? createInterface({ input: process.stdin, output: process.stdout }) : null;
       try {
@@ -504,7 +516,7 @@ async function main(): Promise<void> {
           const person = personaToEnrollee(probe, phone);
           const campaign: Campaign = { id: `probe-${asOf}`, title: "Conformance probes", stateId: state.id, rulesId: rules.id, source: "manual", startedAt: new Date().toISOString(), asOf, dueWithinDays: null };
           const wave: Wave = { index: index + 1, priority: 1, personIds: [person.id], attempt: 1 };
-          const { call } = await createScreeningCall({ config, client, campaign, rules, state, person, wave, webhookUrl: null });
+          const { call } = await createScreeningCall({ config, client, campaign, rules, state, person, wave, webhookUrl: null, ...(simulateMode !== null ? { probeSimulation: { probeId: probe.id, mode: simulateMode } } : {}) });
           log(color.dim(`  CALL-E task ${call.id} placed; waiting for the call to finish...`));
           const settled = await pollUntilTerminal(client, call.id, config.mode === "dry-run" ? 500 : 3000, 15 * 60 * 1000);
           const result = evaluateProbe(probe, settled, phone, config.mode, rules.requirement.hours_per_month);

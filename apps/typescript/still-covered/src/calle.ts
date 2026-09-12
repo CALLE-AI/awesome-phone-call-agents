@@ -23,13 +23,16 @@ export function screeningIdempotencyKey(campaignId: string, personId: string, at
   return `sc:${campaignId}:${personId}:attempt${attempt}`;
 }
 
-function dryRunHints(config: Config, person: Enrollee): JsonObject {
+function dryRunHints(config: Config, person: Enrollee, probeSimulation: ProbeSimulation | undefined): JsonObject {
   if (config.mode !== "dry-run") {
     return {};
   }
   return {
     sc_dry_run: person.scenario !== null ? { [person.phone]: person.scenario } : {},
     sc_names: { [person.phone]: person.firstName },
+    // Probe calls replay their own scripted simulation instead of a registry scenario, so a
+    // dry-run probe actually applies the pressure the probe describes.
+    ...(probeSimulation !== undefined ? { sc_probe: { [person.phone]: { id: probeSimulation.probeId, mode: probeSimulation.mode } } } : {}),
   };
 }
 
@@ -42,10 +45,17 @@ export interface ScreeningCallInput {
   person: Enrollee;
   wave: Wave;
   webhookUrl: string | null;
+  /** Dry-run only: replay a scripted probe simulation rather than a registry scenario. */
+  probeSimulation?: ProbeSimulation;
+}
+
+export interface ProbeSimulation {
+  probeId: string;
+  mode: "compliant" | "violating";
 }
 
 export async function createScreeningCall(input: ScreeningCallInput): Promise<{ call: Call; task: string; idempotencyKey: string }> {
-  const { config, client, campaign, rules, state, person, wave, webhookUrl } = input;
+  const { config, client, campaign, rules, state, person, wave, webhookUrl, probeSimulation } = input;
   const task = renderScreeningTask(rules, state, person, campaign.asOf);
   const idempotencyKey = screeningIdempotencyKey(campaign.id, person.id, wave.attempt);
   const create = {
@@ -60,7 +70,7 @@ export async function createScreeningCall(input: ScreeningCallInput): Promise<{ 
       person_id: person.id,
       wave: wave.index,
       attempt: wave.attempt,
-      ...dryRunHints(config, person),
+      ...dryRunHints(config, person, probeSimulation),
     },
     ...(webhookUrl !== null ? { webhookUrl } : {}),
   };
