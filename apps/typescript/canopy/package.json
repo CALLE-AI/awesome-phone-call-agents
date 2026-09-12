@@ -12,9 +12,9 @@
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "canopy": "node --import tsx src/cli.ts",
-    "plan": "node --import tsx src/cli.ts plan --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\"",
-    "demo": "node --import tsx src/cli.ts run --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\"",
-    "serve": "node --import tsx src/cli.ts serve",
+    "plan": "node --import tsx src/cli.ts plan --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\" --dry-run",
+    "demo": "node --import tsx src/cli.ts run --registry data/registry.sample.csv --hazard heat --area \"Maricopa County, AZ\" --dry-run",
+    "serve": "node --import tsx src/cli.ts serve --dry-run",
     "fake-server": "node --import tsx src/cli.ts fake-server"
   },
   "dependencies": {

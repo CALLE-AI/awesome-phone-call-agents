@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCalleClient } from "./calle.js";
-import { assertLiveAllowed, loadConfig, loadDotEnv, type Config } from "./config.js";
+import { assertLiveAllowed, forceDryRun, loadConfig, loadDotEnv, type Config } from "./config.js";
 import { startFakeCalleServer, type FakeServerHandle } from "./fake-calle-server.js";
 import { detectEvents } from "./feeds/index.js";
 import { Ledger } from "./ledger.js";
@@ -62,6 +62,7 @@ Common options
   --batch | --per-person      One task per wave, or one task per person (live default: per-person)
   --event-id <id>             Stable event id (default derived from hazard, area and time)
   --confirm                   Required for live mode
+  --dry-run                   Force dry-run whatever the environment says; no call can be placed
   --override-quiet-hours <reason>
                               Start a life-safety roll call inside quiet hours; the reason is recorded
   --fast                      Collapse retry delays (drills)
@@ -270,6 +271,7 @@ async function main(): Promise<void> {
       "per-person": { type: "boolean", default: false },
       "event-id": { type: "string" },
       confirm: { type: "boolean", default: false },
+      "dry-run": { type: "boolean", default: false },
       "override-quiet-hours": { type: "string" },
       fast: { type: "boolean", default: false },
       "keep-server": { type: "boolean", default: false },
@@ -289,7 +291,10 @@ async function main(): Promise<void> {
   if (!command || values.help) {
     usage();
   }
-  const baseConfig = loadConfig();
+  // --dry-run overrides everything, including CANOPY_MODE=live in .env, so a command named
+  // "demo" can never dial no matter how the operator's environment is configured.
+  const loadedConfig = loadConfig();
+  const baseConfig = values["dry-run"] === true ? forceDryRun(loadedConfig) : loadedConfig;
   if (values.batch && values["per-person"]) {
     throw new Error("Choose either --batch or --per-person, not both.");
   }

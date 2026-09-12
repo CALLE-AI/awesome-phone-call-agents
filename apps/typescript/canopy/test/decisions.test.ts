@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_POLICY, escalationDisposition, nextAction } from "../src/cascade.js";
+import { forceDryRun, loadConfig } from "../src/config.js";
 import { classify } from "../src/classify.js";
 import { planWaves, scorePerson } from "../src/risk.js";
 import type { Person, TriageResult } from "../src/types.js";
@@ -168,4 +169,15 @@ test("risk: oxygen dependence weighs more in a power outage than in heat", () =>
   const heat = scorePerson(person({ medicalRisks: ["oxygen"], hasCooling: "yes" }), "heat");
   const outage = scorePerson(person({ medicalRisks: ["oxygen"], hasCooling: "yes" }), "outage-medical");
   assert.ok(outage.score > heat.score);
+});
+
+test("--dry-run overrides a live environment: a command named 'demo' can never dial", () => {
+  const live = loadConfig({ CANOPY_MODE: "live", CALLE_API_KEY: "iams_live_secret", CANOPY_FAKE_PORT: "4747" });
+  assert.equal(live.mode, "live");
+  assert.ok(live.baseUrl.startsWith("https://"), "live points at the real API");
+
+  const forced = forceDryRun(live);
+  assert.equal(forced.mode, "dry-run");
+  assert.equal(forced.apiKey, null, "the key is dropped, not just unused");
+  assert.equal(forced.baseUrl, "http://127.0.0.1:4747", "and the real API is no longer reachable");
 });

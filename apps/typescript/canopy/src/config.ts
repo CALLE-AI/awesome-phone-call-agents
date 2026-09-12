@@ -131,3 +131,12 @@ export function assertLiveAllowed(config: Config, confirmed: boolean): void {
     throw new Error("Live mode places real phone calls that cost credit. Re-run with --confirm to proceed.");
   }
 }
+
+/**
+ * Forces dry-run regardless of CANOPY_MODE, the API key, or anything else in the environment.
+ * `--dry-run` on the command line uses this, and `npm run demo`, `plan` and `serve` pass that flag,
+ * so a command whose name promises it is safe cannot be made unsafe by a stray .env.
+ */
+export function forceDryRun(config: Config): Config {
+  return { ...config, mode: "dry-run", apiKey: null, baseUrl: `http://127.0.0.1:${config.fakePort}` };
+}
