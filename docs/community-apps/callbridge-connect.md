@@ -1,6 +1,6 @@
 # CallBridge Connect
 
-CallBridge adds a consented AI phone check-in around a music-release workflow. The first example integration is Aura Manager, a music-release strategy SaaS for independent artists. That website integration is proposed, not deployed by this contribution.
+CallBridge adds a consented AI phone check-in around a creative-project workflow. The first example integration is Aura Manager, an AI workspace for creative projects. That website integration is proposed, not deployed by this contribution.
 
 - Repository: [Senseiglobal/callbridge-connect](https://github.com/Senseiglobal/callbridge-connect)
 - License: MIT
@@ -29,7 +29,7 @@ python -m unittest discover -s apps/python/callbridge -v
 
 ## Workflow and result
 
-The request records consent, phone number, release phase, release window and the artist's stated blocker. The live call asks about that blocker, deadline risk, one next action and any requested human follow-up/window. Results are validated against a schema and reviewed by an operator. The app does not perform a live human transfer, book an appointment, change accounts or write into Aura automatically.
+The request records consent, phone number, project phase, project deadline and the creator's stated blocker. The live call asks about that blocker, deadline risk, one next action and any requested human follow-up/window. Results are validated against a schema and reviewed by an operator. The app does not perform a live human transfer, book an appointment, change accounts or write into Aura automatically.
 
 ## Explicit live-call side effect
 
@@ -55,6 +55,6 @@ Local pilot storage retains the full phone number privately for dialing; API lis
 
 ## Verification and boundaries
 
-Local verification: 15 no-call backend tests, TypeScript typecheck and production frontend build. Tests use fake providers and mocked Firestore reads. Live CALL-E call evidence, public hosting, and the owner's demo video remain pending at contribution time. Sample previews are labelled and never counted as real completed calls.
+Local verification: 18 no-call backend tests, TypeScript typecheck and production frontend build. Tests use fake providers and mocked Firestore reads, including coverage for the general creative-project profile and legacy deadline inputs. Live CALL-E call evidence, public hosting, and the owner's demo video remain pending at contribution time. Sample previews are labelled and never counted as real completed calls.
 
 This is a single-operator hackathon MVP. SQLite needs persistent storage and one service instance for a live pilot. Optional Firestore requires appropriate Google credentials/IAM and has not been verified against a real cloud project. No real-customer, revenue or conversion-improvement claim is made. Not intended for emergency, medical, legal, financial, political or collections workflows.
