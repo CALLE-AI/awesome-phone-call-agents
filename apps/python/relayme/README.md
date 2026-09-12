@@ -38,14 +38,29 @@ No network. Covers fail-closed normalization and preflight validation.
 
 ## Live mode (places a real call)
 
-Only after the user authorizes the specific call and `calle` is authenticated:
+RelayMe supports two live paths. Both place one real outbound call and consume a
+CALL-E credit; use only with an authorized destination and explicit intent.
+
+**OAuth / CLI path** (uses `calle auth login`):
 
 ```
 python3 apps/python/relayme/client.py --task <authorized-task.json> --execute
 ```
 
-Live mode drives `calle call plan` -> `calle call run` -> `calle call status`,
-reading the actionable result from the CLI's `structuredContent` envelope.
+Drives `calle call plan` -> `calle call run` -> `calle call status`, reading the
+result from the CLI's `structuredContent` envelope.
+
+**REST API path** (uses a Bearer `api_key` from `CALLE_API_KEY` or a local `.env`):
+
+```
+python3 apps/python/relayme/client.py --task <authorized-task.json> --execute-rest
+```
+
+Drives `GET /v1/goals` preflight -> `POST /v1/calls` (documented `recipients[]`
+schema with `region`/`locale`) -> `GET /v1/calls/{id}` poll, then maps the
+`recipients[].attempts[].transcript_turns` result through the same classifier and
+thread builder as every other path. The destination `region`/`locale` come from
+the task's `region`/`language`; the recipient must be in a supported region.
 
 ## Side effects and cancellation
 

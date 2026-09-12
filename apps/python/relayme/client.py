@@ -137,11 +137,55 @@ def run_live(task: dict, goal: str, poll_seconds: int = 10, max_polls: int = 30)
             "transcript_summary": "Call did not reach a terminal state within the polling window."}, []
 
 
+def _load_api_key() -> str:
+    """Read the CALL-E api_key from env or a local .env file."""
+    import os
+    key = os.environ.get("CALLE_API_KEY") or os.environ.get("api_key")
+    if key:
+        return key.strip()
+    # Walk up looking for a .env with api_key=
+    here = Path(__file__).resolve()
+    for parent in [here.parent, *here.parents]:
+        env = parent / ".env"
+        if env.exists():
+            for line in env.read_text().splitlines():
+                if line.strip().startswith("api_key="):
+                    return line.split("=", 1)[1].strip()
+    raise RuntimeError("no CALL-E api_key found (set CALLE_API_KEY or add api_key= to .env)")
+
+
+def run_live_rest(task: dict, goal: str) -> tuple[dict, list[dict]]:
+    """Drive the real CALL-E REST flow (create -> poll). Returns (raw_result, transcript)."""
+    import calle_rest
+    key = _load_api_key()
+    result_schema = {
+        "answer": "string", "outcome": "string",
+        "transcript_summary": "string", "follow_up_needed": "boolean",
+        "disclosed_ai": "boolean",
+    }
+    created = calle_rest.create_call(
+        api_key=key,
+        to_phone_e164=task["to_phone_e164"],
+        task=goal,
+        result_schema=result_schema,
+        idempotency_key=f"relayme:{task['task_id']}",
+        metadata={"task_id": task["task_id"]},
+    )
+    if created.get("_outcome") == "unknown_possibly_created":
+        return {"outcome": "needs_human",
+                "transcript_summary": "Create outcome unknown; reconcile with the same idempotency key before retrying."}, []
+    call = calle_rest.poll_call(key, created["id"])
+    raw = call.get("structured_result", call)
+    transcript = call.get("transcript") or raw.get("transcript") or []
+    return raw, transcript
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="RelayMe: text-first phone relay via CALL-E.")
     ap.add_argument("--task", required=True, help="path to task JSON")
-    ap.add_argument("--mock", action="store_true", help="no-call replay (default if --execute absent)")
-    ap.add_argument("--execute", action="store_true", help="place a real CALL-E call (requires calle auth)")
+    ap.add_argument("--mock", action="store_true", help="no-call replay (default if no execute flag)")
+    ap.add_argument("--execute", action="store_true", help="place a real call via the calle CLI (OAuth)")
+    ap.add_argument("--execute-rest", action="store_true", help="place a real call via the REST API (api_key)")
     ap.add_argument("--fixture", default=None, help="fixture path for mock mode")
     ap.add_argument("--thread", action="store_true", help="print the user-facing text thread")
     ap.add_argument("--emit-thread-json", default=None, help="write web-view thread JSON to this path")
@@ -169,7 +213,7 @@ def main() -> int:
         return 3
 
     try:
-        if not args.execute:
+        if not args.execute and not args.execute_rest:
             fixture_path = Path(args.fixture) if args.fixture else (
                 Path(__file__).parent / "fixtures" / "answered.json"
             )
@@ -180,8 +224,11 @@ def main() -> int:
                 who = "Agent " if turn["speaker"] == "agent" else "Callee"
                 print(f"    {who}: {turn['text']}")
             raw = fixture.get("structured_result", {})
+        elif args.execute_rest:
+            print("\n[live] Placing a real call via the CALL-E REST API...")
+            raw, transcript = run_live_rest(task, goal)
         else:
-            print("\n[live] Placing a real call via CALL-E...")
+            print("\n[live] Placing a real call via the calle CLI...")
             raw, transcript = run_live(task, goal)
 
         result = classify(raw, transcript)
