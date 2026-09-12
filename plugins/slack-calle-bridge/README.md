@@ -40,7 +40,7 @@ export PORT="8787"
 python bridge.py
 ```
 
-`CALLE_BASE_URL` defaults to `https://api.heycall-e.com`. The bridge accepts another HTTPS base URL for compatible deployments. Plain HTTP is rejected except localhost when `CALLE_ALLOW_INSECURE_LOCALHOST=1` is deliberately set for tests.
+Credential-bearing requests are pinned to the approved CALL-E origin, `https://api.heycall-e.com`. The bridge does not accept an environment override for that origin. Tests inject a transport function and never weaken this origin check.
 
 Health probe:
 
@@ -77,7 +77,7 @@ The bridge never returns a full transcript or recording URL to Slack.
 
 ## Idempotency and retries
 
-The CALL-E `Idempotency-Key` is derived from Slack team, channel, user, trigger, recipient, and goal. A retry of the same Slack command reuses the same key, while a later intentional command receives a fresh trigger ID and can create a new call.
+The CALL-E `Idempotency-Key` is derived from the signed Slack team, channel, user, trigger, recipient, and goal. Transport retries inside one accepted `run` reuse that already-computed key. Repeating the Slack command is a new explicit call intent with a fresh trigger ID and therefore receives a new key.
 
 ## Side effects and cancellation
 
@@ -91,7 +91,8 @@ The CALL-E `Idempotency-Key` is derived from Slack team, channel, user, trigger,
 - Slack requests are accepted only when the HMAC signature is valid and the timestamp is within five minutes.
 - `response_url` must use `https://hooks.slack.com` and is never logged.
 - `SLACK_SIGNING_SECRET` and `CALLE_API_KEY` are environment variables only.
-- Phone numbers are masked in bridge and Slack summaries.
+- Destination numbers are strict ASCII E.164 and are masked in bridge output.
+- Provider summaries are ASCII-bounded, control-character-cleaned, truncated, and scrubbed of phone-like values before they reach Slack.
 - The request body is not logged.
 - A recipient's refusal is a terminal outcome, not a reason to retry automatically.
 
