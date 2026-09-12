@@ -1,0 +1,15 @@
+{
+  "shift_name": "Sunday IST Retail Data Platform On-Call Roster",
+  "date": "2026-09-14",
+  "timezone": "IST",
+  "engineer": {
+    "name": "Aarav Patel",
+    "role": "Senior Software Engineer (Weekend On-Call)",
+    "phone": "+919876543211",
+    "email": "[EMAIL_ADDRESS]",
+    "calle_id": "user_aarav_01",
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "hi-IN"
+  }
+}

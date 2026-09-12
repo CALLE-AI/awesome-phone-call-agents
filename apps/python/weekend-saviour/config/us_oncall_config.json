@@ -5,9 +5,11 @@
   "engineer": {
     "name": "Alex Morgan",
     "role": "Senior Retail Data Platform Engineer (Weekend On-Call)",
-    "phone": "+91 15550199",
+    "phone": "+15550199",
     "email": "alex.morgan@example.com",
     "calle_id": "user_alex_01",
-    "source": "local_config_file"
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "en-IN"
   }
 }
