@@ -1309,6 +1309,13 @@ footer .plate-royal .source-link { margin-top: var(--space-3); }
   min-height: 100svh; display: grid; align-content: start;
   padding-top: 8vh; padding-bottom: var(--space-6);
 }
+/* `.act > .inner` carries `margin: 0 auto`, and auto margins on a grid item mean the item
+ * is sized to its own content and the margins absorb what is left. Every other act fills
+ * the 68rem cap and never notices. The hero holds the board, and a canvas hands its
+ * element size to whatever measures it, a second after first paint: the column stepped
+ * 15px sideways the moment the board mounted. Stating the width makes it a function of the
+ * track instead, and the cap still decides the final number. */
+.act-00 > .inner { width: 100%; }
 .act-00 .inner { will-change: transform; }
 
 /* The curtain. Act 0 holds while Act 1, which is opaque and sits at z-index 2, slides over
