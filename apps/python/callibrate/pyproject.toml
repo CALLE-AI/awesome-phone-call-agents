@@ -1,0 +1,56 @@
+[project]
+name = "callibrate"
+version = "1.0.0"
+description = "Callibrate calls the authoritative source with CALL-E and reconciles a record against what it hears."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Marc Donovici" }]
+keywords = ["call-e", "phone-agents", "verification", "hsds", "open-referral"]
+
+dependencies = [
+  "starlette>=0.41",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  "httpx>=0.27",
+  "python-multipart>=0.0.12",
+  "tzdata>=2024.2; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.7",
+]
+
+[project.scripts]
+callibrate = "callibrate.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Marc-Dvci/Callibrate"
+Repository = "https://github.com/Marc-Dvci/Callibrate"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/callibrate"]
+
+[tool.ruff]
+line-length = 108
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/conftest.py exports shared transcript helpers, so the repository root has
+# to be importable rather than only tests/ being collected from it.
+pythonpath = ["."]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
