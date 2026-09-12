@@ -112,6 +112,19 @@ npm run serve   # dashboard on http://127.0.0.1:4800
 port 4848 and runs the whole campaign against it - webhooks, retries, idempotency replay and all.
 In dry-run mode the base URL points at `127.0.0.1`, so a real call is not reachable even by mistake.
 
+### Or in one container, with nothing installed but Docker
+
+```bash
+docker build -t still-covered .
+docker run --rm -p 4800:4800 still-covered
+# then open http://127.0.0.1:4800 and press "Start drill (dry-run)"
+```
+
+The image is `node:20-alpine`, pins `SC_MODE=dry-run`, and runs the fake CALL-E server inside the
+container. Live mode is deliberately not supported from this image: there is no key in it and the
+base URL never leaves `127.0.0.1`. This is the quickest way for a reviewer to see the whole thing
+working without a Node toolchain, an account, or any credentials.
+
 ### Going live
 
 Live mode needs three independent signals and refuses without all three:
