@@ -446,6 +446,20 @@ function poseSetter(group, onPose) {
  */
 const FRAME_FILL = 0.94;
 const FRAME_YAWS = 24;
+/* And then closer than the solve says.
+ *
+ * The solve above answers one question: how far back does the camera have to sit so that no
+ * rotation the drag allows takes the board out of the frame. The answer is set by the
+ * quarter turn, where the long axis of the grid lies up the short side of a landscape
+ * canvas, and every other pose pays for it. At rest the board was filling 60% of the frame's
+ * width and 40% of its height, which is the shrunken look: the empty space is headroom
+ * reserved for a pose the reader has to drag to.
+ *
+ * So the camera comes in by a sixth. At rest the board is a sixth larger in every dimension;
+ * at the worst pose the corners reach past the frame, and a reader who turns it that far
+ * sees a board cropped rather than a board floating in a margin. That is the better of the
+ * two, and it is a choice rather than an oversight. */
+const FRAME_PULL = 0.84;
 
 /* The points the framing has to keep inside the frame, in the group's own space.
  *
@@ -554,6 +568,8 @@ function framer(THREE, camera, group, framed, lens) {
       dist *= worst / FRAME_FILL;
       place();
     }
+    dist *= FRAME_PULL;
+    place();
   };
 }
 
