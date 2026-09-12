@@ -75,15 +75,23 @@ def _run_byok(job_id: str, lead: dict, api_key: str, goal_id: str) -> None:
         with JOBS_LOCK:
             if job_id in JOBS:
                 JOBS[job_id].update(status="completed", result=result, finished=time.time())
-    except Exception:
-        # Never return provider exceptions: they may contain request details.
+    except Exception as exc:
+        # Return only a coarse provider category; never expose raw exceptions or request data.
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if status_code in (401, 403):
+            message = "CALL-E rejected the API key (HTTP %s). Check that the key is active and belongs to this account." % status_code
+        elif status_code == 404:
+            message = "CALL-E could not find that Goal ID (HTTP 404). Check that the Goal is published and belongs to this account."
+        elif status_code in (400, 422):
+            message = "CALL-E rejected the request (HTTP %s). Check the Goal variables and E.164 phone number." % status_code
+        elif status_code is not None:
+            message = "CALL-E returned an error (HTTP %s). No call result was returned." % status_code
+        else:
+            message = "CALL-E could not complete the run. Check the API key, Goal ID, phone number, and account credits."
         with JOBS_LOCK:
             if job_id in JOBS:
-                JOBS[job_id].update(
-                    status="error",
-                    error="CALL-E could not complete the run. Check the API key, Goal ID, phone number, and account credits.",
-                    finished=time.time(),
-                )
+                JOBS[job_id].update(status="error", error=message, finished=time.time())
     finally:
         # Drop the client/key references as soon as the job is finished.
         client = None
