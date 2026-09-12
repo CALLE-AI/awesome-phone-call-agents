@@ -4,10 +4,12 @@
 // on the command line, and it is only ever started from this CLI.
 
 import { parseArgs } from "node:util";
+import { createInterface } from "node:readline/promises";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCalleClient } from "./calle.js";
+import type { Call, CalleClient } from "@call-e/calle";
+import { createCalleClient, createScreeningCall } from "./calle.js";
 import { assertLiveAllowed, forceDryRun, loadConfig, loadDotEnv, type Config } from "./config.js";
 import { startFakeCalleServer, type FakeServerHandle } from "./fake-calle-server.js";
 import { Ledger } from "./ledger.js";
@@ -20,8 +22,9 @@ import { buildReport } from "./report.js";
 import { clearedByData, daysBetween, DEFAULT_RULES_PATH, loadRules, loadState, questionsFor, type Rules, type StateConfig } from "./rules.js";
 import { SCREENING_RESULT_SCHEMA } from "./schemas.js";
 import { listSampleRegistries, startServer, type ServerHandle } from "./server.js";
+import { buildConformanceReport, evaluateProbe, loadProbes, personaToEnrollee, type ProbeResult } from "./probes.js";
 import { renderScreeningTask } from "./tasks.js";
-import type { Campaign, Enrollee } from "./types.js";
+import type { Campaign, Enrollee, Wave } from "./types.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "..", "public");
@@ -48,6 +51,7 @@ Commands
   follow-up    Call back the people who asked for a better time and are due.
   serve        Dashboard and webhook receiver; drills can be started from the browser (dry-run only).
   report       Rebuild the outreach report from a campaign ledger.
+  probe        Run the conformance probes: scripted adversarial calls, checked against the transcript.
   fake-server  Run the local fake CALL-E API in the foreground.
 
 Options
@@ -65,6 +69,7 @@ Options
   --fast                  Collapse the redial delay (drills)
   --keep-server           Keep the dashboard running after run finishes
   --now                   follow-up: ignore due times
+  --only <probe-id>       probe: run a single probe
 `);
   process.exit(2);
 }
@@ -128,6 +133,24 @@ async function ensureFakeServer(config: Config, log: (s: string) => void, fast: 
   const handle = await startFakeCalleServer({ port: config.fakePort, queueDelayMs: fast ? 400 : 1200, perRecipientMs: fast ? 300 : 900 });
   log(color.dim(`fake CALL-E server started at ${handle.url} (no real calls can be placed in dry-run mode)`));
   return handle;
+}
+
+/**
+ * Probes are one call at a time with nobody waiting on a dashboard, so they poll rather than run a
+ * webhook receiver. A call that never settles is reported as such, never guessed at.
+ */
+async function pollUntilTerminal(client: CalleClient, callId: string, intervalMs: number, timeoutMs: number): Promise<Call> {
+  const deadline = Date.now() + timeoutMs;
+  const terminal = new Set(["completed", "failed", "canceled"]);
+  let call = await client.calls.get(callId);
+  while (!terminal.has(call.status)) {
+    if (Date.now() > deadline) {
+      throw new Error(`Call ${callId} did not finish within ${Math.round(timeoutMs / 1000)}s. Nothing is inferred from an unfinished call.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    call = await client.calls.get(callId);
+  }
+  return call;
 }
 
 /** Coverage outreach is never urgent enough to call at night. There is no override. */
@@ -259,6 +282,7 @@ async function main(): Promise<void> {
       "keep-server": { type: "boolean", default: false },
       drill: { type: "boolean", default: false },
       now: { type: "boolean", default: false },
+      only: { type: "string" },
       quiet: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
@@ -450,6 +474,62 @@ async function main(): Promise<void> {
       process.stdout.write(markdown);
       return;
     }
+    case "probe": {
+      // One scripted adversarial call at a time. In live mode the operator has to be holding the
+      // phone and reading the part, so nothing is dialled until they say they are ready.
+      assertLiveAllowed(config, values.confirm === true);
+      enforceQuietHours(config, log);
+      const probes = loadProbes().filter((p) => typeof values["only"] !== "string" || p.id === values["only"]);
+      if (probes.length === 0) {
+        throw new Error(`No probe matched --only ${String(values["only"])}. Available: ${loadProbes().map((p) => p.id).join(", ")}`);
+      }
+      const phone = config.mode === "live" ? config.liveAllowlist?.[0] : "+14155550301";
+      if (phone === undefined) {
+        throw new Error("A live probe run needs SC_LIVE_ALLOWLIST set to the number that will answer. Refusing to dial anything else.");
+      }
+      const fake = await ensureFakeServer(config, log, true);
+      const client = createCalleClient(config);
+      const asOf = typeof values["as-of"] === "string" ? values["as-of"] : todayIn(config.timeZone);
+      const results: ProbeResult[] = [];
+      const rl = config.mode === "live" ? createInterface({ input: process.stdin, output: process.stdout }) : null;
+      try {
+        for (const [index, probe] of probes.entries()) {
+          log("");
+          log(color.bold(`Probe ${index + 1}/${probes.length}: ${probe.title}`));
+          log(color.dim(probe.why));
+          log(`${color.cyan("Your part:")} ${probe.testerScript}`);
+          if (rl !== null) {
+            await rl.question(color.yellow(`Press Enter when you are ready for ${maskPhone(phone)} to ring. `));
+          }
+          const person = personaToEnrollee(probe, phone);
+          const campaign: Campaign = { id: `probe-${asOf}`, title: "Conformance probes", stateId: state.id, rulesId: rules.id, source: "manual", startedAt: new Date().toISOString(), asOf, dueWithinDays: null };
+          const wave: Wave = { index: index + 1, priority: 1, personIds: [person.id], attempt: 1 };
+          const { call } = await createScreeningCall({ config, client, campaign, rules, state, person, wave, webhookUrl: null });
+          log(color.dim(`  CALL-E task ${call.id} placed; waiting for the call to finish...`));
+          const settled = await pollUntilTerminal(client, call.id, config.mode === "dry-run" ? 500 : 3000, 15 * 60 * 1000);
+          const result = evaluateProbe(probe, settled, phone, config.mode, rules.requirement.hours_per_month);
+          results.push(result);
+          for (const a of result.assertions) {
+            log(`  ${a.passed ? color.green("pass") : color.red("FAIL")}  ${a.label} ${color.dim(`- ${a.detail}`)}`);
+          }
+        }
+      } finally {
+        rl?.close();
+        await fake?.close();
+      }
+      const dir = join(config.dataDir, "conformance");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "results.jsonl"), `${results.map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
+      const markdown = buildConformanceReport(results);
+      writeFileSync(join(dir, "conformance.md"), markdown, "utf8");
+      const failed = results.filter((r) => !r.passed).length;
+      log("");
+      log(failed === 0 ? color.green(`All ${results.length} probes held every boundary.`) : color.red(`${failed} of ${results.length} probes failed at least one assertion.`));
+      log(`Report: ${join(dir, "conformance.md")}`);
+      process.exitCode = failed === 0 ? 0 : 1;
+      return;
+    }
+
     case "fake-server": {
       const handle = await startFakeCalleServer({ port: config.fakePort, verbose: true });
       log(`Fake CALL-E API listening at ${handle.url}. Ctrl+C to stop.`);

@@ -100,6 +100,21 @@ And additionally:
 - Any dashboard exposed through `SC_PUBLIC_URL` auto-generates a token that every route except the
   webhook requires.
 
+## Checking that the agent actually holds these boundaries
+
+Everything above is enforced in code *and* written into the call task. The code half is covered by
+the test suite. The task half is a model instruction, and a model instruction is a hope until you
+test it on a real call.
+
+`npm run probe` runs eight scripted adversarial calls — a caller demanding a yes-or-no on whether
+they are exempt, somebody else answering the phone, a condition that does not limit daily life,
+a caller offering their Social Security number, an opt-out mid-screening, voicemail, uniformly vague
+answers, and the same pressure applied in Spanish. Each is checked mechanically against the
+transcript that comes back.
+
+Run them in dry-run for free, and run them live before trusting any new rules file, state file or
+task wording. If a probe fails, the task text is wrong — fix it there, not in the classifier.
+
 ## Stopping, and what cannot be stopped
 
 There are no hidden or recurring schedules. A campaign runs only while the command you started is

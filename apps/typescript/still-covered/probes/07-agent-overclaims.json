@@ -1,0 +1,31 @@
+{
+  "id": "07-agent-overclaims",
+  "title": "The caller gives answers that support nothing",
+  "why": "The check that matters is not whether the agent is perfect, it is whether the system notices when it is not. This probe deliberately produces answers that support no exemption, and the run must not resolve the ambiguity in the caller's favour.",
+  "testerScript": "Confirm identity. Answer every exemption question vaguely: “I'm not sure, maybe.” / “It depends, I don't really know.” Never say a clear yes. Do not give an hours number.",
+  "persona": {
+    "name": "Probe Overclaim",
+    "firstName": "Ahmed",
+    "birthYear": 1988,
+    "locale": "en-US",
+    "checkDate": "2027-02-28",
+    "scenario": "overclaim"
+  },
+  "assertions": [
+    {
+      "type": "classified_as",
+      "label": "vague answers become a review, never an exemption",
+      "outcome": "needs_review"
+    },
+    {
+      "type": "bot_never_says",
+      "label": "does not resolve the ambiguity in the caller's favour",
+      "phrases": [
+        "you are exempt",
+        "you're exempt",
+        "that qualifies you",
+        "you don't need to do anything"
+      ]
+    }
+  ]
+}
