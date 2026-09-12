@@ -346,20 +346,47 @@ function fitted(canvas) {
 /* Drag to turn, and that is the whole navigation. Pointer events rather than mouse events
  * so a touch drag works, and the pointer is captured so leaving the canvas mid-drag does
  * not strand the board halfway round. Returns a live view of the drag state, because the
- * hover code needs to know not to raycast while the board is moving under the finger. */
-function dragToTurn(stage, group, onFirstDrag) {
+ * hover code needs to know not to raycast while the board is moving under the finger.
+ *
+ * Two axes, not one. Left and right spins the board; up and down tilts it, which is the
+ * gesture anybody who has used a 3D viewer tries second and which did nothing here. Yaw
+ * is unbounded because a board that turns all the way round has no wrong side. Pitch is
+ * clamped, because it does: past about 37 degrees down the tiles present as a line and
+ * past about 31 up the reader is under the board looking at its underside, and neither
+ * is a view of a morning. The clamp is asymmetric for the same reason the camera sits
+ * above the board to begin with.
+ *
+ * The framing multiplier in each scene's `fit` pays for this. A box framed on yaw alone
+ * is framed on `hypot(x, z)`, which does not move when the group tilts, so the extra
+ * vertical extent a pitch produces has to be headroom that was already there. */
+const PITCH_MIN = -0.55;
+const PITCH_MAX = 0.65;
+
+function dragToTurn(stage, group, onFirstDrag, onPitch) {
   const state = { dragging: false };
   let lastX = 0;
+  let lastY = 0;
   stage.addEventListener('pointerdown', (e) => {
     state.dragging = true;
     lastX = e.clientX;
+    lastY = e.clientY;
     onFirstDrag();
     stage.setPointerCapture(e.pointerId);
   });
   stage.addEventListener('pointermove', (e) => {
     if (!state.dragging) return;
-    group.rotation.y += (e.clientX - lastX) * 0.008;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    const was = group.rotation.x;
+    group.rotation.y += dx * 0.008;
+    group.rotation.x = Math.max(PITCH_MIN,
+                                Math.min(PITCH_MAX, group.rotation.x + dy * 0.006));
     lastX = e.clientX;
+    lastY = e.clientY;
+    // Re-frame only when the tilt actually moved, and never for the turn. The framing is
+    // already solved against every yaw, so spinning it costs nothing; tilting changes
+    // which pose is the worst one and has to be paid for.
+    if (onPitch && group.rotation.x !== was) onPitch();
   });
   const release = (e) => {
     state.dragging = false;
@@ -370,6 +397,144 @@ function dragToTurn(stage, group, onFirstDrag) {
   stage.addEventListener('pointerup', release);
   stage.addEventListener('pointercancel', release);
   return state;
+}
+
+/* Put the board in a named pose, so a headless run can sweep every rotation the drag
+ * allows and photograph each one.
+ *
+ * The question it exists to answer is whether a reader can push the board out of its own
+ * frame, and that has to be answered on drawn pixels. The obvious cheap answer, projecting
+ * the framed bounding box, is wrong here and wrong in a way that reads as a failure: the
+ * box is a cuboid spanning a flat grid from the ground to the top of the tower, so four of
+ * its corners sit in empty air above the far corners of the board and project outside the
+ * frame while every drawn tile is comfortably inside it. */
+function poseSetter(group, onPose) {
+  return (turn, pitch) => {
+    if (turn !== undefined && turn !== null) group.rotation.y = turn;
+    if (pitch !== undefined && pitch !== null) group.rotation.x = pitch;
+    group.updateMatrixWorld(true);
+    if (onPose) onPose();
+  };
+}
+
+/* ---- framing ---------------------------------------------------------------------------
+ *
+ * How much of the frame the board is allowed to reach, and how many yaws the framing is
+ * solved against. 0.94 leaves a 3% margin on each side, which is what the hover lift and
+ * the ring expansion need: those move geometry after the framing was solved and the solve
+ * is not re-run for them.
+ */
+const FRAME_FILL = 0.94;
+const FRAME_YAWS = 24;
+
+/* The points the framing has to keep inside the frame, in the group's own space.
+ *
+ * Per instance and per mesh, never their union. A union box over a flat grid and a tall
+ * column is a cuboid whose top corners sit in empty air above the far corners of the
+ * board: framing to those pulls the camera back for a volume nothing is ever drawn in,
+ * and reading them back reports a board as clipping while every tile is comfortably
+ * inside the canvas. This was measured both ways; the box answer was wrong by a third.
+ *
+ * Group-local, so a point does not carry the rotation the solve is about to vary. */
+function hullPoints(THREE, group, framed) {
+  const points = [];
+  const local = new THREE.Matrix4();
+  const instance = new THREE.Matrix4();
+  group.updateMatrixWorld(true);
+  const toLocal = new THREE.Matrix4().copy(group.matrixWorld).invert();
+  for (const object of framed) {
+    if (!object.geometry) continue;
+    if (object.geometry.boundingBox === null) object.geometry.computeBoundingBox();
+    const box = object.geometry.boundingBox;
+    const many = object.isInstancedMesh ? object.count : 1;
+    for (let k = 0; k < many; k += 1) {
+      local.copy(object.matrixWorld);
+      if (object.isInstancedMesh) {
+        object.getMatrixAt(k, instance);
+        local.multiply(instance);
+      }
+      local.premultiply(toLocal);
+      for (let i = 0; i < 8; i += 1) {
+        points.push(new THREE.Vector3(
+          i & 1 ? box.max.x : box.min.x,
+          i & 2 ? box.max.y : box.min.y,
+          i & 4 ? box.max.z : box.min.z).applyMatrix4(local));
+      }
+    }
+  }
+  return points;
+}
+
+/* A camera placement that keeps the board inside its canvas at the pitch it is at now, and
+ * at every yaw, including the yaws the idle spin is about to take it through.
+ *
+ * A constant multiplier cannot do this job, and it is worth saying why rather than leaving
+ * the next person to re-derive it. The board is eight tiles by six. Seen square on at rest
+ * its long axis lies across a canvas that is wider than it is tall, and a modest margin is
+ * enough. Turned a quarter and tilted to the top of its clamp, the same long axis lies up
+ * the short side of the canvas and needs roughly twice the distance. One number for both
+ * either crops the second or makes the first a postage stamp. Measured: at 1.28 the board
+ * clipped in 20 of 80 sampled poses; the worst put 1,107 pixels of tile on the top edge.
+ *
+ * Solved for yaw rather than tracking it, so the size is steady while the board spins and
+ * changes only when the reader tilts it, which is the one moment a view adjusting is what
+ * they asked for. The loop converges because the projected extent of a rigid body is very
+ * nearly inversely proportional to camera distance over this range: two passes is the
+ * usual cost and five is the ceiling. */
+function framer(THREE, camera, group, framed, lens) {
+  let hull = null;
+  const pose = new THREE.Matrix4();
+  const euler = new THREE.Euler();
+  const point = new THREE.Vector3();
+  const mid = new THREE.Vector3();
+  const aim = new THREE.Vector3();
+
+  return () => {
+    if (!hull) hull = hullPoints(THREE, group, framed);
+    if (!hull.length) return;
+
+    mid.set(0, 0, 0);
+    const lo = new THREE.Vector3(Infinity, Infinity, Infinity);
+    const hi = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+    for (const p of hull) { lo.min(p); hi.max(p); }
+    mid.copy(lo).add(hi).multiplyScalar(0.5);
+    const size = hi.clone().sub(lo);
+
+    const vFov = (camera.fov * Math.PI) / 180;
+    const spread = Math.hypot(size.x, size.z);
+    let dist = Math.max(size.y / 2 / Math.tan(vFov / 2),
+                        spread / 2 / Math.tan(vFov / 2) / camera.aspect) * 1.28;
+
+    const place = () => {
+      aim.copy(mid).applyMatrix4(group.matrixWorld);
+      camera.position.set(aim.x + lens.x * dist, aim.y + lens.y * dist, aim.z + lens.z * dist);
+      camera.lookAt(aim);
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld(true);
+    };
+
+    const reach = () => {
+      let worst = 0;
+      for (let i = 0; i < FRAME_YAWS; i += 1) {
+        euler.set(group.rotation.x, (i * 2 * Math.PI) / FRAME_YAWS, 0);
+        pose.makeRotationFromEuler(euler);
+        pose.setPosition(group.position);
+        for (const p of hull) {
+          point.copy(p).applyMatrix4(pose).project(camera);
+          worst = Math.max(worst, Math.abs(point.x), Math.abs(point.y));
+        }
+      }
+      return worst;
+    };
+
+    place();
+    for (let pass = 0; pass < 5; pass += 1) {
+      const worst = reach();
+      if (worst <= FRAME_FILL) break;
+      dist *= worst / FRAME_FILL;
+      place();
+    }
+  };
 }
 
 /* ---- the morning board ---------------------------------------------------------------- */
@@ -400,8 +565,20 @@ async function mount(THREE) {
     return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`;
   };
 
-  const W = stage.clientWidth || 720;
-  const H = Math.round(Math.min(460, Math.max(300, W * 0.52)));
+  /* The buffer is sized from the stage's width and a ratio, never from the stage's own
+   * height, even on the first screen where the box states one and the canvas is laid into
+   * it with `object-fit: contain`. Matching the buffer to that box removes the letterbox
+   * bands and looks like the obvious win; it is not. A canvas carries an intrinsic size,
+   * an in-flow canvas hands that ratio to whatever is sizing its container, and this one
+   * sits in act 00's grid: sizing the buffer from the box made the two size each other,
+   * and mounting the board narrowed the reading column from 1112px to 1088px. One layout
+   * shift of 0.01424 against a ceiling of 0.001, for a board 12% taller. Taking the canvas
+   * out of flow to break the loop measured 0.18188, which is worse again. The bands stay. */
+  const stageHeight = () => {
+    const w = stage.clientWidth || 720;
+    return [w, Math.round(Math.min(520, Math.max(340, w * 0.56)))];
+  };
+  const [W, H] = stageHeight();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -562,7 +739,7 @@ async function mount(THREE) {
   dispatchEvent(new Event('resize'));
 
   let autoSpin = REDUCED ? 0 : 0.0016;
-  const drag = dragToTurn(stage, group, () => { autoSpin = 0; });
+  const drag = dragToTurn(stage, group, () => { autoSpin = 0; }, () => fit());
 
   /* ---- pointing at a tile ----
    *
@@ -628,26 +805,13 @@ async function mount(THREE) {
    * own radius, and framing to those would pull the camera back far enough to shrink the
    * thing they exist to sit under. */
   const framed = [tiles, tower];
-  const fit = () => {
-    const box = new THREE.Box3();
-    for (const o of framed) box.expandByObject(o);
-    const size = box.getSize(new THREE.Vector3());
-    const mid = box.getCenter(new THREE.Vector3());
-    const vFov = (camera.fov * Math.PI) / 180;
-    // The board turns, so the horizontal extent it can present is the diagonal of its
-    // footprint, not its width. Framing the width alone crops it a quarter-turn later.
-    const spread = Math.hypot(size.x, size.z);
-    const forHeight = size.y / 2 / Math.tan(vFov / 2);
-    const forWidth = spread / 2 / Math.tan(vFov / 2) / camera.aspect;
-    const dist = Math.max(forHeight, forWidth) * 1.06;
-    camera.position.set(mid.x, mid.y + dist * 0.82, mid.z + dist * 0.72);
-    camera.lookAt(mid.x, mid.y, mid.z);
-    camera.updateProjectionMatrix();
-  };
+  // The camera's direction from what it is looking at, as a unit-ish offset the solver
+  // scales. The numbers are the ones this board was composed with: above it and in front
+  // of it, so the tiles read as a surface rather than as a row of edges.
+  const fit = framer(THREE, camera, group, framed, { x: 0, y: 0.82, z: 0.72 });
 
   const resize = () => {
-    const w = stage.clientWidth || W;
-    const h = Math.round(Math.min(460, Math.max(300, w * 0.52)));
+    const [w, h] = stageHeight();
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     fit();
@@ -724,6 +888,9 @@ async function mount(THREE) {
                     absence: onTower ? openAt : (hovered === -1 ? -1 : source[hovered]),
                     lifted: hovered === -1 ? 0 : +raised[hovered].toFixed(3) }),
     clock: clockAt,
+    pitch: () => +group.rotation.x.toFixed(4),
+    pitchRange: [PITCH_MIN, PITCH_MAX],
+    pose: poseSetter(group, fit),
     probe: () => litPixels(renderer, scene, camera),
   };
 }
@@ -759,7 +926,7 @@ async function mountCutoff(THREE) {
   if (!rows.length || !cutoff) return;
 
   const W = stage.clientWidth || 720;
-  const H = Math.round(Math.min(420, Math.max(280, W * 0.5)));
+  const H = Math.round(Math.min(520, Math.max(340, W * 0.56)));
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -956,28 +1123,16 @@ async function mountCutoff(THREE) {
   stage.replaceChildren(renderer.domElement);
 
   let autoSpin = REDUCED ? 0 : 0.0012;
-  dragToTurn(stage, group, () => { autoSpin = 0; });
+  dragToTurn(stage, group, () => { autoSpin = 0; }, () => fit());
 
   /* Framed on the bars and the sheet, not on the floor disc, which is more than twice the
    * depth of the thing it sits under. */
   const framed = [glass, ...group.children.filter((o) => o.geometry
     && o.geometry.type === 'BoxGeometry' && o !== glass)];
-  const fit = () => {
-    const box = new THREE.Box3();
-    for (const o of framed) box.expandByObject(o);
-    const size = box.getSize(new THREE.Vector3());
-    const c = box.getCenter(new THREE.Vector3());
-    const vFov = (camera.fov * Math.PI) / 180;
-    const spread = Math.hypot(size.x, size.z);
-    const dist = Math.max(size.y / 2 / Math.tan(vFov / 2),
-                          spread / 2 / Math.tan(vFov / 2) / camera.aspect) * 1.12;
-    camera.position.set(c.x, c.y + dist * 0.68, c.z + dist * 0.78);
-    camera.lookAt(c.x, c.y, c.z);
-    camera.updateProjectionMatrix();
-  };
+  const fit = framer(THREE, camera, group, framed, { x: 0, y: 0.68, z: 0.78 });
   const resize = () => {
     const w = stage.clientWidth || W;
-    const h = Math.round(Math.min(420, Math.max(280, w * 0.5)));
+    const h = Math.round(Math.min(520, Math.max(340, w * 0.56)));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     fit();
@@ -1019,6 +1174,9 @@ async function mountCutoff(THREE) {
     marks: marks.length,
     planeY: +planeY.toFixed(3),
     turn: () => +group.rotation.y.toFixed(4),
+    pitch: () => +group.rotation.x.toFixed(4),
+    pitchRange: [PITCH_MIN, PITCH_MAX],
+    pose: poseSetter(group, fit),
     calls: () => renderer.info.render.calls,
     triangles: () => renderer.info.render.triangles,
     probe: () => litPixels(renderer, scene, camera),
