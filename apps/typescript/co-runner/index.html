@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Co runner: Your AI Call Assistant</title>
+    <style>
+        body {
+            background-image: linear-gradient(to bottom, #9EFBD3 0%, #57E9F2 48%, #45D4FB 100%);
+            color: black;
+            min-height: 100vh;
+            font-family: 'Times New Roman', Times, serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            margin: 0;
+        }
+        .container {
+            width: 100%;
+            max-width: 350px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .menu-button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            background-color: white;
+            border: 2px solid black;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: 0.3s;
+        }
+        .menu-button:hover {
+            background-color: black;
+            color: white;
+        }
+        .chip-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+        .prompt-chip {
+            background: #e0f7fa;
+            border: 1px solid #00acc1;
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-family: sans-serif;
+            transition: 0.2s;
+        }
+        .prompt-chip:hover {
+            background: #00acc1;
+            color: white;
+        }
+        .history-item {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 13px;
+            font-family: sans-serif;
+        }
+        .brand-logo {
+            width: 100px;
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SCREEN 1: MAIN MENU -->
+        <div id="mainMenuScreen">
+            <h2>Co runner</h2>
+            <p style="color: gray; font-style: italic;">Your AI Call Assistant</p>
+            <button class="menu-button" id="newCallBtn">Make new call</button>
+            <button class="menu-button" id="reviewCallBtn">Review old call</button>
+            <img class="brand-logo" src="CALL-E.png" alt="Powered by CALL-E">
+        </div>
+
+        <!-- SCREEN 2: NEW CALL FORM -->
+        <div id="newCallScreen" style="display: none;">
+            <h2>New Call</h2>
+            <p style="color: gray; font-size: 13px; margin-bottom: 15px;">Set your global preferences:</p>
+
+            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Select Language:</label>
+            <select id="targetLanguage" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px;">
+                <option value="English">🇮🇳 English (India)</option>
+                <option value="Hindi">🇮🇳 Hindi (भारत)</option>
+                <option value="Tamil">🇮🇳 Tamil (தமிழ்)</option>
+                <option value="German">🇩🇪 German (Deutschland)</option>
+                <option value="Spanish">🇪🇸 Spanish (España)</option>
+                <option value="French">🇫🇷 French (France)</option>
+                <option value="Japanese">🇯🇵 Japanese (日本語)</option>
+            </select>
+
+            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Business Phone Number:</label>
+            <input type="text" id="targetPhone" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+
+            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Your Query Templates:</label>
+            <div class="chip-container">
+                <span class="prompt-chip" data-template="Check store operating hours and holiday timing.">🕒 Store Hours</span>
+                <span class="prompt-chip" data-template="Inquire about table reservation availability for 4 guests tonight.">🍽️ Reservation</span>
+                <span class="prompt-chip" data-template="Ask about product stock availability and bulk shipping costs.">📦 Stock Check</span>
+            </div>
+
+            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Custom Query (In English):</label>
+            <textarea id="englishPrompt" placeholder="What should your AI Assistant ask?" rows="3" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: sans-serif;"></textarea>
+
+            <button class="menu-button" id="submitCallBtn">📞 Dial AI Agent</button>
+            <button class="menu-button" id="backBtn">⬅ Back to Menu</button>
+            <p id="statusLog" style="font-size: 13px; font-weight: bold; margin-top: 10px; color: #555;"></p>
+        </div>
+
+        <!-- SCREEN 3: REVIEW CALL HISTORY -->
+        <div id="historyScreen" style="display: none;">
+            <h2>Call History</h2>
+            <p style="color: gray; font-size: 13px; margin-bottom: 15px;">Logs stored locally on your device. Tap a call to see its reply:</p>
+            <div id="historyList" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;"></div>
+            <div id="replyLogBox" style="display: none; background: #eef9ff; border: 1px solid #00acc1; border-radius: 6px; padding: 12px; margin-bottom: 15px; text-align: left; font-family: sans-serif; font-size: 13px;">
+                <b>Reply Log:</b>
+                <p id="replyLogContent" style="margin: 8px 0 0 0; white-space: pre-wrap;"></p>
+            </div>
+            <button class="menu-button" id="deleteSelectedBtn" style="border-color: #c62828; color: #c62828;">🗑 Delete Selected</button>
+            <button class="menu-button" id="backFromHistoryBtn">⬅ Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="apps.js"></script>
+</body>
+</html>
