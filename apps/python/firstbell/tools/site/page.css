@@ -485,13 +485,98 @@ h3 {
  * on the element that holds running prose and nowhere else. `letter-spacing: 0` pins what
  * is already inherited: it is here so a later tracking rule on an ancestor cannot reach
  * body copy, which is the one place on this page tracking must not be applied. */
+/* No `text-align` here, deliberately. The initial value is `start`, which is already left
+ * in this document, so declaring it buys nothing and costs everything: at (0,0,1) it beats
+ * the `:where()` lists below, which are written at zero specificity precisely so the
+ * `:has(code)` rule can override them. With it present nothing on the page justified at
+ * all, and the cause was one redundant declaration. */
 p {
   margin: 0 0 1.1rem;
   max-width: var(--measure);
-  text-align: left;
   line-height: 1.65;
   letter-spacing: 0;
   text-wrap: pretty;
+}
+
+/* ---- justified prose ------------------------------------------------------------------
+ *
+ * Running prose is justified; everything that is not running prose is not.
+ *
+ * The distinction is doing real work and it is measured rather than guessed. A paragraph
+ * of three lines or more in a column 380px or wider has enough words on a line that the
+ * space between them stretches by a few pixels and nothing else happens. A two-line label
+ * in a 155px cell has three or four words on a line, and justifying it drags those words
+ * to the edges with a hole in the middle: that is the failure this stylesheet already
+ * recorded once, with a worst gap of 97.9px, and the reason justification came back out.
+ *
+ * Two more guards on top of the length one. Below 52rem the reading column is narrow
+ * enough that every paragraph behaves like the label case, so nothing is justified there.
+ * And a paragraph that sets `text-wrap: balance` is never justified: balance chooses short
+ * lines deliberately, and justification then stretches each of them to the full box, which
+ * is how a 778px claim ended up with 46.2px between its words.
+ *
+ * `hyphens: auto` is here and is not load-bearing. With a dictionary in the reader's own
+ * profile it closes a gap or two; on the fresh profile a gate run gets it does nothing.
+ * It costs a declaration and can only help. */
+@media (min-width: 52rem) {
+  /* `:where()` on both lists, so neither can beat the other on specificity and the order
+   * they are written in is the order that decides. Written the obvious way, `p.lede` at
+   * (0,1,1) beat a (0,0,2) rule meant to override it, and four paragraphs stayed justified
+   * with a 24.9px hole in them. */
+  :where(
+    .inner > p,
+    .band > p,
+    .claim > p,
+    .fold > p,
+    .fold-body > p,
+    p.note, p.dim,
+    p.money-why, p.money-foot, p.money-key-foot,
+    p.closes,
+    p.lane-note, p.scene-note, p.hero-foot, p.hero-turn, p.take-why,
+    p.queue-foot, p.queue-clockless, p.verify-say, p.mrn-say
+  ) {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+  }
+
+  /* Quoting an identifier is not what decides this, and a rule that said so was built,
+   * measured and thrown away. `p:has(code)` left the two longest paragraphs on the page
+   * ragged, 23 lines each, over one `<code>` apiece: `.money-key-foot` justifies without a
+   * single loose line and `.closes` opens one, on the line that carries two file paths.
+   * Photographed rather than counted, both read better justified than ragged.
+   *
+   * What does decide it is whether a line has words to spread the stretch across. A
+   * `.hard` paragraph opened a 46.2px word space and a `.band-count` 41.6px, and neither
+   * of them holds a token worth blaming: `.hard` is `text-wrap: balance`, which picks
+   * short lines on purpose, and justification then pulls every one of them out to the full
+   * box. Balanced display type and two-line notes are ragged below for that reason, and
+   * the list is by name because no selector can count lines. */
+
+  /* Ragged by name. Narrow cells, balanced display type, and labels. */
+  :where(
+    p.eyebrow, p.pull,
+    p.minute-say, p.minute-claim, p.minute-eyebrow, p.q-head, p.q-tried, p.q-todo,
+    p.q-when, p.path-why, p.path-k, p.path-lead, p.mut-code, p.mut-plain,
+    p.limit, p.hard, p.band-count, p.duet-line,
+    /* A lede is two or three lines of display type. Justify it and the stretch all lands
+     * on the one full line: "Every safety rule is verified against simulated failures."
+     * opened a 24.9px word space, seven times its own natural one, which is the exact
+     * complaint a ragged edge was supposed to be causing. Justification needs lines to
+     * spread the stretch across, and a short paragraph does not have them. `.stakes` is
+     * here for the same reason in a 416px column. */
+    p.lede, p.stakes,
+    p.take-run, p.take-h, p.further-k, p.money-n, p.money-what, p.read-why,
+    p.queue-said, p.tally-head, p.tally-alt, p.mrn-hint, p.nav-note, p.stakes-src,
+    p.standfirst,
+    /* The two plates are four lines of provenance carrying six mono tokens between
+     * them. Justified, the first line held `abfb3f9 plus uncommitted changes` and
+     * nothing else that would fit, and the words on it stood 25.2px apart. */
+    .plate-royal p
+  ) {
+    text-align: left;
+    hyphens: manual;
+  }
 }
 p.lede {
   font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.4rem);
