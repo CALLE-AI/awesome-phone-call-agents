@@ -12,7 +12,7 @@ guide for [AfterCare app](https://github.com/frasfras/after-call).
 - [Source repository](https://github.com/frasfras/after-call)
 
 ## Structured checkin
-   The patient is asked about their medical procedure as well as how they feel and whether
+   The patient is asked about their medical procedure as well as how they feel and flags whether
    they need to be reseen.
    The call response is information for clinicians. 
 
@@ -22,4 +22,4 @@ guide for [AfterCare app](https://github.com/frasfras/after-call).
 
 ## Default call demonstration
 
-- The [demo](https://aftercare.ai.studio/#/demo) enter who to call and about what
+- For The [demo](https://aftercare.ai.studio/#/demo) enter who to call and about what
