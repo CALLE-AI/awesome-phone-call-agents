@@ -144,6 +144,25 @@ that as unknown rather than guessing. If you reach voicemail, do not leave
 sensitive details; record that it was voicemail. Thank them and end the call.
 ```
 
+## How It Uses CALL-E
+
+RelayMe drives CALL-E's three tools at runtime through the `calle` CLI:
+
+1. `calle call plan --to-phone <E164> --goal "<goal>"` builds the call from the
+   goal template above and returns a `plan_id` and `confirm_token`. RelayMe
+   reserves the task before this step, so a duplicate is refused.
+2. `calle call run --plan-id <id> --confirm-token <token>` places the call and
+   returns a `run_id`.
+3. `calle call status --run-id <id>` polls `get_call_run` until the call reaches
+   a terminal state, then reads the transcript and structured result from
+   `status_result.structuredContent`.
+
+If `run_call`'s outcome is uncertain, RelayMe recovers with
+`calle call recover --recovery-id <id>` rather than starting a new plan, so one
+authorization is never dialled twice. The runnable client in
+`apps/python/relayme/client.py` implements this flow, with a mock path that
+exercises the same classifier and thread builder without placing a call.
+
 ## Structured Result
 
 RelayMe returns a text-first, fail-closed result. The user reads `answer` and
