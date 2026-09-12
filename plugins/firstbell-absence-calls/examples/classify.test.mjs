@@ -236,12 +236,18 @@ test("escalation is a second axis and never a fourth resolution", () => {
 
 test("the rule fails closed on anything that is not an explicit yes", () => {
   for (const value of [undefined, null, "", "no", "unknown", "YES?", "y", 0, "maybe"]) {
-    assert.equal(safeguardingEscalation({ parent_confirmed_aware: value }), "safeguarding",
-      `${JSON.stringify(value)} should not close a call`);
+    assert.equal(
+      safeguardingEscalation({ parent_confirmed_aware: value, expected_return: "tomorrow", reason_category: "illness" }),
+      "safeguarding",
+      `${JSON.stringify(value)} should not close a call`,
+    );
   }
   for (const value of ["yes", "YES", " Yes "]) {
-    assert.equal(safeguardingEscalation({ parent_confirmed_aware: value }), "none",
-      `${JSON.stringify(value)} is a confirmation`);
+    assert.equal(
+      safeguardingEscalation({ parent_confirmed_aware: value, expected_return: "tomorrow", reason_category: "illness" }),
+      "none",
+      `${JSON.stringify(value)} is a confirmation`,
+    );
   }
   assert.equal(safeguardingEscalation(null), "safeguarding");
   assert.equal(safeguardingEscalation("not an object"), "safeguarding");
@@ -287,10 +293,9 @@ test("an all-unknown answer is flagged, not filed as an ordinary callback", () =
   assert.equal(out.needsAHuman, true);
 });
 
-test("a confirmed parent who then said nothing usable is not flagged", () => {
-  // The flag follows the rule, not the branch. An explicit yes closes the safeguarding
-  // question even when the rest of the answer is worthless, and the row still needs a
-  // person for the ordinary reason.
+test("a confirmed parent who then gave no return date escalates under the 3-field rule", () => {
+  // S-3127 reproduction: A parent may confirm awareness, but an unknown return date for
+  // an unexplained absence is a potential missing-child risk that cannot safely close.
   const out = classifyRecipient(recipient({
     structured_result: {
       parent_confirmed_aware: "yes",
@@ -299,7 +304,7 @@ test("a confirmed parent who then said nothing usable is not flagged", () => {
     },
   }));
   assert.equal(out.resolution, "undetermined");
-  assert.equal(out.escalation, "none");
+  assert.equal(out.escalation, "safeguarding");
   assert.equal(out.needsAHuman, true);
 });
 
