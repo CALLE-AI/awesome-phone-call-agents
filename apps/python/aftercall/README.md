@@ -24,11 +24,11 @@ guide for [AfterCare app](https://github.com/frasfras/after-call).
 - The CALL-E token is stored in secrets management in Cloud run and refered to as CALLE_TOKEN
 
 ## Side effects, retries, and cancellation
-  Starting in live demo mode sends the authorized number, call instructions
+  Starting in live demo mode sends the authorized number, call instructions.
   Planning and scheduling does not initiate call.
-  no retries
-  Demo may cost credits and contact a real phone. Only test with personal number or agreeing recipient 
-  Patient can decline call
+  no retries.
+  Demo may cost credits and contact a real phone. Only test with personal number or agreeing recipient .
+  Patient can decline call.
   
 ## Default call demonstration
 
