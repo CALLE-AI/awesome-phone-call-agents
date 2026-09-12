@@ -1,0 +1,28 @@
+@* Indicador de carga: logo CareCall latiendo con ondas expansivas alrededor. *@
+
+<div class="heart-loader @(Overlay ? "heart-loader-overlay" : null)">
+    <div class="heart-loader-inner">
+        <div class="heart-logo-wrap" style="@($"--hb-size:{Size}px;")">
+            <span class="heart-wave"></span>
+            <span class="heart-wave wave-2"></span>
+            <span class="heart-wave wave-3"></span>
+            <img class="heart-logo" src="carecall-logo.svg" alt="Loading" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <p class="heart-loader-text">@Message</p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Optional text below the logo.</summary>
+    [Parameter] public string? Message { get; set; }
+
+    /// <summary>Logo size in pixels.</summary>
+    [Parameter] public int Size { get; set; } = 56;
+
+    /// <summary>If true, covers the parent container with a translucent veil.</summary>
+    [Parameter] public bool Overlay { get; set; }
+}

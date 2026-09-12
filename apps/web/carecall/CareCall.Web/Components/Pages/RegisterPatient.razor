@@ -1,0 +1,23 @@
+@page "/patients/new"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>CareCall · Register patient</PageTitle>
+
+<div class="setup-content">
+    <div class="page-header">
+        <div>
+            <a class="back-link" href="/patients">&larr; Patients</a>
+            <h1>Register patient</h1>
+            <p class="subtitle">Manual patient onboarding · discharge and follow-up planning.</p>
+        </div>
+        <a class="btn btn-outline-primary" href="/settings">Try a live call</a>
+    </div>
+    <section class="panel">
+        <DemoSettingsForm LiveTrial="false" OnCancel="BackToPatients" />
+    </section>
+</div>
+
+@code {
+    private void BackToPatients() => Navigation.NavigateTo("/patients");
+}

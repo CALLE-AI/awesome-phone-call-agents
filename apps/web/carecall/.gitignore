@@ -1,0 +1,40 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+artifacts/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Bb]uild/
+[Bb]in/
+[Oo]bj/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Azure publishing / deployment artifacts
+*.deploy.zip
+*.pubxml
+*.pubxml.user
+*.publishsettings
+
+## Base de datos local (SQLite) y secretos
+*.db-shm
+*.db-wal
+!CareCall.Web/carecall.db
+appsettings.*.local.json
+secrets.json
+
+## Varios
+*.log
+node_modules/

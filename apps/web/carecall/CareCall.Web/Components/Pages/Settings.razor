@@ -1,0 +1,18 @@
+@page "/settings"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>CareCall · Guided trial</PageTitle>
+
+<div class="setup-content">
+    <div class="page-header">
+        <h1>Guided trial</h1>
+    </div>
+    <section class="panel">
+        <DemoSettingsForm OnCancel="BackToDashboard" />
+    </section>
+</div>
+
+@code {
+    private void BackToDashboard() => Navigation.NavigateTo("/");
+}

@@ -1,0 +1,155 @@
+@page "/calls"
+@rendermode InteractiveServer
+@inject DashboardService Dashboard
+
+<PageTitle>CareCall · Call history</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Call history</h1>
+        <p class="subtitle">Latest 50 sessions · open a call to review its agents and transcript in the care monitor.</p>
+    </div>
+    <RefreshControl OnRefresh="LoadAsync" IntervalSeconds="30" />
+</div>
+
+<div class="filter-bar">
+    <label class="filter-search">
+        <Icon Name="search" />
+        <input aria-label="Search call history" placeholder="Search by patient or summary..." @bind="_search" @bind:event="oninput" />
+    </label>
+
+    <div class="filter-group">
+        <span class="filter-label">Outcome</span>
+        <select class="filter-select" aria-label="Call outcome" @bind="_outcome">
+            <option value="">All</option>
+            <option value="@CallOutcome.Completed">Completed</option>
+            <option value="@CallOutcome.NoAnswer">No answer</option>
+            <option value="@CallOutcome.Failed">Failed</option>
+            <option value="@CallOutcome.Refused">Refused</option>
+            <option value="@CallOutcome.Pending">Pending</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <span class="filter-label">Risk</span>
+        <select class="filter-select" aria-label="Assessed risk" @bind="_risk">
+            <option value="">All</option>
+            <option value="@RiskLevel.High">High</option>
+            <option value="@RiskLevel.Medium">Medium</option>
+            <option value="@RiskLevel.Low">Low</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <div class="segmented">
+            <button type="button" class="@(!_onlyWorsening ? "active" : null)" @onclick="() => _onlyWorsening = false">All</button>
+            <button type="button" class="@(_onlyWorsening ? "active" : null)" @onclick="() => _onlyWorsening = true">Worse</button>
+        </div>
+    </div>
+
+    <div class="filter-spacer"></div>
+
+    <span class="filter-count">@Filtered.Count of @_calls.Count calls</span>
+
+    @if (HasFilters)
+    {
+        <button type="button" class="filter-clear" @onclick="ClearFilters">Clear filters</button>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <p class="list-error" role="alert">@_error</p>
+}
+<section class="panel panel-fill" aria-label="Call history">
+    @if (_loading)
+    {
+        <HeartbeatLoader Message="Loading call history..." />
+    }
+    else if (Filtered.Count == 0)
+    {
+        <p class="empty">@(HasFilters ? "No calls match these filters." : "No calls recorded yet.")</p>
+    }
+    else
+    {
+        <div class="activity-list">
+            @foreach (var c in Filtered)
+            {
+                <a @key="c.Id" class="activity-card" href="@($"/?call={c.Id}")">
+                    <span class="care-avatar" aria-hidden="true"><Icon Name="@(c.Outcome == CallOutcome.NoAnswer ? "phone_missed" : "call")" /></span>
+                    <div class="activity-main">
+                        <h2>@c.PatientName</h2>
+                        <div class="activity-meta"><span>@c.DateTime.ToLocalTime().ToString("dd MMM yyyy · HH:mm")</span>
+                            @if (c.Duration > TimeSpan.Zero)
+                            {
+                                <span>@c.Duration.ToString(@"hh\:mm\:ss") duration</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(c.Summary))
+                        {
+                            <p>@c.Summary</p>
+                        }
+                    </div>
+                    <div class="activity-end">
+                        <div class="card-badges"><OutcomeBadge Outcome="c.Outcome" />
+                            @if (c.Risk is { } risk) { <RiskBadge Level="risk" /> }
+                            @if (c.Worsening) { <span class="badge-pill severity-critical">Worsening</span> }
+                        </div>
+                        <span class="card-note">Review call →</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<CallRow> _calls = [];
+    private string? _search;
+    private string _outcome = string.Empty;
+    private string _risk = string.Empty;
+    private bool _onlyWorsening;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+
+    private IReadOnlyList<CallRow> Filtered =>
+        _calls
+            .Where(c => string.IsNullOrWhiteSpace(_search)
+                        || c.PatientName.Contains(_search, StringComparison.OrdinalIgnoreCase)
+                        || (c.Summary?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(c => string.IsNullOrEmpty(_outcome) || c.Outcome.ToString() == _outcome)
+            .Where(c => string.IsNullOrEmpty(_risk) || c.Risk?.ToString() == _risk)
+            .Where(c => !_onlyWorsening || c.Worsening)
+            .ToList();
+
+    private bool HasFilters =>
+        !string.IsNullOrWhiteSpace(_search) || !string.IsNullOrEmpty(_outcome)
+        || !string.IsNullOrEmpty(_risk) || _onlyWorsening;
+
+    private void ClearFilters()
+    {
+        _search = null;
+        _outcome = string.Empty;
+        _risk = string.Empty;
+        _onlyWorsening = false;
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            _calls = await Dashboard.GetRecentCallsAsync(50);
+            _error = null;
+        }
+        catch (Exception)
+        {
+            _error = "Could not refresh calls. Last received data is shown; use Refresh to retry.";
+        }
+        finally { _loading = false; _busy = false; }
+    }
+}

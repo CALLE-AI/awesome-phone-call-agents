@@ -1,0 +1,23 @@
+<span class="badge-pill status-@Status.ToString().ToLowerInvariant()"><Icon Name="@Icon" Class="badge-icon" /> @Text</span>
+
+@code {
+    [Parameter, EditorRequired] public PatientStatus Status { get; set; }
+
+    private string Icon => Status switch
+    {
+        PatientStatus.Discharged => "local_hospital",
+        PatientStatus.InFollowUp => "autorenew",
+        PatientStatus.Completed => "task_alt",
+        PatientStatus.Escalated => "e911_emergency",
+        _ => "circle"
+    };
+
+    private string Text => Status switch
+    {
+        PatientStatus.Discharged => "Recently discharged",
+        PatientStatus.InFollowUp => "In follow-up",
+        PatientStatus.Completed => "Follow-up completed",
+        PatientStatus.Escalated => "Escalated",
+        _ => Status.ToString()
+    };
+}

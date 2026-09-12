@@ -194,6 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
+- [CareCall](apps/web/carecall/) — .NET 10 Blazor application for AI-assisted post-discharge follow-up. Uses CALL-E for explicit, E.164-validated phone calls, simulation mode by default, host-owned scheduling, longitudinal follow-up tracking, structured SBAR clinical summaries for professional review, adaptive follow-up planning, and auditable AgentTrace records.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 

@@ -1,0 +1,246 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject DashboardService Dashboard
+@inject DemoSettingsService DemoSettings
+@inject ILogger<Home> Logger
+
+<PageTitle>CareCall · Care monitor</PageTitle>
+
+<div class="care-monitor">
+    <header class="monitor-heading">
+        <div>
+            <span class="eyebrow">CareCall · Post-discharge care</span>
+            <h1>Care monitor</h1>
+            <p>Calls, clinical findings and patients needing attention. One shared view.</p>
+        </div>
+        <div class="update-status">
+            <span class="connection @(_error is null ? "" : "stale")"><span class="status-dot"></span>@(_error is null ? "Auto-refresh · 5s" : "Updates interrupted")</span>
+            @if (_snapshot is not null)
+            {
+                <small>Last received @_snapshot.UpdatedOn.ToLocalTime().ToString("HH:mm:ss")</small>
+            }
+            @if (DemoSettings.SetupCompleted)
+            {
+                <button type="button" class="btn btn-outline-primary btn-sm" aria-haspopup="dialog" @onclick="OpenSettings">Guided trial</button>
+            }
+        </div>
+    </header>
+
+    @if (!DemoSettings.SetupCompleted)
+    {
+        <div class="demo-notice setup">
+            <span role="status">Explore the dashboard, then try a <strong>Guided trial</strong>: register a fictional patient and schedule a follow-up using the current call mode.</span>
+            <button type="button" class="btn btn-outline-primary btn-sm" aria-haspopup="dialog" @onclick="OpenSettings">Guided trial</button>
+        </div>
+    }
+    @if (_error is not null)
+    {
+        <p class="update-error" role="alert">@_error</p>
+    }
+    <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">@_announcement</span>
+
+    @if (_snapshot is null)
+    {
+        @if (_error is null)
+        {
+            <HeartbeatLoader Message="Loading care monitor..." Size="72" />
+        }
+    }
+    else
+    {
+        <div class="overview" aria-label="Current care summary">
+            <a class="metric @(_snapshot.CriticalAlerts > 0 ? "urgent" : "")" href="/alerts">
+                <span>Needs attention</span><strong>@_snapshot.OpenAlerts</strong><small>@_snapshot.CriticalAlerts critical alerts</small>
+            </a>
+            <div class="metric"><span>Awaiting call result</span><strong>@_snapshot.AwaitingResults</strong><small>Queued or submitted sessions</small></div>
+            <div class="metric"><span>Awaiting assessment</span><strong>@_snapshot.UnassessedCalls</strong><small>Completed calls without a result</small></div>
+            <a class="metric" href="/patients?status=InFollowUp"><span>In follow-up</span><strong>@_snapshot.InFollowUp</strong><small>Patients under follow-up</small></a>
+        </div>
+
+        <div class="monitor-grid">
+            <section class="monitor-panel call-list" aria-labelledby="calls-heading">
+                <header><div><span class="eyebrow">Call activity</span><h2 id="calls-heading">Calls</h2></div><a href="/calls">History</a></header>
+                <p class="section-note">Awaiting results first · latest 12 sessions</p>
+                @if (_snapshot.Calls.Count == 0)
+                {
+                    <p class="quiet-state">No calls yet. New sessions will appear here automatically.</p>
+                }
+                <div class="contact-list panel-scroll" tabindex="0" role="region" aria-label="Call activity list">
+                    @foreach (var call in _snapshot.Calls)
+                    {
+                        <button @key="call.Id" class="contact-row @(Focus?.Id == call.Id ? "selected" : "") @(call.Outcome == CallOutcome.Pending && !call.Scheduled ? "pending-session" : "") @(call.Scheduled && !call.IsDue ? "scheduled-session" : "")"
+                                aria-pressed="@(Focus?.Id == call.Id)" @onclick="() => SelectCall(call.Id)">
+                            <span class="avatar" aria-hidden="true">@Initials(call.PatientName)</span>
+                            <span class="contact-copy"><strong>@call.PatientName</strong><span class="@(call.Outcome == CallOutcome.Failed ? "failure-text" : "")">@call.Status</span><small>@(call.Scheduled ? $"Scheduled {LocalStamp(call.StartedOn)}" : LocalStamp(call.StartedOn))</small></span>
+                            <span class="call-indicator @(AnimateCall(call) ? "phone-motion" : "")" aria-hidden="true">
+                                <Icon Name="@(call.Scheduled ? "schedule" : call.Outcome == CallOutcome.Pending ? "phone_in_talk" : call.NeedsResult ? "schedule" : "call")" />
+                            </span>
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <section class="monitor-panel focus-panel @(Focus?.Outcome == CallOutcome.Pending ? "pending-focus" : "")" aria-labelledby="focus-heading">
+                <header>
+                    <div><span class="eyebrow">@(_selectedCallId is null ? "Automatic focus" : "Pinned call")</span><h2 id="focus-heading">Call &amp; clinical review</h2></div>
+                    @if (_selectedCallId is not null)
+                    {
+                        <button class="text-button" @onclick="FollowActivity">Follow activity</button>
+                    }
+                </header>
+                <div class="panel-scroll focus-scroll" tabindex="0" role="region" aria-label="Focused call details">
+                @if (Focus is { } focused)
+                {
+                    <div class="call-hero">
+                        <div class="call-identity-row">
+                            <span class="avatar hero-avatar" aria-hidden="true">@Initials(focused.PatientName)</span>
+                            <h3>@focused.PatientName</h3>
+                            <span class="phone-number">@focused.PhoneNumber</span>
+                            <a class="record-link" href="@($"/patients/{focused.PatientId}")">Patient record <span aria-hidden="true">→</span></a>
+                        </div>
+                        <div class="call-context-row">
+                            <span class="call-status @(focused.Outcome == CallOutcome.Failed ? "failed" : "")" title="@(focused.Outcome == CallOutcome.Pending ? "Connection is not confirmed; awaiting the provider's result." : focused.Status)">
+                                <span class="@(AnimateCall(focused) ? "phone-motion" : "")" aria-hidden="true"><Icon Name="@(focused.Outcome == CallOutcome.Pending ? "phone_in_talk" : "call")" /></span>
+                                @focused.Status
+                            </span>
+                            <span class="call-diagnosis">@focused.Diagnosis</span>
+                            <small>@(focused.Scheduled ? $"Scheduled {LocalStamp(focused.StartedOn)}" : $"Started {LocalStamp(focused.StartedOn)}")</small>
+                        </div>
+                    </div>
+                    @if (focused.Risk is { } risk)
+                    {
+                        <details class="clinical-summary" @key="(focused.Id, nameof(MonitoringCall.Summary))">
+                            <summary><RiskBadge Level="risk" /><span>Clinical summary</span></summary>
+                            <p>@focused.Summary</p>
+                        </details>
+                    }
+
+                    <CallReview @key="focused.Id" Steps="focused.Steps" Transcript="@focused.Transcript" />
+                }
+                else
+                {
+                    <div class="quiet-state"><Icon Name="call" />
+                        <h3>@(_selectedCallId is null ? "Ready to monitor" : "Call not found")</h3>
+                        <p>@(_selectedCallId is null ? "A call and its clinical findings will appear here when available." : "This session is no longer available. Choose another call or follow activity.")</p>
+                    </div>
+                }
+                </div>
+            </section>
+
+            <aside class="monitor-panel attention-panel" aria-labelledby="attention-heading">
+                <header><div><span class="eyebrow">Clinical priority</span><h2 id="attention-heading">Needs attention</h2></div><a href="/alerts">All alerts</a></header>
+                <p class="section-note">Highest severity first · @_snapshot.OpenAlerts open</p>
+                <div class="panel-scroll" tabindex="0" role="region" aria-label="Priority alerts">
+                @if (_snapshot.Alerts.Count == 0)
+                {
+                    <div class="quiet-state"><Icon Name="verified" /><h3>No open alerts</h3><p>New alerts appear here automatically.</p></div>
+                }
+                @foreach (var alert in _snapshot.Alerts)
+                {
+                    <a @key="alert.Id" class="attention-item @(alert.Severity == AlertSeverity.Critical ? "critical" : "")" href="@($"/patients/{alert.PatientId}")">
+                        <SeverityBadge Severity="alert.Severity" /><strong>@alert.PatientName</strong><p>@alert.Description</p><small>@LocalStamp(alert.CreatedOn) · Open record →</small>
+                    </a>
+                }
+                </div>
+            </aside>
+        </div>
+
+    }
+</div>
+
+@if (_showSettings)
+{
+    <DemoSettingsDialog OnSaved="SettingsSavedAsync" OnCancel="CloseSettings" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "call")] public Guid? RequestedCallId { get; set; }
+    private Guid? _previousRequestedCallId;
+    private MonitoringSnapshot? _snapshot;
+    private Guid? _selectedCallId;
+    private string? _error;
+    private string _announcement = string.Empty;
+    private bool _busy;
+    private bool _showSettings;
+    private readonly CancellationTokenSource _stop = new();
+    private Task? _refreshLoop;
+
+    private MonitoringCall? Focus => _selectedCallId is { } selected
+        ? _snapshot?.Calls.FirstOrDefault(c => c.Id == selected)
+        : _snapshot?.Calls.OrderByDescending(c => c.NeedsResult)
+            .ThenByDescending(c => c.Steps.LastOrDefault()?.CreatedOn ?? c.StartedOn).FirstOrDefault();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_snapshot is null || RequestedCallId != _previousRequestedCallId)
+        {
+            _previousRequestedCallId = RequestedCallId;
+            _selectedCallId = RequestedCallId;
+            await LoadAsync();
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _refreshLoop = RefreshLoopAsync();
+    }
+
+    private async Task RefreshLoopAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+            {
+                await InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+            }
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_busy || _stop.IsCancellationRequested) return;
+        _busy = true;
+        try
+        {
+            var next = await Dashboard.GetMonitoringAsync(_selectedCallId, _stop.Token);
+            var previousFocus = Focus;
+            var previousAlerts = _snapshot?.OpenAlerts;
+            _snapshot = next;
+            _error = null;
+            if (Focus?.Id != previousFocus?.Id || Focus?.Steps.Count != previousFocus?.Steps.Count || previousAlerts != next.OpenAlerts)
+                _announcement = $"Updated. {next.OpenAlerts} open alerts. {Focus?.PatientName}: {Focus?.Status}. {Focus?.Steps.Count ?? 0} agent results available.";
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Care monitor refresh failed.");
+            _error = "Could not refresh monitoring data. The last received data remains visible; retrying automatically.";
+        }
+        finally { _busy = false; }
+    }
+
+    private void OpenSettings() => _showSettings = true;
+    private void CloseSettings() => _showSettings = false;
+
+    private async Task SettingsSavedAsync(PatientRegistrationResult _)
+    {
+        _showSettings = false;
+        await LoadAsync();
+    }
+
+    private void SelectCall(Guid id) => _selectedCallId = id;
+    private void FollowActivity() => _selectedCallId = null;
+    private bool AnimateCall(MonitoringCall call) => !call.Scheduled && call.Outcome == CallOutcome.Pending
+        && _snapshot is { Simulated: false } && _error is null;
+    private static string LocalStamp(DateTime value) => value.ToLocalTime().ToString("dd MMM · HH:mm");
+    private static string Initials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpperInvariant(part[0])));
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        if (_refreshLoop is not null) await _refreshLoop;
+        _stop.Dispose();
+    }
+}

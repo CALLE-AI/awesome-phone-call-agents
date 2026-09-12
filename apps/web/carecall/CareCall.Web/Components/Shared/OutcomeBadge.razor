@@ -1,0 +1,23 @@
+<span class="badge-pill outcome-@Outcome.ToString().ToLowerInvariant()"><Icon Name="@Icon" Class="badge-icon" /> @Text</span>
+
+@code {
+    [Parameter, EditorRequired] public CallOutcome Outcome { get; set; }
+
+    private string Icon => Outcome switch
+    {
+        CallOutcome.Completed => "call_end",
+        CallOutcome.NoAnswer => "phone_missed",
+        CallOutcome.Failed => "phone_disabled",
+        CallOutcome.Refused => "do_not_disturb_on",
+        _ => "schedule"
+    };
+
+    private string Text => Outcome switch
+    {
+        CallOutcome.Completed => "Completed",
+        CallOutcome.NoAnswer => "No answer",
+        CallOutcome.Failed => "Failed",
+        CallOutcome.Refused => "Refused",
+        _ => "Pending"
+    };
+}

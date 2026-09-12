@@ -1,0 +1,7 @@
+@* Google Material Symbols icon. *@
+<span class="material-symbols-outlined @Class" aria-hidden="true">@Name</span>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public string? Class { get; set; }
+}

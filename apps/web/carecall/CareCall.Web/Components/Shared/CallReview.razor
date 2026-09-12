@@ -1,0 +1,104 @@
+<div class="call-review">
+    <div class="review-tabs" role="tablist" aria-label="Call review" @onkeydown="HandleTabKeyAsync">
+        <button @ref="_agentsTab" id="@($"{_id}-agents")" type="button" role="tab"
+                aria-selected="@(!_transcriptSelected)" aria-controls="@($"{_id}-agent-panel")"
+                tabindex="@(!_transcriptSelected ? 0 : -1)" class="@(!_transcriptSelected ? "active" : null)"
+                @onclick="() => _transcriptSelected = false">
+            <Icon Name="neurology" /> Agent activity <span class="tab-count">@Steps.Count</span>
+        </button>
+        <button @ref="_transcriptTab" id="@($"{_id}-transcript")" type="button" role="tab"
+                aria-selected="@_transcriptSelected" aria-controls="@($"{_id}-transcript-panel")"
+                tabindex="@(_transcriptSelected ? 0 : -1)" class="@(_transcriptSelected ? "active" : null)"
+                @onclick="() => _transcriptSelected = true">
+            <Icon Name="forum" /> Transcript
+        </button>
+    </div>
+    <div id="@($"{_id}-agent-panel")" role="tabpanel" aria-labelledby="@($"{_id}-agents")" tabindex="0" hidden="@_transcriptSelected" class="review-content">
+        <p class="review-note">Saved results appear after each stage completes. Safety review runs only when required. AI findings support clinical review; they do not replace it.</p>
+        @if (Steps.Count == 0)
+        {
+            <p class="review-empty">No agent results recorded for this session yet.</p>
+        }
+        else
+        {
+            <ol class="agent-feed">
+                @foreach (var step in Steps)
+                {
+                    <li @key="(step.Agent, step.CreatedOn)" class="agent-result @(!step.Succeeded ? "fallback" : "") @(ValidatedEscalation(step) ? "risk-raised" : "")">
+                        <span class="agent-symbol"><Icon Name="@step.Icon" /></span>
+                        <div>
+                            <div class="agent-title"><strong>@step.Title</strong><small>@step.CreatedOn.ToLocalTime().ToString("HH:mm:ss")</small></div>
+                            <span class="result-label">@(step.Succeeded ? "Result recorded" : "Unavailable / fallback")</span>
+                            <p class="agent-outcome">@step.Outcome</p>
+                            @if (!string.IsNullOrWhiteSpace(step.Rationale) && step.Rationale != step.Outcome)
+                            {
+                                <p class="agent-rationale">@step.Rationale</p>
+                            }
+                            @* Only validated Outcome is authoritative for safety and scheduling; raw JSON contains proposals. *@
+                            @if (step.Highlights.Count > 0 && step.Agent is not (AgentKind.DevilsAdvocate or AgentKind.AdaptiveScheduler))
+                            {
+                                <dl class="result-highlights">
+                                    @foreach (var item in step.Highlights)
+                                    {
+                                        <dt>@item.Label</dt><dd>@item.Value</dd>
+                                    }
+                                </dl>
+                            }
+                            @if (step.Findings.Count > 0 && step.Agent != AgentKind.DevilsAdvocate)
+                            {
+                                <ul class="result-findings">
+                                    @foreach (var finding in step.Findings)
+                                    {
+                                        <li>@finding</li>
+                                    }
+                                </ul>
+                            }
+                            @if (ValidatedEscalation(step))
+                            {
+                                <strong class="risk-warning">Risk raised by verified safety review</strong>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </div>
+    <div id="@($"{_id}-transcript-panel")" role="tabpanel" aria-labelledby="@($"{_id}-transcript")" tabindex="0" hidden="@(!_transcriptSelected)" class="review-content">
+        <p class="review-note">Saved conversation · updates when received from the provider, not live audio.</p>
+        @if (string.IsNullOrWhiteSpace(Transcript))
+        {
+            <p class="review-empty">No transcript received for this session yet.</p>
+        }
+        else
+        {
+            <TranscriptView Transcript="@Transcript" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<AgentStepVm> Steps { get; set; } = [];
+    [Parameter] public string Transcript { get; set; } = string.Empty;
+
+    private readonly string _id = $"review-{Guid.NewGuid():N}";
+    private bool _transcriptSelected;
+    private ElementReference _agentsTab;
+    private ElementReference _transcriptTab;
+
+    private async Task HandleTabKeyAsync(KeyboardEventArgs args)
+    {
+        if (args.Key is not ("ArrowLeft" or "ArrowRight" or "Home" or "End")) return;
+        _transcriptSelected = args.Key switch
+        {
+            "Home" => false,
+            "End" => true,
+            _ => !_transcriptSelected
+        };
+        await (_transcriptSelected ? _transcriptTab : _agentsTab).FocusAsync();
+    }
+
+    private static bool ValidatedEscalation(AgentStepVm step) => step.Succeeded
+        && step.Agent == AgentKind.DevilsAdvocate
+        && step.Outcome.StartsWith("Challenge upheld:", StringComparison.Ordinal)
+        && !step.Outcome.EndsWith("no override", StringComparison.Ordinal);
+}

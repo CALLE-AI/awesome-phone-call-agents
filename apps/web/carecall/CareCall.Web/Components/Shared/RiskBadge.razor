@@ -1,0 +1,19 @@
+<span class="badge-pill risk-@Level.ToString().ToLowerInvariant()"><Icon Name="@Icon" Class="badge-icon" /> @Text</span>
+
+@code {
+    [Parameter, EditorRequired] public RiskLevel Level { get; set; }
+
+    private string Icon => Level switch
+    {
+        RiskLevel.High => "crisis_alert",
+        RiskLevel.Medium => "warning",
+        _ => "check_circle"
+    };
+
+    private string Text => Level switch
+    {
+        RiskLevel.High => "High risk",
+        RiskLevel.Medium => "Medium risk",
+        _ => "Low risk"
+    };
+}

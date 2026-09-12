@@ -1,0 +1,405 @@
+@page "/patients/{Id:guid}"
+@rendermode InteractiveServer
+@inject DashboardService Dashboard
+@inject NavigationManager Navigation
+
+<PageTitle>CareCall · Patient record</PageTitle>
+
+@if (_loading)
+{
+    <HeartbeatLoader Message="Loading patient record..." Size="72" />
+}
+else if (_vm is null)
+{
+    <div class="page-header">
+        <div>
+            <a class="back-link" href="/patients">&larr; Patients</a>
+            <h1>Patient not found</h1>
+            <p class="subtitle">
+                @(_loadError ?? "This record no longer exists or the link is out of date.")
+            </p>
+        </div>
+    </div>
+}
+else
+{
+    var p = _vm.Patient;
+
+    <div class="page-header patient-header">
+        <div>
+            <a class="back-link" href="/patients">&larr; Patients</a>
+            <h1>@p.Name</h1>
+            <div class="meta-chips">
+                <span class="meta-chip"><Icon Name="person" Class="meta-icon" /><span class="meta-label">Age</span>@p.Age</span>
+                <a class="meta-chip meta-chip-phone" href="@($"tel:{p.PhoneNumber}")">
+                    <Icon Name="call" Class="meta-icon" /><span class="meta-label">Phone</span>@p.PhoneNumber
+                </a>
+                <span class="meta-chip meta-chip-date">
+                    <Icon Name="event_available" Class="meta-icon" /><span class="meta-label">Discharged</span>@p.DischargeDate.ToLocalTime().ToString("dd/MM/yyyy")
+                </span>
+            </div>
+        </div>
+        <div class="badges">
+            <StatusBadge Status="p.Status" />
+            <RiskBadge Level="p.RiskLevel" />
+            <button class="btn-call @(_calling ? "calling" : null)" disabled="@_calling" @onclick="TriggerCallAsync">
+                <Icon Name="@(_calling ? "graphic_eq" : "call")" Class="meta-icon" />
+                @(_calling ? "Calling..." : "Call now")
+            </button>
+            @if (Dashboard.SimulateCalls)
+            {
+                <span class="badge-pill severity-info" title="Calls are simulated: the CALL-E provider is not contacted.">
+                    <Icon Name="science" Class="badge-icon" /> Demo mode
+                </span>
+            }
+            <RefreshControl OnRefresh="LoadAsync" IntervalSeconds="30" />
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <div class="filter-spacer"></div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_patientActionBusy" @onclick="CancelFollowUpAsync">Cancel follow-up</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_patientActionBusy" @onclick="ConfirmDeleteAsync">@(_confirmDelete ? "Confirm delete" : "Delete patient")</button>
+    </div>
+
+    @if (_calling)
+    {
+        <div class="call-progress">
+            <CallingIndicator />
+            <div class="call-progress-text">
+                <strong>Calling @p.Name...</strong>
+                <span class="muted">CareCall is placing the follow-up call to @p.PhoneNumber.</span>
+            </div>
+        </div>
+    }
+
+    @if (_callMessage is not null)
+    {
+        <div class="call-feedback">
+            <span>@_callMessage</span>
+            <button type="button" class="call-feedback-close" title="Dismiss" @onclick="DismissCallMessage">
+                <Icon Name="close" Class="meta-icon" />
+            </button>
+        </div>
+    }
+
+    <nav class="record-sections" aria-label="Patient record sections">
+        <a href="@($"/patients/{p.Id}#clinical-context")">Clinical context</a>
+        <a href="@($"/patients/{p.Id}#patient-alerts")">Alerts (@_vm.Alerts.Count(a => !a.Resolved) open)</a>
+        <a href="@($"/patients/{p.Id}#patient-calls")">Calls (@_vm.Calls.Count)</a>
+    </nav>
+
+    <div id="clinical-context" class="panel-grid record-section">
+        <section class="panel">
+            <header><h2>Clinical data</h2></header>
+            <dl class="detail-list">
+                <dt>Diagnosis</dt>
+                <dd>@p.Diagnosis</dd>
+                <dt>Follow-up plan</dt>
+                <dd>@(p.FollowUpPlan is { Active: true } ? "Active" : "Inactive")</dd>
+                <dt>Scheduled calls</dt>
+                <dd>
+                    @if (_vm.ScheduledDates.Count == 0)
+                    {
+                        <span class="muted">No scheduled dates</span>
+                    }
+                    else
+                    {
+                        <ul class="plain record-plan" tabindex="0" aria-label="Follow-up schedule">
+                            @foreach (var d in _vm.ScheduledDates)
+                            {
+                                <li class="@(d < DateTime.UtcNow ? "muted" : null)">@d.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</li>
+                            }
+                        </ul>
+                    }
+                </dd>
+            </dl>
+        </section>
+
+        <section class="panel">
+            <header><h2>Risk evolution</h2></header>
+            @if (_vm.Evolution.Count == 0)
+            {
+                <p class="empty">No assessments yet.</p>
+            }
+            else
+            {
+                <div class="timeline">
+                    @foreach (var point in _vm.Evolution)
+                    {
+                        <div class="timeline-point risk-@point.Risk.ToString().ToLowerInvariant()">
+                            <span class="dot"></span>
+                            <div class="timeline-body">
+                                <div class="timeline-head">
+                                    <RiskBadge Level="point.Risk" />
+                                    @if (point.Worsening)
+                                    {
+                                        <span class="badge-pill severity-critical"><Icon Name="trending_up" Class="badge-icon" /> Worse</span>
+                                    }
+                                </div>
+                                <div class="muted timeline-date">
+                                    @point.DateTime.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+
+    <section id="patient-alerts" class="panel record-section">
+        <header>
+            <h2>Patient alerts</h2>
+            <button type="button" class="filter-clear" @onclick="() => _showResolved = !_showResolved">@(_showResolved ? "Open only" : "Include resolved")</button>
+        </header>
+        @if (!_vm.Alerts.Any(a => _showResolved || !a.Resolved))
+        {
+            <p class="empty">@(_showResolved ? "No alerts recorded." : "No open alerts for this patient.")</p>
+        }
+        else
+        {
+            <div class="activity-list">
+                @foreach (var a in _vm.Alerts.Where(a => _showResolved || !a.Resolved).OrderBy(a => a.Resolved).ThenByDescending(a => a.Severity))
+                {
+                    <article @key="a.Id" class="activity-card @(a.Resolved ? "resolved" : $"priority-{a.Severity.ToString().ToLowerInvariant()}")">
+                        <div class="activity-main"><p>@a.Description</p><div class="activity-meta">@a.CreatedOn.ToLocalTime().ToString("dd MMM yyyy · HH:mm")</div></div>
+                        <div class="activity-end">
+                            <SeverityBadge Severity="a.Severity" />
+                            @if (a.Resolved)
+                            {
+                                <span class="card-note">Resolved</span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ResolveAsync(a.Id)">Resolve</button>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section id="patient-calls" class="panel record-section">
+        <header><h2>Call history</h2><span class="card-note">Expand a session to review findings and transcript</span></header>
+        @if (_vm.Calls.Count == 0)
+        {
+            <p class="empty">No calls recorded.</p>
+        }
+        else
+        {
+            <div class="record-history">
+            @foreach (var call in _vm.Calls)
+            {
+                <details @key="call.Id" id="@($"call-{call.Id}")" class="call-record" open="@(call.Id == _vm.Calls[0].Id)">
+                    <summary>
+                        <div>
+                            <strong>@call.DateTime.ToLocalTime().ToString("dd MMM yyyy · HH:mm")</strong>
+                            @if (call.Duration > TimeSpan.Zero)
+                            {
+                                <span class="muted"> · @call.Duration.ToString(@"hh\:mm\:ss")</span>
+                            }
+                        </div>
+                        <div class="card-badges">
+                            <OutcomeBadge Outcome="call.Outcome" />
+                            @if (call.Assessment is { } assessment)
+                            {
+                                <RiskBadge Level="assessment.RiskClassification" />
+                                @if (assessment.WorseningDetected)
+                                {
+                                    <span class="badge-pill severity-critical"><Icon Name="trending_up" Class="badge-icon" /> Worse</span>
+                                }
+                            }
+                        </div>
+                    </summary>
+
+                    @if (call.Assessment is { } a2)
+                    {
+                        <div class="record-assessment">
+                        <p class="summary">@a2.Summary</p>
+                        @if (a2.ExtractedSymptoms.Count > 0)
+                        {
+                            <div class="symptoms-box">
+                                <div class="symptoms-title">
+                                    <Icon Name="vital_signs" Class="title-icon" /> Detected symptoms
+                                    <span class="symptoms-count">@a2.ExtractedSymptoms.Count</span>
+                                </div>
+                                <div class="chips">
+                                    @foreach (var s in a2.ExtractedSymptoms)
+                                    {
+                                        <span class="chip chip-symptom risk-@a2.RiskClassification.ToString().ToLowerInvariant()">@s</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        </div>
+                    }
+
+                    <div class="record-review" tabindex="0" role="region" aria-label="Session review">
+                        <CallReview Steps="@(_vm.Reasoning.GetValueOrDefault(call.Id) ?? [])" Transcript="@call.Transcript" />
+                    </div>
+                </details>
+            }
+            </div>
+        }
+    </section>
+}
+
+<JudgeAccessDialog Visible="@(_protectedAction is not null)" ActionLabel="@ProtectedActionLabel" Busy="_patientActionBusy" Error="@_accessError"
+                   OnConfirm="ConfirmProtectedActionAsync" OnCancel="CancelProtectedActionAsync" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PatientDetailVm? _vm;
+    private bool _loading = true;
+    private bool _calling;
+    private bool _showResolved;
+    private bool _patientActionBusy;
+    private bool _confirmDelete;
+    private string? _protectedAction;
+    private string? _accessError;
+    private string? _callMessage;
+    private string? _loadError;
+    private Guid _loadedId;
+
+    // Loading happens after the first interactive render (not in OnParametersSetAsync),
+    // so the server prerender doesn't leave the screen stuck and we always refresh
+    // the UI explicitly with StateHasChanged.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _loadedId != Id)
+        {
+            _loadedId = Id;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            // Without this catch an exception would leave the screen loading forever.
+            _loadError = ex.Message;
+            _vm = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    // NOTE: does not touch _loading. If it did, the RefreshControl (which lives inside
+    // the else block) would unmount in the middle of its own callback and the
+    // screen would stay loading indefinitely.
+    private async Task LoadAsync()
+    {
+        _vm = await Dashboard.GetPatientAsync(Id);
+        StateHasChanged();
+    }
+
+    private async Task TriggerCallAsync()
+    {
+        _calling = true;
+        _callMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            _callMessage = await Dashboard.TriggerCallAsync(Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _callMessage = ex.Message;
+        }
+        finally
+        {
+            _calling = false;
+            StateHasChanged();
+        }
+    }
+
+    private void DismissCallMessage() => _callMessage = null;
+
+    private Task ResolveAsync(Guid alertId)
+    {
+        _protectedAction = $"resolve:{alertId}";
+        _accessError = null;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelFollowUpAsync()
+    {
+        _protectedAction = "cancel";
+        _accessError = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (!_confirmDelete)
+        {
+            _confirmDelete = true;
+            return;
+        }
+
+        _protectedAction = "delete";
+        _accessError = null;
+    }
+
+    private string ProtectedActionLabel => _protectedAction switch
+    {
+        "cancel" => "cancel this follow-up",
+        "delete" => "delete this patient",
+        _ => "resolve this alert"
+    };
+
+    private async Task ConfirmProtectedActionAsync(string password)
+    {
+        if (_protectedAction is null || _patientActionBusy) return;
+        _patientActionBusy = true;
+        try
+        {
+            if (_protectedAction == "cancel")
+            {
+                await Dashboard.CancelFollowUpAsync(Id, password);
+                _callMessage = "Follow-up cancelled. Existing call history was retained.";
+                await LoadAsync();
+            }
+            else if (_protectedAction == "delete")
+            {
+                await Dashboard.DeletePatientAsync(Id, password);
+                Navigation.NavigateTo("/patients");
+            }
+            else if (Guid.TryParse(_protectedAction[8..], out var alertId))
+            {
+                await Dashboard.ResolveAlertAsync(alertId, password);
+                await LoadAsync();
+            }
+            _protectedAction = null;
+        }
+        catch (Exception ex)
+        {
+            _accessError = ex.Message;
+        }
+        finally { _patientActionBusy = false; }
+    }
+
+    private Task CancelProtectedActionAsync()
+    {
+        _protectedAction = null;
+        _accessError = null;
+        return Task.CompletedTask;
+    }
+}
