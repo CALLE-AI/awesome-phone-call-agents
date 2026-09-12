@@ -24,6 +24,7 @@ The bundled case uses a fictional US number and is marked synthetic. Live dispat
 4. With authorization to place this particular call, run `python relay.py send private/case.json --approve DIGEST`.
 5. Run `python relay.py refresh DIGEST` to retrieve the result. Inspect the recipient quote and available windows.
 6. Record your review using `python relay.py decide DIGEST accept_availability --reason "Reviewed the recipient evidence"`, or use `reject`.
+7. Export reviewed proposals using `python relay.py handoff --window-id saturday --capacity 2`. Use the actual window ID from your case. This exports only explicitly accepted, evidence-supported responses, checks session times match, and refuses over-capacity exports. Redirect the JSON to a private file if needed. The coordinator must still confirm appointments separately.
 
 The SQLite database defaults to `relay.sqlite3`; choose another path with the global `--db` option. It contains contact information and transcripts and is excluded from Git. Keep it in a private local directory. The application does not publish or transmit the database.
 

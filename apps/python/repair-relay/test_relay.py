@@ -3,7 +3,7 @@ import json
 import sqlite3
 import unittest
 from pathlib import Path
-from relay import assess, connect, decide, preview, refresh, send, validate_case
+from relay import assess, connect, decide, handoff, preview, refresh, send, validate_case
 
 ROOT = Path(__file__).parent
 
@@ -87,6 +87,33 @@ class RelayTests(unittest.TestCase):
                 self.assertEqual(assess(self.case, result)['state'], 'needs_review')
         self.result['recipients'][0]['attempts'] = [{'transcript_turns': None}]
         self.assertEqual(assess(self.case, self.result)['state'], 'needs_review')
+
+    def test_handoff_requires_review_and_enforces_capacity(self):
+        self.case['synthetic'] = False
+        digest = preview(self.case)['approval_digest']
+        send(self.db, self.case, digest, lambda *args: {'id': 'call_test'})
+        refresh(self.db, digest, lambda *args: self.result)
+        window_id = self.result['recipients'][0]['structured_result']['available_window_ids'][0]
+        self.assertEqual(handoff(self.db, window_id, 1)['proposals'], [])
+        decide(self.db, digest, 'accept_availability', 'Reviewed complete conversation')
+        packet = handoff(self.db, window_id, 1)
+        self.assertEqual(len(packet['proposals']), 1)
+        self.assertEqual(packet['remaining_places'], 0)
+        self.assertFalse(packet['appointment_booked'])
+        self.assertNotIn(self.case['contact']['phone'], json.dumps(packet))
+        second = copy.deepcopy(self.case)
+        second['contact']['phone'] = '+12025550124'
+        second['case_id'] = 'second'
+        second_digest = preview(second)['approval_digest']
+        send(self.db, second, second_digest, lambda *args: {'id': 'call_second'})
+        refresh(self.db, second_digest, lambda *args: self.result)
+        decide(self.db, second_digest, 'accept_availability', 'Reviewed')
+        with self.assertRaisesRegex(ValueError, 'exceed'):
+            handoff(self.db, window_id, 1)
+        second['windows'][1]['end'] = '2026-09-19T16:00:00-04:00'
+        self.db.execute('UPDATE calls SET case_json=? WHERE digest=?', (json.dumps(second), second_digest))
+        with self.assertRaisesRegex(ValueError, 'different session'):
+            handoff(self.db, window_id, 2)
 
     def test_changed_result_invalidates_review(self):
         self.case['synthetic'] = False

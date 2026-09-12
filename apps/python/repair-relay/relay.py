@@ -193,6 +193,36 @@ def decide(db, digest, decision, reason):
     return {"decision": decision, "reason": reason, "appointment_booked": False}
 
 
+def handoff(db, window_id, capacity):
+    """Export only reviewed availability for one exact session, never bookings."""
+    if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity < 1:
+        raise ValueError("Capacity must be a positive integer")
+    proposals = []
+    session = None
+    for row in db.execute("SELECT * FROM calls WHERE decision='accept_availability' ORDER BY digest"):
+        case = json.loads(row["case_json"])
+        result = json.loads(row["result_json"])
+        assessment = assess(case, result)
+        if assessment["state"] != "review_ready":
+            raise ValueError("An accepted result no longer has supported evidence; review it again")
+        window = next((w for w in assessment["windows"] if w["id"] == window_id), None)
+        if window is None:
+            continue
+        bounds = (window["start"], window["end"])
+        if session is not None and session != bounds:
+            raise ValueError("Window ID refers to different session times across cases")
+        session = bounds
+        proposals.append({"case_id": case["case_id"], "digest": row["digest"],
+                          "repair": case["repair"], "window": window,
+                          "quote": assessment["quote"], "review_reason": row["reason"],
+                          "synthetic": case.get("synthetic", False)})
+    if len(proposals) > capacity:
+        raise ValueError("Reviewed proposals exceed session capacity; revise the review decisions")
+    return {"appointment_booked": False, "window_id": window_id, "capacity": capacity,
+            "proposals": proposals, "remaining_places": capacity - len(proposals),
+            "instruction": "Coordinator must confirm appointments separately. Keep this export private."}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", default="relay.sqlite3")
@@ -210,6 +240,9 @@ def main():
     decision_cmd.add_argument("digest")
     decision_cmd.add_argument("decision", choices=["accept_availability", "reject"])
     decision_cmd.add_argument("--reason", required=True)
+    handoff_cmd = commands.add_parser("handoff", help="Export reviewed proposals for one session")
+    handoff_cmd.add_argument("--window-id", required=True)
+    handoff_cmd.add_argument("--capacity", type=int, required=True)
     args = parser.parse_args()
     try:
         if args.command in ("preview", "send", "evaluate"):
@@ -227,6 +260,8 @@ def main():
                     output = send(db, case, args.approve)
                 elif args.command == "refresh":
                     output = refresh(db, args.digest)
+                elif args.command == "handoff":
+                    output = handoff(db, args.window_id, args.capacity)
                 else:
                     output = decide(db, args.digest, args.decision, args.reason)
         print(json.dumps(output, indent=2))
