@@ -55,7 +55,7 @@ def run_retail_etl_task():
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
 
-    # SQL Transformation query expected for Sunday night batch to prepare Monday data
+    # SQL Transformation query expected for Friday night batch to prepare Monday data
     sql_query = """
         INSERT INTO daily_store_inventory_agg (store_id, sales_date, total_sales, total_stock, inventory_status, updated_at)
         SELECT 
@@ -88,7 +88,6 @@ def run_retail_etl_task():
             "error_message": str(e),
             "exception": str(e)
         }
-        on_failure_callback(failure_payload)
         raise e
 
 # Minimal Apache Airflow DAG Definition (for Airflow Scheduler parsing)
@@ -103,6 +102,7 @@ try:
         'owner': 'retail_data_team',
         'depends_on_past': False,
         'start_date': datetime.datetime(2026, 9, 1),
+        'retries': 0,
         'on_failure_callback': on_failure_callback,
     }
 
