@@ -165,6 +165,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`otherend-task-test`](skills/otherend-task-test/) - Rehearses a CALL-E task text and result schema against a programmable receptionist line the operator owns, reads the deterministic grade (manifest, self-report, fabrication, disclosure, confidence calibration), and turns each failing check into a task-text edit before the task reaches real people.
 
 ### Apps
+- [CallIQ](https://github.com/kk590/CallIQ) - autonomously researches, validates, and calls sales leads with AI voice agents that conduct natural conversations, qualify prospects, handle objections, and book meetings while updating the CRM.
 
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
