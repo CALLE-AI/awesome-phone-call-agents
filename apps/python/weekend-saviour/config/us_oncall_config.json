@@ -5,9 +5,11 @@
   "engineer": {
     "name": "Santhosh",
     "role": "Senior Retail Data Platform Engineer (Weekend On-Call)",
-    "phone": "+91 9003939495",
+    "phone": "+919003939495",
     "email": "sandyinspires@icloud.com",
     "calle_id": "user_santhosh_01",
-    "source": "local_config_file"
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "en-IN"
   }
 }
