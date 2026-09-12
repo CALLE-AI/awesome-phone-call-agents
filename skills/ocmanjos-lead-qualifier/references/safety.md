@@ -26,3 +26,10 @@ This skill places real outbound phone calls and must be used with care.
 
 - This skill only calls leads where a real price could be matched from the price sheet. It does not call on guessed or estimated values.
 - Known limitation: keyword extraction may not correctly price every product variant. Review matched_keyword and estimated_value output before trusting a scoring decision for a new product category.
+
+## Explicit intent and scope
+
+- This skill only initiates a call after a human operator has reviewed the qualifying lead and manually run plan_call and run_call — it does not autonomously trigger calls.
+- Only E.164-formatted phone numbers sourced directly from a genuine customer enquiry are authorized destinations. No other number format or source is permitted.
+- If the qualification data is ambiguous (missing category match, no price found, unclear enquiry text), the skill returns call: false rather than guessing. Ambiguity always resolves to not calling.
+- Cancellation: since run_call has not yet been invoked at the qualification stage, cancellation is simply not running the call. Once a call is placed via CALL-E, this skill has no cancellation capability — that is a CALL-E platform-level constraint, not something this skill can override.
