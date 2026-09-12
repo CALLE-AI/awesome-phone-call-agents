@@ -102,7 +102,7 @@ No credentials, no network, no phone call:
 
 ```bash
 npm install
-npm test        # 47 tests
+npm test        # 48 tests
 npm run plan    # who gets cleared without a call, the wave order, the exact call task
 npm run demo    # full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard on http://127.0.0.1:4800
@@ -241,7 +241,7 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 47 tests, no network
+npm test               # 48 tests, no network
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 

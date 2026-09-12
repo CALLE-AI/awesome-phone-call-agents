@@ -13,9 +13,9 @@
     "test": "node --import tsx --test test/*.test.ts",
     "test:failures": "node --import tsx --test test/robustness.test.ts",
     "sc": "node --import tsx src/cli.ts",
-    "plan": "node --import tsx src/cli.ts plan --registry data/enrollees.sample.csv --as-of 2026-09-14",
-    "demo": "node --import tsx src/cli.ts run --registry data/enrollees.sample.csv --as-of 2026-09-14 --fast",
-    "serve": "node --import tsx src/cli.ts serve",
+    "plan": "node --import tsx src/cli.ts plan --registry data/enrollees.sample.csv --as-of 2026-09-14 --dry-run",
+    "demo": "node --import tsx src/cli.ts run --registry data/enrollees.sample.csv --as-of 2026-09-14 --fast --dry-run",
+    "serve": "node --import tsx src/cli.ts serve --dry-run",
     "fake-server": "node --import tsx src/cli.ts fake-server"
   },
   "dependencies": {

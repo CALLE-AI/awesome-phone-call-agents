@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCalleClient } from "./calle.js";
-import { assertLiveAllowed, loadConfig, loadDotEnv, type Config } from "./config.js";
+import { assertLiveAllowed, forceDryRun, loadConfig, loadDotEnv, type Config } from "./config.js";
 import { startFakeCalleServer, type FakeServerHandle } from "./fake-calle-server.js";
 import { Ledger } from "./ledger.js";
 import { maskPhone } from "./mask.js";
@@ -61,6 +61,7 @@ Options
   --wave-size <n>         People per wave (default from SC_WAVE_SIZE)
   --parallel <n>          Waves in flight at once (default 1)
   --confirm               Required for live mode
+  --dry-run               Force dry-run whatever the environment says; no call can be placed
   --fast                  Collapse the redial delay (drills)
   --keep-server           Keep the dashboard running after run finishes
   --now                   follow-up: ignore due times
@@ -253,6 +254,7 @@ async function main(): Promise<void> {
       "wave-size": { type: "string" },
       parallel: { type: "string" },
       confirm: { type: "boolean", default: false },
+      "dry-run": { type: "boolean", default: false },
       fast: { type: "boolean", default: false },
       "keep-server": { type: "boolean", default: false },
       drill: { type: "boolean", default: false },
@@ -265,7 +267,10 @@ async function main(): Promise<void> {
   if (!command || values.help) {
     usage();
   }
-  const config = loadConfig();
+  // --dry-run overrides everything, including SC_MODE=live in .env. `npm run demo` passes it, so a
+  // command named "demo" can never dial no matter how the operator's environment is configured.
+  const loaded = loadConfig();
+  const config: Config = values["dry-run"] === true ? forceDryRun(loaded) : loaded;
   const rules = loadRules(values.rules ?? DEFAULT_RULES_PATH);
   const state = loadState(values.state ?? config.stateId);
   const log = (line: string): void => {

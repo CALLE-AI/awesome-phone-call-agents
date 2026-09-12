@@ -121,3 +121,12 @@ export function assertLiveAllowed(config: Config, confirmed: boolean): void {
 export function dialAllowed(config: Config, phone: string): boolean {
   return config.mode !== "live" || config.liveAllowlist === null || config.liveAllowlist.includes(phone);
 }
+
+/**
+ * Forces dry-run regardless of SC_MODE, the API key, or anything else in the environment.
+ * `--dry-run` on the command line uses this, and `npm run demo`, `plan` and `serve` pass that flag,
+ * so a command whose name promises it is safe cannot be made unsafe by a stray .env.
+ */
+export function forceDryRun(config: Config): Config {
+  return { ...config, mode: "dry-run", apiKey: null, baseUrl: `http://127.0.0.1:${config.fakePort}` };
+}

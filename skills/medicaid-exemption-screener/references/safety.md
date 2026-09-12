@@ -100,6 +100,30 @@ And additionally:
 - Any dashboard exposed through `SC_PUBLIC_URL` auto-generates a token that every route except the
   webhook requires.
 
+## Stopping, and what cannot be stopped
+
+There are no hidden or recurring schedules. A campaign runs only while the command you started is
+running; nothing re-arms itself, nothing runs on a timer, and closing the process ends the campaign.
+`follow-up` is a separate command you have to run deliberately.
+
+To stop a campaign in progress:
+
+- **Ctrl-C.** Calls already accepted by CALL-E cannot be recalled — the platform has no cancel
+  operation — so treat the wave in flight as committed. That is why wave size is the commitment and
+  the code never over-dials expecting to stop.
+- The ledger is append-only and written as events happen, so an interrupted campaign loses nothing.
+  `resume --campaign-id <id>` settles whatever was in flight and finishes the worklist; it places no
+  duplicate call, because every attempt is keyed.
+- To stop permanently instead, simply do not resume. People who were never dialled stay
+  `not_attempted`, which produces an `operator_review` item and no letter, no navigator call and no
+  verdict.
+
+To stop calling one person, for good:
+
+- Set `do_not_call=yes` on their row. They will never load again, in any campaign.
+- Anyone who says "do not call me again" on a call is suppressed automatically for the rest of the
+  campaign and handled by mail only.
+
 ## Data handling
 
 - Real enrollee lists must be named `*.private.csv`; that pattern is git-ignored, as is `.env` and

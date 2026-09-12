@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { dialAllowed, loadConfig } from "../src/config.js";
+import { dialAllowed, forceDryRun, loadConfig } from "../src/config.js";
 import { CallInbox } from "../src/orchestrator.js";
 import { formatWindow, isQuietNow, parseQuietHours } from "../src/quiet-hours.js";
 import { startServer } from "../src/server.js";
@@ -47,4 +47,16 @@ test("a public URL forces a dashboard token; the webhook stays open, everything 
   } finally {
     await server.close();
   }
+});
+
+test("--dry-run overrides a live environment: a command named 'demo' can never dial", () => {
+  const live = loadConfig({ SC_MODE: "live", CALLE_API_KEY: "iams_live_secret", SC_FAKE_PORT: "4848" });
+  assert.equal(live.mode, "live");
+  assert.ok(live.baseUrl.startsWith("https://"), "live points at the real API");
+
+  const forced = forceDryRun(live);
+  assert.equal(forced.mode, "dry-run");
+  assert.equal(forced.apiKey, null, "the key is dropped, not just unused");
+  assert.equal(forced.baseUrl, "http://127.0.0.1:4848", "and the real API is no longer reachable");
+  assert.equal(dialAllowed(forced, "+14155550999"), true, "dry-run dials nobody anyway");
 });
