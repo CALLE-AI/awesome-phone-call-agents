@@ -51,7 +51,6 @@ export interface Toast {
   id: number;
   tone: "route" | "avoided";
   title: string;
-  detail: string;
 }
 
 /** Everything the screens need, pushed several times a second. Phone numbers are always masked. */
@@ -80,8 +79,11 @@ export interface Snapshot {
   };
   order: string[];
   routeVersion: number;
+  /** The stop the rider is standing at, if any. */
+  door: { stopId: string; state: "waiting" | "delivering" | "failed" } | null;
   stops: {
     id: string;
+    order: string;
     customer: string;
     label: string;
     status: string;
@@ -117,6 +119,8 @@ export class RunController {
   private holdUntil = 0;
   private liveHoldUntil = 0;
   private toast: Toast | null = null;
+  /** The last answer that changed the plan, named in the next route-change message. */
+  private lastAnswer: { customer: string; note: string } | null = null;
   private toastCount = 0;
   private log: Snapshot["log"] = [];
   private routeVersion = 0;
@@ -167,6 +171,7 @@ export class RunController {
     this.holdUntil = 0;
     this.liveHoldUntil = 0;
     this.toast = null;
+    this.lastAnswer = null;
     this.log = [];
     this.routeVersion = 0;
     for (const event of this.engine.events) this.record(event);
@@ -207,11 +212,18 @@ export class RunController {
       rider: this.rider(engine),
       order: engine ? [...(engine.leg ? [engine.leg.to] : []), ...engine.order] : day.stops.map((stop) => stop.id),
       routeVersion: this.routeVersion,
+      door: engine?.door
+        ? {
+            stopId: engine.door.stopId,
+            state: engine.door.failed ? "failed" : engine.now < engine.door.readyAt ? "waiting" : "delivering",
+          }
+        : null,
       stops: day.stops.map((stop) => {
         const state = engine?.states.get(stop.id);
         const eta = etas.get(stop.id);
         return {
           id: stop.id,
+          order: stop.order,
           customer: stop.customer,
           label: stop.label,
           status: state?.status ?? "planned",
@@ -297,20 +309,21 @@ export class RunController {
         if (card.live) this.liveHoldUntil = Date.now() + LIVE_RESULT_HOLD_MS;
         else this.holdUntil = Date.now() + ANSWER_HOLD_MS;
       }
-      if (event.type === "call_result" && (event.plan === "remove" || event.plan === "revisit")) {
-        this.showToast("avoided", "Wasted trip avoided", `${customer(event.stopId)}: ${event.note}`);
-      }
+      if (event.type === "call_result" && event.verified) this.lastAnswer = { customer: customer(event.stopId), note: event.note };
+      if (event.type === "call_result" && event.plan === "remove") this.showToast("avoided", `${customer(event.stopId)}: not today, trip avoided`);
+      if (event.type === "call_result" && event.plan === "revisit") this.showToast("avoided", `${customer(event.stopId)}: ${event.note}, trip avoided`);
     }
     if (event.type === "reordered") {
       this.routeVersion++;
-      this.showToast("route", `Route updated · saves ${Math.max(1, Math.round(event.savedMinutes))} min`, event.because);
+      const why = this.lastAnswer ? `${this.lastAnswer.customer}: ${this.lastAnswer.note}` : "Route updated";
+      this.showToast("route", `${why} · saves ${Math.max(1, Math.round(event.savedMinutes))} min`);
     }
     const text = describeEvent(event, day);
     if (text) this.log.push({ clock: minutesToClock(event.at, day.shiftStart), kind: event.type, text });
   }
 
-  private showToast(tone: Toast["tone"], title: string, detail: string): void {
-    this.toast = { id: ++this.toastCount, tone, title, detail };
+  private showToast(tone: Toast["tone"], title: string): void {
+    this.toast = { id: ++this.toastCount, tone, title };
   }
 
   private story(engine: RouteEngine | null): Snapshot["story"] {

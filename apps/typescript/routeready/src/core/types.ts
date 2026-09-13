@@ -22,6 +22,8 @@ export interface GeoPoint {
 }
 
 export interface Stop extends GeoPoint {
+  /** Order number the customer sees, for example "#RR4102". */
+  order: string;
   customer: string;
   label: string;
   phone: string;

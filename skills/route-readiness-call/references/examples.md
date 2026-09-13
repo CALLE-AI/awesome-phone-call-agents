@@ -9,7 +9,7 @@ Stop:            s2 (Rahim, House 12, Road 5)
 To:              +155****0102  region=US
 Idempotency key: routeready:2026-09-12-demo:s2
 Told arrival:    33 minutes
-Task:            (the template from SKILL.md with order RR-S2 and cash 1,250 taka)
+Task:            (the template from SKILL.md with order #RR4102 and cash 1,250 taka)
 ```
 
 ## 1. The customer needs fifteen minutes

@@ -257,7 +257,7 @@ export class RouteEngine {
       locale: route.target.locale,
       task: buildReadinessTask({
         merchant: day.merchant,
-        orderRef: `RR-${pick.stopId.toUpperCase()}`,
+        orderRef: state.stop.order,
         etaMinutes: Math.max(1, Math.round(etaMinutes)),
         codAmount: state.stop.codAmount === null ? null : `${state.stop.codAmount} taka`,
         language: language ?? "English",

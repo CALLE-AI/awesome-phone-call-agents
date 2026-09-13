@@ -86,7 +86,7 @@ function render(snap) {
     }
   }
 
-  draw("sheet", [snap.order, snap.rider, snap.calls[0], snap.story, snap.done], () => {
+  draw("sheet", [snap.order, snap.rider, snap.door, snap.stops, snap.calls[0], snap.story, snap.done], () => {
     $("route-sheet").innerHTML = routeSheet(snap);
   });
   draw("stops", [snap.order, snap.stops], () => {
@@ -102,8 +102,7 @@ function render(snap) {
   if (snap.toast && snap.toast.id !== shownToast) {
     shownToast = snap.toast.id;
     const toast = $("toast");
-    $("toast-title").textContent = snap.toast.title;
-    $("toast-detail").textContent = snap.toast.detail;
+    toast.textContent = snap.toast.title;
     toast.className = `toast show ${snap.toast.tone}`;
     clearTimeout(render.toastTimer);
     render.toastTimer = setTimeout(() => (toast.className = "toast"), 6000);
