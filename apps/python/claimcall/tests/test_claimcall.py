@@ -315,7 +315,10 @@ def test_concurrency_error_explains_retry():
             client.create_call({"task": "x"}, "key-1")
     finally:
         server.shutdown()
-        server.server_close()def test_dashboard_seeds_demo_case_over_http():
+        server.server_close()
+
+
+def test_dashboard_seeds_demo_case_over_http():
     import subprocess
     import sys
     import tempfile
