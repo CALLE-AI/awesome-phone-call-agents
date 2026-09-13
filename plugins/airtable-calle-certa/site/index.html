@@ -195,6 +195,14 @@ footer a:hover { color:var(--ink); }
   .flow { grid-template-columns:1fr; }
   .rowline { grid-template-columns:1fr; gap:8px; }
 }
+.uses { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 34px; }
+.use { border: 1px solid var(--hair); border-radius: 20px; padding: 26px 28px; background: var(--raised); }
+.use .kicker { display: inline-block; font: 500 11.5px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+.use h3 { font: 300 21px/1.25 var(--display); letter-spacing: -.019em; margin: 0 0 10px; }
+.use p { color: var(--muted); font-size: 14.5px; line-height: 1.62; margin: 0 0 10px; }
+.use .why { color: var(--ink); padding-left: 14px; border-left: 2px solid var(--line); margin-bottom: 0; }
+.uses + .note { margin-top: 26px; color: var(--faint); font-size: 14px; max-width: 68ch; }
+@media (max-width: 820px) { .uses { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
   *,*::before,*::after { transition:none !important; animation:none !important; }
@@ -214,6 +222,7 @@ footer a:hover { color:var(--ink); }
       <b>Certa</b>
     </a>
     <a class="navlink" href="#how">How it works</a>
+    <a class="navlink" href="#uses">Use cases</a>
     <a class="navlink" href="#boundaries">Boundaries</a>
     <a class="navlink" href="https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/airtable-calle-certa">Source</a>
     <button class="btn sm" id="theme">Auto</button>
@@ -312,6 +321,40 @@ footer a:hover { color:var(--ink); }
         <p>Results land back in your base as each call finishes.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="band" id="uses">
+  <div class="wrap">
+    <h2 class="reveal">Who actually makes these calls.</h2>
+    <p class="sub reveal">Verification of employment is not a niche. It is a step somebody performs by phone, every working day, because the answer lives with a person rather than in a database.</p>
+    <div class="uses">
+      <article class="use reveal">
+        <span class="kicker">Lending</span>
+        <h3>Before a loan closes</h3>
+        <p>An underwriter must confirm the applicant works where the application says. For large employers a payroll database answers. For everyone else &mdash; small firms, contractors, most of the world outside the US &mdash; somebody calls HR and waits.</p>
+        <p class="why">Certa runs the queue from the view the underwriter already works in, and refuses any row whose employer number came from the applicant.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Tenancy</span>
+        <h3>Before a lease is signed</h3>
+        <p>A letting agent checks that a prospective tenant is employed and earning consistently enough to cover rent. The check is nearly always a phone call to an employer the applicant named.</p>
+        <p class="why">The applicant naming the employer is exactly why the number must be sourced independently. That is a boundary, not a setting.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Background screening</span>
+        <h3>Before an offer is confirmed</h3>
+        <p>Screening firms verify claimed employment history for candidates. Volume is high, the questions are fixed, and the work is almost entirely hold music.</p>
+        <p class="why">Three questions, eight prohibitions, a typed answer per row, and an audit record of who was called under which consent.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Immigration</span>
+        <h3>Before a filing goes out</h3>
+        <p>Employment letters get verified by phone against the employer named on the filing. A refusal to confirm is a real and acceptable outcome that has to be recorded as one.</p>
+        <p class="why">A refusal ends the call and is terminal, never retried. Redialling somebody who declined is harassment, and the code treats it that way.</p>
+      </article>
+    </div>
+    <p class="note reveal">The same shape every time: a third party who did not ask to be called, a consent that has to be provable, a short bounded set of questions, and an answer that must be typed rather than transcribed.</p>
   </div>
 </section>
 

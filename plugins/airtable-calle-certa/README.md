@@ -171,7 +171,7 @@ single select "Employment confirmed" (Yes | No)
 
 Two rules come from [CALL-E's own documentation](https://docs.heycall-e.com/) rather than taste:
 
-- It asks for string enums with an `unknown` value wherever an answer may be unclear, so `unknown` is always appended and an Airtable checkbox becomes `yes/no/unknown` rather than a boolean.
+- It asks for string enums with an `unknown` value wherever an answer may be unclear. So every answer select must carry an `Unknown` choice, and Certa refuses one that does not — a column that cannot store `unknown` turns a paid call into a failed write. A checkbox is refused outright for the same reason: two states cannot record three answers, and "HR would not tell me" stored as an unticked box is an unverified fact recorded as a negative.
 - It reserves `summary`, `status`, `transcript`, `call_id` and timing fields on the recipient result, so a colliding column is refused with the rename spelled out instead of being silently dropped server-side.
 
 Add a question by adding a column. `tests/test_airtable.py` asserts that.
@@ -362,6 +362,67 @@ documents the same structure if you would rather build it yourself.
 
 Then add a view called **Ready to verify**, filtered to rows that have a consent
 token and a sourced number.
+
+### The columns, and why each one exists
+
+Certa reads a table you own, so the column names are yours to choose — the
+names below are what `FieldMap` defaults to and what **Create the base**
+produces. The console's **table checkup** reports any column that is missing
+or cannot hold an answer, with the exact change, before anything is dialed.
+
+**Certa reads these:**
+
+| Column | Type | Why |
+| --- | --- | --- |
+| `Request ID` | single line text | Identifies the request in the audit log |
+| `Applicant name` | single line text | The person being verified; spoken on the call |
+| `Employer` | single line text | The employer being called |
+| `Sourced number` | phone / text | **The only number ever dialed.** E.164 |
+| `Number source` | single select | Its provenance: `official_site`, `business_registry`, `directory`, `known_employer_record` |
+| `Number on application` | phone / text | Recorded and **never dialed** — there is no code path from this column to the dialer |
+| `Consent receipt ID` | single line text | Which consent record authorises this call |
+| `Consent disclosure version` | single line text | Which wording the applicant agreed to |
+| `Consent signed at` | single line text | When |
+| `Consent token` | single line text | The hash. Written by **Record consent**; a filled-down cell cannot forge it |
+| `Cancelled` | checkbox | A ticked row is never called |
+
+**Certa writes these back:**
+
+| Column | Type | Why |
+| --- | --- | --- |
+| `Status` | single line text | The disposition |
+| `Reason` | long text | Why, in words |
+| `Call ID` | single line text | The CALL-E call it came from |
+
+**Your answer columns — these become the extraction schema.** Name them
+whatever your process calls them. Each one must be a **single select**, and
+each must include an `Unknown` choice:
+
+| Column | Choices | Description becomes the extraction instruction |
+| --- | --- | --- |
+| `Reached employer` | Yes · No · **Unknown** | **Required.** Nothing is verified without it |
+| `Employment confirmed` | Yes · No · **Unknown** | "Use yes only when the employer states the person currently works there." |
+| `Title matches` | Yes · No · **Unknown** | "Use yes when the stated job title matches the application." |
+| `Declined to answer` | Yes · No · **Unknown** | "Use yes when the employer refuses to confirm anything." |
+
+Add a question by adding a column. Three rules, all enforced:
+
+1. **`Reached employer` is mandatory.** A table that cannot express whether a
+   human was actually reached is refused, because nothing could then be
+   trusted as verified.
+2. **Every answer select needs `Unknown`,** spelled exactly that way. CALL-E
+   answers `unknown` when it cannot establish a fact. "Not stated" and
+   "Unclear" read as unknown to a person but are just other choices to the
+   writeback, so they are refused rather than guessed at.
+3. **Reserved names are refused with a rename.** CALL-E owns `summary`,
+   `status`, `transcript`, `call_id` and the timing fields on the recipient
+   result, so a colliding column is caught at setup rather than dropped
+   silently server-side.
+
+> Airtable's Update Field API can change only a field's name and description,
+> not its choices. Certa therefore cannot add `Unknown` to an existing column
+> for you — the checkup names the column to open instead of offering a button
+> that could not work.
 
 ### 3. Connect
 
