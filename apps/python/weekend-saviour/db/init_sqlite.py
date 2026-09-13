@@ -1,12 +1,13 @@
-import sqlite3
 import os
+import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'retail_data.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), "retail_data.db")
+
 
 def init_db(reset_schema=True):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     if reset_schema:
         print("[DB Init] Resetting database tables...")
         cursor.execute("DROP TABLE IF EXISTS raw_store_sales;")
@@ -50,31 +51,38 @@ def init_db(reset_schema=True):
     cursor.execute("DELETE FROM raw_inventory;")
 
     # Insert sample sales for Sunday night CDT batch
-    cursor.executemany("""
+    cursor.executemany(
+        """
         INSERT INTO raw_store_sales (store_id, sales_date, total_sales_amount, transactions_count)
         VALUES (?, ?, ?, ?);
-    """, [
-        (101, '2026-09-06', 15420.50, 320),
-        (102, '2026-09-06', 22310.00, 450),
-        (103, '2026-09-06', 8940.75, 180),
-        (104, '2026-09-06', 31200.25, 610)
-    ])
+    """,
+        [
+            (101, "2026-09-06", 15420.50, 320),
+            (102, "2026-09-06", 22310.00, 450),
+            (103, "2026-09-06", 8940.75, 180),
+            (104, "2026-09-06", 31200.25, 610),
+        ],
+    )
 
     # Insert sample inventory
-    cursor.executemany("""
+    cursor.executemany(
+        """
         INSERT INTO raw_inventory (store_id, product_id, stock_on_hand, reorder_level, last_restock_date)
         VALUES (?, ?, ?, ?, ?);
-    """, [
-        (101, 501, 150, 50, '2026-09-01'),
-        (101, 502, 30, 40, '2026-08-28'),
-        (102, 501, 200, 60, '2026-09-02'),
-        (103, 503, 10, 25, '2026-08-25'),
-        (104, 501, 500, 100, '2026-09-04')
-    ])
+    """,
+        [
+            (101, 501, 150, 50, "2026-09-01"),
+            (101, 502, 30, 40, "2026-08-28"),
+            (102, 501, 200, 60, "2026-09-02"),
+            (103, 503, 10, 25, "2026-08-25"),
+            (104, 501, 500, 100, "2026-09-04"),
+        ],
+    )
 
     conn.commit()
     conn.close()
     print(f"[DB Init] Retail Database initialized successfully at '{DB_PATH}'")
+
 
 if __name__ == "__main__":
     init_db()
