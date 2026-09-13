@@ -1,0 +1,65 @@
+{
+  "id": "eval-025",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Furniture retailer's AI assistant looks up an order and states delivery window, signature rule, and service level.",
+  "task": "Confirm the delivery window for Samuel Okafor's sofa order OA33918.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thanks for calling Oak and Arbor Furniture. I'm an automated assistant powered by AI. I can check order status, delivery windows, and returns. what can I help with?",
+      "offset_seconds": 1.2
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Samuel Okafor. I'd like to confirm the delivery window for his sofa order, number O A 3 3 9 1 8.",
+      "offset_seconds": 11.97
+    },
+    {
+      "speaker": "user",
+      "text": "thanks. let me look up order O A 3 3 9 1 8.",
+      "offset_seconds": 23.58
+    },
+    {
+      "speaker": "user",
+      "text": "I found it. Samuel's order, a three seat sofa in slate gray, is scheduled for delivery on Thursday, September seventeenth, between one and five PM. the driver will call about thirty minutes before arrival.",
+      "offset_seconds": 29.46
+    },
+    {
+      "speaker": "bot",
+      "text": "does someone need to be home to sign?",
+      "offset_seconds": 41.75
+    },
+    {
+      "speaker": "user",
+      "text": "yes, an adult will need to be present to sign for the delivery. if no one is home, the delivery will be rescheduled and a redelivery fee may apply.",
+      "offset_seconds": 45.56
+    },
+    {
+      "speaker": "bot",
+      "text": "is white glove setup included?",
+      "offset_seconds": 56.23
+    },
+    {
+      "speaker": "user",
+      "text": "yes, this order includes white glove delivery, which covers in home placement and removal of packaging.",
+      "offset_seconds": 59.0
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you, that's everything.",
+      "offset_seconds": 65.76
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome. have a great day.",
+      "offset_seconds": 68.01
+    }
+  ]
+}

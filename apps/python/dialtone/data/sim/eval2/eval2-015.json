@@ -1,0 +1,55 @@
+{
+  "id": "eval2-015",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Insurance DTMF claim-status line reads back the claim record (status, adjuster, dates) and repeats it verbatim on request.",
+  "task": "Check the status of the customer's homeowner's insurance claim.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "claim 310557842 status read back",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Pinecrest Insurance. This call may be monitored or recorded for quality purposes. If you are calling to file a new claim, press 1. To check the status of an existing claim, press 2. For policy and billing questions, press 3. To repeat these options, press 9.",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 2]",
+      "offset_seconds": 21.29
+    },
+    {
+      "speaker": "user",
+      "text": "Please enter your nine-digit claim number, followed by the pound key.",
+      "offset_seconds": 22.81
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 310557842#]",
+      "offset_seconds": 28.2
+    },
+    {
+      "speaker": "user",
+      "text": "Please hold while we retrieve your claim information.",
+      "offset_seconds": 32.22
+    },
+    {
+      "speaker": "user",
+      "text": "Claim number 3 1 0 5 5 7 8 4 2. Status: under review. An adjuster has been assigned. Your adjuster is Nadia Farrell. The most recent update was received on September 10th. Estimated decision date: September 24th. To repeat this information, press 1. To speak with your adjuster, press 2. To return to the main menu, press star.",
+      "offset_seconds": 39.42
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 63.7
+    },
+    {
+      "speaker": "user",
+      "text": "Claim number 3 1 0 5 5 7 8 4 2. Status: under review. An adjuster has been assigned. Your adjuster is Nadia Farrell. The most recent update was received on September 10th. Estimated decision date: September 24th. To repeat this information, press 1. To speak with your adjuster, press 2. To return to the main menu, press star.",
+      "offset_seconds": 65.19
+    }
+  ]
+}
