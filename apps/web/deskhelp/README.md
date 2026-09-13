@@ -157,9 +157,9 @@ second is a list of specific numbers somebody had to enter. Everything else
 runs against the fixture transport: the demo, the whole test suite, and a
 reviewer's first run all take the path that dials nobody.
 
-The public deployment has live calling off and an empty allow list, so the same
-buttons walk the same code and reach no phone. Behind its sign-in sit only
-seeded synthetic families in the reserved `NXX-555-01XX` range.
+Behind the demo sign-in sit seeded synthetic families in the reserved
+`NXX-555-01XX` range, so a visitor can open every workflow, read the exact
+words, and walk a run from end to end.
 
 Timezone, jurisdiction and calling hours are declared by the operator, never
 worked out from a phone number, a locale or the server's clock. India permits
@@ -360,7 +360,6 @@ available through the same register mechanism.
 
 - Application and full documentation:
   <https://github.com/vickysharma-prog/DeskHelp.ai>
-- Live demo, which cannot place calls:
-  <https://deskhelp.onrender.com>
+- Live demo: <https://deskhelp.onrender.com>
 - Demo video: <https://www.youtube.com/watch?v=bN7Rh2KrZKo>
 - Licence: MIT
