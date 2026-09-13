@@ -29,6 +29,10 @@ agent that audits itself through the same channel it wrote with has proved nothi
 - [Preview, which is the default](#preview-which-is-the-default)
 - [One live run](#one-live-run)
 - [Two channels, one verdict](#two-channels-one-verdict)
+- [What counts as taking the incident](#what-counts-as-taking-the-incident)
+  - [The call that never rang](#the-call-that-never-rang)
+  - [In Spanish, on the same rules](#in-spanish-on-the-same-rules)
+- [Asking to be called back](#asking-to-be-called-back)
 - [Exit codes](#exit-codes)
 - [The incident file](#the-incident-file)
 - [The call script](#the-call-script)
@@ -59,8 +63,8 @@ uv sync
 uv run pytest -q          # 589 tests, no credentials, no outbound calls
 ```
 
-Eleven of those tests read the project site and skip where `docs/` is absent, which is the case in
-any checkout of this directory alone — there the run reports 501 passed and 11 skipped.
+Twelve of those tests read the project site and skip where `docs/` is absent, which is the case in
+any checkout of this directory alone — there the run reports 577 passed and 12 skipped.
 
 **Every command in this file runs from `apps/python/ringdown/`.**
 
@@ -212,8 +216,8 @@ Two of the three are read as *answers to a question the agent asked*, not as wor
 somewhere on the call. The name counts only if it is spoken after "Am I speaking with {name}?", the
 same way the minutes count only if they are spoken after "How many minutes…?". A name said before
 the question, or three turns later while talking about somebody else, confirms nobody. The answer
-may carry the name in any of four shapes — "this is Alice", "Alice speaking", "I am Alice", "soy
-Alice" — but it has to carry it: "yes, I am" confirms nobody, because the only name on that call was
+may carry the name in any of six shapes — "this is Alice", "speaking with Alice", "Alice
+speaking", "soy Alice", "habla Alice", and "I am Alice" or "I'm Alice" — but it has to carry it: "yes, I am" confirms nobody, because the only name on that call was
 spoken by the agent. A script
 that never asks either question is refused before a call is placed, because a script like that
 would settle every call as not acknowledged and look like bad luck rather than a broken script.
@@ -240,6 +244,29 @@ The list of qualifiers is deliberately short, and deliberately leaves out "but" 
 Both of them appear in perfectly firm commitments — "yes, I'm on it, but who else is paged?" — and
 a list that flags them wakes the next person for no reason. See ceiling 23 for why that error is
 worse than it looks.
+
+### The call that never rang
+
+One reason is decided before any of this, and before the status the provider puts on the call: an
+attempt that began and ended in the same second with nothing transcribed settles
+`not_acknowledged` with the reason `zero_duration`, whatever the provider says happened. Four of
+the nine live calls came back that way, reported as the recipient hanging up, while the carrier
+that owns the destination number had no record of them — the phone never rang.
+
+The distinction is not cosmetic. A ladder exhausted by dropped calls used to report that the
+incident had no owner, which is indistinguishable from a ladder where three people were rung and
+none of them answered, and those demand opposite responses. The snapshot now carries the attempt's
+measured `duration_seconds` — the evidence, not a conclusion drawn from it, and `None` where the
+provider gives no timestamps to measure — and a run that had any of them prints the count beside
+the verdict:
+
+```text
+1 of 1 calls ended before they could ring
+```
+
+What it cannot prove is in ceiling 16: somebody who answers and hangs up inside the same second is
+indistinguishable from a call that never connected, and the provider has never documented what two
+equal timestamps mean.
 
 ### In Spanish, on the same rules
 
@@ -338,7 +365,8 @@ script reads them out**, which the default one does. A script that never mention
 need the incident to carry one: the field list follows the script rather than the other way round.
 
 Policy defaults: `min_confidence` 0.7, `accepted_confidence_labels` `["medium", "high"]`,
-`max_eta_minutes` 120, `per_call_timeout_seconds` 180, `poll_interval_seconds` 3. The score is the
+`max_eta_minutes` 120, `per_call_timeout_seconds` 180, `poll_interval_seconds` 3,
+`ladder_timeout_seconds` 900 — the last one is the budget a callback request has to fit inside. The score is the
 strict signal: a `high` label carrying 0.05 does not pass.
 
 See [`examples/incident.example.json`](examples/incident.example.json).
@@ -888,8 +916,8 @@ own call over a second transport. Same technique, different product.
     prints when it finishes, compared by hand. A keyed HMAC, and a `verify` that takes the expected
     head, are the real fix and a different product.
 
-12. Six calls have now been placed against the live provider, on 2026-08-20, and what they
-    settled is worth more than what they confirmed. **Cross-surface verification does not work,
+12. Nine calls have now been placed against the live provider — six on 2026-08-20 and three more
+    on 2026-09-13 — and what they settled is worth more than what they confirmed. **Cross-surface verification does not work,
     and cannot be made to work from this side.** `get_call_run` takes a `run_id` and rejects
     `call_id` outright with a validation error; Ringdown had been sending `call_id`, which is
     fixed. But no identifier a REST-placed call exposes resolves to a run — not the call id, not
@@ -910,11 +938,11 @@ own call over a second transport. Same technique, different product.
     see it. Making the fake faithful changes what the ten checks can prove, so it is a decision
     and not a patch, and it has not been taken.
 
-    The same six calls confirmed the REST contract, which had also never been observed.
+    The same calls confirmed the REST contract, which had also never been observed.
     `metadata` comes back exactly as sent, so the attempt identity check passes; each attempt
-    carries a `provider_call_id`; and the content-derived idempotency key works. All five REST
-    creates returned `transport_failure` before answering, and all five replays returned the
-    existing call rather than placing a second one. That is not a defensive branch that rarely
+    carries a `provider_call_id`; and the content-derived idempotency key works. All eight REST
+    creates across the two sessions returned `transport_failure` before answering, and all eight
+    replays returned the existing call rather than placing a second one. That is not a defensive branch that rarely
     runs: against the real API the 15-second socket timeout in `calle.py` is shorter than the
     provider's create latency, so **reconciliation is the normal path**, and the demo's fourth
     scenario is the ordinary one.
@@ -942,8 +970,9 @@ own call over a second transport. Same technique, different product.
     shapes proves the parser wrong. The shape is the only thing in this repository confirmed by
     something other than itself.
 
-16. The provider drops calls, often, and reports it as the recipient hanging up. Four of the six
-    calls placed on 2026-08-20 ended three seconds after the provider's own log said
+16. The provider drops calls and reports it as the recipient hanging up. Four of the nine calls —
+    all four in the 2026-08-20 batch, and none of the three placed on 2026-09-13, which ran 60, 59
+    and 90 seconds — ended three seconds after the provider's own log said
     `status=calling`, with an attempt whose `started_at` and `completed_at` are the same second,
     an empty transcript, and `failure_message` reading `calling task status=DECLINED (Hangup by:
     user)`. The Twilio account that owns the destination number has no record of any of them, so
@@ -1072,7 +1101,7 @@ own call over a second transport. Same technique, different product.
     [`gmassello/ringdown`](https://github.com/gmassello/ringdown), and every test that reads it
     skips where that directory is absent. The browser port of `chain_checks` in `docs/ledger.js`
     is pinned by a test that runs both
-    implementations over the same six ledgers and compares every `(ok, label)` pair
+    implementations over the same seven ledgers and compares every `(ok, label)` pair
     (`tests/test_site_port.py`, skipped where `docs/` or `node` is absent). That closes the drift
     the seals could never catch — a missing family of checks does not change a digest. Two gaps
     are left open on purpose. **`JSON.stringify` cannot reproduce Python's float repr**: `15.0`
