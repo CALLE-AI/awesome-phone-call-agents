@@ -6,17 +6,6 @@ ClaimCall turns a disrupted-flight case into a bounded CALL-E phone task, requir
 to approve exactly what the agent may ask for, and turns the resulting airline conversation into
 structured case state, commitments, evidence, and the next action.
 
-```text
-disruption case ──► what is missing? ──► is a call needed? ──► bounded call plan
-                                                              (human approves)
-        │                                                          │
-        │                                                     CALL-E call
-        │                                                          │
-        └──► BEFORE vs AFTER ◄── structured airline response ──────┘
-                    │
-        commitments + evidence + recommended next action
-```
-
 ![ClaimCall workflow: disruption case to before-after outcome](docs/workflow.svg)
 
 The phone call is not the product. The value is the state transition: **what changed because
