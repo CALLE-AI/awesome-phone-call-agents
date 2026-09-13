@@ -9,7 +9,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Port = 8080
-$ServerVersion = "1.10.0-ship"
+$ServerVersion = "1.10.1-ship"
 # NOTE: IN/en-IN is the production default per spec, but IN-region dialing never
 # rang the sandbox number on this account (NO ANSWER without ringing), while
 # US/en-US completed to the same number. Sandbox uses proven US route until
@@ -110,25 +110,27 @@ function Resolve-AppointmentDate {
 
 # 1b. Contact resolution layer (demo directory + sandbox override, never globally hardcoded)
 $script:ContactCache = $null
+# NOTE (PS 5.1 quirk): @(Get-Content | ConvertFrom-Json) WRAPS instead of
+# flattening, producing a 1-element nested array. Always flatten explicitly.
+function Read-JsonArray {
+  param([string]$Path)
+  $out = @()
+  if (-not (Test-Path -LiteralPath $Path)) { return $out }
+  try {
+    $parsed = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+    foreach ($e in $parsed) { $out += $e }
+  } catch { }
+  return $out
+}
 function Get-DemoContacts {
-  $list = @()
-  $p = Join-Path $Root "contacts.json"
-  if (Test-Path -LiteralPath $p) {
-    try { $list = @(Get-Content -LiteralPath $p -Raw -Encoding utf8 | ConvertFrom-Json) } catch { $list = @() }
-  }
-  $cp = Join-Path $Root "ringback_custom_contacts.json"
-  if (Test-Path -LiteralPath $cp) {
-    try { $list = $list + @(Get-Content -LiteralPath $cp -Raw -Encoding utf8 | ConvertFrom-Json) } catch { }
-  }
-  return $list
+  $list = Read-JsonArray (Join-Path $Root "contacts.json")
+  $custom = Read-JsonArray (Join-Path $Root "ringback_custom_contacts.json")
+  return @($list) + @($custom)
 }
 function Save-CustomContact {
   param([string]$Name, [string]$Type, [string]$Phone)
   $cp = Join-Path $Root "ringback_custom_contacts.json"
-  $list = @()
-  if (Test-Path -LiteralPath $cp) {
-    try { $list = @(Get-Content -LiteralPath $cp -Raw -Encoding utf8 | ConvertFrom-Json) } catch { $list = @() }
-  }
+  $list = Read-JsonArray $cp
   $list = @($list | Where-Object { [string]$_.phone -ne $Phone })
   $list += @{ name = $Name; type = $Type; phone = $Phone; source = "user_added" }
   ($list | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $cp -Encoding utf8
@@ -315,7 +317,7 @@ function Save-AddressBookEntry {
 }
 
 # 2a2. Transcript mining: numbers the OTHER party volunteers on the call become
-# suggested follow-ups (we never instruct the bot to demand numbers — CALL-E
+# suggested follow-ups (we never instruct the bot to demand numbers - CALL-E
 # declines that; we only extract what was freely offered, with context).
 function Find-FollowupNumbers {
   param($TranscriptTurns)
@@ -342,18 +344,13 @@ function Find-FollowupNumbers {
 function Save-HistoryEntry {
   param($Entry)
   $hp = Join-Path $Root "ringback_history.json"
-  $hist = @()
-  if (Test-Path -LiteralPath $hp) {
-    try { $hist = @(Get-Content -LiteralPath $hp -Raw -Encoding utf8 | ConvertFrom-Json) } catch { $hist = @() }
-  }
+  $hist = Read-JsonArray $hp
   $hist = @($hist) + @($Entry)
   if ($hist.Count -gt 50) { $hist = $hist[($hist.Count - 50)..($hist.Count - 1)] }
   ($hist | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $hp -Encoding utf8
 }
 function Get-HistoryEntries {
-  $hp = Join-Path $Root "ringback_history.json"
-  if (-not (Test-Path -LiteralPath $hp)) { return @() }
-  try { return @(Get-Content -LiteralPath $hp -Raw -Encoding utf8 | ConvertFrom-Json) } catch { return @() }
+  return Read-JsonArray (Join-Path $Root "ringback_history.json")
 }
 
 # 3. Fail-Closed Evaluator

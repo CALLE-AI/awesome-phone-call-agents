@@ -20,6 +20,10 @@ $serverScript = Get-Content "C:\Users\user\Documents\call-e\ringback_server.ps1"
 $functionsOnly = $serverScript.Substring(0, $serverScript.IndexOf('$listener ='))
 Invoke-Expression $functionsOnly
 
+# Deterministic production path: ignore any machine-level sandbox override so
+# resolved numbers are the fictional directory values (valid E.164).
+$env:DEMO_MODE = "0"
+
 # TEST A: Pharmacy prior authorization
 $pA = Get-CaregiverPlan "My wife's pharmacy says her blood pressure medication needs prior authorization from her doctor."
 Assert-Equal "Test A intent" $pA.intent "prescription_prior_authorization"
@@ -176,6 +180,11 @@ $resF = Resolve-RingbackContact $planSlow "" "" "followup:call_follow_test:0" ""
 Assert-Equal "Test F3 followup resolves" $resF.phone "+919123456780"
 Assert-Equal "Test F4 followup source" $resF.source "call_followup"
 if ($hadH2) { $bak2 | Set-Content -LiteralPath $hp2 -Encoding utf8 } else { Remove-Item -LiteralPath $hp2 -ErrorAction SilentlyContinue }
+
+# JSON loader returns a flat array (PS 5.1 @(ConvertFrom-Json) nesting guard)
+$flatCheck = @(Read-JsonArray "C:\Users\user\Documents\call-e\contacts.json")
+Assert-Equal "Test J1 flat count" $flatCheck.Count 3
+Assert-Equal "Test J2 flat scalar" ($flatCheck[0].phone -is [string]) $true
 
 # Custom contacts: saved offices resolve henceforth (backup/restore real file)
 $ccPath = "C:\Users\user\Documents\call-e\ringback_custom_contacts.json"
