@@ -1,0 +1,98 @@
+{
+  "name": "Switchboard approval gate",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "queueCall",
+        "userInput": "Call the supplier and ask whether order 4417 shipped today. Report what they said.",
+        "phone": "+15550101234",
+        "region": "US",
+        "mode": "dry_run",
+        "timezone": "UTC",
+        "resultSchema": "{\n  \"type\": \"object\",\n  \"required\": [\"shipped\"],\n  \"properties\": {\n    \"shipped\": { \"type\": \"string\", \"enum\": [\"yes\", \"no\", \"unknown\"] },\n    \"eta\": { \"type\": \"string\" }\n  }\n}"
+      },
+      "id": "a2",
+      "name": "Queue Call",
+      "type": "n8n-nodes-calle-switchboard.calleSwitchboard",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "notes": "Runs policy checks, plans the call, holds confirm_token. Does not dial. Switch mode to require_approval for a real call."
+    },
+    {
+      "parameters": {
+        "operation": "awaitResult",
+        "jobId": "={{ $json.jobId }}",
+        "approvalTimeout": 30
+      },
+      "id": "a3",
+      "name": "Await Result",
+      "type": "n8n-nodes-calle-switchboard.calleSwitchboard",
+      "typeVersion": 1,
+      "position": [440, 0],
+      "notes": "Blocks until a human approves at http://localhost:4300, then dials and polls."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.result.branchable.taskCompleted }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            },
+            {
+              "leftValue": "={{ $json.result.branchable.confidenceScore }}",
+              "rightValue": 0.8,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ]
+        }
+      },
+      "id": "a4",
+      "name": "Completed with confidence?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "notes": "Branch on CALL-E's machine-readable outcome. You cannot branch on prose."
+    },
+    {
+      "parameters": { "mode": "raw", "jsonOutput": "={{ JSON.stringify($json.result.branchable) }}" },
+      "id": "a5",
+      "name": "Act on result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [880, -100]
+    },
+    {
+      "parameters": { "mode": "raw", "jsonOutput": "={{ JSON.stringify({ needsHuman: true, job: $json.id, status: $json.status }) }}" },
+      "id": "a6",
+      "name": "Send to a human",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [880, 100]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Queue Call", "type": "main", "index": 0 }]] },
+    "Queue Call": { "main": [[{ "node": "Await Result", "type": "main", "index": 0 }]] },
+    "Await Result": { "main": [[{ "node": "Completed with confidence?", "type": "main", "index": 0 }]] },
+    "Completed with confidence?": {
+      "main": [
+        [{ "node": "Act on result", "type": "main", "index": 0 }],
+        [{ "node": "Send to a human", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

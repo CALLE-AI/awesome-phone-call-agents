@@ -1,0 +1,5 @@
+node_modules/
+data/*.json
+.env
+*.log
+data/test-jobs.json

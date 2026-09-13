@@ -305,6 +305,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
+| [`plugins/n8n-switchboard`](plugins/n8n-switchboard) | n8n | Approval gate that takes custody of the CALL-E `confirm_token` and releases it only on human approval, with policy checks, host-owned scheduling, per-campaign call budgets, a kill switch, and a dry-run preview that never contacts CALL-E. |
 
 ### Safety patterns
 
