@@ -152,7 +152,8 @@ Only do this for a number you own and have offered for testing.
 ```bash
 # 1. Point one sample contact at your own phone. Refuses drama numbers and
 #    invalid numbers, and makes you type the contact id back.
-uv run reachable live-contact --contact C-2090 --number +441234567890
+#    Substitute your own number in E.164; no example is given here on purpose.
+uv run reachable live-contact --contact C-2090 --number "<your number, E.164>"
 
 # 2. Turn live calls on. This is necessary and NOT sufficient.
 export CALLE_API_KEY=...            # server environment only
