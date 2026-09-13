@@ -119,6 +119,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`bridgecalle-active-listener`](skills/bridgecalle-active-listener/) - Active-listening voice companion skill for seniors that enforces a 90/10 active listening ratio, extracts nostalgic memories, and exports family summaries.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
@@ -166,6 +167,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
 - [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
