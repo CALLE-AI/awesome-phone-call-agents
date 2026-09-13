@@ -318,6 +318,15 @@ def test_concurrency_error_explains_retry():
         server.server_close()
 
 
+def test_friendly_error_is_short_for_known_failures():
+    from claimcall.calle_client import friendly_error, CalleError
+    busy = friendly_error(CalleError("CALL-E API POST /v1/calls failed: HTTP 429 " + '{"code": "account_concurrency_exceeded"}' * 20))
+    assert busy == "Your calling line is busy with another call. Wait for it to finish, then retry once."
+    long_other = friendly_error(CalleError("boom " + "z" * 500))
+    assert len(long_other) <= 301
+    assert friendly_error(CalleError("plain")) == "plain"
+
+
 def test_dashboard_seeds_demo_case_over_http():
     import subprocess
     import sys

@@ -26,6 +26,16 @@ class CalleError(RuntimeError):
     pass
 
 
+def friendly_error(error: Exception) -> str:
+    """Short operator-facing message for known CALL-E failures (used by the dashboard)."""
+    text = str(error)
+    if "account_concurrency_exceeded" in text:
+        return "Your calling line is busy with another call. Wait for it to finish, then retry once."
+    if len(text) > 300:
+        return text[:300] + "…"
+    return text
+
+
 def check_origin(base_url: str, allow_local_fake: bool) -> str:
     """The bearer key is only ever sent to the official HTTPS origin, or to a loopback fake in fixture mode."""
     p = urlparse(base_url)

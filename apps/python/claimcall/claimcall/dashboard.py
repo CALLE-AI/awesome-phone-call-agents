@@ -6,7 +6,6 @@ even then they need the same explicit approval plus an exact-destination repeat.
 """
 from __future__ import annotations
 
-import html
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,7 +14,7 @@ from urllib.parse import urlparse
 
 from . import engine
 from .analysis import analyze_case
-from .calle_client import LOOPBACK_HOSTS, OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer
+from .calle_client import LOOPBACK_HOSTS, OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer, friendly_error
 from .call_plan import build_plan, build_task
 from .models import Store, mask_phone, new_case
 
@@ -161,9 +160,6 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
     allowlist = _env("CLAIMCALL_ALLOWLIST", app_dir)
     live_available = bool(allow_live and live_key)
 
-    def esc(text: Any) -> str:
-        return html.escape(str(text if text is not None else ""))
-
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a: Any) -> None:
             pass
@@ -250,7 +246,7 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
                 else:
                     return self._json(400, {"placed": False, "reason": f"unknown mode {mode!r}"})
             except CalleError as e:
-                return self._json(200, {"placed": False, "reason": f"CALL-E error: {esc(e)}"})
+                return self._json(200, {"placed": False, "reason": friendly_error(e)})
             if res.get("placed"):
                 store.save(case)
                 return self._json(200, {"placed": True, "reason": "ok"})
