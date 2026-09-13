@@ -550,7 +550,9 @@ export class CallPlayer {
       li.dataset.at = t.offset_seconds;
       li.dataset.who = t.speaker;
       li.dataset.rel = 'ahead';
-      const who = t.speaker === 'bot' ? 'agent' : 'parent';
+      // Same word the built page uses, for the reason turn_li() in judge_page.py gives:
+      // `spoke_with` came back unknown on these calls.
+      const who = t.speaker === 'bot' ? 'agent' : 'recipient';
       // Every value on the next three lines goes through esc, including the locale. The
       // locale was the one that did not, and it lands inside an attribute rather than in
       // text, so a locale carrying a double quote would have closed lang= and opened

@@ -116,12 +116,18 @@ def test_the_hero_separates_the_calls_it_publishes_from_the_money_denominator():
         "against and this gate would be checking a number against itself")
     published = len(json.loads(island.group(1))["calls"])
 
-    shown = re.search(r"This page publishes (\d+) calls", page)
+    # The sentence used to read "This page publishes N calls, each with its transcript",
+    # and this gate held that N against the island, which is where those transcripts sit
+    # unrendered. Claim and evidence were the same object, so the gate was green while the
+    # page published two of twenty. The verb is now "placed", which the island can speak
+    # for, and whether anything is over-claimed as rendered is asked by
+    # tests/test_transcripts_are_reachable.py against the built markup instead.
+    shown = re.search(r"out of (\d+) this software placed through CALL-E", page)
     assert shown, (
-        "the first screen no longer says how many calls it publishes. It is the figure a "
-        "reader compares against the player controls in front of them")
+        "the first screen no longer says how many calls this software placed. It is the "
+        "figure a reader compares against the player controls in front of them")
     assert int(shown.group(1)) == published, (
-        f"the first screen says it publishes {shown.group(1)} calls and the page carries "
+        f"the first screen says it placed {shown.group(1)} calls and the page carries "
         f"{published}")
 
     pooled = json.loads(

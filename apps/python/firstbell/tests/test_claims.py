@@ -923,6 +923,30 @@ GATES_THAT_CANNOT_ALWAYS_RUN = {
     # they are computed at all rather than typed, runs anywhere.
     "cells":
         "reads out/index.html, which only exists after the page has been built",
+    # tests/test_transcripts_are_reachable.py, both helpers and the narrow second gate.
+    # They read the built pages, so a clean clone cannot run them. What is lost while they
+    # are quiet is the only check that separates a transcript the page carries from one a
+    # reader can reach. Two sentences claimed a transcript for every call while the build
+    # drew two, and both were checked against the page's own data island, which is where
+    # the undrawn eighteen live. A gate reading the island cannot see that defect, so these
+    # read the markup with script tags cut out and nothing else.
+    "_reader_text":
+        "reads out/*.html, which only exists after the page has been built",
+    "_calls":
+        "reads the call-data island out of out/index.html, built from receipts held "
+        "outside this repository",
+    "test_the_calls_with_a_play_control_have_their_words_for_the_player":
+        "reads out/index.html, which only exists after the page has been built",
+    # tests/test_hero_paragraph.py. The paragraph under the hero card is prose, so nothing
+    # derives it, and it has described the wrong call twice: written for S-3103 it kept
+    # that child's school bus through the whole period S-3127 was the hero, and written for
+    # S-3127 it kept his bike through the move to S-4105. Both times every derived value
+    # beside it was right, which is what let it survive. Quiet in a clean clone because it
+    # needs both the built page and the hero's own turns.
+    "_hero_paragraph":
+        "reads out/index.html, which only exists after the page has been built",
+    "_hero_and_calls":
+        "needs transcripts.json, which is held outside this repository",
     "test_the_dateline_is_derived_and_not_written_out":
         "asks the builder for the block twice, which needs the receipts on this machine",
     # Reads evidence/suite-pair.json, which tools/suite_pair.py writes and which is not

@@ -176,8 +176,11 @@ def morning_markup(placed: str, compact: bool = False) -> str:
         'The only thing it says about a call is the split it draws, forty that close and '
         'one that does not, and the clock face a tile reports is its slot in the window '
         'above and not a time anybody dialled. '
-        'This software has placed ' + placed + ' real calls, and the transcript of every '
-        'one of them is on the evidence page. A run built out of '
+        # Was "and the transcript of every one of them is on the evidence page", which
+        # was not true: the evidence page draws two of them and holds the rest in a
+        # data island no reader opens. The count is the claim worth making here.
+        'This software has placed ' + placed + ' real calls through CALL-E. A run '
+        'built out of '
         'matched hard cases is not a sample of a real morning, and multiplying its '
         'proportions up to a school would state something nobody measured. The single '
         'open column is the shape of the problem, not a rate.'

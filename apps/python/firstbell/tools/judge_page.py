@@ -811,7 +811,11 @@ def turn_li(call: dict, turn: dict) -> str:
     and the other not would read as two different transcripts of one call. `player.js`
     builds the third copy from the same field on the same object.
     """
-    who = "agent" if turn["speaker"] == "bot" else "parent"
+    # "recipient", not "parent". On the hero card that label sat two lines above
+    # `spoke_with unknown`, so the page was asserting in its own voice the one thing the
+    # receipt beside it had refused to assert. It is also CALL-E's own word: the notes it
+    # wrote for these calls open "Recipient ...".
+    who = "agent" if turn["speaker"] == "bot" else "recipient"
     m, s = divmod(int(turn["offset_seconds"]), 60)
     said = (f'<span class=turn-text lang="{esc(call["locale"])}">'
             f'{esc(turn["text"])}</span>')
@@ -2426,11 +2430,11 @@ def queue_markup(run: dict) -> str:
     counted = receipt_counts("06-locale-matched-pairs.json")
     out.append('<p class=queue-foot>Every row is a real call from '
                '<code>06-locale-matched-pairs.json</code>, sorted by the same rule the '
-               'program uses. Nothing here was arranged for the picture. The recordings '
-               'are on the <a href="https://firstbell-evidence.vercel.app" '
-               'rel="noopener">evidence page</a>; the receipt file is on neither that page '
-               'nor in the repository, for the reason <code>evidence/README.md</code> '
-               'gives. The count holds without it: '
+               'program uses. Nothing here was arranged for the picture. One of them is '
+               'the call this page opens on, and it plays up there; the recordings of the '
+               'rest are held with the receipts, and the receipt file is on neither this '
+               'page nor in the repository, for the reason '
+               '<code>evidence/README.md</code> gives. The count holds without it: '
                '<code>evidence/recorded-calls.json</code> records that receipt&#8217;s '
                f'{counted["calls"]} calls and the {counted["escalated"]} of them that '
                f'needed a human, which is the {len(rows)} rows here, and it carries the '
@@ -3118,16 +3122,24 @@ def build(has_audio: bool, repo_url: str | None = None,
     # receipt, rather than this page's summary of it. It is also the card's accessible
     # name, so the visible caption and the name a screen reader announces are one string,
     # and neither can describe a call the lane is not playing.
-    hero_said = esc(str(calls[hero].get("note") or "").strip().rstrip("."))
+    def said(cid: str) -> str:
+        return esc(str(calls[cid].get("note") or "").strip().rstrip("."))
+
+    hero_said = said(hero)
+    # Both captions, not just the hero's. The control card read "the parent knew, and said
+    # why", which is this page summarising a call in its own voice and calling the speaker
+    # a parent on a receipt whose `spoke_with` says unknown. CALL-E wrote a sentence about
+    # each of these calls when it returned them; that sentence is the caption.
+    control_said = said(control)
     lanes_shown = [
         # The control, and it is the shorter of the two calls. It exists to say that this
         # software does not simply mark everything undetermined, which is one sentence.
-        {"id": control, "label": "the parent knew, and said why",
+        {"id": control, "label": control_said or "the office got what it needed",
          "two_bucket": "resolved", "two_bucket_note": "case closed",
          "ours": "resolved",
          "ours_note": f"{_spelled(_acted_on(control)).capitalize()} fields the office can "
                       "act on."},
-        {"id": hero, "label": hero_said or "the parent reported a child unaccounted for",
+        {"id": hero, "label": hero_said or "the call came back without the answer",
          "two_bucket": "resolved",
          "two_bucket_note": f"case closed. Filed as reason_category {hero_why}, "
                             f"parent_confirmed_aware {hero_aware}.",
@@ -3202,8 +3214,13 @@ def build(has_audio: bool, repo_url: str | None = None,
         # for the two figures, so all three phrasings are load-bearing and none may be
         # tidied: see `tests/test_page_prose_counts.py`.
         f'<p class=hero-foot>{_spelled(len(lanes_shown)).capitalize()} calls above, '
-        'played from their own recordings. This page publishes '
-        f'{_published_call_total()} calls, each with its transcript, and the money is '
+        # "out of twenty this software placed", and not "publishes twenty, each with its
+        # transcript", which is what it said while the page rendered two of them. The count
+        # was never wrong. The verb was: a transcript only a parser can reach, inside the
+        # page's own data island, is shipped and not published, and the gate watching this
+        # sentence compared it to that island rather than to anything a reader can see.
+        'played from their own recordings, out of '
+        f'{_published_call_total()} this software placed through CALL-E; the money is '
         f'computed over the {_recorded_call_total()} pooled in '
         '<code>evidence/recorded-calls.json</code>; '
         f'<a href="#act-02">act 02</a> holds both conversations in full. The recordings '
@@ -3244,16 +3261,24 @@ def build(has_audio: bool, repo_url: str | None = None,
         '<p>An unanswered absence message is not information. It is an absence of '
         'information, and it looks identical whether the child is at home with a fever or '
         'never arrived anywhere.</p>',
-        # Every value in this paragraph is read out of the call the page opened on. It was
-        # written for S-3103, and it kept that call's daughter, her school bus and the
-        # classroom her parent asked the office to check for as long as S-3127 had been the
-        # hero, one screen under a card playing a different conversation.
+        # This paragraph describes whichever call the page opened on, and it has now been
+        # wrong twice. Written for S-3103, it kept that call's daughter and her school bus
+        # for the whole time S-3127 was the hero; written for S-3127, it kept his bike and
+        # his friend through the move to S-4105. Both times it sat one screen under a card
+        # playing a different conversation, and both times every derived value around it
+        # was correct, which is what let it survive. tests/test_hero_paragraph.py now fails
+        # when a noun in here is absent from the hero's own transcript.
+        #
+        # It says "the person who answered" and not "a mother". `spoke_with` came back
+        # unknown on this call, and this software's whole argument is that it does not fill
+        # an unknown in with the likely answer. Prose that guesses what the receipt refused
+        # to guess costs more than the sentence is worth.
         '<p>The call above is the second kind. At '
-        f'{cue + 5} seconds a parent tells a robot that their son left the house on his '
-        'bike with a friend, and that something is wrong. They had just asked it whether he '
-        'was missing from the class, and been told that he was. The reason for the absence '
-        f'came back <b>{hero_why}</b>, and <code>parent_confirmed_aware</code> came back '
-        f'<b>{hero_aware}</b>.</p>',
+        f'{cue + 5} seconds the person who answered is asked to confirm they know the '
+        'child is absent, and says they did not know, and that she left for school that '
+        'morning. Nobody on the call could say where she actually was. The reason for the '
+        f'absence came back <b>{hero_why}</b>, and <code>parent_confirmed_aware</code> '
+        f'came back <b>{hero_aware}</b>.</p>',
         # Not written for this page. This is what the program prints at the head of its
         # own escalation queue, and it was sitting nine screens below here, in terminal
         # text, as the last thing a reader met. A reader called it the strongest

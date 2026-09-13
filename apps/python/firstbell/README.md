@@ -38,9 +38,9 @@ call** is the price above which the desk is cheaper. A thousand calls against th
 
 [![Evidence page](https://img.shields.io/badge/evidence-firstbell--evidence.vercel.app-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
 [![Offline by default](https://img.shields.io/badge/offline-dials%20nobody%2C%20no%20account-1a7f5a?style=flat-square)](#run-it)
-[![Real calls](https://img.shields.io/badge/real%20calls-20%20published%2C%2016%20with%20audio-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
+[![Real calls](https://img.shields.io/badge/real%20calls-20%20placed%20through%20CALL--E-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
 <br>
-[![Tests](https://img.shields.io/badge/tests-852%20collected-444?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-855%20collected-444?style=flat-square)](#tests)
 [![Mutations](https://img.shields.io/badge/gates%20broken%20on%20purpose-358-444?style=flat-square)](evidence/MUTATIONS.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-444?style=flat-square)](../../../LICENSE)
 
@@ -102,9 +102,9 @@ and nothing here is a screenshot.
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 358 rows, each with the change made and the number of tests that noticed |
 
-Twenty live calls are published: twelve placed on 2026-09-04, eight of them recorded and on
-the [evidence page](https://firstbell-evidence.vercel.app) with their transcripts, and twelve
-more placed on 2026-09-11 and written up in
+Twenty live calls sit behind this entry: twelve placed on 2026-09-04, two of which play in
+full on the [evidence page](https://firstbell-evidence.vercel.app) with their transcripts,
+and twelve more placed on 2026-09-11 and written up in
 [`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). The receipt files are on neither that
 page nor in this tree ([`evidence/README.md`](evidence/README.md) says why), so what travels
 with the code is the arithmetic they produced:
@@ -1270,24 +1270,23 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 852 tests collected
+python -m pytest tests/ -q          # 855 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**852 is the number collected, and two different pairs add up to it.** Some of these gates
+**855 is the number collected, and two different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the call recordings, which are held
 outside the tree ([`evidence/README.md`](evidence/README.md) says why), a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **812 passed, 40
-skipped**. The forty name what is missing rather than passing quietly:
-thirty-six want a built page, four of those thirty-six also wanting its
-Content-Security-Policy, three want a gate report, and one is a run whose rows are all of
-one kind, so the ordering it would check proves nothing. Build the page and run the gates and
-the same suite reports **850 passed, 2 skipped**. Both pairs are measured, both add up to
-852, and the difference between them is what a reader has on their disk.
+A clean checkout of this commit into an empty directory reports **796 passed, 59
+skipped**. The fifty-nine name what is missing rather than passing quietly: thirty-eight
+want a built page, four of those thirty-eight also wanting its Content-Security-Policy,
+eighteen want the recordings, and three want a gate report. Build the page and run the
+gates and the same suite reports **853 passed, 2 skipped**. Both pairs are measured, both
+add up to 855, and the difference between them is what a reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 811 and 41.
+The very first run in a fresh clone reports one more skip and one fewer pass, 795 and 60.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on
