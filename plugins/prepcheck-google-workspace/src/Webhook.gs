@@ -111,7 +111,6 @@ function onPartial_(r, result) {
 
   // Never schedule a callback past the procedure itself.
   const callback = new Date(Date.now() + PARTIAL_CALLBACK_HOURS * 3600 * 1000);
-  const nextCheckpointDue = checkpointDueAt_(r.procedure_at, r.checkpoint);
   const procedure = new Date(r.procedure_at);
   const when = callback >= procedure
     ? new Date(procedure.getTime() - 12 * 3600 * 1000)

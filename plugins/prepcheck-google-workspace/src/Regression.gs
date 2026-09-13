@@ -141,3 +141,34 @@ function notifyRegression_(r, diff) {
       'Verify the record before the procedure goes ahead.'
     ].filter(Boolean).join('\n'));
 }
+
+/**
+ * Returns one patient to a clean first-call state. Used by the panel's
+ * "Start this patient over" action, and for re-running the examples in
+ * examples/ without editing cells by hand.
+ */
+function resetRow(rowId) {
+  const r = findByRowId_(rowId);
+  if (!r) throw new Error('No such row_id: ' + rowId);
+  updateRow_(r._row, {
+    checkpoint: CHECKPOINTS[0],
+    state: STATE.PENDING,
+    next_call_at: '',
+    partial_cycles: 0,
+    no_answer_attempts: 0,
+    call_id: '',
+    last_outcome: '',
+    items_outstanding: '',
+    staff_note: '',
+    prep_snapshot: '',
+    readiness_delta: ''
+  });
+  logEvent_(rowId, '', CHECKPOINTS[0], 'RESET', 'Returned to first checkpoint.');
+}
+
+/** Rotates the webhook shared secret without changing the deployment URL. */
+function rotateWebhookSecret() {
+  const secret = Utilities.getUuid();
+  props_().setProperty('WEBHOOK_SECRET', secret);
+  Logger.log('New webhook secret: ' + secret);
+}

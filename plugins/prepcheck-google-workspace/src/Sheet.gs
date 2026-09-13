@@ -91,11 +91,23 @@ function seedSyntheticPatients() {
 
   const rows = [
     ['P001', 'Alex Demo', '+12025550143', 'US', 'en-US', 'Colonoscopy',
-     inHours(73), 'T72', STATE.PENDING, inHours(0), 0, 0, '', '', '', '', ''],
-    ['P002', 'Sam Demo', '+12025550143', 'US', 'en-US', 'Upper Endoscopy',
-     inHours(74), 'T72', STATE.PENDING, inHours(0), 0, 0, '', '', '', '', '']
+     inHours(73), 'T72', STATE.PENDING, inHours(0)],
+    ['P002', 'Sam Demo', '+12025550147', 'US', 'en-US', 'Upper Endoscopy',
+     inHours(74), 'T72', STATE.PENDING, inHours(0)],
+    ['P003', 'Maya Demo', '+12025550162', 'US', 'en-US', 'Colonoscopy',
+     inHours(77), 'DONE', STATE.CONFIRMED, '']
   ];
-  p.getRange(p.getLastRow() + 1, 1, rows.length, COLS.length).setValues(rows);
+
+  // Pad each row to the full width so adding a column never breaks the seed.
+  const padded = rows.map(r => {
+    const full = r.slice();
+    while (full.length < COLS.length) full.push('');
+    full[COLS.indexOf('partial_cycles')] = 0;
+    full[COLS.indexOf('no_answer_attempts')] = 0;
+    return full;
+  });
+
+  p.getRange(p.getLastRow() + 1, 1, padded.length, COLS.length).setValues(padded);
 }
 
 /** Colour-codes the state column so transitions are visible on screen. */
