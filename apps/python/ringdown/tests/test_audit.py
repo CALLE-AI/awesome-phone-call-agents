@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from fake import scenarios
 from ringdown.audit import (
     GENESIS,
     SCHEMA,
@@ -21,12 +20,10 @@ from ringdown.audit import (
     verification_record,
     verdict_v1,
 )
-from ringdown.calls import parse_turns, snapshot_from
 from ringdown.canonical import canonical_json
 from ringdown.checks import all_ok, contradicted
-from ringdown.escalate import Attempt, LadderResult
+from ringdown.escalate import LadderResult
 from ringdown.incident import IncidentError
-from ringdown.extract import extract
 from tests.data import ALICE, EXTRACTION, LADDER, an_attempt
 
 GOLDEN = Path(__file__).resolve().parent / "golden"

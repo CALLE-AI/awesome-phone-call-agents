@@ -71,11 +71,11 @@ Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). No runtime dependenc
 git clone https://github.com/gmassello/ringdown
 cd ringdown/apps/python/ringdown
 uv sync
-uv run pytest -q          # 589 tests, no credentials, no outbound calls
+uv run pytest -q          # 606 tests, no credentials, no outbound calls
 ```
 
 Twelve of those tests read the project site and skip where `docs/` is absent, which is the case in
-any checkout of this directory alone — there the run reports 577 passed and 12 skipped.
+any checkout of this directory alone — there the run reports 594 passed and 12 skipped.
 
 **Every command in this file runs from `apps/python/ringdown/`.**
 
@@ -318,6 +318,11 @@ call, have to fit inside what is left of `ladder_timeout_seconds`. Ask for ninet
 fifteen-minute ladder and the next rung rings immediately, with the request recorded rather than
 granted. The wait competes against the escalation rather than suspending it, which is the whole
 point: an incident that cannot wait does not wait.
+
+All of this waiting lives inside one process and one ladder, and it is not re-escalation. An
+ETA that was accepted and then expires wakes nothing: the run is over and nothing survived it.
+That gap is ceiling 7 of the [known ceilings](#known-ceilings), and it is the difference between
+what this section does and what an on-call tool is eventually expected to do.
 
 The second call is a second call, not a retry. The attempt number lives inside the hashed payload,
 so it produces its own idempotency key, its own `intent` and `attempt` records, and its own

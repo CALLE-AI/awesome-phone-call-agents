@@ -25,8 +25,7 @@ PORT = SITE / "ledger.js"
 NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(
-    not PORT.exists() or NODE is None,
-    reason="docs/ stays out of the upstream checkout, and the port needs node to run",
+    not PORT.exists(), reason="docs/ stays out of the upstream checkout"
 )
 
 READER = """
@@ -41,6 +40,7 @@ console.log(JSON.stringify(checks.map((check) => [check.ok, check.label])));
 
 @pytest.fixture(scope="module")
 def reader(tmp_path_factory) -> Path:
+    assert NODE, "docs/ is in this checkout, so the port has to run rather than skip"
     script = tmp_path_factory.mktemp("port") / "read.mjs"
     script.write_text(READER.format(port=PORT.as_uri()))
     return script

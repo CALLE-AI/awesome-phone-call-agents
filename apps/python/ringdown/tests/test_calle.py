@@ -21,7 +21,7 @@ from ringdown.calle import (
     _snapshot,
     assert_trusted_url,
 )
-from ringdown.script import attempt_id, call_payload, idempotency_key
+from ringdown.script import attempt_id, call_payload
 from tests.data import ALICE, LADDER
 
 KEY = "rd-test-1"

@@ -12,7 +12,7 @@ from ringdown.calle import UntrustedHost, assert_trusted_url
 from ringdown.escalate import LadderResult
 from ringdown.exits import EXIT_ACKNOWLEDGED, EXIT_UNKNOWN, EXIT_UNRESOLVED, EXIT_UNVERIFIED
 from ringdown.notes import VENDORS, note_text, post_note
-from tests.data import ALICE, EXTRACTION, an_attempt
+from tests.data import ALICE, an_attempt
 
 PAGERDUTY, OPSGENIE = VENDORS["pagerduty"], VENDORS["opsgenie"]
 REFUSAL = {"error": {"message": "Requester User Not Found"}}
