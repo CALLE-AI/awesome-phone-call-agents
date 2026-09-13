@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>School Collections Assistant</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <div class="app">
+
+    <header>
+      <div>
+        <h1>School Collections<span> Assistant</span></h1>
+        <p>Intelligent school payment reminders</p>
+      </div>
+
+      <div class="status">
+        <span></span>
+        Ready
+      </div>
+    </header>
+
+
+    <main>
+
+      <section class="card">
+
+        <div class="card-header">
+          <h2>Payment Reminder</h2>
+          <p>Let School Collections Assistant handle the conversation.</p>
+        </div>
+
+
+        <form id="reminderForm">
+
+          <div class="grid">
+
+            <div class="field">
+              <label>Parent / Guardian</label>
+              <input
+                id="parentName"
+                type="text"
+                placeholder="e.g. John Banda"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Student</label>
+              <input
+                id="studentName"
+                type="text"
+                placeholder="e.g. Mary Banda"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Phone number</label>
+              <input
+                id="phoneNumber"
+                type="tel"
+                placeholder="+12025550100"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Outstanding amount</label>
+              <input
+                id="amount"
+                type="text"
+                placeholder="K 2,500"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Payment due date</label>
+              <input
+                id="dueDate"
+                type="date"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>School</label>
+              <input
+                id="schoolName"
+                type="text"
+                placeholder="e.g. ABC Private School"
+              />
+            </div>
+
+            <div class="field">
+              <label>Operator API token</label>
+              <input
+                id="apiToken"
+                type="password"
+                autocomplete="off"
+                placeholder="SCHOOL_COLLECTIONS_API_TOKEN"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label>Stable intent id (optional)</label>
+              <input
+                id="intentId"
+                type="text"
+                placeholder="e.g. fee-2026-09-mary-banda"
+              />
+            </div>
+
+          </div>
+
+          <label class="confirm-live">
+            <input id="confirmLiveCall" type="checkbox" />
+            Confirm a real live call (ignored unless the server has CALLE_LIVE_ENABLED=true)
+          </label>
+
+          <button type="submit" id="callButton">
+            <span></span>
+            Start Reminder Call
+          </button>
+
+        </form>
+
+      </section>
+
+
+      <section class="card result-card">
+
+        <div class="card-header">
+          <h2>Call Result</h2>
+          <p id="callStatus">No call started yet.</p>
+        </div>
+
+        <div id="result">
+          <div class="empty">
+            <div></div>
+            <p>Call results will appear here.</p>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="app.js"></script>
+
+</body>
+</html>

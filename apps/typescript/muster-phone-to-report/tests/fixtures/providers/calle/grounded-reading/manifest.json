@@ -1,0 +1,741 @@
+{
+  "contractVersion": "1.4.0",
+  "manifestRevision": 5,
+  "evaluatorVersion": "grounded-reading-extraction/phase-2-v2",
+  "runtimeObservation": {
+    "nodeVersion": "v22.17.0",
+    "scope": "local_spike_observation_not_production_decision"
+  },
+  "fixtureContract": {
+    "requiredFields": [
+      "fixtureId",
+      "fixtureRevisionId",
+      "revision",
+      "lifecycleStatus",
+      "coverageTags",
+      "proofScope",
+      "provenance",
+      "custody",
+      "availability",
+      "reviewStatus",
+      "artifactRefs",
+      "expectedZoneInventoryRef",
+      "adapterReportShapeRef",
+      "lineage",
+      "expectedQuality",
+      "requiredDecisionGates"
+    ],
+    "artifactReferenceRequiredFields": [
+      "path",
+      "recordId",
+      "pointer",
+      "sha256",
+      "recordRole"
+    ],
+    "requiredArtifactRoles": [
+      "provider_lifecycle",
+      "retained_evidence",
+      "reviewed_evidence_assertion",
+      "structured_provider_output",
+      "reviewed_ground_truth",
+      "expected_derived"
+    ],
+    "fixtureProvenanceClasses": [
+      "provider_observed",
+      "simulated"
+    ],
+    "reviewStatuses": [
+      "reviewed",
+      "unreviewed",
+      "review_blocked"
+    ],
+    "expectedQualities": [
+      "complete",
+      "partial",
+      "unknown",
+      "invalid"
+    ],
+    "provenanceProofScopeRules": {
+      "simulated": {
+        "proofScope": "contract_only",
+        "custody": "repository_reviewed",
+        "displayLabel": "SIMULATED",
+        "opaqueRunReferencePattern": "simulatedRunReferencePattern"
+      },
+      "provider_observed": {
+        "proofScope": "calle_result_contract",
+        "custody": "repository_redacted",
+        "displayLabelForbidden": "SIMULATED",
+        "opaqueRunReferencePattern": "opaqueRunReferencePattern"
+      }
+    },
+    "requiredIndependentAxes": [
+      "provenance",
+      "custody",
+      "availability"
+    ],
+    "fixtureIdPattern": "^[a-z0-9][a-z0-9_-]*$",
+    "fixtureRevisionIdPattern": "^[a-z0-9][a-z0-9_-]*$",
+    "revisionConstraint": "positive_integer"
+  },
+  "recordGraphIntegrity": {
+    "resolveEveryJsonPointer": true,
+    "pointedRecordIdMustMatch": true,
+    "pointedRecordRoleMustMatch": true,
+    "pointedFixtureRevisionMustMatch": true,
+    "manifestAndContainerFixtureIdSetsMustMatch": true,
+    "manifestAndContainerRecordIdSetsMustMatch": true
+  },
+  "inventoryContract": {
+    "requiredFields": [
+      "inventoryId",
+      "version",
+      "adapterReportShapeRef",
+      "shapeVerification",
+      "zones"
+    ],
+    "zoneKeyConstraint": "unique_ascii_exact",
+    "shapeVerificationStates": [
+      "unverified",
+      "reviewed"
+    ],
+    "reconciliationStatuses": [
+      "supported",
+      "missing",
+      "ambiguous",
+      "contradictory",
+      "not_applicable"
+    ]
+  },
+  "closedSets": {
+    "committedRecordRoles": [
+      "provider_lifecycle",
+      "retained_evidence",
+      "reviewed_evidence_assertion",
+      "structured_provider_output",
+      "reviewed_ground_truth",
+      "expected_derived"
+    ],
+    "runtimeOnlyRecordRoles": [
+      "actual_derived"
+    ],
+    "provenanceClasses": [
+      "provider_observed",
+      "primary_source",
+      "hardware_observed",
+      "simulated",
+      "repository_review",
+      "derived",
+      "inferred",
+      "unknown"
+    ],
+    "custodyClasses": [
+      "protected_external",
+      "repository_redacted",
+      "repository_reviewed",
+      "runtime_only"
+    ],
+    "availabilityStates": [
+      "present",
+      "unavailable",
+      "withheld_by_policy",
+      "unresolvable"
+    ],
+    "proofScopes": [
+      "contract_only",
+      "calle_result_contract"
+    ],
+    "fixtureLifecycleStatuses": [
+      "active",
+      "superseded",
+      "withdrawn"
+    ],
+    "reviewStatuses": [
+      "reviewed",
+      "unreviewed",
+      "review_blocked"
+    ],
+    "expectedQualities": [
+      "complete",
+      "partial",
+      "unknown",
+      "invalid"
+    ]
+  },
+  "recordRoleContract": {
+    "exclusiveRolePerRecord": true,
+    "committedRoles": {
+      "provider_lifecycle": {
+        "owns": [
+          "allowlisted_provider_status_facts",
+          "provider_supplied_stage_timestamps",
+          "opaque_run_reference"
+        ],
+        "mustNotOwn": [
+          "reviewed_reading",
+          "ground_truth",
+          "expected_quality"
+        ]
+      },
+      "retained_evidence": {
+        "owns": [
+          "opaque_protected_evidence_reference",
+          "repository_safe_anchor_metadata",
+          "provider_confidence_token",
+          "admission_review_state"
+        ],
+        "mustNotOwn": [
+          "protected_content",
+          "semantic_conclusion",
+          "ground_truth"
+        ]
+      },
+      "reviewed_evidence_assertion": {
+        "owns": [
+          "exact_source_anchor_assertion",
+          "subject_and_field",
+          "exact_safe_token",
+          "review_role_and_revision"
+        ],
+        "mustNotOwn": [
+          "provider_lifecycle",
+          "expected_quality",
+          "protected_content"
+        ]
+      },
+      "structured_provider_output": {
+        "owns": [
+          "redacted_provider_supplied_fields",
+          "explicit_provider_null"
+        ],
+        "mustNotOwn": [
+          "reviewer_correction",
+          "expected_quality",
+          "hardware_claim"
+        ]
+      },
+      "reviewed_ground_truth": {
+        "owns": [
+          "reviewed_exact_readings_and_states",
+          "reviewed_evidence_bases",
+          "expected_inventory_facts",
+          "review_role_and_timestamp"
+        ],
+        "mustNotOwn": [
+          "provider_lifecycle",
+          "quality_policy",
+          "unsupported_normality"
+        ]
+      },
+      "expected_derived": {
+        "owns": [
+          "expected_quality",
+          "expected_reconciliation",
+          "blocked_rule_ids",
+          "expected_provider_neutral_output"
+        ],
+        "mustNotOwn": [
+          "source_truth",
+          "evidence_provenance",
+          "protected_content"
+        ]
+      }
+    },
+    "runtimeOnlyRole": {
+      "role": "actual_derived",
+      "fixtureMutationPermitted": false,
+      "mayBecomeGroundTruth": false
+    }
+  },
+  "lineageContract": {
+    "identityDomains": [
+      "fixtureId",
+      "fixtureRevisionId",
+      "opaqueRunRef",
+      "recordId"
+    ],
+    "uniqueKeys": [
+      "fixtureRevisionId",
+      "fixtureId+revision"
+    ],
+    "positiveRevisionRequired": true,
+    "atMostOneActiveRevisionPerFixtureId": true,
+    "acyclic": true,
+    "contiguous": true,
+    "semanticCorrectionRequiresNewRevision": true,
+    "lateMaterialRequiresNewRevision": true,
+    "correctionRequiredFields": [
+      "supersedes",
+      "correctionReason",
+      "reviewedAt",
+      "reviewerRole",
+      "basisRefs"
+    ],
+    "lastWriteWinsPermitted": false,
+    "supersededRecordsRemainAuditable": true
+  },
+  "evidenceAcquisition": {
+    "externalActivityAuthorized": false,
+    "currentDecision": "Decision: NO-GO",
+    "requiredGates": [
+      {
+        "gateId": "explicit_authorization",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "authorization_reviewer",
+        "reconsiderationRequirement": "fresh purpose- and window-bound authorization outside Git"
+      },
+      {
+        "gateId": "capture_policy",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "capture_policy_reviewer",
+        "reconsiderationRequirement": "reviewed minimum-necessary capture, access, retention, and stop policy"
+      },
+      {
+        "gateId": "protected_storage",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "protected_custody_reviewer",
+        "reconsiderationRequirement": "approved external custody with access, retention, deletion, and incident controls"
+      },
+      {
+        "gateId": "provider_configuration",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "provider_configuration_reviewer",
+        "reconsiderationRequirement": "separately approved provider setup with no repository credentials"
+      },
+      {
+        "gateId": "redaction",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "redaction_reviewer",
+        "reconsiderationRequirement": "field-allowlisted redaction with second-person repository-safety review"
+      },
+      {
+        "gateId": "source_correlation",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "source_correlation_reviewer",
+        "reconsiderationRequirement": "reviewed same-run correlation across lifecycle, evidence, result, and fixture revision"
+      },
+      {
+        "gateId": "source_review",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "independent_source_reviewer",
+        "reconsiderationRequirement": "independent comparison of reviewed assertions and ground truth with protected source evidence"
+      },
+      {
+        "gateId": "responsible_operator",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "authorized_operator",
+        "reconsiderationRequirement": "named functional operator assignment within the authorized purpose and activity window"
+      },
+      {
+        "gateId": "responsible_reviewer",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "independent_evidence_reviewer",
+        "reconsiderationRequirement": "independent reviewer assignment for redaction, source assertions, and ground truth"
+      },
+      {
+        "gateId": "provider_observed_samples",
+        "availability": "unavailable",
+        "activityPermitted": false,
+        "decisionImpact": "Decision: NO-GO",
+        "responsibleRole": "final_audit_reviewer",
+        "reconsiderationRequirement": "two authorized input-distinct reviewed provider results after every prerequisite gate passes"
+      }
+    ]
+  },
+  "phase3ProviderAssessment": {
+    "assessmentVersion": "grounded-reading-extraction/phase-3-v1",
+    "assessedAt": "2026-08-04T12:32:12Z",
+    "externalActivityAttempted": false,
+    "providerObservedPair": {
+      "requiredCount": 2,
+      "admittedCount": 0,
+      "status": "UNMET",
+      "inputSpecificityStatus": "not_evaluable_without_admitted_pair",
+      "reasonCodes": [
+        "PROVIDER_OBSERVED_PAIR_MISSING"
+      ]
+    },
+    "providerRunCorrelation": {
+      "status": "UNMET",
+      "observedRunCount": 0,
+      "requiredStages": [
+        "provider_lifecycle",
+        "retained_evidence",
+        "structured_provider_output",
+        "reviewed_ground_truth"
+      ],
+      "missingStages": [
+        "provider_lifecycle",
+        "retained_evidence",
+        "structured_provider_output",
+        "reviewed_ground_truth"
+      ],
+      "reasonCodes": [
+        "LIFECYCLE_STAGE_MISSING",
+        "EVIDENCE_STAGE_MISSING",
+        "STRUCTURED_RESULT_ABSENT"
+      ]
+    },
+    "providerLineage": {
+      "status": "UNMET",
+      "observedRevisionCount": 0,
+      "lateMaterialStatus": "not_observed",
+      "duplicateMaterialStatus": "not_observed",
+      "correctionStatus": "not_observed",
+      "lastWriteWinsPermitted": false,
+      "reasonCodes": [
+        "PROVIDER_OBSERVED_PAIR_MISSING"
+      ]
+    },
+    "privacyAndAdmission": {
+      "status": "UNMET",
+      "activityPermitted": false,
+      "providerFixtureFilesCreated": false,
+      "protectedContentCommitted": false,
+      "reasonCodes": [
+        "PRIVACY_OR_AUTHORIZATION_GATE_UNMET"
+      ]
+    },
+    "syntheticAntiStub": {
+      "fixtureIds": [
+        "sim_complete_primary",
+        "sim_complete_secondary"
+      ],
+      "inputSpecificContractCheck": "PASS",
+      "proofScope": "contract_only",
+      "providerGateSatisfied": false
+    },
+    "acceptance": {
+      "AC-INTEGRATION-1": "UNMET",
+      "AC-ASYNC-1": "UNMET",
+      "AC-ERROR-2": "PASS"
+    },
+    "decisionImpact": "Decision: NO-GO"
+  },
+  "repositorySafety": {
+    "repositoryReferenceKind": "repository_relative",
+    "allowedFixtureRoot": "tests/fixtures/providers/calle/grounded-reading/",
+    "protectedEvidenceReferenceKind": "opaque_protected_evidence_reference_only",
+    "recordIdPattern": "^[a-z0-9][a-z0-9_-]{2,127}$",
+    "opaqueRunReferencePattern": "^run_ref_[a-z0-9][a-z0-9_-]{15,63}$",
+    "simulatedRunReferencePattern": "^sim_run_ref_[a-z0-9][a-z0-9_-]{15,63}$",
+    "opaqueProtectedEvidenceReferencePattern": "^evidence_ref_[a-z0-9][a-z0-9_-]{15,63}$",
+    "forbiddenRepositoryReferenceForms": [
+      "absolute_path",
+      "parent_traversal",
+      "url",
+      "protected_evidence_path",
+      "native_provider_identifier"
+    ],
+    "forbiddenCommittedContent": [
+      "target",
+      "phone_number",
+      "credential",
+      "authorization_header",
+      "raw_consent",
+      "recording",
+      "transcript",
+      "unredacted_provider_payload"
+    ]
+  },
+  "fixtureMatrixContract": {
+    "fixtureContainerPath": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json",
+    "matrixPath": "docs/spikes/grounded-reading-extraction/fixture-matrix.md",
+    "displayLabel": "SIMULATED",
+    "fixtureCount": 9,
+    "actualDerivedCustody": "runtime_only",
+    "requiredColumns": [
+      "Fixture revision",
+      "Provenance / proof scope",
+      "Dedicated coverage",
+      "Input evidence refs",
+      "Truth review",
+      "Expected zone reconciliation",
+      "Expected quality",
+      "Actual quality",
+      "Failed grounding rule",
+      "Contract result"
+    ],
+    "requiredCoverageTags": [
+      "complete",
+      "negative_value",
+      "decimal_value",
+      "spoken_unit",
+      "normalized_unit",
+      "device_alarm",
+      "power_state",
+      "battery_state",
+      "confidence_linkage",
+      "missing_zone",
+      "not_applicable_zone",
+      "unexpected_zone",
+      "ambiguous",
+      "contradictory",
+      "truncated",
+      "null_structured_result"
+    ]
+  },
+  "fixtures": [
+    {
+      "fixtureId": "sim_complete_primary",
+      "fixtureRevisionId": "sim_complete_primary_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["complete", "negative_value", "decimal_value", "spoken_unit", "normalized_unit", "device_alarm", "power_state", "battery_state"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_complete_primary_0001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_complete_primary", "pointer": "/fixtureRevisions/0/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_complete_primary", "pointer": "/fixtureRevisions/0/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_complete_primary", "pointer": "/fixtureRevisions/0/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_complete_primary", "pointer": "/fixtureRevisions/0/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_complete_primary", "pointer": "/fixtureRevisions/0/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_complete_primary", "pointer": "/fixtureRevisions/0/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_complete_primary_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "complete",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_complete_secondary",
+      "fixtureRevisionId": "sim_complete_secondary_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["complete", "input_specific_values"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_complete_secondary_002",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_complete_secondary", "pointer": "/fixtureRevisions/1/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_complete_secondary", "pointer": "/fixtureRevisions/1/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_complete_secondary", "pointer": "/fixtureRevisions/1/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_complete_secondary", "pointer": "/fixtureRevisions/1/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_complete_secondary", "pointer": "/fixtureRevisions/1/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_complete_secondary", "pointer": "/fixtureRevisions/1/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_complete_secondary_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "complete",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_missing_zone",
+      "fixtureRevisionId": "sim_missing_zone_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["missing_zone", "expected_zone_reconciliation"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_missing_zone_000001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_missing_zone", "pointer": "/fixtureRevisions/2/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_missing_zone", "pointer": "/fixtureRevisions/2/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_missing_zone", "pointer": "/fixtureRevisions/2/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_missing_zone", "pointer": "/fixtureRevisions/2/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_missing_zone", "pointer": "/fixtureRevisions/2/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_missing_zone", "pointer": "/fixtureRevisions/2/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_missing_zone_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "partial",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_ambiguous_duplicate",
+      "fixtureRevisionId": "sim_ambiguous_duplicate_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["ambiguous"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_ambiguous_duplicate01",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_ambiguous", "pointer": "/fixtureRevisions/3/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_ambiguous", "pointer": "/fixtureRevisions/3/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_ambiguous", "pointer": "/fixtureRevisions/3/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_ambiguous", "pointer": "/fixtureRevisions/3/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_ambiguous", "pointer": "/fixtureRevisions/3/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_ambiguous", "pointer": "/fixtureRevisions/3/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_ambiguous_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "partial",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_contradictory_sign",
+      "fixtureRevisionId": "sim_contradictory_sign_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["contradictory"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_contradictory_sign01",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_contradictory", "pointer": "/fixtureRevisions/4/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_contradictory", "pointer": "/fixtureRevisions/4/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_contradictory", "pointer": "/fixtureRevisions/4/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_contradictory", "pointer": "/fixtureRevisions/4/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_contradictory", "pointer": "/fixtureRevisions/4/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_contradictory", "pointer": "/fixtureRevisions/4/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_contradictory_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "partial",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_truncated_report",
+      "fixtureRevisionId": "sim_truncated_report_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["truncated"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_truncated_report_001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_truncated", "pointer": "/fixtureRevisions/5/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_truncated", "pointer": "/fixtureRevisions/5/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_truncated", "pointer": "/fixtureRevisions/5/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_truncated", "pointer": "/fixtureRevisions/5/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_truncated", "pointer": "/fixtureRevisions/5/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_truncated", "pointer": "/fixtureRevisions/5/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_truncated_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "partial",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_null_structured_result",
+      "fixtureRevisionId": "sim_null_structured_result_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["null_structured_result"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_null_structured_0001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_null", "pointer": "/fixtureRevisions/6/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_null", "pointer": "/fixtureRevisions/6/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_null", "pointer": "/fixtureRevisions/6/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_null", "pointer": "/fixtureRevisions/6/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_null", "pointer": "/fixtureRevisions/6/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_null", "pointer": "/fixtureRevisions/6/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_null_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "unknown",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_unexpected_zone",
+      "fixtureRevisionId": "sim_unexpected_zone_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["unexpected_zone", "expected_zone_reconciliation"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_unexpected_zone_00001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_unexpected_zone", "pointer": "/fixtureRevisions/7/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_unexpected_zone", "pointer": "/fixtureRevisions/7/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_unexpected_zone", "pointer": "/fixtureRevisions/7/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_unexpected_zone", "pointer": "/fixtureRevisions/7/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_unexpected_zone", "pointer": "/fixtureRevisions/7/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_unexpected_zone", "pointer": "/fixtureRevisions/7/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_unexpected_zone_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "partial",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    },
+    {
+      "fixtureId": "sim_reviewed_contract",
+      "fixtureRevisionId": "sim_reviewed_contract_rev_1",
+      "revision": 1,
+      "lifecycleStatus": "active",
+      "coverageTags": ["complete", "confidence_linkage", "not_applicable_zone"],
+      "proofScope": "contract_only",
+      "provenance": "simulated",
+      "custody": "repository_reviewed",
+      "availability": "present",
+      "reviewStatus": "reviewed",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_reviewed_contract_001",
+      "artifactRefs": [
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "lifecycle_reviewed_contract", "pointer": "/fixtureRevisions/8/records/0", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "provider_lifecycle" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "evidence_reviewed_contract", "pointer": "/fixtureRevisions/8/records/1", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "retained_evidence" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "assertions_reviewed_contract", "pointer": "/fixtureRevisions/8/records/2", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_evidence_assertion" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "result_reviewed_contract", "pointer": "/fixtureRevisions/8/records/3", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "structured_provider_output" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "truth_reviewed_contract", "pointer": "/fixtureRevisions/8/records/4", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "reviewed_ground_truth" },
+        { "path": "tests/fixtures/providers/calle/grounded-reading/simulated-edge-cases.json", "recordId": "expected_reviewed_contract", "pointer": "/fixtureRevisions/8/records/5", "sha256": "2c683271f74b3651ffd3724a5fecf5f66090591eb5e7553b4d04cac5e0f24030", "recordRole": "expected_derived" }
+      ],
+      "expectedZoneInventoryRef": "inventory_sim_reviewed_contract_v1",
+      "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+      "lineage": { "supersedes": null },
+      "expectedQuality": "complete",
+      "requiredDecisionGates": ["contract_only", "simulated_cannot_satisfy_provider_gate"]
+    }
+  ]
+}
