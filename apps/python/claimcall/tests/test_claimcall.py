@@ -17,7 +17,7 @@ EXAMPLES = os.path.join(APP, "examples")
 
 
 def make_case(**over):
-    base = dict(passenger_name="Alex Morgan", airline="EuroSky Airways", booking_ref="ABC123",
+    base = dict(passenger_name="Santee Cooper", airline="EuroSky Airways", booking_ref="ABC123",
                 flight_no="ES421", origin="Paris", destination="Bengaluru", flight_status="Cancelled",
                 scheduled_date="2026-09-14", airline_hotline="+12125550100", region="US")
     base.update(over)
@@ -41,7 +41,7 @@ def client(fake):
 def test_demo_case_loads():
     with open(os.path.join(EXAMPLES, "demo-case.json"), encoding="utf-8") as f:
         seed = json.load(f)
-    assert seed["passenger_name"] == "Alex Morgan"
+    assert seed["passenger_name"] == "Santee Cooper"
     assert seed["flight_status"] == "Cancelled"
     case = make_case()
     assert case["status"] == "open"
@@ -90,7 +90,7 @@ def test_call_plan_generation():
 
 def test_policy_boundaries_in_task():
     task = build_task(make_case(), build_plan(make_case(), []))
-    for needle in ("Alex Morgan", "EuroSky Airways", "ES421", "ABC123", "Paris", "Bengaluru"):
+    for needle in ("Santee Cooper", "EuroSky Airways", "ES421", "ABC123", "Paris", "Bengaluru"):
         assert needle in task
     for boundary in policy.HARD_BOUNDARIES:
         assert boundary in task

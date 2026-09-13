@@ -39,7 +39,7 @@ python3 -m pytest                              # 21 tests, all offline
 
 Python 3.9 or newer, standard library only. `pytest` is the only development dependency.
 
-The demo case is fictional: passenger Alex Morgan, EuroSky Airways, booking ABC123, flight
+The demo case is fictional: passenger Santee Cooper, EuroSky Airways, booking ABC123, flight
 ES421, Paris → Bengaluru, Cancelled. Phone fixtures use the fictional NANP range `555-01XX`.
 
 ## Demo script (3 minutes)
@@ -55,7 +55,7 @@ python3 -m claimcall --data ./data serve   # open http://127.0.0.1:8766
 
 | Time | Show | Where |
 | --- | --- | --- |
-| 00:00 | Flight cancelled: Alex Morgan, EuroSky ES421, Paris → Bengaluru | 1. Disruption Case |
+| 00:00 | Flight cancelled: Santee Cooper, EuroSky ES421, Paris → Bengaluru | 1. Disruption Case |
 | 00:15 | Five missing facts, all unknown | 2. Missing Information |
 | 00:30 | Why a phone call helps: critical facts live on the airline's line | 4. Human Approval, first paragraph |
 | 00:45 | Exactly what the agent may ask: five objectives | 3. Call Plan |
