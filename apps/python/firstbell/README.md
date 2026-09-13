@@ -36,6 +36,7 @@ $13.89 a student. This app computes its own ceiling on every run and prints it: 
 call** is the price above which the desk is cheaper. A thousand calls against that renewal is
 0.22% of it.
 
+[![Watch the demo](https://img.shields.io/badge/watch%20the%20demo-2%3A44-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://youtu.be/1MM1oL9bQ4E)
 [![Evidence page](https://img.shields.io/badge/evidence-firstbell--evidence.vercel.app-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
 [![Offline by default](https://img.shields.io/badge/offline-dials%20nobody%2C%20no%20account-1a7f5a?style=flat-square)](#run-it)
 [![Real calls](https://img.shields.io/badge/real%20calls-20%20placed%20through%20CALL--E-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
@@ -44,6 +45,7 @@ call** is the price above which the desk is cheaper. A thousand calls against th
 [![Mutations](https://img.shields.io/badge/gates%20broken%20on%20purpose-358-444?style=flat-square)](evidence/MUTATIONS.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-444?style=flat-square)](../../../LICENSE)
 
+**[Watch the demo](https://youtu.be/1MM1oL9bQ4E)** &nbsp;·&nbsp;
 **[Evidence page](https://firstbell-evidence.vercel.app)** &nbsp;·&nbsp;
 **[What it costs](#the-three-money-figures-and-where-each-one-comes-from)** &nbsp;·&nbsp;
 **[A pilot a district could sign](docs/what-a-pilot-would-look-like.md)** &nbsp;·&nbsp;
@@ -76,12 +78,6 @@ python -m firstbell --work-file examples/absences.csv
 
 That dials nobody, costs nothing and needs no CALL-E account. It prints one line per row and
 a total that does not add the middle outcome to the successes.
-
-There is a demo film, 2 minutes 44. The greeting is a recording of me, every
-other line is a voice clone of the same speaker, and the call you hear in it is the recording
-CALL-E returned, played in one unbroken cut, with the part of the person who answered read
-by a volunteer. Its running time, loudness and hash are measured into
-[`evidence/film.json`](evidence/film.json) rather than typed.
 
 ![The path of one absence row, left to right. Two checks come first: a family with no consent is never dialled, and a family the telephone cannot reach goes straight to a person. Then a short instruction in the family's own language, with the automated-caller disclosure before anything is asked. Then CALL-E places the call, under a cap on how many families are rung at once, one idempotency key per row, polled to the end. Then exactly one of three endings: resolved, owned by nobody; undetermined and failed, both owned by a person. A safeguarding escalation runs as a second axis, leaving resolved and undetermined but never failed, because a call that reached nobody has no answer to read a rule against.](docs/images/the-path-of-one-absence.svg)
 
@@ -201,9 +197,6 @@ seven rows below can be checked without an account.
 
 </details>
 
-<details>
-<summary><b>Reusable without this app</b></summary>
-
 ## Reusable without this app
 
 The classification rule is not locked inside a Python CLI. The same three outcomes ship as
@@ -251,8 +244,6 @@ The defect this entry is built around is a schema-valid answer closing a record 
 nothing; reading a guardian's confirmation out of prose is the same defect with a better
 vocabulary. A transcript is not a decision.
 
-
-</details>
 
 <details>
 <summary><b>The problem</b></summary>
@@ -501,9 +492,6 @@ attempts is not a price.
 
 </details>
 
-<details>
-<summary><b>Run it</b></summary>
-
 ## Run it
 
 The default is offline against a local double that speaks the real CALL-E API. Nothing
@@ -614,11 +602,6 @@ second guardian's number. CALL-E bills per call, not per student, so the number 
 matters to a budget is the eight.
 
 
-</details>
-
-<details>
-<summary><b>The three money figures, and where each one comes from</b></summary>
-
 ## The three money figures, and where each one comes from
 
 Three numbers, and each is a link away from the arithmetic that produced it.
@@ -667,11 +650,6 @@ safeguarding rule and without it, and prints what eleven calls can and cannot ru
 
 
 
-</details>
-
-<details>
-<summary><b>Who picked up the telephone</b></summary>
-
 ## Who picked up the telephone
 
 The number is the one a school has on record for a child. That is not the same as a
@@ -711,11 +689,6 @@ mutation. So absent is counted and printed rather than resolved in either direct
 every one of the eleven real calls on the evidence page falls in that row, because they
 were placed before the field existed.
 
-
-</details>
-
-<details>
-<summary><b>Whether it finishes before the cutoff</b></summary>
 
 ## Whether it finishes before the cutoff
 
@@ -757,11 +730,6 @@ one flag. What a district is agreeing to when it sets that flag is six families 
 once with no way to stop any of them, which is a sentence that belongs in the decision
 rather than in a default.
 
-
-</details>
-
-<details>
-<summary><b>Three outcomes, not two</b></summary>
 
 ## Three outcomes, not two
 
@@ -888,11 +856,6 @@ The summary at the end of a run reports the same three numbers, and the queue of
 needing a person is printed after them rather than folded into a rate.
 
 
-</details>
-
-<details>
-<summary><b>What it uses from CALL-E</b></summary>
-
 ## What it uses from CALL-E
 
 Read from the SDK source rather than the quickstart, which documents a narrower surface
@@ -910,11 +873,6 @@ than the API has.
   same key rather than minting a fresh one, so a network failure cannot double-call a
   family. The header is set once per work item in `dispatch/scheduler.py`.
 
-
-</details>
-
-<details>
-<summary><b>Safety and side effects</b></summary>
 
 ## Safety and side effects
 
@@ -973,8 +931,6 @@ than the API has.
   vulnerable people should know that before they do, and it is filed as a defect report
   rather than left as a footnote.
 
-
-</details>
 
 <details>
 <summary><b>Live mode</b></summary>
@@ -1173,9 +1129,6 @@ says what would be reachable, and tells you how to proceed anyway.
 
 </details>
 
-<details>
-<summary><b>Evidence from real calls</b></summary>
-
 ## Evidence from real calls
 
 Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. A shortened id for each
@@ -1233,11 +1186,6 @@ Moving this from a Chennai school to a California district changes two inputs an
 the jurisdiction is data, and only the data is jurisdictional.
 
 
-</details>
-
-<details>
-<summary><b>What a district already has</b></summary>
-
 ## What a district already has
 
 Every district this is priced for already owns a mass-notification system. SchoolMessenger,
@@ -1261,8 +1209,6 @@ that reads the language limit in act 07 and decides the calling layer is not for
 take the three outcomes, the consent gate and the structured reason over the dialler they
 already pay for, and the receipt shape is documented for exactly that.
 
-
-</details>
 
 <details>
 <summary><b>Tests</b></summary>
@@ -1333,9 +1279,6 @@ calls were of the second kind.
 
 </details>
 
-<details>
-<summary><b>What this does not claim</b></summary>
-
 ## What this does not claim
 
 Three of these are legal rather than technical, and they are set out properly in
@@ -1399,11 +1342,6 @@ TCPA, which puts a call like this one inside the statute rather than beside it.
   nobody answered, and `dispatch/scheduler.py` records why it refuses to say more.
 
 
-</details>
-
-<details>
-<summary><b>What I would build next</b></summary>
-
 ## What I would build next
 
 Four things, and each one is a limitation named above rather than a feature I fancy. In the
@@ -1436,11 +1374,6 @@ is a thing you can describe well enough to be refused.
    four because one bilingual person cannot say the same thing twice from memory.
 
 
-</details>
-
-<details>
-<summary><b>When this was built</b></summary>
-
 ## When this was built
 
 Newly created. The first commit in this directory is `b668ac0`, 2026-09-04, and every
@@ -1454,11 +1387,6 @@ git log --reverse --format='%h %ad %s' --date=short -- :/apps/python/firstbell |
 That command prints the creation date from the repository itself rather than asking anyone
 to take the sentence above on trust.
 
-
-</details>
-
-<details>
-<summary><b>Attribution</b></summary>
 
 ## Attribution
 
@@ -1480,5 +1408,3 @@ shortened at both ends. The receipts that hold the number are on neither surface
 sentences are both true and they are eighty lines apart, which was worth closing rather
 than leaving a reader to reconcile.
 
-
-</details>

@@ -489,15 +489,6 @@ def _recorded_call_total() -> int:
         (EVIDENCE / "recorded-calls.json").read_text(encoding="utf-8"))["counts"]["calls"]
 
 
-def _film_running_time() -> str:
-    """`2 min 58`, from the measurement, or nothing at all if it has not been measured."""
-    facts = EVIDENCE / "film.json"
-    if not facts.exists():
-        return "the demo"
-    seconds = json.loads(facts.read_text(encoding="utf-8"))["seconds"]
-    return f"{int(seconds // 60)} min {int(round(seconds % 60)):02d}"
-
-
 def _node_suite_size() -> tuple[int, int]:
     """How many tests the n8n recipe ships, counted rather than remembered.
 
@@ -1352,12 +1343,8 @@ def where_it_lives(repo_url: str | None, video_url: str | None) -> str:
             'here.</p>')
     if not video_url:
         out.append(
-            # The two paragraphs shared a 22-word closing clause, word for word. Each
-            # keeps the fact it is about; the shared one is said once and pointed at.
-            f'<p>A demo film runs {_film_running_time()} and is measured in '
-            '<code>evidence/film.json</code>, which records its length, its shot count, how '
-            'much of it carries sound and the digest of the file. It was not uploaded when '
-            'this page was built, so its link is in the submission form too.</p>')
+            '<p>There is a demo film of the app running. It was not uploaded when this '
+            'page was built, so its link is in the submission form rather than here.</p>')
     return "".join(out)
 
 
@@ -1439,7 +1426,7 @@ def nav_markup(repo_url: str | None, video_url: str | None) -> str:
     ]
     if video_url:
         out.append(f'<a class=nav-link href="{html.escape(video_url, quote=True)}" '
-                   f'rel="noopener">Watch the demo, {_film_running_time()}</a>')
+                   f'rel="noopener">Watch the demo</a>')
     if repo_url:
         out.append(f'<a class="nav-link nav-cta" href="{html.escape(repo_url, quote=True)}" '
                    'rel="noopener">GitHub PR</a>')
@@ -1474,7 +1461,7 @@ def nav_note_markup(repo_url: str | None, video_url: str | None) -> str:
     """
     missing = []
     if not video_url:
-        missing.append(f'the demo film, {_film_running_time()}')
+        missing.append('the demo film')
     if not repo_url:
         missing.append('the pull request into CALL-E’s own repository')
     if not missing:
@@ -1496,18 +1483,14 @@ def video_link_markup(video_url: str | None) -> str:
 
     Rebuild with `--video-url` the moment it is up.
 
-    The running time is read rather than written. It said 2 min 53 here for a fortnight,
-    and a re-render made the cut five seconds longer and this line wrong, along with the
-    same figure in the README and in this docstring. The film is not in the repository, so
-    the script that renders it measures the finished file and writes `evidence/film.json`,
-    and this reads that. There is no `make-receipt.py`: this line named one for a while,
-    which sent a reader looking for a script that was never here.
+    The film is not in this repository and neither is anything that measures it. This
+    prints the link and nothing about the file, so there is no figure here that can rot.
     """
     if not video_url:
         return ""      # and the fact in act 08. See `where_it_lives`.
     safe = html.escape(video_url, quote=True)
     return (f'<p class=source-link><a href="{safe}" rel="noopener">'
-            f'Watch the demo, {_film_running_time()}</a></p>')
+            'Watch the demo</a></p>')
 
 
 def marginalia(label: str, body: str) -> str:
