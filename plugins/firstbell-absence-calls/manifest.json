@@ -28,7 +28,7 @@
   "credentials": [
     "CALL-E API key provided as CALL_E_API_KEY through the n8n deployment secret or environment-variable store. It is read at execution time and never stored in workflow data, so it does not travel in an export."
   ],
-  "tested_with": {
+  "tooling_tested_with": {
     "node": "22.23.2"
   },
   "verification": {
