@@ -5,7 +5,7 @@ AfterCare is a post-discharge care coordinator that uses CALL-E to conduct
  identify risk signals and instantly flags anyone who needs to be escalated.
 
 This directory is a 
-guide for [AfterCare app](https://github.com/frasfras/after-call).
+guide for [AfterCare Call app](https://github.com/frasfras/after-call).
 
 
 - [Public demo](https://aftercare.ai.studio/)
