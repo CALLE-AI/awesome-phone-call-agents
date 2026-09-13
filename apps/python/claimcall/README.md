@@ -188,11 +188,6 @@ docs/architecture.svg      module diagram (diagram-design style guide)
 tests/test_claimcall.py    offline pytest suite
 ```
 
-Diagrams are flat self-contained SVGs drawn from the
-[diagram-design](https://github.com/cathrynlavery/diagram-design) style guide:
-one accent colour reserved for the focal nodes (approval, outcome, policy, live path),
-everything else ink and muted.
-
 For recurring reminders the repository default applies: a host scheduler would invoke one
 `run` cycle per occasion; the provider places exactly one call per run. ClaimCall ships no
 scheduler of its own.
