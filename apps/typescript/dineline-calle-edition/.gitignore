@@ -5,3 +5,4 @@ coverage/
 .env.local
 *.log
 .call-journal/
+.vercel/
