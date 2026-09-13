@@ -17,7 +17,7 @@ Finding a skilled nursing bed for a discharged patient means phoning facility af
 - **Re-Plan** queues a sister facility named on the call, widens the radius, or stops early on a verified match.
 - The run ends at a **human gate**: a case manager approves or declines a proposed placement, and a referral packet PDF records the decision.
 
-An optional LLM transcript review (Claude) can only make a finding more cautious, and only with a verbatim quote of the facility's own words; code applies or rejects each flag. It never confirms a requirement or approves a placement.
+An optional LLM transcript review (Claude, on the Claude API or Amazon Bedrock) can only make a finding more cautious, and only with a verbatim quote of the facility's own words; code applies or rejects each flag. It never confirms a requirement or approves a placement.
 
 ## Setup
 
@@ -69,7 +69,7 @@ The app places at most one call task per facility per run and does not retry or 
 
 The referral packet PDF is generated locally and is **never transmitted**: e-fax dispatch and transport coordination are not implemented, and the packet states this.
 
-When `ANTHROPIC_API_KEY` is set, the synthetic call evidence for each facility is sent to the Claude API for review. Without it, the review is skipped and the rule-based agent runs unchanged.
+When an LLM provider is configured, the synthetic call evidence for each facility is sent to it for review: the Claude API (`LLM_PROVIDER=anthropic` with `ANTHROPIC_API_KEY`) or Claude on Amazon Bedrock (`LLM_PROVIDER=bedrock` with `AWS_REGION` and a Bedrock API key or AWS credentials). Without one, the review is skipped and the rule-based agent runs unchanged.
 
 ## Safe testing path with no calls
 
@@ -87,7 +87,7 @@ The API additionally requires a `max_calls` ceiling on call-placing runs, refuse
 
 ## Credential handling
 
-CALL-E and Anthropic credentials are read from environment variables only. They are never committed, never written to recordings or reports, and never returned by the API. The repository ships a `.env.example` with empty values, and `.env` is excluded by `.gitignore`.
+CALL-E, Anthropic, and AWS credentials are read from environment variables only. They are never committed, never written to recordings or reports, and never returned by the API. The repository ships a `.env.example` with empty values, and `.env` is excluded by `.gitignore`.
 
 The API server has no authentication and is meant for a single local operator. Run it on `localhost`, as in the setup above, and do not expose it on a network interface.
 
