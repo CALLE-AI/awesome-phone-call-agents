@@ -103,10 +103,10 @@ and nothing here is a screenshot.
 | No dated permission, no call, and a permission naming another telephone does not authorise this one | `python -m firstbell --work-file examples/absences-with-consent.csv --consent-records examples/consent-register.json` refuses five of the eight rows and prints each family's reason, then counts the dialled rows that rested on a record naming no number at all |
 | Every gate here was broken on purpose to prove it fires | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md), 358 rows, each with the change made and the number of tests that noticed |
 
-Twenty live calls sit behind this entry: twelve placed on 2026-09-04, two of which play in
-full on the [evidence page](https://firstbell-evidence.vercel.app) with their transcripts,
-and twelve more placed on 2026-09-11 and written up in
-[`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). The receipt files are on neither that
+Twenty live calls sit behind this entry: eight from the 2026-09-04 locale experiment, two
+of which play in full on the [evidence page](https://firstbell-evidence.vercel.app) with
+their transcripts, and twelve that connected on 2026-09-11 out of nineteen dialled that
+day, written up in [`CALLE_FEEDBACK_REPORT.md`](CALLE_FEEDBACK_REPORT.md). The receipt files are on neither that
 page nor in this tree ([`evidence/README.md`](evidence/README.md) says why), so what travels
 with the code is the arithmetic they produced:
 [`evidence/recorded-calls.json`](evidence/recorded-calls.json) names all six receipt files and
@@ -1275,7 +1275,7 @@ python -m pytest tests/ -q          # 855 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**855 is the number collected, and two different pairs add up to it.** Some of these gates
+**855 is the number collected, and three different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the call recordings, which are held
 outside the tree ([`evidence/README.md`](evidence/README.md) says why), a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
@@ -1284,8 +1284,12 @@ A clean checkout of this commit into an empty directory reports **796 passed, 59
 skipped**. The fifty-nine name what is missing rather than passing quietly: thirty-eight
 want a built page, four of those thirty-eight also wanting its Content-Security-Policy,
 eighteen want the recordings, and three want a gate report. Build the page and run the
-gates and the same suite reports **853 passed, 2 skipped**. Both pairs are measured, both
-add up to 855, and the difference between them is what a reader has on their disk.
+gates and the same suite reports **853 passed, 2 skipped**. Do both but leave the
+recordings where they are, which is the state a reviewer who clones this and builds it
+will be in, and it reports **836 passed, 19 skipped**: the eighteen that want the
+recordings, and one more that can only run when no gate report is there to read. All three
+pairs are measured, all three add up to 855, and the difference between them is what a
+reader has on their disk.
 
 The very first run in a fresh clone reports one more skip and one fewer pass, 795 and 60.
 The figure on the first screen is generated rather than committed, so

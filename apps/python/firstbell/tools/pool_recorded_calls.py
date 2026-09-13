@@ -178,7 +178,8 @@ def document(receipts_dir: Path, read_at: str) -> dict:
         "what_this_is": (
             "Counts over the twelve calls pooled from the receipts this file names, "
             "which is not every call this software has placed: the evidence page publishes "
-            "twenty, and twelve of those were placed after this pool was taken. Against "
+            "twenty, being eight of these twelve (the locale experiment of receipts 05 and "
+            "06) plus twelve more placed on 2026-09-11. Against "
             "api.heycall-e.com. No conversation, no telephone number, no call id, no "
             "field value: the same line evidence/api-shape.json draws, for the same "
             "reason, which is that the receipts themselves are not committed and "

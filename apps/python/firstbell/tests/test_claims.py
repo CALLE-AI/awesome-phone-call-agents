@@ -2021,10 +2021,15 @@ def test_the_queue_rows_are_the_number_the_committed_record_holds():
 def test_every_pair_the_readme_publishes_adds_up_to_the_number_collected():
     """The count above them was checked. What they add up to was not.
 
-    `README.md` states the number of tests collected, and then explains it with two pairs:
-    what a clean checkout reports, and what the same suite reports once the page is built
-    and the gates have run. Both pairs describe the same suite, so both have to sum to the
+    `README.md` states the number of tests collected, and then explains it with the pairs
+    a reader can reproduce: what a clean checkout reports, what the same suite reports once
+    the page is built and the gates have run, and what it reports on a built tree without
+    the recordings. Every pair describes the same suite, so every one has to sum to the
     same number, and that number is the one directly above them.
+
+    The closing sentence was read for the literal word "both" until a third pair was
+    published on 2026-09-13, at which point the gate failed on the wording rather than on
+    the arithmetic. A gate that counts pairs should not also hard-code how many there are.
 
     They did not. The tree grew by eighteen tests in one night, the collected count moved
     because a gate made it move, and both pairs went on adding up to the figure from the
@@ -2056,9 +2061,9 @@ def test_every_pair_the_readme_publishes_adds_up_to_the_number_collected():
             "this suite, so a pair that does not add up to the count above it was measured "
             "on a tree that no longer exists")
 
-    stated = re.search(r"both add up to (\d+)", readme)
+    stated = re.search(r"(?:both|all \w+) add up to (\d+)", readme)
     assert stated, (
-        "the README no longer says what the two pairs add up to, and that sentence is the "
+        "the README no longer says what the pairs add up to, and that sentence is the "
         "one a reader checks the arithmetic against")
     assert int(stated.group(1)) == collected, (
         f"the README says both pairs add up to {stated.group(1)} and the suite collects "
