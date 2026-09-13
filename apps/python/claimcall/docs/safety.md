@@ -24,6 +24,8 @@ Phone calls are real-world side effects. Safety is enforced in code (`claimcall/
 
 - The hotline must be a full E.164 number whose country code matches the case region
   (`policy.REGIONS`); anything else is refused in code.
+- A number typed into the dashboard for a live call carries its own region, derived from
+  its country code (`policy.region_for_number`); unsupported country codes are refused.
 - If `CLAIMCALL_ALLOWLIST` is set, live calls to any number outside it are refused.
   For hackathon verification, put your own test number there.
 - Destinations are masked (`+1***00`) in CLI output, the dashboard, and stored call records.

@@ -70,7 +70,8 @@ small.mut{color:#64748b}
 <div class="card"><h2>3. Call Plan</h2><div id="plan"></div></div>
 <div class="card"><h2>4. Human Approval</h2>
 <div id="why"></div>
-<label><input type="checkbox" id="approve"> I approve <b>one</b> call to the exact number above for exactly these objectives.</label><br><br>
+<label>Call my mobile (live only, E.164): <input id="dest" placeholder="+15551234567" style="width:170px"></label><br><br>
+<label><input type="checkbox" id="approve"> I approve <b>one</b> call for exactly these objectives.</label><br><br>
 <select id="mode"><option value="preview">preview (no call)</option><option value="fixture" selected>fixture (synthetic, no call)</option><option value="live">live (real CALL-E call)</option></select>
 <button id="go" onclick="run()">Resolve by Phone — Approve &amp; Call</button>
 <span id="livestate"></span><div id="out"></div></div>
@@ -101,7 +102,7 @@ function render(){
   document.getElementById('outcome').innerHTML=h||'<small class="mut">Call recorded but no usable result.</small>';
  }
 }
-async function run(){const body={mode:document.getElementById('mode').value,approved:document.getElementById('approve').checked};
+async function run(){const body={mode:document.getElementById('mode').value,approved:document.getElementById('approve').checked,destination:document.getElementById('dest').value};
  const r=await fetch('/api/run',{method:'POST',headers:HDR,body:JSON.stringify(body)}).then(r=>r.json());
  const o=document.getElementById('out');
  if(r.task&&!r.placed){o.innerHTML=`<pre>${esc('PREVIEW — would dial '+r.masked_destination+'. Nothing sent.')}\n${esc(r.task)}</pre>`;return}
@@ -197,6 +198,7 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
                 return self._json(400, {"error": "invalid JSON"})
             mode = body.get("mode", "preview")
             approved = body.get("approved") is True
+            destination = (body.get("destination") or "").strip() or None
             if not store.exists():
                 return self._json(404, {"placed": False, "reason": "no case; run `init-demo` first"})
             case = store.load()
@@ -214,7 +216,8 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
                                                 "reason": "refused: live calls need --allow-live plus CALLE_API_KEY on the server"})
                     client = CalleClient(live_key, OFFICIAL_ORIGIN)
                     res = engine.run(case, "live", client=client, approved=True,
-                                     allowlist=allowlist, api_key_present=True)
+                                     allowlist=allowlist, api_key_present=True,
+                                     live_destination=destination)
                 else:
                     return self._json(400, {"placed": False, "reason": f"unknown mode {mode!r}"})
             except CalleError as e:

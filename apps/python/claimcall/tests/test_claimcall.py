@@ -248,3 +248,39 @@ def test_no_secrets_or_real_numbers_in_fixtures():
     for number in re.findall(r"\+\d[\d\s().-]{6,}", demo):
         digits = re.sub(r"\D", "", number)
         assert "55501" in digits, f"non-fictional number in demo fixture: {number}"
+
+
+# ---- UI-typed live destination ------------------------------------------------------------
+
+OVERRIDE_NUMBER = "+14155550100"
+
+
+def test_region_derived_from_typed_number():
+    assert policy.region_for_number("+14155550100") == "US"
+    assert policy.region_for_number("+442079460000") == "GB"
+    assert policy.region_for_number("+9991234567") is None
+    assert policy.region_for_number("not-a-number") is None
+
+
+def test_live_override_destination_is_dialed(client):
+    case = make_case()
+    res = engine.run(case, "live", client=client, approved=True, allowlist=OVERRIDE_NUMBER,
+                     api_key_present=True, live_destination=OVERRIDE_NUMBER)
+    assert res["placed"] is True
+    assert res["call"]["hotline_masked"] == mask_phone(OVERRIDE_NUMBER)
+    assert case["airline_hotline"] == "+12125550100"  # case facts untouched
+
+
+def test_live_override_off_allowlist_refused(client):
+    res = engine.run(make_case(), "live", client=client, approved=True,
+                     allowlist="+19995550100", api_key_present=True,
+                     live_destination=OVERRIDE_NUMBER)
+    assert res["placed"] is False
+    assert "ALLOWLIST" in res["reason"]
+
+
+def test_live_override_bad_number_refused(client):
+    for bad in ("not-a-number", "+9991234567"):
+        res = engine.run(make_case(), "live", client=client, approved=True,
+                         allowlist="", api_key_present=True, live_destination=bad)
+        assert res["placed"] is False, bad

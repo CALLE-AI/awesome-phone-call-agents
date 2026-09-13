@@ -35,6 +35,22 @@ HARD_BOUNDARIES = [
 ]
 
 
+def region_for_number(hotline: str) -> Optional[str]:
+    """Derive the dialling region from the number's country code (longest prefix wins).
+
+    Used when the operator types a live destination into the dashboard: the typed
+    number carries its own region instead of inheriting the case region. Returns
+    None when the country code is not in the supported table.
+    """
+    if not isinstance(hotline, str) or not hotline.startswith("+"):
+        return None
+    digits = hotline[1:]
+    for region, cc in sorted(REGIONS.items(), key=lambda kv: -len(kv[1])):
+        if digits.startswith(cc):
+            return region
+    return None
+
+
 def destination_problems(hotline: str, region: str) -> List[str]:
     """Every reason a destination is not a valid, dialable, region-consistent E.164 number."""
     if not isinstance(hotline, str) or not E164_PATTERN.match(hotline):

@@ -61,6 +61,7 @@ python3 -m claimcall --data ./data serve   # open http://127.0.0.1:8766
 | 00:45 | Exactly what the agent may ask: five objectives | 3. Call Plan |
 | 01:00 | What it may never do: no purchases, no payment, no unrelated changes | 3. Call Plan, restrictions |
 | 01:10 | Tick the checkbox, mode `fixture`, press Resolve by Phone — Approve & Call | 4. Human Approval |
+| live | Type your mobile into Call my mobile, tick approval, mode `live`, Approve & Call | 4. Human Approval |
 | 01:20 | CALL-E execution: call ID, completed status | 5. CALL-E Execution |
 | 01:50 | Structured result folded into the case | 5. CALL-E Execution, outcome |
 | 02:05 | Three commitments plus transcript evidence | 6 + 7. Outcome |
@@ -111,7 +112,13 @@ items are listed, and nothing is invented.
 
 A call never happens because a case was loaded or analysed. Before live execution the app shows
 **Why is ClaimCall making this call?** and **What is ClaimCall allowed to do?**, then requires
-an explicit `Approve & Call` action covering exactly one call to the exact number shown.
+an explicit `Approve & Call` action covering exactly one call.
+
+In the dashboard, type your mobile number into **Call my mobile**, tick the approval checkbox,
+select `live`, and press Resolve by Phone — Approve & Call. The typed number is validated as
+E.164 with a supported country code and checked against `CLAIMCALL_ALLOWLIST` when set; the
+case facts stay fictional, only the destination is yours. On the CLI the same authorisation is
+`--approve` plus `--hotline` repeating the destination exactly.
 
 ## Workflow
 

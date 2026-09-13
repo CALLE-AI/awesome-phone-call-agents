@@ -1,7 +1,7 @@
 """Turn a disruption case into one bounded CALL-E task: instruction text plus a closed result schema."""
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .policy import CALL_CONSTRAINTS, HARD_BOUNDARIES
 
@@ -112,13 +112,16 @@ def build_task(case: Dict[str, Any], plan: Dict[str, Any]) -> str:
     return "\n\n".join(parts)
 
 
-def build_request(case: Dict[str, Any], task: str, idempotency_key: str) -> Dict[str, Any]:
+def build_request(case: Dict[str, Any], task: str, idempotency_key: str,
+                  destination: Optional[str] = None, region: Optional[str] = None) -> Dict[str, Any]:
+    hotline = destination or case["airline_hotline"]
+    dest_region = region or case["region"]
     req: Dict[str, Any] = {
         "task": task,
         "recipients": [
             {
-                "phones": [case["airline_hotline"]],
-                "region": case["region"],
+                "phones": [hotline],
+                "region": dest_region,
                 "locale": case.get("locale", "en-US"),
             }
         ],

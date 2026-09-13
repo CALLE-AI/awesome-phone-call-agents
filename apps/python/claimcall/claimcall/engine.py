@@ -206,13 +206,14 @@ def preview(case: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _fold_terminal(case: Dict[str, Any], terminal: Dict[str, Any], mode: str, key: str) -> Dict[str, Any]:
+def _fold_terminal(case: Dict[str, Any], terminal: Dict[str, Any], mode: str, key: str,
+                   dialed: Optional[str] = None) -> Dict[str, Any]:
     call_record = {
         "id": terminal["id"],
         "created_at": now_iso(),
         "mode": mode,
         "status": terminal.get("status"),
-        "hotline_masked": mask_phone(case["airline_hotline"]),
+        "hotline_masked": mask_phone(dialed or case["airline_hotline"]),
         "summary": terminal.get("summary"),
         "task_completed": terminal.get("task_completed"),
         "completion_confidence": terminal.get("completion_confidence"),
@@ -234,11 +235,14 @@ def run(
     approved: bool = False,
     allowlist: Optional[str] = None,
     api_key_present: bool = False,
+    live_destination: Optional[str] = None,
 ) -> RunResult:
     """Run one resolution cycle. Fixture and live share the same fold path.
 
     Fixture and live both require explicit approval; preview never dials and
-    needs neither approval nor credentials.
+    needs neither approval nor credentials. In live mode an explicit
+    live_destination (typed into the dashboard) overrides the case hotline;
+    it is validated and allowlisted exactly like the case number.
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
@@ -248,21 +252,29 @@ def run(
         return RunResult(placed=False, reason="refused: this call needs explicit human approval (Approve & Call)", call=None)
     if client is None:
         raise ValueError("client required for fixture and live modes")
+    dialed = case["airline_hotline"]
+    dest_region = case["region"]
     if mode == "live":
-        problems = policy.live_gate(case["airline_hotline"], case["region"], approved, api_key_present, allowlist)
+        if live_destination:
+            dialed = live_destination.strip()
+            derived = policy.region_for_number(dialed)
+            if derived is None:
+                return RunResult(placed=False, reason="refused: destination country code is not supported", call=None)
+            dest_region = derived
+        problems = policy.live_gate(dialed, dest_region, approved, api_key_present, allowlist)
         if problems:
             return RunResult(placed=False, reason="refused: " + "; ".join(problems), call=None)
-        dest_problems = policy.destination_problems(case["airline_hotline"], case["region"])
+        dest_problems = policy.destination_problems(dialed, dest_region)
         if dest_problems:
             return RunResult(placed=False, reason="refused: " + "; ".join(dest_problems), call=None)
     analysis = analyze_case(case)
     plan = build_plan(case, analysis["missing_information"])
     task = build_task(case, plan)
     key = idempotency_key()
-    request = build_request(case, task, key)
+    request = build_request(case, task, key, destination=dialed, region=dest_region)
     created = client.create_call(request, key)
     terminal = client.wait(created["id"], poll_seconds=0.05 if mode == "fixture" else 5.0)
-    call_record = _fold_terminal(case, terminal, mode, key)
+    call_record = _fold_terminal(case, terminal, mode, key, dialed=dialed)
     return RunResult(
         placed=True,
         reason="ok",
