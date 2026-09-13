@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ringback · Caregiver Phone Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen">
+  <div class="max-w-3xl mx-auto px-4 py-12">
+    <!-- Header -->
+    <header class="border-b border-slate-800 pb-6 mb-8 text-center">
+      <div class="text-xs uppercase tracking-widest text-emerald-400 font-semibold mb-1">AI Caregiver Phone Assistant</div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">RINGBACK</h1>
+      <p class="text-sm text-slate-400 mt-1">Make the phone call you don't have time to make. Describe your situation in plain language, and Ringback figures out who to contact, what to ask, and brings back a verified answer.</p>
+    </header>
+
+    <!-- Main Card -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+      <!-- Your own CALL-E key: calls bill to YOUR account, never the builder's -->
+      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+        <label class="block text-xs uppercase tracking-wider font-semibold text-slate-400 mb-1">Your CALL-E API key <span class="normal-case font-normal text-slate-500">(stays in this tab only — <a class="text-emerald-400 underline" href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">get a free one here</a>)</span></label>
+        <input type="password" id="key-input" autocomplete="off" placeholder="iams_live_… (blank = use demo server key)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm font-mono focus:outline-none focus:border-emerald-500 transition" />
+      </div>
+
+      <!-- Situation Input -->
+      <div>
+        <label class="block text-xs uppercase tracking-wider font-semibold text-slate-400 mb-2">What do you need help with? (Natural Language)</label>
+        <textarea id="situation-input" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 transition" placeholder="e.g., My wife's pharmacy says her blood pressure medicine needs approval from her doctor. Can you find out what's needed?"></textarea>
+      </div>
+
+      <!-- Plan Preview Badge -->
+      <div id="plan-badge" class="hidden p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-1">
+        <div><span class="font-bold text-emerald-400 uppercase tracking-wide">I think you need to contact:</span> <span id="plan-target-text" class="font-semibold text-white"></span></div>
+        <div class="text-slate-400">Here's what I'll find out: <span id="plan-goal-text" class="italic"></span></div>
+      </div>
+
+      <!-- Optional contact override -->
+      <div>
+          <label class="block text-xs uppercase tracking-wider font-semibold text-slate-400 mb-2">Know a better number? <span class="normal-case font-normal text-slate-500">(optional override — Ringback already picks the contact above)</span></label>
+          <input type="text" id="phone-input" placeholder="+91XXXXXXXXXX (only if overriding)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 text-sm font-mono focus:outline-none focus:border-emerald-500 transition" />
+      </div>
+
+      <button id="call-btn" onclick="startCallFlow()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        Call & Find Out
+      </button>
+
+      <!-- Need-number notice -->
+      <div id="need-number-box" class="hidden p-4 bg-amber-950/30 rounded-xl border border-amber-500/30 text-sm text-amber-200"></div>
+
+      <!-- Resolved contacts (each callable separately) -->
+      <div id="contact-cards" class="space-y-2"></div>
+
+    </div>
+
+    <!-- Live Status / Progress Screen -->
+    <div id="progress-section" class="mt-8 hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin"></div>
+        <h3 id="progress-status-text" class="text-sm font-semibold text-white">Preparing your call...</h3>
+      </div>
+      <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden">
+        <div id="progress-bar" class="bg-emerald-500 h-full w-1/4 transition-all duration-500"></div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="mt-8 hidden space-y-6">
+      <!-- Status Banner -->
+      <div id="result-banner" class="p-5 rounded-2xl border flex items-start gap-4">
+        <div id="result-icon" class="p-2.5 rounded-xl"></div>
+        <div>
+          <div id="result-outcome" class="text-xs font-bold uppercase tracking-wider mb-1"></div>
+          <h2 id="result-title" class="text-lg font-bold text-white"></h2>
+          <p id="result-summary" class="text-sm text-slate-300 mt-1 leading-relaxed"></p>
+        </div>
+      </div>
+
+      <!-- Action Required Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-2">Next Step for Caregiver</h3>
+        <p id="result-action" class="text-sm font-medium text-emerald-400"></p>
+      </div>
+    </div>
+
+    <!-- Situation report: what was asked, who was called, what was decided -->
+    <div class="mt-8 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">Situation Report</h3>
+      <div id="report-list" class="space-y-3 text-sm text-slate-300">
+        <div class="text-slate-500 italic text-xs">No calls yet. Your completed calls will appear here as a plain-language report.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function calleHeaders(extra) {
+      const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+      const k = (document.getElementById('key-input').value || '').trim();
+      if (k) { sessionStorage.setItem('ringback_key', k); h['X-Calle-Key'] = k; }
+      else {
+        const s = sessionStorage.getItem('ringback_key') || '';
+        if (s) h['X-Calle-Key'] = s;
+      }
+      return h;
+    }
+    async function loadReport() {
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const list = document.getElementById('report-list');
+        if (!data.entries || !data.entries.length) return;
+        list.innerHTML = data.entries.slice(0, 10).map(e => {
+          const chip = e.outcome === 'confirmed'
+            ? '<span class="text-emerald-400 font-bold">CONFIRMED</span>'
+            : '<span class="text-amber-400 font-bold">NEEDS ATTENTION</span>';
+          const s = (e.structured && e.structured.result_summary) || e.reason || '';
+          const nxt = e.next_step ? `<div class="mt-1 text-xs text-slate-400">What to do: ${e.next_step}</div>` : '';
+          const who = e.contact ? `<div class="text-[11px] text-slate-500">Called: ${e.contact}</div>` : '';
+          const sit = e.situation ? `<div class="text-xs text-slate-400 italic">“${e.situation}”</div>` : '';
+          return `<div class="p-3 bg-slate-950 rounded-xl border border-slate-800">${sit}${who}<div class="mt-1">${chip} — ${s}</div>${nxt}</div>`;
+        }).join('');
+      } catch (e) {}
+    }
+    loadReport();
+    // Live plan preview as user types
+    let typingTimer;
+    document.getElementById('situation-input').addEventListener('input', function() {
+      clearTimeout(typingTimer);
+      const situation = this.value.trim();
+      if (!situation) {
+        document.getElementById('plan-badge').classList.add('hidden');
+        return;
+      }
+      typingTimer = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ situation })
+          });
+          const data = await res.json();
+          const plan = data.plan;
+          if (plan && plan.valid) {
+            document.getElementById('plan-target-text').textContent = plan.target_display;
+            document.getElementById('plan-goal-text').textContent = plan.goal;
+            document.getElementById('plan-badge').classList.remove('hidden');
+            renderContactCards(data.contacts || [], situation);
+          }
+          if (data.need_number) {
+            document.getElementById('plan-badge').classList.add('hidden');
+            const box = document.getElementById('need-number-box');
+            box.textContent = data.message;
+            box.classList.remove('hidden');
+            document.getElementById('contact-cards').innerHTML = '';
+          }
+        } catch (e) {}
+      }, 300);
+
+      function renderContactCards(contacts, situation) {
+        const wrap = document.getElementById('contact-cards');
+        document.getElementById('need-number-box').classList.add('hidden');
+        if (!contacts.length) { wrap.innerHTML = ''; return; }
+        wrap.innerHTML = '<div class="text-xs uppercase tracking-wider font-semibold text-slate-400">Who should we call? (each call is confirmed separately)</div>' +
+          contacts.map(c =>
+            `<div class="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">` +
+            `<div><div class="text-sm font-semibold text-white">${c.name}</div>` +
+            `<div class="text-[11px] text-slate-500">${c.phone_masked} · calling them because: ${document.getElementById('plan-goal-text').textContent}</div></div>` +
+            `<button onclick="startCallFlow(null, null, '${c.ref}')" class="ml-3 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition">Call</button>` +
+            `</div>`
+          ).join('');
+      }
+    });
+
+    async function startCallFlow(phoneOverride, contactName, contactRef) {
+      const situation = document.getElementById('situation-input').value.trim();
+      const phone = (phoneOverride !== undefined && phoneOverride !== null) ? phoneOverride : document.getElementById('phone-input').value.trim();
+      const btn = document.getElementById('call-btn');
+      const progress = document.getElementById('progress-section');
+      const results = document.getElementById('results-section');
+
+      if (!situation) { alert('Please describe your situation first.'); return; }
+
+      btn.disabled = true;
+      results.classList.add('hidden');
+      document.getElementById('need-number-box').classList.add('hidden');
+      progress.classList.remove('hidden');
+      updateProgress("Understanding your request...", "20%");
+
+      try {
+        // 1. Initiate asynchronous call (server resolves contact; phone optional)
+        const initRes = await fetch('/api/call', {
+          method: 'POST',
+          headers: calleHeaders(),
+          body: JSON.stringify({ situation, phone, contact_name: contactName || '', contact_ref: contactRef || '' })
+        });
+        const initData = await initRes.json();
+        if (initData.need_number) {
+          progress.classList.add('hidden');
+          btn.disabled = false;
+          const box = document.getElementById('need-number-box');
+          box.textContent = initData.error || "I know who needs to be contacted, but I need their phone number before I can call.";
+          box.classList.remove('hidden');
+          document.getElementById('phone-input').focus();
+          return;
+        }
+        if (initData.error) { throw new Error(initData.error); }
+
+        const callId = initData.call_id;
+        const targetName = initData.contact_name || (initData.plan ? initData.plan.target_display : "recipient");
+        updateProgress(`Ringback is contacting ${targetName}...`, "45%");
+
+        // 2. Poll call status lifecycle
+        let pollAttempts = 0;
+        const pollInterval = setInterval(async () => {
+          pollAttempts++;
+          if (pollAttempts > 60) {
+            clearInterval(pollInterval);
+            finishWithError("Call timed out waiting for terminal state.");
+            return;
+          }
+
+          try {
+            const pollRes = await fetch(`/api/call/${callId}`, { headers: calleHeaders() });
+            const pollData = await pollRes.json();
+            const status = pollData.status;
+
+            if (status === 'in_progress') {
+              updateProgress(`Listening for an answer from ${targetName}...`, "75%");
+            } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+              clearInterval(pollInterval);
+              updateProgress("Verifying what we learned...", "100%");
+              setTimeout(() => {
+                progress.classList.add('hidden');
+                renderResult(pollData.evaluation);
+                loadReport();
+              }, 600);
+            }
+          } catch (e) {
+            // Transient poll network error, keep trying
+          }
+        }, 2000);
+
+      } catch (err) {
+        progress.classList.add('hidden');
+        alert('Call execution error: ' + err.message);
+        btn.disabled = false;
+      }
+    }
+
+    function updateProgress(text, width) {
+      document.getElementById('progress-status-text').textContent = text;
+      document.getElementById('progress-bar').style.width = width;
+    }
+
+    function finishWithError(msg) {
+      document.getElementById('progress-section').classList.add('hidden');
+      document.getElementById('call-btn').disabled = false;
+      alert(msg);
+    }
+
+    function renderResult(evaluation) {
+      const section = document.getElementById('results-section');
+      const banner = document.getElementById('result-banner');
+      const icon = document.getElementById('result-icon');
+      const outcome = document.getElementById('result-outcome');
+      const title = document.getElementById('result-title');
+      const summary = document.getElementById('result-summary');
+      const action = document.getElementById('result-action');
+      const btn = document.getElementById('call-btn');
+
+      section.classList.remove('hidden');
+      btn.disabled = false;
+
+      const s = evaluation.structured || {};
+      const callFailed = evaluation.status === 'failed' || evaluation.status === 'canceled';
+      if (evaluation.outcome === 'confirmed') {
+        banner.className = "p-5 rounded-2xl border bg-emerald-950/20 border-emerald-500/30 flex items-start gap-4";
+        icon.className = "p-2.5 rounded-xl bg-emerald-500/15 text-emerald-400";
+        icon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+        outcome.textContent = "Verified Outcome";
+        outcome.className = "text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1";
+        title.textContent = "We Found Out";
+      } else if (callFailed) {
+        banner.className = "p-5 rounded-2xl border bg-rose-950/20 border-rose-500/30 flex items-start gap-4";
+        icon.className = "p-2.5 rounded-xl bg-rose-500/15 text-rose-400";
+        icon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+        outcome.textContent = "Call Issue";
+        outcome.className = "text-xs font-bold uppercase tracking-wider text-rose-400 mb-1";
+        title.textContent = "Call Could Not Be Completed";
+      } else {
+        banner.className = "p-5 rounded-2xl border bg-amber-950/20 border-amber-500/30 flex items-start gap-4";
+        icon.className = "p-2.5 rounded-xl bg-amber-500/15 text-amber-400";
+        icon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+        outcome.textContent = "Inconclusive / Incomplete";
+        outcome.className = "text-xs font-bold uppercase tracking-wider text-amber-400 mb-1";
+        title.textContent = "Needs Attention";
+      }
+
+      summary.textContent = evaluation.reason || s.result_summary || "No details returned.";
+      action.textContent = callFailed ? "Please try again in a little while." : (s.next_step || "Review the call summary and follow up manually if necessary.");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+call_result.json
+ringback_history.json
+ringback_server.log
+server_startup.log
+ringback_last_result.json
+ringback_addressbook.json
+ringback_custom_contacts.json
