@@ -1,4 +1,5 @@
 import { getRuntimeMode } from "@/lib/config/server";
+import Link from "next/link";
 
 const steps = [
   ["Ask", "Call a normal phone number and speak naturally."],
@@ -12,23 +13,20 @@ export default function Home() {
 
   return (
     <main>
-      <nav aria-label="Product">
-        <a className="brand" href="#top">Senior Phone AI</a>
-        <span className="mode" data-mode={mode}>{mode} mode</span>
-      </nav>
-
       <section className="hero" id="top">
-        <p className="eyebrow">Voice is the interface</p>
-        <h1>AI without the app.<br />Just call.</h1>
+        <p className="eyebrow">Your phone assistant workspace</p>
+        <h1>Start a call.<br />Keep the details.</h1>
         <p className="lede">
-          A phone-native assistant designed to help older people find information,
-          remember important details and request simple actions through conversation.
+          Have a conversation, answer the questions that matter, and text the
+          information your customer asked for after the call.
         </p>
+        <div className="workspace-actions"><Link className="workspace-primary" href="/calls">Open calls <span aria-hidden="true">→</span></Link><Link className="workspace-secondary" href="/followups">View SMS follow-ups</Link><span className="mode" data-mode={mode}>{mode} mode</span></div>
         <div className="notice" role="status">
-          <strong>Local realtime harness available</strong>
+          <strong>Choose your next step</strong>
           <span>
-            Test browser audio at <a href="/realtime">/realtime</a>, or review and explicitly confirm a
-            CALL-E destination at <a href="/calls">/calls</a>. Prepare personalized morning information at <a href="/briefings">/briefings</a>. Messages and recurring calls remain disabled.
+            Use Calls to start a conversation, SMS follow-ups to track requested answers,
+            or Briefings to prepare information before a call. Live calls and messages
+            require setup and the customer’s permission.
           </span>
         </div>
       </section>

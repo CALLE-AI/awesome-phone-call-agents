@@ -81,13 +81,14 @@ test("migration, seed, consent triggers and family RLS run in embedded PostgreSQ
     await db.exec(`
       insert into public.action_authorizations (
         id, senior_id, principal_user_id, action, destination_e164, purpose,
-        state, expires_at, confirmed_at, consumed_at
+        state, expires_at, confirmed_at, consumed_at, created_at
       ) values (
         '60000000-0000-4000-8000-000000000001',
         '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000001',
         'create_reminder', '+12025550123', 'Synthetic reminder', 'consumed',
-        '2026-09-12T00:00:00Z', '2026-09-11T00:00:00Z', '2026-09-11T00:00:01Z'
+        '2026-09-12T00:00:00Z', '2026-09-11T00:00:00Z', '2026-09-11T00:00:01Z',
+        '2026-09-10T00:00:00Z'
       );
       insert into public.reminders (
         id, senior_id, authorization_id, principal_user_id, idempotency_key,

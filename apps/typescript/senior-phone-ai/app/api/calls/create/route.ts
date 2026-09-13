@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       requestId: dispatchRequest.idempotencyKey,
       source: "provider",
     });
-    return NextResponse.json({ callReference: `${result.callId.slice(0, 14)}…`, status: result.status }, { status: 201, headers: noStoreHeaders });
+    return NextResponse.json({ callReference: `${result.callId.slice(0, 14)}…`, status: result.status, followupRegistration: result.followupRegistration }, { status: 201, headers: noStoreHeaders });
   } catch (cause) {
     const rejected = isDefinitiveCalleRejection(cause);
     await recordOutboundCallResult(dispatchRequest.idempotencyKey, {

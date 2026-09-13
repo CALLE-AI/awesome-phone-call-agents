@@ -23,6 +23,16 @@ body {
 
 main { min-height: 100vh; }
 
+#workspace-content { outline: none; scroll-margin-top: 140px; }
+.workspace-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 28px 0 36px; }
+.workspace-primary, .workspace-secondary { display: inline-flex; align-items: center; gap: 24px; padding: 14px 22px; border-radius: 9px; text-decoration: none; font-size: 16px; font-weight: 700; }
+.workspace-primary { color: white; background: var(--green); border: 1px solid var(--green); }
+.workspace-secondary { color: var(--green); border: 1px solid #a8b7a9; }
+.workspace-primary:hover { background: #173e2c; }
+.workspace-secondary:hover { background: var(--sage); }
+.workspace-primary:focus-visible, .workspace-secondary:focus-visible { outline: 3px solid var(--orange); outline-offset: 3px; }
+.page-context { max-width: 1180px; margin: auto; padding: 24px 32px 0; }
+
 nav {
   align-items: center;
   display: flex;

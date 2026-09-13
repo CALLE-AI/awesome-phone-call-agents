@@ -1,0 +1,16 @@
+.page { max-width: 900px; margin: auto; padding: 32px 20px; }
+.page nav, .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page header { margin: 40px 0 24px; }
+.page h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+.page h2 { font-size: 1.4rem; }
+.card { padding: 24px; margin: 20px 0; border: 1px solid #cbd5cf; border-radius: 16px; background: #fff; }
+.page label { display: block; margin: 16px 0; line-height: 1.6; }
+.page input:not([type=checkbox]), .page select { display: block; width: 100%; padding: 12px; border: 1px solid #89998d; border-radius: 8px; font: inherit; }
+.page .check { display: flex; gap: 12px; align-items: flex-start; }
+.check input { margin-top: 7px; width: 18px; height: 18px; flex-shrink: 0; }
+.page button { padding: 12px 18px; border: 1px solid #27523c; border-radius: 8px; background: #27523c; color: white; font: inherit; cursor: pointer; }
+.page button:disabled { opacity: .5; cursor: default; }
+.page .cancel { margin-left: 12px; background: white; color: #27523c; }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; padding: 20px; background: #f2f5f1; border-radius: 8px; font: inherit; line-height: 1.7; }
+.notice { padding: 16px; background: #f2f5f1; border-radius: 8px; }
+.error { padding: 16px; color: #852a20; background: #fff0ed; border-radius: 8px; }

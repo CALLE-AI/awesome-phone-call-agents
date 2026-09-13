@@ -3,6 +3,8 @@ import { resolveBriefingTask } from "../briefings/store";
 
 import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } from "./status";
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
+import { addPostCallSearchInstructions, assertFollowupDestination, CALLE_FOLLOWUP_SCHEMA } from "./followup-evidence";
+import { readTwilioSmsConfig } from "../tools/twilio-sms";
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
 
@@ -56,6 +58,12 @@ export async function createCalleCall(
 ): Promise<CalleCallSnapshot> {
   const validated = validateOutboundCallRequest(request);
   const briefingTask = validated.briefingId ? await resolveBriefingTask(validated.briefingId) : undefined;
+  const { calleFollowupsEnabled, createCalleFollowups } = await import("./followup-server");
+  const useFollowup = calleFollowupsEnabled() && readTwilioSmsConfig(process.env).recipients.includes(validated.destinationE164);
+  const followups = useFollowup ? createCalleFollowups() : undefined;
+  const task = briefingTask ?? (validated.purpose
+    ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
+    : "Identify yourself as Senior Phone AI and have a general conversation with the recipient.");
   const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
     method: "POST",
     headers: {
@@ -64,9 +72,8 @@ export async function createCalleCall(
       "Idempotency-Key": validated.idempotencyKey,
     },
     body: JSON.stringify({
-      task: briefingTask ?? (validated.purpose
-        ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
-        : "Identify yourself as Senior Phone AI and have a general conversation with the recipient."),
+      task: useFollowup ? addPostCallSearchInstructions(task) : task,
+      ...(useFollowup ? { result_schema: CALLE_FOLLOWUP_SCHEMA } : {}),
       recipients: [{ phones: [validated.destinationE164] }],
       metadata: { application: "senior-phone-ai" },
     }),
@@ -74,13 +81,19 @@ export async function createCalleCall(
   });
   if (response.status >= 300 && response.status < 400) throw new Error("CALL-E redirect rejected");
   if (!response.ok) throw new CalleRequestError(response.status, await readCalleErrorCode(response));
-  return parseCalleCallSnapshot(await response.json());
+  const snapshot = parseCalleCallSnapshot(await response.json());
+  if (followups) {
+    try { await followups.register(snapshot.callId, validated.destinationE164, true); return { ...snapshot, followupRegistration: "armed" }; }
+    catch { return { ...snapshot, followupRegistration: "registration_failed" }; }
+  }
+  return snapshot;
 }
 
 export async function getCalleCallSnapshot(
   callId: string,
   apiKey: string,
   fetcher: typeof fetch = fetch,
+  expectedDestination?: string,
 ): Promise<CalleCallSnapshot> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -97,7 +110,11 @@ export async function getCalleCallSnapshot(
       throw new Error("CALL-E redirect rejected");
     }
     if (!response.ok) throw new Error(`CALL-E status ${response.status}`);
-    return parseCalleCallSnapshot(await response.json());
+    const raw = await response.json();
+    if (expectedDestination) assertFollowupDestination(raw, expectedDestination);
+    const snapshot = parseCalleCallSnapshot(raw);
+    if (snapshot.callId !== callId) throw new Error("Call result correlation failed");
+    return snapshot;
   } finally {
     clearTimeout(timeout);
   }

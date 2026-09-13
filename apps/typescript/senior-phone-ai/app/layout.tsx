@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { AppNavigation } from "./AppNavigation";
 
 export const metadata: Metadata = {
   title: "Senior Phone AI",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><AppNavigation /><div id="workspace-content" tabIndex={-1}>{children}</div></body>
     </html>
   );
 }

@@ -1,4 +1,5 @@
 import { redactPhoneNumbers } from "../safety/phone";
+import { followupEvidence, summaryEvidence, type FollowupEvidence, type SummaryEvidence } from "./followup-evidence";
 
 export const CALLE_CALL_STATUSES = [
   "queued",
@@ -27,6 +28,9 @@ export interface CalleCallSnapshot {
   readonly taskCompleted?: boolean;
   readonly transcript: CalleTranscriptTurn[];
   readonly updatedAt: string;
+  readonly postCallSearch?: FollowupEvidence;
+  readonly postCallSummary?: SummaryEvidence;
+  readonly followupRegistration?: "armed" | "registration_failed";
 }
 
 const CALL_ID = /^call_[A-Za-z0-9_-]{3,200}$/;
@@ -71,11 +75,13 @@ export function parseCalleCallSnapshot(value: unknown, now = Date.now): CalleCal
       ? taskCompleted === true ? "completed" : "incomplete"
       : status;
   const transcript: CalleTranscriptTurn[] = [];
+  let evidenceAttempts = 0;
 
   for (const recipientValue of Array.isArray(root.recipients) ? root.recipients : []) {
     const recipient = record(recipientValue);
     for (const attemptValue of recipient && Array.isArray(recipient.attempts) ? recipient.attempts : []) {
       const attempt = record(attemptValue);
+      if (attempt && Array.isArray(attempt.transcript_turns) && attempt.transcript_turns.length) evidenceAttempts++;
       for (const [index, turnValue] of (attempt && Array.isArray(attempt.transcript_turns)
         ? attempt.transcript_turns
         : []).entries()) {
@@ -110,5 +116,13 @@ export function parseCalleCallSnapshot(value: unknown, now = Date.now): CalleCal
     taskCompleted,
     transcript,
     updatedAt: new Date(now()).toISOString(),
+    postCallSearch: (() => {
+      const parsed = followupEvidence.safeParse(record(root.structured_result)?.post_call_search);
+      return parsed.success && evidenceAttempts === 1 && Object.values(parsed.data).every((value) => redactPhoneNumbers(value) === value) ? parsed.data : undefined;
+    })(),
+    postCallSummary: (() => {
+      const parsed = summaryEvidence.safeParse(record(root.structured_result)?.post_call_summary);
+      return parsed.success && evidenceAttempts === 1 && Object.values(parsed.data).every((value) => redactPhoneNumbers(value) === value) ? parsed.data : undefined;
+    })(),
   };
 }

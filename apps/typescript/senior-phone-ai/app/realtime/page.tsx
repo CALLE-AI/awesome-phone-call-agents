@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { RealtimeHarness } from "./RealtimeHarness";
 
@@ -11,10 +10,7 @@ export const metadata: Metadata = {
 export default function RealtimeHarnessPage() {
   return (
     <main className="harness-page">
-      <nav aria-label="Developer harness">
-        <Link className="brand" href="/">Senior Phone AI</Link>
-        <span className="mode">private harness</span>
-      </nav>
+      <div className="page-context"><span className="mode">private harness</span></div>
       <RealtimeHarness />
     </main>
   );

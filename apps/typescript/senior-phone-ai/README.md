@@ -1,12 +1,15 @@
 # Senior Phone AI
 
-The next-phase [Vapi in-call search prototype](../../../docs/senior-phone-ai/vapi-live-search.md)
-provides an authenticated search callback and a tool configuration template.
-It requires Vapi account and HTTPS setup before live verification.
+The [Australian Twilio SMS pilot](../../../docs/senior-phone-ai/twilio-sms.md)
+adds an explicitly enabled live SMS adapter, signed delivery callbacks and a
+server-only post-call factory. The [CALL-E follow-up workflow](../../../docs/senior-phone-ai/calle-followups.md)
+offers an SMS recap during every eligible call, collects permission, and includes
+requested search results after completion in one Twilio follow-up. Track it at `/followups`.
+Live carrier verification remains. Preview is the default.
 
 Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters, Supabase persistence with family-scoped row-level access controls, and a local-only explicitly confirmed CALL-E outbound-call harness. It does not yet connect an inbound telephone or live SMS provider.
+This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters, Supabase persistence with family-scoped row-level access controls, and a local-only explicitly confirmed CALL-E outbound-call harness. It does not yet connect an inbound telephone. An opt-in Twilio adapter is available for the Australian SMS pilot; live delivery is not yet verified.
 
 ## Quick start
 
@@ -77,7 +80,7 @@ The CALL-E page uses the same exact loopback-origin rule and separate rate limit
 
 ## Side effects and safety
 
-The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. The separate local CALL-E page can place an outbound call after an operator enters the exact destination and purpose, reviews a masked preview and explicitly confirms. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network; Twilio delivery remains deferred to SPA-004.
+The Realtime harness can stream microphone audio and run read-only live web searches only after explicit operator action. It cannot place calls, deliver SMS or schedule work. The separate local CALL-E page can place an outbound call after an operator enters the exact destination and purpose, reviews a masked preview and explicitly confirms. Search failures are reported instead of guessed. The SMS workflow composes sourced messages, consumes exact one-time authorization, reserves an idempotency key before dispatch, masks operational output and preserves uncertain outcomes without retrying. Its preview/fake adapters do not contact a network. The Twilio pilot requires separate enablement and an exact test-recipient allowlist; live verification remains part of SPA-004.
 
 The shared safety layer permits read-only tools to run automatically and requires side-effect tools to consume a one-time server authorization bound to the authenticated principal, exact action, strict E.164 destination, purpose and details. Changed, denied, expired or reused authorizations fail closed. Phone output is masked. Preview tests use process-local stores; Supabase-backed authorization and SMS stores provide durable production boundaries. The CALL-E harness is restricted to the exact local loopback origin and is not an authenticated production endpoint.
 
@@ -116,7 +119,7 @@ Implementation progress and acceptance criteria are tracked in [`docs/senior-pho
 ## Current limitations
 
 - There is no inbound phone integration.
-- There is no live SMS delivery or authorized family dashboard. Scheduled CALL-E calls currently use the local operator registry; durable multi-worker Supabase scheduling remains in SPA-011.
+- Live Twilio SMS delivery is unverified. CALL-E automatic follow-ups require structured request/permission fields with matching transcript evidence; old calls without those fields cannot trigger SMS. Scheduled CALL-E calls currently use the local operator registry; durable multi-worker Supabase scheduling remains in SPA-011.
 - Conversation notes are stored only in one browser and have no authentication or multi-user access controls.
 - CALL-E transcript turns may not appear until a call reaches a terminal state.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.

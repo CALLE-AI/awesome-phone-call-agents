@@ -25,7 +25,7 @@ Last updated: 2026-09-11
 
 Implementation is in progress. MVP: **13/15 done**. Optional extensions: **0/4 done**.
 
-Current ticket: [SPA-015](#spa-015). Deployment, demo and PR materials are prepared; hosted migration verification and approved live browser evidence remain. The Twilio voice/SMS gate remains [SPA-004](#spa-004) and runs last.
+Current ticket: [SPA-015](#spa-015). Deployment, demo and PR materials are prepared; hosted migration verification and approved live browser evidence remain. The Twilio voice/SMS gate remains [SPA-004](#spa-004). The [CALL-E post-call workflow](calle-followups.md) now collects request/permission evidence, waits for completion, searches and sends one Twilio SMS. The `/followups` UI uses the CALL-E monitor. Live extraction and carrier verification remain unfinished.
 
 Read [submission review findings](review-notes.md) before implementation. The review informed the acceptance criteria below, including runtime grouping, early endpoint protection and public-artifact privacy checks.
 

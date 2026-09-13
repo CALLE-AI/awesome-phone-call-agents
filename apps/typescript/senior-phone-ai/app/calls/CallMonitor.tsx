@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CalleCallSnapshot } from "@/lib/calle/status";
@@ -77,7 +76,7 @@ export function CallMonitor() {
         country.removeTrunkPrefix,
       );
     } catch {
-      setError("Enter a valid local phone number, such as 0449 852 021 for Australia.");
+      setError("Enter a valid local phone number. Australian mobiles use the format 04xx xxx xxx.");
       return;
     }
     if (callPurpose.length > 300) {
@@ -119,11 +118,11 @@ export function CallMonitor() {
           confirmed: true,
         }),
       });
-      const result = await response.json() as { callReference?: string; call?: ScheduledCallSummary; error?: string };
+      const result = await response.json() as { callReference?: string; call?: ScheduledCallSummary; error?: string; followupRegistration?: string };
       if (!response.ok) throw new Error(result.error ?? "CALL-E did not accept the call");
       setDispatchMessage(review.scheduledFor
         ? `Call scheduled for ${new Date(review.scheduledFor).toLocaleString()}.`
-        : `CALL-E accepted ${result.callReference ?? "the call"}. Monitoring has started.`);
+        : `CALL-E accepted ${result.callReference ?? "the call"}. Monitoring has started.${result.followupRegistration === "armed" ? " An automatic SMS recap is connected to this called number, subject to the customer's permission. Requested searches use the same follow-up." : result.followupRegistration === "registration_failed" ? " Follow-up registration failed; connect this call on the follow-ups page before it ends." : ""}`);
       setNationalNumber("");
       setPurpose("");
       setScheduledLocal("");
@@ -200,10 +199,7 @@ export function CallMonitor() {
 
   return (
     <main className="monitor-page">
-      <nav aria-label="Product">
-        <Link className="brand" href="/">Senior Phone AI</Link>
-        <span className="mode">local operator view</span>
-      </nav>
+      <div className="page-context"><span className="mode">local operator view</span></div>
       <section className="monitor-card" aria-labelledby="monitor-heading">
         <p className="eyebrow">Live call visibility</p>
         <h1 id="monitor-heading">Phone conversations</h1>
@@ -234,7 +230,7 @@ export function CallMonitor() {
                 id="destination"
                 inputMode="tel"
                 onChange={(event) => { setNationalNumber(event.target.value); setReview(undefined); }}
-                placeholder="0449 852 021"
+                placeholder="04xx xxx xxx"
                 value={nationalNumber}
               />
             </div>
@@ -268,6 +264,7 @@ export function CallMonitor() {
         {review ? (
           <div className="call-confirmation" role="group" aria-label="Confirm outbound call">
             <h2>Confirm this phone call</h2>
+            <p>When SMS follow-ups are enabled for this Australian mobile, the agent offers a short recap by text. The called number is saved automatically; after the call, one SMS is sent with the customer&apos;s permission. Requested searches are handled in the same follow-up.</p>
             <p><strong>Destination:</strong> {review.destinationSummary}</p>
             <p><strong>Purpose:</strong> {review.purpose || "No specific purpose"}</p>
             <p><strong>When:</strong> {review.scheduledFor ? new Date(review.scheduledFor).toLocaleString() : "Now"}</p>
