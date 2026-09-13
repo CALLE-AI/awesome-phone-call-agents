@@ -1,0 +1,7 @@
+PASS: No-ID readiness error says creation is unconfirmed, not rejected or ringing
+PASS: Recovery review shows the saved ID/key and cancellation performs no request (replay)
+PASS: Request diagnostics and long IDs reflow at 320, 390 and 1440 pixels (replay)
+PASS: Known-ID pending result uses a status-check action
+PASS: Recovery review shows the saved ID/key and cancellation performs no request (read)
+PASS: Request diagnostics and long IDs reflow at 320, 390 and 1440 pixels (read)
+6 provider UI checks passed

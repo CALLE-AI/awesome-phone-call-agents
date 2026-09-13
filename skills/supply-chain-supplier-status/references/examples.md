@@ -1,6 +1,6 @@
 # Examples
 
-All company names, phone numbers, and representative contacts in these examples are synthetic and fictional.
+All company names, phone numbers, and representative contacts in these examples are synthetic and fictional. All returned telephone numbers and provider-specific telemetry are masked in transcripts, structured output records, and aggregated exports.
 
 ## Example 1: On-Time Fulfillment Confirmation
 
@@ -41,7 +41,7 @@ All company names, phone numbers, and representative contacts in these examples 
 > **Agent:** "Understood, that falls under raw material shortages. When do you estimate the full shipment can be delivered?"  
 > **Supplier Contact:** "We expect the resin tomorrow. We can deliver by September 20th."  
 > **Agent:** "That represents a 5-day delay against the committed deadline. Could you provide the contact information for your plant manager in case our logistics lead needs to arrange expedited transit?"  
-> **Supplier Contact:** "Sure, plant manager is Maria Gomez at +1-555-014-9923."  
+> **Supplier Contact:** "Sure, plant manager is Maria Gomez at +1-555-***-9923."  
 > **Agent:** "Thank you David. I have logged the revised September 20 date, raw material shortage cause, and Maria Gomez as escalation lead. Our procurement team will follow up."
 
 ### Structured Output Record
@@ -57,7 +57,7 @@ All company names, phone numbers, and representative contacts in these examples 
   "delay_reason_details": "Polymer resin adhesive shipment delayed at regional port customs.",
   "estimated_financial_exposure_usd": 8350.0,
   "escalation_contact_name": "Maria Gomez",
-  "escalation_contact_phone": "+15550149923",
+  "escalation_contact_phone": "+1-555-***-9923",
   "requires_escalation": true
 }
 ```

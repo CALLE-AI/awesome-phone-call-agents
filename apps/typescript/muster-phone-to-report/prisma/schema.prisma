@@ -1,0 +1,437 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../packages/infrastructure-postgres/src/generated/prisma"
+  engineType   = "client"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AuditEventKind {
+  foundationHealthChecked @map("foundation.health.checked")
+
+  @@map("audit_event_kind")
+}
+
+enum AuditEventOutcome {
+  ready
+  degraded
+
+  @@map("audit_event_outcome")
+}
+
+enum ObservationProvenance {
+  simulated        @map("SIMULATED")
+  providerObserved @map("PROVIDER_OBSERVED")
+
+  @@map("observation_provenance")
+}
+
+enum EndpointCompatibility {
+  simulatorTested  @map("simulator-tested")
+  providerObserved @map("provider-observed")
+
+  @@map("endpoint_compatibility")
+}
+
+enum DtmfPolicyKind {
+  forbidden
+  allowlistedFixedPlan @map("allowlisted_fixed_plan")
+
+  @@map("dtmf_policy_kind")
+}
+
+enum ExpectedZoneApplicability {
+  required
+  reviewedNotApplicable @map("reviewed_not_applicable")
+
+  @@map("expected_zone_applicability")
+}
+
+enum CallAttemptStage {
+  scheduled
+  calling
+  extracting
+  terminal
+
+  @@map("call_attempt_stage")
+}
+
+enum CallAttemptTerminalOutcome {
+  observationRecorded @map("observation_recorded")
+  blocked
+  noAnswer            @map("no_answer")
+  busy
+  providerFailed      @map("provider_failed")
+  evidenceUnavailable @map("evidence_unavailable")
+
+  @@map("call_attempt_terminal_outcome")
+}
+
+enum ObservationTrigger {
+  manual
+  scheduled
+
+  @@map("observation_trigger")
+}
+
+enum EvidenceSourceCompleteness {
+  complete
+  truncated
+  unknown
+
+  @@map("evidence_source_completeness")
+}
+
+enum ObservationQuality {
+  complete
+  partial
+  unknown
+  invalid
+
+  @@map("observation_quality")
+}
+
+enum ReadingDisposition {
+  grounded
+  missing
+  ambiguous
+  contradictory
+  reviewedNotApplicable @map("reviewed_not_applicable")
+  invalid
+
+  @@map("reading_disposition")
+}
+
+enum LiveSimulatorAuthorizationState {
+  issued
+  reserved
+  bound
+
+  @@map("live_simulator_authorization_state")
+}
+
+enum LiveSimulatorCleanupState {
+  barrier_pending
+  awaiting_identity
+  awaiting_arrival
+  awaiting_terminal
+  awaiting_grace
+  restoration_ready
+  restoration_started
+  restored
+  secrets_revoked
+  host_stopped
+  tunnel_stopped
+  complete
+  blocked
+
+  @@map("live_simulator_cleanup_state")
+}
+
+enum LiveDemoReviewCleanupState {
+  ready
+  cleanup_pending
+  cleanup_blocked
+  deleted
+
+  @@map("live_demo_review_cleanup_state")
+}
+
+model LiveSimulatorAuthorization {
+  authorizationVersion      Int                             @default(1) @map("authorization_version")
+  organizationId           String                          @map("organization_id") @db.VarChar(128)
+  operationId              String                          @map("operation_id") @db.VarChar(128)
+  nonceDigest              String                          @unique(map: "live_simulator_authorizations_nonce_digest_key") @map("nonce_digest") @db.Char(64)
+  semanticDigest           String                          @map("semantic_digest") @db.Char(64)
+  scenarioId               String                          @map("scenario_id") @db.VarChar(128)
+  scenarioRevision         Int                             @map("scenario_revision")
+  audience                 String                          @db.VarChar(128)
+  endpointAlias            String                          @map("endpoint_alias") @db.VarChar(128)
+  expectedCallerDigest     String?                         @map("expected_caller_digest") @db.Char(64)
+  authorizedTargetDigest   String?                         @map("authorized_target_digest") @db.Char(64)
+  publicOrigin             String?                         @map("public_origin") @db.VarChar(512)
+  purpose                  String?                         @db.VarChar(64)
+  callBudget               Int?                            @map("call_budget")
+  concurrency              Int?
+  retryBudget              Int?                            @map("retry_budget")
+  dtmfPolicy               String?                         @map("dtmf_policy") @db.VarChar(32)
+  terminalDeadlineSeconds  Int?                            @map("terminal_deadline_seconds")
+  predecessorOperationId   String?                         @map("predecessor_operation_id") @db.VarChar(128)
+  issuedAt                 DateTime                        @map("issued_at") @db.Timestamptz(3)
+  expiresAt                DateTime                        @map("expires_at") @db.Timestamptz(3)
+  state                    LiveSimulatorAuthorizationState @default(issued)
+  reservedAt               DateTime?                       @map("reserved_at") @db.Timestamptz(3)
+  providerDispatchIdentity String?                         @unique(map: "live_simulator_authorizations_provider_dispatch_key") @map("provider_dispatch_identity") @db.VarChar(256)
+  boundAt                  DateTime?                       @map("bound_at") @db.Timestamptz(3)
+  dispatchClaimedAt        DateTime?                       @map("dispatch_claimed_at") @db.Timestamptz(3)
+  dispatchDisposition      String?                         @map("dispatch_disposition") @db.VarChar(32)
+  dispatchClosedAt         DateTime?                       @map("dispatch_closed_at") @db.Timestamptz(3)
+  cleanupState             LiveSimulatorCleanupState?      @map("cleanup_state")
+  cleanupDeadlineAt        DateTime?                       @map("cleanup_deadline_at") @db.Timestamptz(3)
+  cleanupOwnerDigest       String?                         @map("cleanup_owner_digest") @db.Char(64)
+  cleanupBlockedReason     String?                         @map("cleanup_blocked_reason") @db.VarChar(64)
+  cleanupStateChangedAt    DateTime?                       @map("cleanup_state_changed_at") @db.Timestamptz(3)
+  cleanupGraceUntilAt      DateTime?                       @map("cleanup_grace_until_at") @db.Timestamptz(3)
+  cleanupTerminalStatus    String?                         @map("cleanup_terminal_status") @db.VarChar(32)
+  reviewSessionId          String?                         @unique(map: "live_simulator_authorizations_review_session_key") @map("review_session_id") @db.VarChar(128)
+  reviewReadyAt            DateTime?                       @map("review_ready_at") @db.Timestamptz(3)
+  reviewExpiresAt          DateTime?                       @map("review_expires_at") @db.Timestamptz(3)
+  reviewCleanupState       LiveDemoReviewCleanupState?     @map("review_cleanup_state")
+  reviewCleanupStateChangedAt DateTime?                    @map("review_cleanup_state_changed_at") @db.Timestamptz(3)
+  reviewCustodyOwnershipDigest String?                     @map("review_custody_ownership_digest") @db.Char(64)
+  reviewDatabaseOwnershipDigest String?                    @map("review_database_ownership_digest") @db.Char(64)
+
+  @@id([organizationId, operationId])
+  @@index([organizationId, predecessorOperationId], map: "live_simulator_authorizations_predecessor_idx")
+  @@map("live_simulator_authorizations")
+}
+
+model LiveDemoReviewDatabaseOwnership {
+  singleton                  Boolean  @id @default(true)
+  sessionId                  String   @unique(map: "live_demo_review_database_ownership_session_key") @map("session_id") @db.VarChar(128)
+  operationId                String   @map("operation_id") @db.VarChar(128)
+  ownershipDigest            String   @map("ownership_digest") @db.Char(64)
+  provisioningOwnershipDigest String   @map("provisioning_ownership_digest") @db.Char(64)
+  createdAt                  DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@map("live_demo_review_database_ownership")
+}
+
+model LiveSimulatorProviderFact {
+  appendOrdinal       BigInt   @default(autoincrement()) @map("append_ordinal")
+  organizationId     String   @map("organization_id") @db.VarChar(128)
+  operationId        String   @map("operation_id") @db.VarChar(128)
+  phase              String   @db.VarChar(32)
+  providerCallDigest String   @map("provider_call_digest") @db.Char(64)
+  semanticDigest     String   @map("semantic_digest") @db.Char(64)
+  outcome            String   @db.VarChar(32)
+  occurredAt         DateTime @map("occurred_at") @db.Timestamptz(3)
+  traceId            String   @map("trace_id") @db.Char(32)
+  signatureValidated Boolean  @map("signature_validated")
+  actionsObserved    Int?     @map("actions_observed")
+  inboundCallCount   Int?     @map("inbound_call_count")
+
+  @@id([organizationId, operationId, phase])
+  @@index([organizationId, operationId, appendOrdinal], map: "live_simulator_provider_facts_operation_append_idx")
+  @@map("live_simulator_provider_facts")
+}
+
+model AuditEvent {
+  id             String            @id @db.VarChar(128)
+  organizationId String            @map("organization_id") @db.VarChar(128)
+  kind           AuditEventKind
+  occurredAt     DateTime          @map("occurred_at") @db.Timestamptz(3)
+  correlationId  String            @map("correlation_id") @db.VarChar(128)
+  idempotencyKey String            @map("idempotency_key") @db.VarChar(128)
+  outcome        AuditEventOutcome
+
+  @@unique([organizationId, kind, idempotencyKey], map: "audit_events_org_kind_idempotency_key")
+  @@index([organizationId, occurredAt], map: "audit_events_org_occurred_at_idx")
+  @@map("audit_events")
+}
+
+model Endpoint {
+  organizationId           String           @map("organization_id") @db.VarChar(128)
+  id                       String           @db.VarChar(128)
+  activeAdapterVersionId   String?          @map("active_adapter_version_id") @db.VarChar(128)
+  authorizationReferenceId String           @map("authorization_reference_id") @db.VarChar(256)
+  siteDisplayName          String?          @map("site_display_name") @db.VarChar(160)
+  endpointDisplayName      String?          @map("endpoint_display_name") @db.VarChar(160)
+  freshnessWindowSeconds   Int?             @map("freshness_window_seconds")
+  adapterVersions          AdapterVersion[] @relation("EndpointAdapterVersions")
+  activeAdapterVersion     AdapterVersion?  @relation("EndpointActiveAdapter", fields: [organizationId, id, activeAdapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+
+  @@id([organizationId, id])
+  @@map("endpoints")
+}
+
+model AdapterVersion {
+  organizationId             String                @map("organization_id") @db.VarChar(128)
+  id                         String                @db.VarChar(128)
+  endpointId                 String                @map("endpoint_id") @db.VarChar(128)
+  dtmfPolicyKind             DtmfPolicyKind        @map("dtmf_policy_kind")
+  dtmfPlanReferenceId        String?               @map("dtmf_plan_reference_id") @db.VarChar(256)
+  dtmfInstructionFingerprint String?               @map("dtmf_instruction_fingerprint") @db.VarChar(256)
+  compatibility              EndpointCompatibility
+  provenance                 ObservationProvenance
+  endpoint                   Endpoint              @relation("EndpointAdapterVersions", fields: [organizationId, endpointId], references: [organizationId, id], onDelete: Restrict)
+  activeForEndpoints         Endpoint[]            @relation("EndpointActiveAdapter")
+  expectedZones              AdapterExpectedZone[]
+  callAttempts               CallAttempt[]
+  evidenceRecords            EvidenceRecord[]
+  observations               Observation[]
+  readings                   Reading[]
+
+  @@id([organizationId, id])
+  @@unique([organizationId, endpointId, id], map: "adapter_versions_org_endpoint_id_key")
+  @@map("adapter_versions")
+}
+
+model AdapterExpectedZone {
+  organizationId    String                    @map("organization_id") @db.VarChar(128)
+  endpointId        String                    @map("endpoint_id") @db.VarChar(128)
+  adapterVersionId  String                    @map("adapter_version_id") @db.VarChar(128)
+  zoneId            String                    @map("zone_id") @db.VarChar(128)
+  ordinal           Int
+  applicability     ExpectedZoneApplicability
+  requiredFacet     String                    @map("required_facet") @db.VarChar(64)
+  admissibleMinimum String?                   @map("admissible_minimum") @db.VarChar(128)
+  admissibleMaximum String?                   @map("admissible_maximum") @db.VarChar(128)
+  adapterVersion    AdapterVersion            @relation(fields: [organizationId, endpointId, adapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+  unitMappings      AdapterZoneUnitMapping[]
+  readings          Reading[]
+
+  @@id([organizationId, adapterVersionId, zoneId])
+  @@unique([organizationId, endpointId, adapterVersionId, zoneId], map: "adapter_expected_zones_org_endpoint_adapter_zone_key")
+  @@unique([organizationId, adapterVersionId, ordinal], map: "adapter_expected_zones_org_adapter_ordinal_key")
+  @@map("adapter_expected_zones")
+}
+
+model AdapterZoneUnitMapping {
+  organizationId   String              @map("organization_id") @db.VarChar(128)
+  endpointId       String              @map("endpoint_id") @db.VarChar(128)
+  adapterVersionId String              @map("adapter_version_id") @db.VarChar(128)
+  zoneId           String              @map("zone_id") @db.VarChar(128)
+  ruleId           String              @map("rule_id") @db.VarChar(128)
+  spokenUnit       String              @map("spoken_unit") @db.VarChar(128)
+  normalizedUnit   String              @map("normalized_unit") @db.VarChar(128)
+  expectedZone     AdapterExpectedZone @relation(fields: [organizationId, endpointId, adapterVersionId, zoneId], references: [organizationId, endpointId, adapterVersionId, zoneId], onDelete: Restrict)
+
+  @@id([organizationId, adapterVersionId, zoneId, ruleId])
+  @@unique([organizationId, adapterVersionId, zoneId, spokenUnit, normalizedUnit], map: "adapter_zone_unit_mappings_exact_key")
+  @@map("adapter_zone_unit_mappings")
+}
+
+model CallAttempt {
+  organizationId           String                      @map("organization_id") @db.VarChar(128)
+  id                       String                      @db.VarChar(128)
+  endpointId               String                      @map("endpoint_id") @db.VarChar(128)
+  adapterVersionId         String                      @map("adapter_version_id") @db.VarChar(128)
+  idempotencyKey           String                      @map("idempotency_key") @db.VarChar(256)
+  trigger                  ObservationTrigger
+  provenance               ObservationProvenance
+  semanticFingerprint      String                      @map("semantic_fingerprint") @db.VarChar(256)
+  providerDispatchIdentity String                      @map("provider_dispatch_identity") @db.VarChar(256)
+  acceptedAt               DateTime                    @map("accepted_at") @db.Timestamptz(3)
+  stage                    CallAttemptStage
+  lastTransitionAt         DateTime                    @map("last_transition_at") @db.Timestamptz(3)
+  terminalOutcome          CallAttemptTerminalOutcome? @map("terminal_outcome")
+  retryable                Boolean?
+  latestEvidenceId         String?                     @map("latest_evidence_id") @db.VarChar(128)
+  latestObservationId      String?                     @map("latest_observation_id") @db.VarChar(128)
+  resourceVersion          Int                         @default(1) @map("resource_version")
+  adapterVersion           AdapterVersion              @relation(fields: [organizationId, endpointId, adapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+  evidenceRecords          EvidenceRecord[]            @relation("CallAttemptEvidence")
+  observations             Observation[]               @relation("CallAttemptObservations")
+  latestEvidence           EvidenceRecord?             @relation("CallAttemptLatestEvidence", fields: [organizationId, id, latestEvidenceId], references: [organizationId, callAttemptId, id], onDelete: Restrict)
+  latestObservation        Observation?                @relation("CallAttemptLatestObservation", fields: [organizationId, id, latestObservationId], references: [organizationId, operationId, id], onDelete: Restrict)
+
+  @@id([organizationId, id])
+  @@unique([organizationId, idempotencyKey], map: "call_attempts_org_idempotency_key")
+  @@unique([organizationId, providerDispatchIdentity], map: "call_attempts_org_provider_dispatch_identity_key")
+  @@unique([organizationId, id, endpointId, adapterVersionId], map: "call_attempts_org_id_endpoint_adapter_key")
+  @@index([organizationId, stage, acceptedAt], map: "call_attempts_org_stage_accepted_at_idx")
+  @@index([organizationId, endpointId, acceptedAt, id], map: "call_attempts_org_endpoint_accepted_id_idx")
+  @@map("call_attempts")
+}
+
+model EvidenceRecord {
+  organizationId        String                     @map("organization_id") @db.VarChar(128)
+  id                    String                     @db.VarChar(128)
+  callAttemptId         String                     @map("call_attempt_id") @db.VarChar(128)
+  endpointId            String                     @map("endpoint_id") @db.VarChar(128)
+  adapterVersionId      String                     @map("adapter_version_id") @db.VarChar(128)
+  revision              Int
+  predecessorEvidenceId String?                    @map("predecessor_evidence_id") @db.VarChar(128)
+  providerRunId         String                     @map("provider_run_id") @db.VarChar(256)
+  providerRevisionId    String                     @map("provider_revision_id") @db.VarChar(256)
+  capturedAt            DateTime                   @map("captured_at") @db.Timestamptz(3)
+  retainedAt            DateTime                   @map("retained_at") @db.Timestamptz(3)
+  opaqueCustodyRef      String                     @map("opaque_custody_ref") @db.VarChar(512)
+  provenance            ObservationProvenance
+  sourceCompleteness    EvidenceSourceCompleteness @map("source_completeness")
+  callAttempt           CallAttempt                @relation("CallAttemptEvidence", fields: [organizationId, callAttemptId, endpointId, adapterVersionId], references: [organizationId, id, endpointId, adapterVersionId], onDelete: Restrict)
+  latestForAttempts     CallAttempt[]              @relation("CallAttemptLatestEvidence")
+  adapterVersion        AdapterVersion             @relation(fields: [organizationId, endpointId, adapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+  predecessorEvidence   EvidenceRecord?            @relation("EvidenceCorrection", fields: [organizationId, callAttemptId, predecessorEvidenceId], references: [organizationId, callAttemptId, id], onDelete: Restrict)
+  successorEvidence     EvidenceRecord[]           @relation("EvidenceCorrection")
+  observations          Observation[]
+  readings              Reading[]
+
+  @@id([organizationId, id])
+  @@unique([organizationId, callAttemptId, id], map: "evidence_records_org_attempt_id_key")
+  @@unique([organizationId, callAttemptId, revision], map: "evidence_records_org_attempt_revision_key")
+  @@unique([organizationId, providerRunId, providerRevisionId], map: "evidence_records_provider_revision_key")
+  @@unique([organizationId, callAttemptId, adapterVersionId, id, providerRevisionId], map: "evidence_records_exact_lineage_key")
+  @@unique([organizationId, callAttemptId, adapterVersionId, id, providerRevisionId, providerRunId, capturedAt], map: "evidence_records_reading_correlation_key")
+  @@index([organizationId, endpointId, capturedAt, id], map: "evidence_records_org_endpoint_captured_id_idx")
+  @@map("evidence_records")
+}
+
+model Observation {
+  organizationId              String                @map("organization_id") @db.VarChar(128)
+  id                          String                @db.VarChar(128)
+  operationId                 String                @map("operation_id") @db.VarChar(128)
+  endpointId                  String                @map("endpoint_id") @db.VarChar(128)
+  version                     Int
+  predecessorObservationId    String?               @map("predecessor_observation_id") @db.VarChar(128)
+  createdAt                   DateTime              @map("created_at") @db.Timestamptz(3)
+  evidenceId                  String                @map("evidence_id") @db.VarChar(128)
+  evidenceRevisionId          String                @map("evidence_revision_id") @db.VarChar(256)
+  adapterVersionId            String                @map("adapter_version_id") @db.VarChar(128)
+  extractorVersionId          String                @map("extractor_version_id") @db.VarChar(128)
+  reconciliationPolicyVersion String                @map("reconciliation_policy_version") @db.VarChar(128)
+  provenance                  ObservationProvenance
+  quality                     ObservationQuality
+  inputFingerprint            String                @map("input_fingerprint") @db.VarChar(256)
+  callAttempt                 CallAttempt           @relation("CallAttemptObservations", fields: [organizationId, operationId, endpointId, adapterVersionId], references: [organizationId, id, endpointId, adapterVersionId], onDelete: Restrict)
+  latestForAttempts           CallAttempt[]         @relation("CallAttemptLatestObservation")
+  evidence                    EvidenceRecord        @relation(fields: [organizationId, operationId, adapterVersionId, evidenceId, evidenceRevisionId], references: [organizationId, callAttemptId, adapterVersionId, id, providerRevisionId], onDelete: Restrict)
+  adapterVersion              AdapterVersion        @relation(fields: [organizationId, endpointId, adapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+  predecessorObservation      Observation?          @relation("ObservationCorrection", fields: [organizationId, operationId, predecessorObservationId], references: [organizationId, operationId, id], onDelete: Restrict)
+  successorObservations       Observation[]         @relation("ObservationCorrection")
+  readings                    Reading[]
+
+  @@id([organizationId, id])
+  @@unique([organizationId, operationId, id], map: "observations_org_operation_id_key")
+  @@unique([organizationId, operationId, version], map: "observations_org_operation_version_key")
+  @@unique([organizationId, operationId, evidenceId, adapterVersionId, extractorVersionId, reconciliationPolicyVersion], map: "observations_derivation_identity_key")
+  @@index([organizationId, endpointId, quality, operationId, version, id], map: "observations_org_endpoint_quality_tie_idx")
+  @@map("observations")
+}
+
+model Reading {
+  organizationId             String              @map("organization_id") @db.VarChar(128)
+  operationId                String              @map("operation_id") @db.VarChar(128)
+  observationId              String              @map("observation_id") @db.VarChar(128)
+  endpointId                 String              @map("endpoint_id") @db.VarChar(128)
+  adapterVersionId           String              @map("adapter_version_id") @db.VarChar(128)
+  evidenceId                 String              @map("evidence_id") @db.VarChar(128)
+  evidenceRevisionId         String              @map("evidence_revision_id") @db.VarChar(256)
+  zoneId                     String              @map("zone_id") @db.VarChar(128)
+  ordinal                    Int
+  disposition                ReadingDisposition
+  value                      String?             @db.VarChar(128)
+  spokenUnit                 String?             @map("spoken_unit") @db.VarChar(128)
+  normalizedUnit             String?             @map("normalized_unit") @db.VarChar(128)
+  confidenceToken            String?             @map("confidence_token") @db.VarChar(128)
+  confidenceSemanticsVersion String?             @map("confidence_semantics_version") @db.VarChar(128)
+  candidateIds               String[]            @map("candidate_ids")
+  evidenceAnchorIds          String[]            @map("evidence_anchor_ids")
+  reasonCodes                String[]            @map("reason_codes")
+  providerRunId              String              @map("provider_run_id") @db.VarChar(256)
+  extractorVersionId         String              @map("extractor_version_id") @db.VarChar(128)
+  sourceCapturedAt           DateTime            @map("source_captured_at") @db.Timestamptz(3)
+  derivedAt                  DateTime            @map("derived_at") @db.Timestamptz(3)
+  observation                Observation         @relation(fields: [organizationId, operationId, observationId], references: [organizationId, operationId, id], onDelete: Restrict)
+  evidence                   EvidenceRecord      @relation(fields: [organizationId, operationId, adapterVersionId, evidenceId, evidenceRevisionId, providerRunId, sourceCapturedAt], references: [organizationId, callAttemptId, adapterVersionId, id, providerRevisionId, providerRunId, capturedAt], onDelete: Restrict)
+  adapterVersion             AdapterVersion      @relation(fields: [organizationId, endpointId, adapterVersionId], references: [organizationId, endpointId, id], onDelete: Restrict)
+  expectedZone               AdapterExpectedZone @relation(fields: [organizationId, endpointId, adapterVersionId, zoneId], references: [organizationId, endpointId, adapterVersionId, zoneId], onDelete: Restrict)
+
+  @@id([organizationId, observationId, zoneId])
+  @@unique([organizationId, observationId, ordinal], map: "readings_org_observation_ordinal_key")
+  @@map("readings")
+}

@@ -1,0 +1,1482 @@
+{
+ "note": "Ground truth for the DETERMINISTIC SIMULATED FACILITY transport. Used only by the simulator and by the evaluation panel. Never used by the planner or the extractor.",
+ "generated_at": "2026-08-26T16:00:00.000Z",
+ "facilities": [
+  {
+   "id": "MC-1001",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 394,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-16:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1002",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 604,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-19:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1003",
+   "line_type": "none",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 648,
+   "truth": {
+    "open_now": false,
+    "hours": "07:00-21:00",
+    "pet_policy": "no_pets",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1004",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 568,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1005",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 499,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-17:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "referral_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1006",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 363,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-21:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1007",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 227,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-21:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1008",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 575,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-20:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1009",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 453,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1010",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 276,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-16:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "not_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1011",
+   "line_type": "mobile",
+   "reachability": "unreachable_today",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 422,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-16:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1012",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 821,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-21:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1013",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 425,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1014",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 812,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1015",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 495,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-18:00",
+    "pet_policy": "no_pets",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1016",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 817,
+   "truth": {
+    "open_now": false,
+    "hours": "08:00-19:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1017",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 233,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-19:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1018",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 760,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-19:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1019",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 485,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-20:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1020",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 294,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-17:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1021",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 558,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1022",
+   "line_type": "ivr",
+   "reachability": "unreachable_today",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 718,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-17:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "referral_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1023",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 470,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-19:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1024",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 701,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-19:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1025",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 278,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-18:00",
+    "pet_policy": "no_pets",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1026",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 433,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-18:00",
+    "pet_policy": "no_pets",
+    "accessibility": "not_accessible",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1027",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 801,
+   "truth": {
+    "open_now": false,
+    "hours": "08:00-19:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1028",
+   "line_type": "none",
+   "reachability": "unreachable_today",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 225,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1029",
+   "line_type": "none",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 864,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-21:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1030",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 409,
+   "truth": {
+    "open_now": false,
+    "hours": "09:00-18:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1031",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 457,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-21:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1032",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 324,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-16:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "not_accessible",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1033",
+   "line_type": "main",
+   "reachability": "hard",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 361,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-18:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1034",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 522,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "no_pets",
+    "accessibility": "ramp_only",
+    "intake_requirements": "referral_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1035",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 824,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-21:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1036",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 788,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-16:00",
+    "pet_policy": "no_pets",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1037",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 445,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-20:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1038",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 297,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-21:00",
+    "pet_policy": "no_pets",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1039",
+   "line_type": "none",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 592,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-16:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1040",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 357,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-17:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1041",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 306,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-17:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1042",
+   "line_type": "ivr",
+   "reachability": "unreachable_today",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 886,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1043",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 587,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-17:00",
+    "pet_policy": "no_pets",
+    "accessibility": "not_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": false,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1044",
+   "line_type": "disconnected",
+   "reachability": "unreachable_today",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 432,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-16:00",
+    "pet_policy": "no_pets",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1045",
+   "line_type": "mobile",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 547,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1046",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 223,
+   "truth": {
+    "open_now": false,
+    "hours": "10:00-20:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1047",
+   "line_type": "none",
+   "reachability": "hard",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 882,
+   "truth": {
+    "open_now": true,
+    "hours": "08:00-18:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1048",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 476,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "no_pets",
+    "accessibility": "ramp_only",
+    "intake_requirements": "referral_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": false,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1049",
+   "line_type": "main",
+   "reachability": "unreachable_today",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 863,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-21:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1050",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 317,
+   "truth": {
+    "open_now": false,
+    "hours": "09:00-17:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1051",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 522,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-21:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1052",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 832,
+   "truth": {
+    "open_now": false,
+    "hours": "09:00-18:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1053",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 379,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "not_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": false,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1054",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 748,
+   "truth": {
+    "open_now": false,
+    "hours": "08:00-18:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1055",
+   "line_type": "ivr",
+   "reachability": "unreachable_today",
+   "persona": "knowledgeable_manager",
+   "answer_delay_ms": 699,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-19:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1056",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "front_desk_unsure",
+   "answer_delay_ms": 575,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-19:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1057",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 585,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-16:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": false,
+    "capacity_status": false
+   }
+  },
+  {
+   "id": "MC-1058",
+   "line_type": "ivr",
+   "reachability": "hard",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 618,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-16:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": false,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1059",
+   "line_type": "main",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 422,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-16:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-1060",
+   "line_type": "mobile",
+   "reachability": "unreachable_today",
+   "persona": "terse_maintenance",
+   "answer_delay_ms": 823,
+   "truth": {
+    "open_now": true,
+    "hours": "10:00-18:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "ramp_only",
+    "intake_requirements": "no_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   }
+  },
+  {
+   "id": "MC-9101",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 575,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-20:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": true,
+    "capacity_status": true
+   },
+   "shares_line_with": "MC-1008"
+  },
+  {
+   "id": "MC-9102",
+   "line_type": "disconnected",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 294,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-17:00",
+    "pet_policy": "crated_pets_only",
+    "accessibility": "fully_accessible",
+    "intake_requirements": "referral_required",
+    "capacity_status": "space_available"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": true,
+    "intake_requirements": false,
+    "capacity_status": true
+   },
+   "shares_line_with": "MC-1020"
+  },
+  {
+   "id": "MC-9103",
+   "line_type": "ivr",
+   "reachability": "normal",
+   "persona": "bilingual_handoff",
+   "answer_delay_ms": 324,
+   "truth": {
+    "open_now": true,
+    "hours": "09:00-16:00",
+    "pet_policy": "pets_allowed",
+    "accessibility": "not_accessible",
+    "intake_requirements": "id_requested_not_required",
+    "capacity_status": "at_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   },
+   "shares_line_with": "MC-1032"
+  },
+  {
+   "id": "MC-9104",
+   "line_type": "mobile",
+   "reachability": "normal",
+   "persona": "new_volunteer",
+   "answer_delay_ms": 547,
+   "truth": {
+    "open_now": true,
+    "hours": "07:00-18:00",
+    "pet_policy": "service_animals_only",
+    "accessibility": "ramp_only",
+    "intake_requirements": "photo_id_required",
+    "capacity_status": "near_capacity"
+   },
+   "knows": {
+    "open_now": true,
+    "hours": true,
+    "pet_policy": true,
+    "accessibility": false,
+    "intake_requirements": true,
+    "capacity_status": true
+   },
+   "shares_line_with": "MC-1045"
+  }
+ ]
+}

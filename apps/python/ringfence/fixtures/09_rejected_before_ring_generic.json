@@ -1,0 +1,29 @@
+{
+  "_evidence_source": "synthetic: models calltruth's rejected_before_ring classification (attempt never started dialing, no policy/destination marker matched) feeding into RingFence's fail-closed escalation",
+  "category": "escalation_case",
+  "case": {
+    "case_id": "case_f09",
+    "account_holder_name": "Nora Kessler",
+    "on_file_phone": "+14155550109",
+    "claimed_transaction_amount": "4100.00",
+    "claimed_recipient": "Kessler family trust",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f09",
+    "status": "failed",
+    "task": "Verify a flagged $4,100 wire transaction to the Kessler family trust.",
+    "failure_code": "call_failed",
+    "failure_message": "The call could not be completed due to a carrier routing error.",
+    "task_completed": false,
+    "completion_confidence": {"score": 0.1, "label": "low"},
+    "summary": "Call never reached a ringing state."
+  },
+  "attempts": [],
+  "events": [
+    {"id": "evt_f09a", "type": "call.rejected", "call_id": "call_f09", "created_at": "2026-09-10T17:00:00Z", "level": "error", "status": "failed", "message": "Pre-flight check failed before dialing began.", "details": {"region": "US"}}
+  ],
+  "signals": {},
+  "expected_disposition": "ESCALATE_TO_HUMAN"
+}

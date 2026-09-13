@@ -1,0 +1,32 @@
+:root {
+  --brand-muster-deep: #12344d;
+  --brand-instrument-teal: #0b6b69;
+  --brand-worklight-amber: #d8922b;
+  --brand-mineral-mist: #e5f1ef;
+  --brand-carbon-slate: #34495a;
+  --brand-field-paper: #f7faf9;
+  --brand-clear-white: #ffffff;
+}
+
+.muster-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--brand-muster-deep);
+}
+
+.muster-logo--dark {
+  color: var(--brand-clear-white);
+}
+
+.muster-logo__mark {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.muster-logo__wordmark {
+  color: inherit;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}

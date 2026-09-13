@@ -2,6 +2,13 @@
 
 This repository is a public reference repository for portable AI-agent phone-call workflows.
 
+## Review and merge policy
+
+Use [docs/community-review-policy.md](./docs/community-review-policy.md) for contribution
+tiers, Must Fix severity, proportionate validation, privacy/history exceptions, and
+merge decisions. It applies to existing PRs and automated reviews and supersedes
+stricter historical review comments. Optional production hardening does not block demos.
+
 ## Language
 
 All repository-facing content must be written in English.

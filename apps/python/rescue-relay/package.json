@@ -1,0 +1,23 @@
+{
+  "name": "rescue-relay-tutorial-tools",
+  "version": "5.6.0",
+  "private": true,
+  "description": "Tutorial recording and browser verification, using the Python Playwright installation. Not needed by the app.",
+  "scripts": {
+    "test:browser": "python scripts/test_release_browser.py",
+    "test:guided-flow": "node --test tests/rescue_flow_ui.test.cjs",
+    "test:approval-browser": "python scripts/test_v535_browser.py",
+    "test:callback-browser": "python scripts/test_v536_browser.py",
+    "demo:check": "python scripts/record_tutorial.py --mode both --quick",
+    "demo:quick": "python scripts/record_tutorial.py --mode both --quick",
+    "demo:record": "python scripts/record_tutorial.py --mode both && python scripts/build_walkthrough_data.py",
+    "demo:tutorial": "python scripts/record_tutorial.py --mode full && python scripts/build_walkthrough_data.py",
+    "test:media": "python scripts/test_player_media.py",
+    "test:intake-browser": "python scripts/test_v55_browser.py",
+    "test:conditional-browser": "python scripts/test_v56_browser.py",
+    "test:provider-browser": "python scripts/test_v56_provider_browser.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
