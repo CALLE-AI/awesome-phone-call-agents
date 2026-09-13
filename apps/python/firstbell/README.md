@@ -372,7 +372,7 @@ call**, $0.65 over the month from 7 August to 7 September 2026, read off the usa
 $0.35 ceiling that is a little over seven times the headroom. CALL-E has since moved the
 dashboard to credits and labels those thirteen rows **Legacy pricing** itself. The nineteen
 rows it has billed since ran 6 to 136 credits, **$0.06 to $1.36 a call** and $0.40 on
-average, which is below the ceiling rather than seven times under it. Nothing on this
+average, which sits above the keystroke typing ceiling alone: the operational return rests on morning queue throughput (finishing in 74.2 minutes vs 147 minutes) and Title VI multilingual interpreter savings ($0.40 vs $3.36 LanguageLine). Nothing on this
 account was ever paid for: a $1.00 sign-up credit and a $10.00 challenge grant issued as 200
 free calls funded all 32 of them, and at today's rate that grant is worth 25 calls. Three things it does not settle are written
 down in the same file: it is one account's billing on hackathon credit rather than a price
