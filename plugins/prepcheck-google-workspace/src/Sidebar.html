@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  :root {
+    --ink:     #17221F;
+    --muted:   #6C7D77;
+    --faint:   #97A5A0;
+    --rule:    #E4E8E6;
+    --paper:   #FFFFFF;
+    --wash:    #F4F7F6;
+    --drape:   #1F5E52;   /* surgical drape green — the one brand colour */
+    --ready:   #2E7D5B;
+    --warn:    #B07A12;
+    --alarm:   #A32E22;
+    --idle:    #B6C0BC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink);
+    background: var(--paper);
+  }
+
+  .wrap { padding: 0 0 26px; }
+
+  /* ---------- clinic header ---------- */
+
+  header {
+    padding: 16px 16px 13px;
+    border-bottom: 1px solid var(--rule);
+  }
+  header .clinic {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header .strap {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ---------- list ---------- */
+
+  .group { padding: 14px 16px 2px; }
+  .group h2 {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .patient {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--rule);
+    padding: 11px 16px 11px 13px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+  .patient:hover { background: var(--wash); }
+  .patient:focus-visible { outline: 2px solid var(--drape); outline-offset: -2px; }
+  .patient.alarm { border-left-color: var(--alarm); }
+  .patient.warn  { border-left-color: var(--warn); }
+  .patient.ready { border-left-color: var(--ready); }
+  .patient.ok    { border-left-color: var(--rule); }
+  .patient.idle  { border-left-color: var(--idle); }
+
+  .patient .top {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  }
+  .patient .name { font-weight: 600; }
+  .patient .word { font-size: 12px; white-space: nowrap; }
+  .word.alarm { color: var(--alarm); }
+  .word.warn  { color: var(--warn); }
+  .word.ready { color: var(--ready); }
+  .word.ok, .word.idle { color: var(--muted); }
+
+  .patient .line { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .patient .holdup { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+  /* ---------- card ---------- */
+
+  .back {
+    font: inherit;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    padding: 12px 16px 0;
+    cursor: pointer;
+  }
+  .back:hover { color: var(--ink); }
+
+  .card-head { padding: 6px 16px 14px; border-bottom: 1px solid var(--rule); }
+  .card-head h1 {
+    margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em;
+  }
+  .card-head .when { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+
+  .verdict { padding: 15px 16px 14px; border-bottom: 1px solid var(--rule); }
+  .verdict .headline {
+    margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .verdict .headline.alarm { color: var(--alarm); }
+  .verdict .headline.warn  { color: var(--warn); }
+  .verdict .headline.ready { color: var(--ready); }
+  .verdict .because { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+
+  /* the checkpoint rail — genuinely a sequence, so it reads as one */
+  .rail { padding: 16px 16px 6px; }
+  .stage { display: flex; gap: 12px; }
+  .spine { flex: 0 0 11px; display: flex; flex-direction: column; align-items: center; }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid var(--idle); background: var(--paper); margin-top: 4px;
+  }
+  .stage.past .dot { border-color: var(--ready); background: var(--ready); }
+  .stage.now  .dot { border-color: var(--drape); background: var(--drape);
+                     box-shadow: 0 0 0 3px rgba(31,94,82,.14); }
+  .thread { flex: 1; width: 2px; background: var(--rule); margin: 3px 0 0; }
+  .stage:last-child .thread { display: none; }
+
+  .stage-body { flex: 1; padding-bottom: 16px; }
+  .stage-when { font-size: 12px; color: var(--muted); }
+  .stage.now .stage-when { color: var(--drape); font-weight: 600; }
+
+  ul.steps { list-style: none; margin: 5px 0 0; padding: 0; }
+  ul.steps li { display: flex; gap: 8px; padding: 2px 0; }
+  .tick { flex: 0 0 13px; font-weight: 700; line-height: 1.4; }
+  .tick.done { color: var(--ready); }
+  .tick.outstanding { color: var(--alarm); }
+  .tick.unknown { color: var(--idle); }
+  li.is-unknown .step-label { color: var(--faint); }
+  li.is-outstanding .step-label { font-weight: 600; }
+
+  .facts { padding: 4px 16px 0; }
+  .fact {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 12px; color: var(--muted);
+    padding: 6px 0; border-top: 1px solid var(--rule);
+  }
+  .fact b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    margin: 12px 16px 0; padding: 10px 11px;
+    background: #FBF4E4; border-radius: 3px; font-size: 12px;
+  }
+
+  .actions { display: flex; flex-direction: column; gap: 7px; padding: 16px 16px 0; }
+  button.act {
+    font: inherit; font-weight: 500;
+    padding: 10px 12px; border-radius: 3px;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+    cursor: pointer; text-align: left;
+  }
+  button.act:hover:not(:disabled) { background: var(--wash); }
+  button.act:focus-visible { outline: 2px solid var(--drape); outline-offset: 1px; }
+  button.act.primary {
+    background: var(--drape); color: #fff; border-color: var(--drape);
+  }
+  button.act.primary:hover:not(:disabled) { background: #17473E; }
+  button.act:disabled { opacity: .45; cursor: default; }
+
+  footer {
+    margin-top: 20px; padding: 12px 16px 0;
+    border-top: 1px solid var(--rule);
+    font-size: 11px; color: var(--faint);
+  }
+
+  .msg { padding: 24px 16px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root" class="msg">Loading…</div>
+
+<script>
+  var view = { name: 'list', rowId: null };
+
+  /* ---------- list ---------- */
+
+  function renderList(q) {
+    if (!q) return fail('No patients in this sheet yet.');
+    view = { name: 'list', rowId: null };
+
+    var groups = [
+      { key: 'attention', title: 'Needs attention' },
+      { key: 'working',   title: 'Preparation under way' },
+      { key: 'settled',   title: 'Ready for the procedure' }
+    ];
+
+    var html = '<div class="wrap">';
+    html += '<header><p class="clinic">' + esc(q.clinic) + '</p>' +
+            '<p class="strap">Procedure preparation &middot; ' +
+            q.patients.length + (q.patients.length === 1 ? ' patient' : ' patients') +
+            '</p></header>';
+
+    groups.forEach(function (g) {
+      var rows = q.patients.filter(function (p) { return p.bucket === g.key; });
+      if (!rows.length) return;
+      html += '<div class="group"><h2>' + esc(g.title) + ' (' + rows.length + ')</h2></div>';
+      html += rows.map(row).join('');
+    });
+
+    html += '<footer>Calls placed by CALL-E' +
+            (q.liveCalls ? '' : ' &middot; calling switched off') + '</footer>';
+    html += '</div>';
+    document.getElementById('root').className = '';
+    document.getElementById('root').innerHTML = html;
+  }
+
+  function row(p) {
+    return '<button class="patient ' + p.tone + '" onclick="open_(\'' + esc(p.rowId) + '\')">' +
+             '<span class="top">' +
+               '<span class="name">' + esc(p.name) + '</span>' +
+               '<span class="word ' + p.tone + '">' + esc(p.word) + '</span>' +
+             '</span>' +
+             '<div class="line">' + esc(p.procedure) +
+               (p.when ? ' &middot; ' + esc(p.when) : '') + '</div>' +
+             (p.holdup ? '<div class="holdup">' + esc(p.holdup) + '</div>' : '') +
+           '</button>';
+  }
+
+  /* ---------- card ---------- */
+
+  function renderCard(c) {
+    if (!c) return fail('That patient is no longer in the sheet.');
+    view = { name: 'card', rowId: c.rowId };
+
+    var html = '<div class="wrap">';
+    html += '<button class="back" onclick="loadList()">&larr; All patients</button>';
+    html += '<div class="card-head"><h1>' + esc(c.name) + '</h1>' +
+            '<p class="when">' + esc(c.procedure) +
+            (c.procedureAt ? ' &middot; ' + esc(c.procedureAt) : '') + '</p></div>';
+
+    html += '<div class="verdict">' +
+              '<p class="headline ' + c.tone + '">' + esc(headline(c)) + '</p>' +
+              '<p class="because">' + esc(because(c)) + '</p>' +
+            '</div>';
+
+    html += '<div class="rail">' + c.stages.map(stage).join('') + '</div>';
+
+    html += '<div class="facts">';
+    if (c.nextCallAt) html += fact('Next call', c.nextCallAt);
+    if (c.partialCycles) {
+      html += fact('Follow-up calls used', c.partialCycles + ' of ' + c.maxPartialCycles);
+    }
+    if (c.noAnswerAttempts) html += fact('Unanswered calls', String(c.noAnswerAttempts));
+    html += '</div>';
+
+    if (c.staffNote) html += '<div class="note">' + esc(c.staffNote) + '</div>';
+
+    html += '<div class="actions">';
+    html +=   '<button class="act primary" onclick="act(\'callPatient\', this)">Call ' +
+              esc(first(c.name)) + ' now</button>';
+    html +=   '<button class="act" onclick="act(\'resetPatient\', this)">' +
+              'Start this patient over</button>';
+    html += '</div>';
+
+    html += '<footer>Calls placed by CALL-E' +
+            (c.liveCalls ? '' : ' &middot; calling switched off') + '</footer>';
+    html += '</div>';
+
+    document.getElementById('root').className = '';
+    document.getElementById('root').innerHTML = html;
+  }
+
+  function headline(c) {
+    if (c.word === 'Needs you')     return 'Needs a person to step in';
+    if (c.word === 'Not ready')     return 'Not ready — release the slot';
+    if (c.word === 'Ready')         return 'Ready for the procedure';
+    if (c.word === 'Slipped back')  return 'A confirmed step has come undone';
+    if (c.word === 'Stalled')       return 'Preparation has stopped moving';
+    if (c.word === 'On the phone')  return 'On the phone now';
+    if (c.word === 'No answer')     return 'Could not reach them';
+    if (c.word === 'Not called yet') return 'Not called yet';
+    return 'Preparation under way';
+  }
+
+  function because(c) {
+    if (c.regressed.length) {
+      return 'Confirmed on an earlier call, now reported as not done: ' +
+             c.regressed.join(', ') + '.';
+    }
+    if (c.word === 'Stalled' || c.word === 'Needs you') {
+      return c.outstanding.length
+        ? 'Still outstanding after ' + c.partialCycles + ' follow-up ' +
+          (c.partialCycles === 1 ? 'call' : 'calls') + ': ' + c.outstanding.join(', ') + '.'
+        : 'Preparation has not moved since the previous call.';
+    }
+    if (c.word === 'Ready') return 'Every preparation step has been confirmed.';
+    if (c.word === 'Not called yet') {
+      return c.nextCallAt ? 'First call goes out ' + c.nextCallAt + '.'
+                          : 'No call scheduled yet.';
+    }
+    if (c.outstanding.length) return 'Waiting on ' + c.outstanding.join(', ') + '.';
+    return 'Waiting for the next checkpoint.';
+  }
+
+  function stage(s) {
+    return '<div class="stage ' + s.position + '">' +
+             '<div class="spine"><span class="dot"></span><span class="thread"></span></div>' +
+             '<div class="stage-body">' +
+               '<div class="stage-when">' + esc(before(s.hoursBefore)) + '</div>' +
+               '<ul class="steps">' + s.items.map(step).join('') + '</ul>' +
+             '</div>' +
+           '</div>';
+  }
+
+  function before(hours) {
+    if (hours % 24 === 0) {
+      var d = hours / 24;
+      return d === 1 ? 'The day before' : d + ' days before';
+    }
+    return hours + ' hours before';
+  }
+
+  function step(it) {
+    var mark = it.status === 'done' ? '&#10003;'
+             : it.status === 'outstanding' ? '&#10007;' : '&middot;';
+    return '<li class="is-' + it.status + '">' +
+             '<span class="tick ' + it.status + '">' + mark + '</span>' +
+             '<span class="step-label">' + esc(it.label) + '</span>' +
+           '</li>';
+  }
+
+  function fact(k, v) {
+    return '<div class="fact"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>';
+  }
+
+  /* ---------- plumbing ---------- */
+
+  function open_(rowId) {
+    busy('Opening…');
+    google.script.run.withSuccessHandler(renderCard)
+      .withFailureHandler(failWith).focusRow(rowId);
+  }
+
+  function loadList() {
+    busy('Loading…');
+    google.script.run.withSuccessHandler(renderList)
+      .withFailureHandler(failWith).getQueue();
+  }
+
+  function act(fn, btn) {
+    var all = document.querySelectorAll('button');
+    for (var i = 0; i < all.length; i++) all[i].disabled = true;
+    btn.textContent = 'Working…';
+    google.script.run.withSuccessHandler(renderCard)
+      .withFailureHandler(failWith)[fn](view.rowId);
+  }
+
+  function refresh() {
+    if (view.name === 'card' && view.rowId) {
+      google.script.run.withSuccessHandler(renderCard)
+        .withFailureHandler(failWith).getPatientCard(view.rowId);
+    } else {
+      google.script.run.withSuccessHandler(renderList)
+        .withFailureHandler(failWith).getQueue();
+    }
+  }
+
+  function busy(text) {
+    var root = document.getElementById('root');
+    root.className = 'msg';
+    root.textContent = text;
+  }
+
+  function fail(text) {
+    var root = document.getElementById('root');
+    root.className = 'msg';
+    root.textContent = text;
+  }
+
+  function failWith(e) { fail(e && e.message ? e.message : 'Something went wrong.'); }
+
+  function first(n) { return String(n || '').split(' ')[0]; }
+
+  function esc(s) {
+    return String(s === undefined || s === null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/'/g, '&#39;');
+  }
+
+  loadList();
+  window.addEventListener('focus', refresh);
+</script>
+</body>
+</html>

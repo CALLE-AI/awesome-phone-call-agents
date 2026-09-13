@@ -1,0 +1,22 @@
+{
+  "_comment": "The patient cannot be ready in time. PrepCheck releases the slot, emails the scheduling staff, and stops calling. The agent does not offer a new date — rebooking stays with a person.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.9, "label": "high" },
+  "metadata": { "row_id": "P002", "checkpoint": "T72", "source": "prepcheck" },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "not_prepared",
+        "items_completed": [],
+        "items_outstanding": [
+          "completed the pre-procedure blood test"
+        ],
+        "outstanding_plan": "no appointment booked, cannot get one in time",
+        "wants_reschedule": "yes",
+        "flag_for_staff": false,
+        "identity_verified": true
+      }
+    }
+  ]
+}
