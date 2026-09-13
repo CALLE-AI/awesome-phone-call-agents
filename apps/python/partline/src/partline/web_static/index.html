@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="PartLine evidence review console for approved industrial supplier calls.">
+  <title>PartLine · Supplier evidence</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="loading-screen" id="loading-screen" aria-live="polite">
+    <div class="loading-mark" aria-hidden="true"></div>
+    <p>Loading the evidence ledger…</p>
+  </div>
+
+  <div class="app" id="app" hidden>
+    <header class="topbar">
+      <button class="menu-button" id="menu-button" type="button" aria-label="Open request details" aria-controls="request-dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <a class="wordmark" href="#workspace" aria-label="PartLine home">PARTLINE</a>
+      <div class="header-fact header-request">
+        <span>Active request</span>
+        <strong id="header-request-id">—</strong>
+      </div>
+      <div class="header-fact header-status">
+        <span>Status</span>
+        <strong id="header-status">No call placed</strong>
+      </div>
+      <button class="primary-button review-plan-button" id="review-plan-button" type="button">
+        Review call plan
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </header>
+
+    <main class="console-shell" id="workspace">
+      <aside class="workflow-rail" aria-label="PartLine workflow status">
+        <ol id="workflow-list"></ol>
+      </aside>
+
+      <aside class="request-ledger" aria-labelledby="request-ledger-title">
+        <div class="section-rule">
+          <h2 id="request-ledger-title">Request ledger</h2>
+        </div>
+        <p class="part-number" id="part-number">—</p>
+        <p class="manufacturer" id="manufacturer">—</p>
+        <dl class="request-metrics">
+          <div><dt>Quantity</dt><dd id="quantity">—</dd></div>
+          <div><dt>Need by</dt><dd id="need-by">—</dd></div>
+        </dl>
+        <div class="specifications">
+          <h3>Specifications <span id="spec-count"></span></h3>
+          <ul id="spec-list"></ul>
+        </div>
+        <div class="request-context">
+          <h3>Request context</h3>
+          <dl>
+            <div><dt>Facility</dt><dd id="facility">—</dd></div>
+            <div><dt>Requested by</dt><dd id="requester">—</dd></div>
+            <div><dt>Alternates</dt><dd id="alternates">—</dd></div>
+          </dl>
+        </div>
+        <button class="secondary-button full-width" id="request-details-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM9 11h6M9 15h6M14 3v4h4"/></svg>
+          View request details
+        </button>
+      </aside>
+
+      <section class="main-workspace" aria-label="Call plan and supplier evidence">
+        <nav class="view-tabs" aria-label="Workspace views">
+          <button class="view-tab" id="call-plan-tab" type="button" role="tab" aria-controls="call-plan-view" aria-selected="false" data-view="plan">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h4l2 5-3 2a16 16 0 0 0 4 4l2-3 5 2v4c0 2-2 4-4 4C9 20 4 15 3 7c0-2 2-4 4-4Z"/></svg>
+            Call plan
+          </button>
+          <button class="view-tab active" id="evidence-tab" type="button" role="tab" aria-controls="evidence-view" aria-selected="true" data-view="evidence">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1 3h3v14H5V7h3zM9 12h6M9 16h6"/></svg>
+            Evidence
+          </button>
+        </nav>
+
+        <section class="request-mobile-summary" aria-label="Request summary">
+          <span>Part</span>
+          <strong id="mobile-part-number">—</strong>
+          <dl>
+            <div><dt>Quantity</dt><dd id="mobile-quantity">—</dd></div>
+            <div><dt>Need by</dt><dd id="mobile-need-by">—</dd></div>
+            <div><dt>Specifications</dt><dd id="mobile-spec-count">—</dd></div>
+          </dl>
+        </section>
+
+        <section id="evidence-view" class="workspace-view" role="tabpanel" aria-labelledby="evidence-tab">
+          <div class="workspace-heading">
+            <h1>Supplier evidence</h1>
+            <div class="legend" aria-label="Match status legend">
+              <span><i class="status-icon exact" aria-hidden="true"></i>Exact</span>
+              <span><i class="status-icon compatible" aria-hidden="true"></i>Compatible</span>
+              <span><i class="status-icon unresolved" aria-hidden="true"></i>Unresolved</span>
+            </div>
+          </div>
+
+          <div class="evidence-table-wrap">
+            <table class="evidence-table">
+              <thead>
+                <tr>
+                  <th scope="col">Supplier</th>
+                  <th scope="col">Match</th>
+                  <th scope="col">Available</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">Ship</th>
+                  <th scope="col">Lead</th>
+                  <th scope="col"><span class="visually-hidden">Open evidence</span></th>
+                </tr>
+              </thead>
+              <tbody id="evidence-rows"></tbody>
+            </table>
+          </div>
+
+          <article class="evidence-detail" id="evidence-detail" aria-live="polite"></article>
+        </section>
+
+        <section id="call-plan-view" class="workspace-view" role="tabpanel" aria-labelledby="call-plan-tab" hidden>
+          <div class="workspace-heading plan-heading">
+            <div>
+              <h1>Masked call plan</h1>
+              <p>No call has been placed. Review the exact task and side effect before using the CLI approval gate.</p>
+            </div>
+            <span class="no-call-state">No call placed</span>
+          </div>
+          <div class="plan-layout">
+            <section class="plan-recipients" aria-labelledby="recipient-title">
+              <div class="section-rule"><h2 id="recipient-title">Approved contacts</h2></div>
+              <ol id="recipient-list"></ol>
+            </section>
+            <section class="plan-task" aria-labelledby="task-title">
+              <div class="section-rule"><h2 id="task-title">CALL-E task</h2></div>
+              <p id="plan-task-text"></p>
+            </section>
+          </div>
+          <div class="approval-checkpoint">
+            <div>
+              <span>Request-bound approval</span>
+              <strong id="approval-token">—</strong>
+            </div>
+            <button class="primary-button" id="copy-command-button" type="button">Copy live CLI command</button>
+          </div>
+        </section>
+      </section>
+
+      <aside class="authority-rail" aria-labelledby="authority-title">
+        <div class="section-rule"><h2 id="authority-title">Authority &amp; scope</h2></div>
+        <section class="authority-block can-verify">
+          <div class="authority-heading">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 8 3v6c0 5-3 9-8 11-5-2-8-6-8-11V5zM8 12l3 3 5-6"/></svg>
+            <h3>PartLine can verify</h3>
+          </div>
+          <p>Supplier identity, exact part claims, available quantity, ship timing and spoken evidence.</p>
+        </section>
+        <section class="authority-block cannot">
+          <div class="authority-heading">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m6 18 12-12"/></svg>
+            <h3>PartLine cannot</h3>
+          </div>
+          <p>Order, reserve, negotiate, accept terms or approve an engineering substitution.</p>
+        </section>
+        <section class="masked-plan-summary">
+          <div class="section-rule"><h3>No-call plan</h3></div>
+          <dl>
+            <div><dt>Recipients</dt><dd id="authority-recipients">—</dd></div>
+            <div><dt>Weekday window</dt><dd id="authority-window">—</dd></div>
+            <div><dt>Approval</dt><dd>Request-bound</dd></div>
+            <div><dt>Purchase authority</dt><dd>None</dd></div>
+          </dl>
+        </section>
+        <button class="secondary-button full-width" id="authority-plan-button" type="button">View call plan</button>
+      </aside>
+    </main>
+
+    <footer class="status-bar">
+      <p id="view-status">You are viewing the Evidence view.</p>
+      <p class="keyboard-hint">Press <kbd>1</kbd> for Call plan <span>·</span> <kbd>2</kbd> for Evidence</p>
+      <p class="save-state"><span aria-hidden="true"></span> Local review only</p>
+      <button id="activity-button" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
+        Activity log
+      </button>
+    </footer>
+
+    <button class="mobile-authority" id="mobile-authority-button" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 8 3v6c0 5-3 9-8 11-5-2-8-6-8-11V5zM8 12l3 3 5-6"/></svg>
+      Verify facts only · No purchase authority
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <dialog id="request-dialog">
+    <form method="dialog" class="dialog-shell">
+      <header><h2>Request details</h2><button aria-label="Close request details" value="cancel">×</button></header>
+      <div id="request-dialog-content"></div>
+      <footer><button class="secondary-button" value="cancel">Close</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="activity-dialog">
+    <form method="dialog" class="dialog-shell">
+      <header><h2>Activity log</h2><button aria-label="Close activity log" value="cancel">×</button></header>
+      <ol class="activity-list" id="activity-list"></ol>
+      <footer><button class="secondary-button" value="cancel">Close</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="authority-dialog">
+    <form method="dialog" class="dialog-shell">
+      <header><h2>Authority boundary</h2><button aria-label="Close authority boundary" value="cancel">×</button></header>
+      <div class="dialog-copy">
+        <p><strong>PartLine verifies sourcing evidence.</strong> It does not create a purchase order, reserve stock, negotiate, accept supplier terms or approve alternate parts.</p>
+        <p>Every compatible, contradictory or low-evidence result remains a human decision.</p>
+      </div>
+      <footer><button class="secondary-button" value="cancel">Close</button></footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="noscript">PartLine requires JavaScript to render the local evidence console. The CLI remains fully available.</p></noscript>
+</body>
+</html>

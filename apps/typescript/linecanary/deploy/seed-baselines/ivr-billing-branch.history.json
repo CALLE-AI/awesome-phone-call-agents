@@ -1,0 +1,207 @@
+[
+  {
+    "checkId": "ivr-billing-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 14,
+      "secondsToFirstResponse": 14,
+      "turnCount": 4
+    },
+    "confidence": 0.9,
+    "callId": "call_MC70mUQ9NBjj-heBSIk_Xg",
+    "at": "2026-08-03T19:36:06.049757Z",
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "branch_answered",
+          "equals": true
+        },
+        "pass": true,
+        "actual": true,
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "billing_message",
+          "matches": "monday|billing"
+        },
+        "pass": true,
+        "actual": "Our billing team is available Monday to Friday, 9AM to 4PM. Please call back then or email billing at sample dental dot example.",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-billing-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 10,
+      "secondsToFirstResponse": 10,
+      "turnCount": 4
+    },
+    "confidence": 0.86,
+    "callId": "call_oWdEH6DYsuTMio4U6_lxlw",
+    "at": "2026-08-03T19:40:09.064086Z",
+    "status": "fail",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "branch_answered",
+          "equals": true
+        },
+        "pass": false,
+        "actual": false,
+        "detail": "expected true, got false"
+      },
+      {
+        "assertion": {
+          "path": "billing_message",
+          "matches": "monday|billing"
+        },
+        "pass": false,
+        "detail": "billing_message is missing from the result"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-billing-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 12,
+      "secondsToFirstResponse": 12,
+      "turnCount": 4
+    },
+    "confidence": 0.9,
+    "callId": "call_00xi0ZVH2ln00_eqbrS6oQ",
+    "at": "2026-08-03T19:42:27.066814Z",
+    "status": "fail",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "branch_answered",
+          "equals": true
+        },
+        "pass": false,
+        "actual": false,
+        "detail": "expected true, got false"
+      },
+      {
+        "assertion": {
+          "path": "billing_message",
+          "matches": "monday|billing"
+        },
+        "pass": false,
+        "detail": "billing_message is missing from the result"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-billing-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 9,
+      "secondsToFirstResponse": 9,
+      "turnCount": 4
+    },
+    "confidence": 0.92,
+    "callId": "call_T-QwZHXY1GY4I01c6OGLJg",
+    "at": "2026-08-03T19:44:53.829953Z",
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "branch_answered",
+          "equals": true
+        },
+        "pass": true,
+        "actual": true,
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "billing_message",
+          "matches": "monday|billing"
+        },
+        "pass": true,
+        "actual": "Our billing team is available Monday to Friday, 9AM to 4PM. Please call back then. Or email billing at sample dental dot example.",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-billing-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 10,
+      "secondsToFirstResponse": 10,
+      "turnCount": 4
+    },
+    "confidence": 0.93,
+    "callId": "call_38BPc8eioADeCMAhgvozPw",
+    "at": "2026-08-03T20:26:11.201607Z",
+    "transcript": [
+      {
+        "offsetSeconds": 0,
+        "speaker": "bot",
+        "text": "This is an automated test call from LineCanary,"
+      },
+      {
+        "offsetSeconds": 2,
+        "speaker": "bot",
+        "text": "monitoring this line on behalf of its owner."
+      },
+      {
+        "offsetSeconds": 10,
+        "speaker": "user",
+        "text": "Thank you for calling Sample Dental. This line is monitored. Canary ID, LC7391. For appointments, press 1. For opening hours, press 2. For billing questions, press 3."
+      },
+      {
+        "offsetSeconds": 21,
+        "speaker": "user",
+        "text": "Our billing team is available Monday to Friday, 9AM to 4PM. Please call back then. Or email billing at sample dental dot example."
+      }
+    ],
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "branch_answered",
+          "equals": true
+        },
+        "pass": true,
+        "actual": true,
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "billing_message",
+          "matches": "monday|billing"
+        },
+        "pass": true,
+        "actual": "Our billing team is available Monday to Friday, 9AM to 4PM. Please call back then. Or email billing at sample dental dot example.",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  }
+]

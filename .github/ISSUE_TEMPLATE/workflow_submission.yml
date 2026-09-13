@@ -1,0 +1,51 @@
+name: Workflow resource submission
+description: Suggest a phone-call skill, runnable app, workflow plugin, adapter, scheduler recipe, or safety resource.
+title: "[Submission]: "
+type: Task
+labels:
+  - "area:community-repo"
+  - "status:needs-triage"
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: Name of the skill, runnable app, workflow plugin, adapter, scheduler recipe, or resource.
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: Select the closest contribution type.
+      options:
+        - Agent Skill
+        - Runnable app
+        - Workflow plugin
+        - Provider adapter
+        - Scheduler recipe
+        - Safety pattern
+        - Documentation resource
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      description: Public URL, if available.
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Explain how this helps AI agents with phone-call workflows.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety notes
+      description: Describe real-world side effects, credential handling, dry-run behavior, cancellation behavior, and any sensitive domains.
+    validations:
+      required: true

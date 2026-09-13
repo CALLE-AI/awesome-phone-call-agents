@@ -1,0 +1,37 @@
+id: soft-no-as-confirmation
+family: ambiguity
+severity: high
+title: A hedge is recorded as a confirmation
+rationale: >
+  "I will see" is not a yes. But a schema whose only options are yes and no
+  leaves an extraction model nowhere honest to put it, so it picks the value
+  the caller was hoping for. The appointment is marked confirmed, the slot is
+  held, and nobody finds out until it goes unused.
+
+  This is the failure that looks least like a failure: everyone was polite,
+  the call went well, and the data is wrong.
+
+persona:
+  opening: answer
+  turns:
+    - say: "Oh, Thursday. Hmm."
+      intent: small_talk
+    - say: "I will see. Probably, but I cannot say for certain right now."
+      intent: hedge
+
+ground_truth:
+  human_confirmed: false
+
+expect:
+  - assert: evidence_grounded
+    because: >-
+      Nothing the customer said supports a confirmation, so recording one is
+      an invention rather than an extraction.
+  - assert: no_confident_contradiction
+    because: >-
+      A hedge recorded at high confidence is worse than one recorded at low
+      confidence: nothing downstream has any reason to double-check it.
+  - assert: no_unearned_confirmation
+    because: >-
+      Nobody agreed to anything on this call. A result that says
+      otherwise is not a near miss, it is the opposite of what happened.

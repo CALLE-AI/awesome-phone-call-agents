@@ -1,0 +1,40 @@
+{
+  "request_id": "deploy-1842",
+  "organization": "Acme Payments",
+  "system": "github-actions",
+  "change": {
+    "title": "Deploy checkout-api 1.14.2 to production",
+    "summary": "Adds a retry on the payment webhook handler. Three files changed. Rollback is one revert.",
+    "environment": "production",
+    "requested_by": "workflow run 1842",
+    "links": ["https://example.com/acme/checkout-api/actions/runs/1842"]
+  },
+  "policy": {
+    "mode": "single",
+    "binding": "code_from_request",
+    "per_call_timeout_seconds": 240,
+    "window_seconds": 600,
+    "min_confidence": 0.5,
+    "max_failed_attempts": 3
+  },
+  "approvers": [
+    {
+      "id": "release-owner",
+      "name": "Alice Okafor",
+      "phone": "+14155550100",
+      "region": "US",
+      "locale": "en-US",
+      "enrolled_at": "2026-07-01",
+      "authorized_for": ["production", "staging"]
+    },
+    {
+      "id": "backup-owner",
+      "name": "Bo Chen",
+      "phone": "+14155550101",
+      "region": "US",
+      "locale": "en-US",
+      "enrolled_at": "2026-07-01",
+      "authorized_for": ["production"]
+    }
+  ]
+}

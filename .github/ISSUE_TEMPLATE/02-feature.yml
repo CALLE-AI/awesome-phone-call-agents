@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a new CALL-E capability or product behavior.
+type: Feature
+labels:
+  - "status:needs-triage"
+
+body:
+  - type: dropdown
+    id: affected_surface
+    attributes:
+      label: Affected area
+      options:
+        - Developer API / SDK / Webhooks
+        - Goals / Goal Runs
+        - MCP / CLI
+        - Dashboard / Chat
+        - Calling / Routing
+        - Voice / Speech
+        - Billing / Account
+        - Documentation
+        - Community repository
+        - Other / Cross-surface
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_limitation
+    attributes:
+      label: Current limitation
+      description: Explain what cannot be done today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: requested_outcome
+    attributes:
+      label: Requested outcome
+      description: Describe the user-visible capability, not only a proposed implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why this matters
+      description: Describe the workflow, affected users, and impact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety_cost
+    attributes:
+      label: Safety, privacy, billing, and compatibility considerations
+      description: Cover real-call side effects, cancellation, credentials, migration, and backwards compatibility where relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround or alternatives

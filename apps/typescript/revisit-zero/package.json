@@ -1,0 +1,36 @@
+{
+  "name": "@calle/revisit-zero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:ui",
+    "build:server": "tsc -p tsconfig.json",
+    "build:ui": "vite build",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "node --import tsx demo/run-demo.ts",
+    "start": "node --import tsx src/server.ts",
+    "start:prod": "node dist/src/server.js"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.10"
+  }
+}

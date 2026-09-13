@@ -1,0 +1,11 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true
+    }
+  ],
+  "name": "quotewake-salesforce",
+  "namespace": "",
+  "sourceApiVersion": "66.0"
+}

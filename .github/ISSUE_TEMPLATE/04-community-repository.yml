@@ -1,0 +1,45 @@
+name: Community repository task
+description: Report work needed in this repository's skills, apps, plugins, examples, validation, or governance.
+type: Task
+labels:
+  - "area:community-repo"
+  - "status:needs-triage"
+
+body:
+  - type: dropdown
+    id: repository_area
+    attributes:
+      label: Repository area
+      options:
+        - Agent Skill
+        - Runnable app
+        - Workflow plugin
+        - Provider adapter or reference
+        - Documentation or safety pattern
+        - Validation or automation
+        - Repository governance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: task
+    attributes:
+      label: Requested change
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and data considerations
+      description: Explain side effects, credential handling, dry-run behavior, cancellation, and any private data concerns.
+    validations:
+      required: true

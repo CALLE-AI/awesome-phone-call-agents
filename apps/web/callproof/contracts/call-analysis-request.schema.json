@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://callproof.dev/contracts/call-analysis-request.schema.json",
+  "title": "CallProof call analysis request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "call_id",
+    "submitted_at",
+    "call_contract",
+    "transcript",
+    "callback"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0" },
+    "request_id": { "type": "string", "format": "uuid" },
+    "call_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "agentkit_run_id": { "type": ["string", "null"], "maxLength": 255 },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "call_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective",
+        "protocol_language",
+        "success_conditions",
+        "allowed_commitments",
+        "escalation_conditions",
+        "verification_claims"
+      ],
+      "properties": {
+        "objective": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "protocol_language": { "enum": ["en", "es"] },
+        "success_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["delivery_date_confirmed", "delivery_time_confirmed"] }
+        },
+        "allowed_commitments": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximum_surcharge_cents"],
+          "properties": {
+            "maximum_surcharge_cents": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "forbidden_commitments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "const": "product_substitution" }
+        },
+        "required_disclosures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "const": "recording_notice" }
+        },
+        "escalation_conditions": {
+          "type": "array",
+          "maxItems": 0,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        },
+        "verification_claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/success_claim" },
+              { "$ref": "#/$defs/commitment_limit_claim" },
+              { "$ref": "#/$defs/required_disclosure_claim" },
+              { "$ref": "#/$defs/forbidden_commitment_claim" }
+            ]
+          }
+        }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "turns"],
+      "properties": {
+        "language": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+        "turns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transcript_turn" }
+        }
+      }
+    },
+    "provider_result": { "type": ["object", "null"] },
+    "callback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    },
+    "metadata": { "type": "object" }
+  },
+  "$defs": {
+    "success_claim": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "result_field", "operator", "expected"],
+          "properties": {
+            "kind": { "const": "success" },
+            "id": { "const": "delivery_date_confirmed" },
+            "result_field": { "const": "delivery_date" },
+            "operator": { "const": "equals" },
+            "expected": { "type": "string", "format": "date" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "result_field", "operator", "expected"],
+          "properties": {
+            "kind": { "const": "success" },
+            "id": { "const": "delivery_time_confirmed" },
+            "result_field": { "const": "delivery_time" },
+            "operator": { "const": "equals" },
+            "expected": {
+              "type": "string",
+              "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+            }
+          }
+        }
+      ]
+    },
+    "commitment_limit_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "id", "result_field", "operator", "maximum"
+      ],
+      "properties": {
+        "kind": { "const": "commitment_limit" },
+        "id": { "const": "surcharge_within_limit" },
+        "result_field": { "const": "surcharge_cents" },
+        "operator": { "const": "less_than_or_equal" },
+        "maximum": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "required_disclosure_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "required_disclosure" },
+        "id": { "const": "recording_notice" }
+      }
+    },
+    "forbidden_commitment_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "evaluation_mode"],
+      "properties": {
+        "kind": { "const": "forbidden_commitment" },
+        "id": { "const": "product_substitution" },
+        "evaluation_mode": { "const": "semantic_only" }
+      }
+    },
+    "transcript_turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "speaker", "text"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "speaker": { "enum": ["agent", "recipient", "system", "unknown"] },
+        "text": { "type": "string", "minLength": 1 },
+        "started_at_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "ended_at_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

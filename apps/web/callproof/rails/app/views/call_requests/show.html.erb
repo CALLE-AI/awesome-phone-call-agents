@@ -1,0 +1,87 @@
+<% content_for :title, "CallProof run ##{@call_request.id}" %>
+
+<main class="shell">
+  <nav><%= link_to "← Run another simulation", root_path, class: "back-link" %></nav>
+
+  <header class="result-header">
+    <div>
+      <p class="eyebrow">Verified call run #<%= @call_request.id %></p>
+      <h1><%= @call_request.status.humanize %></h1>
+    </div>
+    <span class="badge large <%= @call_request.status %>"><%= @call_request.status.humanize %></span>
+  </header>
+
+  <section class="result-grid">
+    <article class="panel compact">
+      <p class="step-label">01 · Intent</p>
+      <h2>Explicit objective</h2>
+      <p><%= @call_request.objective %></p>
+      <dl>
+        <dt>Recipient</dt><dd><%= @call_request.provider_profile.name %></dd>
+        <dt>Phone</dt><dd><%= @call_request.masked_phone_number %></dd>
+        <dt>Mode</dt><dd><%= @call_request.mode_label %></dd>
+      </dl>
+    </article>
+
+    <article class="panel compact">
+      <p class="step-label">02 · Contract</p>
+      <h2>Authorized boundary</h2>
+      <dl>
+        <dt>Maximum surcharge</dt><dd>$<%= format("%.2f", @call_request.call_policy.maximum_surcharge_cents / 100.0) %></dd>
+        <dt>Success conditions</dt><dd><%= @call_request.call_contract.success_conditions.join(", ") %></dd>
+        <dt>Contract hash</dt><dd class="mono"><%= @call_request.call_contract.snapshot_hash.first(12) %>…</dd>
+      </dl>
+    </article>
+  </section>
+
+  <% if @analysis&.completed? %>
+    <section class="panel verdict <%= @analysis.needs_human_review? ? "danger" : "success" %>">
+      <div>
+        <p class="step-label">03 · Call Analyzer verdict</p>
+        <h2><%= @analysis.verdict.fetch("summary") %></h2>
+      </div>
+      <div class="metrics">
+        <div><span>Policy adherence</span><strong><%= @analysis.verdict.fetch("policy_adherence") ? "Yes" : "No" %></strong></div>
+        <div><span>Risk score</span><strong><%= number_to_percentage(@analysis.verdict.fetch("risk_score") * 100, precision: 0) %></strong></div>
+        <div><span>Confidence</span><strong><%= number_to_percentage(@analysis.result_confidence * 100, precision: 0) %></strong></div>
+      </div>
+    </section>
+
+    <section class="panel compact">
+      <p class="step-label">Evidence</p>
+      <% @analysis.analysis_evidences.each do |evidence| %>
+        <div class="evidence">
+          <strong><%= evidence.finding.humanize %></strong>
+          <p><%= evidence.explanation %></p>
+          <span>Transcript turns <%= evidence.transcript_turn_ids.join(", ") %></span>
+        </div>
+      <% end %>
+    </section>
+  <% elsif @analysis %>
+    <section class="panel compact">
+      <p class="step-label">03 · Call Analyzer</p>
+      <h2>Analysis pending</h2>
+      <p>The transcript was accepted and is being evaluated. This page will show the verdict and evidence after the signed callback arrives.</p>
+      <dl>
+        <dt>Status</dt><dd><%= @analysis.status.humanize %></dd>
+        <% if @analysis.external_analysis_id.present? %>
+          <dt>Analysis ID</dt><dd class="mono"><%= @analysis.external_analysis_id %></dd>
+        <% end %>
+      </dl>
+    </section>
+  <% end %>
+
+  <% if @suggestion %>
+    <section class="panel review">
+      <p class="step-label">04 · AgentKit HITL</p>
+      <h2>The flow is suspended, not blocked.</h2>
+      <p>AgentKit persisted a high-priority decision with the analyzer evidence. Approving or rejecting it resumes the same idempotent run.</p>
+      <%= link_to "Open human review", agentkit.suggestions_path, class: "primary-button" %>
+    </section>
+  <% elsif @call_request.agentkit_run_id.present? %>
+    <section class="panel compact">
+      <p class="step-label">AgentKit trace</p>
+      <p class="mono"><%= @call_request.agentkit_run_id %></p>
+    </section>
+  <% end %>
+</main>

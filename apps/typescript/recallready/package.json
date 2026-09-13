@@ -1,0 +1,26 @@
+{
+  "name": "recallready",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-gated product-recall qualification calls using official CPSC data and CALL-E.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/src/server.js",
+    "test": "tsx --test test/*.test.ts",
+    "check": "pnpm run build && pnpm test"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "4.23.11",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

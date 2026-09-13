@@ -1,0 +1,1 @@
+# Keep HubSpot CLI from inheriting repository .gitignore rules that ignore .worktrees/.

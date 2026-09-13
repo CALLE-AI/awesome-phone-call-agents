@@ -1,0 +1,202 @@
+{
+  "uid": "calle_create_call_candidate_action",
+  "type": "workflow-action",
+  "config": {
+    "actionUrl": "https://replace-with-hubspot-serverless-domain.example/hs/serverless/calle/create-call",
+    "isPublished": true,
+    "supportedClients": [
+      {
+        "client": "WORKFLOWS"
+      }
+    ],
+    "objectTypes": [
+      "CONTACT",
+      "DEAL"
+    ],
+    "inputFields": [
+      {
+        "typeDefinition": {
+          "name": "source_object_type",
+          "type": "enumeration",
+          "fieldType": "select",
+          "options": [
+            {
+              "value": "contact",
+              "label": "Contact"
+            },
+            {
+              "value": "deal",
+              "label": "Deal"
+            }
+          ]
+        },
+        "supportedValueTypes": [
+          "STATIC_VALUE"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "source_object_id",
+          "type": "string",
+          "fieldType": "text"
+        },
+        "supportedValueTypes": [
+          "OBJECT_PROPERTY"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "phone",
+          "type": "string",
+          "fieldType": "text"
+        },
+        "supportedValueTypes": [
+          "OBJECT_PROPERTY"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "phone_property",
+          "type": "string",
+          "fieldType": "text"
+        },
+        "supportedValueTypes": [
+          "STATIC_VALUE"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "call_purpose",
+          "type": "string",
+          "fieldType": "textarea"
+        },
+        "supportedValueTypes": [
+          "STATIC_VALUE"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "consent_allowed",
+          "type": "enumeration",
+          "fieldType": "select",
+          "options": [
+            {
+              "value": "true",
+              "label": "Yes"
+            },
+            {
+              "value": "false",
+              "label": "No"
+            }
+          ]
+        },
+        "supportedValueTypes": [
+          "STATIC_VALUE"
+        ],
+        "isRequired": true
+      },
+      {
+        "typeDefinition": {
+          "name": "do_not_call",
+          "type": "enumeration",
+          "fieldType": "select",
+          "options": [
+            {
+              "value": "false",
+              "label": "No"
+            },
+            {
+              "value": "true",
+              "label": "Yes"
+            }
+          ]
+        },
+        "supportedValueTypes": [
+          "STATIC_VALUE"
+        ],
+        "isRequired": true
+      }
+    ],
+    "outputFields": [
+      {
+        "typeDefinition": {
+          "name": "call_id",
+          "type": "string",
+          "fieldType": "text"
+        }
+      },
+      {
+        "typeDefinition": {
+          "name": "status",
+          "type": "string",
+          "fieldType": "text"
+        }
+      },
+      {
+        "typeDefinition": {
+          "name": "error",
+          "type": "string",
+          "fieldType": "text"
+        }
+      },
+      {
+        "typeDefinition": {
+          "name": "masked_phone",
+          "type": "string",
+          "fieldType": "text"
+        }
+      }
+    ],
+    "labels": {
+      "en": {
+        "appDisplayName": "CALL-E",
+        "actionName": "Create CALL-E Call",
+        "actionDescription": "Creates a CALL-E call task from the enrolled HubSpot record. Use only after the workflow trigger confirms call intent.",
+        "actionCardContent": "Create CALL-E call for {{source_object_type}} using {{phone_property}}",
+        "inputFieldLabels": {
+          "source_object_type": "Source object type",
+          "source_object_id": "Source object ID",
+          "phone": "Phone number",
+          "phone_property": "Phone property name",
+          "call_purpose": "Call task",
+          "consent_allowed": "Phone contact allowed",
+          "do_not_call": "Do not call"
+        },
+        "inputFieldDescriptions": {
+          "source_object_type": "HubSpot object type used for CALL-E metadata.",
+          "source_object_id": "HubSpot object ID for the enrolled record.",
+          "phone": "Phone number from the enrolled record. Use a property value mapped from the workflow.",
+          "phone_property": "Name of the property used for phone lookup, such as phone or mobilephone.",
+          "call_purpose": "Natural-language CALL-E task. The workflow action creates the CALL-E call task immediately after validation.",
+          "consent_allowed": "Select Yes only when phone contact is allowed for this workflow.",
+          "do_not_call": "Select Yes to skip records that must not be called."
+        },
+        "outputFieldLabels": {
+          "call_id": "CALL-E call ID",
+          "status": "CALL-E call status",
+          "error": "CALL-E safe error",
+          "masked_phone": "Masked phone number"
+        },
+        "inputFieldOptionLabels": {
+          "source_object_type": {
+            "contact": "Contact",
+            "deal": "Deal"
+          },
+          "consent_allowed": {
+            "true": "Yes",
+            "false": "No"
+          },
+          "do_not_call": {
+            "false": "No",
+            "true": "Yes"
+          }
+        }
+      }
+    }
+  }
+}

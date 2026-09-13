@@ -1,0 +1,12 @@
+{
+  "name": "local-fake",
+  "endpoint": "http://127.0.0.1:0/speak",
+  "method": "POST",
+  "authHeader": "x-api-key",
+  "authEnv": "LOCAL_FAKE_KEY",
+  "bodyTemplate": "{\"text\":\"{text}\",\"voice\":\"{voice}\"}",
+  "audio": { "kind": "body" },
+  "format": "wav",
+  "maxChars": 4000,
+  "languages": ["en-US", "en-IN"]
+}

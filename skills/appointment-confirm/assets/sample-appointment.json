@@ -1,0 +1,23 @@
+{
+  "request_id": "apt-2026-09-03-amelia",
+  "business_display_name": "KAY2 Studios",
+  "caller_role": "studio coordinator",
+  "recipient_first_name": "Amelia",
+  "phone": "+447700900123",
+  "region": "GB",
+  "locale": "en-GB",
+  "timezone": "Europe/London",
+  "appointment": {
+    "service": "brand strategy session",
+    "starts_at": "2026-09-03T10:00:00+01:00",
+    "duration_minutes": 45,
+    "location": "KAY2 Studios, London"
+  },
+  "consent": true,
+  "authorized_reason": "Recipient booked this session online and asked the studio to call to confirm.",
+  "reschedule_windows": [
+    "2026-09-03T14:00:00+01:00",
+    "2026-09-04T10:00:00+01:00"
+  ],
+  "do_not_call": false
+}

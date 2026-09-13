@@ -1,0 +1,54 @@
+# LineCanary in GitHub Actions.
+#
+# Job 1 (monitor): scheduled synthetic monitoring. The workflow's cron owns
+# recurrence — each run places at most one call per check. Baselines persist
+# between runs through the Actions cache, so regressions compare against the
+# line's own history.
+#
+# Job 2 (deploy-gate): CI regression gate after a voice-agent deploy —
+# a smoke check must pass before the deploy is considered good.
+#
+# Copy into .github/workflows/linecanary.yml in the repo that holds your
+# linecanary.config.json, and set the CALLE_API_KEY repository secret.
+
+name: linecanary
+on:
+  schedule:
+    - cron: "*/30 13-23 * * 1-5" # every 30 min, business hours (UTC), weekdays
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Place real calls"
+        default: "true"
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore baselines
+        uses: actions/cache@v4
+        with:
+          path: baselines
+          key: linecanary-baselines-${{ hashFiles('linecanary.config.json') }}-${{ github.run_id }}
+          restore-keys: |
+            linecanary-baselines-${{ hashFiles('linecanary.config.json') }}-
+      - name: Run LineCanary
+        uses: your-org/linecanary@main # or a local path if vendored: ./linecanary
+        with:
+          config: linecanary.config.json
+          live: "true"
+          calle-api-key: ${{ secrets.CALLE_API_KEY }}
+
+  # deploy-gate:
+  #   runs-on: ubuntu-latest
+  #   needs: deploy-voice-agent
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Smoke-check the deployed agent by phone
+  #       uses: your-org/linecanary@main
+  #       with:
+  #         config: linecanary.config.json
+  #         only: reception-hours
+  #         live: "true"
+  #         calle-api-key: ${{ secrets.CALLE_API_KEY }}

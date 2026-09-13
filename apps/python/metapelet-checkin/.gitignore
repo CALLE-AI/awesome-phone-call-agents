@@ -1,0 +1,10 @@
+﻿.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+call-result*.json
+my-live-request.json
+*.local.json
+.call-state/

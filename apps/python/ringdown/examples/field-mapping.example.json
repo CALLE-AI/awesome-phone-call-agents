@@ -1,0 +1,10 @@
+{
+  "id": "$.alerts[0].fingerprint",
+  "title": "$.alerts[0].labels.alertname",
+  "severity": "$.alerts[0].labels.severity",
+  "service": "$.alerts[0].labels.service",
+  "summary": "$.alerts[0].annotations.summary",
+  "runbook_url": "$.alerts[0].annotations.runbook_url",
+  "ladder": ["primary", "secondary", "incident_commander"],
+  "timezone": "America/Argentina/Buenos_Aires"
+}

@@ -1,0 +1,4 @@
+# Local secrets — never commit. The example file is the only env file that ships.
+.env
+.env.*
+!.env.example

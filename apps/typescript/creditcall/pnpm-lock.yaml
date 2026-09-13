@@ -1,0 +1,32 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@call-e/cli':
+        specifier: ^0.5.0
+        version: 0.5.0
+
+packages:
+
+  '@call-e/cli@0.5.0':
+    resolution: {integrity: sha512-fDbiO7NddcMjtLMeXX9mKDGioOj5abux5msutAMcHBJn7PXkojLp5787nYTy2R18O12IHjnWzYECeqxB7i23LQ==}
+    engines: {node: '>=22'}
+    hasBin: true
+
+  '@call-e/core@0.3.0':
+    resolution: {integrity: sha512-I2PnZ0eHf2MrMobWV3pY8zZsEy6g9byNfJ25Gna0ndaOadtdQnkwEsS+P3QPT0GAnQTTIKqziLKP1+Qtwfya6w==}
+    engines: {node: '>=22'}
+
+snapshots:
+
+  '@call-e/cli@0.5.0':
+    dependencies:
+      '@call-e/core': 0.3.0
+
+  '@call-e/core@0.3.0': {}

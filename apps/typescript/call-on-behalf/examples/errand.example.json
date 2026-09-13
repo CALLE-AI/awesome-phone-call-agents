@@ -1,0 +1,45 @@
+{
+  "errand_id": "bayview-checkup-aug",
+  "on_behalf_of": {
+    "name": "Fatima Haddad",
+    "reason_for_delegation": "she is deaf and this clinic takes bookings by phone only"
+  },
+  "callee": {
+    "name": "Bayview Family Clinic",
+    "phone": "+14155550122",
+    "published_source": "https://example.com/bayview-family-clinic/contact",
+    "region": "US"
+  },
+  "goal": {
+    "summary": "book a routine check-up for Fatima Haddad, who is a new patient",
+    "commitment": "slot_within_windows"
+  },
+  "disclosure": [
+    { "key": "full_name", "label": "the caller's full name", "value": "Fatima Haddad" },
+    { "key": "date_of_birth", "label": "date of birth", "value": "12 April 1990" },
+    { "key": "insurance_plan", "label": "insurance plan name", "value": "Blue Shield PPO" }
+  ],
+  "questions": [
+    {
+      "id": "earliest",
+      "text": "What is the earliest appointment you have for a routine check-up?",
+      "answer": "datetime"
+    },
+    { "id": "accepts_plan", "text": "Do you take Blue Shield PPO?", "answer": "yes_no" },
+    {
+      "id": "bring",
+      "text": "What should she bring to a first appointment?",
+      "answer": "text"
+    }
+  ],
+  "authorized_windows": [
+    { "from": "2026-08-12T09:00:00-07:00", "to": "2026-08-12T17:00:00-07:00" },
+    { "from": "2026-08-13T09:00:00-07:00", "to": "2026-08-13T17:00:00-07:00" }
+  ],
+  "policy": {
+    "per_call_timeout_seconds": 300,
+    "language": "en-US",
+    "leave_voicemail": false,
+    "min_confidence": 0.5
+  }
+}

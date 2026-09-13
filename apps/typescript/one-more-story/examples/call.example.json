@@ -1,0 +1,11 @@
+{
+  "requestId": "family-demo-001",
+  "storytellerPhone": "+15555550123",
+  "locale": "en-US",
+  "region": "US",
+  "familyName": "a family member",
+  "question": "What did the rose market smell like when you were young?",
+  "contactPermission": false,
+  "aiDisclosureApproved": false,
+  "confirmIntent": false
+}

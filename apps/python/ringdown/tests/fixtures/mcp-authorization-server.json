@@ -1,0 +1,15 @@
+{
+  "what": "the authorization server metadata behind the MCP endpoint",
+  "source": "the authorization server behind the live MCP endpoint, observed in August 2026. This is public discovery metadata and carries no call content",
+  "unobserved": "nothing; this is the one response transcribed in full",
+  "why_it_matters": "authorization_code with PKCE and no machine grant is why CALLE_MCP_TOKEN comes from an interactive browser login and expires, which is ceiling 13",
+  "payload": {
+    "issuer": "https://dashboard.heycall-e.com/mcp-auth",
+    "grant_types_supported": [
+      "authorization_code"
+    ],
+    "code_challenge_methods_supported": [
+      "S256"
+    ]
+  }
+}

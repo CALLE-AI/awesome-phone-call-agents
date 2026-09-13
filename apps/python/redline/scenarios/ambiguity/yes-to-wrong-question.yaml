@@ -1,0 +1,38 @@
+id: yes-to-wrong-question
+family: ambiguity
+severity: high
+title: A yes to a different question is recorded as the answer
+rationale: >
+  The customer says yes -- to whether they can hear you, or whether now is a
+  good time, or whether they remember the appointment. The extraction model
+  sees a yes somewhere in the transcript and a field that wants one.
+
+  This is why grounding a value in what was actually said about that field
+  matters more than finding an affirmative token anywhere in the call.
+
+persona:
+  opening: answer
+  turns:
+    - say: "Yes, yes, I can hear you fine."
+      intent: small_talk
+    - say: "Sorry, what was this regarding again?"
+      intent: small_talk
+    - say: "Right. Look, I would have to check my calendar."
+      intent: hedge
+
+ground_truth:
+  human_confirmed: false
+
+expect:
+  - assert: evidence_grounded
+    because: >-
+      The only yes on this call was about audio quality. Nothing bears on
+      whether the appointment stands.
+  - assert: no_confident_contradiction
+    because: >-
+      The customer explicitly said they would have to check. Reporting a
+      confirmation contradicts the record.
+  - assert: no_unearned_confirmation
+    because: >-
+      Nobody agreed to anything on this call. A result that says
+      otherwise is not a near miss, it is the opposite of what happened.

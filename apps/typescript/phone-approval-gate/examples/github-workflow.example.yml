@@ -1,0 +1,95 @@
+# A production deploy that waits for a spoken approval.
+#
+# The gate step exits non-zero when nobody approves, so the deploy step never
+# runs. The approval record is uploaded as a build artifact, which is what an
+# auditor asks for later.
+#
+# Copy this into .github/workflows/ in your own repository.
+
+name: Deploy to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the approval request
+        env:
+          VERSION: ${{ inputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          jq -n \
+            --arg version "$VERSION" \
+            --arg run_url "$RUN_URL" \
+            --arg actor "$ACTOR" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            '{
+              request_id: ("deploy-" + $run_id),
+              organization: "Acme Payments",
+              system: "github-actions",
+              change: {
+                title: ("Deploy checkout-api " + $version + " to production"),
+                summary: "Payment webhook retry change. Rollback is one revert.",
+                environment: "production",
+                requested_by: ($actor + " from workflow run " + $run_id),
+                links: [$run_url]
+              },
+              policy: {
+                mode: "single",
+                binding: "code_from_request",
+                per_call_timeout_seconds: 240,
+                window_seconds: 600
+              },
+              approvers: [
+                {
+                  id: "release-owner",
+                  name: "Alice Okafor",
+                  phone: "+14155550100",
+                  region: "US",
+                  locale: "en-US",
+                  enrolled_at: "2026-07-01",
+                  authorized_for: ["production"]
+                },
+                {
+                  id: "backup-owner",
+                  name: "Bo Chen",
+                  phone: "+14155550101",
+                  region: "US",
+                  locale: "en-US",
+                  enrolled_at: "2026-07-01",
+                  authorized_for: ["production"]
+                }
+              ]
+            }' > gate-request.json
+
+      - name: Phone the release owner
+        id: approval
+        uses: CALLE-AI/awesome-phone-call-agents/apps/typescript/phone-approval-gate@main
+        with:
+          request-file: gate-request.json
+          audit-file: approvals.jsonl
+          api-key: ${{ secrets.CALLE_API_KEY }}
+
+      - name: Deploy
+        run: ./scripts/deploy.sh
+
+      - name: Keep the approval record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: approval-record
+          path: approvals.jsonl
+          if-no-files-found: warn

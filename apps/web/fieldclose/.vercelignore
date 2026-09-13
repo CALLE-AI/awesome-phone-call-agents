@@ -1,0 +1,12 @@
+.claude/
+.env
+.env.*
+!.env.example
+.next/
+.next-e2e/
+.next-verify/
+coverage/
+node_modules/
+playwright-report/
+submission/
+test-results/

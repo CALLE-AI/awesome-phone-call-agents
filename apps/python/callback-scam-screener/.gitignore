@@ -1,0 +1,11 @@
+.env
+*.env
+.call_guardrail_state.json
+.llm_budget_state.json
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+uv.lock.bak
+my_test_email.txt

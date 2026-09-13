@@ -1,0 +1,13 @@
+{
+  "right_person_reached": "yes",
+  "item_recognized": "yes",
+  "item_status": "sold_it",
+  "notice_understood": "yes",
+  "selected_next_step": "refund",
+  "preferred_time": "whenever",
+  "questions": "",
+  "human_follow_up_required": "no",
+  "contact_outcome": "resolved",
+  "certainty": "high",
+  "agent_note": "customer seemed happy"
+}

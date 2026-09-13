@@ -1,0 +1,21 @@
+{
+  "schema_version": "2.0",
+  "request_id": "northstar-site-caution",
+  "freelancer_name": "Northstar Studio",
+  "contact": {
+    "name": "Morgan Reed",
+    "organization": "Example Harbor",
+    "phone_e164": "+12025550124"
+  },
+  "authorization": {
+    "authorization_type": "explicit_consent",
+    "authorized_by": "Morgan Reed",
+    "authorized_at": "2026-09-01T03:05:00Z",
+    "purpose": "Verify the project brief for human review.",
+    "source": "contact_verbal_consent"
+  },
+  "project_summary": "Create a fictional product-launch microsite and content templates.",
+  "known_context": ["A draft brief was shared before the call."],
+  "language": "English",
+  "region": "US"
+}

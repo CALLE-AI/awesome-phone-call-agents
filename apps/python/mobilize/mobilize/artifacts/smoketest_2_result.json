@@ -1,0 +1,13 @@
+{
+  "purpose": "day-1 end-to-end smoke test #2: full mobilize() pipeline (dispatcher + ledger + real CalleTransport) against a single real recipient, donor-mobilization task prompt",
+  "need": {"label": "O-negative blood needed urgently", "count": 1, "max_calls": 1},
+  "mobilization_id": "real_smoketest_2",
+  "result": {
+    "filled": false,
+    "confirmed_count": 0,
+    "outcome": "soft_yes",
+    "commitment_score": 0.54,
+    "note": "Scored just below the 0.55 confirmation threshold, so correctly NOT counted as confirmed. This is the commitment calibration system behaving as designed at a real decision boundary, not a bug -- it demonstrates the threshold is discriminating rather than rubber-stamping every stated yes."
+  },
+  "phone_redacted": "[redacted]"
+}

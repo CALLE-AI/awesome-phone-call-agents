@@ -1,0 +1,65 @@
+<% content_for :title, "CallProof — safe phone-agent demo" %>
+
+<main class="shell">
+  <header class="hero">
+    <p class="eyebrow">CALL-E × Call Analyzer × AgentKit Rails</p>
+    <h1>Phone agents with verifiable outcomes.</h1>
+    <p class="lede">This local vertical slice never places a real call. It creates an explicit contract, runs a deterministic CALL-E simulation, analyzes transcript evidence, and opens human review when policy is violated.</p>
+  </header>
+
+  <% if alert %><p class="notice error"><%= alert %></p><% end %>
+
+  <section class="panel">
+    <div>
+      <p class="step-label">New simulation</p>
+      <h2>Change a fictional delivery</h2>
+    </div>
+
+    <%= form_with url: demo_calls_path, scope: :call_request, class: "demo-form" do |form| %>
+      <label>
+        Objective
+        <%= form.text_area :objective, required: true, rows: 4, value: "Call Northstar Supplies about order C1023. Move delivery to Friday at 9 AM and do not accept a surcharge above $250." %>
+      </label>
+
+      <label>
+        Deterministic scenario
+        <%= form.select :simulation_scenario, [["Policy violation — accepts $320", "policy_violation"], ["Compliant — accepts $200", "compliant"]] %>
+      </label>
+
+      <div class="safety-line">
+        <span class="status-dot"></span>
+        Fake provider · fictional +1 202-555-0147 · no network call
+      </div>
+
+      <%= form.submit "Run verified simulation", class: "primary-button" %>
+    <% end %>
+  </section>
+
+  <section class="live-entry">
+    <div>
+      <p class="step-label">Optional live path</p>
+      <h2>Prepare a real CALL-E request</h2>
+      <p>Creates a contract preview first. A separate typed confirmation and server-side safety switches are required before any call.</p>
+    </div>
+    <%= link_to "Prepare live call", new_live_call_path, class: "secondary-button" %>
+  </section>
+
+  <section class="history">
+    <div class="section-heading">
+      <p class="step-label">Evidence trail</p>
+      <h2>Recent runs</h2>
+    </div>
+    <% if @recent_call_requests.any? %>
+      <div class="run-list">
+        <% @recent_call_requests.each do |request| %>
+          <%= link_to call_request_path(request), class: "run-card" do %>
+            <span><%= request.objective.truncate(78) %></span>
+            <strong class="badge <%= request.status %>"><%= request.status.humanize %></strong>
+          <% end %>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="empty">No simulations yet.</p>
+    <% end %>
+  </section>
+</main>

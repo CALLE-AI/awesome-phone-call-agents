@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Operator sign-in</h1>
+<p class="muted">This app can place real phone calls. Access requires the operator password.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/login">
+  <label>Password <input type="password" name="password" required></label>
+  <button class="primary">Sign in</button>
+</form>
+{% endblock %}

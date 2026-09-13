@@ -1,0 +1,18 @@
+{
+  "id": "inc-2026-08-09-0113",
+  "title": "checkout p99 latency above 3s",
+  "severity": "sev2",
+  "service": "checkout-api",
+  "summary": "p99 latency is 3.4s against a 1.2s objective and has been climbing for 12 minutes.",
+  "runbook_url": "https://runbooks.example.com/checkout-latency",
+  "ladder": ["primary", "secondary", "incident_commander"],
+  "timezone": "America/Argentina/Buenos_Aires",
+  "policy": {
+    "min_confidence": 0.7,
+    "accepted_confidence_labels": ["medium", "high"],
+    "max_eta_minutes": 120,
+    "per_call_timeout_seconds": 180,
+    "poll_interval_seconds": 3,
+    "ladder_timeout_seconds": 900
+  }
+}

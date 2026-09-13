@@ -1,0 +1,52 @@
+<% content_for :title, "Prepare a CALL-E call · CallProof" %>
+
+<main class="shell narrow">
+  <nav><%= link_to "← Back to safe demo", root_path, class: "back-link" %></nav>
+
+  <header class="hero">
+    <p class="eyebrow">Live workflow · step 1 of 2</p>
+    <h1>Prepare, then inspect.</h1>
+    <p class="lede">This step only creates an immutable CallContract preview. It cannot contact CALL-E or place a phone call.</p>
+  </header>
+
+  <% if alert %><p class="notice error"><%= alert %></p><% end %>
+
+  <section class="panel">
+    <%= form_with model: @call_request, url: live_calls_path, class: "demo-form" do |form| %>
+      <label>
+        Recipient phone in E.164 format
+        <%= form.telephone_field :recipient_phone_e164, required: true, placeholder: "+525512345678", autocomplete: "off" %>
+      </label>
+
+      <label>
+        Objective and constraints
+        <%= form.text_area :objective, required: true, rows: 5, placeholder: "Call about order C1023. Move delivery to Friday at 9 AM…" %>
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Required delivery date
+          <%= form.date_field :delivery_date, required: true, value: "2026-08-07" %>
+        </label>
+        <label>
+          Required delivery time
+          <%= form.time_field :delivery_time, required: true, value: "09:00" %>
+        </label>
+        <label>
+          Recipient region
+          <%= form.select :region, [["Mexico · Spanish", "MX"], ["United States · English", "US"]] %>
+        </label>
+        <label>
+          Maximum surcharge (USD)
+          <%= form.number_field :maximum_surcharge_dollars, required: true, value: "250.00", min: 0, max: 1000, step: "0.01" %>
+        </label>
+      </div>
+
+      <div class="safety-line">
+        <span class="status-dot"></span>
+        Preview only · no external request · confirmation required later
+      </div>
+      <%= form.submit "Create contract preview", class: "primary-button" %>
+    <% end %>
+  </section>
+</main>
