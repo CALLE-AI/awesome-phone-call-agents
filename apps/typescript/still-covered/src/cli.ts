@@ -155,6 +155,23 @@ async function pollUntilTerminal(client: CalleClient, callId: string, intervalMs
   return call;
 }
 
+/**
+ * Quiet hours exist to protect enrollees, and for a campaign there is no override.
+ *
+ * A conformance probe is not outreach. It can only dial a number on SC_LIVE_ALLOWLIST, the operator
+ * presses Enter to make that phone ring seconds beforehand, and nobody on the enrollee list is
+ * reachable by this command at all. So a probe warns rather than refuses - and only ever when an
+ * allowlist is set, which is enforced separately before anything is dialled.
+ */
+function warnQuietHoursForProbe(config: Config, allowlisted: string, log: (s: string) => void): void {
+  if (!isQuietNow(new Date(), config.quietHours, config.timeZone)) {
+    return;
+  }
+  const window = `${formatWindow(config.quietHours)} ${config.timeZone}`;
+  log(color.yellow(`Quiet hours (${window}) are in effect. A campaign would be refused outright.`));
+  log(color.yellow(`Probes continue: they can only dial ${maskPhone(allowlisted)} from SC_LIVE_ALLOWLIST, and you confirm each call before it rings.`));
+}
+
 /** Coverage outreach is never urgent enough to call at night. There is no override. */
 function enforceQuietHours(config: Config, log: (s: string) => void): void {
   if (!isQuietNow(new Date(), config.quietHours, config.timeZone)) {
@@ -481,7 +498,6 @@ async function main(): Promise<void> {
       // One scripted adversarial call at a time. In live mode the operator has to be holding the
       // phone and reading the part, so nothing is dialled until they say they are ready.
       assertLiveAllowed(config, values.confirm === true);
-      enforceQuietHours(config, log);
       const probes = loadProbes().filter((p) => typeof values["only"] !== "string" || p.id === values["only"]);
       if (probes.length === 0) {
         throw new Error(`No probe matched --only ${String(values["only"])}. Available: ${loadProbes().map((p) => p.id).join(", ")}`);
@@ -490,6 +506,8 @@ async function main(): Promise<void> {
       if (phone === undefined) {
         throw new Error("A live probe run needs SC_LIVE_ALLOWLIST set to the number that will answer. Refusing to dial anything else.");
       }
+      // Only reachable once the allowlist has produced a number, so the warning can name it.
+      warnQuietHoursForProbe(config, phone, log);
       const fake = await ensureFakeServer(config, log, true);
       const client = createCalleClient(config);
       const asOf = typeof values["as-of"] === "string" ? values["as-of"] : todayIn(config.timeZone);

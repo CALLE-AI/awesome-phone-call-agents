@@ -60,3 +60,14 @@ test("--dry-run overrides a live environment: a command named 'demo' can never d
   assert.equal(forced.baseUrl, "http://127.0.0.1:4848", "and the real API is no longer reachable");
   assert.equal(dialAllowed(forced, "+14155550999"), true, "dry-run dials nobody anyway");
 });
+
+test("quiet hours block a campaign absolutely, but a probe to your own allowlisted number is not outreach", () => {
+  const night = new Date("2026-09-13T02:30:00Z"); // 22:30 in New York
+  const config = loadConfig({ SC_MODE: "live", CALLE_API_KEY: "k", SC_TIMEZONE: "America/New_York", SC_LIVE_ALLOWLIST: "+14155550301" });
+  assert.equal(isQuietNow(night, config.quietHours, config.timeZone), true, "it is inside quiet hours");
+
+  // The campaign rule is unchanged and has no override: a probe can only ever reach the allowlist.
+  assert.equal(config.liveAllowlist?.length, 1);
+  assert.equal(dialAllowed(config, "+14155550301"), true, "the operator's own test number");
+  assert.equal(dialAllowed(config, "+14155550999"), false, "and nobody else, at any hour");
+});

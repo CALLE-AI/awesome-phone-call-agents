@@ -78,8 +78,15 @@ as the CMS rule describes. A condition alone is a review, not an exemption.
 - **Three calls per person per campaign, maximum.** `HARD_CALL_CAP = 3` overrides any configuration;
   `SC_MAX_ATTEMPTS` above 3 is rejected when the config loads.
 - Default is 2: the first call and one redial.
-- **Quiet hours are absolute.** 21:00-08:00 local by default, enforced in live mode with no override
-  flag. Coverage outreach is never urgent enough to call at night.
+- **Quiet hours are absolute for campaigns.** 21:00-08:00 local by default, enforced in live mode
+  with no override flag. Coverage outreach is never urgent enough to call at night, and `run`,
+  `resume` and `follow-up` refuse outright.
+
+  The one documented exception is `probe`, and it is an exception to *who is being called*, not to
+  the rule. A conformance probe can only dial a number on `SC_LIVE_ALLOWLIST` — an enrollee is not
+  reachable by that command at any hour — and the operator presses Enter to make that phone ring
+  seconds before it does. Calling your own test phone at 22:30 to check the agent's guardrails is
+  not outreach. The run says so in the output rather than staying quiet about it.
 - People who ask for a better time are called back once, at their stated time, and then written to.
 
 ## Live-mode gates
