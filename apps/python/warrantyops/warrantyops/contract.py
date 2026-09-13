@@ -1,13 +1,14 @@
-"""WarrantyOps result contract v0.
+"""WarrantyOps result contract v1: the counterparty-stated exception answer.
 
 Two schemas live here and they are deliberately not the same object.
 
 ``build_extraction_schema`` is what CALL-E is asked to fill in. It describes
-only what a person on the call can say.
+only what a person on the call can say, and it never asks the model to decide
+anything: no value, no probability, no recovery estimate.
 
-``BusinessResult`` is what this application is willing to assert. It is derived
-from the extraction, never copied from it, and a field that was not established
-on the call stays ``None`` or ``UNKNOWN``.
+``ClaimResult`` is what this application is willing to assert. It is derived
+from the extraction under transcript grounding, never copied from it, and a
+field that was not established on the call stays ``None`` or ``UNKNOWN``.
 """
 
 from __future__ import annotations
@@ -16,61 +17,67 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-CONTRACT_VERSION = "warranty-recovery/v0"
+#: v1 is the residual post-submission claim-exception contract. v0 was the
+#: former coverage/RMA hero; results under the two contracts are not
+#: comparable and the old test suite proves nothing about this one.
+CONTRACT_VERSION = "warranty-claim-exception/v1"
 
 
-class CoverageStatus(str, Enum):
-    """Whether the counterparty stated the failure is covered."""
+class ClaimStatus(str, Enum):
+    """Where the counterparty says the claim stands, in their words.
 
-    COVERED = "COVERED"
-    NOT_COVERED = "NOT_COVERED"
+    This is the counterparty's statement about their own system, not an
+    adjudication of the claim and not a copy of the source record's status.
+    """
+
+    STATED_REJECTED = "STATED_REJECTED"
+    STATED_RETURNED = "STATED_RETURNED"
+    STATED_IN_PROCESS = "STATED_IN_PROCESS"
+    STATED_PAID = "STATED_PAID"
     UNKNOWN = "UNKNOWN"
 
 
-class ResolutionStatus(str, Enum):
-    """What the counterparty agreed to do next."""
+class ReferenceKind(str, Enum):
+    """What kind of reference the counterparty gave, if any."""
 
-    RMA_ISSUED = "RMA_ISSUED"
-    REPLACEMENT_APPROVED = "REPLACEMENT_APPROVED"
-    REPAIR_APPROVED = "REPAIR_APPROVED"
-    DOCUMENTATION_REQUIRED = "DOCUMENTATION_REQUIRED"
-    DIAGNOSTICS_REQUIRED = "DIAGNOSTICS_REQUIRED"
-    HUMAN_ACTION_REQUIRED = "HUMAN_ACTION_REQUIRED"
-    UNRESOLVED = "UNRESOLVED"
+    CLAIM = "CLAIM"
+    CASE = "CASE"
+    CREDIT = "CREDIT"
+    UNKNOWN = "UNKNOWN"
 
-
-#: Resolutions that assert an authorization the operator will act on. Each one
-#: is only allowed to survive when a high-consequence identifier reached the
-#: CONFIRMED state. See :mod:`warrantyops.identifiers`.
-AUTHORIZING_RESOLUTIONS = frozenset(
-    {
-        ResolutionStatus.RMA_ISSUED,
-        ResolutionStatus.REPLACEMENT_APPROVED,
-        ResolutionStatus.REPAIR_APPROVED,
-    }
-)
 
 #: Every key the extraction schema may return. Anything else is a malformed
 #: result, whatever the transport said.
 EXTRACTION_FIELDS = (
-    "coverage_status",
-    "coverage_evidence_quote",
-    "resolution_status",
-    "resolution_evidence_quote",
-    "authorization_reference_heard",
-    "authorization_reference_readback_performed",
-    "authorization_reference_confirmed",
-    "authorization_reference_confirmation_quote",
-    "replacement_eta",
-    "return_deadline",
+    "claim_status",
+    "claim_status_evidence_quote",
+    "stated_reason",
+    "required_correction",
     "required_documents",
-    "next_action",
+    "stated_deadline",
+    "escalation_path",
+    "stated_next_action",
+    "reference_kind",
+    "reference_heard",
+    "reference_readback_performed",
+    "reference_confirmed",
+    "reference_confirmation_quote",
 )
 
 REQUIRED_EXTRACTION_FIELDS = (
-    "coverage_status",
-    "resolution_status",
-    "authorization_reference_readback_performed",
+    "claim_status",
+    "reference_kind",
+    "reference_readback_performed",
+)
+
+#: Free-text fields whose values must be traceable to a counterparty turn
+#: before this application will assert them. See :mod:`warrantyops.evidence`.
+STATED_TEXT_FIELDS = (
+    "stated_reason",
+    "required_correction",
+    "stated_deadline",
+    "escalation_path",
+    "stated_next_action",
 )
 
 
@@ -80,72 +87,107 @@ def build_extraction_schema() -> dict[str, Any]:
     Written to the documented guidance for CALL-E structured results: a small
     schema, enum selection rules carried in ``description``, an explicit
     ``UNKNOWN`` member wherever the call may not contain enough evidence,
-    ``additionalProperties: false``, and evidence fields beside every value
-    this workflow would act on.
+    ``additionalProperties: false``, and an evidence quote beside the one enum
+    this workflow would act on first.
 
     It uses only the schema features CALL-E documents as supported: ``type``
     with a single value, ``properties``, ``required``, ``enum``, simple
     ``array.items``, ``description`` and ``additionalProperties: false``.
+
+    "Not stated" is expressed by omitting the field, because a type array
+    including ``null`` is not a documented CALL-E feature. "Stated but not
+    established" — hedged, deferred, contradicted — is the ``UNKNOWN`` enum
+    member. "Malformed" is a local validation failure. The three states stay
+    distinguishable end to end.
     """
 
-    # The documented `type` keyword takes one of six single values. A type
-    # array such as ["string", "null"] is not among them, so "not stated" is
-    # expressed by omitting the field rather than by returning null. Several
-    # merged contributions in this repository do use type arrays; that is
-    # convention, not documentation, and this schema does not depend on it.
     optional_string = {"type": "string"}
     return {
         "type": "object",
         "additionalProperties": False,
         "required": list(REQUIRED_EXTRACTION_FIELDS),
         "properties": {
-            "coverage_status": {
+            "claim_status": {
                 "type": "string",
-                "enum": [status.value for status in CoverageStatus],
+                "enum": [status.value for status in ClaimStatus],
                 "description": (
-                    "COVERED only when the representative stated the failure is "
-                    "covered. NOT_COVERED only when they stated it is not. "
-                    "UNKNOWN for anything hedged, conditional, deferred to a "
-                    "record they could not see, or never discussed."
+                    "What the representative says the current status of this "
+                    "claim is in their system. Use UNKNOWN for anything "
+                    "hedged, deferred to a record they could not see, or never "
+                    "discussed. This is their statement, not your judgement of "
+                    "the claim."
                 ),
             },
-            "coverage_evidence_quote": {
+            "claim_status_evidence_quote": {
                 **optional_string,
                 "description": (
                     "The representative's own words that establish "
-                    "coverage_status, at most 200 characters. Omit this field "
+                    "claim_status, at most 200 characters. Omit this field "
                     "when they said nothing that establishes it."
                 ),
             },
-            "resolution_status": {
+            "stated_reason": {
+                **optional_string,
+                "description": (
+                    "The reason they gave for the claim being held, rejected, "
+                    "returned or unpaid, as close to their own words as "
+                    "possible. Omit this field when they gave no reason."
+                ),
+            },
+            "required_correction": {
+                **optional_string,
+                "description": (
+                    "The correction they asked for, in one sentence of their "
+                    "words. Omit this field when they asked for no correction."
+                ),
+            },
+            "required_documents": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Documents or photographs they asked for, one per entry, "
+                    "in their words. Empty array when none were asked for."
+                ),
+            },
+            "stated_deadline": {
+                **optional_string,
+                "description": (
+                    "Any deadline they stated, exactly as stated. Omit this "
+                    "field when none was stated. Do not compute a date from a "
+                    "duration."
+                ),
+            },
+            "escalation_path": {
+                **optional_string,
+                "description": (
+                    "Where they said this should be escalated or directed, in "
+                    "their words. Omit this field when they gave no path."
+                ),
+            },
+            "stated_next_action": {
+                **optional_string,
+                "description": (
+                    "The single next step they asked for, in one sentence. "
+                    "Omit this field when they asked for nothing."
+                ),
+            },
+            "reference_kind": {
                 "type": "string",
-                "enum": [status.value for status in ResolutionStatus],
+                "enum": [kind.value for kind in ReferenceKind],
                 "description": (
-                    "What the representative agreed to do. Use "
-                    "DOCUMENTATION_REQUIRED when they asked for a document or "
-                    "photograph, DIAGNOSTICS_REQUIRED when they asked for a "
-                    "further test or reading, HUMAN_ACTION_REQUIRED when they "
-                    "referred the matter onward, and UNRESOLVED when the call "
-                    "ended without any of these."
+                    "What kind of reference they gave: CLAIM, CASE or CREDIT. "
+                    "UNKNOWN when they gave none or it was not clear."
                 ),
             },
-            "resolution_evidence_quote": {
+            "reference_heard": {
                 **optional_string,
                 "description": (
-                    "The representative's own words that establish "
-                    "resolution_status, at most 200 characters. Omit this field "
-                    "when they said nothing that establishes it."
+                    "The claim, case or credit reference exactly as first "
+                    "heard, before any read-back. Omit this field when none "
+                    "was given."
                 ),
             },
-            "authorization_reference_heard": {
-                **optional_string,
-                "description": (
-                    "The authorization, RMA, claim or case reference exactly as "
-                    "first heard, before any read-back. Omit this field when "
-                    "none was given."
-                ),
-            },
-            "authorization_reference_readback_performed": {
+            "reference_readback_performed": {
                 "type": "boolean",
                 "description": (
                     "True only when the reference was read back to the "
@@ -154,52 +196,21 @@ def build_extraction_schema() -> dict[str, Any]:
                     "when no reference was given."
                 ),
             },
-            "authorization_reference_confirmed": {
+            "reference_confirmed": {
                 **optional_string,
                 "description": (
                     "The reference as the representative confirmed it during "
                     "the read-back. When they corrected the read-back, this is "
-                    "the corrected value. Omit this field unless they explicitly "
-                    "confirmed a value."
+                    "the corrected value. Omit this field unless they "
+                    "explicitly confirmed a value."
                 ),
             },
-            "authorization_reference_confirmation_quote": {
+            "reference_confirmation_quote": {
                 **optional_string,
                 "description": (
                     "The representative's own words confirming or correcting "
-                    "the read-back, at most 200 characters. Omit this field when "
-                    "they did not respond to a read-back."
-                ),
-            },
-            "replacement_eta": {
-                **optional_string,
-                "description": (
-                    "Replacement or shipment timing exactly as stated. Omit this "
-                    "field when not stated. Do not compute a date from a "
-                    "duration."
-                ),
-            },
-            "return_deadline": {
-                **optional_string,
-                "description": (
-                    "Deadline for returning the failed unit exactly as stated. "
-                    "Omit this field when not stated."
-                ),
-            },
-            "required_documents": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": (
-                    "Documents or photographs the representative asked for, one "
-                    "per entry, in their words. Empty array when none were "
-                    "asked for."
-                ),
-            },
-            "next_action": {
-                **optional_string,
-                "description": (
-                    "The single next step the representative asked for, in one "
-                    "sentence. Omit this field when they asked for nothing."
+                    "the read-back, at most 200 characters. Omit this field "
+                    "when they did not respond to a read-back."
                 ),
             },
         },
@@ -207,45 +218,72 @@ def build_extraction_schema() -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class BusinessResult:
+class ConfirmedReference:
+    """A reference this application is willing to assert.
+
+    Populated only from an identifier that reached ``CONFIRMED_IDENTIFIER``
+    through its own read-back exchange. See :mod:`warrantyops.identifiers`.
+    """
+
+    value: str
+    kind: ReferenceKind
+    corrected: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "value": self.value,
+            "kind": self.kind.value,
+            "corrected": self.corrected,
+        }
+
+
+@dataclass(frozen=True)
+class ClaimResult:
     """What the application is willing to assert after a call.
 
-    ``authorization_reference`` is populated only from a CONFIRMED identifier.
-    Every other unknown stays ``None`` or ``UNKNOWN``.
+    Every field is counterparty-stated or it is empty. Missing, ambiguous and
+    not-stated remain distinguishable: omitted by the extractor means not
+    stated, ``UNKNOWN`` means stated but not established, and a value that
+    failed grounding is dropped with a note in ``downgrades``.
     """
 
     contract_version: str
-    coverage_status: CoverageStatus
-    resolution_status: ResolutionStatus
-    authorization_reference: str | None = None
-    replacement_eta: str | None = None
-    return_deadline: str | None = None
+    claim_status: ClaimStatus
+    stated_reason: str | None = None
+    required_correction: str | None = None
     required_documents: tuple[str, ...] = ()
-    next_action: str | None = None
+    stated_deadline: str | None = None
+    escalation_path: str | None = None
+    stated_next_action: str | None = None
+    confirmed_reference: ConfirmedReference | None = None
     evidence: tuple[dict[str, str], ...] = ()
     downgrades: tuple[str, ...] = field(default=())
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "contract_version": self.contract_version,
-            "coverage_status": self.coverage_status.value,
-            "resolution_status": self.resolution_status.value,
-            "authorization_reference": self.authorization_reference,
-            "replacement_eta": self.replacement_eta,
-            "return_deadline": self.return_deadline,
+            "claim_status": self.claim_status.value,
+            "stated_reason": self.stated_reason,
+            "required_correction": self.required_correction,
             "required_documents": list(self.required_documents),
-            "next_action": self.next_action,
+            "stated_deadline": self.stated_deadline,
+            "escalation_path": self.escalation_path,
+            "stated_next_action": self.stated_next_action,
+            "confirmed_reference": (
+                self.confirmed_reference.to_dict()
+                if self.confirmed_reference
+                else None
+            ),
             "evidence": [dict(item) for item in self.evidence],
             "downgrades": list(self.downgrades),
         }
 
 
-def unresolved_result(reason: str) -> BusinessResult:
+def unresolved_result(reason: str) -> ClaimResult:
     """The only result a call that produced no business evidence may become."""
 
-    return BusinessResult(
+    return ClaimResult(
         contract_version=CONTRACT_VERSION,
-        coverage_status=CoverageStatus.UNKNOWN,
-        resolution_status=ResolutionStatus.UNRESOLVED,
+        claim_status=ClaimStatus.UNKNOWN,
         downgrades=(reason,),
     )

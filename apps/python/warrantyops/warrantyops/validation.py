@@ -62,9 +62,8 @@ def _validate_node(value: Any, schema: dict[str, Any], path: str) -> list[str]:
             return errors
     if value is None:
         return errors
-    if "enum" in schema:
-        if value not in schema["enum"]:
-            errors.append(f"{path}: {value!r} is not one of {schema['enum']}")
+    if "enum" in schema and value not in schema["enum"]:
+        errors.append(f"{path}: {value!r} is not one of {schema['enum']}")
     if isinstance(value, dict):
         properties = schema.get("properties", {})
         required = set(schema.get("required", []))

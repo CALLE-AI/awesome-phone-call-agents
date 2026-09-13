@@ -2,28 +2,40 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
+from warrantyops.authorization import (
+    AuthorizationBasis,
+    AuthorizationRefusal,
+    CallAuthorization,
+    authorize_call,
+    mask_e164,
+    normalize_e164,
+)
 from warrantyops.idempotency import (
     MAX_KEY_LENGTH,
     IdempotencyError,
     derive_idempotency_key,
 )
 
-BASE = dict(
-    namespace="warrantyops",
-    authorization_record_reference="vault://authorizations/2026-09-01/acme",
-    case_reference="CASE-1042",
-    contract_version="warranty-recovery/v0",
-)
+BASE = {
+    "namespace": "warrantyops",
+    "authorization_record_reference": "vault://authorizations/2026-09-01/acme",
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1042",
+    "source_version": "v7",
+    "contract_version": "warranty-claim-exception/v1",
+}
 
 
 def test_the_same_authorized_operation_always_derives_the_same_key():
     assert derive_idempotency_key(**BASE) == derive_idempotency_key(**BASE)
 
 
-def test_a_different_case_derives_a_different_key():
-    other = {**BASE, "case_reference": "CASE-1043"}
+def test_a_different_claim_derives_a_different_key():
+    other = {**BASE, "source_claim_id": "CLM-1043"}
     assert derive_idempotency_key(**BASE) != derive_idempotency_key(**other)
 
 
@@ -33,7 +45,18 @@ def test_a_different_authorization_derives_a_different_key():
 
 
 def test_a_contract_change_derives_a_different_key():
-    other = {**BASE, "contract_version": "warranty-recovery/v1"}
+    other = {**BASE, "contract_version": "warranty-claim-exception/v2"}
+    assert derive_idempotency_key(**BASE) != derive_idempotency_key(**other)
+
+
+def test_a_new_source_version_of_the_same_claim_derives_a_different_key():
+    """The key is claim-version bound: a moved record is a new question.
+
+    Reusing the v7 key for a v8 record would return the v7 call's answer for
+    a record that has since changed, which is the duplicate the lock forbids.
+    """
+
+    other = {**BASE, "source_version": "v8"}
     assert derive_idempotency_key(**BASE) != derive_idempotency_key(**other)
 
 
@@ -52,7 +75,13 @@ def test_the_key_fits_the_documented_header_limit():
 
 
 def test_incomplete_inputs_are_refused_rather_than_defaulted():
-    for field in ("authorization_record_reference", "case_reference"):
+    for field in (
+        "authorization_record_reference",
+        "source_platform",
+        "source_claim_id",
+        "source_version",
+        "contract_version",
+    ):
         with pytest.raises(IdempotencyError):
             derive_idempotency_key(**{**BASE, field: "   "})
     with pytest.raises(IdempotencyError):
@@ -62,30 +91,20 @@ def test_incomplete_inputs_are_refused_rather_than_defaulted():
 # --- authorization ---------------------------------------------------------
 
 
-from datetime import datetime, timedelta, timezone
-
-from warrantyops.authorization import (
-    AuthorizationBasis,
-    AuthorizationRefusal,
-    CallAuthorization,
-    authorize_call,
-    mask_e164,
-)
-
 NOW = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
-PURPOSE = "warranty exception resolution"
+PURPOSE = "warranty claim exception follow-up"
 
 
 def make(**overrides) -> CallAuthorization:
-    base = dict(
-        recipient_e164="+12025550142",
-        basis=AuthorizationBasis.EXISTING_SERVICE_RELATIONSHIP,
-        purpose=PURPOSE,
-        granted_by="operations-manager",
-        granted_at=NOW - timedelta(days=2),
-        expires_at=NOW + timedelta(days=2),
-        record_reference="vault://authorizations/2026-08-30/acme",
-    )
+    base = {
+        "recipient_e164": "+12025550142",
+        "basis": AuthorizationBasis.EXISTING_SERVICE_RELATIONSHIP,
+        "purpose": PURPOSE,
+        "granted_by": "operations-manager",
+        "granted_at": NOW - timedelta(days=2),
+        "expires_at": NOW + timedelta(days=2),
+        "record_reference": "vault://authorizations/2026-08-30/acme",
+    }
     base.update(overrides)
     return CallAuthorization(**base)
 
@@ -137,3 +156,74 @@ def test_numbers_are_masked_for_every_human_readable_surface():
     masked = mask_e164("+12025550142")
     assert masked == "+12*******42"
     assert "5550142" not in masked
+
+
+# --- destination binding ----------------------------------------------------
+
+
+def test_numbers_are_normalized_before_the_destination_comparison():
+    """Trim-only normalization: a valid E.164 has no internal formatting."""
+
+    assert normalize_e164("  +12025550142 ") == normalize_e164("+12025550142")
+    assert normalize_e164("+12025550142 ") == "+12025550142"
+    assert normalize_e164("+12025550142") != normalize_e164("+14155550101")
+
+
+def test_the_destination_mismatch_is_a_named_authorization_refusal():
+    assert AuthorizationRefusal.AUTHORIZED_RECIPIENT_MISMATCH.value == (
+        "AUTHORIZED_RECIPIENT_MISMATCH"
+    )
+
+
+# --- the decision surface and the remaining named refusals --------------------
+
+
+def test_the_authorization_decision_renders_its_refusals():
+    allowed = authorize_call(make(), requested_purpose=PURPOSE, now=NOW)
+    refused = authorize_call(
+        make(expires_at=NOW - timedelta(minutes=1)), requested_purpose=PURPOSE, now=NOW
+    )
+    assert allowed.to_dict() == {"allowed": True, "refusals": []}
+    assert refused.to_dict() == {
+        "allowed": False,
+        "refusals": [AuthorizationRefusal.EXPIRED.value],
+    }
+
+
+def test_masking_covers_the_short_and_empty_forms():
+    assert mask_e164("") == ""
+    assert mask_e164("+12345") == "+*****"
+    assert "12345" not in mask_e164("+12345")
+
+
+def test_a_naive_clock_is_rejected_rather_than_assumed_local():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        authorize_call(
+            make(), requested_purpose=PURPOSE, now=datetime(2026, 9, 1, 12, 0)
+        )
+    naive_grant = make(granted_at=datetime(2026, 9, 1, 10, 0))
+    with pytest.raises(ValueError, match="timezone-aware"):
+        authorize_call(naive_grant, requested_purpose=PURPOSE, now=NOW)
+
+
+def test_a_blank_purpose_is_refused_not_defaulted():
+    decision = authorize_call(make(), requested_purpose="  ", now=NOW)
+    assert AuthorizationRefusal.MISSING_PURPOSE in decision.refusals
+
+
+def test_an_authorization_not_yet_in_force_is_refused():
+    decision = authorize_call(
+        make(granted_at=NOW + timedelta(minutes=1)), requested_purpose=PURPOSE, now=NOW
+    )
+    assert AuthorizationRefusal.NOT_YET_VALID in decision.refusals
+
+
+def test_a_key_past_the_header_limit_is_refused(monkeypatch):
+    """The slug regex already caps real keys at 97 characters; the limit
+    guard is the backstop underneath it, proven here with the bound lowered."""
+
+    from warrantyops import idempotency as idempotency_module
+
+    monkeypatch.setattr(idempotency_module, "MAX_KEY_LENGTH", 10)
+    with pytest.raises(IdempotencyError, match="255 character limit"):
+        derive_idempotency_key(**BASE)

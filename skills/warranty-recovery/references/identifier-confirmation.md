@@ -1,20 +1,21 @@
 # Confirming a high-consequence identifier
 
-An RMA number is not a fact about a conversation. It is an instruction to ship
-a unit, and a single wrong digit produces a result that passes every schema
-check and is still false. Schema-valid does not mean factually correct, and
-this is the field where the difference costs money.
+A case, claim or credit reference is not a fact about a conversation. It is
+an instruction to act against one specific record, and a single wrong digit
+produces a result that passes every schema check and is still false.
+Schema-valid does not mean factually correct, and this is the field where
+the difference costs money.
 
 ## The exchange
 
 ```text
-Representative  "RMA four eight one seven one."
-Agent           "Just to confirm, that is RMA four-eight-one-seven-one, correct?"
+Representative  "Your case reference is four eight one seven one."
+Agent           "Just to confirm, that is case four-eight-one-seven-one, correct?"
 Representative  "Correct."
 ```
 
 Only after that third line may the application treat
-`authorization_reference = RMA-48171` as verified.
+`confirmed_reference = CASE-48171` as verified.
 
 ## Why extraction confidence is not enough
 
@@ -48,7 +49,8 @@ A value is promoted to `CONFIRMED_IDENTIFIER` only when all of these hold:
 
 Anything else leaves the state at `UNCONFIRMED_IDENTIFIER`, and the business
 result carries no reference at all. Losing a reference costs a call back.
-Publishing a wrong one costs a shipment sent to the wrong authorization.
+Publishing a wrong one costs a correction filed against somebody else's
+case.
 
 ## Rule 5 is the one that matters
 

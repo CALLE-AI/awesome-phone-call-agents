@@ -1,5 +1,12 @@
 # WarrantyOps Phase 0 handoff
 
+> **Historical record — superseded.** This is the Phase 0 scaffold handoff
+> for the pre-decision coverage/RMA hero. Its domain contract, test counts
+> and status fields describe the former scaffold only. The current product
+> is the v1 post-submission claim-exception contract; see `README.md` and
+> `warrantyops/contract.py` in this directory. Retained unchanged as
+> lineage, not as current instructions.
+
 Everything a new executor needs to continue this contribution without the
 conversation that produced it. Public-safe: no credentials, no real call
 identifiers, no real phone numbers, no transcripts, no private paths.
@@ -11,11 +18,12 @@ portal has no record of the serial, the form rejects the purchase date, the
 email thread has gone quiet. The information needed to settle it exists, and it
 is in the head of a person on a support line.
 
-WarrantyOps makes that one call and returns a coverage decision, a resolution,
-and — only when the counterparty confirmed a spoken read-back — an
-authorization reference. Its governing rule is that the result is allowed to be
-empty. An unknown labelled unknown is worth more than a confident answer nobody
-gave.
+WarrantyOps makes that one call and returns the counterparty-stated status of
+the claim, the reason it is being held, rejected, returned or left unpaid,
+what they need from us, and — only when the counterparty confirmed a spoken
+read-back — a claim, case or credit reference. Its governing rule is that the
+result is allowed to be empty. An unknown labelled unknown is worth more than
+a confident answer nobody gave.
 
 Contribution: the portable skill `skills/warranty-recovery/` and the runnable
 reference app `apps/python/warrantyops/`.
@@ -33,7 +41,7 @@ Verification that must stay green:
 ```bash
 python3 scripts/validate_repository.py                 # repository validator
 python3 scripts/check_branch_name.py --branch <branch>  # branch naming
-cd apps/python/warrantyops && python3 -m pytest         # 80 tests
+cd apps/python/warrantyops && python3 -m pytest         # the full suite, no fixed count
 ```
 
 ## Data zones
@@ -65,8 +73,13 @@ on any of it; that is the lesson of the next section.
 
 - `POST /v1/calls`, `GET /v1/calls/{call_id}`, `GET /v1/calls/{call_id}/events`.
 - `Idempotency-Key` header, 1-255 characters. Same key plus same body returns
-  the original call; same key plus different body returns
-  `409 idempotency_conflict`.
+  the original call — re-verified 2026-09-04 against the official Calls API
+  page and the installed `calle-ai` 0.7.0 source (`calls.create` sends the
+  key as the `Idempotency-Key` header). Same key plus different body is
+  **not stated on the current documentation page** and stays UNKNOWN; the
+  local attempt ledger remains the primary duplicate-call control and
+  suppresses both cases by fingerprint comparison. Vendor replay is
+  defence in depth only, and no runtime call has exercised it yet.
 - Status enum: `queued`, `in_progress`, `completed`, `failed`, `canceled`.
 - `result_schema` is validated server-side before a terminal call is returned.
   `structured_result` is null when no schema-valid task-level result could be
@@ -110,12 +123,20 @@ decay quickly.
 
 ```text
 apps/python/warrantyops/warrantyops/
+  envelope.py       the source-claim record the gates decide on
+  gates.py          residual necessity, economics, unchanged source
   contract.py       extraction schema, and the result the app will assert
+  evidence.py       free-text values grounded in a counterparty turn
   identifiers.py    ABSENT / UNCONFIRMED / CONFIRMED, and the exchange binding
   outcome.py        transport state and business state, kept apart
   validation.py     the documented JSON Schema subset, re-checked locally
-  authorization.py  who may be called, for what, until when
+  authorization.py  who may be called, for what, until when, at which number
   idempotency.py    keys derived from the authorization, not the attempt
+  ledger.py         the local attempt ledger: duplicate-call suppression
+  disclosure.py     the allowlist of what may reach the call
+  review.py         the packet a human sees, the decision a write-back demands
+  writeback.py      deterministic write-back, refusing a moved source
+  source.py         the read seam over the system of record
   config.py         dry run by default; the gates a live call must pass
   workflow.py       the order the stages run in
   providers/        base protocol, fake (default), CALL-E
@@ -127,24 +148,33 @@ provider is an interface so that a change of transport is one new class.
 
 ## Domain contract
 
-`coverage_status`: `COVERED`, `NOT_COVERED`, `UNKNOWN`. The first two require
-an evidence quote; without one the value is reduced to `UNKNOWN` and the
-reduction is recorded in `downgrades`.
+The current contract is **`warranty-claim-exception/v1`**: one submitted
+claim exception, one call, one counterparty-stated answer.
 
-`resolution_status`: `RMA_ISSUED`, `REPLACEMENT_APPROVED`, `REPAIR_APPROVED`,
-`DOCUMENTATION_REQUIRED`, `DIAGNOSTICS_REQUIRED`, `HUMAN_ACTION_REQUIRED`,
-`UNRESOLVED`. The first three assert an authorization an operator will act on,
-and each survives only when the identifier reached `CONFIRMED_IDENTIFIER`;
-otherwise the resolution is downgraded to `HUMAN_ACTION_REQUIRED` and the
-reference is dropped rather than reported.
+`claim_status`: `STATED_REJECTED`, `STATED_RETURNED`, `STATED_IN_PROCESS`,
+`STATED_PAID`, `UNKNOWN`. The first four are the counterparty's statement
+about their own system, never an adjudication of the claim, and each requires
+an evidence quote grounded in a counterparty turn that is neither hedged nor
+non-final; otherwise the value is reduced to `UNKNOWN` and the reduction is
+recorded in `downgrades` with the quote preserved for the reviewer.
 
-Other fields: `authorization_reference`, `replacement_eta`, `return_deadline`,
-`required_documents`, `next_action`, `evidence`, `downgrades`. Values are
-recorded exactly as stated; a duration is never turned into a date.
+Other fields: `stated_reason`, `required_correction`, `required_documents`,
+`stated_deadline`, `escalation_path`, `stated_next_action`,
+`confirmed_reference`, `evidence`, `downgrades`. Free-text values survive
+only when found verbatim in a counterparty turn. Values are recorded exactly
+as stated; a duration is never turned into a date.
 
-Coverage and resolution are independent. A representative can issue an RMA
-without confirming coverage, so `UNKNOWN` coverage with a confirmed reference
-is a valid result, not a contradiction.
+Status and reference are independent. A representative can confirm a case
+reference while hedging the status, so `UNKNOWN` status with a confirmed
+reference is a valid result, not a contradiction.
+
+**Superseded: the v0 coverage/RMA contract.** An earlier iteration of this
+app returned `coverage_status` (`COVERED`/`NOT_COVERED`/`UNKNOWN`) and a
+`resolution_status` (`RMA_ISSUED`, `REPLACEMENT_APPROVED`, `REPAIR_APPROVED`,
+…) with an `authorization_reference`. That contract is gone; results under
+the two contracts are not comparable, and the old five-fixture suite proves
+nothing about this one. Anything in old notes describing coverage decisions
+or RMA assertions describes v0.
 
 ## Transport state and business state
 
@@ -152,25 +182,27 @@ Different questions, separate objects.
 
 | Terminal state | Meaning |
 | --- | --- |
-| `NOT_ATTEMPTED` | the authorization gate refused, or nothing was sent |
+| `NOT_ATTEMPTED` | nothing was sent, or a gate refused before the call |
 | `IN_FLIGHT` | the call has not reached a terminal state |
-| `TRANSPORT_FAILED` | the call ended without completing; no business outcome |
+| `TRANSPORT_FAILED` | the call ended without completing (`failed`, `canceled`); no business outcome |
 | `RESULT_UNAVAILABLE` | completed, no schema-valid structured result |
-| `BUSINESS_RESOLVED` | an authorization was established and confirmed |
-| `BUSINESS_ACTION_REQUIRED` | something specific is needed to move this |
+| `INFORMATION_OBTAINED` | a status, reason or reference was established |
+| `ACTION_REQUIRED` | something specific is needed to move this |
 | `BUSINESS_UNRESOLVED` | completed and settled nothing |
 
-`TRANSPORT_FAILED` always carries `coverage_status: UNKNOWN`. A call nobody
-answered is not a coverage decision. `failure_code` is carried as
+`TRANSPORT_FAILED` always carries `claim_status: UNKNOWN`. A call nobody
+answered is not a claim status. `failure_code` is carried as
 `diagnostic_failure_code` for support and never read; a test asserts that two
 different failure strings produce byte-identical business results.
 
 ## High-consequence identifier confirmation
 
-An RMA number is not a fact about a conversation. It is an instruction to ship
-a unit, and one wrong digit produces a result that passes every schema check
-and is still false. This is the part of the system most worth understanding,
-and the part most worth copying into an unrelated workflow.
+A claim, case or credit reference is not a fact about a conversation. It is a
+pointer into the counterparty's system, and one wrong digit produces a result
+that passes every schema check and is still false. This is the part of the
+system most worth understanding, and the part most worth copying into an
+unrelated workflow. (The v0 contract carried RMA numbers; the control is
+reference-kind agnostic.)
 
 States: `ABSENT`, `UNCONFIRMED_IDENTIFIER`, `CONFIRMED_IDENTIFIER`. Promotion
 requires all of:
@@ -255,18 +287,83 @@ purpose, who granted it, when, and when it expires. Accepted bases:
 The record itself never enters the repository; the workflow holds a pointer to
 where it is filed. Refusals are named, not summed: `INVALID_E164`,
 `MISSING_PURPOSE`, `PURPOSE_MISMATCH`, `EXPIRED`, `NOT_YET_VALID`,
-`MISSING_RECORD_REFERENCE`, `RECIPIENT_NOT_ALLOWLISTED`.
+`MISSING_RECORD_REFERENCE`, `RECIPIENT_NOT_ALLOWLISTED`,
+`AUTHORIZED_RECIPIENT_MISMATCH`.
+
+The authorization is also bound to a destination: after normalization, the
+authorized recipient must equal the claim's `counterparty_phone_e164`. A
+record that permits calling one number is never permission to dial a
+different claim's counterparty, so a mismatch refuses with zero provider
+interactions rather than trusting the provider to notice.
 
 Numbers are validated against the stricter of the two E.164 patterns CALL-E
 publishes, and masked in every output a human or a log will see.
 
-## Idempotency
+## Idempotency and duplicate-call suppression
 
-Keys are derived from the authorization record, the case reference and the
-contract version — properties of what was authorized, never of the attempt. A
-retried request returns the original call instead of dialling again. A
-deliberate re-check must pass an explicit token, because reusing the original
-key would return the very answer being re-checked.
+Duplicate calls are prevented **locally, before the provider**. Immediately
+before `place_call`, the workflow reserves the idempotency key and a
+fingerprint of the exact request in an attempt ledger
+(`warrantyops/ledger.py`), atomically. Only a reservation the current run
+created may reach the provider; an existing reservation in any state
+(`RESERVED`, `COMPLETED`, `UNKNOWN`) refuses with
+`DUPLICATE_CALL_SUPPRESSED` (same fingerprint) or `IDEMPOTENCY_CONFLICT`
+(different body), with zero provider interactions. An unavailable or missing
+ledger is `ATTEMPT_LEDGER_UNAVAILABLE` — the reservation is mandatory and
+fails closed.
+
+The ledger is deliberately minimal: key, fingerprint, state, timestamps,
+and the vendor call id once creation succeeds (persisted between creation
+and the first status read, so a crash in between stays reconcilable). No
+phone number, transcript, claim text or credential is ever stored. The
+durable implementation is SQLite at an explicit user-state path, refused
+inside the repository; the in-memory implementation is legal only next to
+the fake provider, and a provider declaring live capability refuses a
+non-durable ledger (`LEDGER_NOT_DURABLE`).
+
+An attempt whose outcome could not be determined — the provider raised, or
+returned before a terminal state — is marked `UNKNOWN` and is **never
+retried automatically**. Reconciling whether that call happened is a human
+task against the vendor's records; a new attempt needs a new source version
+and therefore a new key. A crash after reservation leaves the committed row,
+which is itself the suppression.
+
+Keys are still derived deterministically from the authorization record, the
+claim and its source version, and the contract version — properties of what
+was authorized, never of the attempt — and the key is still sent to CALL-E
+on the one permitted request. That is defence in depth only: the vendor's
+same-key replay guarantee is documented but has never been exercised at
+runtime by this project and is treated as **UNKNOWN** until the Runtime
+Proof verifies it. A deliberate re-check must pass an explicit token,
+because reusing the original key would return the very answer being
+re-checked.
+
+The source version under a key is live, not assumed: the current version is
+re-read through a supplied reader before dialing, and write-back re-reads it
+again immediately before mutating. A missing reader is itself a named refusal
+(`SOURCE_RECHECK_UNAVAILABLE`) with zero provider interactions — the check is
+mandatory and is never silently skipped.
+
+## The live adapter and the SDK
+
+The live CALL-E adapter (`providers/calle_client.py`) is written against
+the **installed SDK source**, `calle-ai==0.7.0` (pinned in `pyproject.toml`
+for reproducibility), read in the isolated environment
+`/private/tmp/warrantyops-live-venv` on 2026-09-04. Verified from that
+source: `CalleClient(api_key, base_url, timeout)` is a context manager;
+`calls.create(*, task, recipients, result_schema, metadata,
+idempotency_key, …)` and `calls.get(call_id)` return plain `dict`s;
+`CallStatus` is `queued|in_progress|completed|failed|canceled`;
+`TranscriptSpeaker` includes `unknown` alongside `bot` and `user`; errors
+are `CalleAPIError` (with `code`, `status_code`), `CalleTimeoutError`,
+`CalleConnectionError`. The SDK ships `calls.wait_for_result`, but it
+sleeps on the real clock, so the adapter polls `calls.get` itself with an
+injectable clock, a wall-clock deadline and no invented cancellation. The
+vendor call id is persisted to the attempt ledger between creation and the
+first status read. The SDK requires **Python 3.11+**; the adapter imports
+it lazily so the 3.9-compatible core never needs it. Same-key/different-body
+idempotency conflict semantics and rate limits remain runtime-only
+unknowns.
 
 ## Dry run and the fake provider
 
@@ -278,34 +375,77 @@ repository, and a passing authorization gate. Any one missing is a refusal.
 ```bash
 cd apps/python/warrantyops
 python3 -m warrantyops --list
-python3 -m warrantyops --scenario case_d_identifier_readback
+python3 -m warrantyops --scenario case_d_corrected_reference
+# durable duplicate suppression demo (explicit user-state path, outside the repo):
+python3 -m warrantyops --scenario case_a_useful_resolution --ledger-db /tmp/warrantyops-attempts.sqlite
+python3 -m warrantyops --scenario case_a_useful_resolution --ledger-db /tmp/warrantyops-attempts.sqlite  # DUPLICATE_CALL_SUPPRESSED
 ```
 
-Five synthetic scenarios in `fixtures/`: a clean success, a documentation
-request, a hedged answer, a misheard reference caught by the read-back, and a
-call that never completed. Each declares the outcome it expects and a test
-asserts the code produces it. Every fixture reports `real_calls_placed: 0`.
+Six synthetic scenarios in `fixtures/`, and exactly six — a test asserts the
+set by name:
+
+- `case_a_useful_resolution` — status, reason, documents, deadline and a
+  confirmed case reference.
+- `case_b_source_sufficient` — the portal already states the next step; the
+  residual gate refuses and the provider is never invoked.
+- `case_c_missing_documents` — documents requested; status stays `UNKNOWN`,
+  terminal state `ACTION_REQUIRED`.
+- `case_d_corrected_reference` — a misheard reference caught by the read-back;
+  only the corrected value is asserted.
+- `case_e_no_result` — the call completed but produced no schema-valid
+  result; nothing is written.
+- `case_f_source_changed` — the source record moved between call and
+  write-back; the write-back refuses.
+
+Each declares the outcome it expects and a test asserts the code produces it.
+Every fixture reports `real_calls_placed: 0`. (Superseded: an earlier
+five-fixture set — clean success, documentation request, hedged answer,
+misheard reference, incomplete call — belonged to the v0 contract; the
+hedged-answer and incomplete-call behaviours are now pinned by unit tests in
+`test_outcome.py` rather than by fixtures.)
 
 ## Tests, and what they prove
 
-80 tests. What they are for, not how many:
+The full suite (no count is pinned here; run it). What they are for:
 
-- `test_identifiers.py` — the confirmation control and eighteen attacks on it,
+- `test_identifiers.py` — the confirmation control and the attacks on it,
   including the "yes to an earlier question" defect, hedges, corrections
   without a second read-back, two numbers in one read-back, a case number
-  confirmation reused for an RMA, the agent's own read-back quoted as
+  confirmation reused for a credit note, the agent's own read-back quoted as
   agreement, a repeated short reply, and a missing transcript.
-- `test_outcome.py` — a failed call never becomes a coverage decision; two
-  different `failure_code` strings produce identical business results; an
-  authorizing resolution without a confirmed identifier is downgraded.
+- `test_outcome.py` — a failed or canceled call never becomes a claim status;
+  two different `failure_code` strings produce identical business results; a
+  hedged or non-final status quote is deterministically reduced to `UNKNOWN`
+  with the quote preserved; a clear grounded status survives.
 - `test_validation.py` — malformed results rejected, `UNKNOWN` preserved
   exactly, a null structured result treated as a state rather than an error.
 - `test_contract.py` — the schema is closed, complete, and free of undocumented
   features.
-- `test_gates.py` — authorization refusals and idempotency determinism.
+- `test_gates.py` — authorization refusals, destination normalization, and
+  idempotency determinism.
+- `test_envelope.py` — the source-claim record refuses rather than defaults.
+- `test_pre_call.py` — residual necessity, organization-owned economics,
+  disclosure allowlist, and the source-version re-read.
+- `test_workflow_guards.py` — a missing version reader or a destination
+  mismatch refuses with zero provider interactions; one run is one provider
+  interaction; one shared ledger across two runs is one total interaction.
+- `test_attempt_ledger.py` — the local duplicate-call control: shared-ledger
+  single interaction, SQLite restart suppression, `IDEMPOTENCY_CONFLICT`,
+  `UNKNOWN` after provider error with retry suppression, fail-closed
+  unavailable ledger, durable-ledger requirement for live-capable providers,
+  and a byte-level audit that no sensitive field is stored.
+- `test_calle_adapter.py` — the live adapter against mocked SDK 0.7.0
+  shapes: creation-before-first-read call-id persistence, dict handling,
+  bounded polling to every terminal status, malformed-id failure, deadline
+  and error paths to UNKNOWN, exactly one creation, context-manager
+  lifecycle, safe diagnostics.
 - `test_dry_run.py` — zero calls with sockets patched to raise, live gates,
-  artifact directory refused inside the repository, fixtures match their
-  declared outcomes, transcript read from the correct attempt.
+  artifact directory refused inside the repository, transcript read from the
+  correct attempt.
+- `test_scenarios.py` — the six fixtures run end to end and match their
+  declared outcomes, including the CLI surface.
+- `test_review_writeback.py` — review gate, bounded note, semantic
+  idempotency, stale-source refusal.
 - `test_repo_hygiene.py` — reserved numbers only, no credential-shaped strings,
   synthetic call identifiers only.
 
@@ -342,14 +482,15 @@ capped at 60 minutes. The project does not depend on the outcome.
 ## Test 1 — cooperative, pass and fail
 
 One authorized call to a number the operator owns, or a person who explicitly
-agreed. The recipient plays a cooperative warranty desk: confirms coverage,
-issues a reference, confirms it when read back, gives a return deadline,
-declines to give a shipping date.
+agreed. The recipient plays a cooperative warranty desk: states the claim
+status in their system, gives the reason it is held, asks for a document,
+states a deadline, confirms a case reference when it is read back, and
+declines to give anything further.
 
 Pass requires all of: the call reached `completed`; `structured_result` was not
 null; local validation passed; the identifier reached `CONFIRMED_IDENTIFIER`;
 the confirmation quote appears in a `user` transcript turn; and the derived
-coverage, resolution and reference match what the recipient actually said.
+status, stated fields and reference match what the recipient actually said.
 
 A failure of the first three is a platform finding worth recording. A failure
 of the last three is a defect in this workflow.
@@ -364,8 +505,9 @@ before any output is examined.
 
 **Pass is not schema-valid JSON.** Pass is that the final business state and
 the critical identifier match what the recipient said and confirmed. A hedge
-must not become `COVERED`. A decoy case number must not become the
-authorization. The value first heard must not survive a correction.
+must not become a definitive `claim_status`. A decoy case number must not
+become the confirmed reference. The value first heard must not survive a
+correction.
 
 Outcomes are recorded as one of: CORRECT; CORRECTLY UNRESOLVED (the workflow
 refused to assert something it could not establish, and was right to); SILENT
@@ -378,9 +520,12 @@ LOUD ERROR (failed visibly, cheap, record the cause).
 2. Whether a Goal Run result exposes transcripts or attempts.
 3. Whether a model asked to omit an optional field omits it or returns null.
    Both are handled; this is a question about which branch is exercised.
-4. **Everything above is synthetic.** 80 tests against transcripts written by
-   hand. No real call has been placed. This is the largest unknown by far, and
-   the only one that a test suite cannot reduce.
+4. **Everything above is synthetic.** The whole suite runs against
+   transcripts written by hand. No real call has been placed. This is the
+   largest unknown by far, and the only one that a test suite cannot reduce.
+5. **The vendor's same-key replay guarantee.** Documented, never exercised.
+   Duplicate calls are suppressed locally by the attempt ledger; the key on
+   the wire is defence in depth only.
 
 ## Deadlines
 
@@ -398,10 +543,11 @@ LOUD ERROR (failed visibly, cheap, record the cause).
    asserted business result by hand. Run the hygiene audit afterwards.
 3. Run Test 2 with an authorized adversarial recipient and a pre-written answer
    key. This is the strongest technical evidence the project can produce.
-4. Conduct the two field-service operator interviews. The decisive question is
-   what happens if nobody makes the call: "we email and eventually get an
-   answer" is a weak problem, "nobody knows who is paying and it stays open" is
-   a strong one.
+4. Maintain passive collision and adoption monitoring from official
+   documentation, current products, public customer behaviour, app reviews and
+   forums. Do not conduct interviews, surveys, focus groups or hired human
+   review for this strategy lock, and do not reopen the concept unless a kill
+   gate fires.
 5. Open the pull request, by Sep 5 and no later than Sep 7.
 
 ## DO NOT REOPEN WITHOUT REAL EVIDENCE
@@ -429,6 +575,9 @@ schedule does not have.
 - **No polished UI, dashboard, authentication, CRM integration, billing,
   multi-call chains or agent builder** until the business and technical gates
   have both passed.
+- **A search result of “nothing found” describes the tool's reach, not the
+  world.** Before that result can move a product decision, verify it by a
+  second independent search method and record both scopes.
 
 ## ESCALATE TO A STRONG REASONING MODEL ONLY IF
 
@@ -445,7 +594,8 @@ mechanical refactors that change no control — does not need one. These do:
   idempotency in a way that would change the transport decision.
 - **Maintainer feedback requires an architectural change**, as opposed to a
   rename, a documentation fix or a reserved-number correction.
-- **Field-service interviews invalidate the workflow**, for instance if
-  operators report that portals and email already settle exceptions.
+- **Public customer-behaviour evidence or an authorized real test invalidates
+  the workflow**, for instance if portals and email already settle the target
+  exceptions without meaningful delay or ambiguity.
 - A **credential, transcript, real number or call identifier reaches git**.
   History remediation is never a mechanical fix.

@@ -39,6 +39,10 @@ class AuthorizationRefusal(str, Enum):
     NOT_YET_VALID = "NOT_YET_VALID"
     MISSING_RECORD_REFERENCE = "MISSING_RECORD_REFERENCE"
     RECIPIENT_NOT_ALLOWLISTED = "RECIPIENT_NOT_ALLOWLISTED"
+    #: The authorization names a number other than the claim's counterparty.
+    #: An authorization record is for one destination; it cannot be replayed
+    #: onto a different claim's number.
+    AUTHORIZED_RECIPIENT_MISMATCH = "AUTHORIZED_RECIPIENT_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,18 @@ def mask_e164(number: str) -> str:
     if len(digits) <= 6:
         return "+" + "*" * len(digits)
     return f"+{digits[:2]}{'*' * (len(digits) - 4)}{digits[-2:]}"
+
+
+def normalize_e164(number: str) -> str:
+    """Canonical form for comparing two numbers: surrounding whitespace off.
+
+    Nothing more aggressive is done, deliberately. A valid E.164 number has no
+    internal formatting to strip — :data:`E164_RE` refuses spaces, dashes and
+    dots — so two numbers either match exactly once trimmed, or they are
+    genuinely different destinations.
+    """
+
+    return (number or "").strip()
 
 
 def authorize_call(

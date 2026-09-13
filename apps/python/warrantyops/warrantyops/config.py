@@ -9,6 +9,7 @@ a refusal, not a warning.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -92,10 +93,10 @@ def artifact_dir_refusals(artifact_dir: Path | None) -> tuple[ConfigRefusal, ...
     return ()
 
 
-def load_config(env: dict[str, str] | None = None) -> RuntimeConfig:
+def load_config(env: Mapping[str, str] | None = None) -> RuntimeConfig:
     """Build a configuration from the environment. Never raises on dry run."""
 
-    source = os.environ if env is None else env
+    source: Mapping[str, str] = os.environ if env is None else env
     live_requested = source.get("CALLE_LIVE_CALLS_ENABLED", "").strip() == "1"
     artifact_value = source.get("WARRANTYOPS_ARTIFACT_DIR", "").strip()
     return RuntimeConfig(

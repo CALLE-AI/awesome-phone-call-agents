@@ -19,11 +19,11 @@ assert REPO_ROOT is not None
 CONTRIBUTION_PATHS = (
     REPO_ROOT / "apps" / "python" / "warrantyops",
     REPO_ROOT / "skills" / "warranty-recovery",
-    REPO_ROOT / "PHASE0_HANDOFF.md",
+    REPO_ROOT / "apps" / "python" / "warrantyops" / "PHASE0_HANDOFF.md",
 )
 
 TEXT_SUFFIXES = {".py", ".md", ".json", ".toml", ".yaml", ".yml", ".txt", ".jsonl"}
-SKIP_DIRS = {"__pycache__", ".pytest_cache", ".venv", "node_modules", "artifacts"}
+SKIP_DIRS = {"__pycache__", "node_modules", "artifacts"}
 
 #: North American fictional numbers reserved for use in fiction: the 555-0100
 #: to 555-0199 block. Any other +1 number in these files is a defect.
@@ -39,6 +39,10 @@ SECRET_PATTERNS = (
 
 #: Identifiers in the CALL-E vocabulary that share the ``call_`` prefix without
 #: being call ids: object names, webhook event names and stable error codes.
+#: ``call_dMU`` and ``call_Zs2`` are deliberately different: each is the
+#: *masked* public form of one real recorded call — prefix only, the middle
+#: elided — and the data-zone rules allow exactly those two forms. This is a
+#: list of one-time evidence facts, never a class of permitted prefixes.
 DOCUMENTED_CALL_TOKENS = frozenset(
     {
         "call_id",
@@ -46,7 +50,12 @@ DOCUMENTED_CALL_TOKENS = frozenset(
         "call_failed",
         "call_completed",
         "call_not_ready",
+        "call_dMU",
+        "call_Zs2",
         "call_result_validation_failed",
+        # Structured-observation event/reason names, not provider call ids.
+        "call_created",
+        "call_id_persisted",
     }
 )
 
@@ -61,7 +70,12 @@ def text_files() -> list[Path]:
         for path in root.rglob("*"):
             if not path.is_file() or path.suffix not in TEXT_SUFFIXES:
                 continue
-            if SKIP_DIRS & set(path.relative_to(REPO_ROOT).parts):
+            # Dot-directories (.mypy_cache, .ruff_cache, .hypothesis,
+            # .pytest_cache, .venv) are machine-local, git-ignored tool
+            # caches, not contribution content — nothing inside them is
+            # data this contribution ships.
+            parts = path.relative_to(REPO_ROOT).parts
+            if SKIP_DIRS & set(parts) or any(p.startswith(".") for p in parts):
                 continue
             files.append(path)
     return files

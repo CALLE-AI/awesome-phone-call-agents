@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
 
 from ..identifiers import TranscriptTurn
 from ..outcome import TransportOutcome, TransportState
@@ -33,6 +33,9 @@ class FakeCallProvider:
     name: str = "fake"
     calls_placed: int = 0
     replays: int = 0
+    #: Replays a recording; cannot dial anything, so it accepts the
+    #: non-durable in-memory ledger the CLI demo uses.
+    requires_durable_ledger: bool = False
 
     def load(self) -> dict[str, Any]:
         path = self.fixture_dir / f"{self.scenario}.json"
@@ -41,9 +44,14 @@ class FakeCallProvider:
             raise FileNotFoundError(
                 f"unknown scenario {self.scenario!r}; available: {available}"
             )
-        return json.loads(path.read_text(encoding="utf-8"))
+        fixture: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return fixture
 
-    def place_call(self, request: CallRequest) -> ProviderCall:
+    def place_call(
+        self,
+        request: CallRequest,
+        on_call_created: Optional[Callable[[str], None]] = None,
+    ) -> ProviderCall:
         fixture = self.load()
         expected = fixture.get("recipient_e164")
         if expected and expected != request.recipient_e164:
@@ -57,6 +65,11 @@ class FakeCallProvider:
             diagnostic_failure_code=fixture["transport"].get("failure_code"),
             diagnostic_failure_message=fixture["transport"].get("failure_message"),
         )
+        # The synthetic "creation" is replaying the fixture: report its call
+        # id the way the live provider reports the vendor's, before any
+        # status is read.
+        if on_call_created is not None and transport.call_id:
+            on_call_created(transport.call_id)
         return ProviderCall(
             transport=transport,
             structured_result=fixture.get("structured_result"),

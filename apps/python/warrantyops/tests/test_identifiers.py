@@ -479,8 +479,75 @@ def test_a_value_of_the_wrong_shape_is_refused():
         ("user", "Correct, that is RMA four eight one seven one."),
     )
     decision = evaluate(
-        claim(heard="RMA A", confirmed="RMA A", quote="Correct, that is RMA four eight one seven one."),
+        claim(
+            heard="RMA A",
+            confirmed="RMA A",
+            quote="Correct, that is RMA four eight one seven one.",
+        ),
         transcript,
     )
     assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
     assert IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE in decision.refusals
+
+
+# --- the binding edges: empty folds, short replies, missing halves -------------
+
+
+def test_a_value_that_folds_to_nothing_is_not_an_identifier():
+    assert normalize_identifier("---", "RMA") is None
+
+
+def test_a_punctuation_only_quote_cannot_bind_to_any_turn():
+    decision = evaluate(claim(heard="RMA 48171", confirmed="RMA 48171", quote="—"), CLEAN)
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.QUOTE_TOO_SHORT in decision.refusals
+
+
+def test_a_short_reply_found_inside_a_longer_turn_is_still_too_short():
+    """The quote must be the counterparty's whole turn, or long enough to
+    carry its own words: a word buried in a longer sentence can bind to the
+    wrong exchange."""
+
+    transcript = turns(
+        ("bot", "Just to confirm, that is RMA four eight one seven one, correct?"),
+        ("user", "That is correct, the RMA is four eight one seven one."),
+    )
+    decision = evaluate(
+        claim(heard="RMA 48171", confirmed="RMA 48171", quote="correct"),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.QUOTE_TOO_SHORT in decision.refusals
+
+
+def test_a_readback_without_a_confirmation_value_refuses_by_name():
+    decision = evaluate(
+        claim(
+            heard="RMA 48171",
+            confirmed=None,
+            quote="Correct, RMA four eight one seven one.",
+        ),
+        CLEAN,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.NO_CONFIRMATION_VALUE in decision.refusals
+
+
+def test_a_confirmation_as_the_very_first_turn_has_no_readback_to_bind_to():
+    """With no agent turn before it, the read-back half of the exchange does
+    not exist in the transcript; the claim's own ``readback_performed`` flag
+    is then the only witness, and the binding walk starts from nothing."""
+
+    transcript = turns(
+        ("user", "Correct, that is RMA four eight one seven one."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA 48171",
+            confirmed="RMA 48171",
+            quote="Correct, that is RMA four eight one seven one.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.CONFIRMED_IDENTIFIER
+    assert decision.value == "RMA-48171"

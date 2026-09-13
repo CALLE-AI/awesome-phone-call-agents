@@ -127,6 +127,10 @@ class IdentifierRefusal(str, Enum):
     IDENTIFIER_NOT_IN_EXCHANGE = "IDENTIFIER_NOT_IN_EXCHANGE"
     AMBIGUOUS_EXCHANGE = "AMBIGUOUS_EXCHANGE"
     PATTERN_MISMATCH = "PATTERN_MISMATCH"
+    #: The confirmation held, but no transcript turn can be shown as evidence
+    #: for the value itself: neither a counterparty utterance naming the
+    #: reference nor a read-back pair containing it could be located.
+    REFERENCE_EVIDENCE_UNGROUNDED = "REFERENCE_EVIDENCE_UNGROUNDED"
 
 
 @dataclass(frozen=True)
@@ -166,6 +170,11 @@ def _fold(text: str) -> str:
     stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
     cleaned = re.sub(r"[^a-z0-9\s]+", " ", stripped.lower())
     return re.sub(r"\s+", " ", cleaned).strip()
+
+
+#: Public alias so transcript-grounding checks in other modules fold text the
+#: same way the identifier machinery does. One folding rule, one place.
+fold_text = _fold
 
 
 def _tokens_to_digits(folded: str) -> list[str]:
@@ -324,9 +333,12 @@ def evaluate_identifier(
     if quote and confirmed is not None:
         refusals.extend(_exchange_refusals(quote, confirmed, transcript, negated))
 
-    if confirmed is not None and expected_pattern is not None:
-        if re.fullmatch(expected_pattern, confirmed) is None:
-            refusals.append(IdentifierRefusal.PATTERN_MISMATCH)
+    if (
+        confirmed is not None
+        and expected_pattern is not None
+        and re.fullmatch(expected_pattern, confirmed) is None
+    ):
+        refusals.append(IdentifierRefusal.PATTERN_MISMATCH)
 
     if refusals:
         return IdentifierDecision(

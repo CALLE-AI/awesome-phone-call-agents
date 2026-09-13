@@ -66,7 +66,7 @@ fields do not establish the distinction, the business outcome should be kept
 unresolved.
 
 So this workflow carries `failure_code` as diagnostic context and never reads
-it. A failed call becomes `TRANSPORT_FAILED` with `coverage_status: UNKNOWN`,
+it. A failed call becomes `TRANSPORT_FAILED` with `claim_status: UNKNOWN`,
 whatever string came back.
 
 **There is no cancel operation.** The documentation states the Calls API does
@@ -100,8 +100,11 @@ Two documented properties decide against it for this workflow, for now:
   contract in `result-contract.md` would have to move into the Goal, which
   means the read-back fields could no longer be changed in a pull request.
 
-The Goal Run error enum remains the better contract. If a published Goal can
-carry this extraction schema, the transport layer is the only part of this
+The Goal Run error enum remains the better contract. All eight codes are
+mapped to explicit transport/terminal/claim triples in the application
+(`warrantyops/goal_runs.py`), every row pinned by tests with an UNKNOWN claim
+status: a transport code never grounds a business fact. If a published Goal
+can carry this extraction schema, the transport layer is the only part of this
 workflow that has to change, which is why the provider is an interface rather
 than a function.
 
@@ -109,6 +112,9 @@ than a function.
 
 - Whether a `GoalRun` result exposes transcripts or attempts. Until that is
   known, the read-back binding cannot be assumed to work on the Goal Runs path.
+  The question is answerable mechanically: `probe_goal_capability` evaluates
+  any GET-returned GoalRun payload against the promotion criteria, and until
+  a real payload passes it the Calls API stays primary.
 - Whether a model asked to omit an optional field reliably omits it rather than
   returning null. Both are handled, so this is a question about which branch
   gets exercised, not a risk to the result.

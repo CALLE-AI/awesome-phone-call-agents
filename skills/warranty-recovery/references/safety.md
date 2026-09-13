@@ -55,8 +55,8 @@ a retried request returns the original call instead of dialling again.
 
 ## Boundaries
 
-This workflow asks about equipment. It does not give legal advice about a
-contract, does not dispute or negotiate warranty terms, does not discuss
-payment instruments, and is not a route to emergency help. A representative who
-refers the matter to a person is recorded as `HUMAN_ACTION_REQUIRED`; the
-workflow does not press.
+This workflow asks about a submitted claim's status. It does not give legal
+advice about a contract, does not dispute or negotiate warranty terms, does
+not discuss payment instruments, and is not a route to emergency help. A
+representative who refers the matter to a person is recorded as
+`ACTION_REQUIRED`; the workflow does not press.
