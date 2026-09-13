@@ -291,6 +291,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
+- [Auto Property Manager](https://autopropertymanager.com) - Consent-gated, hosted short-term-rental management app using CALL-E for owner-alert and contractor-dispatch phone calls, with a dedicated no-real-recipient rehearsal page, self-registration, and provider-verified result readback. See the [integration notes](docs/community-apps/auto-property-manager.md).
 
 ### Plugins
 
