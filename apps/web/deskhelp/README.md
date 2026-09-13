@@ -84,7 +84,7 @@ phone.
 | `metadata.workflow_run_id` | Ties a call back to the run that authorised it |
 | Terminal polling with a fixed timeout | Resumable after a restart, with no automatic resend |
 | `transcript_turns` and `evidence_quotes` | Every stored answer traced to a turn the recipient spoke |
-| `completion_confidence` | Recorded alongside the judgement rather than substituted for it |
+| `completion_confidence` | Stored beside DeskHelp's own reading and shown with the call. It never decides an outcome: a score of 0.99 does not save an answer the recipient never supported, and 0.1 does not spoil one they did |
 
 Hindi, English, and the code-switched mix Indian families use on the phone.
 `hi-en` has no locale of its own at any provider, so the call is placed as
@@ -222,7 +222,7 @@ A submitted call cannot be recalled, and closing the page does not stop it.
 git clone https://github.com/vickysharma-prog/DeskHelp.ai.git
 cd DeskHelp.ai
 npm run demo       # the whole loop on scripted calls, no network, no account
-npm run check      # typecheck and 173 tests
+npm run check      # typecheck and 174 tests
 ```
 
 Then the product itself:
