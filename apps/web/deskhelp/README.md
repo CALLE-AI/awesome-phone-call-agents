@@ -1,7 +1,13 @@
 # DeskHelp
 
-Scheduled phone work for schools, colleges and coaching institutes, with every
-answer checked against what the recipient actually said.
+An assistant for every call your office has to make, that speaks to people on
+your behalf and tells you what each call settled.
+
+Any office that runs on the phone: reminders, chasing something somebody owes
+you, confirming a slot, asking why somebody has not arrived, a short survey
+after a job. Fourteen education workflows ship ready to switch on, because that
+is where the work is heaviest, and the engine underneath knows nothing about
+students.
 
 Live: <https://deskhelp.onrender.com> · Source:
 <https://github.com/vickysharma-prog/DeskHelp.ai> · Demo:
@@ -44,21 +50,22 @@ live call before this was submitted.
 
 ## The work it takes off a front desk
 
-Every week somebody at a coaching institute picks up the phone and works
-through the same list. Fees due on Friday. A child missing from the morning
-batch. Twenty people who asked about admission in June and were never called
-back. It takes most of a week, and the week after that it starts again.
+Every office has a list it works through by phone, and the list refills itself.
+Money owed on Friday. Somebody who has not turned up. Twenty people who
+enquired in June and were never called back. It takes a person most of a week,
+and the week after that it starts again.
 
-Fourteen workflows ship: fee reminders before and after the due date, absence
-checks, repeated-absence checks, admission enquiry follow-ups, requested
-callbacks, demo class follow-ups, document chases, parent meeting slots,
-end-of-term feedback, next-term re-enrolment, approved announcements, staff
-absence, and finding cover for a class.
+A workflow is a short description of who to call, what may be said to them, and
+what a useful answer looks like. That is all. The engine has no idea what a
+student, an invoice or a delivery is, so the same code runs a fee reminder, a
+staff attendance check, a supplier confirmation or a feedback survey.
 
-Each one is a declarative `ActionDefinition`: who is called, what may be said
-to them, and what a useful answer looks like. Nothing underneath knows what a
-student is, so the same engine runs staff attendance or a vendor confirmation.
-The fifteenth workflow is a config object, not a module.
+Fourteen ship ready for an education hub: fee reminders before and after the
+due date, absence checks, repeated-absence checks, admission enquiry
+follow-ups, requested callbacks, demo class follow-ups, document chases, parent
+meeting slots, end-of-term feedback, next-term re-enrolment, approved
+announcements, staff absence, and finding cover for a class. Writing the
+fifteenth, for any office at all, is a config object rather than a module.
 
 Every workflow ships switched off. Installing DeskHelp is never the same thing
 as starting to ring people.
@@ -112,10 +119,7 @@ DeskHelp takes no card, UPI or bank detail on any call.
 **Children are named carefully.** On a call about a student, the first name and
 class are spoken only after the answerer confirms they are the named guardian.
 Anyone else, and voicemail, hear that the institute called and would like a
-call back. This follows the pattern in `roll-call`
-([PR #325](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/325)),
-cited here as prior art; DeskHelp's absence check is one of fourteen scheduled
-workflows rather than a single-morning safeguarding tool.
+call back.
 
 **Stop means stop.** A recorded opt-out silences that contact across all
 fourteen workflows, permanently, and survives re-importing a spreadsheet that
@@ -192,10 +196,8 @@ Answering and hanging up is `declined` and is never retried. A phone that rang
 out is `unreached` and may be tried once more, four hours later. Collapsing the
 two means the more clearly somebody refuses, the more often they are rung. An
 attempt whose start and finish are the same instant never rang anybody, so it
-is a connection failure rather than a statement about the recipient, and it
-reaches a person; the same distinction
-[`ringfence`](../../python/ringfence/) documents against the live API.
-Anything unrecognised reaches a person, per
+is a connection failure rather than a statement about the recipient, so it
+reaches a person instead. Anything unrecognised reaches a person, per
 [`docs/adr/0006-a-refusal-is-not-a-missed-call.md`](../../../docs/adr/0006-a-refusal-is-not-a-missed-call.md).
 
 ---
@@ -302,8 +304,7 @@ CALL-E accepts a narrow slice of JSON Schema: `type`, `properties`, `required`,
 `enum`, `items`, `description`, and `additionalProperties: false`. DeskHelp
 checks a schema against that vocabulary before sending it, on every path
 including fixtures, so a schema mistake surfaces in the test suite rather than
-on a live call. The vocabulary is the one
-[`kept`](../../python/kept/) documents and enforces.
+on a live call.
 
 ---
 
@@ -342,6 +343,10 @@ DeskHelp schedules and places outbound calls and reads back what they
 established. It does not receive calls, take payment, or decide anything on its
 own: every captured question waits for a person, and every stated intention
 stays a stated intention until the office confirms it elsewhere.
+
+The fourteen shipped workflows are an education pack. The engine is not
+education software, and a new pack for a clinic, a workshop or a supplier desk
+is configuration rather than code.
 
 Each account holds one workspace. The scheduler computes the next run for every
 workflow and shows it before you arm one; runs are started by an operator.
