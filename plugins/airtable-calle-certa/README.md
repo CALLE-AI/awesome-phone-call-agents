@@ -282,13 +282,27 @@ writeback has landed real dispositions (`Status`, `Reason`, `Call ID`,
 `Consent receipt ID`) on a live base, and the audit chain verified intact
 across consent, authorisation, dispatch and interpretation records.
 
-**Not yet demonstrated.** A single run that carries the full product payload
-all the way from Airtable to a *verified* disposition. Live attempts after the
-successful call failed inside CALL-E's telephony leg before the destination
-rang — `failure_code` varying (404, 500) across payloads whose recipient
-fields were byte-identical to the one that connected. That is not a signature
-this plugin's input can produce, and the cause is still open. It is recorded
-here rather than omitted.
+**Demonstrated since.** A full product payload — REST, derived region, both
+schemas — completed a 51-second call over 13 turns at confidence 0.93,
+returning `reached_employer: yes` and `employment_confirmed: yes`. The row
+wrote back as **verified** with its call id, consent receipt and reason, and
+the chain verified intact across consent, authorisation, dispatch and
+interpretation.
+
+**A finding from that run.** CALL-E kept refining the recipient result *after*
+the call was terminal: `title_matches` read `"yes"` when the runner read it and
+`"unknown"` about a minute later. The row was written verified and was, by
+CALL-E's own later answer, partial. `_confirm` now re-reads a terminal call
+after a settle delay; a result that moved routes to **needs review**, because
+neither read is knowably the final one and picking a winner would be the
+guessing this product exists to avoid. An unchanged second read costs one
+request and settles it.
+
+**Still open.** Some live attempts failed inside CALL-E's telephony leg before
+the destination rang — `failure_code` varying (404, 500) across payloads whose
+recipient fields were byte-identical to one that connected. That is not a
+signature this plugin's input can produce. It is reported upstream and
+recorded here rather than omitted.
 
 **What that means for a reviewer.** The plugin's own path — schema derivation,
 consent gating, provenance refusal, region resolution, dispatch, audit

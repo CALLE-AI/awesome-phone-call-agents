@@ -15,7 +15,8 @@ from certa.calle import Disposition
 from certa.consent import derive_token
 from certa.runner import PRICE_PER_CALL_USD, RunError, execute, plan, reconcile
 from certa.tasks import TASK_SPEC_VERSION
-from certa.transport import FixtureTransport
+from certa.schema import UNKNOWN
+from certa.transport import FixtureTransport, TransportError
 from certa.types import Relationship
 
 from tests.test_airtable import FIELDS, SCHEMA, ON_APPLICATION, SOURCED, record
@@ -338,6 +339,79 @@ class TestRegionReachesThePayload(unittest.TestCase):
         self.assertEqual(len(result.skipped), 1)
         self.assertIn("coverage", result.skipped[0].reason)
         self.assertEqual(self.transport.created, [])
+
+
+class RevisedAfterTerminal(Base):
+    """CALL-E keeps refining a recipient result after the call is terminal.
+
+    Observed live on 13 Sep 2026: `title_matches` read "yes" at the moment the
+    call completed and "unknown" about a minute later. The row was written
+    verified on the first read and was, by CALL-E's own later answer, partial.
+    """
+
+    def revising(self, first, second):
+        """A call that reaches a terminal state and then changes its answer."""
+        self.transport = FixtureTransport({
+            "create": {"id": "call_1", "status": "queued"},
+            "poll": [
+                {"status": "in_progress"},
+                completed_call(**first),
+                completed_call(**second),
+            ],
+        })
+
+    def test_a_revised_answer_routes_to_human_review(self):
+        self.revising(first={"title_matches": "yes"},
+                      second={"title_matches": UNKNOWN})
+        report = self.run_it(self.client([consented()]), settle_delay=1)
+        outcome = report.outcomes[0]
+        self.assertEqual(outcome.interpretation.disposition, Disposition.NEEDS_REVIEW)
+        self.assertIn("revised", outcome.interpretation.reason)
+        self.assertIn("title_matches", outcome.interpretation.reason)
+
+    def test_the_verified_row_is_not_written_on_a_revision(self):
+        """The exact live failure: verified on the first read, partial on the second."""
+        self.revising(first={"title_matches": "yes"},
+                      second={"title_matches": UNKNOWN})
+        client = self.client([consented()])
+        report = self.run_it(client, settle_delay=1)
+        self.assertNotEqual(report.outcomes[0].interpretation.disposition,
+                            Disposition.VERIFIED)
+        written = [w for u in client.writes for w in u]
+        self.assertTrue(written, "the row is still written, with the honest disposition")
+
+    def test_an_unchanged_answer_confirms_and_verifies(self):
+        """A second read that agrees costs one request and settles it."""
+        same = {"title_matches": "yes"}
+        self.revising(first=same, second=same)
+        report = self.run_it(self.client([consented()]), settle_delay=1)
+        self.assertEqual(report.outcomes[0].interpretation.disposition,
+                         Disposition.VERIFIED)
+
+    def test_settle_delay_zero_skips_the_confirmation(self):
+        """Opt out for a caller who wants the old single-read behaviour."""
+        self.revising(first={"title_matches": "yes"},
+                      second={"title_matches": UNKNOWN})
+        report = self.run_it(self.client([consented()]), settle_delay=0)
+        self.assertEqual(report.outcomes[0].interpretation.disposition,
+                         Disposition.VERIFIED)
+
+    def test_a_failed_confirmation_read_does_not_invent_a_verdict(self):
+        """If the second read raises, the first interpretation still stands."""
+        self.revising(first={"title_matches": "yes"}, second={"title_matches": "yes"})
+        original = self.transport.get_call
+        calls = {"n": 0}
+
+        def flaky(call_id):
+            calls["n"] += 1
+            if calls["n"] >= 3:
+                raise TransportError("network went away during confirmation")
+            return original(call_id)
+
+        self.transport.get_call = flaky
+        report = self.run_it(self.client([consented()]), settle_delay=1)
+        self.assertEqual(report.outcomes[0].interpretation.disposition,
+                         Disposition.VERIFIED)
 
 
 if __name__ == "__main__":

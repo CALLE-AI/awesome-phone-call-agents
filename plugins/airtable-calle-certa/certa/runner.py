@@ -58,6 +58,13 @@ DEFAULT_POLL_FIRST_DELAY = 60.0
 DEFAULT_POLL_INTERVAL = 8.0
 DEFAULT_POLL_TIMEOUT = 900.0
 
+# CALL-E keeps refining a recipient result after the call reaches a terminal
+# status. A live call read `title_matches: "yes"` at the moment it completed
+# and `"unknown"` a minute later, which is the difference between a verified
+# row and a partial one. So the first terminal read is confirmed rather than
+# trusted, and this is how long to wait before confirming it.
+DEFAULT_SETTLE_DELAY = 12.0
+
 
 class RunError(Exception):
     """A run could not be planned or executed."""
@@ -204,6 +211,7 @@ def _poll_to_terminal(
     first_delay: float,
     interval: float,
     timeout: float,
+    settle_delay: float,
     sleep: Callable[[float], None],
     now: Callable[[], float],
 ) -> tuple[dict[str, Any], Interpretation]:
@@ -221,7 +229,11 @@ def _poll_to_terminal(
         call = transport.get_call(call_id)
         result = interpret(call, derived, confidence_floor=confidence_floor)
         if result.is_terminal:
-            return call, result
+            return _confirm(
+                transport, call_id, derived, call, result,
+                confidence_floor=confidence_floor,
+                settle_delay=settle_delay, sleep=sleep,
+            )
         if now() >= deadline:
             return call, Interpretation(
                 Disposition.PENDING,
@@ -229,6 +241,62 @@ def _poll_to_terminal(
                 "events endpoint rather than redialing",
             )
         sleep(interval)
+
+
+def _confirm(
+    transport: Transport,
+    call_id: str,
+    derived: DerivedSchema,
+    call: dict[str, Any],
+    result: Interpretation,
+    *,
+    confidence_floor: float,
+    settle_delay: float,
+    sleep: Callable[[float], None],
+) -> tuple[dict[str, Any], Interpretation]:
+    """Read a terminal call a second time and refuse to guess if it moved.
+
+    CALL-E revises a recipient result after the call is terminal. Observed
+    live: `title_matches` read `"yes"` on completion and `"unknown"` shortly
+    after -- a verified row that should have been partial.
+
+    Neither read is knowably the final one, so this does not pick a winner.
+    A result that changed under us is one a person should look at, which is
+    the same fail-closed rule the rest of the interpreter follows. A second
+    read that agrees costs one request and settles the question.
+    """
+    if settle_delay <= 0:
+        return call, result
+
+    sleep(settle_delay)
+    try:
+        again = transport.get_call(call_id)
+    except Exception:  # noqa: BLE001 - a failed confirmation is not a verdict
+        return call, result
+
+    confirmed = interpret(again, derived, confidence_floor=confidence_floor)
+    if not confirmed.is_terminal:
+        return call, result
+
+    moved = sorted(
+        key for key in set(result.answers) | set(confirmed.answers)
+        if result.answers.get(key) != confirmed.answers.get(key)
+    )
+    if not moved:
+        return again, confirmed
+
+    changes = ", ".join(
+        f"{key} {result.answers.get(key)!r} -> {confirmed.answers.get(key)!r}"
+        for key in moved
+    )
+    return again, Interpretation(
+        Disposition.NEEDS_REVIEW,
+        f"CALL-E revised the result after the call was terminal ({changes}); "
+        "neither read is knowably final, so a person decides",
+        evidence=confirmed.evidence,
+        confidence=confirmed.confidence,
+        answers=confirmed.answers,
+    )
 
 
 def execute(
@@ -246,6 +314,7 @@ def execute(
     first_delay: float = DEFAULT_POLL_FIRST_DELAY,
     interval: float = DEFAULT_POLL_INTERVAL,
     timeout: float = DEFAULT_POLL_TIMEOUT,
+    settle_delay: float = DEFAULT_SETTLE_DELAY,
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.monotonic,
 ) -> RunReport:
@@ -296,6 +365,7 @@ def execute(
             first_delay=first_delay,
             interval=interval,
             timeout=timeout,
+            settle_delay=settle_delay,
             sleep=sleep,
             now=now,
         )
