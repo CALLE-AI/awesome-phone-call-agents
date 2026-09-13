@@ -12,7 +12,7 @@
  * @property {HTMLInputElement} live
  * @property {HTMLElement} liveCallNote
  * @property {HTMLInputElement} medicine
- * @property {HTMLSelectElement} strengthValue
+ * @property {HTMLInputElement} strengthValue
  * @property {HTMLSelectElement} strengthUnit
  * @property {HTMLSelectElement} dosageForm
  * @property {HTMLElement} hint
@@ -45,7 +45,7 @@ export const dom = {
   live: /** @type {HTMLInputElement} */ (document.querySelector("#live")),
   liveCallNote: document.querySelector("#live-call-note"),
   medicine: /** @type {HTMLInputElement} */ (document.querySelector("#medicine")),
-  strengthValue: /** @type {HTMLSelectElement} */ (document.querySelector("#strength-value")),
+  strengthValue: /** @type {HTMLInputElement} */ (document.querySelector("#strength-value")),
   strengthUnit: /** @type {HTMLSelectElement} */ (document.querySelector("#strength-unit")),
   dosageForm: /** @type {HTMLSelectElement} */ (document.querySelector("#dosage-form")),
   hint: document.querySelector("#hint"),

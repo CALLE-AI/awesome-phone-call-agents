@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 // ---------------------------------------------------------------------------
@@ -90,4 +91,10 @@ test("esc() handles empty string", () => {
 
 test("esc() does not escape single quotes (not in the map)", () => {
   assert.equal(esc("it's"), "it's");
+});
+
+test("strength value accepts a typed whole number instead of a preset list", async () => {
+  const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+  assert.match(html, /<input id="strength-value" type="number"[^>]*min="1"[^>]*step="1"/);
+  assert.doesNotMatch(html, /<select id="strength-value"/);
 });
