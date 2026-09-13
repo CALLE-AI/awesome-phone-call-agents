@@ -1,10 +1,11 @@
 # Evidence
 
-Twelve calls were placed against `api.heycall-e.com` on 2026-09-04, and their receipt files
-are **not in this directory and not on the evidence page either**. Twenty live calls are
-published in the entry now, because twelve more were placed on 2026-09-11; every count in
-this directory is over the 2026-09-04 twelve, which are the calls with receipts. This
-paragraph used to say they were on that page, and a reader who went looking found recordings.
+Twelve calls were placed against `api.heycall-e.com` on 2026-09-04 (eight of them recorded),
+and their receipt files are **not in this directory and not on the evidence page either**.
+Twenty live calls are published in the entry now (the eight recorded calls from 2026-09-04,
+plus twelve that connected on 2026-09-11); every count in this directory is over the 2026-09-04
+twelve, which are the calls with receipts. This paragraph used to say they were on that page,
+and a reader who went looking found recordings.
 
 What is published is the same material with the identifiers taken out. The
 [evidence page](https://firstbell-evidence.vercel.app) carries a shortened id for all twelve
