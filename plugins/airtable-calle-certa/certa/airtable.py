@@ -409,24 +409,24 @@ def base_definition(fields: FieldMap | None = None) -> dict[str, Any]:
                     text(fields.reason, "multilineText"),
                     text(fields.call_id),
                     select(
-                        "Reached employer", ["Yes", "No"],
+                        "Reached employer", ["Yes", "No", "Unknown"],
                         "Use yes only if a person at the employer spoke about "
                         "employment records. Use no if only an automated menu, a "
                         "voicemail, or a wrong department was reached.",
                     ),
                     select(
-                        "Employment confirmed", ["Yes", "No"],
+                        "Employment confirmed", ["Yes", "No", "Unknown"],
                         "Use yes only when the employer states the person "
                         "currently works there.",
                     ),
                     select(
-                        "Title matches", ["Yes", "No"],
+                        "Title matches", ["Yes", "No", "Unknown"],
                         "Use yes when the stated job title matches the "
                         "application. Use no when the employer names a different "
                         "title. Use unknown if they would not say.",
                     ),
                     select(
-                        "Declined to answer", ["Yes", "No"],
+                        "Declined to answer", ["Yes", "No", "Unknown"],
                         "Use yes when the employer refuses to confirm anything or "
                         "asks for a written request.",
                     ),

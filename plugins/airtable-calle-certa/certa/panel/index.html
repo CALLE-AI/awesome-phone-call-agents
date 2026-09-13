@@ -332,6 +332,19 @@ footer .bad { color: var(--stop); }
 }
 /* Phones. The console is a desktop tool, but an operator checking a run from
    a phone should not meet a three-line tagline wedged against a status chip. */
+.checkup { border: 1px solid var(--hair); border-radius: 20px; padding: 22px 24px; margin: 0 0 26px; background: var(--raised); }
+.checkup[data-ok="true"] { opacity: .82; }
+.checkup-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.checkup h2 { font: 300 19px/1.25 var(--display); letter-spacing: -.018em; margin: 0; }
+.checkup-sub { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; max-width: 62ch; }
+.checkup-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.checkup-list li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--surface); }
+.checkup-list li[data-s="problem"] { background: var(--stop-bg); }
+.checkup-list .mark { font: 600 13px/1.5 var(--mono); color: var(--ok); }
+.checkup-list li[data-s="problem"] .mark { color: var(--stop); }
+.checkup-list .col { font: 500 13.5px/1.5 var(--text); }
+.checkup-list .det { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.checkup-list .fix { font-size: 13px; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--stop-line); }
 @media (max-width: 620px) {
   .top { gap: 10px; padding: 22px 0 18px; }
   .top a span { display: none; }          /* tagline: the logo already says it */
@@ -367,6 +380,17 @@ footer .bad { color: var(--stop); }
     <div class="fig" id="fig-hidden"><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
     <div class="fig"><dt>Estimated</dt><dd id="m-cost">—</dd></div>
   </dl>
+
+  <!-- Table checkup. Configuration problems are the common failure, and the
+       expensive version is discovering one after a call has been paid for. -->
+  <section class="checkup" id="checkup" hidden>
+    <div class="checkup-head">
+      <h2 id="checkup-title">This table cannot run yet</h2>
+      <button class="quiet sm" id="checkup-toggle">Show all columns</button>
+    </div>
+    <p class="checkup-sub" id="checkup-sub"></p>
+    <ol class="checkup-list" id="checkup-list"></ol>
+  </section>
 
   <div class="notice" id="notice" hidden>
     <p id="notice-text"></p>
@@ -713,6 +737,38 @@ async function loadPlan() {
   catch (e) { say(e.message, true); $("planned").innerHTML = ""; }
 }
 
+/* Table checkup -------------------------------------------------------- */
+let CHECKUP_ALL = false;
+async function loadCheckup() {
+  let c;
+  try { c = await api("/api/checkup"); } catch (e) { return; }
+  const box = $("checkup");
+  if (!c.connected) { box.hidden = true; return; }
+  const problems = (c.findings || []).filter((f) => f.state === "problem");
+  const ok = problems.length === 0;
+  box.hidden = false;
+  box.dataset.ok = String(ok);
+  $("checkup-title").textContent = ok
+    ? "This table is ready"
+    : problems.length === 1 ? "One column needs a change" : `${problems.length} columns need a change`;
+  $("checkup-sub").textContent = ok
+    ? "Every column Certa reads or writes is present and can hold the answers CALL-E gives."
+    : "Fix these before running. Each one would otherwise fail after a call has been placed and paid for.";
+  $("checkup-toggle").textContent = CHECKUP_ALL ? "Show only problems" : "Show all columns";
+  $("checkup-toggle").hidden = ok && !CHECKUP_ALL ? false : false;
+  const rows = CHECKUP_ALL ? c.findings : (ok ? [] : problems);
+  $("checkup-list").innerHTML = rows.map((f) => `
+    <li data-s="${f.state}">
+      <span class="mark">${f.state === "problem" ? "\u2715" : "\u2713"}</span>
+      <div>
+        <div class="col">${esc(f.column)}</div>
+        <div class="det">${esc(f.detail)}</div>
+        ${f.fix ? `<div class="fix">${esc(f.fix)}</div>` : ""}
+      </div>
+    </li>`).join("");
+}
+$("checkup-toggle").addEventListener("click", () => { CHECKUP_ALL = !CHECKUP_ALL; loadCheckup(); });
+
 async function loadAudit() {
   try {
     const a = await api("/api/audit");
@@ -775,6 +831,7 @@ $("run").addEventListener("click", async () => {
   try {
     renderConfig(await api("/api/config"));
     await loadPlan();
+    await loadCheckup();
     await loadAudit();
   } catch (e) {
     say(e.message + " — open the URL printed when Certa started; it carries the access token.", true);

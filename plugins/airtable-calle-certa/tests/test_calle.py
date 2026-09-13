@@ -47,10 +47,10 @@ def columns():
         }
 
     return [
-        sel("Reached employer", ["Yes", "No"]),
-        sel("Employment confirmed", ["Yes", "No"]),
-        sel("Title matches", ["Yes", "No"]),
-        sel("Declined to answer", ["Yes", "No"]),
+        sel("Reached employer", ["Yes", "No", "Unknown"]),
+        sel("Employment confirmed", ["Yes", "No", "Unknown"]),
+        sel("Title matches", ["Yes", "No", "Unknown"]),
+        sel("Declined to answer", ["Yes", "No", "Unknown"]),
     ]
 
 

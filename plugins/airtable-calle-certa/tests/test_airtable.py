@@ -47,10 +47,10 @@ SCHEMA = [
     {"name": FIELDS.status, "type": "singleLineText"},
     {"name": FIELDS.reason, "type": "multilineText"},
     {"name": FIELDS.call_id, "type": "singleLineText"},
-    sel("Reached employer", ["Yes", "No"]),
-    sel("Employment confirmed", ["Yes", "No"], "Use yes only if HR states it."),
-    sel("Title matches", ["Yes", "No"]),
-    sel("Declined to answer", ["Yes", "No"]),
+    sel("Reached employer", ["Yes", "No", "Unknown"]),
+    sel("Employment confirmed", ["Yes", "No", "Unknown"], "Use yes only if HR states it."),
+    sel("Title matches", ["Yes", "No", "Unknown"]),
+    sel("Declined to answer", ["Yes", "No", "Unknown"]),
 ]
 
 
@@ -87,7 +87,7 @@ class AnswerColumns(unittest.TestCase):
 
     def test_adding_a_column_adds_a_schema_field(self):
         """The whole idea: a new question is a new column, not new code."""
-        extended = SCHEMA + [sel("Still employed today", ["Yes", "No"])]
+        extended = SCHEMA + [sel("Still employed today", ["Yes", "No", "Unknown"])]
         derived = derive_recipient_schema(answer_columns(extended, FIELDS))
         self.assertIn("still_employed_today", derived.schema["properties"])
 

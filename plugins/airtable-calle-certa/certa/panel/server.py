@@ -43,6 +43,7 @@ from ..airtable import (
 )
 from ..grant import GrantError, grant_consent, revoke_consent
 from ..audit import AuditLog
+from ..checkup import check_table
 from ..runner import RunError, execute, plan
 from ..mcp import McpTransport
 from ..transport import FixtureTransport, LiveTransport, TransportError
@@ -388,6 +389,28 @@ class Panel:
         self.reconfigure()
         return self.config_json()
 
+    def checkup(self) -> dict[str, Any]:
+        """Whether the connected table can run, and what to change if not.
+
+        Reads schema only. Places no calls and writes nothing, so it is safe
+        to run before anything is configured.
+        """
+        if not self.client:
+            return {"connected": False, "runnable": False, "findings": []}
+        try:
+            result = check_table(self.client.table_schema(self.table))
+        except Exception as exc:  # noqa: BLE001 - surfaced to the operator
+            return {"connected": True, "runnable": False, "error": str(exc), "findings": []}
+        return {
+            "connected": True,
+            "runnable": result.runnable,
+            "table": self.table,
+            "findings": [
+                {"column": f.column, "state": f.state, "detail": f.detail, "fix": f.fix}
+                for f in result.findings
+            ],
+        }
+
     def audit_status(self) -> dict[str, Any]:
         status = self.audit.verify_chain()
         return {
@@ -460,6 +483,9 @@ def make_handler(panel: Panel):
                     return self._send(200, panel.plan(view))
                 if parts.path == "/api/status":
                     return self._send(200, panel.state.snapshot())
+                if parts.path == "/api/checkup":
+                    return self._send(200, panel.checkup())
+
                 if parts.path == "/api/audit":
                     return self._send(200, panel.audit_status())
                 if parts.path == "/api/config":

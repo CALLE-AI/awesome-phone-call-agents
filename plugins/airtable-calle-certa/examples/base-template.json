@@ -81,6 +81,9 @@
           {
             "id": "sel1",
             "name": "No"
+          },
+          {
+            "name": "Unknown"
           }
         ]
       }
@@ -98,6 +101,9 @@
           {
             "id": "sel1",
             "name": "No"
+          },
+          {
+            "name": "Unknown"
           }
         ]
       }
@@ -115,6 +121,9 @@
           {
             "id": "sel1",
             "name": "No"
+          },
+          {
+            "name": "Unknown"
           }
         ]
       }
@@ -132,6 +141,9 @@
           {
             "id": "sel1",
             "name": "No"
+          },
+          {
+            "name": "Unknown"
           }
         ]
       }
@@ -141,6 +153,7 @@
     "Answer fields are anything Certa does not own. Adding a single select here adds a field to CALL-E's recipient_result_schema; its choices become the enum and its description becomes the instruction the extraction model reads.",
     "One answer field must map to `reached_employer`. Nothing is reported as verified without it, because CALL-E can return task_completed true when setup fails before dialing (CALL-E issue #341).",
     "`Number source` must be one of official_site, business_registry, directory, known_employer_record. There is deliberately no value for the number written on the application.",
-    "`Number on application` is stored for the record and comparison only. No code path converts it into a dialable number."
+    "`Number on application` is stored for the record and comparison only. No code path converts it into a dialable number.",
+    "Every answer single select must include an Unknown choice. CALL-E answers `unknown` when it cannot establish a fact, and a column that cannot store that value turns a successful call into a failed write."
   ]
 }

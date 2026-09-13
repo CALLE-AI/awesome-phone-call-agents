@@ -22,24 +22,26 @@ def select(name: str, choices: list[str], description: str = "") -> dict:
     }
 
 
-GATE = select("Reached employer", ["Yes", "No"])
+GATE = select("Reached employer", ["Yes", "No", "Unknown"])
 
 
 class Derivation(unittest.TestCase):
     def test_single_select_choices_become_the_enum(self):
         derived = derive_recipient_schema(
-            [GATE, select("Employment confirmed", ["Yes", "No"])]
+            [GATE, select("Employment confirmed", ["Yes", "No", "Unknown"])]
         )
         prop = derived.schema["properties"]["employment_confirmed"]
         self.assertEqual(prop["type"], "string")
         self.assertEqual(prop["enum"], ["yes", "no", UNKNOWN])
 
-    def test_unknown_is_always_appended(self):
+    def test_unknown_is_appended_last(self):
+        """Whatever the other choices are, `unknown` is the final enum value."""
         derived = derive_recipient_schema(
-            [GATE, select("Tenure matches", ["Matches", "Does not match"])]
+            [GATE, select("Tenure matches", ["Matches", "Does not match", "Unknown"])]
         )
         self.assertEqual(
-            derived.schema["properties"]["tenure_matches"]["enum"][-1], UNKNOWN
+            derived.schema["properties"]["tenure_matches"]["enum"],
+            ["matches", "does_not_match", UNKNOWN],
         )
 
     def test_unknown_is_not_duplicated_when_the_operator_modelled_it(self):
@@ -52,20 +54,54 @@ class Derivation(unittest.TestCase):
     def test_column_description_becomes_the_extraction_instruction(self):
         instruction = "Use yes only when HR states the title verbatim."
         derived = derive_recipient_schema(
-            [GATE, select("Title matches", ["Yes", "No"], instruction)]
+            [GATE, select("Title matches", ["Yes", "No", "Unknown"], instruction)]
         )
         self.assertEqual(
             derived.schema["properties"]["title_matches"]["description"], instruction
         )
 
-    def test_checkbox_becomes_a_string_enum_not_a_boolean(self):
-        """CALL-E's docs ask for enums with an unknown value, not booleans."""
+    def test_checkbox_answer_column_is_refused(self):
+        """A checkbox has two states; CALL-E answers with three.
+
+        Recording "HR would not tell me" as an unticked box is the exact
+        misrepresentation this product exists to prevent, so the column is
+        refused at setup with the fix named rather than written wrongly
+        after a call has been paid for.
+        """
+        with self.assertRaises(SchemaError) as caught:
+            derive_recipient_schema(
+                [GATE, {"name": "Declined to answer", "type": "checkbox", "options": {}}]
+            )
+        message = str(caught.exception)
+        self.assertIn("single select", message)
+        self.assertIn("Unknown", message)
+
+    def test_select_without_an_unknown_choice_is_refused(self):
+        """The live failure: CALL-E returned `unknown`, Airtable rejected the write."""
+        with self.assertRaises(SchemaError) as caught:
+            derive_recipient_schema(
+                [GATE, select("Title matches", ["Yes", "No"])]
+            )
+        self.assertIn("Unknown", str(caught.exception))
+
+    def test_the_choice_must_be_named_unknown_not_a_synonym(self):
+        """Deliberately literal.
+
+        "Not stated" and "Unclear" read as unknown to a person but are just
+        other choices to the writeback, which would then fail exactly as it
+        did live. The error names the one spelling that works rather than
+        guessing at synonyms.
+        """
+        with self.assertRaises(SchemaError):
+            derive_recipient_schema(
+                [GATE, select("Title matches", ["Yes", "No", "Not stated"])]
+            )
+
+    def test_the_unknown_choices_label_is_kept_for_writeback(self):
         derived = derive_recipient_schema(
-            [GATE, {"name": "Declined to answer", "type": "checkbox", "options": {}}]
+            [GATE, select("Title matches", ["Yes", "No", "Unknown"])]
         )
-        prop = derived.schema["properties"]["declined_to_answer"]
-        self.assertEqual(prop["type"], "string")
-        self.assertIn(UNKNOWN, prop["enum"])
+        self.assertEqual(derived.choice_labels[("title_matches", UNKNOWN)], "Unknown")
 
     def test_number_precision_selects_integer_or_number(self):
         derived = derive_recipient_schema(
@@ -87,7 +123,7 @@ class Derivation(unittest.TestCase):
 
     def test_writeback_map_survives_derivation(self):
         derived = derive_recipient_schema(
-            [GATE, select("Employment confirmed", ["Yes", "No"])]
+            [GATE, select("Employment confirmed", ["Yes", "No", "Unknown"])]
         )
         self.assertEqual(
             derived.field_names["employment_confirmed"], "Employment confirmed"
@@ -101,7 +137,7 @@ class OnlySupportedFeatures(unittest.TestCase):
     """CALL-E documents which schema features it supports. Emit only those."""
 
     def test_schema_is_strict_and_flat(self):
-        derived = derive_recipient_schema([GATE, select("Title matches", ["Yes", "No"])])
+        derived = derive_recipient_schema([GATE, select("Title matches", ["Yes", "No", "Unknown"])])
         self.assertEqual(derived.schema["additionalProperties"], False)
         self.assertEqual(derived.schema["type"], "object")
         self.assertCountEqual(
@@ -109,7 +145,7 @@ class OnlySupportedFeatures(unittest.TestCase):
         )
 
     def test_never_emits_unsupported_keywords(self):
-        derived = derive_recipient_schema([GATE, select("Title matches", ["Yes", "No"])])
+        derived = derive_recipient_schema([GATE, select("Title matches", ["Yes", "No", "Unknown"])])
         rendered = repr(derived.schema)
         for unsupported in ("$ref", "oneOf", "anyOf", "allOf"):
             self.assertNotIn(unsupported, rendered)
@@ -117,7 +153,7 @@ class OnlySupportedFeatures(unittest.TestCase):
     def test_reserved_recipient_keys_are_refused_with_a_rename(self):
         for reserved in ("Summary", "Status", "Transcript", "Call id"):
             with self.assertRaises(SchemaError) as ctx:
-                derive_recipient_schema([GATE, select(reserved, ["Yes", "No"])])
+                derive_recipient_schema([GATE, select(reserved, ["Yes", "No", "Unknown"])])
             self.assertIn("reserve", str(ctx.exception).lower())
 
     def test_reserved_set_matches_the_documented_names(self):
@@ -130,7 +166,7 @@ class ContactGate(unittest.TestCase):
 
     def test_schema_without_the_gate_is_refused(self):
         with self.assertRaises(SchemaError) as ctx:
-            derive_recipient_schema([select("Employment confirmed", ["Yes", "No"])])
+            derive_recipient_schema([select("Employment confirmed", ["Yes", "No", "Unknown"])])
         self.assertIn(CONTACT_GATE_KEY, str(ctx.exception))
 
     def test_gate_must_be_able_to_answer_yes(self):

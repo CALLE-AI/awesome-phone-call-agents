@@ -102,11 +102,16 @@ def _enum_property(
 ) -> tuple[dict[str, Any], dict[tuple[str, str], str]]:
     values: list[str] = []
     labels: dict[tuple[str, str], str] = {}
+    has_unknown = False
     for choice in choices:
         label = choice.get("name", "")
         value = slug(label)
         if value == UNKNOWN:
-            # The operator already modelled it; do not duplicate.
+            # The operator already modelled it. Keep their spelling for the
+            # writeback ("Unknown", "Not stated", …) but do not duplicate the
+            # enum value.
+            has_unknown = True
+            labels[(key, UNKNOWN)] = label
             continue
         if value in values:
             raise SchemaError(
@@ -117,6 +122,17 @@ def _enum_property(
         labels[(key, value)] = label
     if not values:
         raise SchemaError(f"column {column.get('name')!r} has no choices")
+    if not has_unknown:
+        # CALL-E is told to answer `unknown` whenever it cannot establish a
+        # fact, so it will. A select that cannot hold that value turns a
+        # successful call into a failed write, and the operator discovers it
+        # only after paying for the call. Refused here, with the fix named.
+        raise SchemaError(
+            f"column {column.get('name')!r} has no choice for an unclear "
+            f"answer. Add a choice named \"Unknown\" to it. CALL-E answers "
+            f"`unknown` when it cannot establish a fact -- if this column "
+            f"cannot store that, the call succeeds and the write fails."
+        )
     values.append(UNKNOWN)
     prop: dict[str, Any] = {"type": "string", "enum": values}
     return prop, labels
@@ -159,11 +175,16 @@ def derive_recipient_schema(columns: list[dict[str, Any]]) -> DerivedSchema:
             )
             labels.update(choice_labels)
         elif kind == "checkbox":
-            # Deliberately not a boolean: CALL-E's docs ask for a string enum
-            # with an `unknown` value wherever the answer may be unclear, and
-            # "did HR confirm the title" is exactly that kind of question.
-            prop = {"type": "string", "enum": ["yes", "no", UNKNOWN]}
-            labels.update({(key, "yes"): "true", (key, "no"): "false"})
+            # A checkbox has two states, and CALL-E answers with three. Ticked
+            # and unticked cannot say "HR would not tell me", and writing that
+            # answer as unticked is the exact misrepresentation this product
+            # exists to prevent -- an unverified fact recorded as a negative.
+            raise SchemaError(
+                f"column {raw_name!r} is a checkbox, which has no way to record "
+                "an unclear answer. Change it to a single select with choices "
+                "Yes, No and Unknown. CALL-E answers `unknown` when it cannot "
+                "establish a fact, and a checkbox would record that as 'no'."
+            )
         elif kind == "number":
             precision = int(options.get("precision", 0) or 0)
             prop = {"type": "integer" if precision == 0 else "number"}
