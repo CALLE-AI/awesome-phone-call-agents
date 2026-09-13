@@ -10,7 +10,7 @@ week, surveyed from pharmacy invoices, and you can read it yourself:
 
 ```
 CMS NADAC, METFORMIN HCL 500 MG TABLET: $0.01419 per each, effective 2026-08-19.
-https://data.medicaid.gov/dataset/dfa2ab14-06c2-457a-9e36-5cb6d80f8d93
+https://data.medicaid.gov/dataset/fbb83258-11c7-47f5-8b18-5f8e79f7e704
 ```
 
 What *you* pay is a different number. It is different at every pharmacy, it changes, and
