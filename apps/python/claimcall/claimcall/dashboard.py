@@ -17,7 +17,20 @@ from . import engine
 from .analysis import analyze_case
 from .calle_client import LOOPBACK_HOSTS, OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer
 from .call_plan import build_plan, build_task
-from .models import Store, mask_phone
+from .models import Store, mask_phone, new_case
+
+
+def seed_demo_case(store: Store, app_dir: str) -> Dict[str, Any]:
+    """Create the synthetic demo case. Only when none exists; never overwrites."""
+    if store.exists():
+        raise KeyError("a case already exists")
+    with open(os.path.join(app_dir, "examples", "demo-case.json"), "r", encoding="utf-8") as f:
+        seed = json.load(f)
+    seed.pop("synthetic", None)
+    seed.pop("note", None)
+    case = new_case(**seed)
+    store.save(case)
+    return case
 
 
 def _host_is_loopback(host_header: str) -> bool:
@@ -82,7 +95,8 @@ small.mut{color:#64748b}
 let S=null;
 const HDR={'content-type':'application/json','x-claimcall':'dashboard'};
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-async function load(){S=await fetch('/api/state').then(r=>r.json());render()}
+async function load(){const r=await fetch('/api/state');if(r.status===404){document.querySelector('main').innerHTML=`<div class="card"><h2>No case yet</h2><p>SYNTHETIC DEMO — NOT A REAL BOOKING.</p><button onclick="seed()">Load synthetic demo case</button></div>`;return}S=await r.json();render()}
+async function seed(){await fetch('/api/init-demo',{method:'POST',headers:HDR});location.reload()}
 function render(){
  const c=S.case;
  document.getElementById('case').innerHTML=`<b>${esc(c.passenger_name)}</b> | ${esc(c.airline)} ${esc(c.flight_no)} ${esc(c.origin)} &rarr; ${esc(c.destination)} | booking ${esc(c.booking_ref)} | <b>${esc(c.flight_status)}</b> <span class="tag ${esc(c.status)}">${esc(c.status.replace(/_/g,' '))}</span><br><small class="mut">Airline line ${esc(c.hotline_masked)} (${esc(c.region)})</small>`;
@@ -189,7 +203,14 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
         def do_POST(self) -> None:
             if not self._guard(True):
                 return
-            if urlparse(self.path).path != "/api/run":
+            path = urlparse(self.path).path
+            if path == "/api/init-demo":
+                try:
+                    seed_demo_case(store, app_dir)
+                except KeyError:
+                    return self._json(409, {"error": "a case already exists"})
+                return self._json(200, {"ok": True})
+            if path != "/api/run":
                 return self._json(404, {"error": "not found"})
             length = int(self.headers.get("Content-Length", "0"))
             try:

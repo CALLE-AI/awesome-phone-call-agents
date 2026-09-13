@@ -284,3 +284,57 @@ def test_live_override_bad_number_refused(client):
         res = engine.run(make_case(), "live", client=client, approved=True,
                          allowlist="", api_key_present=True, live_destination=bad)
         assert res["placed"] is False, bad
+
+
+# ---- dashboard seeds its own demo case ------------------------------------------------------
+
+def test_dashboard_seeds_demo_case_over_http():
+    import subprocess
+    import sys
+    import tempfile
+    import time
+    import urllib.error
+    import urllib.request
+
+    port = 18766
+    base = f"http://127.0.0.1:{port}"
+
+    def get(path):
+        try:
+            with urllib.request.urlopen(base + path, timeout=2) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            return e.code, json.load(e)
+
+    def post(path):
+        req = urllib.request.Request(base + path, data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json", "X-ClaimCall": "dashboard"})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            return e.code, json.load(e)
+
+    with tempfile.TemporaryDirectory() as data:
+        proc = subprocess.Popen([sys.executable, "-m", "claimcall", "--data", data, "serve", "--port", str(port)],
+                                cwd=APP, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline = time.time() + 20
+            while True:
+                try:
+                    urllib.request.urlopen(base + "/", timeout=2).read()
+                    break
+                except Exception:
+                    if proc.poll() is not None:
+                        pytest.fail("dashboard exited during startup")
+                    if time.time() > deadline:
+                        pytest.fail("dashboard did not start")
+                    time.sleep(0.2)
+            assert get("/api/state")[0] == 404
+            assert post("/api/init-demo")[0] == 200
+            status, state = get("/api/state")
+            assert status == 200
+            assert state["case"]["passenger_name"] == "Santee Cooper"
+            assert post("/api/init-demo")[0] == 409  # never overwrites
+        finally:
+            proc.terminate()

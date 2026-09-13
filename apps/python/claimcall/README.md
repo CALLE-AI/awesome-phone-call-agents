@@ -49,9 +49,11 @@ For recording the demo video. Start clean:
 ```bash
 cd apps/python/claimcall
 rm -rf ./data
-python3 -m claimcall --data ./data init-demo
 python3 -m claimcall --data ./data serve   # open http://127.0.0.1:8766
 ```
+
+Click **Load synthetic demo case** in the dashboard (or `init-demo` on the CLI for the
+same seed). Then follow the table.
 
 | Time | Show | Where |
 | --- | --- | --- |
