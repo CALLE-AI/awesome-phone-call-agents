@@ -6,18 +6,21 @@ CALL-E, and get a structured yes/no (plus any alternate time) back.
 
 Usage
 -----
-    # Preview only — validates the number and shows exactly what would be
-    # sent. Makes NO network call and places NO real call.
-    python confirm_call.py --task "Confirm the 10am appointment tomorrow" \\
-        --phone +12025550123 --region US --dry-run
-
-    # Place the real call (prompts for an explicit typed confirmation
-    # first, since this has a real-world side effect):
+    # Preview is the DEFAULT — validates the number and shows exactly what
+    # would be sent. Makes NO network call and places NO real call, with
+    # or without --dry-run. This is intentional: a tool that can trigger a
+    # real phone call should never do so unless explicitly told to.
     python confirm_call.py --task "Confirm the 10am appointment tomorrow" \\
         --phone +12025550123 --region US
 
-    # Skip the interactive prompt (e.g. for scripting/CI):
-    python confirm_call.py --task "..." --phone +1... --region US --yes
+    # Place the real call: requires --live AND a per-run assertion that
+    # you are authorizing that exact E.164 number (typed interactively, or
+    # passed via --authorize for scripting/CI — it must match --phone
+    # exactly, digit for digit, or the run refuses).
+    python confirm_call.py --task "Confirm the 10am appointment tomorrow" \\
+        --phone +12025550123 --region US --live
+    python confirm_call.py --task "..." --phone +12025550123 --region US \\
+        --live --authorize +12025550123 --yes   # scripting/CI, no prompt
 
     # Check a call you already placed, instead of placing a new one:
     python confirm_call.py --check call_abc123
@@ -57,16 +60,6 @@ _DEFAULT_RESULT_SCHEMA = {
     },
     "required": ["confirmed"],
 }
-
-
-def _mask(phone: str) -> str:
-    """Mask everything but the last 3 digits, for anything printed to a
-    shared terminal/log — the destination is only fully shown in the
-    interactive confirmation prompt itself."""
-    digits_only = "".join(c for c in phone if c.isdigit())
-    if len(digits_only) <= 3:
-        return phone
-    return phone[: -len(digits_only) or None] + "*" * (len(digits_only) - 3) + digits_only[-3:]
 
 
 def _load_recent_calls() -> dict:
@@ -118,14 +111,18 @@ def cmd_place(args: argparse.Namespace) -> int:
     phone_digits = "".join(c for c in phone if c.isdigit())
 
     print("=== Call preview ===")
-    print(f"  Recipient : {_mask(phone)}")
+    print(f"  Recipient : {calle.mask_phone(phone)}")
     print(f"  Region    : {args.region}")
     print(f"  Task      : {args.task}")
     print(f"  Result schema: confirmed (bool), reason, alternate_time_requested")
     print()
 
-    if args.dry_run:
-        print("Dry run only — no network request was made, no call was placed.")
+    # Preview/no-call is the default. --live is a separate, explicit,
+    # affirmative opt-in — the tool never places a real call just because
+    # --dry-run was left off.
+    if not args.live:
+        print("No-call preview mode (default) — no network request was made, "
+              "no call was placed. Pass --live to actually place this call.")
         return 0
 
     if not args.force:
@@ -134,11 +131,40 @@ def cmd_place(args: argparse.Namespace) -> int:
             print(f"Skipped: {dup}", file=sys.stderr)
             return 1
 
-    if not args.yes:
+    # A per-run assertion that this exact E.164 destination is authorized,
+    # required in addition to --live. Interactively this is a typed
+    # read-back of the number; for scripted/CI use, --authorize must be
+    # supplied and must match --phone's normalized form exactly — --yes
+    # alone is never sufficient to fire a real call.
+    if args.authorize is not None:
+        try:
+            authorized = calle.normalize_phone(args.authorize, args.region)
+        except calle.CallEError as e:
+            print(f"Error: --authorize is not a valid number: {e}", file=sys.stderr)
+            return 1
+        if authorized != phone:
+            print(
+                f"Refusing to place the call: --authorize ({calle.mask_phone(authorized)}) "
+                f"does not exactly match --phone ({calle.mask_phone(phone)}).",
+                file=sys.stderr,
+            )
+            return 1
+    elif args.yes:
+        print(
+            "Error: --live with --yes (no interactive prompt) also requires "
+            "--authorize <exact phone> as a per-run assertion of the destination.",
+            file=sys.stderr,
+        )
+        return 1
+    else:
         print(f"This will place a REAL phone call to {phone}.")
-        confirm = input("Type YES to proceed: ").strip()
-        if confirm != "YES":
-            print("Not placed — confirmation not received.")
+        typed = input("Type the exact number above to authorize this call: ").strip()
+        try:
+            typed_normalized = calle.normalize_phone(typed, args.region)
+        except calle.CallEError:
+            typed_normalized = None
+        if typed_normalized != phone:
+            print("Not placed — the number you typed didn't match. No call was made.")
             return 1
 
     idempotency_key = calle.new_idempotency_key()
@@ -148,7 +174,7 @@ def cmd_place(args: argparse.Namespace) -> int:
             phone=phone,
             region=args.region,
             locale=args.locale,
-            result_schema=None if args.no_schema else _DEFAULT_RESULT_SCHEMA,
+            recipient_result_schema=None if args.no_schema else _DEFAULT_RESULT_SCHEMA,
             idempotency_key=idempotency_key,
         )
     except calle.CallEError as e:
@@ -161,7 +187,7 @@ def cmd_place(args: argparse.Namespace) -> int:
         return 1
 
     _save_recent_call(phone_digits, call_id)
-    print(f"Call placed. call_id = {call_id}")
+    print(f"Call placed to {calle.mask_phone(phone)}. call_id = {call_id}")
 
     if args.no_wait:
         print(f"Not waiting for completion — check later with:\n  python confirm_call.py --check {call_id}")
@@ -180,8 +206,10 @@ def main() -> int:
     parser.add_argument("--phone", help="Recipient phone number (E.164 preferred, e.g. +12025550123).")
     parser.add_argument("--region", default="US", help="Recipient region code CALL-E supports (default: US).")
     parser.add_argument("--locale", default=None, help="Spoken language/locale, e.g. en-IN.")
-    parser.add_argument("--dry-run", action="store_true", help="Validate and preview only — no call is placed.")
-    parser.add_argument("--yes", action="store_true", help="Skip the interactive typed confirmation prompt.")
+    parser.add_argument("--dry-run", action="store_true", help="No-op flag kept for backward compatibility — preview/no-call is already the default; see --live.")
+    parser.add_argument("--live", action="store_true", help="Required to actually place a real call. Without this, the tool only previews (this is the default).")
+    parser.add_argument("--authorize", metavar="PHONE", default=None, help="Exact E.164 number you're authorizing this run to call — must match --phone exactly. Required with --live --yes; otherwise you'll be prompted interactively instead.")
+    parser.add_argument("--yes", action="store_true", help="Skip the interactive typed confirmation prompt (requires --authorize).")
     parser.add_argument("--force", action="store_true", help="Bypass the duplicate-call guard.")
     parser.add_argument("--no-wait", action="store_true", help="Return immediately after placing the call instead of polling for the result.")
     parser.add_argument("--no-schema", action="store_true", help="Don't request a structured result — just a free-text summary.")

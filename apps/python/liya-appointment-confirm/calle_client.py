@@ -14,7 +14,6 @@ a single outbound call to confirm an appointment, then reports the result).
 """
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import os
 import time
@@ -109,7 +108,7 @@ def _headers(api_key: str, idempotency_key: str) -> dict:
 
 
 def create_call(task: str, phone: str, region: str, locale: Optional[str],
-                 result_schema: Optional[dict], idempotency_key: str) -> dict:
+                 recipient_result_schema: Optional[dict], idempotency_key: str) -> dict:
     api_key = get_api_key()
     base_url = get_base_url()
 
@@ -120,8 +119,16 @@ def create_call(task: str, phone: str, region: str, locale: Optional[str],
         recipient["locale"] = locale
 
     payload: dict = {"task": task, "recipients": [recipient]}
-    if result_schema:
-        payload["result_schema"] = result_schema
+    if recipient_result_schema:
+        # Per CALL-E's documented Calls API (see calle-ai SDK quickstart):
+        # `result_schema` aggregates a structured result across the whole
+        # call (all recipients combined) — meaningless for a single-
+        # recipient call and never populated here. The individual
+        # recipient's answer is `recipient_result_schema`, read back per-
+        # recipient at recipients[i].structured_result. Sending the wrong
+        # field is why structured_result previously came back null even
+        # on a fully successful call.
+        payload["recipient_result_schema"] = recipient_result_schema
 
     try:
         resp = requests.post(
@@ -192,68 +199,65 @@ def poll_until_done(call_id: str, timeout_seconds: int = 180) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Result summarization + sharper failure diagnosis
+# Result summarization
 # ---------------------------------------------------------------------------
-def _parse_calle_timestamp(ts: str):
-    if not ts:
+def mask_phone(phone: str) -> str:
+    """Mask everything but the last 3 digits. Used everywhere a phone
+    number reaches a terminal/log after the call is placed — the full
+    number is only ever shown in the interactive live-call prompt itself,
+    never in a summary, dry-run preview, or --check output."""
+    if not phone:
+        return phone
+    digits_only = "".join(c for c in phone if c.isdigit())
+    if len(digits_only) <= 3:
+        return phone
+    prefix = phone[: -len(digits_only)] if len(digits_only) else phone
+    return prefix + "*" * (len(digits_only) - 3) + digits_only[-3:]
+
+
+def _recipient_structured_result(call: dict) -> Optional[dict]:
+    """Per CALL-E's documented Calls API, a single-recipient call's answer
+    lives at recipients[0].structured_result (populated from the
+    recipient_result_schema sent on create), not the call-level
+    structured_result field (which aggregates across multiple recipients
+    and is never populated for a call with only one)."""
+    recipients = call.get("recipients") or []
+    if not recipients:
         return None
-    ts = ts.rstrip("Z")
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            return _dt.datetime.strptime(ts, fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def diagnose_failure(call: dict) -> Optional[str]:
-    """CALL-E's generic 'may be busy, try again later' summary can hide a
-    much sharper signal: if an attempt ended in a second or two with a
-    carrier-level failure_code, that's not a busy/no-answer signal (those
-    take several seconds of ringing first) — it means the number itself
-    couldn't be reached at all (wrong digit, disconnected, not a real
-    line)."""
-    for recipient in (call.get("recipients") or []):
-        for attempt in (recipient.get("attempts") or []):
-            code = str(attempt.get("failure_code") or "").strip()
-            if not code:
-                continue
-            started = _parse_calle_timestamp(attempt.get("started_at", ""))
-            completed = _parse_calle_timestamp(attempt.get("completed_at", ""))
-            duration = (completed - started).total_seconds() if started and completed else None
-            if duration is not None and duration < 2:
-                phone = (recipient.get("phones") or [""])[0]
-                return (
-                    f"Heads up: that attempt to {phone or 'the recipient'} ended in "
-                    f"under {max(duration, 0):.0f}s with carrier failure code {code} — "
-                    f"too fast for the phone to have even rung. That pattern almost "
-                    f"always means the number itself couldn't be reached at all (a "
-                    f"typo'd digit, disconnected, or not a real line), not that the "
-                    f"recipient was busy or unavailable."
-                )
-    return None
+    r0 = recipients[0]
+    return r0.get("structured_result") or r0.get("structuredResult")
 
 
 def summarize(call: dict) -> str:
     status = str(call.get("status", "unknown"))
     call_id = call.get("id", "")
-    structured = call.get("structured_result") or call.get("structuredResult")
+    structured = _recipient_structured_result(call)
     summary = call.get("summary") or call.get("result_summary")
     phone = ""
     recipients = call.get("recipients") or []
     if recipients:
         phone = (recipients[0].get("phones") or [""])[0]
 
-    lines = [f"CALL-E call {call_id} to {phone}: {status}."]
+    lines = [f"CALL-E call {call_id} to {mask_phone(phone)}: {status}."]
 
     if call.get("_timed_out"):
         lines.append(f"Still running past the wait window — check back with call id {call_id}.")
         return " ".join(lines)
 
     if status.lower() in {"failed", "canceled", "cancelled", "error"}:
-        diagnosis = diagnose_failure(call)
-        if diagnosis:
-            lines.append(diagnosis)
+        # Report only what CALL-E's response actually documents for a
+        # failed attempt — a failure_code and its stated meaning, if any.
+        # We deliberately do not infer what a fast failure or a specific
+        # code "usually means" (e.g. unreachable vs. busy): CALL-E's API
+        # doesn't document that inference as reliable, so asserting it
+        # here would be an unsupported claim dressed up as a diagnosis.
+        for recipient in recipients:
+            for attempt in (recipient.get("attempts") or []):
+                code = str(attempt.get("failure_code") or "").strip()
+                reason = str(attempt.get("failure_reason") or "").strip()
+                if code or reason:
+                    detail = " ".join(p for p in (code, reason) if p)
+                    lines.append(f"CALL-E reported failure detail: {detail}.")
 
     if summary:
         lines.append(str(summary))
