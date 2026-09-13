@@ -40,7 +40,7 @@ export PORT="8787"
 python bridge.py
 ```
 
-Credential-bearing requests are pinned to the approved CALL-E origin, `https://api.heycall-e.com`. The bridge does not accept an environment override for that origin. Tests inject a transport function and never weaken this origin check.
+Credential-bearing requests are pinned to the approved CALL-E origin, `https://api.heycall-e.com`. The bridge does not accept an environment override for that origin. The HTTP boundary rechecks this origin whenever an Authorization header is present, and redirects are rejected rather than forwarding credentials or Slack result bodies. Tests inject fake transports and never weaken the origin check.
 
 Health probe:
 
@@ -77,7 +77,9 @@ The bridge never returns a full transcript or recording URL to Slack.
 
 ## Idempotency and retries
 
-The CALL-E `Idempotency-Key` is derived from the signed Slack team, channel, user, trigger, recipient, and goal. Transport retries inside one accepted `run` reuse that already-computed key. Repeating the Slack command is a new explicit call intent with a fresh trigger ID and therefore receives a new key.
+The CALL-E `Idempotency-Key` is derived from the original signed Slack team, channel, user, trigger, recipient, and goal. Replaying that same accepted request preserves the key and call payload; delivery metadata such as `response_url` is not part of the intent. Deduplication of repeated creation requests depends on CALL-E honoring that key.
+
+The bridge sends one creation request and does **not** automatically retry a failed or timed-out request. Repeating the slash command produces a fresh Slack trigger and a **new call intent**, not a same-call retry. After an ambiguous timeout, reconcile the original task with CALL-E before issuing another `run`; the provider may already have accepted the call. An integration that retries the same call must retain the original signed intent fields rather than substitute a fresh trigger, destination, or goal.
 
 ## Side effects and cancellation
 
@@ -91,8 +93,8 @@ The CALL-E `Idempotency-Key` is derived from the signed Slack team, channel, use
 - Slack requests are accepted only when the HMAC signature is valid and the timestamp is within five minutes.
 - `response_url` must use `https://hooks.slack.com` and is never logged.
 - `SLACK_SIGNING_SECRET` and `CALLE_API_KEY` are environment variables only.
-- Destination numbers are strict ASCII E.164 and are masked in bridge output.
-- Provider summaries are ASCII-bounded, control-character-cleaned, truncated, and scrubbed of phone-like values before they reach Slack.
+- Destination numbers are strict ASCII E.164, revalidated at the call boundary, and masked in bridge output. An explicit `run` authorizes only the single destination and goal in that signed command; preview mode cannot execute a call.
+- Provider summaries normalize Unicode digits and separators into ASCII-bounded text, mask phone-like values before truncation, and escape Slack markup before posting. Only the allowlisted result fields are forwarded; non-string summaries and malformed outcomes fail closed.
 - The request body is not logged.
 - A recipient's refusal is a terminal outcome, not a reason to retry automatically.
 

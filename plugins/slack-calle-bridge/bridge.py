@@ -7,14 +7,15 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com"
 E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$", re.ASCII)
-PHONE_LIKE_RE = re.compile(r"(?<![A-Za-z0-9])\+?[0-9][0-9 ().-]{6,}[0-9](?![A-Za-z0-9])", re.ASCII)
+PHONE_LIKE_RE = re.compile(r"(?<![0-9])\+?[0-9](?:[ ()./\-]*[0-9]){6,}(?![0-9])", re.ASCII)
 TERMINAL_STATUSES = {"completed", "failed", "canceled", "cancelled"}
 SAFE_OUTCOMES = {"resolved", "needs_human", "declined", "unreached"}
 MAX_SLACK_AGE_SECONDS = 300
@@ -25,6 +26,11 @@ def mask_phone(phone: str) -> str:
     if len(phone) < 6:
         return "***"
     return f"{phone[:2]}{'*' * (len(phone) - 4)}{phone[-2:]}"
+
+
+def validate_destination(phone: str) -> None:
+    if not isinstance(phone, str) or not E164_RE.fullmatch(phone):
+        raise ValueError("Phone must be ASCII E.164, for example +12025550123")
 
 
 def parse_command(text: str) -> dict[str, str]:
@@ -39,8 +45,7 @@ def parse_command(text: str) -> dict[str, str]:
     if "|" not in raw:
         raise ValueError("Use: [preview|run] +E164_PHONE | call goal")
     phone, goal = (part.strip() for part in raw.split("|", 1))
-    if not E164_RE.fullmatch(phone):
-        raise ValueError("Phone must be ASCII E.164, for example +12025550123")
+    validate_destination(phone)
     if not goal or len(goal) > 400:
         raise ValueError("Goal must contain 1-400 characters")
     return {"mode": mode, "phone": phone, "goal": goal}
@@ -115,12 +120,21 @@ def calle_base_url(value: str | None) -> str:
     return base
 
 
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Fail closed: neither bearer headers nor Slack result bodies may move origins.
+        return None
+
+
 def request_json(
     method: str, url: str, headers: dict[str, str], body: dict[str, Any] | None = None
 ) -> dict[str, Any]:
+    if any(name.lower() == "authorization" for name in headers):
+        parsed = urlparse(url)
+        calle_base_url(f"{parsed.scheme}://{parsed.netloc}")
     data = None if body is None else json.dumps(body).encode()
     req = Request(url, data=data, headers=headers, method=method)
-    with urlopen(req, timeout=15) as response:
+    with build_opener(NoRedirectHandler()).open(req, timeout=15) as response:
         payload = response.read()
     if not payload:
         return {}
@@ -135,8 +149,13 @@ def provider_safe_summary(value: Any) -> str:
     """Bound untrusted provider text before it reaches Slack."""
     if not isinstance(value, str):
         return "No structured summary returned."
-    ascii_text = value.encode("ascii", "replace").decode("ascii")
-    printable = "".join(char if char.isprintable() else " " for char in ascii_text)
+    normalized = unicodedata.normalize("NFKC", value)
+    # Normalize digits and separators before masking, including invisible controls.
+    printable = "".join(
+        str(unicodedata.decimal(char)) if char.isdecimal()
+        else char if char.isascii() and char.isprintable() else " "
+        for char in normalized
+    )
     masked = PHONE_LIKE_RE.sub("[phone redacted]", printable)
     return masked[:500] or "No structured summary returned."
 
@@ -152,7 +171,10 @@ def safe_result(call: dict[str, Any], phone: str) -> dict[str, Any]:
     raw_status = str(call.get("status") or "unknown").lower()
     status = raw_status if raw_status in TERMINAL_STATUSES | {"poll_timeout"} else "unknown"
     raw_outcome = structured.get("outcome")
-    outcome = raw_outcome if raw_outcome in SAFE_OUTCOMES else "needs_human"
+    outcome = (
+        raw_outcome if isinstance(raw_outcome, str) and raw_outcome in SAFE_OUTCOMES
+        else "needs_human"
+    )
     return {
         "status": status,
         "phone": mask_phone(phone),
@@ -169,7 +191,10 @@ def run_calle(
     transport: Callable[..., dict[str, Any]] = request_json,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
+    if command.get("mode") != "run":
+        raise ValueError("An explicit run command is required")
     phone, goal = command["phone"], command["goal"]
+    validate_destination(phone)
     base_url = calle_base_url(base_url)
     headers = {
         "Authorization": f"Bearer {api_key}",
