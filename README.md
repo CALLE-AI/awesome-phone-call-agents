@@ -194,6 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
+- [Ringdown](apps/python/ringdown/) - Runnable on-call escalation ladder that only counts a page as acknowledged when an owner and an ETA are each quoted from what the recipient said, seals every verdict in a hash-chained ledger that re-derives it offline, and dials nothing without an explicit confirmation phrase. [Demo video](https://youtu.be/cZg4hbkCVMA)
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
