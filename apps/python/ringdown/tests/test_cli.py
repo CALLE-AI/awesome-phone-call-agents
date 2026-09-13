@@ -19,7 +19,7 @@ from ringdown.exits import (
 )
 from ringdown.audit import LedgerError, append_record
 from ringdown.calle import LIVE_BASE_URL, LIVE_MCP_URL, RestClient
-from ringdown.pagerduty import NoteResult
+from ringdown.notes import VENDORS, NoteResult
 from ringdown.task import CALL_TASK
 from tests.data import ALICE, BEN, CARLA, EXAMPLES, example_body, write_json
 
@@ -450,109 +450,102 @@ def test_suggest_mapping_without_a_key_asks_nobody_and_guesses_nothing(monkeypat
     assert "GEMINI_API_KEY is not set" in capsys.readouterr().out
 
 
-def test_a_run_without_the_pagerduty_flag_notifies_nobody(serving, incident_file, tmp_path, capsys):
+def test_a_run_without_a_note_flag_notifies_nobody(serving, incident_file, tmp_path, capsys):
     server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
     ledger = tmp_path / "l.jsonl"
 
     _run(server.base_url, incident_file, ledger, "--confirm", CONFIRMATION)
 
-    assert "PagerDuty" not in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert all(vendor.name not in printed for vendor in VENDORS.values())
     assert "notified" not in ledger.read_text()
 
 
-def test_a_run_asked_to_notify_pagerduty_without_credentials_still_settles(
-    serving, incident_file, tmp_path, capsys, monkeypatch
-):
-    monkeypatch.delenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", raising=False)
-    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
-    ledger = tmp_path / "l.jsonl"
-
-    code = _run(
+def _noted(server, incident_file, ledger, name, url):
+    return _run(
         server.base_url,
         incident_file,
         ledger,
         "--confirm", CONFIRMATION,
-        "--pagerduty-note",
-        "--pagerduty-url", server.base_url,
+        f"--{name}-note",
+        f"--{name}-url", url,
     )
+
+
+def _fake_credentials(monkeypatch, vendor, value):
+    for live, fake in (vendor.token_env, *filter(None, (vendor.sender_env,))):
+        monkeypatch.setenv(fake, value)
+        monkeypatch.delenv(live, raising=False)
+
+
+@pytest.mark.parametrize("name", VENDORS)
+def test_a_run_asked_to_write_a_note_without_credentials_still_settles(
+    name, serving, incident_file, tmp_path, capsys, monkeypatch
+):
+    monkeypatch.delenv(VENDORS[name].token_env[1], raising=False)
+    server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
+    ledger = tmp_path / "l.jsonl"
+
+    code = _noted(server, incident_file, ledger, name, server.base_url)
 
     assert code == EXIT_ACKNOWLEDGED
     assert "the run is unaffected" in capsys.readouterr().out
     assert "notified" not in ledger.read_text()
 
 
-def test_the_live_pagerduty_token_is_never_read_for_a_note_against_the_local_fake(
-    serving, incident_file, tmp_path, capsys, monkeypatch
+@pytest.mark.parametrize("name", VENDORS)
+def test_the_live_token_is_never_read_for_a_note_against_the_local_fake(
+    name, serving, incident_file, tmp_path, capsys, monkeypatch
 ):
-    monkeypatch.delenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", raising=False)
-    monkeypatch.setenv("PAGERDUTY_TOKEN", "pd_live_token")
-    monkeypatch.setenv("PAGERDUTY_FROM", "oncall@example.com")
+    vendor = VENDORS[name]
+    for live, fake in (vendor.token_env, *filter(None, (vendor.sender_env,))):
+        monkeypatch.delenv(fake, raising=False)
+        monkeypatch.setenv(live, f"{name}_live_secret")
     server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
     ledger = tmp_path / "l.jsonl"
 
-    code = _run(
-        server.base_url,
-        incident_file,
-        ledger,
-        "--confirm", CONFIRMATION,
-        "--pagerduty-note",
-        "--pagerduty-url", server.base_url,
-    )
+    code = _noted(server, incident_file, ledger, name, server.base_url)
 
     assert code == EXIT_ACKNOWLEDGED
     printed = capsys.readouterr().out
-    assert "RINGDOWN_FAKE_PAGERDUTY_TOKEN is not set" in printed
-    assert "pd_live_token" not in printed
+    assert f"{vendor.token_env[1]} is not set" in printed
+    assert f"{name}_live_secret" not in printed
     assert "notified" not in ledger.read_text()
 
 
-def test_a_pagerduty_token_is_refused_against_the_url_of_the_other_channel(
-    serving, incident_file, tmp_path, capsys, monkeypatch
+@pytest.mark.parametrize("name", VENDORS)
+def test_a_note_credential_is_refused_against_the_url_of_the_other_channel(
+    name, serving, incident_file, tmp_path, capsys, monkeypatch
 ):
-    monkeypatch.setenv("PAGERDUTY_TOKEN", "pd_live_token")
+    vendor = VENDORS[name]
+    monkeypatch.setenv(vendor.token_env[0], f"{name}_live_secret")
     server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
     ledger = tmp_path / "l.jsonl"
 
-    code = _run(
-        server.base_url,
-        incident_file,
-        ledger,
-        "--confirm", CONFIRMATION,
-        "--pagerduty-note",
-        "--pagerduty-url", LIVE_BASE_URL,
-    )
+    code = _noted(server, incident_file, ledger, name, LIVE_BASE_URL)
 
     assert code == EXIT_ACKNOWLEDGED
     printed = capsys.readouterr().out
-    assert "refusing to notify PagerDuty" in printed
-    assert "pd_live_token" not in printed
+    assert f"refusing to notify {vendor.name}" in printed
+    assert f"{name}_live_secret" not in printed
     assert "notified" not in ledger.read_text()
 
 
-def test_a_pagerduty_note_that_cannot_be_delivered_never_changes_the_exit_code(
-    serving, incident_file, tmp_path, capsys, monkeypatch
+@pytest.mark.parametrize("name", VENDORS)
+def test_a_note_that_cannot_be_delivered_never_changes_the_exit_code(
+    name, serving, incident_file, tmp_path, capsys, monkeypatch
 ):
-    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_TOKEN", "pd_test_token")
-    monkeypatch.setenv("RINGDOWN_FAKE_PAGERDUTY_FROM", "ops@example.com")
+    _fake_credentials(monkeypatch, VENDORS[name], "test_secret")
     server = serving({ALICE.phone: scenarios.answer_ack("Alice Okafor", "alice")})
     ledger = tmp_path / "l.jsonl"
 
-    code = _run(
-        server.base_url,
-        incident_file,
-        ledger,
-        "--confirm", CONFIRMATION,
-        "--pagerduty-note",
-        "--pagerduty-url", server.base_url,
-    )
+    code = _noted(server, incident_file, ledger, name, server.base_url)
 
     assert code == EXIT_ACKNOWLEDGED
-    assert "PagerDuty note on" in capsys.readouterr().out
+    assert f"{VENDORS[name].name} note on" in capsys.readouterr().out
     written = [json.loads(line) for line in ledger.read_text().splitlines()]
     assert [record for record in written if record["type"] == "notified"]
     assert main(["verify", "--ledger", str(ledger)]) == EXIT_UNRESOLVED
-
-
 
 
 def test_a_note_the_ledger_refuses_to_record_never_changes_the_exit_code(

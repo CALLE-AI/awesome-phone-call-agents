@@ -20,10 +20,10 @@ FORBIDDEN = [
     ("calls", "ringdown.calle"),
     ("checks", "ringdown.verify"),
     ("audit", "ringdown.escalate"),
-    ("audit", "ringdown.pagerduty"),
+    ("audit", "ringdown.notes"),
     ("task", "ringdown.incident"),
-    ("adapter", "ringdown.pagerduty"),
-    ("incident", "ringdown.pagerduty"),
+    ("adapter", "ringdown.notes"),
+    ("incident", "ringdown.notes"),
 ]
 
 

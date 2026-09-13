@@ -27,23 +27,23 @@ def call_task(incident: Incident, rung: Rung) -> str:
     )
 
 
-def attempt_id(incident: Incident, rung: Rung) -> str:
-    return f"{incident.id}/{rung.scope}/1"
+def attempt_id(incident: Incident, rung: Rung, attempt: int = 1) -> str:
+    return f"{incident.id}/{rung.scope}/{attempt}"
 
 
-def call_metadata(incident: Incident, rung: Rung) -> dict[str, str]:
+def call_metadata(incident: Incident, rung: Rung, attempt: int = 1) -> dict[str, str]:
     return {
-        "ringdown_attempt_id": attempt_id(incident, rung),
+        "ringdown_attempt_id": attempt_id(incident, rung, attempt),
         "ringdown_incident_id": incident.id,
         "ringdown_contact_id": rung.contact.id,
     }
 
 
-def call_payload(incident: Incident, rung: Rung) -> dict[str, Any]:
+def call_payload(incident: Incident, rung: Rung, attempt: int = 1) -> dict[str, Any]:
     return {
         "task": call_task(incident, rung),
         "recipients": [{"phones": [rung.contact.phone]}],
-        "metadata": call_metadata(incident, rung),
+        "metadata": call_metadata(incident, rung, attempt),
     }
 
 

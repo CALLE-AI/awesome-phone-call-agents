@@ -468,3 +468,28 @@ def test_a_last_line_that_is_not_an_object_is_a_usage_error_not_a_traceback(tmp_
         append_record(ledger, {"type": "note"})
     with pytest.raises(IncidentError, match="not a JSON object"):
         head(ledger)
+
+
+def test_two_calls_to_one_rung_still_re_derive_the_verdict_they_settled_on(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    asked = an_attempt(attempt_id="inc-1/primary/1", reason="callback_requested")
+    answered = an_attempt(
+        attempt_id="inc-1/primary/2", verdict="acknowledged", extraction=EXTRACTION
+    )
+    append_record(ledger, attempt_record(asked, "inc-1"))
+    append_record(ledger, attempt_record(answered, "inc-1"))
+    append_record(
+        ledger, verdict_record("inc-1", LadderResult("acknowledged", (asked, answered)))
+    )
+
+    checks = chain_checks(ledger)
+
+    assert all_ok(checks)
+    assert checks[-1][1] == "record 3 verdict acknowledged follows from the recorded attempts"
+
+
+def test_an_attempt_that_asked_for_no_callback_writes_the_record_it_always_wrote(tmp_path):
+    plain = attempt_record(an_attempt(), "inc-1")
+
+    assert "callback_minutes" not in plain
+    assert "callback" not in plain["spans"]

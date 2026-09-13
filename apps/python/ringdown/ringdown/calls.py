@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, Mapping
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
@@ -36,6 +37,7 @@ class CallSnapshot:
     recipient_phone: str | None
     metadata: dict[str, str]
     turns: tuple[Turn, ...]
+    duration_seconds: float | None
 
     @property
     def terminal(self) -> bool:
@@ -73,6 +75,20 @@ def parse_turns(raw: Any) -> tuple[Turn, ...]:
     return tuple(turns)
 
 
+def _duration(attempt: Mapping[str, Any]) -> float | None:
+    started, ended = attempt.get("started_at"), attempt.get("completed_at")
+    if not started or not ended:
+        return None
+    try:
+        return (moment(ended) - moment(started)).total_seconds()
+    except ValueError:
+        return None
+
+
+def moment(stamp: str) -> datetime:
+    return datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+
+
 def snapshot_from(body: Mapping[str, Any]) -> CallSnapshot:
     recipients = body.get("recipients") or [{}]
     first = recipients[0] if isinstance(recipients[0], dict) else {}
@@ -91,6 +107,7 @@ def snapshot_from(body: Mapping[str, Any]) -> CallSnapshot:
         recipient_phone=last.get("phone") or (first.get("phones") or [None])[0],
         metadata=dict(body.get("metadata") or {}),
         turns=parse_turns(last.get("transcript_turns")),
+        duration_seconds=_duration(last),
     )
 
 

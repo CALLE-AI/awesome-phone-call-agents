@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from typing import Callable
 
 from ringdown.audit import DETAIL_LIMIT
 from ringdown.calle import (
@@ -16,12 +18,41 @@ from ringdown.escalate import LadderResult
 from ringdown.exits import EXIT_UNRESOLVED, EXIT_UNVERIFIED
 from ringdown.incident import mask_phone
 
-LIVE_US = "https://api.pagerduty.com"
-LIVE_EU = "https://api.eu.pagerduty.com"
-LIVE_URLS = (LIVE_US, LIVE_EU)
-
-ACCEPT = "application/vnd.pagerduty+json;version=2"
 NOTE_LIMIT = 2000
+
+
+@dataclass(frozen=True)
+class Vendor:
+    name: str
+    live: tuple[str, ...]
+    path: str
+    authorization: str
+    body: Callable[[str], dict]
+    token_env: tuple[str, str]
+    headers: tuple[tuple[str, str], ...] = ()
+    sender_env: tuple[str, str] | None = None
+
+
+VENDORS = {
+    "pagerduty": Vendor(
+        name="PagerDuty",
+        live=("https://api.pagerduty.com", "https://api.eu.pagerduty.com"),
+        path="/incidents/{id}/notes",
+        authorization="Token token={token}",
+        body=lambda content: {"note": {"content": content}},
+        token_env=("PAGERDUTY_TOKEN", "RINGDOWN_FAKE_PAGERDUTY_TOKEN"),
+        headers=(("Accept", "application/vnd.pagerduty+json;version=2"),),
+        sender_env=("PAGERDUTY_FROM", "RINGDOWN_FAKE_PAGERDUTY_FROM"),
+    ),
+    "opsgenie": Vendor(
+        name="Opsgenie",
+        live=("https://api.opsgenie.com", "https://api.eu.opsgenie.com"),
+        path="/v2/alerts/{id}/notes?identifierType=id",
+        authorization="GenieKey {token}",
+        body=lambda content: {"note": content, "source": "Ringdown"},
+        token_env=("OPSGENIE_API_KEY", "RINGDOWN_FAKE_OPSGENIE_API_KEY"),
+    ),
+}
 
 SETTLED = {
     "acknowledged": "acknowledged the page",
@@ -85,6 +116,7 @@ def note_text(result: LadderResult, code: int, records: int, head: str) -> str:
 
 
 def post_note(
+    vendor: Vendor,
     url: str,
     token: str,
     sender: str,
@@ -92,16 +124,19 @@ def post_note(
     content: str,
     timeout: float = 15.0,
 ) -> NoteResult:
-    base = assert_trusted_url(url, LIVE_URLS)
+    base = assert_trusted_url(url, vendor.live)
+    target = vendor.path.format(id=urllib.parse.quote(incident_id, safe=""))
     request = urllib.request.Request(
-        f"{base}/incidents/{incident_id}/notes",
-        data=json.dumps({"note": {"content": content}}).encode(),
+        f"{base}{target}",
+        data=json.dumps(vendor.body(content)).encode(),
         method="POST",
     )
-    request.add_header("Authorization", f"Token token={token}")
-    request.add_header("Accept", ACCEPT)
+    request.add_header("Authorization", vendor.authorization.format(token=token))
     request.add_header("Content-Type", "application/json")
-    request.add_header("From", sender)
+    for name, value in vendor.headers:
+        request.add_header(name, value)
+    if vendor.sender_env is not None:
+        request.add_header("From", sender)
     try:
         with _OPENER.open(request, timeout=timeout) as response:
             return NoteResult(True, f"http {response.status}")

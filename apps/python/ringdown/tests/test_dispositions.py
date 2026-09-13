@@ -40,11 +40,76 @@ def test_a_clean_acknowledgement_with_a_grounded_eta_is_acknowledged():
     assert judged.reason == ""
 
 
+def test_a_clean_acknowledgement_in_spanish_is_acknowledged():
+    judged = judge(scenarios.answer_ack_es(ALICE.name, "alice"))
+
+    assert judged.verdict == "acknowledged"
+    assert judged.reason == ""
+
+
+def test_a_commitment_with_a_condition_in_spanish_is_still_not_an_acknowledgement():
+    judged = judge(scenarios.hedged_yes_es(ALICE.name, "alice"))
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "hedged_acknowledgement"
+
+
+def test_an_accented_contact_can_confirm_their_own_name():
+    jose = replace(ALICE, name="José Pérez")
+    scenario = scenarios.answer_ack_es(jose.name, "José")
+
+    judged = classify(*parts(snapshot_for(scenario)), jose, POLICY)
+
+    assert judged.verdict == "acknowledged"
+    assert judged.reason == ""
+
+
 def test_an_ambiguous_yes_without_an_eta_does_not_acknowledge():
     judged = judge(scenarios.ambiguous_yes(ALICE.name, "alice"))
 
     assert judged.verdict == "not_acknowledged"
     assert judged.reason == "no_eta"
+
+
+def test_a_call_that_ended_before_it_rang_says_so_instead_of_blaming_the_recipient():
+    judged = judge(scenarios.dropped_before_ringing())
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "zero_duration"
+
+
+def test_a_call_the_provider_calls_completed_is_still_silent_if_it_took_no_time():
+    settled = {
+        "id": "call_1",
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.94, "label": "high"},
+        "recipients": [
+            {
+                "attempts": [
+                    {
+                        "started_at": "2026-08-20T00:30:03Z",
+                        "completed_at": "2026-08-20T00:30:03Z",
+                        "transcript_turns": [],
+                    }
+                ]
+            }
+        ],
+    }
+    snapshot = snapshot_from(settled)
+
+    judged = classify(*parts(snapshot), ALICE, POLICY)
+
+    assert judged.reason == "zero_duration"
+
+
+def test_a_call_that_ended_at_once_but_carries_words_is_not_reported_as_silent():
+    spoken = [turn("bot", scenarios.IDENTIFY.format(name=ALICE.name))]
+
+    judged = judge(scenarios.dropped_before_ringing(spoken))
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "call_failed"
 
 
 def test_a_high_label_with_a_low_score_is_not_confident():
@@ -205,5 +270,36 @@ def test_a_recipient_who_speaks_the_commitment_is_acknowledged_even_alongside_an
             "fifteen minutes",
         )
     )
+
+    assert judged.verdict == "acknowledged"
+
+
+def test_a_commitment_with_a_condition_attached_is_not_an_acknowledgement():
+    judged = judge(
+        hostile(
+            "yes, this is alice",
+            "i'll take it, but i'm not sure i can get to it",
+            "fifteen minutes",
+        )
+    )
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "hedged_acknowledgement"
+
+
+def test_a_commitment_the_recipient_walked_back_before_saying_is_not_an_acknowledgement():
+    judged = judge(
+        hostile("yes, this is alice", "no, i can't, i'll take it tomorrow", "fifteen minutes")
+    )
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "hedged_acknowledgement"
+
+
+def test_a_hedge_the_recipient_never_spoke_cannot_reach_the_verdict():
+    snapshot, extraction, grounded = parts(snapshot_for(scenarios.answer_ack(ALICE.name, "alice")))
+    planted = replace(extraction, hedge_span="i am not sure about any of this")
+
+    judged = classify(snapshot, planted, ground(planted, snapshot.turns), ALICE, POLICY)
 
     assert judged.verdict == "acknowledged"

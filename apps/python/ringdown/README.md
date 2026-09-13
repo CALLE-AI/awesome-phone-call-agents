@@ -3,6 +3,18 @@
 Phone the on-call engineer until somebody commits to the incident, and prove the commitment
 happened.
 
+## The problem
+
+Every on-call system reports "notification sent" and treats the incident as escalated. That
+proves nothing. The push arrived at a phone on silent, the email landed in a folder, the SMS was
+half-read at 03:00 and the engineer went back to sleep. The acknowledgement is the only part that
+matters and it is exactly the part nobody verifies.
+
+A commitment is not a delivery receipt. It has an owner and an ETA, and both have to come out of
+the recipient's own mouth.
+
+## How it works
+
 Ringdown walks an escalation ladder one rung at a time. Each rung is a real phone call that asks
 one person two questions: are you taking this incident, and in how many minutes. A run ends when
 somebody commits with an owner and a clock, when somebody says no, or when the ladder is
@@ -12,7 +24,6 @@ The part that matters is the last step. Ringdown **places the call over the REST
 it over MCP**, then writes both the verdict and the verification into a hash-chained ledger. An
 agent that audits itself through the same channel it wrote with has proved nothing.
 
-- [The problem](#the-problem)
 - [Setup](#setup)
 - [Try it without an account](#try-it-without-an-account)
 - [Preview, which is the default](#preview-which-is-the-default)
@@ -26,7 +37,8 @@ agent that audits itself through the same channel it wrote with has proved nothi
   - [A worked example: PagerDuty](#a-worked-example-pagerduty)
   - [A second worked example: Opsgenie](#a-second-worked-example-opsgenie)
   - [Asking a model for the mapping](#asking-a-model-for-the-mapping)
-- [Telling PagerDuty what happened](#telling-pagerduty-what-happened)
+- [Telling the alert system what happened](#telling-the-alert-system-what-happened)
+  - [Opsgenie, the same way](#opsgenie-the-same-way)
 - [The ledger](#the-ledger)
 - [Side effects, cancellation, credentials](#side-effects-cancellation-credentials)
 - [Threat model](#threat-model)
@@ -34,16 +46,6 @@ agent that audits itself through the same channel it wrote with has proved nothi
 - [The defence](#the-defence)
 - [Known ceilings](#known-ceilings)
 - [License](#license)
-
-## The problem
-
-Every on-call system reports "notification sent" and treats the incident as escalated. That
-proves nothing. The push arrived at a phone on silent, the email landed in a folder, the SMS was
-half-read at 03:00 and the engineer went back to sleep. The acknowledgement is the only part that
-matters and it is exactly the part nobody verifies.
-
-A commitment is not a delivery receipt. It has an owner and an ETA, and both have to come out of
-the recipient's own mouth.
 
 ## Setup
 
@@ -54,11 +56,11 @@ Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). No runtime dependenc
 git clone https://github.com/gmassello/ringdown
 cd ringdown/apps/python/ringdown
 uv sync
-uv run pytest -q          # 449 tests, no credentials, no outbound calls
+uv run pytest -q          # 589 tests, no credentials, no outbound calls
 ```
 
-Seven of those tests read the project site and skip where `docs/` is absent, which is the case in
-any checkout of this directory alone — there the run reports 442 passed and 7 skipped.
+Eleven of those tests read the project site and skip where `docs/` is absent, which is the case in
+any checkout of this directory alone — there the run reports 501 passed and 11 skipped.
 
 **Every command in this file runs from `apps/python/ringdown/`.**
 
@@ -66,7 +68,11 @@ any checkout of this directory alone — there the run reports 442 passed and 7 
 
 Nothing to install: the [project site](https://gmassello.github.io/ringdown/#ledger) fetches the
 committed ledger, lets you rewrite every verdict in it, reseals and relinks the whole chain in your
-browser — and shows the verification failing anyway.
+browser — and shows the verification failing anyway. [The run](https://gmassello.github.io/ringdown/#run)
+plays the three calls out loud, marking each sentence as it is spoken and naming the field it was
+quoted into. Nobody was called: those are synthesised voices reading the fake server's script, which
+is the same text the extractor is handed. `demo/audio.py` renders them from `fake/scenarios.py` and a
+test refuses a page whose audio has drifted from the script.
 
 Locally, the demo needs no account either:
 
@@ -74,8 +80,11 @@ Locally, the demo needs no account either:
 uv run python -m demo.run_local
 ```
 
-Seven scenarios against a fake CALL-E on `127.0.0.1`. No account, no network beyond loopback,
-nothing rings — the demo supplies its own throwaway key. `demo/EXPECTED.md` holds the full
+Ten scenarios against a fake CALL-E on `127.0.0.1`. No account, no network beyond loopback,
+nothing rings — the demo supplies its own throwaway key. `python -m demo.audio` renders the first
+three of them as audio next to the transcript that produced it, writing to `demo/out/audio` unless
+`--out` says otherwise; it needs `say` and `ffmpeg`, which is why it is a separate command and not
+part of the demo. `demo/EXPECTED.md` holds the full
 narrated output; this is scenario 2:
 
 ```text
@@ -192,6 +201,102 @@ first thing to read in [Known ceilings](#known-ceilings). The live MCP surface i
 `run_id` that only its own placement tool hands out, and no identifier a REST-placed call exposes
 resolves to one, so there is no run to read. Live, every verdict settles at exit 45.
 
+## What counts as taking the incident
+
+Three things have to line up before Ringdown records an owner, and each is quoted by a span the
+recipient spoke: they said they were taking it, they confirmed their own first name, and they gave
+a number of minutes. A missing one is not an acknowledgement — that is what scenario 2 of the demo
+is there to show.
+
+Two of the three are read as *answers to a question the agent asked*, not as words that appear
+somewhere on the call. The name counts only if it is spoken after "Am I speaking with {name}?", the
+same way the minutes count only if they are spoken after "How many minutes…?". A name said before
+the question, or three turns later while talking about somebody else, confirms nobody. The answer
+may carry the name in any of four shapes — "this is Alice", "Alice speaking", "I am Alice", "soy
+Alice" — but it has to carry it: "yes, I am" confirms nobody, because the only name on that call was
+spoken by the agent. A script
+that never asks either question is refused before a call is placed, because a script like that
+would settle every call as not acknowledged and look like bad luck rather than a broken script.
+
+A fourth condition is about *how* it was said. The commitment has to arrive without a condition
+attached:
+
+- **A negation before it does not count as a commitment.** "No, I can't, I'll take it tomorrow"
+  contains "I'll take it" and used to settle acknowledged, on the strength of two words inside a
+  refusal. The owner and the ETA were already gated against a negation this way; the disposition,
+  which is the field that hands someone an incident, was the one that was not.
+- **A commitment with a qualifier is not a commitment.** "I'll take it, but I'm not sure I can",
+  "I think I'm taking this", "I'll try to take it", "I'll take it if I can get to a laptop". The
+  attempt settles `not_acknowledged` with the reason `hedged_acknowledgement`, and the words that
+  carried the qualifier are quoted in the ledger and on the terminal so it is clear what was heard.
+
+Both gates are scoped to the turn the commitment was spoken in, and only the negation is scoped to
+the text *before* it. "Yes, I am taking this, nobody else is around" is an acknowledgement: the
+negation is about who else is available, not about taking the incident. Getting that backwards
+would escalate past someone who committed, which is the failure this whole section is trying not to
+cause.
+
+The list of qualifiers is deliberately short, and deliberately leaves out "but" and "actually".
+Both of them appear in perfectly firm commitments — "yes, I'm on it, but who else is paged?" — and
+a list that flags them wakes the next person for no reason. See ceiling 23 for why that error is
+worse than it looks.
+
+### In Spanish, on the same rules
+
+The four conditions above are not English conditions. The phrase tables carry Spanish beside
+English — one table per family, not one per language — so *"sí, lo tomo yo"* takes the incident and
+*"creo que lo tomo yo, tal vez"* does not, for the same reason *"I think I'll take it"* does not.
+Minutes are read the same way: `quince minutos`, `45 minutos`, `media hora`, `treinta y cinco
+minutos`. `normalise` folds accents before anything is matched, so `José` and `Muñoz` confirm an
+owner where they used to be read as `jos` and `mu`.
+
+There is no language flag, and that is deliberate. A real on-call call code-switches — *"yes, dale,
+quince minutos"* — and the language is not known until somebody answers, so a flag would have to be
+set before the thing it describes has happened. `examples/guardia.script.txt` is the call script in
+Spanish, and `validate_task_template` accepts it because the two questions it requires now have a
+Spanish form; a script that asks neither question in either language is still refused. Scenario 8
+of the demo runs the whole ladder in Spanish, and the second channel re-derives the verdict from
+the Spanish transcript.
+
+One word the fold takes away with the accent, and it is worth knowing which: `sí` and `si` become
+the same string, so *"sí puedo, lo tomo yo"* and *"lo tomo yo si puedo"* are indistinguishable to the
+extractor. Reading them as qualified would escalate past someone who firmly committed, which is the
+failure this section exists to avoid, so `si puedo` is not in the qualifier list and the conditional
+form is accepted. `si llego a` and `si es que` carry the same meaning with no such collision.
+
+What this is not is comprehension — see ceiling 10. These are lists of phrases, so an engineer who
+agrees in words nobody wrote down escalates past a real acknowledgement, in either language.
+
+## Asking to be called back
+
+"I can't right now, call me back in ten minutes" is not an acknowledgement and Ringdown does not
+record it as one: the attempt settles `not_acknowledged`, with the reason `callback_requested` and
+the words that carried the request quoted in the ledger beside the minutes asked for. Nobody owns
+the incident yet, and the exit code says so.
+
+What changes is where the ladder goes next. Instead of stepping past that person, it waits and
+calls the same person once more — but only if the wait fits. The minutes asked for, plus one more
+call, have to fit inside what is left of `ladder_timeout_seconds`. Ask for ninety minutes on a
+fifteen-minute ladder and the next rung rings immediately, with the request recorded rather than
+granted. The wait competes against the escalation rather than suspending it, which is the whole
+point: an incident that cannot wait does not wait.
+
+The second call is a second call, not a retry. The attempt number lives inside the hashed payload,
+so it produces its own idempotency key, its own `intent` and `attempt` records, and its own
+`ringdown_attempt_id` for the provider to echo back. One rung can ring at most twice, ever: a
+person who keeps asking for more time is escalated past on the second ask.
+
+A rung is a *scope*, not a person, and the second call proves it. When the wait ends, Ringdown asks
+the rotation who covers that scope now. If the shift changed while it waited, the second call goes
+to the person coming on, with their own idempotency key and their own name and number in the
+ledger — the person going off shift is not rung again. Nobody is dialled twice, and the rung still
+rings at most twice; it is the telephone that may be somebody else's. If nobody covers the scope by
+then, the second call goes to the person who asked for it.
+
+The agent never offers this. The call script still forbids promising a callback, because a promise
+Ringdown cannot keep across a crash is worse than no promise. This is only Ringdown hearing
+something the recipient volunteered, and acting on it inside one run.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -218,8 +323,8 @@ already rang. It replaces 30 for that case — a ledger that cannot be opened, r
 a call exists is an infrastructure failure, not an operator mistake, and collapsing the two would
 tell a scheduler that no phone rang. The run prints the verdict and the attempts it got to before
 exiting, because that output is the only surviving evidence. A ledger that is unusable *before* the
-first call still exits 30: nothing was placed and the input file is simply bad. The PagerDuty note
-is the one writer exempt from this — it is best effort by design, so a note that cannot be posted or
+first call still exits 30: nothing was placed and the input file is simply bad. The note written
+back to the alert system is the one writer exempt from this — it is best effort by design, so a note that cannot be posted or
 recorded is reported and the run still exits on its own verdict.
 
 ## The incident file
@@ -426,7 +531,7 @@ worked example, and a change on Google's side surfaces there rather than the fir
 That job never gates anything else — it says whether the contract still holds, and nothing in
 `preview`, `run` or `verify` depends on the answer.
 
-## Telling PagerDuty what happened
+## Telling the alert system what happened
 
 Once the verdict has settled, `run --pagerduty-note` writes a note on the PagerDuty incident saying
 who was called, what they said, and where the evidence lives:
@@ -476,7 +581,53 @@ source of truth, and the note only points at it.
 or loopback. Any other host is refused before a socket opens, so the token cannot leave for somewhere
 else. Every delivery, successful or not, appends a `notified` record to the ledger.
 
-This leg has been exercised against a local server, never against PagerDuty itself.
+### Opsgenie, the same way
+
+`run --opsgenie-note` writes the same words to
+[an Opsgenie alert](https://docs.opsgenie.com/docs/alert-api#add-note-to-alert), because the note is
+composed before any vendor is chosen:
+
+```bash
+export OPSGENIE_API_KEY=...
+python -m ringdown run --incident /tmp/incident.json --rotation examples/rotation.example.json \
+                       --ledger ledger.jsonl --confirm 'place real calls' --opsgenie-note
+```
+
+A vendor is a row in a table — pinned regions, path, the shape of the `Authorization` header, the
+shape of the body — and nothing else. The text, the ledger record, the exit code and the refusal to
+guess a URL are shared, which is why the second one cost no new code path to get wrong:
+
+| | PagerDuty | Opsgenie |
+|---|---|---|
+| pinned to | `api.pagerduty.com`, `api.eu.pagerduty.com` | `api.opsgenie.com`, `api.eu.opsgenie.com` |
+| path | `/incidents/{id}/notes` | `/v2/alerts/{id}/notes?identifierType=id` |
+| authorization | `Token token=…` | `GenieKey …` |
+| body | `{"note": {"content": …}}` | `{"note": …, "source": "Ringdown"}` |
+| credentials | `PAGERDUTY_TOKEN`, `PAGERDUTY_FROM` | `OPSGENIE_API_KEY` |
+
+Opsgenie needs no second credential because it attributes the note to the key's owner rather than to
+a named user, and Ringdown does not fill in its optional `user` field for the same reason it will not
+send PagerDuty's `From` on anything but a note.
+
+**And Opsgenie is where refusing to acknowledge costs the most.** PagerDuty's acknowledgement is
+awkward — it needs a `From` header naming a person who did not act. Opsgenie's is
+`POST /v2/alerts/{id}/acknowledge` with nothing in the body: one line, no impersonation, and it would
+have looked like a feature. It is exactly the system where the shortcut was easiest, and it is not
+taken, because suppressing Opsgenie's own escalation on the strength of a phone call is the
+operator's decision and not this tool's.
+
+The `id` the note is written against is the one the alert payload carried, so the mapping that read
+the incident in is what points the note back — `$.event.data.id` for PagerDuty,
+`$.alert.alertId` for Opsgenie. Nothing checks that an id belongs to the vendor being written to; see
+ceiling 18.
+
+Alertmanager is read but never written. It is not an oversight and not a queue of work: an
+Alertmanager alert has nowhere to put a note. The only thing its API accepts about an existing alert
+is a silence, and silencing a page because somebody said "I've got it" on the phone is the same state
+change this whole section exists to refuse. Three systems are read; two have somewhere to write back;
+the third is named rather than left blank.
+
+This leg has been exercised against a local server, never against PagerDuty or Opsgenie themselves.
 
 ## The ledger
 
@@ -583,6 +734,11 @@ subcommand exits 30 without opening a socket when the key is absent. The payload
 your network, which is the one cost here that no pin removes, and the reason drafting a mapping is a
 separate opt-in subcommand rather than a fallback inside `adapt`.
 
+The note written back to an alert system puts the incident `id` in a URL path, and that id came out
+of an alert payload. It is percent-encoded with nothing left safe, so an id carrying `/`, `?` or `..`
+cannot reshape the request into a different endpoint on a host that is already trusted and already
+holds the credential. The pin decides the host; the encoding decides that the path stays the path.
+
 Webhooks are not used. The provider's deliveries carry no secret, no timestamp and no signature,
 and an unsigned delivery proves nothing about its sender, so Ringdown polls instead of trusting
 one.
@@ -640,7 +796,7 @@ Delete the model and you are back to writing the file yourself; delete it from t
 there is no verdict at all. That asymmetry is the whole rule.
 
 The obvious extra is still out: a model that narrates the outcome after the fact, deciding nothing.
-The prose a human reads already exists and is deterministic — the PagerDuty note quotes the spans,
+The prose a human reads already exists and is deterministic — the note quotes the spans,
 names the settled exit code and cites the ledger head — so a generated retelling would add an API
 key, a failure mode and a source of drift in exchange for restating what is already stated. It was
 considered and dropped on purpose.
@@ -677,8 +833,12 @@ own call over a second transport. Same technique, different product.
 2. A verdict of `unknown` is never verified — see [Exit codes](#exit-codes).
 3. No inbound webhooks, because they are unsigned. The provider's deliveries carry no secret, no
    timestamp and no signature, so `adapt` reads a payload the operator hands it on disk and nothing
-   is accepted over the network. The outbound direction is now real but narrow — see
-   [Telling PagerDuty what happened](#telling-pagerduty-what-happened).
+   is accepted over the network. The outbound direction is real for the two systems that have
+   somewhere to receive it — see
+   [Telling the alert system what happened](#telling-the-alert-system-what-happened). The third
+   payload shape this app reads, Alertmanager, has nowhere: its API takes silences, not notes, and a
+   silence is a state change Ringdown will not make. So the asymmetry is two written out of three
+   read, on purpose.
 4. No cancellation of a call in flight.
 5. Two runners are not prevented. The lock on the ledger is taken per append and only serialises
    writers to that file; it is not a run lock and it is not distributed. What stops a second run
@@ -686,18 +846,39 @@ own call over a second transport. Same technique, different product.
    therefore stable across processes — provided the provider honours it. Their records may
    interleave in a shared ledger without breaking the audit: `verify` re-derives each verdict from
    the attempts of its own incident, not from whatever preceded it in the file.
-6. The ladder never re-calls. If that is ever added it needs another idempotency key and another
-   record, never a silent retry.
-7. Re-escalation when an ETA expires is documented, not implemented. Recurrence belongs to the
-   host scheduler.
+6. The ladder re-calls exactly once per rung, and only when the recipient asked it to. That second
+   call is a second call in every sense: its own attempt number inside the hashed payload, its own
+   idempotency key, its own `intent` and `attempt` records. It may also reach a different person —
+   the rung is a scope, and a shift change during the wait hands it over (ceiling 22). There is
+   still no silent retry, and no path that dials the same key twice meaning two different calls.
+7. Re-escalation when an ETA expires is still not implemented, and a callback is not it. Ringdown
+   honours a request to be called back only *within one process and one ladder*: nothing survives
+   the run. If the process dies during the wait, the ledger holds the request and the words that
+   carried it, and calling back is the host scheduler's job, as it always was.
 8. The confidence label allowlist can start failing if the provider adds a new label. It fails
    closed, which is why the score is the primary check.
 9. `ladder_timeout_seconds` is a global deadline checked between rungs: once it expires no new
    rung is started, but a call already in flight is never cut short — its real bound stays
-   `per_call_timeout_seconds`.
-10. Disposition and ETA extraction are English-only phrase lists and regexes, and so is the call
-    script check: a script in another language is refused because it cannot contain the English
-    sentence the extractor looks for. Translating the call means translating the extractor with it.
+   `per_call_timeout_seconds`. A callback waits against that same deadline, which is what stops a
+   long request from eating the escalation: the wait is honoured only if the minutes asked for plus
+   one more call still fit inside what is left.
+10. The extractor reads English and Spanish, and nothing else. Both languages live in the same
+    phrase tables rather than behind a locale flag, because a real call code-switches and the
+    language is not known before somebody answers; `normalise` folds accents away, so `José` and
+    `Muñoz` reach the same rules as any other name. What that buys is two languages, not
+    comprehension: these are still lists of phrases, so an engineer who agrees in words nobody
+    wrote down produces an exit 20 over a real acknowledgement, in either language. A third
+    language is the same work again — the tables, the two questions `task.py` requires of a script,
+    the three injection families — and the tables can only take phrases of two words or more, since
+    a single short word matches inside unrelated speech in the other language.
+
+    A live call on 2026-09-13 found the ceiling under that ceiling: through this provider the
+    Spanish tables cannot be reached at all. A recipient answering *"Sí, soy German"* and *"Sí, lo
+    tomo yo"* was transcribed as `C is not a` and `C, the Thomas` — confident English words, on a
+    call the provider labelled `high` at 0.9 — and the create request exposes no language or locale
+    to tell it otherwise. So Spanish is proven against the fake and against fixtures, and live it
+    depends on a transcription that does not arrive. Scenario 8 of the demo is honest about what the
+    extractor does with a Spanish transcript; it cannot promise that this provider will produce one.
 11. The chain proves internal consistency, not completeness, and it proves nothing against an
     adversary. It is unkeyed and anchored to nothing outside the file: cutting records off the end
     leaves a file that verifies, and so does renumbering and resealing the whole chain. The
@@ -752,7 +933,7 @@ own call over a second transport. Same technique, different product.
     supported set at load time is a preflight this app does not do.
 15. Almost every artefact in this repository was produced with one channel wearing two names.
     The demo points both flags at a single `FakeCalleServer` — same process, same port, one
-    transcript in memory — so the seven scenarios, the committed ledger and most of the suite
+    transcript in memory — so the ten scenarios, the committed ledger and most of the suite
     verify against the server that placed the call. Ringdown refuses that collision off
     loopback, announces it on loopback and records both hostnames either way, so the gap is
     visible rather than hidden. The exception is now real: [`tests/fixtures/`](tests/fixtures/)
@@ -768,13 +949,31 @@ own call over a second transport. Same technique, different product.
     user)`. The Twilio account that owns the destination number has no record of any of them, so
     nobody hung up: the call never reached the destination network. It is not tied to a surface —
     a call placed over MCP connected between two REST failures, and a REST call connected between
-    two others — and Ringdown cannot tell the difference from a real decline except by the empty
-    transcript. A ladder run against this provider should expect to be exhausted by infrastructure
-    rather than by people, and `failure_code` is the only honest signal for it.
+    two others. Ringdown now records the shape rather than the category: the snapshot carries the
+    attempt's measured duration, and a call that took no time at all and transcribed nothing settles
+    `not_acknowledged` with the reason **`zero_duration`**, whatever status the provider puts on it.
+    The run then says how many of its calls ended that way beside the verdict, so a ladder that was
+    exhausted without a telephone ringing does not read as one where nobody was willing.
 
-17. `instructed` is a heuristic, not a classifier. It matches three families of English phrasing —
-    instruction override, role or system impersonation, and commands that name a verdict — so an
-    attack phrased outside them, or in another language, is stored without the flag. That is a gap
+    What it does *not* do is act on the distinction. The ladder still places one call per rung and
+    moves on, because the promise that nobody is dialled twice rests on not being able to know the
+    call did not happen — the provider says it did. Whether to try that rung again is the operator's
+    call, and what changed is that they can now see which case they are in. The second channel
+    cannot help either: MCP serves no attempt timestamps, so `zero_duration` is corroborated by
+    nothing, which on this provider is the same wall as ceiling 12.
+
+    What it is not is proof. The reason is named for what the payload shows, not for what it
+    suggests: zero duration and an empty transcript are *consistent with* a call that never reached
+    the network, and what actually established that in August was the absence of any record on the
+    Twilio side, out of band. A recipient who answers and hangs up inside the same second would
+    produce the same shape. The provider still reports both as `Hangup by: user`, and a distinct
+    `failure_code` for "never connected" is the thing only they can give us — which is why the
+    feedback sent to them asks for exactly that.
+
+17. `instructed` is a heuristic, not a classifier. It matches three families of phrasing in the
+    two languages the extractor reads — instruction override, role or system impersonation, and
+    commands that name a verdict — so an attack phrased outside them, or in a third language, is
+    stored without the flag. That is a gap
     in the evidence, not in the defence: the flag decides nothing. What keeps a hostile transcript
     from acknowledging is structural, and holds whether or not the flag trips — every verdict field
     comes from deterministic rules over recipient turns, each one must be quoted by a span the
@@ -785,18 +984,75 @@ own call over a second transport. Same technique, different product.
     The converse is not a hole either, and is worth stating because it looks like one: a recipient
     who says "disregard your instructions" and then, in their own voice, gives their name, says they
     are taking the incident and names a number of minutes, is acknowledged. Nothing was obeyed — the
-    person simply said the thing. Distinguishing that from an impersonator who says the same words
-    is identity verification, which a phone call does not provide and this app does not claim.
+    person simply said the thing.
 
-18. The PagerDuty note is written once, with no retry and no queue. If PagerDuty is down, rate
-    limits the request, or refuses the `From` user, the note is lost and the run still exits on its
-    own verdict — the ledger keeps the evidence and the incident does not. It also assumes the
-    incident `id` is PagerDuty's own, which only holds when the incident entered through that
-    mapping; pointing it at an incident id from anywhere else produces a 404 that is reported and
-    otherwise ignored. And it has never run against PagerDuty: the leg is exercised against a local
-    server, so what is proven is the request this app builds, not the response their API gives it.
-    A note that does not arrive is not silent, though: the failure is appended to the ledger and
-    `verify` reports it as unresolved.
+    Whoever answers the phone is who Ringdown records, and that is the real ceiling. The name is now
+    read only from the turns that follow "Am I speaking with {name}?", which stops a name mentioned
+    in passing from becoming an owner, but it cannot stop somebody else from answering the question.
+    These are the sentences that cross it today, verified against the extractor rather than imagined:
+
+    | Spoken in answer to the identity question | Recorded owner |
+    |---|---|
+    | "speaking with alice? she is not here right now" | `alice` |
+    | "this is alice roommate, she stepped out" | `alice` |
+    | "this is alice's phone, she is in the shower" | `alice's`, so the gate holds — by the apostrophe |
+
+    Two of the three settle as acknowledgements in Alice's name if the person then takes the
+    incident and gives a number of minutes. The third holds by accident: the name pattern keeps the
+    apostrophe, so `alice's` is not `alice`. A test pins all three as they behave now, so closing one
+    is visible rather than silent. The obvious gate — refusing any identity turn containing a
+    negation, the way a hedged commitment is refused — was tried and is worse: it rejects "yes, this
+    is alice, nobody else is around" while still missing "this is alice roommate", which contains no
+    negation at all. Guaranteed false negatives for partial coverage is the wrong trade when the
+    false negative wakes the next person up. Closing this properly is identity verification — a PIN,
+    a challenge, a possession factor — which a phone call does not provide and this app does not
+    claim.
+
+    The mirror of that hole is a false negative, and a live call on 2026-09-13 walked straight into
+    it. Asked "Am I speaking with German Massello?", the recipient answered *"Hi. Yes. I am."* — the
+    ordinary English answer — then took the incident and gave fifteen minutes, and the attempt
+    settled `not_acknowledged` with the reason `owner_not_confirmed`. The extractor now also reads
+    the name out of "I am {name}" and "I'm {name}" when they answer that question: that phrasing is
+    grounded exactly as well as "this is {name}" and was simply missing from the table.
+
+    That new phrasing is read only from the first recipient turn after the question, and the scope is
+    worth describing precisely, because it narrows the exposure rather than closing it. "I am" is the
+    start of a great many sentences that are not an introduction, and "yes, I'm on it." yields an
+    owner called `on` when it *is* that first turn — a test pins exactly that, rather than a fixture
+    hiding it behind a filler turn. Nothing hangs on it: `owner_matches` compares the token against
+    the roster's first name, so a capture like `on` settles `owner_not_confirmed` the same as no
+    capture at all, and what it costs is an `owner` span in the ledger quoting a turn that named
+    nobody. The scope is also the reason a hostile transcript cannot multiply the pattern's cost by
+    its turn count. Two consequences to know: a filler turn — the provider really does emit a bare
+    "Hi." of its own accord — burns the window, and the four older patterns still run on every turn
+    after the question, so the scope can only fail to add a name, never take one away. And the
+    clause-end anchor assumes the provider punctuates its turns, which is true of all nine calls
+    captured so far and is a property of its transcriber rather than of speech.
+
+    The exit from all of it is to stop discovering an unknown name and match the known one: the
+    roster already holds the first name the gate compares against, so `find_owner` could take it and
+    match `(?:this is|I am|I'm|soy|habla) {first}` directly. That drops the anchor, the scope and
+    every junk capture in one move, and it costs a ledger schema version, because it changes what a
+    recorded `owner_confirmed` means — which is why it is the next entry rather than this one.
+
+    Assent carrying no name — "yes, I am", "speaking", "that's me" — still confirms nobody, and that
+    is the gate working rather than failing: the only name spoken on such a call is the agent's, and
+    a field Ringdown records has to be quoted from the recipient. The cost is real and worth stating
+    plainly, because `video/live/preflight.sh` has always told the operator to answer *"Yes, this is
+    {name}"* — a demo that works partly because the human was coached into an accepted phrasing.
+
+18. The note is written once, with no retry and no queue. If the vendor is down, rate limits the
+    request, or refuses the `From` user, the note is lost and the run still exits on its own verdict
+    — the ledger keeps the evidence and the incident does not. It also assumes the incident `id`
+    belongs to the vendor being written to, and **nothing checks that**: the flag picks the
+    destination and the mapping picked the id, so `--opsgenie-note` on an incident that entered
+    through the PagerDuty mapping posts a PagerDuty id to Opsgenie and earns a 404 that is reported
+    and otherwise ignored. Opsgenie adds one more inch of distance between the record and the truth:
+    it answers `202 Accepted`, which is acceptance and not durability, so `delivered` there means the
+    far end took the request, not that a note exists. And neither leg has ever run against the real
+    API: both are exercised against a local server, so what is proven is the request this app builds,
+    not the response theirs gives it. A note that does not arrive is not silent, though: the failure
+    is appended to the ledger and `verify` reports it as unresolved.
 
 19. The call script is configurable; the shape of the commitment is not. Ringdown settles a call as
     acknowledged only when somebody names a number of minutes: `classify` returns `no_eta` before it
@@ -834,6 +1090,25 @@ own call over a second transport. Same technique, different product.
     difference, because at that point there is no difference: it is a well-formed incident. The
     mapping file is therefore reviewed by a human before it dials, which is why `suggest-mapping`
     writes a file and stops rather than feeding `run` directly.
+
+22. The ladder itself is resolved once, when it starts. Only the rung that waited is re-resolved:
+    when a callback wakes up, Ringdown asks the rotation who covers *that scope* now and calls them
+    instead, but the rungs below it still name whoever the first resolution named. A shift change
+    that happens during a callback therefore reaches the person being called back and nobody else,
+    and a rung that was skipped as unstaffed at the start stays skipped even if somebody comes on
+    shift meanwhile. Re-resolving the whole ladder is a bigger change than it looks: `resolve_ladder`
+    deduplicates by contact, so the ladder can change length underneath the loop that is walking it.
+
+23. Hardening the extractor cannot be checked by the extractor. A qualifier list that is too wide
+    escalates past somebody who did commit, and **nothing catches it**: the second channel is
+    re-read with the same extractor (`verify.py`, `extract(run.turns)`), so it agrees, and
+    `no_ack_checks` — the check whose whole job is catching an escalation past a real yes — agrees
+    too. The failure is silent by construction, and the only thing that would break it is a second
+    derivation the provider cannot supply, which is the same wall as ceiling 12. What stands in for
+    it here is a short list, gates scoped to one turn, and the words that caused the refusal written
+    into the ledger so a human reading it afterwards can see the call was judged wrongly. The
+    opposite error — accepting a hedge — is the one the ledger cannot show at all, which is why the
+    list exists.
 
 ## License
 

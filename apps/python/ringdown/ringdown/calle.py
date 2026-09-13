@@ -70,7 +70,10 @@ def error_envelope(error: urllib.error.HTTPError) -> Mapping[str, Any]:
         body = json.loads(error.read() or b"{}")
     except (json.JSONDecodeError, OSError):
         return {}
-    return body.get("error", {}) if isinstance(body, dict) else {}
+    if not isinstance(body, dict):
+        return {}
+    nested = body.get("error")
+    return nested if isinstance(nested, Mapping) else body
 
 
 def assert_trusted_url(url: str, live: str | Sequence[str]) -> str:

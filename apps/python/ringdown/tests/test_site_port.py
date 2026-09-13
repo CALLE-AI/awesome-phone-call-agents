@@ -106,6 +106,17 @@ def check_counts_that_are_not_numbers(ledger: Path) -> None:
     rewrite(ledger, records)
 
 
+def spans_spoken_in_spanish(ledger: Path) -> None:
+    a_run(ledger)
+    records = records_in(ledger)
+    records[1]["spans"] = {
+        "disposition": "sí, lo tomo yo",
+        "owner": "sí, soy José Muñoz",
+        "eta": "dame quince minutos",
+    }
+    rewrite(ledger, records)
+
+
 def a_schema_from_the_future(ledger: Path) -> None:
     a_run(ledger)
     records = records_in(ledger)
@@ -119,6 +130,7 @@ LEDGERS = [
     an_announced_call_with_no_attempt,
     a_verdict_that_does_not_follow,
     check_counts_that_are_not_numbers,
+    spans_spoken_in_spanish,
     a_schema_from_the_future,
 ]
 

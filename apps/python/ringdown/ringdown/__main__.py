@@ -44,14 +44,16 @@ from ringdown.incident import (
     Incident,
     IncidentError,
     Rung,
+    Shift,
     load_incident,
     load_rotation,
+    on_call_for,
     parse_incident,
     read_json,
     resolve_ladder,
     unstaffed_scopes,
 )
-from ringdown.pagerduty import LIVE_URLS as PAGERDUTY_LIVE, LIVE_US, note_text, post_note
+from ringdown.notes import VENDORS, Vendor, note_text, post_note
 from ringdown.script import call_payload, call_task, idempotency_key
 from ringdown.suggest import MODEL, suggest_mapping
 from ringdown.checks import Check, all_checks, render_blocks
@@ -82,8 +84,9 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--confirm", default="")
     run.add_argument("--base-url", default=RestClient.LIVE)
     run.add_argument("--mcp-url", default=McpClient.LIVE)
-    run.add_argument("--pagerduty-note", action="store_true")
-    run.add_argument("--pagerduty-url", default=LIVE_US)
+    for name, vendor in VENDORS.items():
+        run.add_argument(f"--{name}-note", action="store_true")
+        run.add_argument(f"--{name}-url", default=vendor.live[0])
 
     verify = commands.add_parser("verify")
     verify.add_argument("--ledger", type=Path, required=True)
@@ -99,8 +102,8 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _ladder(incident: Incident, rotation: Path, moment: datetime) -> tuple[Rung, ...]:
-    rungs = resolve_ladder(incident, load_rotation(rotation), moment)
+def _ladder(incident: Incident, shifts: Sequence[Shift], moment: datetime) -> tuple[Rung, ...]:
+    rungs = resolve_ladder(incident, shifts, moment)
     for scope in unstaffed_scopes(incident, rungs):
         emit(f"note: scope {scope} has nobody on call and was skipped")
     return rungs
@@ -109,7 +112,7 @@ def _ladder(incident: Incident, rotation: Path, moment: datetime) -> tuple[Rung,
 def preview(args: argparse.Namespace) -> int:
     incident = load_incident(args.incident)
     moment = datetime.now(UTC)
-    rungs = _ladder(incident, args.rotation, moment)
+    rungs = _ladder(incident, load_rotation(args.rotation), moment)
     payload = call_payload(incident, rungs[0])
     emit(*report.header_lines(incident, rungs, moment))
     emit(f"idempotency key {idempotency_key(payload)}", "", call_task(incident, rungs[0]))
@@ -149,7 +152,8 @@ def run(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     incident = load_incident(args.incident)
     start = datetime.now(UTC)
-    rungs = _ladder(incident, args.rotation, start)
+    shifts = load_rotation(args.rotation)
+    rungs = _ladder(incident, shifts, start)
     emit(*report.header_lines(incident, rungs, start))
 
     total = len(rungs)
@@ -175,6 +179,7 @@ def run(args: argparse.Namespace) -> int:
             log=lambda line: emit(report.progress_line(line)),
             watch=watch,
             announce=announce,
+            resolve=lambda scope: on_call_for(scope, shifts, datetime.now(UTC)),
         )
         emit(*report.verdict_lines(result))
         append_record(args.ledger, verdict_record(incident.id, result))
@@ -195,8 +200,10 @@ def run(args: argparse.Namespace) -> int:
             emit(*report.NOTHING_PLACED)
         elif code in report.ADVICE and result.verdict == "acknowledged":
             emit("", *report.ADVICE[code])
-        if args.pagerduty_note:
-            _notify_pagerduty(args.pagerduty_url, args.ledger, incident.id, result, code)
+        for name, vendor in VENDORS.items():
+            if getattr(args, f"{name}_note"):
+                url = getattr(args, f"{name}_url")
+                _notify(vendor, url, args.ledger, incident.id, result, code)
         emit("", *report.ledger_lines(*head(args.ledger), result))
         return code
     except LedgerError as error:
@@ -204,21 +211,21 @@ def run(args: argparse.Namespace) -> int:
         return EXIT_LEDGER if placed else EXIT_USAGE
 
 
-def _notify_pagerduty(
-    url: str, ledger: Path, incident_id: str, result: LadderResult, code: int
+def _notify(
+    vendor: Vendor, url: str, ledger: Path, incident_id: str, result: LadderResult, code: int
 ) -> None:
     if not result.placed:
-        emit("no call was placed, so PagerDuty was not notified")
+        emit(f"no call was placed, so {vendor.name} was not notified")
         return
     try:
-        pinned = assert_trusted_url(url, PAGERDUTY_LIVE)
-        token = _credential(pinned, "PAGERDUTY_TOKEN", "RINGDOWN_FAKE_PAGERDUTY_TOKEN")
-        sender = _credential(pinned, "PAGERDUTY_FROM", "RINGDOWN_FAKE_PAGERDUTY_FROM")
-        if not token or not sender:
-            emit("skipping the PagerDuty note; the run is unaffected")
+        pinned = assert_trusted_url(url, vendor.live)
+        token = _credential(pinned, *vendor.token_env)
+        sender = _credential(pinned, *vendor.sender_env) if vendor.sender_env else ""
+        if not token or (vendor.sender_env and not sender):
+            emit(f"skipping the {vendor.name} note; the run is unaffected")
             return
         content = note_text(result, code, *head(ledger))
-        written = post_note(pinned, token, sender, incident_id, content)
+        written = post_note(vendor, pinned, token, sender, incident_id, content)
         append_record(
             ledger,
             notified_record(
@@ -229,13 +236,13 @@ def _notify_pagerduty(
             ),
         )
     except UntrustedHost as error:
-        emit(f"refusing to notify PagerDuty: {error}")
+        emit(f"refusing to notify {vendor.name}: {error}")
         return
     except IncidentError as error:
-        emit(f"the PagerDuty note could not be recorded: {error}; the run is unaffected")
+        emit(f"the {vendor.name} note could not be recorded: {error}; the run is unaffected")
         return
     emit(
-        f"PagerDuty note on {incident_id}: "
+        f"{vendor.name} note on {incident_id}: "
         + ("written" if written.delivered else f"not written ({written.detail})")
     )
 

@@ -11,15 +11,18 @@ from ringdown.audit import DETAIL_LIMIT, append_record, chain_checks, notified_r
 from ringdown.calle import UntrustedHost, assert_trusted_url
 from ringdown.escalate import LadderResult
 from ringdown.exits import EXIT_ACKNOWLEDGED, EXIT_UNKNOWN, EXIT_UNRESOLVED, EXIT_UNVERIFIED
-from ringdown.pagerduty import LIVE_EU, LIVE_URLS, LIVE_US, note_text, post_note
+from ringdown.notes import VENDORS, note_text, post_note
 from tests.data import ALICE, EXTRACTION, an_attempt
+
+PAGERDUTY, OPSGENIE = VENDORS["pagerduty"], VENDORS["opsgenie"]
+REFUSAL = {"error": {"message": "Requester User Not Found"}}
 
 RECEIVED: list[dict] = []
 
 
 class _Notes(BaseHTTPRequestHandler):
     status = 200
-    message = "Requester User Not Found"
+    envelope = REFUSAL
 
     def do_POST(self) -> None:
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
@@ -33,7 +36,7 @@ class _Notes(BaseHTTPRequestHandler):
         self.send_response(type(self).status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps({"error": {"message": type(self).message}}).encode())
+        self.wfile.write(json.dumps(type(self).envelope).encode())
 
     def log_message(self, *_) -> None:
         return
@@ -43,7 +46,7 @@ class _Notes(BaseHTTPRequestHandler):
 def notes():
     RECEIVED.clear()
     _Notes.status = 200
-    _Notes.message = "Requester User Not Found"
+    _Notes.envelope = REFUSAL
     server = HTTPServer(("127.0.0.1", 0), _Notes)
     threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.0005}, daemon=True
@@ -90,7 +93,7 @@ def test_a_ladder_that_placed_no_call_still_renders_a_note():
 def test_the_note_is_posted_where_pagerduty_documents_it(notes):
     _, url = notes
 
-    assert post_note(url, "tok", "ops@example.com", "PBAZLIU", "hello").delivered
+    assert post_note(PAGERDUTY, url, "tok", "ops@example.com", "PBAZLIU", "hello").delivered
 
     sent = RECEIVED[0]
     assert sent["path"] == "/incidents/PBAZLIU/notes"
@@ -101,36 +104,92 @@ def test_the_note_is_posted_where_pagerduty_documents_it(notes):
     assert sent["headers"]["Content-Type"] == "application/json"
 
 
+def test_the_note_is_posted_where_opsgenie_documents_it(notes):
+    _Notes.status = 202
+    _, url = notes
+
+    assert post_note(OPSGENIE, url, "key", "", "a1b2", "hello").delivered
+
+    sent = RECEIVED[0]
+    assert sent["path"] == "/v2/alerts/a1b2/notes?identifierType=id"
+    assert sent["body"] == {"note": "hello", "source": "Ringdown"}
+    assert sent["headers"]["Authorization"] == "GenieKey key"
+    assert "From" not in sent["headers"]
+    assert "Accept" not in sent["headers"]
+
+
+def test_the_same_words_go_to_both_vendors():
+    text = note_text(a_result(), EXIT_ACKNOWLEDGED, 8, "sha256:1ebde0bc")
+
+    assert PAGERDUTY.body(text) == {"note": {"content": text}}
+    assert OPSGENIE.body(text) == {"note": text, "source": "Ringdown"}
+
+
+def test_an_opsgenie_error_reports_the_message_it_puts_at_the_root(notes):
+    _, url = notes
+    _Notes.status = 422
+    _Notes.envelope = {"message": "Alert not found", "took": 0.1}
+
+    written = post_note(OPSGENIE, url, "key", "", "a1b2", "hello")
+
+    assert not written.delivered
+    assert written.detail == "http 422 Alert not found"
+
+
+def test_an_identifier_from_an_alert_payload_cannot_reshape_the_path(notes):
+    _, url = notes
+
+    post_note(OPSGENIE, url, "key", "", "../../v2/alerts/other", "hello")
+
+    assert RECEIVED[0]["path"] == "/v2/alerts/..%2F..%2Fv2%2Falerts%2Fother/notes?identifierType=id"
+
+
 def test_a_refused_note_is_reported_without_raising(notes):
     _Notes.status = 403
 
-    written = post_note(notes[1], "tok", "nobody@example.com", "PBAZLIU", "hello")
+    written = post_note(PAGERDUTY, notes[1], "tok", "nobody@example.com", "PBAZLIU", "hello")
 
     assert not written.delivered
     assert "403" in written.detail
     assert "Requester User Not Found" in written.detail
 
 
-def test_a_host_that_is_not_pagerduty_never_receives_the_token():
+@pytest.mark.parametrize("vendor", VENDORS.values(), ids=list(VENDORS))
+def test_a_lookalike_host_never_receives_the_token(vendor):
     RECEIVED.clear()
 
     with pytest.raises(UntrustedHost):
-        post_note("https://api.pagerduty.com.evil.test", "tok", "ops@example.com", "P1", "hello")
+        post_note(vendor, f"{vendor.live[0]}.evil.test", "tok", "ops@example.com", "P1", "hi")
 
     assert not RECEIVED
 
 
-@pytest.mark.parametrize("live", [LIVE_US, LIVE_EU])
-def test_both_documented_pagerduty_regions_are_trusted(live):
-    assert assert_trusted_url(live, LIVE_URLS) == live
+def test_the_credential_of_one_vendor_is_never_sent_to_the_other():
+    RECEIVED.clear()
+
+    for vendor, other in ((PAGERDUTY, OPSGENIE), (OPSGENIE, PAGERDUTY)):
+        with pytest.raises(UntrustedHost):
+            post_note(vendor, other.live[0], "tok", "ops@example.com", "P1", "hi")
+
+    assert not RECEIVED
+
+
+@pytest.mark.parametrize(
+    "vendor,live",
+    [(vendor, live) for vendor in VENDORS.values() for live in vendor.live],
+)
+def test_both_documented_regions_of_each_vendor_are_trusted(vendor, live):
+    assert assert_trusted_url(live, vendor.live) == live
 
 
 def test_a_provider_error_too_long_for_the_ledger_is_cut_by_whoever_produces_it(notes):
     _, url = notes
     _Notes.status = 400
-    _Notes.message = "The From header is not a valid PagerDuty user: " + "x" * 178
+    _Notes.envelope = {
+        "error": {"message": "The From header is not a valid PagerDuty user: " + "x" * 178}
+    }
 
-    written = post_note(url, "tok", "ops@example.com", "PBAZLIU", "hello")
+    written = post_note(PAGERDUTY, url, "tok", "ops@example.com", "PBAZLIU", "hello")
 
     assert not written.delivered
     assert len(written.detail) == DETAIL_LIMIT
@@ -142,7 +201,7 @@ def test_a_server_that_never_answers_is_reported_as_a_transport_failure(notes):
     server, url = notes
     server.shutdown()
 
-    written = post_note(url, "tok", "ops@example.com", "PBAZLIU", "hello", timeout=0.2)
+    written = post_note(PAGERDUTY, url, "tok", "ops@example.com", "PBAZLIU", "hello", timeout=0.2)
 
     assert not written.delivered
     assert "transport failure" in written.detail
