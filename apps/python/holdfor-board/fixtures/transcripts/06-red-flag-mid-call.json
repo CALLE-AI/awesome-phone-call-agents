@@ -1,0 +1,65 @@
+{
+  "state": "terminal_verified",
+  "outcome": "COMPLETED",
+  "turns": [
+    {
+      "index": 0,
+      "speaker": "agent",
+      "text": "Hello, is that Alan?"
+    },
+    {
+      "index": 1,
+      "speaker": "other",
+      "text": "Yes, that's me."
+    },
+    {
+      "index": 2,
+      "speaker": "agent",
+      "text": "This is an automated call from Fieldgate Surgery. I'm a computer, not a person, so I'll keep this short. You saw someone here on Tuesday, and the practice asked me to check how you've been getting on since. I won't ask you for your date of birth, your address, your bank details or anything like that. I don't need them, and nobody from the practice will ever ask you for them over the phone. If anyone does, it isn't us. Is now a good time? If it isn't, just say so and I'll leave you be."
+    },
+    {
+      "index": 3,
+      "speaker": "other",
+      "text": "Aye, go on then."
+    },
+    {
+      "index": 4,
+      "speaker": "agent",
+      "text": "Since Tuesday, are you feeling better, about the same, or worse?"
+    },
+    {
+      "index": 5,
+      "speaker": "other",
+      "text": "About the same, I'd say."
+    },
+    {
+      "index": 6,
+      "speaker": "agent",
+      "text": "Are you getting on alright with what they gave you?"
+    },
+    {
+      "index": 7,
+      "speaker": "other",
+      "text": "Not really. My lips have swollen up since I started the new ones."
+    },
+    {
+      "index": 8,
+      "speaker": "agent",
+      "text": "Thank you for telling me. That's something a person needs to hear, not a computer, so I'm going to stop here rather than get it wrong. Please ring 111 and tell them what you've just told me. They're there day and night, and they'll decide what happens next. If it feels like an emergency, ring 999. You won't be any trouble to them. That's what the number is for. I'm letting the practice know we spoke, and someone there will see this today, so you are not left on your own with it. So that's 111. Take care, Alan."
+    },
+    {
+      "index": 9,
+      "speaker": "other",
+      "text": "Right. Thank you."
+    }
+  ],
+  "structured": {
+    "feeling": "same",
+    "medication_ok": null,
+    "wants_seen": null,
+    "carried_words_text": null,
+    "carried_words_turn": null,
+    "stop_condition": true,
+    "stop_reason": "red_flag_phrase"
+  }
+}

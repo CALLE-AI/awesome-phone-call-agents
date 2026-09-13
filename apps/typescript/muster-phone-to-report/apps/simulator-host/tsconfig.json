@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/application" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/infrastructure-calle" },
+    { "path": "../../packages/infrastructure-jobs" },
+    { "path": "../../packages/infrastructure-local-evidence" },
+    { "path": "../../packages/infrastructure-postgres" },
+    { "path": "../../packages/infrastructure-twilio-simulator" },
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/testing" }
+  ]
+}

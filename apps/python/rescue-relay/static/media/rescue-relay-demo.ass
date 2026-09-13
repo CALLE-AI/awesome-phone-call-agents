@@ -1,0 +1,30 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1600
+PlayResY: 900
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,DejaVu Sans,24,&H00F5F7F3,&H00F5F7F3,&H00333F19,&H00333F19,0,0,0,0,100,100,0,0,1,0,0,2,45,45,13,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:07.01,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}MEET RESCUE RELAY{\fs24\c&H00F3F7F5&}\NFrom finding an animal in need to bringing the right help together. Fictional example shown.
+Dialogue: 0,0:00:07.11,0:00:14.11,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}TRY A COMPLETE RESCUE{\fs24\c&H00F3F7F5&}\NLoad the example, then make the same decisions you would in your own rescue.
+Dialogue: 0,0:00:14.29,0:00:23.30,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}DESCRIBE WHAT YOU SEE{\fs24\c&H00F3F7F5&}\NA dog cannot put weight on its rear leg. The location and a USD 200 budget are ready to review.
+Dialogue: 0,0:00:23.35,0:00:35.35,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CLARIFY THE OUTCOME{\fs24\c&H00F3F7F5&}\NReview the report. Describe what a successful rescue should include.
+Dialogue: 0,0:00:35.39,0:00:44.39,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}YOUR GOAL, YOUR CHOICE{\fs24\c&H00F3F7F5&}\NCheck the goal and location. Edit anything that is not right before finding help.
+Dialogue: 0,0:00:44.45,0:00:52.46,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}FIND AVAILABLE HELP{\fs24\c&H00F3F7F5&}\NSelect and confirm the goal, then choose Find help to check availability and prices.
+Dialogue: 0,0:00:52.46,0:01:02.46,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}REVIEW THE FIRST OPTION{\fs24\c&H00F3F7F5&}\NGreenway Rescue covers all three tasks. Its USD 300 quote is above your budget.
+Dialogue: 0,0:01:02.51,0:01:10.52,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}FIND ANOTHER OPTION{\fs24\c&H00F3F7F5&}\NKeep your first offer and ask for another option. Your selected plan stays unchanged.
+Dialogue: 0,0:01:10.52,0:01:21.53,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}COMPARE COMPLETE PLANS{\fs24\c&H00F3F7F5&}\NKindred Rescue offers the same requested tasks for USD 150, within your budget.
+Dialogue: 0,0:01:21.56,0:01:28.57,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CHOOSE YOUR PLAN{\fs24\c&H00F3F7F5&}\NChoose the plan that works for you. You stay in control of the final approval.
+Dialogue: 0,0:01:28.61,0:01:40.61,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}READ THE SAVED CONVERSATION{\fs24\c&H00F3F7F5&}\NThe saved conversation keeps the final identity, task, timing and all-in price available for review.
+Dialogue: 0,0:01:41.40,0:01:51.42,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}REVIEW BEFORE APPROVAL{\fs24\c&H00F3F7F5&}\NConfirm the selected helper, included tasks and price limit.
+Dialogue: 0,0:01:51.50,0:02:00.51,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CONFIRM YOUR HELPER{\fs24\c&H00F3F7F5&}\NApprove the plan. The chosen helper is asked to confirm the agreed work and price.
+Dialogue: 0,0:02:00.51,0:02:09.51,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}HELP IS CONFIRMED{\fs24\c&H00F3F7F5&}\NThe helper is ready. Keep the rescue up to date as you hear from them.
+Dialogue: 0,0:02:09.56,0:02:17.57,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}ON THE WAY{\fs24\c&H00F3F7F5&}\NWhen the helper confirms departure, record “On the way”.
+Dialogue: 0,0:02:17.57,0:02:25.57,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}ARRIVAL CONFIRMED{\fs24\c&H00F3F7F5&}\NRecord arrival after it has been confirmed by you or the helper.
+Dialogue: 0,0:02:25.61,0:02:33.62,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}THEIR PART IS FINISHED{\fs24\c&H00F3F7F5&}\NMark the helper’s work as finished once their part of the rescue is complete.
+Dialogue: 0,0:02:33.62,0:02:45.62,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}CLOSE THE LOOP{\fs24\c&H00F3F7F5&}\NAdd where the animal is now, and confirm that it is safe.
+Dialogue: 0,0:02:45.75,0:02:54.76,Default,,0,0,0,,{\fs14\c&H00C6EDD8&}A SAFE PLACE. A FINISHED RESCUE.{\fs24\c&H00F3F7F5&}\NThe closing note, helper updates and conversations remain with your report.

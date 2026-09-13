@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "files": [],
+  "references": [
+    { "path": "packages/domain" },
+    { "path": "packages/contracts" },
+    { "path": "packages/application" },
+    { "path": "packages/infrastructure-postgres" },
+    { "path": "packages/infrastructure-local-evidence" },
+    { "path": "packages/infrastructure-jobs" },
+    { "path": "packages/infrastructure-calle" },
+    { "path": "packages/infrastructure-twilio-simulator" },
+    { "path": "packages/observability" },
+    { "path": "packages/testing" },
+    { "path": "packages/api-client" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" },
+    { "path": "apps/simulator-host" },
+    { "path": "tools/architecture" },
+    { "path": "tools/openapi" },
+    { "path": "tools/toolchain" }
+  ]
+}

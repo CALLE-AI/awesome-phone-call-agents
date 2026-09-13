@@ -1,0 +1,77 @@
+PASS: Demo dialog cancels without a report and restores keyboard focus
+PASS: Draft text does not execute HTML
+SCENE: MEET RESCUE RELAY
+PASS: Opening the app does not create a report or inquiry
+PASS: Walkthrough is accessible from the app
+SCENE: TRY A COMPLETE RESCUE
+SCENE: DESCRIBE WHAT YOU SEE
+PASS: Loading the example saves contacts, not an incident or calls
+SCENE: CLARIFY THE OUTCOME
+PASS: Clarification is still an unsubmitted draft
+SCENE: YOUR GOAL, YOUR CHOICE
+PASS: The exact requested goal is visible before confirmation
+PASS: Ready-to-confirm is not mistaken for permission to call
+SCENE: FIND AVAILABLE HELP
+PASS: Confirming the goal saves it without starting calls
+SCENE: REVIEW THE FIRST OPTION
+PASS: First full-plan quote is PKR 3,000
+PASS: The over-budget warning is shown from the server result
+PASS: An offer does not become an approved callback
+PASS: Technical history is collapsed by default
+PASS: Main dashboard contains user outcomes, not implementation commentary
+SCENE: FIND ANOTHER OPTION
+PASS: Comparing does not silently switch the selected plan
+SCENE: COMPARE COMPLETE PLANS
+PASS: Both complete plans are available for comparison
+SCENE: CHOOSE YOUR PLAN
+PASS: Selecting a plan does not call a helper back
+SCENE: REVIEW BEFORE APPROVAL
+PASS: Approval contains only the selected plan’s responder
+PASS: Missing approval checkbox blocks the callback
+PASS: Cancelling approval creates no callback
+SCENE: CONFIRM YOUR HELPER
+SCENE: HELP IS CONFIRMED
+PASS: Only Kindred Rescue receives an approval callback
+PASS: Confirmation does not invent travel or arrival
+SCENE: ON THE WAY
+SCENE: ARRIVAL CONFIRMED
+SCENE: THEIR PART IS FINISHED
+SCENE: CLOSE THE LOOP
+PASS: Writing a closure note does not close the rescue before confirmation
+SCENE: A SAFE PLACE. A FINISHED RESCUE.
+PASS: The complete start-to-finish rescue is saved
+PASS: The reporter’s closing note is visible on the finished rescue
+PASS: Sound stays off until explicitly enabled
+PASS: rescue has no horizontal overflow at 320px
+PASS: rescue has no horizontal overflow at 390px
+PASS: rescue has no horizontal overflow at 640px
+PASS: rescue has no horizontal overflow at 1280px
+PASS: rescue has no horizontal overflow at 1600px
+PASS: report has no horizontal overflow at 320px
+PASS: report has no horizontal overflow at 390px
+PASS: report has no horizontal overflow at 640px
+PASS: report has no horizontal overflow at 1280px
+PASS: report has no horizontal overflow at 1600px
+PASS: contacts has no horizontal overflow at 320px
+PASS: contacts has no horizontal overflow at 390px
+PASS: contacts has no horizontal overflow at 640px
+PASS: contacts has no horizontal overflow at 1280px
+PASS: contacts has no horizontal overflow at 1600px
+PASS: Contact dialog is available at phone width
+PASS: Phone-width contact dialog cancels with Escape
+PASS: Server advertises the release version
+PASS: Served asset: /static/tutorial.html
+PASS: Served asset: /static/tutorial.css
+PASS: Served asset: /static/tutorial.js
+PASS: Served asset: /static/walkthrough-data.js
+PASS: Served asset: /static/favicon.svg
+PASS: Player opens on the product demo without autoplay
+PASS: Video never autoplays
+PASS: Full tutorial exposes its extra actual chapters
+PASS: Player includes a readable transcript for every chapter
+PASS: Walkthrough player reflows at 320px
+PASS: Walkthrough player reflows at 390px
+PASS: Walkthrough player reflows at 760px
+PASS: Walkthrough player reflows at 1440px
+PASS: No JavaScript page errors across app and player
+58 release browser checks passed

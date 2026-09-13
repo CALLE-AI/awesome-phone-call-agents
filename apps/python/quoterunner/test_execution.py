@@ -12,6 +12,7 @@ import json
 import os
 import unittest
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from unittest import mock
 
@@ -35,7 +36,14 @@ from quoterunner import Candidate
 
 FIXTURE = Path(__file__).parent / "example-candidates.json"
 OPEN_ALL_DAY = "Mo-Su 00:00-23:59"
-MOMENT = datetime(2026, 8, 7, 10, 0, 0)
+# THE MOMENT CARRIES ITS ZONE, AND IT HAS TO. Naive, it was made explicit by
+# `local_now` in the HOST's offset and then converted to the shop's, so this
+# suite returned a different answer depending on the country it ran in. It
+# passes in Chicago and fails in Europe, where a naive 10:00 becomes 03:00 at
+# the shop and lands inside an opening window the test expects to be closed.
+# A suite that depends on its reader's timezone measures the machine, not the
+# code.
+MOMENT = datetime(2026, 8, 7, 10, 0, 0, tzinfo=ZoneInfo("America/Chicago"))
 
 GOOD_QUOTE = {
     "does_this_job": "yes",
@@ -184,6 +192,26 @@ class TestCallArguments(unittest.TestCase):
 
 
 # ----------------------------------------------------------- the gates --
+class TestTheSuiteDoesNotDependOnItsReader(unittest.TestCase):
+    """A suite that passes in one country and fails in another is not a suite.
+
+    `local_now` makes a naive moment explicit in the HOST's offset before
+    converting it to the shop's zone, which is the right behaviour for a real
+    run and the wrong one for a fixture. Pinning the fixture's zone is what
+    keeps the two apart.
+    """
+
+    def test_the_shared_moment_carries_a_zone(self):
+        self.assertIsNotNone(MOMENT.tzinfo)
+
+    def test_the_shop_local_time_is_the_same_whatever_the_host_offset(self):
+        """The property, not the symptom. With an aware moment the host branch
+        of `local_now` is never taken, so no host offset can change the answer."""
+        shop = quoterunner.local_now(candidate(), MOMENT)
+        self.assertEqual(shop.hour, 10)
+        self.assertEqual(str(shop.tzinfo), "America/Chicago")
+
+
 class TestLiveGates(unittest.TestCase):
     """Four independent gates. Any one of them alone stops the call."""
 

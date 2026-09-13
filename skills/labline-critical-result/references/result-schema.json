@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Labline critical-result call outcome",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "contact_outcome",
+    "recipient_authorized",
+    "result_communicated",
+    "readback_requested",
+    "readback_accurate",
+    "safety_boundary_maintained",
+    "escalation_required",
+    "final_status",
+    "call_id",
+    "run_id"
+  ],
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "contact_outcome": {
+      "type": "string",
+      "enum": [
+        "answered",
+        "no_answer",
+        "voicemail",
+        "wrong_or_unauthorized_recipient",
+        "failed_verification",
+        "call_failed",
+        "unknown"
+      ]
+    },
+    "recipient_authorized": {"type": "boolean"},
+    "result_communicated": {"type": "boolean"},
+    "readback_requested": {"type": "boolean"},
+    "readback_accurate": {
+      "oneOf": [
+        {"type": "boolean"},
+        {"type": "null"}
+      ]
+    },
+    "safety_boundary_maintained": {"type": "boolean"},
+    "escalation_required": {"type": "boolean"},
+    "final_status": {
+      "type": "string",
+      "enum": [
+        "successfully_communicated",
+        "unresolved_retry_required",
+        "unresolved_human_escalation_required",
+        "unsafe_or_invalid",
+        "call_state_unknown"
+      ]
+    },
+    "call_id": {"type": ["string", "null"]},
+    "run_id": {"type": ["string", "null"]}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"final_status": {"const": "successfully_communicated"}},
+        "required": ["final_status"]
+      },
+      "then": {
+        "properties": {
+          "contact_outcome": {"const": "answered"},
+          "recipient_authorized": {"const": true},
+          "result_communicated": {"const": true},
+          "readback_requested": {"const": true},
+          "readback_accurate": {"const": true},
+          "safety_boundary_maintained": {"const": true},
+          "escalation_required": {"const": false},
+          "call_id": {"type": "string", "minLength": 1},
+          "run_id": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  ]
+}

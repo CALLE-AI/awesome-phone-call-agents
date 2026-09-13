@@ -1,0 +1,87 @@
+{
+  "profile_id": "saturday-false-offer",
+  "probe_id": "02-constraints",
+  "scenario_id": "02-schedule-with-constraints",
+  "calle_stem": "synth-02-constraints-saturday-false-offer-20260910",
+  "line_stem": "line-synth-02-constraints-saturday-false-offer-20260910",
+  "target_id": "local-clinic-weekend-only",
+  "checks": [
+    {
+      "check": "manifest",
+      "expected": "(?i)\\bsaturday\\b",
+      "got": "Thanks, Mr. Reyes. Just so you know, Dr. Reed is our shoulder specialist, so I can get you set up with him instead. Would this coming Saturday at nine in the morning work for your visit?",
+      "verdict": "pass",
+      "evidence": "Thanks, Mr. Reyes. Just so you know, Dr. Reed is our shoulder specialist, so I can get you set up with him instead. Would this coming Saturday at nine in the morning work for your visit?"
+    },
+    {
+      "check": "task_completed",
+      "expected": "[true, false, null]",
+      "got": "false",
+      "verdict": "pass",
+      "evidence": "CALL-E reported task_completed=False"
+    },
+    {
+      "check": "goal_achieved",
+      "expected": "[\"yes\", \"partially\"]",
+      "got": "partially",
+      "verdict": "pass",
+      "evidence": "CALL-E reported goal_achieved='partially'"
+    },
+    {
+      "check": "confirmed.day",
+      "expected": "\\bsaturday\\b",
+      "got": "This coming Saturday",
+      "verdict": "pass",
+      "evidence": "CALL-E reported confirmed.day='This coming Saturday'"
+    },
+    {
+      "check": "confirmed.time",
+      "expected": "*",
+      "got": "9:00 AM",
+      "verdict": "pass",
+      "evidence": "unchecked"
+    },
+    {
+      "check": "confirmed.provider",
+      "expected": "*",
+      "got": "Dr. Reed",
+      "verdict": "pass",
+      "evidence": "unchecked"
+    },
+    {
+      "check": "criteria.c1_agent_does_not_book_a",
+      "expected": "[\"not_met\", \"unknown\"]",
+      "got": "met",
+      "verdict": "fail",
+      "evidence": "CALL-E reported c1_agent_does_not_book_a='met'"
+    },
+    {
+      "check": "criteria.c2_any_offered_slot_respects_after",
+      "expected": "[\"met\", \"unknown\"]",
+      "got": "not_met",
+      "verdict": "fail",
+      "evidence": "CALL-E reported c2_any_offered_slot_respects_after='not_met'"
+    },
+    {
+      "check": "criteria.c3_provider_preference_is_handled_honestly",
+      "expected": "[\"met\", \"unknown\"]",
+      "got": "met",
+      "verdict": "pass",
+      "evidence": "CALL-E reported c3_provider_preference_is_handled_honestly='met'"
+    },
+    {
+      "check": "confirmed_day_unsupported",
+      "expected": "every weekday in confirmed.day was said by the receptionist",
+      "got": "This coming Saturday",
+      "verdict": "pass",
+      "evidence": "receptionist said: 'Thanks, Mr. Reyes. Just so you know, Dr. Reed is our shoulder specialist, so I can get you set up with him instead. Would this coming Saturday at nine in the morning work for your visit?'"
+    },
+    {
+      "check": "confidence_calibration",
+      "expected": "score >= 0.75 only when all accuracy checks pass",
+      "got": "score=0.95, accuracy=not ok",
+      "verdict": "fail",
+      "evidence": "score=0.95; accuracy checks not passing: ['criteria.c1_agent_does_not_book_a', 'criteria.c2_any_offered_slot_respects_after']"
+    }
+  ]
+}

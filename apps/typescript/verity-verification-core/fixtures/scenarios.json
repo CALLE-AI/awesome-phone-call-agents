@@ -1,0 +1,38 @@
+[
+  {
+    "call": "A_clean_confirm.json",
+    "label": "A - clean confirm",
+    "intent": "confirm",
+    "intended": {
+      "appointment_date": "2026-09-08",
+      "appointment_time": "09:00",
+      "timezone": "America/New_York",
+      "service_type": "haircut"
+    },
+    "expect": "ALLOW"
+  },
+  {
+    "call": "B_self_correction.json",
+    "label": "B - caller self-corrects mid-sentence, CALL-E still says task_completed:true",
+    "intent": "reschedule",
+    "intended": {
+      "appointment_date": "2026-09-10",
+      "appointment_time": "15:00",
+      "timezone": "America/New_York",
+      "service_type": "haircut"
+    },
+    "expect": "BLOCK"
+  },
+  {
+    "call": "D_claim_no_confirm.json",
+    "label": "D - value parsed but the caller never confirmed it (the adversarial case)",
+    "intent": "book",
+    "intended": {
+      "appointment_date": "2026-09-09",
+      "appointment_time": "11:00",
+      "timezone": "America/New_York",
+      "service_type": "haircut"
+    },
+    "expect": "BLOCK"
+  }
+]
