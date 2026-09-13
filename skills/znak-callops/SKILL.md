@@ -13,7 +13,8 @@ answer, and a quote present in a transcript is not independent proof of its trut
 ## Setup and verification
 
 Requires Python 3.10+ for the local helper, and an Agent Skills-compatible host
-with authenticated CALL-E MCP tools for live calls. Copy this whole directory to
+with authenticated CALL-E MCP tools or Python 3.11+ with the optional official SDK
+adapter for live calls. Copy this whole directory to
 the host's skill directory. For Codex, use `~/.codex/skills/znak-callops/`.
 Use [references/call-e.md](references/call-e.md) to connect the official provider.
 The helper uses only Python's standard library and never connects to a network.
@@ -28,6 +29,10 @@ python3 -m unittest discover -s skills/znak-callops/scripts -p 'test_*.py'
 Read [references/examples.md](references/examples.md) for inputs, expected results,
 and manual verification. These tests exercise local code, not the CALL-E service.
 The live host integration has not been verified by a real call in this contribution.
+For the optional executable SDK path, read
+[references/sdk-dispatch.md](references/sdk-dispatch.md). `dispatch.py` defaults to
+a no-network preview and imports the official SDK only after explicit live/read
+opt-in. No live CALL-E call has been verified through either path.
 
 ## Workflow
 

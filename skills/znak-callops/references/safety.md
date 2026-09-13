@@ -2,8 +2,10 @@
 
 ZNAK CallOps is a service availability and price inquiry. Its local Python helper
 only reads JSON and writes results to stdout. It has no network or booking path.
-The live Agent Skills host can place one real phone call through CALL-E and may
-consume provider credits. Installing the skill or running its demo does not call.
+The live Agent Skills host or explicitly enabled SDK adapter can place one real
+phone call through CALL-E and may consume provider credits. Installing the skill
+or running its demo or adapter preview does not call. Read `sdk-dispatch.md` for
+the adapter's opt-in flags and private receipt handling.
 
 Before live dispatch, resolve purpose-specific user intent, the recipient's
 authorization to receive this call, and a known E.164 destination. A local
