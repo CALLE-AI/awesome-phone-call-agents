@@ -77,10 +77,11 @@ python -m firstbell --work-file examples/absences.csv
 That dials nobody, costs nothing and needs no CALL-E account. It prints one line per row and
 a total that does not add the middle outcome to the successes.
 
-There is a demo film, 2 minutes 40. The greeting is a recording of me, every
-other line is a voice clone of the same speaker, and the call you hear in it is the parent's
-own voice from the recording CALL-E returned. Its running time, loudness and hash are
-measured into [`evidence/film.json`](evidence/film.json) rather than typed.
+There is a demo film, 2 minutes 44. The greeting is a recording of me, every
+other line is a voice clone of the same speaker, and the call you hear in it is the recording
+CALL-E returned, played in one unbroken cut, with the part of the person who answered read
+by a volunteer. Its running time, loudness and hash are measured into
+[`evidence/film.json`](evidence/film.json) rather than typed.
 
 ![The path of one absence row, left to right. Two checks come first: a family with no consent is never dialled, and a family the telephone cannot reach goes straight to a person. Then a short instruction in the family's own language, with the automated-caller disclosure before anything is asked. Then CALL-E places the call, under a cap on how many families are rung at once, one idempotency key per row, polled to the end. Then exactly one of three endings: resolved, owned by nobody; undetermined and failed, both owned by a person. A safeguarding escalation runs as a second axis, leaving resolved and undetermined but never failed, because a call that reached nobody has no answer to read a rule against.](docs/images/the-path-of-one-absence.svg)
 
