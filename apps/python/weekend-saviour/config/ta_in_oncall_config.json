@@ -1,0 +1,16 @@
+{
+  "shift_name": "Sunday Night CDT Retail Data Platform On-Call Roster",
+  "date": "2026-09-06",
+  "timezone": "America/Chicago (CDT)",
+  "engineer": {
+    "name": "Alex Morgan",
+    "role": "Senior Retail Data Platform Engineer (Weekend On-Call)",
+    "phone": "+15550199",
+    "email": "alex.morgan@example.com",
+    "calle_id": "user_alex_01",
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "ta-IN",
+    "userid": "a7m9x1"
+  }
+}
