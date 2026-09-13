@@ -85,7 +85,7 @@ The missing information lives with the person answering the business phone. CALL
 
 The direct HTTP adapter lives in [server/calle.ts](server/calle.ts). It uses the documented CALL-E Calls API; it does not depend on a private SDK or agent CLI login.
 
-**Live validation boundary:** earlier app-originated calls established runtime execution and transcript persistence. The latest recorded call kept the budget private but failed the intended negotiation and had screening and role-confusion problems. Policy 1.3.0 addresses those behaviors in its instructions and local regressions; it has not yet been validated in another live call. CALL-E controls speech and does not invoke the local rehearsal controller before each turn. See the [observed verification record](docs/VERIFICATION.md).
+**Live validation boundary:** earlier app-originated calls established runtime execution and transcript persistence. The latest recorded call kept the budget private but failed the intended negotiation and had screening and role-confusion problems. Policy 1.3.0 addresses those behaviors in its instructions and local regressions; it has not yet been validated in another live call. CALL-E controls speech and does not invoke the local rehearsal controller before each turn.
 
 ## Architecture Overview
 
@@ -155,7 +155,7 @@ For a second path, start a fresh sample and explore the supported budget revisio
 
 ### Real inquiries
 
-The [live test guide](docs/LIVE_TEST_PROTOCOL.md) explains server credentials, consenting recipients, authorized accounts, calling hours and call limits. Each real inquiry requires approval of its current plan. Phone numbers are masked in the interface; secrets stay on the server.
+The [live-call setup guide](docs/DEPLOYMENT.md#live-call-setup) explains server credentials, consenting recipients, authorized accounts, calling hours and call limits. Each real inquiry requires approval of its current plan. Phone numbers are masked in the interface; secrets stay on the server.
 
 **Stop future calls** stops queued work. It does not cancel a call already accepted by CALL-E. Closing the browser does not cancel it either. There are no recurring call schedules.
 
@@ -214,7 +214,7 @@ readycheck/
 ├── server/               # Sessions, SQLite, orchestration and CALL-E adapter
 ├── tests/                # Domain, HTTP, fault and browser regressions
 ├── scripts/              # Evaluation, rehearsal, readiness and backup utilities
-├── docs/                 # Focused architecture, operations and submission guides
+├── docs/                 # Architecture, deployment and product screenshots
 ├── public/notices/       # Bundled font licenses
 ├── .github/workflows/    # Reproducible CI
 ├── Dockerfile            # Persistent Node deployment
@@ -234,17 +234,6 @@ readycheck/
 
 This app supports factual repair, item/rental and venue inquiries. It is not a workflow for medical, legal, financial or emergency decisions.
 
-## Challenge Alignment
-
-| Judging area              | ReadyCheck evidence                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------- |
-| Real World Impact         | A specific everyday coordination problem: finding an option that meets every material requirement |
-| Quality of the Idea       | Evidence review, focused follow-ups and explicit tradeoffs carry the task beyond call completion  |
-| Technical Implementation  | Runtime CALL-E integration, constrained extraction, durable recovery and reproducible fault tests |
-| Product Experience & Demo | Guided request-to-outcome workflow with responsive UI and a credential-free sample path           |
-
-See the [submission package](docs/SUBMISSION.md) for release links, demo narration and entry text. The [official rules](https://call-e.devpost.com/rules) remain the source of truth for submission requirements.
-
 ## Deployment and Current Boundary
 
 The [deployment guide](docs/DEPLOYMENT.md) covers a single persistent Node container, SQLite storage, backups and recovery. The public fictional demo runs on Railway Hobby with a persistent volume and live calling disabled. A Render Blueprint remains available as an alternative. Hosting usage is monitored with a $5 alert and a $10 hard limit; hitting the limit takes the demo offline. The sample experience works locally without hosting access.
@@ -254,10 +243,7 @@ ReadyCheck is a working prototype with an opt-in live integration. Public busine
 ## Technical References
 
 - [Architecture and evidence behavior](docs/ARCHITECTURE.md)
-- [Observed verification and limitations](docs/VERIFICATION.md)
-- [Controlled live-call protocol](docs/LIVE_TEST_PROTOCOL.md)
 - [Deployment, backups and recovery](docs/DEPLOYMENT.md)
-- [Submission package](docs/SUBMISSION.md)
 
 ## License
 

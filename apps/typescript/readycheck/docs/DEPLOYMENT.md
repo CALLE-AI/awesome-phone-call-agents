@@ -1,20 +1,25 @@
-# ReadyCheck pilot operations
+# Deployment and operations
 
 Run one Node instance with HTTPS and persistent storage: `/var/data` on Render or a volume at `/app/data` with Docker. Keep `LIVE_CALLS_ENABLED=false` for the sample pilot. The application has no public business discovery, email verification or password recovery service. An operator must be available before inviting users to depend on it.
 
-## Railway Hobby deployment
+## Railway deployment
 
-The public fictional demo is [readycheck-demo.up.railway.app](https://readycheck-demo.up.railway.app). Railway accepted and built the tracked-only release **918659b** on September 13, 2026, after the workspace upgraded to Hobby. The API reports the active plan as `HOBBY` and deployment `76b9730d-1df0-48b1-b0e6-d226a1a68022` as successful.
+The public [ReadyCheck demo](https://readycheck-demo.up.railway.app) runs on Railway with fictional samples and live calling disabled. It uses one Node 24 container and a persistent volume at `/app/data`. The service sleeps when idle, so the first visit may take a moment to load.
 
-The deployment uses the root Dockerfile, one instance, sleep when idle, `/api/health`, port 3000 and HTTPS `APP_ORIGIN`. Its 500 MB volume is mounted at `/app/data`; `DATABASE_PATH=/app/data/readycheck-20260913.sqlite` keeps ReadyCheck separate from pre-existing files. `RAILWAY_RUN_UID=0` lets the existing container entry point prepare only its configured database paths, then drop to the `node` user before starting the application. The previous repository source was disconnected; this release was uploaded with the CLI, so GitHub pushes do not currently auto-deploy.
+To deploy your own instance:
 
-Live calling is disabled, with no CALL-E key or permitted live recipients/accounts. The local development database and private call artifacts were excluded from the upload. Judge access uses fictional samples without account creation; signup remains optional.
+1. Deploy the root Dockerfile with one service instance and a persistent volume mounted at `/app/data`.
+2. Set `NODE_ENV=production`, `PORT=3000`, `BIND_HOST=0.0.0.0`, and `APP_ORIGIN` to the service's HTTPS URL.
+3. Set `DATABASE_PATH` to a SQLite file under the mounted volume. Keep this path stable across releases.
+4. Keep `LIVE_CALLS_ENABLED=false`, `TEST_RECIPIENTS_JSON=[]`, and `LIVE_USER_IDS` empty for a fictional demo. Leave `CALLE_API_KEY` unset.
+5. If the volume requires root initialization, set `RAILWAY_RUN_UID=0`. The container entry point prepares its configured database paths, then drops to the `node` user before starting the application.
+6. Configure `/api/health` as the health check. After deployment, run a fictional repair case, create a test account, save an outcome, and restart the service. Sign in again and verify the saved records survived.
 
-Hobby costs a $5 monthly minimum including $5 of resource usage, with extra usage billed above that allowance. A **$5 compute-usage email alert and $10 hard limit** are configured. Railway rejected a $5 hard limit because its minimum positive hard limit is $10. Reaching the hard limit takes the service offline; monitor usage through judging. Sleep can also introduce a delay on the first request after inactivity. [Pricing](https://railway.com/pricing) and [usage controls](https://docs.railway.com/pricing/cost-control).
+The hosted demo currently uses CLI uploads; GitHub pushes do not auto-deploy. For a CLI release, upload a tracked-only checkout with `railway up --project <project-id> --service <service-id> --environment production --detach`. Preserve the existing volume and database path. Never upload a development database, local credentials or private call artifacts.
 
-The hosted repair workflow, signup, fresh sign-in, export and mobile evidence checks passed. A service restart preserved the synthetic account, case and saved outcome. See the [verification record](VERIFICATION.md) for the tested scope.
+Configure usage alerts and a spending limit in the hosting dashboard. Reaching a hard limit takes the service offline. Monitor usage while providing public access.
 
-For future releases, upload a tracked-only checkout with `railway up --project <project-id> --service <service-id> --environment production --detach`. Wait for deployment success, check `/api/health`, and run the fictional repair walkthrough. Preserve the volume and database filename. A healthy build alone does not establish data persistence; see the [verification record](VERIFICATION.md) for observed checks.
+The hosted repair workflow, signup, fresh sign-in, export and mobile evidence checks passed. A service restart preserved a synthetic account, case and saved outcome. Hosted backup/restore and load testing remain outstanding.
 
 ## Render alternative
 
@@ -33,7 +38,7 @@ After provisioning:
 3. Create a synthetic test account, save a case, sign out and sign back in.
 4. Restart this service, sign in again, and verify the saved case and revisions survived.
 5. Inspect the mounted disk and confirm `DATABASE_PATH=/var/data/readycheck.sqlite`.
-6. Keep the service accessible through the judging period and record the URL and tested commit in the verification record.
+6. Keep the service accessible through the judging period and record the URL and tested commit in your release notes.
 
 Only data under the disk mount persists. A disk-backed service uses one instance and has brief restart downtime during deploys. CI-gated automatic deployment is configured; deployments wait for repository checks. [Blueprint reference](https://render.com/docs/blueprint-spec).
 
@@ -70,3 +75,35 @@ Account support currently means helping a user recover access through an establi
 ## Rollback or disable
 
 Set `LIVE_CALLS_ENABLED=false` and restart to prevent new dispatches. This does not cancel an active provider call. Use the application's stop-future-calls action for queued plans and retain inquiry records for reconciliation. Roll back the application image only if it supports the existing database schema; never replace the live volume with an older snapshot as a routine code rollback.
+
+## Live-call setup
+
+Regular tests and rehearsals never place calls. A live inquiry needs a configured server key, an authorized account, a consenting recipient and approval of its reviewed plan in the app.
+
+Copy `.env.example` to `.env` if no local configuration exists. Set:
+
+| Variable                                      | Purpose                                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `CALLE_API_KEY`                               | Server-side CALL-E API key; separate from CLI OAuth credentials                     |
+| `APP_ORIGIN`                                  | Exact browser origin, including protocol and port                                   |
+| `TEST_RECIPIENTS_JSON`                        | Consenting participants: `id`, `name`, E.164 `phone`, `consentRef`, IANA `timezone` |
+| `LIVE_USER_IDS`                               | Exact registered account IDs, available in Connection                               |
+| `MAX_CALLS_PER_DAY`, `MAX_CALLS_PER_USER_DAY` | Global and account dispatch limits                                                  |
+| `CALL_WINDOW_START`, `CALL_WINDOW_END`        | Recipient-local same-day hours: start 0–23, end 1–24                                |
+| `LIVE_CALLS_ENABLED`                          | Explicit server enablement; defaults to false                                       |
+
+Run `npm run live:check` (or add `-- --json`). It checks local configuration, database access and authorized accounts without network requests or printing private values. Exit code 1 means setup is incomplete. It does not verify credits or call creation. Restart after changing environment settings.
+
+**Connection → Check existing-call access** performs a provider GET for an owned saved inquiry, or optional `CALLE_VERIFICATION_CALL_ID`. Use the API call-task ID, not the dashboard's telephone-attempt ID. This check works with calling disabled, is limited to once per minute and does not create a call.
+
+Before enabling broader use, validate the caller with consenting participants across negotiation, screening, hold, refusal and uncertain-answer scenarios. Review the transcript against the original requirements. A completed call does not establish a successful task. The current policy 1.3.0 has local regression coverage but still needs live validation. Disable calling after the approved session.
+
+## Lost responses and recovery
+
+A create timeout does not prove that no call happened. Keep the inquiry and reservation paused; do not redial or generate a replacement key.
+
+- With an API task ID, use the app's reconciliation action. It reads the existing task and attaches it only when `readycheck_inquiry_id` matches.
+- Without an ID, the app offers **Recover original request once** while the approved plan is current, live access is enabled and recipient routing, consent and calling hours still match. It replays the **exact persisted body and original idempotency key**, using the [documented recovery contract](https://docs.heycall-e.com/calls#recover-after-a-restart-or-lost-response). If the first request never arrived, this can start the approved call now. It retains the existing budget reservation. A persisted marker blocks another replay, including after a restart.
+- If request recovery fails, use the saved call reference for read-only reconciliation or contact the provider. Expired, changed, stopped or disabled requests permit ID reconciliation only. Never rebuild the payload or invent a replacement key.
+- Once the ID is known, refresh/restart should resume reads of that ID. Use mocked fault tests for deliberate response-loss experiments.
+- “Stop future calls” stops queued work; it does not cancel an active provider call.
