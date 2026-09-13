@@ -497,29 +497,36 @@ function withinRateLimit(req, actor) {
 
 /**
  * Generate a deterministic demo result for a pharmacy without placing a call.
- * Status is derived from the last digit of the phone number for variety.
+ * The pharmacy position selects a fixed scenario so demo comparisons are
+ * repeatable and the first two providers have different confirmed quotes.
  * @param {Pharmacy} pharmacy - Pharmacy to generate a demo result for.
  * @param {string} medicine - Medicine name being checked.
+ * @param {number} index - Pharmacy position in the submitted shortlist.
  * @returns {CallResult} Demo call result with mode "demo".
  * @param {Object} productRequest - Structured product specifications, when supplied.
  */
-function demoResult(pharmacy, medicine, productRequest) {
-  const seeds = ["in_stock", "limited", "out_of_stock"];
-  const status = seeds[Number(pharmacy.phone.at(-1)) % seeds.length];
+function demoResult(pharmacy, medicine, index, productRequest) {
+  const scenarios = [
+    { status: "in_stock", price: 600, quantity: 30, availableQuantity: 120 },
+    { status: "in_stock", price: 900, quantity: 60, availableQuantity: 180 },
+    { status: "limited", price: 750, quantity: 30, availableQuantity: 30 },
+  ];
+  const scenario = scenarios[index % scenarios.length];
+  const { status, price, quantity, availableQuantity } = scenario;
   return {
     pharmacy: pharmacy.name,
     phone: maskPhone(pharmacy.phone),
     distanceKm: pharmacy.distanceKm,
     result: {
       offers: productRequest ? [{
-        medicine, brand: productRequest.brand || (Number(pharmacy.phone.at(-1)) % 2 ? "Example Brand A" : "Example Brand B"),
+        medicine, brand: productRequest.brand,
         strength: `${productRequest.strengthValue} ${productRequest.strengthUnit}`, form: productRequest.form,
         releaseType: productRequest.releaseType, exactMatch: true, stock_status: status,
         pickup_readiness: status === "in_stock" ? "ready_today" : "not_confirmed_today",
-        price: Number(pharmacy.phone.at(-1)) % 2 ? 600 : 900,
-        quantity: Number(pharmacy.phone.at(-1)) % 2 ? 30 : 60,
+        price,
+        quantity,
         purchaseMode: "whole_pack",
-        availableQuantity: status === "out_of_stock" ? 0 : status === "limited" ? 60 : 180,
+        availableQuantity,
         unit: ({ Tablet: "tablet", Capsule: "capsule", Syrup: "mL", Suspension: "mL", Cream: "g" })[productRequest.form] || "unknown",
         currency: "KES", priceType: "exact", quote: "Fictional demo pack price; not a real pharmacy quote.",
       }] : [],
@@ -1249,7 +1256,7 @@ async function handlePostCheck(req, res, actor) {
           return runLiveCall(p, medicine, strength, providerIdempotencyKey, productRequest, phase => { progress.phases[index] = phase; })
             .finally(() => { progress.phases[index] = "finished"; });
         }))
-      : clean.map((p) => ({ status: "fulfilled", value: demoResult(p, medicine, productRequest) }));
+      : clean.map((p, index) => ({ status: "fulfilled", value: demoResult(p, medicine, index, productRequest) }));
 
     const results = calls
       .map((item, index) =>

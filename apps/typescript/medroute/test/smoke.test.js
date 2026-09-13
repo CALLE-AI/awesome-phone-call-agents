@@ -119,18 +119,19 @@ test("a live request without credentials fails explicitly and saves no demo resu
   } finally { await app.close(); }
 });
 
-test("structured demo quotes preserve product details, prices, and unknown distances", async () => {
+test("structured demo quotes preserve the requested brand and offer different comparable prices", async () => {
   const app = await startServer();
   try {
     const productRequest = { strengthValue: "500", strengthUnit: "milligrams", form: "Tablet", releaseType: "standard", brand: "Example brand" };
-    const response = await app.request("/api/check", { method: "POST", body: JSON.stringify(checkBody({ productRequest, pharmacies: [{ ...pharmacies[0], distanceKm: "" }] })) });
+    const response = await app.request("/api/check", { method: "POST", body: JSON.stringify(checkBody({ productRequest, pharmacies: [{ ...pharmacies[0], distanceKm: "" }, pharmacies[1]] })) });
     assert.equal(response.status, 200);
     const record = await response.json();
     assert.equal(record.schemaVersion, 2);
     assert.deepEqual(record.productRequest, productRequest);
-    assert.equal(record.results[0].distanceKm, null);
-    assert.equal(record.results[0].result.offers[0].brand, "Example brand");
-    assert.equal(record.results[0].result.offers[0].price, 600);
+    assert.equal(record.results.some(item => item.distanceKm === null), true);
+    assert.deepEqual(record.results.map(item => item.result.offers[0].brand), ["Example brand", "Example brand"]);
+    assert.deepEqual(record.results.map(item => item.result.offers[0].price).sort((a, b) => a - b), [600, 900]);
+    assert.deepEqual(record.results.map(item => item.result.offers[0].stock_status), ["in_stock", "in_stock"]);
     const history = await (await app.request("/api/history")).json();
     assert.deepEqual(history.history[0], record);
   } finally { await app.close(); }
