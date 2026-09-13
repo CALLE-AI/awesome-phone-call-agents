@@ -13,7 +13,7 @@ and puts that call on a named person's desk.**
 
 **A call that reached a parent and learned nothing is not a family contacted.** Tools in this
 category file it as one, and that single rule is the whole design: three endings, not two,
-and only one of them closes a record. Twelve real calls to real families were placed on
+and only one of them closes a record. Twelve real calls to consented test lines were placed on
 4 September 2026. Eight are published here with their recordings and transcripts.
 
 <table>
