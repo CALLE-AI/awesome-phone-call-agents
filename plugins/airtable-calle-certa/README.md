@@ -2,6 +2,10 @@
 
 **Certa verifies someone's employment by phone: calling only employers the applicant consented to, never the phone number the applicant supplied, and returning a typed answer instead of a voicemail.**
 
+![Certa: it verifies employment by phone, and refuses the number on the form](assets/certa-cover.jpg)
+
+**[Demo video](https://vimeo.com/1226396799)** &nbsp;·&nbsp; **[Landing page](https://sooryacodes.github.io/certa/)** &nbsp;·&nbsp; **[Pull request](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/552)**
+
 A workflow plugin for Airtable, built on the CALL-E Developer API. Submitted to the **Workflow Plugins** contribution area for *CALL-E: Your Code Is Calling*, targeting **Most Practical Use Case**.
 
 **macOS** — double-click `Certa.command`
@@ -176,6 +180,8 @@ Two rules come from [CALL-E's own documentation](https://docs.heycall-e.com/) ra
 
 Add a question by adding a column. `tests/test_airtable.py` asserts that.
 
+![A single select's choices become the enum, its description becomes the extraction instruction](assets/schema-from-columns.jpg)
+
 ---
 
 ## Correctness
@@ -223,6 +229,8 @@ whose columns cannot express it is refused at setup.
 
 **Fails closed, always.** Low confidence, a positive claim with no supporting evidence string, or any internal contradiction all route to human review. `tests/test_calle.py` asserts **no rule can promote a result** — every gate can only move a disposition toward review.
 
+![Every gate moves a disposition only toward review; none can promote one](assets/disposition-gates.jpg)
+
 **Hash-chained audit log.** Editing a record, deleting one from the middle, or reordering all break the chain, and `verify_chain()` names the sequence number. Records are fsynced before the call they authorise is dispatched: a record with no call is recoverable, a call with no record is not.
 
 ---
@@ -258,6 +266,8 @@ sequenceDiagram
   C->>C: append call.interpreted
   C-->>O: dispositions, with reasons
 ```
+
+![The console previewing a run: one call, five cents, and the row it refuses](assets/console-preview.jpg)
 
 ### Live testing, stated precisely
 
