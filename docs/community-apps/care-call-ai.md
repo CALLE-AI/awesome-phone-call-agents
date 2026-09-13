@@ -8,6 +8,7 @@ into human-reviewed support requests and printable handoff sheets.
 - Repository: [https://github.com/NeoSPU/care-call-ai](https://github.com/NeoSPU/care-call-ai)
 - Live application: [https://care.alexraixon.com](https://care.alexraixon.com)
 - Project landing: [https://about.care.alexraixon.com](https://about.care.alexraixon.com)
+- Demo video: [https://youtu.be/Hc2bWjTnKFQ](https://youtu.be/Hc2bWjTnKFQ)
 
 The live application is deployed separately. The public repository is a
 sanitized, runnable hackathon edition with fictional seed data, automated
