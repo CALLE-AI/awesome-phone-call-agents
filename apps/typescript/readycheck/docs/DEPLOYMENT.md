@@ -2,7 +2,21 @@
 
 Run one Node instance with HTTPS and persistent storage: `/var/data` on Render or a volume at `/app/data` with Docker. Keep `LIVE_CALLS_ENABLED=false` for the sample pilot. The application has no public business discovery, email verification or password recovery service. An operator must be available before inviting users to depend on it.
 
-## Render deployment
+## Railway Hobby deployment
+
+The public fictional demo is [readycheck-demo.up.railway.app](https://readycheck-demo.up.railway.app). Railway accepted and built the tracked-only release **918659b** on September 13, 2026, after the workspace upgraded to Hobby. The API reports the active plan as `HOBBY` and deployment `76b9730d-1df0-48b1-b0e6-d226a1a68022` as successful.
+
+The deployment uses the root Dockerfile, one instance, sleep when idle, `/api/health`, port 3000 and HTTPS `APP_ORIGIN`. Its 500 MB volume is mounted at `/app/data`; `DATABASE_PATH=/app/data/readycheck-20260913.sqlite` keeps ReadyCheck separate from pre-existing files. `RAILWAY_RUN_UID=0` lets the existing container entry point prepare only its configured database paths, then drop to the `node` user before starting the application. The previous repository source was disconnected; this release was uploaded with the CLI, so GitHub pushes do not currently auto-deploy.
+
+Live calling is disabled, with no CALL-E key or permitted live recipients/accounts. The local development database and private call artifacts were excluded from the upload. Judge access uses fictional samples without account creation; signup remains optional.
+
+Hobby costs a $5 monthly minimum including $5 of resource usage, with extra usage billed above that allowance. A **$5 compute-usage email alert and $10 hard limit** are configured. Railway rejected a $5 hard limit because its minimum positive hard limit is $10. Reaching the hard limit takes the service offline; monitor usage through judging. Sleep can also introduce a delay on the first request after inactivity. [Pricing](https://railway.com/pricing) and [usage controls](https://docs.railway.com/pricing/cost-control).
+
+The hosted repair workflow, signup, fresh sign-in, export and mobile evidence checks passed. A service restart preserved the synthetic account, case and saved outcome. See the [verification record](VERIFICATION.md) for the tested scope.
+
+For future releases, upload a tracked-only checkout with `railway up --project <project-id> --service <service-id> --environment production --detach`. Wait for deployment success, check `/api/health`, and run the fictional repair walkthrough. Preserve the volume and database filename. A healthy build alone does not establish data persistence; see the [verification record](VERIFICATION.md) for observed checks.
+
+## Render alternative
 
 The root [render.yaml](../render.yaml) defines a Node 24 web service, one instance, a 1 GB persistent disk at `/var/data`, and `/api/health` checks. It builds with `npm ci --include=dev && npm run build`, then starts the existing Express application. The start command uses Render's generated HTTPS URL as `APP_ORIGIN` unless an explicit custom origin is configured. This keeps session cookies and origin validation aligned.
 
@@ -34,8 +48,10 @@ Server REST credentials belong in the host's secret controls only. CALL-E CLI OA
 Use Node 24 for the operation below (the backup API requires at least Node 22.16). Run as the application user inside the container:
 
 ```sh
-node scripts/backup.mjs /var/data/backups
+node scripts/backup.mjs /app/data/backups
 ```
+
+On Render, use `/var/data/backups` instead.
 
 The script uses [SQLite's online backup API through Node](https://nodejs.org/api/sqlite.html#sqlitebackupsourceDb-path-options), opens the source read-only, creates a unique private directory and validates the resulting snapshot with `PRAGMA integrity_check`. It includes committed WAL transactions and never overwrites an earlier snapshot. Only the output path is printed. A failed command is not a successful backup.
 

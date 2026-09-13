@@ -43,11 +43,20 @@ The September 13 release passed typechecking, 175 tests across 19 suites, all 45
 
 [GitHub CI run 34779858009](https://github.com/ankitlade12/readycheck/actions/runs/34779858009) passed on Ubuntu with Node 24 for release commit **4fcfc8f**: clean dependency installation, all automated checks, five rehearsals and 17 browser workflows. [Upstream PR #570](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570) is open; opening a contribution does not imply maintainer acceptance.
 
-The Render Blueprint matches Render's published JSON schema. Account authentication and the hosting plan decision remain pending; schema validation is not deployment verification. The paid configuration includes persistent storage. A free service can demonstrate the UI but cannot preserve its SQLite records across service restarts. No public deployment or hosted persistence check is claimed.
+On September 13, Railway confirmed the workspace plan as **HOBBY** and built release **918659b** with the root Node 24 Dockerfile. Deployment **76b9730d-1df0-48b1-b0e6-d226a1a68022** reached `SUCCESS`. The public app is [readycheck-demo.up.railway.app](https://readycheck-demo.up.railway.app).
 
-An earlier Docker snapshot passed local browser checks, container replacement persistence and an isolated backup/restore drill with SQLite integrity checks. That does not establish hosted resilience or verification of the latest container image. The prior Railway project-creation attempt was blocked by an expired account trial; no public deployment was created.
+Hosted verification used fictional records and no CALL-E credentials:
 
-Outstanding: live validation of policy 1.3.0 negotiation/screening behavior and the expanded extraction contract, contrasting refusal/no-answer and successful cases, actual billing and retry behavior, independent extraction accuracy, current hosted persistence and judge access.
+- The desktop home page loaded without recorded JavaScript errors.
+- A repair case loaded three sample responses, displayed quote/source context, resolved its price through a focused fictional follow-up, and saved a shortlist and human-recorded arrangement.
+- Signup retained the guest case. Session cookies were Secure, HttpOnly and SameSite=Strict; the Connection UI reported live calling switched off.
+- Railway restarted the service, with startup logs confirming the restart. The existing account and saved case/outcome remained available. A fresh browser sign-in, sign-out/sign-in cycle, export, and 390px mobile evidence view passed without recorded page errors or horizontal page overflow.
+
+The service uses one instance and a 500 MB persistent volume at `/app/data`; ReadyCheck has a separate database filename. Existing volume contents were not deleted. A $5 compute-usage alert and $10 hard limit are configured. This is observed functional and restart verification, not a load test, long-term availability guarantee, or hosted backup/restore drill. No runtime memory measurement or direct disk-integrity check was obtained; Railway SSH requires a registered key.
+
+Earlier Free-plan attempts were blocked by an expired trial, a new-project quota, and then a regional peak-hour deployment restriction. The Hobby deployment resolved the deployment blocker. The Render Blueprint still matches its published schema but has not been deployed.
+
+An earlier Docker snapshot passed an isolated backup/restore drill with SQLite integrity checks. Hosted backup/restore, traffic capacity, ongoing usage monitoring, independent extraction accuracy, and live validation of policy 1.3.0 negotiation/screening behavior remain outstanding.
 
 ## Reproduce
 

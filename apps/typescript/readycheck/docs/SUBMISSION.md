@@ -8,7 +8,7 @@ Prepared September 13, 2026. The user will upload the video and submit the Devpo
 | --------------- | --------------------------------------------------------------------------------------------- |
 | Source          | https://github.com/ankitlade12/readycheck                                                     |
 | Contribution PR | https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570                                |
-| Hosted app      | Render Blueprint prepared; authentication and free/persistent plan choice pending             |
+| Hosted app      | https://readycheck-demo.up.railway.app — Railway Hobby, fictional samples, no live calls      |
 | Video           | `artifacts/release/readycheck-demo.mp4` — 2:18, narrated; upload publicly to YouTube or Vimeo |
 | Screenshots     | `docs/images/readycheck-desktop.png` and `docs/images/readycheck-mobile.png`                  |
 | License         | MIT; bundled font notices preserved                                                           |
@@ -73,11 +73,11 @@ Validate the revised negotiation and screening policy with consenting participan
 
 ### Built with
 
-TypeScript, React, Vite, Node.js, Express, SQLite, Zod, CALL-E Calls API, Playwright, Docker, GitHub Actions, Render Blueprint.
+TypeScript, React, Vite, Node.js, Express, SQLite, Zod, CALL-E Calls API, Playwright, Docker, GitHub Actions, Railway, Render Blueprint.
 
 ## Judge testing instructions
 
-Use the README's credential-free local setup and fictional repair walkthrough. No CALL-E key, phone number, payment, or account is required for samples. The demo tests the complete comparison, evidence, focused follow-up, revision and outcome workflow. Live calling is disabled by default.
+Open https://readycheck-demo.up.railway.app and follow the README's fictional repair walkthrough. The credential-free local setup remains available as a fallback. No CALL-E key, phone number, payment, or account is required for samples. The demo tests the complete comparison, evidence, focused follow-up, revision and outcome workflow. Live calling is disabled by default.
 
 Source setup: `git clone https://github.com/ankitlade12/readycheck.git`, then `npm ci` and `npm run dev` with Node 24. Open http://localhost:3000. From the contribution checkout, run the same commands inside `apps/typescript/readycheck/`.
 
@@ -96,6 +96,8 @@ This video records the working application's fictional sample workflow. No real 
 Source and setup: https://github.com/ankitlade12/readycheck
 
 Contribution PR: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570
+
+Try the fictional demo: https://readycheck-demo.up.railway.app
 
 The walkthrough shows request review, comparison, transcript evidence, a focused follow-up, a shortlist and arrangement, a supported budget revision, and bounded correction memory. It does not represent a real booking or verified current business availability.
 

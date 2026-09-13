@@ -16,7 +16,7 @@ ReadyCheck turns a practical request into a requirement-by-requirement compariso
 CALL-E handles approved phone inquiries. ReadyCheck handles the request, durable execution, source review, comparison, and the user's decision. Estimates, contradictions and missing answers stay visible.
 
 **Built for:** [CALL-E: Your Code Is Calling](https://call-e.devpost.com/)<br>
-**Try it:** run the credential-free fictional demo locally; public hosting is pending<br>
+**Try it:** [Open the fictional demo](https://readycheck-demo.up.railway.app) — no credentials or phone calls<br>
 **Source:** [ankitlade12/readycheck](https://github.com/ankitlade12/readycheck)<br>
 **Contribution:** [Upstream PR #570](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570)
 
@@ -33,7 +33,7 @@ CALL-E handles approved phone inquiries. ReadyCheck handles the request, durable
 - **A complete user journey:** save cases, shortlist options, record an arrangement or outcome, and export the evidence.
 - **No-call default:** fictional samples and automated tests require no CALL-E credentials and never dial.
 
-[Deploy on Render](https://dashboard.render.com/blueprint/new?repo=https%3A%2F%2Fgithub.com%2Fankitlade12%2Freadycheck) · [Deployment configuration and cost](docs/DEPLOYMENT.md)
+[Railway deployment status and hosting options](docs/DEPLOYMENT.md)
 
 ## Product Preview
 
@@ -118,9 +118,11 @@ flowchart TB
 | Validation   | Zod + JSON Schema             | Runtime input checks and constrained provider extraction  |
 | Calling      | CALL-E Calls REST API         | Approved inquiries and structured call results            |
 | Verification | Node test runner + Playwright | Domain, HTTP, fault and browser workflow checks           |
-| Packaging    | Docker + Render Blueprint     | One persistent Node instance with a database volume       |
+| Packaging    | Docker + Railway / Render     | One persistent Node instance with a database volume       |
 
 ## Judge Quick Start
+
+[Open the hosted demo](https://readycheck-demo.up.railway.app) and follow the walkthrough below. No signup or CALL-E credentials are needed. The first request after inactivity may take longer while the service wakes up.
 
 ### Run locally
 
@@ -245,7 +247,7 @@ See the [submission package](docs/SUBMISSION.md) for release links, demo narrati
 
 ## Deployment and Current Boundary
 
-The [deployment guide](docs/DEPLOYMENT.md) covers a single persistent Node container, SQLite storage, backups and recovery. A Render deployment is prepared; account authentication and approval of its paid persistent storage are pending. The sample experience works locally without hosting access.
+The [deployment guide](docs/DEPLOYMENT.md) covers a single persistent Node container, SQLite storage, backups and recovery. The public fictional demo runs on Railway Hobby with a persistent volume and live calling disabled. A Render Blueprint remains available as an alternative. Hosting usage is monitored with a $5 alert and a $10 hard limit; hitting the limit takes the demo offline. The sample experience works locally without hosting access.
 
 ReadyCheck is a working prototype with an opt-in live integration. Public business discovery, unrestricted dialing, email verification, password recovery, automatic bookings, independent quality benchmarks and reliable live negotiation are not established features. Future work should validate conversation quality and real user outcomes before expanding scope.
 
