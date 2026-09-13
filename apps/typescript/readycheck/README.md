@@ -17,7 +17,8 @@ CALL-E handles approved phone inquiries. ReadyCheck handles the request, durable
 
 **Built for:** [CALL-E: Your Code Is Calling](https://call-e.devpost.com/)<br>
 **Try it:** run the credential-free fictional demo locally; public hosting is pending<br>
-**Source:** [ankitlade12/readycheck](https://github.com/ankitlade12/readycheck)
+**Source:** [ankitlade12/readycheck](https://github.com/ankitlade12/readycheck)<br>
+**Contribution:** [Upstream PR #570](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570)
 
 ## Quick Highlights
 

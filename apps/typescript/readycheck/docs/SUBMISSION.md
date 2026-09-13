@@ -4,14 +4,14 @@ Prepared September 13, 2026. The user will upload the video and submit the Devpo
 
 ## Release links and status
 
-| Item            | Link or status                                                                      |
-| --------------- | ----------------------------------------------------------------------------------- |
-| Source          | https://github.com/ankitlade12/readycheck                                           |
-| Contribution PR | Being prepared from the current release source                                      |
-| Hosted app      | Render Blueprint prepared; authentication and paid resource approval pending        |
-| Video           | `artifacts/release/readycheck-demo.mp4` — upload as a public YouTube or Vimeo video |
-| Screenshots     | `docs/images/readycheck-desktop.png` and `docs/images/readycheck-mobile.png`        |
-| License         | MIT; bundled font notices preserved                                                 |
+| Item            | Link or status                                                                                |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| Source          | https://github.com/ankitlade12/readycheck                                                     |
+| Contribution PR | https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570                                |
+| Hosted app      | Render Blueprint prepared; authentication and free/persistent plan choice pending             |
+| Video           | `artifacts/release/readycheck-demo.mp4` — 2:18, narrated; upload publicly to YouTube or Vimeo |
+| Screenshots     | `docs/images/readycheck-desktop.png` and `docs/images/readycheck-mobile.png`                  |
+| License         | MIT; bundled font notices preserved                                                           |
 
 The deadline is **September 14, 2026, 11:45 p.m. SGT / 10:45 a.m. America/Chicago**. Required materials include a contribution PR link, project description, public YouTube/Vimeo video under three minutes, and the email associated with the entrant's CALL-E account. A hosted URL is optional; provide free access to a working project or test build through judging. Check eligibility and the form before submission. [Official rules](https://call-e.devpost.com/rules).
 
@@ -94,6 +94,8 @@ ReadyCheck checks whether a repair service, item or venue meets the whole reques
 This video records the working application's fictional sample workflow. No real calls are placed in the recording. Narration is generated speech. Earlier live CALL-E execution was tested separately; the revised conversation policy still needs live validation.
 
 Source and setup: https://github.com/ankitlade12/readycheck
+
+Contribution PR: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/570
 
 The walkthrough shows request review, comparison, transcript evidence, a focused follow-up, a shortlist and arrangement, a supported budget revision, and bounded correction memory. It does not represent a real booking or verified current business availability.
 
