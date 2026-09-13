@@ -3,6 +3,7 @@
 An autonomous post-acute placement agent for hospital discharge planning that uses CALL-E as its telephone actuator: it calls skilled nursing facility admissions lines, verifies each care requirement from the structured result, detects when a facility contradicts its directory record, re-plans, and stops at a human approval gate.
 
 - Repository: [https://github.com/Temake/DischargePulse](https://github.com/Temake/DischargePulse)
+- License: MIT
 
 DischargePulse is hosted in its own repository. It is not a CALL-E SDK and does not define a supported application API. It is an audit-ready prototype that runs on synthetic, de-identified data only.
 
