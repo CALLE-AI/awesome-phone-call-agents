@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Service Rescue</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">CALL-E powered · consent-first</p>
+      <h1>Find repair help without the call scramble.</h1>
+      <p class="lede">Service Rescue prepares a transparent availability inquiry. It will never call a provider until you explicitly approve it.</p>
+      <form id="test-login" class="notice"><strong>Test login</strong><input name="username" placeholder="Username" required><input name="password" type="password" placeholder="Password" required><button>Sign in</button><span id="login-status"></span></form>
+
+      <section class="notice"><strong>Not for emergencies.</strong> For imminent danger, contact local emergency services instead.</section>
+
+      <form id="request-form">
+        <div class="grid">
+          <label>Service needed<input name="serviceType" required placeholder="e.g. urgent plumbing repair" /></label>
+          <label>Service location<input name="location" required placeholder="e.g. Gulshan-e-Iqbal, Karachi" /></label>
+          <label>Preferred time<input name="timeWindow" required placeholder="e.g. today, before 6 PM" /></label>
+          <label>Budget guidance <span>(optional)</span><input name="budget" placeholder="e.g. under PKR 10,000" /></label>
+          <label class="full">Authorized provider phone<input name="providerPhone" required placeholder="+922112345678" pattern="\+[1-9][0-9]{7,14}" /></label>
+        </div>
+        <p class="fine-print">Use a provider number you are authorized to contact. The call asks for availability only; it cannot book services or authorize payment.</p>
+        <button type="submit">Prepare call plan</button>
+      </form>
+
+      <section id="plan" class="card hidden" aria-live="polite">
+        <p class="eyebrow">Review before calling</p>
+        <h2>Proposed availability inquiry</h2>
+        <p id="plan-summary"></p>
+        <dl id="call-details"></dl>
+        <label class="confirm"><input id="authority" type="checkbox" /> I am authorized to contact this provider about this request.</label>
+        <label class="confirm"><input id="not-emergency" type="checkbox" /> This is not an emergency; I will contact emergency services if needed.</label>
+        <label class="confirm">Type <code>CALL</code> to explicitly authorize this one outbound call.<input id="confirmation" autocomplete="off" placeholder="CALL" /></label>
+        <button id="start-call" type="button" disabled>Confirm &amp; call provider</button>
+      </section>
+
+      <section id="result" class="card hidden" aria-live="polite">
+        <p class="eyebrow">CALL-E status</p>
+        <h2 id="status">Preparing</h2>
+        <p id="status-message"></p>
+        <ul id="activity"></ul>
+        <article id="outcome" class="hidden"><h3>Call outcome</h3><p id="summary"></p><pre id="extracted"></pre><details><summary>Transcript</summary><p id="transcript"></p></details></article>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
