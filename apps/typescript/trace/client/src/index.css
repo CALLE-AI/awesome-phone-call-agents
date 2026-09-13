@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-text-primary;
+  }
+}
+
+/* Accessibility Focus States */
+*:focus-visible {
+  @apply outline-none ring-2 ring-brand ring-offset-2;
+}
