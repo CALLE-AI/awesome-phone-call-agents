@@ -1,6 +1,9 @@
-# 🍽️ TableAgent
+# 🍽️ CALLFORGE AI
 
-> AI agent that calls restaurants on your behalf, attempts to book a table, handles voicemails, and returns a structured comparison — powered by CALL-E.
+>  — powered by CALL-E.
+
+## What is CALLFORGE AI
+CallForge AI is an AI-powered phone agent and restaurant comparison system. Instead of the user manually calling every restaurant, the user simply defines what they are looking for. For example, they can specify the number of guests, the date, the requested time, and whether they prefer outdoor seating. They can then add the restaurants they want to compare by entering the restaurant name, phone number, region, and locale directly from the dashboard. Nothing is hardcoded into the system, so the same platform can be used with different restaurants and different phone numbers.
 
 ## What it does
 
@@ -15,7 +18,7 @@
 https://github.com/fayyazsarah07/Call-Forge-AI
 
 ## Demo video
-[YouTube link — add before submitting]
+https://youtu.be/43nEwfc_QsY
 
 ## Tech Stack
 - CALL-E SDK (`@call-e/calle`)
