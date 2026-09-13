@@ -27,6 +27,18 @@ def load_env(path: str) -> None:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip('"'))
 
+def load_env_chain() -> None:
+    """Load CALLE_API_KEY and friends from the app dir, the current dir, then
+    ancestors up to the repo root, without overriding real environment variables."""
+    load_env(os.path.join(APP_DIR, ".env"))
+    here = os.path.abspath(os.getcwd())
+    for _ in range(5):
+        load_env(os.path.join(here, ".env"))
+        parent = os.path.dirname(here)
+        if parent == here:
+            break
+        here = parent
+
 
 def load_case(args: argparse.Namespace) -> dict:
     store = Store(args.data)
@@ -113,8 +125,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         if args.hotline != case["airline_hotline"]:
             print(f"REFUSED: --hotline must repeat the case hotline exactly ({mask_phone(case['airline_hotline'])}); this is the authorization.", file=sys.stderr)
             return 3
-        load_env(os.path.join(APP_DIR, ".env"))
-        load_env(os.path.join(os.getcwd(), ".env"))
+        load_env_chain()
         override = os.environ.get("CALLE_BASE_URL")
         if override and override.rstrip("/") != OFFICIAL_ORIGIN:
             print(f"REFUSED: CALLE_BASE_URL={override!r} is not the official origin {OFFICIAL_ORIGIN}; unset it", file=sys.stderr)

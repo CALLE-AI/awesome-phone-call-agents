@@ -129,7 +129,15 @@ load();
 def _env(key: str, app_dir: str) -> str:
     if key in os.environ:
         return os.environ[key]
-    for name in (os.path.join(app_dir, ".env"), os.path.join(os.getcwd(), ".env")):
+    candidates = [os.path.join(app_dir, ".env")]
+    here = os.path.abspath(os.getcwd())
+    for _ in range(5):  # current dir, then ancestors up to the repo root
+        candidates.append(os.path.join(here, ".env"))
+        parent = os.path.dirname(here)
+        if parent == here:
+            break
+        here = parent
+    for name in candidates:
         if os.path.exists(name):
             with open(name, "r", encoding="utf-8") as f:
                 for line in f:
