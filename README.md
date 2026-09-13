@@ -166,6 +166,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
 - [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
@@ -199,6 +200,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/dineline-calle-edition`](apps/typescript/dineline-calle-edition/) | TypeScript / Node | Two-agent restaurant concierge that collects dining preferences, supports a grounded Google Places choice in n8n, binds the diner's exact approval, and verifies Agent Jake's CALL-E booking result; fixture-only public mode by default. |
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
