@@ -24,13 +24,15 @@ saved destination number, a cooldown, and a rolling call/email allowance.
 
 ## Setup
 
-Sign up for a free account at https://autopropertymanager.com (email +
-password, no payment required to explore). After signing in:
+Log in at https://autopropertymanager.com/login with the reviewer demo
+account below (pre-authorized for the rehearsal screen, not an admin
+account; no signup, property, or settings steps are required):
 
-1. Add at least one property (Properties → Add Property).
-2. Open Settings → "Urgent owner calls" and save a phone number.
-3. Open **Safe Call & Email Tests** (`/communication-test`) for a rehearsal
-   that never contacts a real guest or business — see below.
+- Email: calle-reviewer@autopropertymanager.com
+- Password: CalleReview-ef213cad56
+
+Then open **Safe Call & Email Tests** (`/communication-test`) for a
+rehearsal that never contacts a real guest or business — see below.
 
 ## CALL-E integration method
 
