@@ -369,12 +369,14 @@ function showSummary() {
   const both = DATA.calls.filter(c => c.calle_reported.task_completed).length;
   const kept = DATA.calls.filter(c => c.verdict.dialtone_task_completed).length;
   const agentCalls = DATA.calls.filter(c => c.detection.label === "agent");
+  const sim = DATA.calls.some(c => c.simulated) || (b && b.simulated);
+  const tag = sim ? "scripted design · " : "";
   const sum = $("#summary");
   sum.innerHTML = `
     <div class="sum"><div class="big">${agentCalls.length ? "machine found" : "—"}</div>
-      <div class="small">${dt.handshake.acknowledged ? `handshake acknowledged at ${dt.handshake.acknowledged_at.toFixed(1)}s, nonce ${dt.handshake.nonce_ok ? "matched" : "MISMATCH"}` : ""}${yb.detection.label === "agent" ? ` · uncooperative bot caught by behaviour` : ""}</div></div>
-    <div class="sum"><div class="big">${b ? (b.duration / dt.duration).toFixed(1) + "× faster" : dt.duration.toFixed(0) + "s"}</div>
-      <div class="small">${b ? `same AI line, same task: ${dt.duration.toFixed(0)}s with DIALTONE vs ${b.duration.toFixed(0)}s without` : ""}</div></div>
+      <div class="small">${tag}${dt.handshake.acknowledged ? `handshake acknowledged at ${dt.handshake.acknowledged_at.toFixed(1)}s, nonce ${dt.handshake.nonce_ok ? "matched" : "MISMATCH"}` : ""}${yb.detection.label === "agent" ? ` · uncooperative bot caught by behaviour` : ""}</div></div>
+    <div class="sum"><div class="big">${sim ? "the design" : b ? (b.duration / dt.duration).toFixed(1) + "× faster" : dt.duration.toFixed(0) + "s"}</div>
+      <div class="small">${sim ? `scripted: ${dt.duration.toFixed(0)}s with the handshake vs ${b ? b.duration.toFixed(0) : "?"}s without. On 6 live calls the handshake never landed (pickup collision), so no speed-up was measured.` : b ? `same AI line, same task: ${dt.duration.toFixed(0)}s with DIALTONE vs ${b.duration.toFixed(0)}s without` : ""}</div></div>
     <div class="sum"><div class="big" style="color:var(--bad)">${both} said done · ${kept} kept</div>
       <div class="small">CALL-E reported task_completed on ${both} calls. DIALTONE refused ${DATA.calls.filter(c => c.verdict.attestation === "refused").length} it could not attribute to a person or a record.</div></div>`;
   sum.classList.add("show");
@@ -407,7 +409,7 @@ async function showEval() {
   const real = r.real_calls || [];
   const realOk = real.filter(c => c.label && c.detection.label === c.label).length;
   host.innerHTML = `
-    <div class="ev-lede">${r.eval.n} blind simulated transcripts${real.length ? ` + ${real.length} real calls` : ""}. Accuracy <span>${Math.round(full.accuracy * 100)}%</span>, not 99%. Here is where it breaks.</div>
+    <div class="ev-lede">First blind run on ${r.eval.n} simulated transcripts: accuracy <span>${Math.round(full.accuracy * 100)}%</span>, not 99%. Here is where it breaks.</div>
     <div class="ev-grid">
       <div class="card"><h3>Who picked up?</h3><div class="sub">behavioural model only · no handshake · full call · n=${full.n}</div>
         ${cm(full.matrix, labels, cols, maxOf(full.matrix))}

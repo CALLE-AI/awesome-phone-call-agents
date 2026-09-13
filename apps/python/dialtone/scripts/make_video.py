@@ -51,7 +51,40 @@ def narration(src: str) -> list[dict]:
     return scenes
 
 
-def tts(text: str, path: Path, engine: str) -> float:
+FISH = "https://api.fish.audio"
+
+
+def fish_voice(sample: Path) -> str:
+    """Create (once) a private Fish Audio voice clone from the narrator's own recording."""
+    import httpx
+
+    cache = OUT / "fish_voice_id.txt"
+    if cache.exists():
+        return cache.read_text().strip()
+    with sample.open("rb") as f:
+        r = httpx.post(f"{FISH}/model", headers={"Authorization": f"Bearer {os.environ['FISH_API_KEY']}"},
+                       data={"type": "tts", "title": "dialtone-narrator", "train_mode": "fast", "visibility": "private",
+                             "enhance_audio_quality": "true"},
+                       files={"voices": (sample.name, f, "application/octet-stream")}, timeout=300)
+    if r.status_code >= 400:
+        raise SystemExit(f"Fish Audio model creation failed: {r.status_code} {r.text[:300]}")
+    voice_id = r.json()["_id"]
+    cache.write_text(voice_id)
+    return voice_id
+
+
+def tts(text: str, path: Path, engine: str, voice_id: str | None = None) -> float:
+    if engine == "fish":
+        import httpx
+
+        r = httpx.post(f"{FISH}/v1/tts", timeout=300,
+                       headers={"Authorization": f"Bearer {os.environ['FISH_API_KEY']}", "model": os.environ.get("FISH_MODEL", "s2.1-pro-free")},
+                       json={"text": text, "reference_id": voice_id, "format": "wav", "latency": "normal",
+                             "temperature": 0.6, "top_p": 0.7, "prosody": {"speed": 1.0}})
+        if r.status_code >= 400:
+            raise SystemExit(f"Fish Audio TTS failed: {r.status_code} {r.text[:300]}")
+        path.write_bytes(r.content)
+        return duration(path)
     if engine == "gemini":
         from google import genai
         from google.genai import types
@@ -110,8 +143,14 @@ def main():
     load_dotenv(ROOT / ".env")
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", choices=["fixtures", "real"], default="fixtures")
-    ap.add_argument("--tts", choices=["gemini", "say"], default="gemini" if os.environ.get("GEMINI_API_KEY") else "say")
-    ap.add_argument("--voice-dir", help="folder with your own recordings named intro, calls, how, eval, close (.m4a/.mp3/.wav)")
+    sample = next(iter(sorted((OUT / "voice").glob("sample.*"))), None)
+    default_tts = "fish" if os.environ.get("FISH_API_KEY") and sample else "gemini" if os.environ.get("GEMINI_API_KEY") else "say"
+    ap.add_argument("--tts", choices=["fish", "gemini", "say"], default=default_tts)
+    ap.add_argument("--voice-sample", default=str(sample) if sample else None, help="your own recording to clone (Fish Audio)")
+    ap.add_argument("--fish-voice", default=os.environ.get("FISH_VOICE_ID"), help="an existing Fish Audio voice id to use instead of cloning")
+    ap.add_argument("--audio-only", action="store_true", help="generate the narration files and stop (listen before recording)")
+    ap.add_argument("--only", help="comma-separated scene ids to re-render; other scenes reuse their existing out/<id>.mp4")
+    ap.add_argument("--voice-dir", help="folder with your own recordings named intro, calls, live, how, eval, close (.m4a/.mp3/.wav)")
     ap.add_argument("--script-only", action="store_true", help="write out/VOICEOVER.md with the narration text and stop")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
@@ -122,15 +161,32 @@ def main():
                                           + "\n".join(f"## {s['id']}\n\n{s['text']}\n" for s in scenes))
         print(f"wrote {OUT / 'VOICEOVER.md'}")
         return
+    voice_id = None
+    if args.tts == "fish" and args.fish_voice:
+        voice_id = args.fish_voice
+        print(f"Fish Audio stock voice: {voice_id}")
+    elif args.tts == "fish":
+        if not args.voice_sample:
+            raise SystemExit("--tts fish needs a recording at out/voice/sample.m4a (or --voice-sample)")
+        voice_id = fish_voice(Path(args.voice_sample))
+        print(f"Fish Audio voice: {voice_id}")
     parts = []
+    only = set(args.only.split(",")) if args.only else None
     for scene in scenes:
+        if only and scene["id"] not in only and (OUT / f"{scene['id']}.mp4").exists():
+            parts.append(OUT / f"{scene['id']}.mp4")
+            print(f"{scene['id']}: reused")
+            continue
         audio = OUT / f"{scene['id']}.wav"
         own = next(iter(sorted(Path(args.voice_dir).glob(f"{scene['id']}.*"))), None) if args.voice_dir else None
         if own:
             subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(own), "-ac", "1", "-ar", "48000", str(audio)], check=True)
             secs = max(duration(audio) + 0.8, scene["min"])
         else:
-            secs = max(tts(scene["text"], audio, args.tts) + 0.8, scene["min"])
+            secs = max(tts(scene["text"], audio, args.tts, voice_id) + 0.8, scene["min"])
+        if args.audio_only:
+            print(f"{scene['id']}: {audio} ({secs:.1f}s)")
+            continue
         webm = record(scene, secs, OUT / f"{scene['id']}.webm")
         clip = OUT / f"{scene['id']}.mp4"
         vlen = duration(webm)
@@ -142,6 +198,8 @@ def main():
                         "-crf", "20", "-c:a", "aac", "-b:a", "160k", str(clip)], check=True)
         print(f"{scene['id']}: {secs:.1f}s")
         parts.append(clip)
+    if args.audio_only:
+        return
     listing = OUT / "concat.txt"
     listing.write_text("".join(f"file '{p.name}'\n" for p in parts))
     final = OUT / "dialtone-demo.mp4"
