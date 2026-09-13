@@ -3,7 +3,7 @@
 A concept for an AI phone agent that handles flight reschedule and refund requests for online travel agencies (OTAs) and airlines, replacing the repetitive parts of work that is commonly outsourced to business process outsourcing (BPO) contact centers.
 
 > [!NOTE]
-> This is a design document. There is no runnable implementation yet. Setup, dry-run, and live verification instructions will be added with the implementation.
+> A runnable implementation lives in [`apps/typescript/flight-disruption-agent`](../apps/typescript/flight-disruption-agent/). It combines both workflows below into one outbound call per passenger, with a dry-run default and fictional data.
 
 ## Problem
 
@@ -79,6 +79,10 @@ CALL-E places one-off outbound calls. Both workflows use it that way:
 
 Receiving inbound passenger calls directly is outside what this repository covers. Workflow B assumes requests arrive through an existing channel.
 
+CALL-E cannot call out to other systems during a call (its webhook fires only after the call ends), so the agent cannot check eligibility or fares while talking. The implementation therefore prices every option before dialing, puts the final options and amounts in the call task, asks CALL-E for a structured result, and applies the passenger's confirmed choice only after the call ends.
+
+CALL-E currently refuses calls to Indonesian (+62) numbers, so a live demo has to use a number in a supported region.
+
 ## Safety considerations
 
 - Disclose that the caller is an AI at the start of every call.
@@ -92,6 +96,6 @@ Receiving inbound passenger calls directly is outside what this repository cover
 
 ## Open questions
 
-- Should the first implementation start with Workflow A (involuntary, outbound) or Workflow B (voluntary)?
-- Which B2B platform or GDS integration can be simulated for a dry-run demo?
-- How should fare rules from several distributors be represented so the agent can quote charges reliably?
+- How should a real B2B platform or GDS integration replace the fake booking system?
+- How should an operator review and update per-party fare rules as contracts change?
+- Which languages and regions are needed before this can run for Indonesian passengers?
