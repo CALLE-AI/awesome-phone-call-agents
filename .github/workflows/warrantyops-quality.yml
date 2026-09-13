@@ -56,6 +56,10 @@ jobs:
     steps:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
+        defaults:
+          run:
+            shell: bash
+            working-directory: ${{ github.workspace }}
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
