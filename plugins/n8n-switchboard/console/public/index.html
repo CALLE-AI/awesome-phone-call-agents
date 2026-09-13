@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&family=DM+Sans:wght@300;400;500&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000; --card:rgba(255,255,255,.035); --ink:#fff; --muted:rgba(255,255,255,.6);
+    --line:rgba(255,255,255,.14); --accent:#6C5CE7; --accent-soft:rgba(108,92,231,.18);
+    --ok:#4ade80; --ok-soft:rgba(74,222,128,.14);
+    --warn:#fbbf24; --warn-soft:rgba(251,191,36,.14);
+    --stop:#f87171; --stop-soft:rgba(248,113,113,.14);
+    --panel:rgba(255,255,255,.05); --r:14px;
+    --h:'Inter Tight',-apple-system,sans-serif; --b:'DM Sans',-apple-system,sans-serif;
+    --m:'Roboto Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 var(--b);-webkit-font-smoothing:antialiased}
+  body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.12;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E")}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 24px 80px}
+  .eyebrow{color:var(--accent);font-size:12px;font-weight:600;letter-spacing:.04em}
+  h1{font-family:var(--h);font-weight:500;font-size:30px;letter-spacing:-.03em;margin:6px 0 4px}
+  .sub{color:var(--muted);margin:0}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:28px}
+  .btn{border:0;border-radius:999px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn-dark{background:#fff;color:#000}
+  .btn-stop{background:var(--stop);color:#fff}
+  .btn-ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line);backdrop-filter:blur(12px)}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+  .stat{background:var(--card);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+  .stat b{display:block;font-size:24px;letter-spacing:-.02em}
+  .stat span{color:var(--muted);font-size:12px}
+  .panel{background:rgba(255,255,255,.05);backdrop-filter:blur(14px);border:1px solid var(--line);color:#fff;border-radius:20px;padding:22px 24px;margin-bottom:24px;
+    display:flex;justify-content:space-between;align-items:center;gap:20px}
+  .panel h2{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}
+  .panel p{margin:0;color:var(--muted);font-size:13px;max-width:62ch}
+  h3{font-family:var(--m);font-weight:400;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;
+    display:flex;justify-content:space-between;align-items:center}
+  .camp{background:var(--card);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:10px}
+  .camp-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .camp b{letter-spacing:-.01em}
+  .bar{height:6px;background:var(--line);border-radius:999px;margin-top:10px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+  .bar.warning i{background:var(--warn)}
+  .bar.exhausted i{background:var(--stop)}
+  .job{background:var(--card);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:12px}
+  .job.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .job-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+  .goal{font-family:var(--h);font-weight:500;letter-spacing:-.01em;margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .meta{color:var(--muted);font-size:12.5px}
+  .tag{display:inline-block;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;
+    letter-spacing:.03em;white-space:nowrap}
+  .t-pending{background:var(--warn-soft);color:var(--warn)}
+  .t-needs_info,.t-needs_human,.t-approved,.t-dialing,.t-scheduled{background:var(--accent-soft);color:var(--accent)}
+  .t-complete{background:var(--ok-soft);color:var(--ok)}
+  .t-dry_run,.t-neutral{background:rgba(255,255,255,.08);color:var(--muted)}
+  .t-rejected,.t-cancelled,.t-failed,.t-expired{background:var(--stop-soft);color:var(--stop)}
+  .actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  pre{background:rgba(0,0,0,.55);border:1px solid var(--line);color:rgba(255,255,255,.75);font-family:var(--m);border-radius:10px;padding:12px 14px;overflow:auto;
+    font-size:12px;line-height:1.5;margin:12px 0 0}
+  .blocked{background:var(--stop-soft);color:var(--stop);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px}
+  .warnbox{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;
+    font-size:12.5px;margin-top:12px;line-height:1.5}
+  .okbox{background:var(--ok-soft);color:var(--ok);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px}
+  .ask{background:var(--accent-soft);border-radius:10px;padding:12px;margin-top:12px}
+  .ask p{margin:0 0 8px;font-size:13px}
+  .ask input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+    font-family:inherit;font-size:13px;background:rgba(0,0,0,.4);color:var(--ink)}
+  .outcome{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .evidence{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:12.5px}
+  .env{margin-top:12px}
+  .env summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+  .wave{display:flex;align-items:center;gap:3px;height:20px}
+  .wave i{width:3px;background:var(--accent);border-radius:2px;animation:w .9s ease-in-out infinite}
+  @keyframes w{0%,100%{height:4px}50%{height:18px}}
+  .empty{color:var(--muted);background:var(--card);border:1px dashed var(--line);
+    border-radius:var(--r);padding:34px;text-align:center}
+  .audit{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin-top:6px}
+  .bulk{position:sticky;top:0;z-index:5;background:rgba(20,20,24,.92);backdrop-filter:blur(16px);border:1px solid var(--line);color:#fff;border-radius:12px;
+    padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .bulk span{font-size:13px}
+  .cb{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;margin-right:10px;flex:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Call control plane</div>
+      <h1>Switchboard</h1>
+      <p class="sub">Policy, schedule and budget for every call your workflows make.</p>
+    </div>
+    <button class="btn btn-stop" onclick="killAll()">Kill switch</button>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="panel">
+    <div>
+      <h2>CALL-E has no cancel tool</h2>
+      <p>A scheduled call is not planned until it falls due, so the confirm token does not
+         exist yet and nothing has been sent. That is why cancelling here actually cancels.</p>
+    </div>
+    <div class="wave"><i></i><i style="animation-delay:.1s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.15s"></i></div>
+  </div>
+
+  <h3>Campaigns</h3>
+  <div id="camps"></div>
+
+  <h3>Queue <span id="qcount" class="meta"></span></h3>
+  <div id="bulk"></div>
+  <div id="jobs"></div>
+
+  <h3 style="margin-top:28px">Audit</h3>
+  <div class="job" id="audit"></div>
+</div>
+
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const selected = new Set();
+
+async function api(p, m, body) {
+  const r = await fetch(p, { method: m || 'GET', headers: {'Content-Type':'application/json'},
+    body: body ? JSON.stringify(body) : undefined });
+  return r.json();
+}
+
+function statRow(jobs) {
+  const c = s => jobs.filter(j => j.status === s).length;
+  return [['Awaiting you', c('pending')], ['Scheduled', c('scheduled')], ['Needs info', c('needs_info') + c('needs_human')],
+          ['In progress', c('approved') + c('dialing')], ['Completed', c('complete')]]
+    .map(([l, n]) => '<div class="stat"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+}
+
+function campCard(c) {
+  const pct = c.budget ? Math.min(100, Math.round(c.spend.spent / c.budget * 100)) : 0;
+  const cls = c.warn || '';
+  return '<div class="camp"><div class="camp-top"><div>'
+    + '<b>' + esc(c.name) + '</b> '
+    + (c.status === 'stopped' ? '<span class="tag t-rejected">stopped</span>' : '')
+    + '<div class="meta">' + c.spend.spent + (c.budget ? ' of ' + c.budget : '') + ' calls spent &middot; '
+    + c.spend.queued + ' queued &middot; ' + c.spend.stopped + ' stopped</div></div>'
+    + (c.status === 'active'
+        ? '<button class="btn btn-ghost" onclick="stopCamp(\'' + c.id + '\')">Stop campaign</button>' : '')
+    + '</div>'
+    + (c.budget ? '<div class="bar ' + cls + '"><i style="width:' + pct + '%"></i></div>' : '')
+    + (c.warn === 'warning' ? '<div class="warnbox">Over 80% of budget spent.</div>' : '')
+    + (c.warn === 'exhausted' ? '<div class="blocked">Budget exhausted. Further calls are refused at dial time.</div>' : '')
+    + '</div>';
+}
+
+function jobCard(j) {
+  const when = new Date(j.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const phone = j.recipient ? j.recipient.phone : '';
+  const region = j.recipient ? j.recipient.region : '';
+  const selectable = ['pending','scheduled','needs_info'].indexOf(j.status) !== -1;
+  let body = '';
+
+  if (j.wouldBeBlocked || j.blocked) {
+    body += '<div class="blocked"><b>Blocked.</b> '
+      + esc(((j.policy && j.policy.reasons) || [j.error]).filter(Boolean).join(' / ')) + '</div>';
+  }
+  if (j.status === 'scheduled') {
+    body += '<div class="okbox">Scheduled for ' + new Date(j.scheduledFor).toLocaleString()
+      + '. Not planned yet, so nothing has reached CALL-E.</div>';
+  }
+  if (j.preview) body += '<pre>' + esc(j.preview.command) + '</pre>';
+  if (j.status === 'needs_info' && (j.questions || []).length) {
+    body += '<div class="ask"><p><b>CALL-E needs more before it will issue a token.</b><br>'
+      + esc(j.questions.map(q => q.question).join(' ')) + '</p>'
+      + '<input id="a-' + j.id + '" placeholder="Type your answer, then press Enter" '
+      + 'onkeydown="if(event.key===&quot;Enter&quot;)answer(&quot;' + j.id + '&quot;)"></div>';
+  }
+  if (j.confirmSummary && j.status === 'pending') {
+    body += '<p class="meta" style="margin-top:10px">' + esc(j.confirmSummary) + '</p>';
+  }
+
+  if (j.result && (j.result.summary || j.result.branchable)) {
+    const b = j.result.branchable || {};
+    const v = j.validation;
+    if (b.taskCompleted !== null && b.taskCompleted !== undefined) {
+      body += '<div class="outcome"><span class="tag ' + (b.taskCompleted ? 't-complete' : 't-failed') + '">'
+        + (b.taskCompleted ? 'task completed' : 'not completed') + '</span>'
+        + (b.confidenceLabel ? '<span class="tag t-neutral">confidence ' + esc(b.confidenceLabel) + ' '
+            + (b.confidenceScore != null ? b.confidenceScore : '') + '</span>' : '')
+        + (b.durationSeconds != null ? '<span class="tag t-neutral">' + b.durationSeconds + 's</span>' : '')
+        + '</div>';
+    }
+    if (j.result.summary) body += '<p class="meta" style="margin-top:10px">' + esc(j.result.summary) + '</p>';
+    if ((b.evidence || []).length) {
+      body += '<ul class="evidence">' + b.evidence.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>';
+    }
+    body += '<pre>' + esc(JSON.stringify(b, null, 2)) + '</pre>';
+    if (v && v.checked) {
+      if (v.unsupported) {
+        body += '<div class="warnbox"><b>Requested schema not returned.</b> CALL-E has no caller-defined '
+          + 'result schema, so it sent its run envelope instead of ' + esc((v.missing || []).join(', '))
+          + '. Its own extraction is in the summary above, as prose.</div>';
+      } else if (v.ok) {
+        body += '<div class="okbox"><b>Schema validated.</b> Every requested field came back and matched.</div>';
+      } else {
+        body += '<div class="blocked"><b>Schema failed.</b> ' + esc(v.errors.join(' / ')) + '</div>';
+      }
+    }
+    if (j.result.envelope && Object.keys(j.result.envelope).length) {
+      body += '<details class="env"><summary>CALL-E run envelope</summary><pre>'
+        + esc(JSON.stringify(j.result.envelope, null, 2)) + '</pre></details>';
+    }
+  }
+
+  let actions = '';
+  if (j.status === 'pending') {
+    actions = '<button class="btn btn-dark" onclick="act(\'' + j.id + '\',\'approve\')">Approve and dial</button>'
+            + '<button class="btn btn-ghost" onclick="act(\'' + j.id + '\',\'reject\')">Reject</button>';
+  } else if (['approved','dialing','needs_info','needs_human','scheduled'].indexOf(j.status) !== -1) {
+    actions = '<button class="btn btn-ghost" onclick="act(\'' + j.id + '\',\'cancel\')">Cancel</button>';
+  }
+
+  return '<div class="job' + (selected.has(j.id) ? ' sel' : '') + '"><div class="job-top"><div style="display:flex">'
+    + (selectable ? '<input type="checkbox" class="cb"' + (selected.has(j.id) ? ' checked' : '')
+        + ' onchange="toggle(\'' + j.id + '\')">' : '')
+    + '<div><p class="goal" title="' + esc(j.displayGoal || j.userInput || '') + '">'
+    + esc(j.displayGoal || j.userInput || 'Untitled call') + '</p>'
+    + '<div class="meta">' + esc(phone) + ' ' + esc(region) + ' &middot; ' + when + ' &middot; ' + esc(j.mode || '')
+    + (j.hasConfirmToken ? ' &middot; token held' : '') + '</div></div></div>'
+    + '<span class="tag t-' + esc(j.status) + '">' + esc(j.status.replace('_',' ')) + '</span>'
+    + '</div>' + body + (actions ? '<div class="actions">' + actions + '</div>' : '') + '</div>';
+}
+
+function toggle(id) { selected.has(id) ? selected.delete(id) : selected.add(id); refresh(); }
+async function act(id, action) { await api('/api/jobs/' + id + '/' + action, 'POST'); selected.delete(id); refresh(); }
+async function bulk(action) {
+  if (!selected.size) return;
+  if (action === 'approve' && !confirm('Approve and dial ' + selected.size + ' call(s)?')) return;
+  await api('/api/bulk', 'POST', { action: action, ids: Array.from(selected) });
+  selected.clear(); refresh();
+}
+async function answer(id) {
+  const el = document.getElementById('a-' + id);
+  await api('/api/jobs/' + id + '/answer', 'POST',
+    { answer: el.value, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  refresh();
+}
+async function killAll() {
+  if (!confirm('Cancel every pending, scheduled and approved call?')) return;
+  await api('/api/kill', 'POST'); selected.clear(); refresh();
+}
+async function stopCamp(id) {
+  if (!confirm('Stop this campaign and cancel everything not yet sent?')) return;
+  await api('/api/campaigns/' + id + '/stop', 'POST'); refresh();
+}
+
+async function refresh() {
+  const s = await api('/api/state');
+  const jobs = s.jobs || [];
+  document.getElementById('stats').innerHTML = statRow(jobs);
+  document.getElementById('camps').innerHTML = (s.campaigns || []).length
+    ? s.campaigns.map(campCard).join('')
+    : '<div class="empty">No campaigns. Queue a batch with a campaign id to track budget here.</div>';
+  document.getElementById('qcount').textContent = jobs.length + ' job(s)';
+  document.getElementById('bulk').innerHTML = selected.size
+    ? '<div class="bulk"><span>' + selected.size + ' selected</span><div>'
+      + '<button class="btn btn-dark" onclick="bulk(\'approve\')">Approve selected</button> '
+      + '<button class="btn btn-ghost" onclick="bulk(\'reject\')">Reject selected</button></div></div>'
+    : '';
+  document.getElementById('jobs').innerHTML = jobs.length
+    ? jobs.map(jobCard).join('')
+    : '<div class="empty">No calls queued. Run the Switchboard node in n8n and they land here.</div>';
+  const audit = s.audit || [];
+  document.getElementById('audit').innerHTML = audit.length
+    ? audit.slice(0, 12).map(a => '<div class="audit">' + new Date(a.at).toLocaleTimeString()
+        + ' &middot; <b>' + esc(a.action) + '</b> &middot; ' + esc(a.actor) + ' &middot; ' + esc(a.jobId) + '</div>').join('')
+    : '<div class="meta">Nothing yet.</div>';
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
