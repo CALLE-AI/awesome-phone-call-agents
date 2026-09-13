@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node", "vitest/globals"]
+    "types": ["node"]
   },
   "include": ["api/**/*.ts", "src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
 }
