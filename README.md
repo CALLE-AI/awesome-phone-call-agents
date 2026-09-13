@@ -291,6 +291,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
+- [LastCall Materials](https://lastcall-materials.fly.dev/) - A deadline-first construction-material reuse workflow that uses one authorized CALL-E capacity call, converts partial quantities into evidence-backed candidates, and keeps approval and verified pickup human-controlled. The public demo is fixture-only. See the [integration notes](docs/community-apps/lastcall-materials.md).
 
 ### Plugins
 
