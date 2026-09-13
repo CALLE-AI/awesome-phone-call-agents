@@ -50,7 +50,7 @@ export function buildCoverageVerifyStep(): CallStep {
     taskText: (ctx: ChainContext): string => {
       const lossResult = ctx.results["loss_report"] as LossReportResult | undefined;
       const incidentSummary =
-        lossResult?.incident_description ?? "a recently reported incident";
+        lossResult?.incident_description || "a recently reported incident";
 
       return `You are calling on behalf of an insurance company to notify a claimant that their claim has been received and an adjuster will be in touch.
 
