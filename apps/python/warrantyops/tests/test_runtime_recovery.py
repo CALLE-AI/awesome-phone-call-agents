@@ -13,6 +13,7 @@ import os
 import stat
 from pathlib import Path
 
+import pytest
 from test_calle_adapter import FakeCalleCalls
 from test_runtime_proof import (
     API_KEY_PLACEHOLDER,
@@ -107,6 +108,7 @@ def test_the_receipt_filename_and_body_carry_no_secrets(tmp_path):
             assert text not in body  # agent turns never appear
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows does not expose POSIX mode bits")
 def test_the_receipt_file_mode_is_0600(tmp_path):
     execute(tmp_path)
     mode = (tmp_path / "artifacts" / RECEIPT_FILENAME).stat().st_mode
