@@ -79,11 +79,29 @@ calling anyone.
 The `[dev]` extra pulls in pytest and httpx's mock transport, which the test command below
 needs. `pip install -e .` alone installs the app but not the test tooling.
 
-Two more read-only commands:
+Three more read-only commands:
 
 ```bash
 sticker find --zip 10025          # licensed pharmacies near a ZIP. Never dials.
 sticker cost --drug "atorvastatin" --strength "20 mg"   # the national average cost.
+sticker trace --events examples/events.sample.json      # who had the floor on a call.
+```
+
+`trace` is the barge-in meter. CALL-E's event stream logs "Bot is speaking" and "Callee
+speech detected" with timestamps; `trace` draws them as two channels and marks every place
+the agent opened its turn within 1.5 seconds of the callee speaking. It reads a call on
+your account by id (`--call-id call_xxx`, needs `CALLE_API_KEY`) or replays a saved stream
+with no key at all. It never dials. Run on the survey's own calls it counted 24 collisions
+across 15 traced calls, which is the finding behind upstream issue #415.
+
+```
+agent            |   X                  |      X                   |
+callee            |        |                  |
+        +--------------+--------------+--------------+-------------+
+        0s                                                      12s
+
+5 agent turns, 3 callee turns, 2 collisions over 12s (X = agent opened its turn within 1.5s of the callee speaking)
+first collision at 2.7s after connect
 ```
 
 ## Discovery never dials
@@ -214,7 +232,7 @@ find out" invites a fabricated answer.
 python -m pytest tests -q
 ```
 
-94 tests. No network, no credentials, no calls. The simulated CALL-E is an
+104 tests. No network, no credentials, no calls. The simulated CALL-E is an
 `httpx.MockTransport` mounted underneath the real transport, so the request building,
 idempotency header, polling loop, and error mapping under test are the same ones a live
 run uses.
@@ -230,6 +248,7 @@ sticker/pharmacies.py    the federal NPI registry
 sticker/nadac.py         the federal acquisition cost
 sticker/survey.py        orchestration
 sticker/report.py        what counts, and the arithmetic
+sticker/trace.py         the barge-in meter: who had the floor, from the event stream
 ```
 
 ## How this differs from `pharmacy-stock-check`
