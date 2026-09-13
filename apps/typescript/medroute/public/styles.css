@@ -97,9 +97,9 @@ footer{font-size:11.5px;line-height:1.45}
 @media(max-width:760px){.history-summary{padding:13px}.history-content{padding:8px 10px 10px}.history-heading{font-size:18px}.history-actions .reset-demo{width:100%}.history-toggle{padding:0 9px}.history-toggle-show,.history-toggle-hide{font-size:0}.history-toggle-show:after{content:"View";font-size:11px}.history-toggle-hide:after{content:"Hide";font-size:11px}}
 
 /* Pharmacy offer comparison */
-.offer-inputs,.comparison-controls{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0;align-items:end}
-.offer-inputs label,.comparison-controls label{flex:1;min-width:180px}
-.offer-inputs select,.comparison-controls select{display:block;width:100%;padding:10px;margin-top:6px;border:1px solid #bdcadb;border-radius:7px;background:white;color:#233653;font:inherit}
+.comparison-controls{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0;align-items:end}
+.comparison-controls label{flex:1;min-width:180px}
+.comparison-controls select{display:block;width:100%;padding:10px;margin-top:6px;border:1px solid #bdcadb;border-radius:7px;background:white;color:#233653;font:inherit}
 .comparison-controls{padding:18px;border:1px solid #dce6f2;border-radius:10px;background:#f4f8ff}
 .comparison-controls[hidden]{display:none}
 .comparison-controls .pickup-filter{display:flex;align-items:center;gap:8px}
@@ -117,7 +117,7 @@ footer{font-size:11.5px;line-height:1.45}
 .offer-table .transcript-download{display:block;margin-top:10px}
 @media(max-width:760px){
   .pharmacy input:nth-child(3){display:block;grid-column:2}
-  .offer-inputs,.comparison-controls{display:grid;grid-template-columns:1fr}
+  .comparison-controls{display:grid;grid-template-columns:1fr}
   .offer-table,.offer-table tbody,.offer-table tr,.offer-table td{display:block;min-width:0;width:auto}
   .offer-table thead{display:none}
   .offer-table tr{padding:10px;border-bottom:2px solid #dce6f2}
@@ -134,9 +134,6 @@ footer{font-size:11.5px;line-height:1.45}
 @media(max-width:760px){.balance-controls{display:block}.balance-controls p{margin-top:10px}}
 
 .decision-summary{margin:22px 0 28px}
-.quantity-input{display:grid;gap:6px;max-width:560px;margin:18px 0}
-.quantity-input input{max-width:220px}
-.quantity-input small{font-size:12px;line-height:1.6;color:#52647a}
 .budget-controls{display:flex;flex-wrap:wrap;width:100%;gap:14px;border-top:1px solid #dce6f2;padding-top:14px}
 .budget-controls[hidden]{display:none}
 .budget-controls p{margin:0}

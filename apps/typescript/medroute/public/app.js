@@ -236,16 +236,9 @@ dom.run.onclick = async () => {
       strengthValue: dom.strengthValue.value,
       strengthUnit: dom.strengthUnit.value,
       form: dom.dosageForm.value,
-      releaseType: document.querySelector("#release-type").value,
-      brand: document.querySelector("#preferred-brand").value.trim(),
+      releaseType: "standard",
+      brand: "",
     };
-    const quantityInput = document.querySelector("#requested-quantity");
-    if (quantityInput.validity.badInput) throw new Error("Enter a valid requested purchase quantity.");
-    const requestedQuantity = quantityInput.value.trim();
-    if (requestedQuantity) {
-      requestProduct.requestedQuantity = Number(requestedQuantity);
-      if (!requestProduct.strengthValue || !requestProduct.strengthUnit || !requestProduct.form) throw new Error("Complete the product details before requesting a purchase quantity.");
-    }
     const requestBody = {
       medicine,
       strength,
