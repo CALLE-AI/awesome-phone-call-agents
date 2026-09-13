@@ -96,6 +96,18 @@ python3 -m claimcall --data ./data init-demo
 python3 -m claimcall --data ./data run --mode live --approve --hotline +15551234567
 ```
 
+Or from the dashboard (no CLI patching): start the server with live enabled, open
+http://127.0.0.1:8766, type your mobile into **Call my mobile**, tick approval, select
+`live`, and press Approve & Call.
+
+```bash
+python3 -m claimcall --data ./data serve --allow-live
+```
+
+`CALLE_API_KEY` is read from real environment variables first, then from `.env` in the app
+directory, the current directory, and ancestors up to the repo root — a repo-root `.env`
+just works. `.env` and `.env.local` are gitignored; never commit them.
+
 Live refuses unless **all** hold: `--approve` given, `--hotline` repeats the case hotline
 exactly, `CALLE_API_KEY` set, destination a valid region-consistent E.164 number, and (when
 `CLAIMCALL_ALLOWLIST` is set) the destination listed. A `CALLE_BASE_URL` override is refused.
