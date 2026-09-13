@@ -1,0 +1,124 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { CallGateway, StartRequest, StartResult } from "../src/calle.ts";
+import { DryRunGateway } from "../src/calle.ts";
+import { findBooking, loadCatalog } from "../src/data.ts";
+import { Desk } from "../src/desk.ts";
+import { maskPhone, routeFor } from "../src/phone.ts";
+import { quoteFor } from "../src/rules.ts";
+import { buildResultSchema, buildTask } from "../src/task.ts";
+import type { CallOutcome } from "../src/types.ts";
+
+function dryDesk() {
+  return new Desk(loadCatalog(), new DryRunGateway(0), { statePath: null, liveCallBudget: 0 });
+}
+
+test("dry run: every passenger ends applied or in review, never silently dropped", async () => {
+  const desk = dryDesk();
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "a late inbound aircraft");
+  const statuses: Record<string, string> = {};
+  for (const pnr of ["K7Q2XA", "M3P8RD", "T5W1LC", "B9H4ZN", "R2D6YU"]) {
+    await desk.startCall(d.id, pnr);
+    statuses[pnr] = (await desk.refresh(`${d.id}:${pnr}`)).status;
+  }
+  assert.deepEqual(statuses, {
+    K7Q2XA: "applied",
+    M3P8RD: "applied",
+    T5W1LC: "applied",
+    B9H4ZN: "needs_review",
+    R2D6YU: "needs_review",
+  });
+  const snap = desk.snapshot();
+  const sari = snap.disruptions[0]?.bookings.find((b) => b.pnr === "T5W1LC");
+  assert.equal(sari?.state?.status, "rebooked");
+  assert.equal(sari?.state?.flightId, "NA729-2026-09-20");
+  assert.notEqual(sari?.state?.currentPnr, "T5W1LC");
+  assert.equal(snap.flights.find((f) => f.id === "NA729-2026-09-20")?.seatsAvailable, 8);
+});
+
+test("a booking is called at most once per disruption", async () => {
+  const desk = dryDesk();
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  await desk.startCall(d.id, "K7Q2XA");
+  await assert.rejects(desk.startCall(d.id, "K7Q2XA"), /already called/);
+});
+
+test("a person can resolve a review item with an offered option", async () => {
+  const desk = dryDesk();
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  await desk.startCall(d.id, "B9H4ZN");
+  const key = `${d.id}:B9H4ZN`;
+  assert.equal((await desk.refresh(key)).status, "needs_review");
+  const resolved = desk.resolve(key, { kind: "move", optionId: "NA729-2026-09-20" }, "Called back by agent");
+  assert.equal(resolved.status, "resolved_by_human");
+  assert.match(resolved.applied ?? "", /Rebooked to NA 729/);
+});
+
+class RecordingGateway implements CallGateway {
+  readonly mode = "sdk" as const;
+  readonly live = true;
+  readonly firstPollSeconds = 60;
+  readonly pollSeconds = 10;
+  requests: StartRequest[] = [];
+  constructor(private readonly result: StartResult) {}
+  async start(request: StartRequest): Promise<StartResult> {
+    this.requests.push(request);
+    return this.result;
+  }
+  async get(): Promise<CallOutcome> {
+    throw new Error("not polled in this test");
+  }
+}
+
+test("live mode dials only the configured demo phone, after typed confirmation, within budget", async () => {
+  const gateway = new RecordingGateway({ kind: "started", callId: "call_1" });
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 1 });
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  await assert.rejects(desk.startCall(d.id, "K7Q2XA"), /last 4 digits/);
+  await assert.rejects(desk.startCall(d.id, "K7Q2XA", "0101"), /last 4 digits/);
+  const entry = await desk.startCall(d.id, "K7Q2XA", "4567");
+  assert.equal(entry.status, "in_progress");
+  assert.equal(gateway.requests[0]?.phone, "+6591234567");
+  assert.equal(gateway.requests[0]?.region, "SG");
+  assert.equal(gateway.requests[0]?.idempotencyKey, "fda-evt_NA721-2026-09-20_240-K7Q2XA");
+  await assert.rejects(desk.startCall(d.id, "M3P8RD", "4567"), /budget/);
+});
+
+test("an uncertain submission is never retried automatically", async () => {
+  const gateway = new RecordingGateway({ kind: "uncertain", message: "timeout" });
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 5 });
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  assert.equal((await desk.startCall(d.id, "K7Q2XA", "4567")).status, "uncertain");
+  await assert.rejects(desk.startCall(d.id, "K7Q2XA", "4567"), /already called/);
+  assert.equal(gateway.requests.length, 1);
+});
+
+test("Indonesian numbers are refused and live mode will not start with one", () => {
+  const route = routeFor("+628123456789");
+  assert.equal(route.ok, false);
+  assert.throws(
+    () => new Desk(loadCatalog(), new RecordingGateway({ kind: "started", callId: "x" }), { statePath: null, liveDemoPhone: "+628123456789", liveCallBudget: 1 }),
+    /Indonesia/,
+  );
+  assert.equal(maskPhone("+6591234567"), "+65 ••• 4567");
+});
+
+test("the task discloses the AI, states exact amounts, and forbids payment details", () => {
+  const catalog = loadCatalog();
+  const booking = findBooking(catalog, "M3P8RD");
+  const disruption = {
+    id: "evt",
+    flightId: booking.flightId,
+    delayMinutes: 240,
+    reason: "weather",
+    newDeparture: "2026-09-20T05:10:00.000Z",
+    createdAt: "",
+  };
+  const quote = quoteFor(catalog, booking, disruption);
+  const task = buildTask(catalog, booking, disruption, quote);
+  assert.match(task, /You are an AI assistant calling on behalf of TripKita/);
+  assert.match(task, /1,605,000 rupiah/);
+  assert.match(task, /Never ask for or accept card numbers/);
+  const schema = buildResultSchema(quote) as { properties: { selected_flight: { enum: string[] } } };
+  assert.deepEqual(schema.properties.selected_flight.enum, [...quote.moves.map((m) => m.flightId), "none"]);
+});
