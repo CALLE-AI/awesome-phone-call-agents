@@ -2,6 +2,8 @@
 
 **A protocol for when the other end of a CALL-E call is also an AI.**
 
+Demo video (2:30): https://youtu.be/jyzWnDNDsw4 · Submission PR: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/578
+
 Thousands of agents are learning to call businesses, and those businesses increasingly answer with a voicebot. Soon a growing share of CALL-E outbound calls will be answered by an inbound AI agent. Today the calling agent cannot tell, and this goes wrong in three ways:
 
 - **Wasted turns.** It spends a human-paced disclosure on a machine and gets stuck in script loops.

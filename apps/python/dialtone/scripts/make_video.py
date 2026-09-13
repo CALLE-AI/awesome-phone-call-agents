@@ -128,6 +128,8 @@ def record(scene: dict, seconds: float, out: Path) -> Path:
         page.goto(scene["url"], wait_until="networkidle")
         if scene.get("wait_done"):
             page.wait_for_function("window.__demoDone === true", timeout=300_000)
+            # Hold on the final state so the last stamp and the summary band are on screen, not cut.
+            page.wait_for_timeout(4500)
             page.wait_for_timeout(max(0, int((seconds - page.evaluate("performance.now()/1000")) * 1000)))
         else:
             page.wait_for_timeout(int(seconds * 1000))
