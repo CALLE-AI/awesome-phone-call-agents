@@ -13,6 +13,7 @@ against; a row cannot be added, upgraded or reclassified by editing prose.
 | Row | Evidence class | Command | Expected result |
 | --- | --- | --- | --- |
 | R1 — runtime proof call | `Recorded CALL-E result` | `python3 -m warrantyops --proof-screen` (linked receipt: `proof/runtime-proof-receipt.public.json`) | transport `completed`, terminal `INFORMATION_OBTAINED`, `claim_status: UNKNOWN` (honestly), reference BR-4821 grounded by the verbatim quote "Br Hyphen, 4821.", masked call id `call_dMU…A-3Q`, write-back withheld. Cassette unavailable — recorded before the cassette program; never reconstructed. |
+| R3 — live post-routing-fix call | `Recorded CALL-E result` | `python3 -m pytest tests/test_r3_recorded_cassette.py -q` | transport `completed`; person reached (`true` — non-empty counterparty transcript, 18 turns); agent stayed on the NorthStar claim-status inquiry; callee responses did not produce claim-status information, so `claim_status: UNKNOWN` (honestly); write-back withheld. Routing: `IN`/`en-IN`. |
 | R4 — recorded owned-number no-answer | `Recorded CALL-E result` | `python3 -m pytest tests/test_r4_recorded_cassette.py -q` | one provider create and zero retries; transport `failed`; no transcript or person-derived status; terminal `TRANSPORT_FAILED`; `claim_status: UNKNOWN`; write-back withheld. Sanitized cassette replays through the real adapter contract. |
 | R2 — stated status still needs review and recheck | `Synthetic scenario` | `python3 -m pytest tests/test_r_series_synthetic.py -k r2 -q` | a grounded `STATED_RETURNED` still refuses write-back without an approved decision (`NOT_REVIEWED`) and still rechecks the source (`SOURCE_CHANGED`). Never executed live, by freeze. |
 | R3 (synthetic counterpart) — misread reference corrected | `Synthetic scenario` | `python3 -m pytest tests/test_r_series_synthetic.py -k r3 -q` | heard `CASE48171`, corrected to `CASE48178` through its own read-back exchange; only the corrected value asserted. |
@@ -30,20 +31,21 @@ software proofs, never platform observations).
 
 ## Failed authorized attempts — not evidence
 
-R8 and R3 were separately authorized and separately gated. Each created
-exactly one provider call and used zero retries. Both ended as a
-zero-duration `404` that surfaced as `call_failed`, with
-`transcript_turns: 0`, no person reached, `claim_status: UNKNOWN`, and
-write-back withheld. Both `+91…` attempts were sent `US`/`en-US` routing —
-a closed routing defect — but the available data does not independently
-prove that this caused the carrier/platform failure. No sanitized cassette
-or public receipt is published for either row; the private artifacts remain
-outside the repository. **Neither row is evidence** and neither is retried.
+R8 was separately authorized and separately gated. It created exactly one provider call and used zero retries. It ended as a zero-duration `404` that surfaced as `call_failed`, with `transcript_turns: 0`, no person reached,
+`claim_status: UNKNOWN`, and write-back withheld. The `+91…` attempt was
+sent `US`/`en-US` routing — a closed routing defect — but the available
+data does not independently prove that this caused the carrier/platform
+failure. No sanitized cassette or public receipt is published for this row;
+the private artifacts remain outside the repository. **R8 is not evidence**
+and is not retried. Subsequent R8b attempts on 13 September (2026-09-13)
+also failed: one `404` (carrier number-not-reachable on the practitioner's
+number), one `408` (timeout, no ring), and one `500` (CALL-E server error).
+These are infrastructure failures, not product failures, and are recorded
+as known limitations.
 
 | Row | Authorized observation it did not make | Outcome |
 | --- | --- | --- |
 | R8 | spoken field acceptance through a consenting warranty professional | attempted/failed — one create, zero retries, no transcript, `UNKNOWN`; not evidence |
-| R3 | spoken reference correction through a consenting role-player | attempted/failed — one create, zero retries, no transcript, `UNKNOWN`; not evidence |
 
 ## Limitations — rows never executed
 

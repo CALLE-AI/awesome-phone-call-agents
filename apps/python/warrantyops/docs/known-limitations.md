@@ -16,21 +16,29 @@ is `proof/independent-run.md` (no third party has run it).
 
 ## Evidence rows (the R-series)
 
-- **R1 and R4 are the recorded runtime evidence.** R1 is an authorized,
+- **R1, R3, and R4 are the recorded runtime evidence.** R1 is an authorized,
   consenting role-play call; its receipt is sanitized, its raw artifacts live
   outside the repository, and no cassette is reconstructed from the receipt.
-  R4 is an authorized owned-number no-answer call with one create, zero
-  retries, no person reached, and `UNKNOWN` status; its sanitized cassette is
-  replayable and its raw artifacts remain private. Neither row is ever re-run.
+  R3 is a live post-routing-fix call: transport completed, person reached
+  (18-turn counterparty transcript), agent held the claim-status inquiry, but
+  the callee did not produce claim-status information, so `claim_status` is
+  honestly `UNKNOWN`; write-back withheld. Its sanitized cassette is
+  replayable and its raw artifacts remain private. R4 is an authorized
+  owned-number no-answer call with one create, zero retries, no person
+  reached, and `UNKNOWN` status; its sanitized cassette is replayable and its
+  raw artifacts remain private. No recorded row is ever re-run.
 - **R2 is never executed live.** Its synthetic counterpart is a mandatory
   software proof (FakeCalle), as are the synthetic counterparts of R3–R7.
-- **R8 and R3 were authorized attempts, not evidence.** Each made one
-  provider create with zero retries; both ended in a zero-duration `404`
-  that surfaced as `call_failed`, with no transcript, no person reached,
-  `UNKNOWN` status, and write-back withheld. Both `+91…` attempts were sent
-  `US`/`en-US` routing, now fixed, but the cause cannot be independently
-  proven from the available data. Their raw artifacts remain private; no
-  public cassette or receipt is published; neither is retried.
+- **R8 was an authorized attempt, not evidence.** It made one provider
+  create with zero retries; it ended in a zero-duration `404` that surfaced
+  as `call_failed`, with no transcript, no person reached, `UNKNOWN` status,
+  and write-back withheld. The `+91…` attempt was sent `US`/`en-US` routing,
+  now fixed, but the cause cannot be independently proven from the available
+  data. Its raw artifacts remain private; no public cassette or receipt is
+  published; it is not retried. Subsequent R8b attempts on 13 September
+  (2026-09-13) also failed with `404` (carrier unreachable), `408` (timeout,
+  no ring), and `500` (CALL-E server error) — infrastructure failures, not
+  product failures.
 - **R5–R9 other than R8 remain owner-optional and not executed.** Their
   absence does not block product completion. The R-series is stopped; no
   further live row is authorized. R7 with a different body under the same

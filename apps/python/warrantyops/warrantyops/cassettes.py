@@ -391,13 +391,16 @@ REGISTRY: tuple[CassetteRow, ...] = (
     ),
     CassetteRow(
         row="R3",
-        status="attempted/failed",
-        evidence_class="",
+        status="recorded",
+        evidence_class="Recorded CALL-E result",
+        cassette="tests/cassettes/r3.json",
+        receipt="proof/receipts/r3.public.json",
         note=(
-            "authorized reference-correction attempt; one create and zero "
-            "retries ended in a zero-duration 404/call_failed with no "
-            "transcript or person-derived status; it was dialled with "
-            "US/en-US routing, so no platform behaviour is established"
+            "live post-routing-fix call; transport completed, person reached "
+            "(18-turn non-empty counterparty transcript); the callee did not "
+            "produce claim-status information, so claim_status is honestly "
+            "UNKNOWN; write-back withheld. Prior authorized attempt failed "
+            "with US/en-US routing before the routing defect was fixed."
         ),
     ),
     CassetteRow(

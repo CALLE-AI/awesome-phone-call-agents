@@ -252,10 +252,13 @@ def test_load_cassette_refuses_a_schema_mismatch(tmp_path):
         load_cassette(old)
 
 
-def test_r4_is_the_only_checked_in_cassette():
-    """R4 is recorded; R1 remains receipt-only and no other row executed."""
+def test_r3_and_r4_are_the_only_checked_in_cassettes():
+    """R3 and R4 are recorded; R1 remains receipt-only."""
 
-    assert [path.name for path in CASSETTE_DIR.glob("*.json")] == ["r4.json"]
+    assert sorted(path.name for path in CASSETTE_DIR.glob("*.json")) == [
+        "r3.json",
+        "r4.json",
+    ]
 
 
 # --- the FakeCalle divergence harness ---------------------------------------------------
@@ -310,10 +313,10 @@ def test_the_registry_pins_every_row_status():
     assert by_row["R8"].cassette is None
     assert by_row["R8"].receipt is None
     assert "404/call_failed" in by_row["R8"].note
-    assert by_row["R3"].status == "attempted/failed"
-    assert by_row["R3"].cassette is None
-    assert by_row["R3"].receipt is None
-    assert "404/call_failed" in by_row["R3"].note
+    assert by_row["R3"].status == "recorded"
+    assert by_row["R3"].cassette == "tests/cassettes/r3.json"
+    assert by_row["R3"].receipt == "proof/receipts/r3.public.json"
+    assert "post-routing-fix" in by_row["R3"].note
     assert by_row["R4"].status == "recorded"
     assert by_row["R4"].cassette == "tests/cassettes/r4.json"
     assert by_row["R4"].receipt == "proof/receipts/r4.public.json"

@@ -60,7 +60,7 @@ def test_the_table_mirrors_the_registry_statuses():
     assert by_row["R2"].status == "synthetic-only"
     # R8/R3 failed and are limitations; the remaining live rows are unexecuted.
     assert by_row["R8"].status == "attempted/failed"
-    assert by_row["R3"].status == "attempted/failed"
+    assert by_row["R3"].status == "recorded"
     for number in (5, 6, 7):
         assert f"R{number} (recorded)" in table
         assert by_row[f"R{number}"].status == "planned/gated"
@@ -79,7 +79,7 @@ def test_failed_attempts_are_disclosed_without_evidence_pills():
     failed = evidence_table().split("## Failed authorized attempts")[1].split(
         "## Limitations"
     )[0]
-    assert "R8" in failed and "R3" in failed
+    assert "R8" in failed
     assert "one provider call" in failed
     assert "zero retries" in failed
     assert "zero-duration `404`" in failed
