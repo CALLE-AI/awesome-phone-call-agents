@@ -42,6 +42,35 @@ Python 3.9 or newer, standard library only. `pytest` is the only development dep
 The demo case is fictional: passenger Alex Morgan, EuroSky Airways, booking ABC123, flight
 ES421, Paris → Bengaluru, Cancelled. Phone fixtures use the fictional NANP range `555-01XX`.
 
+## Demo script (3 minutes)
+
+For recording the demo video. Start clean:
+
+```bash
+cd apps/python/claimcall
+rm -rf ./data
+python3 -m claimcall --data ./data init-demo
+python3 -m claimcall --data ./data serve   # open http://127.0.0.1:8766
+```
+
+| Time | Show | Where |
+| --- | --- | --- |
+| 00:00 | Flight cancelled: Alex Morgan, EuroSky ES421, Paris → Bengaluru | 1. Disruption Case |
+| 00:15 | Five missing facts, all unknown | 2. Missing Information |
+| 00:30 | Why a phone call helps: critical facts live on the airline's line | 4. Human Approval, first paragraph |
+| 00:45 | Exactly what the agent may ask: five objectives | 3. Call Plan |
+| 01:00 | What it may never do: no purchases, no payment, no unrelated changes | 3. Call Plan, restrictions |
+| 01:10 | Tick the checkbox, mode `fixture`, press Resolve by Phone — Approve & Call | 4. Human Approval |
+| 01:20 | CALL-E execution: call ID, completed status | 5. CALL-E Execution |
+| 01:50 | Structured result folded into the case | 5. CALL-E Execution, outcome |
+| 02:05 | Three commitments plus transcript evidence | 6 + 7. Outcome |
+| 02:20 | BEFORE vs AFTER: every Unknown becomes a confirmed fact | 6 + 7. Outcome, table |
+| 02:40 | Recommended next action: wait for the email, keep receipts | 6 + 7. Outcome, bottom |
+| 02:50 | Call ID and the closed result schema that produced it | 5. CALL-E Execution |
+
+CLI-only alternative: replace the dashboard with `run --mode fixture --approve`, which prints
+the call ID, the before/after rows, the commitments, and the next action.
+
 ## Modes
 
 | Mode | Call placed | API key | Approval |
