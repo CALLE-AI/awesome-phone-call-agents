@@ -24,6 +24,17 @@ The part that matters is the last step. Ringdown **places the call over the REST
 it over MCP**, then writes both the verdict and the verification into a hash-chained ledger. An
 agent that audits itself through the same channel it wrote with has proved nothing.
 
+**And against the live provider, that last step does not close today.** `get_call_run` indexes
+calls by a `run_id` that only its own placement tool hands out, and no identifier a REST-placed call
+exposes resolves to one — so there is no run to re-read, and every live verdict settles at exit 45:
+the second channel said nothing, never that it disagreed. It is ceiling 12 of the twenty-three
+[known ceilings](#known-ceilings) and the first one to read, the provider's own responses are
+committed as fixtures, and a test asserts that this parser cannot read a real run.
+
+Three minutes of it running, the last fifty seconds of them a real call placed against the live
+provider: <https://youtu.be/cZg4hbkCVMA> · the ladder, the ledger and the receiver as live widgets:
+<https://gmassello.github.io/ringdown/>
+
 - [Setup](#setup)
 - [Try it without an account](#try-it-without-an-account)
 - [Preview, which is the default](#preview-which-is-the-default)
