@@ -192,7 +192,7 @@ Enforced in code (`claimcall/policy.py`, `claimcall/engine.py`), see `docs/safet
 There is no recurring schedule: each run is one operator-invoked cycle, so there is nothing to
 unsubscribe from. After `POST /v1/calls` succeeds, stopping the app stops only local status
 polling; it does not recall the outbound call. Use the recorded call ID to check the outcome
-in the CALL-E dashboard.
+in the [CALL-E dashboard](https://dashboard.heycall-e.com/).
 
 ## Testing
 
