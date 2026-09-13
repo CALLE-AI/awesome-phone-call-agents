@@ -61,7 +61,10 @@ class CalleClient:
                 return json.loads(resp.read().decode("utf-8") or "{}")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
-            raise CalleError(f"CALL-E API {method} {path} failed: HTTP {e.code} {detail}") from None
+            hint = ""
+            if e.code == 429 and "account_concurrency_exceeded" in detail:
+                hint = " Another call is still active on your line; wait for it to finish, then retry once."
+            raise CalleError(f"CALL-E API {method} {path} failed: HTTP {e.code} {detail}.{hint}") from None
         except urllib.error.URLError as e:
             raise CalleError(f"CALL-E API unreachable at {self.base_url}: {e.reason}") from None
 

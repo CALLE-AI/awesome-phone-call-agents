@@ -288,7 +288,34 @@ def test_live_override_bad_number_refused(client):
 
 # ---- dashboard seeds its own demo case ------------------------------------------------------
 
-def test_dashboard_seeds_demo_case_over_http():
+def test_concurrency_error_explains_retry():
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from claimcall.calle_client import CalleClient, CalleError
+
+    class Busy(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            body = b'{"error": {"code": "account_concurrency_exceeded"}}'
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Busy)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        host, port = server.server_address[:2]
+        client = CalleClient("test-key", f"http://{host}:{port}", allow_local_fake=True)
+        with pytest.raises(CalleError, match="wait for it to finish"):
+            client.create_call({"task": "x"}, "key-1")
+    finally:
+        server.shutdown()
+        server.server_close()def test_dashboard_seeds_demo_case_over_http():
     import subprocess
     import sys
     import tempfile
