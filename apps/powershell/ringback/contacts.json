@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Dr. Sharma's Office",
+    "type": "doctor_office",
+    "phone": "+15550101",
+    "source": "demo_contacts",
+    "fictional": true
+  },
+  {
+    "name": "CityCare Pharmacy",
+    "type": "pharmacy",
+    "phone": "+15550102",
+    "source": "demo_contacts",
+    "fictional": true
+  },
+  {
+    "name": "Demo Insurance",
+    "type": "insurance_company",
+    "phone": "+15550103",
+    "source": "demo_contacts",
+    "fictional": true
+  }
+]
