@@ -23,6 +23,7 @@ name: WarrantyOps quality
 on:
   pull_request:
     paths:
+      - ".gitattributes"
       - "apps/python/warrantyops/**"
       - "scripts/validate_repository.py"
       - ".github/workflows/warrantyops-quality.yml"
@@ -31,6 +32,7 @@ on:
       - main
       - feat/warranty-recovery-scaffold
     paths:
+      - ".gitattributes"
       - "apps/python/warrantyops/**"
       - "scripts/validate_repository.py"
       - ".github/workflows/warrantyops-quality.yml"
