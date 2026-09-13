@@ -662,12 +662,14 @@ def main(argv: list[str] | None = None) -> int:
         from .statemachine import render_markdown as render_state_machine
 
         DOCS_DIR.mkdir(parents=True, exist_ok=True)
-        (DOCS_DIR / "refusals.md").write_text(
-            render_refusals_markdown(), encoding="utf-8"
-        )
-        (DOCS_DIR / "state-machine.md").write_text(
-            render_state_machine(), encoding="utf-8"
-        )
+        for name, body in (
+            ("refusals.md", render_refusals_markdown()),
+            ("state-machine.md", render_state_machine()),
+        ):
+            with (DOCS_DIR / name).open(
+                "w", encoding="utf-8", newline="\n"
+            ) as handle:
+                handle.write(body)
         print(str(DOCS_DIR))
         return 0
 

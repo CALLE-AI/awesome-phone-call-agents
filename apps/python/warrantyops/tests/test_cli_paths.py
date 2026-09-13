@@ -66,7 +66,12 @@ def test_generate_docs_rewrites_both_files_byte_identically(capsys):
     from warrantyops.statemachine import render_markdown as render_state_machine
 
     before = {
-        name: (DOCS_DIR / name).read_bytes()
+        name: (
+            (DOCS_DIR / name)
+            .read_text(encoding="utf-8")
+            .replace("\r\n", "\n")
+            .encode("utf-8")
+        )
         for name in ("refusals.md", "state-machine.md")
     }
     assert main(["--generate-docs"]) == 0
