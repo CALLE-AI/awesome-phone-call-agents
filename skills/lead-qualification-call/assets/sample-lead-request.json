@@ -1,0 +1,23 @@
+{
+  "request_id": "lq-2026-0914-001",
+  "lead_name": "Sample Lead",
+  "to_phone_e164": "+15550101337",
+  "company_name": "Sample Software Co",
+  "caller_name": "Sample Seller",
+  "authorized_contact_reason": "Lead submitted a demo request on our website on 2026-09-10 and checked the box consenting to be contacted by phone about this inquiry.",
+  "product_label": "the Sample Software Co onboarding trial",
+  "qualification_questions": [
+    "What is the main workflow they hope to improve first?",
+    "How many people would use the product in the first month?",
+    "When do they want a solution in place?"
+  ],
+  "timezone": "America/New_York",
+  "followup_channels": ["email", "sms"],
+  "lead_context": "Signed up for the trial with a work email; form answer: 'evaluating tools for our support team'.",
+  "voicemail_allowed": true,
+  "voicemail_message": "Hi, this is the Sample Software Co assistant calling for Sample Lead about the trial they requested. No action is needed on this call - reply to our email or text whenever convenient and we will take it from there.",
+  "language": "English",
+  "region": "US",
+  "do_not_discuss": ["pricing details", "competitor comparisons"],
+  "disqualify_on": ["no authority to influence the purchase", "timeline is more than 12 months away"]
+}
