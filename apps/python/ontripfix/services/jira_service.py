@@ -157,7 +157,7 @@ def add_jira_comment(issue_key: str, comment_text: str) -> bool:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": f"🤖 [Weekend Saviour] {comment_text}",
+                                    "text": f"🤖 [OnTripFix] {comment_text}",
                                 }
                             ],
                         }

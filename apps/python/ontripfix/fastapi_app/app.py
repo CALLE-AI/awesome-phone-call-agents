@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Weekend Saviour - Autonomous Incident Remediation API",
+    title="OnTripFix - Autonomous Incident Remediation API",
     description="FastAPI service for Airflow incident interception, Call-E Voice AI calls, and LangGraph auto-remediation.",
     version="1.0.0",
     lifespan=lifespan,
@@ -124,10 +124,10 @@ class AirflowWebhookPayload(BaseModel):
 
 @app.get("/api/health", summary="Service Health Check")
 def health_check():
-    """Returns the operational status of the Weekend Saviour FastAPI server and background queue workers."""
+    """Returns the operational status of the OnTripFix FastAPI server and background queue workers."""
     return {
         "status": "ONLINE",
-        "service": "Weekend Saviour - Autonomous Incident Remediation Server",
+        "service": "OnTripFix - Autonomous Incident Remediation Server",
         "framework": "FastAPI (v0.141+)",
         "error_queue": "RUNNING",
         "resolution_queue": "RUNNING",
@@ -234,7 +234,7 @@ if os.path.exists(UI_ASSETS_DIR):
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def serve_dashboard():
-    """Serves the Weekend Saviour React Application Dashboard."""
+    """Serves the OnTripFix React Application Dashboard."""
     index_path = os.path.join(UI_DIST_DIR, "index.html")
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
@@ -245,14 +245,14 @@ def serve_dashboard():
     if os.path.exists(fallback_path):
         with open(fallback_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>Weekend Saviour API</h1><p>Visit <a href='/docs'>/docs</a> for Swagger UI.</p>"
+    return "<h1>OnTripFix API</h1><p>Visit <a href='/docs'>/docs</a> for Swagger UI.</p>"
 
 
 if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 7071))
-    print(f"🚀 Starting Weekend Saviour FastAPI Server on http://0.0.0.0:{port}")
+    print(f"🚀 Starting OnTripFix FastAPI Server on http://0.0.0.0:{port}")
     print(f"📚 Swagger Interactive API Documentation: http://localhost:{port}/docs")
     print(f"📝 Logs written to console and rolling file: {LOG_FILE_PATH}")
     uvicorn.run("fastapi_app.app:app", host="0.0.0.0", port=port, reload=False, log_config=None)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import appLogo from './assets/logo.jpg';
 import {
   Activity,
   ShieldAlert,
@@ -289,12 +290,12 @@ export default function App() {
 
           {/* Logo & Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              <ShieldAlert className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-indigo-500/30 flex items-center justify-center bg-slate-900 shadow-lg shadow-indigo-500/20">
+              <img src={appLogo} alt="OnTripFix Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className={`text-xl font-heading font-bold ${isDark ? 'bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent' : 'text-slate-900'}`}>
-                Weekend Saviour
+                OnTripFix
               </h1>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Autonomous Airflow Incident Remediation & Call-E Voice AI</p>
             </div>
@@ -1390,7 +1391,7 @@ export default function App() {
                     <span>Global On-Call Support Engineers Roster Directory</span>
                   </h3>
                   <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Registered engineers eligible for automated Call-E Voice AI dispatch during weekend incidents
+                    Registered engineers eligible for automated Call-E Voice AI dispatch during on-call incidents
                   </p>
                 </div>
                 <span className="px-3 py-1 text-xs font-bold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
@@ -1471,7 +1472,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className={`border-t py-4 text-center text-xs transition-colors ${isDark ? 'border-[#1f293d] bg-[#111827]/40 text-slate-400' : 'border-slate-200 bg-white text-slate-600'}`}>
-        Weekend Saviour Powered by CALL-E
+        OnTripFix Powered by CALL-E
       </footer>
     </div>
   );
