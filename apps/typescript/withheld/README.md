@@ -16,6 +16,11 @@ answers a phone, at any point, and the business never has a number to ring.
 The number is not withheld by asking the model nicely. It is never put in the
 model's reach.
 
+**Live console: <https://withheld.vercel.app/>** — runs entirely on recorded
+transcripts, so it places no calls and needs no credential. Start at
+[`?s=leaked`](https://withheld.vercel.app/?s=leaked), where the clinic says the
+number aloud: it is caught and masked, and it is not in the page source.
+
 ---
 
 ## What it actually does
