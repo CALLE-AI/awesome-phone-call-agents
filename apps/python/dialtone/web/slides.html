@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DIALTONE · slides</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Chivo:wght@300;400;600&family=Chivo+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0c0a;--ink:#ece7d8;--dim:#8b8778;--line:#262a22;--human:#ff9f45;--agent:#6fd3ff;--ok:#43e08a;--warn:#ffc233;--bad:#ff4136;
+  --display:"Big Shoulders Display","Arial Narrow",sans-serif;--mono:"Chivo Mono",ui-monospace,monospace;--sans:"Chivo",sans-serif}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
+body{background:radial-gradient(1400px 700px at 20% -10%,#1b1f16 0%,transparent 60%),repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),var(--bg)}
+.s{position:absolute;inset:0;padding:110px 140px;display:none;flex-direction:column;justify-content:center;gap:34px}
+.s.on{display:flex}
+.k{font-family:var(--mono);letter-spacing:.24em;font-size:20px;color:var(--dim);text-transform:uppercase}
+h1{font-family:var(--display);font-weight:900;font-size:150px;line-height:.86;margin:0;letter-spacing:.02em;text-transform:uppercase}
+h2{font-family:var(--display);font-weight:700;font-size:86px;line-height:.95;margin:0;text-transform:uppercase}
+p{font-size:34px;line-height:1.35;max-width:1400px;margin:0;color:#d6d1c2}
+.r{opacity:0;transform:translateY(18px);animation:in .8s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes in{to{opacity:1;transform:none}}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:10px}
+.stat div{border-top:3px solid var(--ink);padding-top:16px}
+.stat b{display:block;font-family:var(--display);font-weight:900;font-size:110px;line-height:.9}
+.stat span{font-family:var(--mono);font-size:20px;color:var(--dim)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:20px}
+.flow div{border:1px solid var(--line);border-right:none;padding:30px 28px;min-height:250px;position:relative}
+.flow div:last-child{border-right:1px solid var(--line)}
+.flow i{font-style:normal;font-family:var(--mono);color:var(--dim);font-size:18px;letter-spacing:.18em}
+.flow h3{font-family:var(--display);font-weight:700;font-size:44px;margin:14px 0 12px;text-transform:uppercase;line-height:1}
+.flow p{font-size:24px;color:var(--dim)}
+.quote{font-family:var(--mono);font-size:30px;color:var(--agent);border-left:3px solid var(--agent);padding:10px 0 10px 26px}
+.dot{display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--bad);box-shadow:0 0 26px var(--bad);margin-right:26px;vertical-align:middle;animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.3}}
+</style>
+</head>
+<body>
+<section class="s" id="intro">
+  <div class="k r">CALL-E hackathon · a protocol for agent-to-agent calls</div>
+  <h1 class="r" style="animation-delay:.15s"><span class="dot"></span>Dialtone</h1>
+  <p class="r" style="animation-delay:.5s">Thousands of agents are learning to call businesses. Businesses increasingly answer with a voicebot.
+  <b style="color:var(--agent)">Soon the other end of a CALL-E call is an AI</b>, and nothing in the stack knows it.</p>
+  <div class="stat r" style="animation-delay:1.1s">
+    <div><b>?</b><span>is the other end a person, a menu, or an agent</span></div>
+    <div><b>2×</b><span>agents that both say "confirmed"</span></div>
+    <div><b style="color:var(--bad)">0</b><span>humans who actually attested it</span></div>
+  </div>
+</section>
+
+<section class="s" id="how">
+  <div class="k r">how it works on CALL-E today</div>
+  <h2 class="r" style="animation-delay:.1s">Detect · handshake · attest</h2>
+  <div class="flow r" style="animation-delay:.35s">
+    <div><i>01 · COMPILE</i><h3>Protocol in the task</h3><p>The handshake and three mode rulebooks are compiled into the CALL-E task text.</p></div>
+    <div><i>02 · HANDSHAKE</i><h3>Spoken token + nonce</h3><p>"Dialtone one, code four seven two." A DIALTONE agent echoes the code and declares human review.</p></div>
+    <div><i>03 · DETECT</i><h3>Behaviour when it doesn't</h3><p>CALL-E's live event stream gives millisecond turn timing and barge-ins. 18 explainable features: latency, interruptions, disfluency, phrasing, menus.</p></div>
+    <div><i>04 · ATTEST</i><h3>Re-label task_completed</h3><p>human-attested · system-asserted · agent-asserted · refused. It can downgrade. It never upgrades.</p></div>
+  </div>
+  <div class="quote r" style="animation-delay:.9s">Dialtone one acknowledged, code four seven two. Automated agent. Human review: no.</div>
+</section>
+
+<section class="s" id="close">
+  <div class="k r">a standard an inbound vendor could own</div>
+  <h2 class="r" style="animation-delay:.1s">Two agents agreeing<br>is not a commitment.</h2>
+  <p class="r" style="animation-delay:.45s">Any inbound voicebot adopts DIALTONE v1 with three sentences in its system prompt. Every CALL-E result gets a label that says <b>on whose word</b> it stands.</p>
+  <div class="k r" style="animation-delay:.9s;color:var(--ink)">github.com/CALLE-AI/awesome-phone-call-agents → apps/python/dialtone</div>
+</section>
+<script>
+const id = new URLSearchParams(location.search).get("s") || "intro";
+document.getElementById(id).classList.add("on");
+</script>
+</body>
+</html>

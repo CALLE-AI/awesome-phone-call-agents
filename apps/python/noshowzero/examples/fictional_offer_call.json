@@ -1,0 +1,60 @@
+{
+  "id": "call_fictional0offer0000002",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Call Olivia, who is on the Bright Smile Dental waitlist, and offer them an appointment slot that just opened. (full task omitted)",
+  "recipients": [
+    {
+      "id": "rcp_fictional0002",
+      "phones": ["+12125550199"],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structured_result": null,
+      "summary": "Olivia accepted the 4:30 PM dental cleaning that opened up today.",
+      "attempts": [
+        {
+          "id": "att_fictional0002",
+          "phone": "+12125550199",
+          "status": "completed",
+          "started_at": "2026-09-11T16:42:10Z",
+          "completed_at": "2026-09-11T16:42:38Z",
+          "summary": "Olivia accepted the 4:30 PM dental cleaning that opened up today.",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Hi there! Is this Olivia?" },
+            { "offset_seconds": 2, "speaker": "user", "text": "Yes, this is Olivia." },
+            { "offset_seconds": 4, "speaker": "bot", "text": "Hi Olivia, this is Ava, the virtual assistant for Bright Smile Dental. Good news! A dental cleaning just opened up today at four thirty. Would you like to take it?" },
+            { "offset_seconds": 15, "speaker": "user", "text": "Oh, really? Today at four thirty? Yes! I can totally do that." },
+            { "offset_seconds": 20, "speaker": "bot", "text": "Wonderful! You're all booked for four thirty this afternoon. See you then, Olivia!" },
+            { "offset_seconds": 25, "speaker": "user", "text": "Perfect. Thank you so much!" }
+          ],
+          "provider_call_id": "provider_fictional0002",
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "structured_result": {
+    "reached_patient": "yes",
+    "accepted": "yes",
+    "remove_from_waitlist": "no",
+    "notes": "Accepted today's 4:30 PM dental cleaning."
+  },
+  "summary": "Olivia accepted the 4:30 PM dental cleaning that opened up today.",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.97, "label": "high" },
+  "evidence": [],
+  "metadata": {
+    "app": "noshowzero",
+    "kind": "waitlist_offer",
+    "clinic_id": "clinic-bright-smile",
+    "entry_id": "wl-204",
+    "slot_id": "appt-1042",
+    "slot_at": "2026-09-11T20:30:00Z"
+  },
+  "failure_code": null,
+  "failure_message": null,
+  "created_at": "2026-09-11T16:42:05Z",
+  "completed_at": "2026-09-11T16:42:40Z"
+}

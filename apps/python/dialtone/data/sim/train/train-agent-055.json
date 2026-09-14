@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-055",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Riley, the virtual assistant for Cedar Hair Studio. How may I assist you today?",
+   "offset_seconds": 0.46
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 7.55
+  },
+  {
+   "speaker": "user",
+   "text": "Of so, course! Cedar Hair Studio is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 16.71
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 26.8
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 30.75
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 36.87
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 40.27
+  }
+ ]
+}

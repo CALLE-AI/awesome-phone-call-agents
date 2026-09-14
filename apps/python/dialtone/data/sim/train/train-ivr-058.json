@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-058",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Bloom Florists. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.26
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 17.01
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 20.95
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 29.1
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 33.19
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 41.63
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 42.34
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 50.39
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 51.19
+  }
+ ]
+}
