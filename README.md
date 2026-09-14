@@ -291,7 +291,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
-- [RxScout](https://github.com/prkshverma09/RxScout) - Autonomous AI voice agent powered by CALL-E that sequentially calls nearby pharmacies, navigates IVR phone trees, verifies prescription availability, and alerts patients via SMS. See the [integration notes](docs/community-apps/rxscout.md).
+- [RxScout](https://github.com/prkshverma09/RxScout) - Experimental pharmacy-availability simulation with optional CALL-E and SMS integrations; evaluate only in credential-free sandbox, and do not treat its live queue as unattended-safe or its extracted stock information as verified medical guidance. See the [integration notes](docs/community-apps/rxscout.md).
 
 ### Plugins
 

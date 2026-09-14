@@ -1,6 +1,6 @@
 # RxScout
 
-An autonomous AI voice agent powered by CALL-E that sequentially calls nearby pharmacies and chemists, navigates automated phone trees, verifies critical prescription availability in real-time, and notifies patients instantly via SMS.
+An experimental pharmacy-availability workflow with a simulated search and optional CALL-E/SMS integrations. Recommended evaluation is credential-free sandbox only; extracted stock information is advisory and must be confirmed with the pharmacy.
 
 - Repository: [https://github.com/prkshverma09/RxScout](https://github.com/prkshverma09/RxScout)
 - License: MIT
@@ -15,7 +15,7 @@ RxScout eliminates this manual burden by orchestrating goal-driven voice calls t
 1. **Discovers Local Pharmacies**: Resolves nearby licensed chemists and retail pharmacies within a user-defined radius based on area PIN code.
 2. **Autonomous Calling with CALL-E**: Places outbound calls, navigates switchboards, and reaches the dispensary/counter staff.
 3. **Structured Stock Extraction**: Parses the conversational exchange into machine-readable JSON: availability (`in_stock: boolean`), quantity/strips, and pharmacist notes.
-4. **Zero-Spam Sequential Dialing**: Halts outbound dialing immediately when stock is confirmed, preventing redundant calls to other pharmacies.
+4. **Sequential search prototype**: The intended flow stops when stock is reported. The live queue can currently advance after a timeout or provider error, so it must not be treated as a zero-spam or unattended-safe caller.
 5. **Instant Patient Notification**: Dispatches an SMS alert with store address, contact, distance, and a copyable prescription transfer template.
 
 ## Setup
@@ -29,7 +29,7 @@ cd RxScout
 # Install dependencies
 npm install
 
-# Environment setup (defaults to safe, zero-cost sandbox mode)
+# Environment setup: keep sandbox mode; do not configure CALL-E or Twilio keys
 cp .env.example .env.local
 
 # Run test suite
@@ -54,14 +54,14 @@ The application implements:
 
 In live mode (`NEXT_PUBLIC_APP_MODE=live`), initiating a search sends an outbound call request to CALL-E. This dials a real telephone number and incurs telephony usage.
 
-RxScout mitigates spam and unintended side effects through **Sequential Zero-Spam Dialing**:
+The external live integration is experimental, not approved here for unattended searches. Polling exhaustion and caught provider errors can advance to another pharmacy despite an ambiguous first outcome. That queue must stop for operator reconciliation before unattended use. Its intended sequential behavior is:
 - Calls are dispatched one-by-one, strictly in order of geographic proximity.
 - As soon as a pharmacy confirms that the requested medication is in stock, all remaining calls in the queue are cancelled and dialing stops immediately.
 - In test mode, RxScout restricts dialing to a single user-specified test phone number.
 
 ## Safe testing path with no calls
 
-RxScout defaults to **Sandbox Mode** (`NEXT_PUBLIC_APP_MODE=sandbox`), which requires **no CALL-E API key** and places **zero outbound calls**:
+For review, use **Sandbox Mode** (`NEXT_PUBLIC_APP_MODE=sandbox`) with no CALL-E, Twilio, or other live-service credentials and leave notification recipients unset. Sandbox search simulates calls, but its notifier can still send a real SMS when Twilio credentials and a destination are supplied; sandbox alone is not a universal no-side-effect guarantee.
 - Includes a built-in telephone simulator with realistic IVR audio signaling, speech synthesis, and turn-by-turn conversational flow.
 - Uses deterministic mock pharmacy networks and shortage presets (Delhi, Bengaluru, Mumbai, Kolkata).
 - All 15 automated tests run offline against the simulator and mock fixtures, requiring zero network calls or credentials.
