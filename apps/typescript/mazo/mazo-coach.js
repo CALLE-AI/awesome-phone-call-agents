@@ -64,6 +64,35 @@ function maskSensitiveOutput(str, explicitTarget = targetPhone) {
   return sanitized;
 }
 
+function validateLiveAuthorization(phone, allowedRecipientsRaw) {
+  if (!phone || typeof phone !== 'string' || !phone.trim()) {
+    return {
+      valid: false,
+      error: 'In live mode (--live), an explicit authorized destination must be supplied via --phone <E.164>. Falling back to synthetic numbers is prohibited for live calls.'
+    };
+  }
+  if (!isValidE164(phone)) {
+    return {
+      valid: false,
+      error: `Invalid E.164 phone number format: "${maskSensitiveOutput(phone, phone)}". Format must be E.164 (e.g. +1... with 7-15 digits).`
+    };
+  }
+  if (!allowedRecipientsRaw || !allowedRecipientsRaw.trim()) {
+    return {
+      valid: false,
+      error: 'Live calling requires ALLOWED_RECIPIENTS environment variable to be explicitly configured with authorized E.164 numbers. An empty allowlist does not enforce safety restrictions.'
+    };
+  }
+  const allowed = allowedRecipientsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (!allowed.includes(phone.trim())) {
+    return {
+      valid: false,
+      error: `Phone number ${maskSensitiveOutput(phone, phone)} is not authorized in ALLOWED_RECIPIENTS list.`
+    };
+  }
+  return { valid: true };
+}
+
 async function runPrompt(query) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -83,9 +112,12 @@ async function main() {
   console.log('            Powered by CALL-E Phone Engine            ');
   console.log('======================================================\n');
 
-  if (isLive && !explicitPhone) {
-    console.error('❌ Error: In live mode (--live), an explicit authorized destination must be supplied via --phone <E.164>. Falling back to synthetic numbers is prohibited for live calls.');
-    process.exit(1);
+  if (isLive) {
+    const authCheck = validateLiveAuthorization(explicitPhone, process.env.ALLOWED_RECIPIENTS);
+    if (!authCheck.valid) {
+      console.error(`❌ Error: ${authCheck.error}`);
+      process.exit(1);
+    }
   }
 
   console.log(`👤 Client:   ${userName}`);
@@ -100,9 +132,7 @@ async function main() {
     process.exit(1);
   }
 
-  const callGoal = sessionMode === 'followup'
-    ? `You are ${coachRole}, an elite executive coach in Mazō calling ${userName} for a scheduled follow-up check-in. Inquire whether the agreed milestone was completed, verify execution evidence, update streak momentum, and provide immediate unblocking if stalled.`
-    : `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion.`;
+  const callGoal = buildCallGoal({ coachRole, userName, sessionMode, sessionTopic });
 
   if (!isLive) {
     console.log('--- [DRY-RUN SIMULATION] ---');
@@ -121,19 +151,7 @@ async function main() {
     return;
   }
 
-  // Live Call Execution — Strict authorization enforcement
-  const rawAllowed = process.env.ALLOWED_RECIPIENTS;
-  if (!rawAllowed || !rawAllowed.trim()) {
-    console.error('❌ Error: Live calling requires ALLOWED_RECIPIENTS environment variable to be explicitly configured with authorized E.164 numbers. An empty allowlist does not enforce safety restrictions.');
-    process.exit(1);
-  }
-
-  const allowedNumbers = rawAllowed.split(',').map(s => s.trim()).filter(Boolean);
-  if (!allowedNumbers.includes(targetPhone)) {
-    console.error(`❌ Error: Phone number ${maskSensitiveOutput(targetPhone)} is not authorized in ALLOWED_RECIPIENTS list.`);
-    process.exit(1);
-  }
-
+  // Live Call Execution — Interactive Confirmation Gate
   if (!skipPrompt) {
     const confirmation = await runPrompt(`⚠️ Place REAL phone call to ${maskPhone(targetPhone)} via CALL-E? (y/N): `);
     if (confirmation !== 'y' && confirmation !== 'yes') {
@@ -194,9 +212,9 @@ async function main() {
 function buildCallGoal(options = {}) {
   const { coachRole = 'The Clarifier', userName = 'Omar', sessionMode = 'kickoff', sessionTopic = 'Weekly Momentum' } = options;
   if (sessionMode === 'followup') {
-    return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName} for a scheduled follow-up check-in. Inquire whether the agreed milestone was completed, verify execution evidence, update streak momentum, and provide immediate unblocking if stalled.`;
+    return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName} for a scheduled follow-up check-in. Inquire whether the agreed milestone was completed, verify execution evidence, update streak momentum, and provide immediate unblocking if stalled. Focus strictly on non-clinical personal productivity and time-management; explicitly exclude medical, legal, financial, or crisis advice.`;
   }
-  return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion.`;
+  return `You are ${coachRole}, an elite executive coach in Mazō calling ${userName}. Conduct a concise 3-minute momentum check-in regarding: "${sessionTopic}". Help ${userName} isolate their primary bottleneck, decide on the single highest-leverage next step, and secure an explicit commitment on when it will be finished. Extract structured action items upon completion. Focus strictly on non-clinical personal productivity and time-management; explicitly exclude medical, legal, financial, or crisis decision-making.`;
 }
 
 function simulateExtraction(options = {}) {
@@ -247,6 +265,7 @@ module.exports = {
   isValidE164,
   maskPhone,
   maskSensitiveOutput,
+  validateLiveAuthorization,
   buildCallGoal,
   simulateExtraction,
   main
