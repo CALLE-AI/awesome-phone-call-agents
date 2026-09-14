@@ -120,7 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-- [ridgecalle-active-listener](skills/bridgecalle-active-listener/) - Prompt-guided active-listening elder check-in skill that configures CALL-E phone calls to provide gentle verbal nods, extract nostalgic memories, and export family summaries.
+- [`bridgecalle-active-listener`](skills/bridgecalle-active-listener/) - Prompt-guided active-listening elder check-in skill that configures CALL-E phone calls to provide gentle verbal nods, extract nostalgic memories, and export family summaries.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`accessible-outing-verifier`](skills/accessible-outing-verifier/) - Offline accessibility-planning fixture and proposed bounded CALL-E workflow; demonstrates advisory handling of qualified answers without making calls or certifying venue safety.
