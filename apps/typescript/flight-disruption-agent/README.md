@@ -36,8 +36,9 @@ See [`docs/flight-disruption-agent.md`](../../../docs/flight-disruption-agent.md
 ```mermaid
 flowchart LR
     W["Airline ops webhook<br/>(signed event)"] --> A
+    P["Airline event feed<br/>(pulled by the desk)"] --> A
     O["Operator on the<br/>departure board"] --> A
-    A["Delay or cancellation<br/>recorded once per flight"] --> B["Price options per booking<br/>airline + distributors + OTA"]
+    A["Delay or cancellation<br/>(a worse one replaces a delay)"] --> B["Price options per booking<br/>airline + distributors + OTA"]
     B --> C["Build CALL-E task<br/>+ result schema"]
     C --> D{"Mode"}
     D -- "dry run" --> E["Scripted answer"]
@@ -48,7 +49,9 @@ flowchart LR
     G -- "anything else" --> I["Human review queue"]
 ```
 
-1. **Record the disruption.** An operator reports a delay or cancellation on the departure board, or the airline ops system pushes it to the webhook (see [Airline ops webhook](#airline-ops-webhook)). Each flight has at most one disruption. The desk picks voluntary, involuntary, or force majeure pricing from the table above.
+1. **Record the disruption.** An operator reports a delay or cancellation on the departure board, the airline ops system pushes it to the webhook, or the desk pulls it from the airline's event feed (see [Airline ops events](#airline-ops-events)). The desk picks voluntary, involuntary, or force majeure pricing from the table above.
+   - **A disruption can get worse.** A longer delay or a cancellation replaces the flight's current delay (the board offers **Escalate**). The replaced delay stays visible for its call history but stops driving changes: passengers who agreed to keep the delayed flight go back into the queue to be called with the new options, calls still running finish into review, its review items can only be closed, and new calls come from the replacement. Rebooked and refunded passengers are not touched.
+   - **Anything else needs a person.** A shorter delay, or a delay reported for a cancelled flight, is refused on the board and kept as a conflict when it arrives as an event.
 2. **Price every option** for each booking: keep the delayed flight (delays only; a cancelled flight has nothing to keep), move to a later flight with seats, or cancel and refund. Every line shows which party charges it. One fictional distributor (Samudra Travel Wholesale) charges admin fees even on involuntary changes, so its passengers pay for a move that is free for others.
 3. **Build the call.** CALL-E cannot look anything up during a call, so the task text contains the final options and exact amounts. It tells the agent to disclose that it is an AI, to get a clear yes before accepting any cost or reduced refund, to never ask for payment details, and to hand off to a person on request.
 4. **Call.** The result schema asks CALL-E to return `choice`, `selected_flight`, `fee_accepted`, `human_requested`, and a quoted `reason`.
@@ -62,9 +65,11 @@ flowchart LR
    Everything else lands in the review queue with the reasons.
 6. **Apply** in the fake booking system: keep the ticket, rebook with a new booking code and reissued ticket (and one fewer seat), or record the refund and void the ticket. A human can resolve any review item with one of the offered options.
 
-## Airline ops webhook
+## Airline ops events
 
-The airline or OTA operations system can push disruptions instead of an operator typing them.
+The airline or OTA operations system can report disruptions instead of an operator typing them, either by pushing to the webhook or by exposing a feed the desk pulls. Both use the same event format, dedupe, and escalation rules.
+
+### Push: webhook
 
 ```http
 POST /api/webhooks/airline-ops
@@ -88,15 +93,15 @@ x-ops-signature: t=1789977600,v1=<hex HMAC-SHA256 of "1789977600.<raw body>">
 
   | Status | Meaning |
   | --- | --- |
-  | 201 | Disruption recorded |
+  | 201 | Disruption recorded, or a longer delay or cancellation replaced the flight's delay (`status: "escalated"`) |
   | 200 | Same event `id` delivered again; nothing changed, the first result is returned |
   | 401 | Missing, invalid, or expired signature |
-  | 409 | The flight already has a disruption. The event is kept as a conflict for a person, because calls may already quote the earlier options |
+  | 409 | The event does not make the flight's disruption worse (a shorter delay, or a delay for a cancelled flight). It is kept as a conflict for a person, because calls may already quote the current options |
   | 422 | Invalid event, unknown flight, or a flight with no bookings |
   | 503 | Webhook disabled (no secret in a live mode) |
 
 - **No automatic calls.** An event only records the disruption. The operator still reviews prices and starts each call.
-- **Feed on the dashboard.** Deliveries and their outcome appear in the Airline ops feed panel, and each disruption shows whether it came from the feed or the desk. The page picks up new events within 5 seconds.
+- **Feed on the dashboard.** Events and their outcome appear in the Airline ops feed panel (pushed or pulled), and each disruption shows where it came from. The page picks up new events within 5 seconds.
 
 Try it against a running dry-run desk:
 
@@ -107,30 +112,91 @@ npm run send-event -- delay NA812-2026-09-20 150   # operational delay
 
 `send-event` signs with the same secret as the server. In dry run, if `AIRLINE_WEBHOOK_SECRET` is empty, both use a published demo secret; sdk and cli modes refuse that secret and disable the webhook until you set your own.
 
+### Pull: event feed
+
+For airline systems that cannot call out, set `AIRLINE_FEED_URL` and the desk polls it every `AIRLINE_FEED_POLL_SECONDS` (default 30, minimum 5):
+
+```http
+GET <AIRLINE_FEED_URL>?cursor=<cursor from the previous page>
+authorization: Bearer <AIRLINE_FEED_TOKEN>
+
+200 { "events": [ ...same objects as the webhook body... ], "next_cursor": "42" }
+```
+
+- **Cursor.** The desk saves `next_cursor` after processing each page and sends it back on the next request, reading up to 10 pages per poll. Live runs keep the cursor on disk, so a restart resumes where it stopped; a page read twice is absorbed by the event id dedupe.
+- **Bad data.** An event that fails validation is listed on the dashboard and skipped; the rest of the page is still processed. HTTP errors, timeouts (10 seconds), non-JSON, and pages over 1 MB are shown as the feed's last error and retried on the next poll.
+- **Token safety.** `AIRLINE_FEED_TOKEN` is only sent over HTTPS, or over HTTP to this machine; any other plain-HTTP URL is refused at startup.
+- **Poll now.** The dashboard shows the feed's last poll, cursor, and errors, with a button to poll immediately (`POST /api/feed/poll`).
+
+Try it with the fake feed, which releases a delay on NA 812, a 90-minute delay on NA 721, and a minute later the cancellation of NA 721:
+
+```bash
+npm run fake-feed                                                                   # terminal 1
+AIRLINE_FEED_URL=http://127.0.0.1:4320/events AIRLINE_FEED_POLL_SECONDS=5 npm start   # terminal 2
+```
+
 ## How it works: Workflow B (passenger requests)
 
 ```mermaid
 flowchart LR
-    A["Request via chat,<br/>web form, or phone line"] --> B["Check eligibility<br/>+ voluntary quote"]
+    A["Signed message from chat,<br/>web form, or phone line"] --> B["Check booking code + last name,<br/>eligibility, voluntary quote"]
+    O["Operator logs it<br/>on the desk"] --> B
     B -- "not eligible" --> X["Recorded, nothing quoted"]
-    B --> C["Passenger confirms<br/>the exact amount"]
+    B --> C["Passenger replies YES with<br/>the exact amount"]
     C --> D["Submit to fake<br/>airline portal"]
     D -- "accepted" --> E["Booking updated"]
-    D -- "reissue refused" --> F["CALL-E calls the<br/>airline service desk"]
-    D -- "refund refused" --> I["Human review queue"]
-    F -- "reissued with codes" --> E
+    D -- "reissue or refund refused" --> F["CALL-E calls the<br/>airline service desk"]
+    F -- "reissued or refund approved" --> E
     F -- "refused / call back / unclear" --> I
-    E -.-> G["Optional: CALL-E calls the<br/>passenger with the result"]
+    E -.-> G["Update pushed to the channel,<br/>optional result call"]
 ```
 
-1. **Log the request** in the Passenger requests panel. Requests arrive through an existing channel (chat, web form, or the phone line); the desk does not answer inbound calls.
+1. **Receive the request.** The chat bot, web form backend, or phone line (IVR or contact center) posts it to the signed channel webhook with the booking code and last name (see [Passenger channels](#passenger-channels)), or an operator logs it in the Passenger requests panel. The desk itself does not answer inbound calls.
 2. **Check and quote.** The desk refuses bookings that were already changed, are on a flight with a reported delay or cancellation (Workflow A owns those), have departed, or depart within 60 minutes. It also refuses a reschedule to any flight that is not a later flight on the same route with seats. Eligible requests are priced at voluntary rates across the sales chain, with warnings for a cost or a reduced or zero refund.
-3. **Confirm.** Send the quote through the passenger's channel. To submit, the operator types back the exact amount the passenger agreed to; any other amount is refused.
-4. **Submit to the portal.** The fake portal accepts most changes. It is scripted to refuse the reissue for two NA 725 bookings.
-5. **Call the airline desk** when a reissue is refused. The task gives the booking code, ticket, requested flight, and error, caps any airline charge at the quoted airline fees, and never shares payment details. The result schema returns `outcome`, `new_booking_code`, `new_ticket_number`, `airline_reference`, `extra_charge_requested`, and `reason`. The booking is updated with the desk's codes only when the desk confirmed the reissue, the codes are well formed, `extra_charge_requested` is explicitly `no`, CALL-E explicitly reports the task completed, and confidence is at least 0.7. Everything else goes to review, where a person can close the request or apply the reissue with codes they got from the airline.
-6. **Call the passenger back (optional)** once the request is finished. The call only reports the new booking code and amount, the refund, or that the change could not be made. It changes nothing; if the passenger was not reached or wants a person, the desk flags written follow-up.
+3. **Confirm.** The quote goes back to the passenger as the webhook reply. The passenger confirms in the same conversation by replying YES with the exact amount; an operator can also type the amount back for a request confirmed some other way. Any other amount is refused, and the request records who confirmed it.
+4. **Submit to the portal.** The fake portal accepts most changes. It is scripted to refuse the reissue for two NA 725 bookings and the refund for W4N7QS.
+5. **Call the airline desk** when the portal refuses. For a reissue: The task gives the booking code, ticket, requested flight, and error, caps any airline charge at the quoted airline fees, and never shares payment details. The result schema returns `outcome`, `new_booking_code`, `new_ticket_number`, `airline_reference`, `extra_charge_requested`, and `reason`. The booking is updated with the desk's codes only when the desk confirmed the reissue, the codes are well formed, `extra_charge_requested` is explicitly `no`, CALL-E explicitly reports the task completed, and confidence is at least 0.7. Everything else goes to review, where a person can close the request or apply the reissue with codes they got from the airline.
+
+   For a refund, the task asks the desk to approve the airline's own refund (the fare minus the airline's deduction, before OTA and distributor fees) and forbids accepting less, a voucher, or credit, or sharing bank details. The result schema returns `outcome`, `approved_refund_amount`, `refund_reference`, `reduced_refund_offered`, and `reason`. The refund is recorded only when the desk approved exactly that amount with a reference, `reduced_refund_offered` is explicitly `no`, CALL-E explicitly reports the task completed, and confidence is at least 0.7.
+6. **Update the passenger.** For a request from a channel, every later change (the airline desk answered, a person resolved it, or the operator confirmed or declined it) is pushed to the conversation; see [Passenger channels](#passenger-channels).
+7. **Call the passenger back (optional)** once the request is finished. The call only reports the new booking code and amount, the refund, or that the change could not be made. It changes nothing; if the passenger was not reached or wants a person, the desk flags written follow-up.
 
 Each request allows one airline desk call and one callback. Both use idempotency keys (`fda-<run>-<request>-airline`, `fda-<run>-<request>-callback`).
+
+## Passenger channels
+
+Chat, web form, and phone line integrations talk to the passenger; the desk decides. They post signed messages and show the passenger the `reply` that comes back.
+
+```http
+POST /api/webhooks/channel
+content-type: application/json
+x-channel-signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">
+
+{ "id": "msg_1", "type": "request.submitted", "channel": "chat", "conversation_id": "conv-42",
+  "pnr": "P3X9GA", "last_name": "Saputra", "kind": "reschedule", "target_flight_id": "NA729-2026-09-20" }
+
+{ "id": "msg_2", "type": "request.confirmed", "channel": "chat", "conversation_id": "conv-42",
+  "request_id": "req_P3X9GA_1", "confirmed_amount": 415000 }
+
+{ "id": "msg_3", "type": "request.declined", "channel": "chat", "conversation_id": "conv-42", "request_id": "req_P3X9GA_1" }
+```
+
+- **Response.** `200` with `outcome` (`accepted` or `refused`), `requestId`, and `reply`, the text to show or read to the passenger (the quote with its line items, the result, or why not). A repeated message `id` returns the first result with `duplicate: true` and changes nothing. Bad signatures get `401`, malformed messages `422`, and a live mode without `CHANNEL_WEBHOOK_SECRET` gets `503`.
+- **Who the passenger is.** A request needs the booking code and the passenger's last name (case and accents ignored). A wrong name and an unknown booking get the same reply, so the channel cannot be used to probe booking codes.
+- **Bound to the conversation.** A request created in a conversation can only be confirmed or declined from that same channel and `conversation_id`; other conversations are told it was not found and are not given the request id.
+- **Updates.** Set `CHANNEL_NOTIFY_URL` and the desk posts a signed `request.updated` message (`request_id`, `channel`, `conversation_id`, `status`, `reply`) when the request changes later, once per status. It must be HTTPS unless it is on this machine. Delivery is recorded on the request (sent, failed, or not configured) and never blocks the desk.
+- **Secret.** `CHANNEL_WEBHOOK_SECRET` signs both directions. Dry run falls back to a published demo secret; sdk and cli modes refuse it.
+
+Try it against a running dry-run desk:
+
+```bash
+npm run fake-channel                                               # terminal 1: prints pushed updates
+CHANNEL_NOTIFY_URL=http://127.0.0.1:4330/updates npm start         # terminal 2
+npm run send-channel -- submit P3X9GA Saputra reschedule NA729-2026-09-20
+npm run send-channel -- confirm req_P3X9GA_1 415000                # portal refuses; call the airline desk on the dashboard
+```
+
+`send-channel` defaults to `CHANNEL=chat` and `CONVERSATION_ID=conv-demo-1`; set either to play another channel or conversation.
 
 ### Where CALL-E is used
 
@@ -155,7 +221,8 @@ npm start
 Open http://127.0.0.1:4310.
 
 - **Workflow A:** report a delay or a cancellation on NA 721 (pick an operational or force majeure reason), or push one with `npm run send-event`, then select passengers and simulate calls. The five NA 721 passengers are scripted to cover each path: keep, refund, rebook, asks for a person, and no answer. On a cancelled flight, the passenger scripted to keep goes to review.
-- **Workflow B:** in Passenger requests, log a reschedule for the NA 725 passengers to NA 729. Nadia Kusuma (L6F2KM) goes straight through the portal. The portal refuses Bima Saputra (P3X9GA), and the airline desk reissues the ticket. It also refuses Dewi Halim (C5V8EJ), and the desk refuses too, so that request needs a person.
+- **Workflow A escalation:** report a delay, simulate some calls, then use **Escalate** on the same flight, or run the fake feed (see [Pull: event feed](#pull-event-feed)).
+- **Workflow B:** in Passenger requests, log a reschedule for the NA 725 passengers to NA 729, or send it as the passenger with `npm run send-channel`. Nadia Kusuma (L6F2KM) goes straight through the portal. The portal refuses Bima Saputra (P3X9GA), and the airline desk reissues the ticket. It also refuses Dewi Halim (C5V8EJ), and the desk refuses too, so that request needs a person. A refund for Putri Anggraini (W4N7QS) is refused by the portal and approved by the airline desk.
 
 Terminal walkthroughs:
 
@@ -164,7 +231,7 @@ npm run demo            # Workflow A, 4-hour delay: involuntary pricing
 npm run demo 90         # Workflow A, 90-minute delay: voluntary pricing
 npm run demo cancel     # Workflow A, cancellation: involuntary pricing, no keep option
 npm run demo cancel fm  # Workflow A, force majeure cancellation
-npm run demo:requests   # Workflow B: five scripted passenger requests
+npm run demo:requests   # Workflow B: six scripted passenger requests
 ```
 
 The fixture flights depart on 20 September 2026. Passenger request cutoffs in the dashboard therefore run on a demo clock that starts at `DEMO_NOW` (default `2026-09-19T09:00:00+07:00`) when the server boots and then ticks normally; the header shows it. Set `DEMO_NOW=real` to use the wall clock. Call polling and webhook signatures always use real time.
@@ -221,8 +288,9 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 ## Limitations
 
 - **Fictional data.** The airline, distributors, OTA, bookings, and fares are fictional. There is no real GDS or airline integration; the portal is scripted, and the "apply" step changes a local in-memory booking.
-- **Requests are logged by an operator.** Workflow B has no chat, web form, or inbound call integration, and the passenger's confirmation is recorded by typing the amount back.
-- **Refused refunds are not phoned in.** The airline desk call only covers reissues; a refund the portal refuses goes to review.
+- **No real chat bot, web form, or IVR.** The desk exposes the channel webhook and pushes updates, but ships no chat bot, web form, or IVR; `send-channel` and `fake-channel` stand in for them. Identity is booking code plus last name, as on airline manage-booking pages, not a login.
+- **One disruption at a time per flight.** Only a worse disruption replaces the current one automatically; a flight that gets better (a shorter delay, a reinstated flight) is left for a person.
+- **Feed format is fixed.** The pull feed expects the cursor format above; another airline API needs an adapter in `src/feed.ts`.
 - **No mid-call lookups.** CALL-E cannot call out to other systems during a call, so prices are fixed before dialing. If seats sell out between the call and the apply step, the result goes to review.
 - **English only.** Calls are in English.
 - **No Indonesian numbers.** Indonesian numbers cannot be called today, so a live demo uses a number in a supported region.
@@ -236,11 +304,16 @@ fixtures/            fictional flights, bookings, and fare rules per party
 src/rules.ts         prices keep / move / refund across the sales chain
 src/task.ts          passenger call task text and result schema (Workflow A)
 src/decide.ts        apply automatically or send to review (Workflow A)
-src/events.ts        airline ops webhook: signature check and event parsing (Workflow A)
+src/events.ts        airline ops events: signature check and event parsing (Workflow A)
+src/feed.ts          pulls events from the airline's feed (Workflow A)
 src/send-event.ts    plays the airline ops system: signs and posts an event
+src/fake-feed.ts     plays an airline feed that releases scripted events
 src/eligibility.ts   can this booking be changed as requested (Workflow B)
 src/gds.ts           fake airline portal that can refuse a change (Workflow B)
-src/airline.ts       airline service desk call: task, schema, decision (Workflow B)
+src/airline.ts       airline service desk calls for reissues and refunds (Workflow B)
+src/channel.ts       chat, web form, and phone line messages, replies, updates (Workflow B)
+src/send-channel.ts  plays a passenger channel: signs and posts a message
+src/fake-channel.ts  plays a channel receiving request updates
 src/callback.ts      report-only result call to the passenger (Workflow B)
 src/calle.ts         dry-run, SDK, and CLI gateways
 src/desk.ts          disruptions, requests, call ledger, dedupe, fake GDS

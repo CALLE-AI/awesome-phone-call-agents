@@ -52,7 +52,7 @@ The same team also handles failed bookings and general complaints.
 
 Replace one-way SMS notifications with outbound AI calls.
 
-1. A disruption event arrives from the airline or OTA system. In the implementation this is a signed webhook (`flight.delayed` or `flight.cancelled`, with an operational or force majeure cause); each event id is processed once, and an event that contradicts an existing disruption is held for a person.
+1. A disruption event arrives from the airline or OTA system. In the implementation it is pushed to a signed webhook or pulled from the airline's event feed (`flight.delayed` or `flight.cancelled`, with an operational or force majeure cause). Each event id is processed once. A longer delay or a cancellation replaces a flight's earlier delay, and passengers who had kept the delayed flight are called again; an event that would make the disruption milder is held for a person.
 2. The agent calls each affected passenger who has consented to phone contact.
 3. The agent discloses that it is an AI, explains the change, and answers questions about the new schedule and available options.
 4. The agent records the passenger's choice, such as accepting the new flight, rescheduling, or requesting a refund, as a structured result.
@@ -70,7 +70,7 @@ Automate steps 2 through 6 of the current process.
 4. The agent submits the change through the B2B platform or GDS integration.
 5. If the platform rejects the change, the agent places an outbound call to the airline customer service to request a forced reschedule, then reports the outcome.
 
-In the implementation, the operator logs the request and types back the amount the passenger confirmed. The airline desk call returns the new booking code and ticket number as a structured result, and only a confirmed, well-formed reissue within the quoted airline fees updates the booking. A refund the portal refuses goes to a person instead of a call.
+In the implementation, the request arrives from the chat, web form, or phone line integration through a signed webhook (booking code plus last name), and the passenger confirms the exact quoted amount in the same conversation; an operator can also log a request and type the amount back. Later updates are pushed back to that conversation. The airline desk call returns the new booking code and ticket number as a structured result, and only a confirmed, well-formed reissue within the quoted airline fees updates the booking. A refund the portal refuses is also escalated by phone: the desk asks the airline to approve its own refund amount and records it only with that exact amount and a refund reference.
 
 ## Fit with CALL-E
 
