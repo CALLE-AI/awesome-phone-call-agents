@@ -4,7 +4,7 @@ import {
   CalleClient,
   type Call,
 } from "@call-e/calle";
-import type { Booking, CallOutcome, MoveOption, PassengerResult, Quote, TranscriptTurn } from "./types.ts";
+import type { Booking, CallOutcome, ChangeRequest, MoveOption, PassengerResult, Quote, TranscriptTurn } from "./types.ts";
 
 export interface StartRequest {
   task: string;
@@ -20,6 +20,7 @@ export interface StartRequest {
 
 export type Simulation =
   | { kind: "passenger"; booking: Booking; quote: Quote }
+  | { kind: "request_intake"; booking: Booking; quote: Quote; request: ChangeRequest }
   | { kind: "airline_desk"; booking: Booking; option: MoveOption }
   | { kind: "airline_refund_desk"; booking: Booking; airlineRefund: number }
   | { kind: "result_callback"; booking: Booking };
@@ -107,10 +108,97 @@ export class DryRunGateway implements CallGateway {
     }
     const sim = call.request.simulation;
     if (sim.kind === "passenger") return scriptedOutcome(sim.booking, sim.quote);
+    if (sim.kind === "request_intake") return scriptedIntake(sim.booking, sim.quote, sim.request);
     if (sim.kind === "airline_desk") return scriptedAirlineDesk(sim.booking, sim.option);
     if (sim.kind === "airline_refund_desk") return scriptedAirlineRefundDesk(sim.booking, sim.airlineRefund);
     return scriptedCallback(sim.booking);
   }
+}
+
+/**
+ * The passenger's side of a Workflow B intake call. A request that names a refund or a flight
+ * plays out that choice; an open "change" request follows the booking's scripted answer.
+ */
+function scriptedIntake(booking: Booking, quote: Quote, request: ChangeRequest): CallOutcome {
+  const name = booking.passenger.split(" ")[0];
+  const opening: TranscriptTurn[] = [
+    { speaker: "bot", text: `Hi, this is an AI assistant calling for TripKita. May I speak with ${booking.passenger}?`, offsetSeconds: 0 },
+    { speaker: "user", text: "Speaking.", offsetSeconds: 4 },
+    { speaker: "bot", text: "You asked us to change your booking. You can move to a later flight, cancel for a refund, or keep it as it is.", offsetSeconds: 7 },
+  ];
+  const base = { state: "completed" as const, providerStatus: "completed", result: null, failureCode: null, failureMessage: null };
+  const answer = booking.simulatedAnswer;
+  let choice: "move" | "refund" | "keep" | "human" | "no_answer" =
+    request.kind === "refund" ? "refund" : request.kind === "reschedule" ? "move" : answer.kind;
+  const target =
+    quote.moves.find((m) => m.flightId === request.targetFlightId) ??
+    (answer.kind === "move" ? quote.moves.find((m) => m.flightId === answer.flightId) : undefined) ??
+    quote.moves[0];
+  if (choice === "move" && !target) choice = "human";
+
+  if (choice === "no_answer") {
+    return { ...base, state: "failed", providerStatus: "failed", taskCompleted: false, confidence: null, structured: null, summary: "No one answered the call.", transcript: [], failureCode: "no_answer", failureMessage: "No human answered the call." };
+  }
+  if (choice === "human") {
+    return {
+      ...base,
+      taskCompleted: false,
+      confidence: { score: 0.86, label: "high" },
+      structured: { choice: "unknown", selected_flight: "none", fee_accepted: "unknown", human_requested: "yes", reason: "Passenger said: I'd rather sort this out with a person." },
+      summary: `${name} asked to speak with a human agent.`,
+      transcript: [...opening, { speaker: "user", text: "I'd rather sort this out with a person.", offsetSeconds: 14 }],
+    };
+  }
+  if (choice === "keep") {
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.92, label: "high" },
+      structured: { choice: "no_change", selected_flight: "none", fee_accepted: "not_applicable", human_requested: "no", reason: "Passenger said: Actually, leave it as it is." },
+      summary: `${name} decided to keep the booking unchanged.`,
+      transcript: [...opening, { speaker: "user", text: "Actually, leave it as it is.", offsetSeconds: 14 }],
+    };
+  }
+  if (choice === "refund") {
+    const reduced = quote.refund.amount < quote.refund.gross;
+    const amount = quote.refund.amount.toLocaleString("en-US");
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.9, label: "high" },
+      structured: { choice: "refund", selected_flight: "none", fee_accepted: reduced ? "yes" : "not_applicable", human_requested: "no", reason: `Passenger said: Cancel it, I accept ${amount} rupiah back.` },
+      summary: `${name} chose to cancel for a refund of IDR ${amount}.`,
+      transcript: [
+        ...opening,
+        { speaker: "user", text: "I'd like to cancel. How much do I get back?", offsetSeconds: 14 },
+        { speaker: "bot", text: `The refund is ${amount} rupiah. Do you accept?`, offsetSeconds: 18 },
+        { speaker: "user", text: `Yes, cancel it, I accept ${amount} rupiah back.`, offsetSeconds: 23 },
+        { speaker: "bot", text: "Thank you. TripKita will now arrange this with the airline and send you the confirmation.", offsetSeconds: 27 },
+      ],
+    };
+  }
+  const option = target as MoveOption;
+  const cost = option.total.toLocaleString("en-US");
+  return {
+    ...base,
+    taskCompleted: true,
+    confidence: { score: 0.91, label: "high" },
+    structured: {
+      choice: "move_to_other_flight",
+      selected_flight: option.flightId,
+      fee_accepted: option.total > 0 ? "yes" : "not_applicable",
+      human_requested: "no",
+      reason: `Passenger said: Move me to ${option.label}${option.total > 0 ? `, I'm okay paying ${cost} rupiah` : ""}.`,
+    },
+    summary: `${name} chose ${option.label}${option.total > 0 ? ` and agreed to pay IDR ${cost}` : ""}.`,
+    transcript: [
+      ...opening,
+      { speaker: "user", text: `Can you move me to ${option.label}?`, offsetSeconds: 14 },
+      { speaker: "bot", text: option.total > 0 ? `That costs ${cost} rupiah. Do you agree?` : "That has no cost. Shall I go ahead?", offsetSeconds: 18 },
+      { speaker: "user", text: "Yes, go ahead.", offsetSeconds: 22 },
+      { speaker: "bot", text: "Thank you. TripKita will now arrange this with the airline and send you the confirmation.", offsetSeconds: 26 },
+    ],
+  };
 }
 
 function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {

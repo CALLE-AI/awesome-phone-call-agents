@@ -214,7 +214,8 @@ export interface BookingState {
 
 // ---------------------------------------------------------------- Workflow B
 
-export type RequestKind = "reschedule" | "refund";
+/** What the passenger asked for when they got in touch. They choose for sure on the CALL-E call. */
+export type RequestKind = "reschedule" | "refund" | "change";
 
 /** Where the passenger's request came in. Inbound calls are handled by that channel, not CALL-E. */
 export type RequestChannel = "chat" | "web_form" | "phone";
