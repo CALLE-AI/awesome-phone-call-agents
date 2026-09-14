@@ -67,7 +67,9 @@ export function analyzeQuote(quote: QuoteResult, requestedQuantity: string): Ana
 /** Lowest complete total and earliest parseable ready time; supplier name breaks ties. */
 export function rankQuotes(quotes: RankedQuote[]): { cheapest: string | null; earliest: string | null } {
   const eligible = quotes.filter((q) => q.status === "eligible");
-  const cheapest = [...eligible].sort(
+  // Prices in different currencies are not directly comparable without an FX policy.
+  const comparable = new Set(eligible.map((q) => q.quote.currency)).size <= 1 ? eligible : [];
+  const cheapest = [...comparable].sort(
     (a, b) => a.comparableTotal! - b.comparableTotal! || a.vendorName.localeCompare(b.vendorName),
   )[0];
   const earliest = eligible

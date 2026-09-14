@@ -46,6 +46,16 @@ const webhookToken = process.env.PROCUREPULSE_WEBHOOK_TOKEN?.trim() ?? "";
 const webhookUrl = webhookOrigin.startsWith("https://") && webhookToken ? `${webhookOrigin}/calle/webhook/${webhookToken}` : null;
 const RULE = "─".repeat(72);
 
+// Redact exact credentials before masking phone-like strings at the display boundary.
+function display(value: unknown): string {
+  let text = String(value);
+  for (const secret of [webhookUrl, webhookToken, process.env.CALLE_API_KEY?.trim()]) {
+    if (secret) text = text.split(secret).join("[redacted]");
+  }
+  return text.replace(/\+[1-9][0-9]{7,14}/g, (phone) => mask(phone));
+}
+const print = (value: unknown) => console.log(display(value));
+
 function liveClient(): CalleClient {
   const key = process.env.CALLE_API_KEY?.trim();
   if (!key) throw new Error("CALLE_API_KEY is not set (see .env.example)");
@@ -62,26 +72,28 @@ const money = (n: number | null, currency: string) =>
 
 function printBoard(ledger: Ledger) {
   const b = board(ledger);
-  console.log(RULE);
-  console.log(`${b.request.quantity} · ${b.request.item} · needed ${b.request.deadline}`);
-  console.log(RULE);
+  print(RULE);
+  print(`${b.request.quantity} · ${b.request.item} · needed ${b.request.deadline}`);
+  print(RULE);
   for (const t of b.tasks)
-    console.log(`${t.vendorName.padEnd(22)} ${t.status.replaceAll("_", " ").padEnd(16)} ${t.providerCallId ?? "no call id"}${t.lastError ? `  (${t.lastError})` : ""}`);
-  if (b.quotes.length) console.log(RULE);
+    print(`${t.vendorName.padEnd(22)} ${t.status.replaceAll("_", " ").padEnd(16)} ${t.providerCallId ?? "no call id"}${t.lastError ? `  (${t.lastError})` : ""}`);
+  if (b.quotes.length) print(RULE);
   for (const q of b.quotes) {
     const badges = [q.vendorId === b.rankings.cheapest ? "LOWEST COMPLETE TOTAL" : "", q.vendorId === b.rankings.earliest ? "EARLIEST READY" : ""].filter(Boolean).join(", ");
-    console.log(`${q.vendorName.padEnd(22)} ${money(q.comparableTotal, q.quote.currency).padEnd(14)} ${q.quote.item_match} · ${q.quote.fulfillment_method} · ready ${q.quote.ready_at || "not supplied"} · ${q.completeness}% complete${badges ? `  [${badges}]` : ""}`);
-    for (const w of q.warnings) console.log(`${"".padEnd(23)}! ${w}`);
+    print(`${q.vendorName.padEnd(22)} ${money(q.comparableTotal, q.quote.currency).padEnd(14)} ${q.quote.item_match} · ${q.quote.fulfillment_method} · ready ${q.quote.ready_at || "not supplied"} · ${q.completeness}% complete${badges ? `  [${badges}]` : ""}`);
+    for (const w of q.warnings) print(`${"".padEnd(23)}! ${w}`);
   }
+  if (new Set(b.quotes.filter((q) => q.status === "eligible").map((q) => q.quote.currency)).size > 1)
+    print("Different currencies: no lowest-price recommendation; compare manually.");
   if (b.decision) {
-    console.log(RULE);
-    console.log(`Approved internally: ${b.decision.vendorId}. No purchase has been made.`);
+    print(RULE);
+    print(`Approved internally: ${b.decision.vendorId}. No purchase has been made.`);
     if (b.hold) {
       const r = b.hold.result;
-      console.log(`Hold call: ${b.hold.status.replaceAll("_", " ")}${r ? ` · hold ${r.hold_placed === "yes" ? `confirmed until ${r.hold_expires_at} by ${r.contact_name}` : "not confirmed"} · not a purchase` : ""}`);
+      print(`Hold call: ${b.hold.status.replaceAll("_", " ")}${r ? ` · hold ${r.hold_placed === "yes" ? `confirmed until ${r.hold_expires_at} by ${r.contact_name}` : "not confirmed"} · not a purchase` : ""}`);
     }
   }
-  console.log(RULE);
+  print(RULE);
 }
 
 async function main() {
@@ -89,19 +101,19 @@ async function main() {
     case "preview": {
       const request = readJson<QuoteRequest>(requestFile);
       const plan = planRace(request, { webhookUrl });
-      console.log(RULE);
-      console.log(`Representing  ${plan.representing}`);
-      console.log(`Goal          ${plan.goal}`);
-      for (const r of plan.recipients) console.log(`Recipient     ${r.vendor} ${r.phone} (${r.authorization})`);
-      console.log(`Boundary      ${plan.boundary}`);
-      console.log(`Results via   ${plan.delivery}`);
-      console.log(RULE);
+      print(RULE);
+      print(`Representing  ${plan.representing}`);
+      print(`Goal          ${plan.goal}`);
+      for (const r of plan.recipients) print(`Recipient     ${r.vendor} ${r.phone} (${r.authorization})`);
+      print(`Boundary      ${plan.boundary}`);
+      print(`Results via   ${plan.delivery}`);
+      print(RULE);
       const first = plan.calls[0]!;
       const shown = { ...first.body, recipients: first.body.recipients.map((r) => ({ ...r, phones: r.phones.map(mask) })) };
-      console.log(`POST ${CALLE_ORIGIN}/v1/calls   Idempotency-Key: ${first.idempotencyKey}`);
-      console.log(JSON.stringify(shown, null, 2));
-      console.log(RULE);
-      console.log(`${plan.calls.length} calls would be created (one per supplier, same questions). Nothing was dialed.`);
+      print(`POST ${CALLE_ORIGIN}/v1/calls   Idempotency-Key: ${first.idempotencyKey}`);
+      print(JSON.stringify(shown, null, 2));
+      print(RULE);
+      print(`${plan.calls.length} calls would be created (one per supplier, same questions). Nothing was dialed.`);
       return;
     }
     case "replay": {
@@ -109,11 +121,11 @@ async function main() {
       const request = readJson<QuoteRequest>(requestFile);
       const quote = validateQuoteResult(providerResult(readJson(file)));
       const analysis = analyzeQuote(quote, request.quantity);
-      console.log(`passes the strict schema   yes`);
-      console.log(`completeness               ${completeness(quote)}%`);
-      console.log(`ranking status             ${analysis.status}`);
-      console.log(`comparable total           ${money(analysis.comparableTotal, quote.currency)}`);
-      for (const w of analysis.warnings) console.log(`warning                    ${w}`);
+      print(`passes the strict schema   yes`);
+      print(`completeness               ${completeness(quote)}%`);
+      print(`ranking status             ${analysis.status}`);
+      print(`comparable total           ${money(analysis.comparableTotal, quote.currency)}`);
+      for (const w of analysis.warnings) print(`warning                    ${w}`);
       return;
     }
     case "demo": {
@@ -123,24 +135,24 @@ async function main() {
       const ledger = new Ledger(null);
       const allowlist = new Set(request.vendors.map((v) => v.phone));
       try {
-        console.log(`Loopback fake CALL-E at ${fake.baseUrl}: nothing is dialed.`);
+        print(`Loopback fake CALL-E at ${fake.baseUrl}: nothing is dialed.`);
         await startRace(ledger, client, request, { webhookUrl: null, allowlist });
         for (let step = 0; step < 3; step += 1) {
           for (const call of fake.calls.values()) fake.advance(call);
           await syncRace(ledger, client);
-          console.log(`poll ${step + 1}: ${board(ledger).tasks.map((t) => `${t.vendorName} ${t.status.replaceAll("_", " ")}`).join(" | ")}`);
+          print(`poll ${step + 1}: ${board(ledger).tasks.map((t) => `${t.vendorName} ${t.status.replaceAll("_", " ")}`).join(" | ")}`);
         }
         printBoard(ledger);
         const cheapest = board(ledger).rankings.cheapest;
         if (!cheapest) return;
-        console.log(`Demo only: approving ${cheapest} internally (live use requires approve --i-approve).`);
+        print(`Demo only: approving ${cheapest} internally (live use requires approve --i-approve).`);
         approveVendor(ledger, cheapest, { humanApproved: true });
         await requestHold(ledger, client, { webhookUrl: null, allowlist, humanApproved: true });
         const holdCall = fake.callFor(cheapest, "hold_request");
         for (let step = 0; step < 3; step += 1) fake.advance(holdCall);
         await syncRace(ledger, client);
         printBoard(ledger);
-        console.log(`${fake.requests.length} create-call requests reached the fake server; 0 real calls.`);
+        print(`${fake.requests.length} create-call requests reached the fake server; 0 real calls.`);
       } finally {
         await fake.stop();
       }
@@ -149,9 +161,9 @@ async function main() {
     case "check": {
       const client = liveClient();
       await client.checkKey();
-      console.log(`key accepted       GET ${CALLE_ORIGIN}/v1/goals → 200`);
-      console.log(`dial allowlist     ${[...parseAllowlist(process.env.PROCUREPULSE_DIAL_ALLOWLIST)].map(mask).join(", ") || "(empty: nothing can be dialed)"}`);
-      console.log(`results via        ${webhookUrl ? "webhook + polling" : "polling"}`);
+      print(`key accepted       GET ${CALLE_ORIGIN}/v1/goals → 200`);
+      print(`dial allowlist     ${[...parseAllowlist(process.env.PROCUREPULSE_DIAL_ALLOWLIST)].map(mask).join(", ") || "(empty: nothing can be dialed)"}`);
+      print(`results via        ${webhookUrl ? "webhook + polling" : "polling"}`);
       return;
     }
     case "start": {
@@ -159,7 +171,7 @@ async function main() {
       const ledger = new Ledger(ledgerFile);
       const client = liveClient();
       await startRace(ledger, client, readJson<QuoteRequest>(requestFile), { webhookUrl, allowlist: parseAllowlist(process.env.PROCUREPULSE_DIAL_ALLOWLIST) });
-      if (flag("--wait")) await waitForRace(ledger, client, { onChange: (s) => console.log(`  … ${s}`) });
+      if (flag("--wait")) await waitForRace(ledger, client, { onChange: (s) => print(`  … ${s}`) });
       printBoard(ledger);
       return;
     }
@@ -185,15 +197,15 @@ async function main() {
       const ledger = new Ledger(ledgerFile);
       const client = liveClient();
       await requestHold(ledger, client, { webhookUrl, allowlist: parseAllowlist(process.env.PROCUREPULSE_DIAL_ALLOWLIST), humanApproved: flag("--i-approve-hold") });
-      if (flag("--wait")) await waitForRace(ledger, client, { onChange: (s) => console.log(`  … ${s}`) });
+      if (flag("--wait")) await waitForRace(ledger, client, { onChange: (s) => print(`  … ${s}`) });
       printBoard(ledger);
-      console.log(`Hold task: ${ledger.data.tasks[taskId("hold", ledger.data.decision!.vendorId)]?.status}`);
+      print(`Hold task: ${ledger.data.tasks[taskId("hold", ledger.data.decision!.vendorId)]?.status}`);
       return;
     }
     case "serve-webhook": {
       const port = Number(option("--port", "8788"));
       const server = createWebhookServer(webhookToken, { ledger: new Ledger(ledgerFile), client: liveClient() });
-      server.listen(port, "127.0.0.1", () => console.log(`webhook receiver on 127.0.0.1:${port}/calle/webhook/<token>; expose it over HTTPS and set PUBLIC_BASE_URL`));
+      server.listen(port, "127.0.0.1", () => print(`webhook receiver on 127.0.0.1:${port}/calle/webhook/<token>; expose it over HTTPS and set PUBLIC_BASE_URL`));
       return;
     }
     default:
@@ -202,6 +214,6 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(display(error instanceof Error ? error.message : String(error)));
   process.exit(1);
 });
