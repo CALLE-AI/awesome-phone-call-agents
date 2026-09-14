@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/clinic-slot-assistant`](typescript/clinic-slot-assistant/) | TypeScript / Next.js | Consent-aware appointment-availability calls with result review, staff-confirmed fictional bookings, and a no-call simulation default. |
 | [`typescript/macrodial`](typescript/macrodial/) | TypeScript / Node | No-call review of MacroDial's governed CALL-E playbook/task schema and persisted synthetic outcome transitions; includes hosted Auto Config and Smart Data Loader workflow documentation. |
 | [`go/callhook`](go/callhook/) | Go / TypeScript | Event-driven CALL-E calling platform: webhook in, structured outcome back, goal-driven campaigns with early-stop and budgets, 19 doc-verified platform webhooks, MCP server, and an embedded war-room UI. Dry-run by default. |
 | [`typescript/wever-callback`](typescript/wever-callback/) | TypeScript / Node.js | Consignment-boutique callback inbox with customer requests, approved CALL-E interviews, saved conversations and staff-confirmed next steps; local no-call mode by default. |

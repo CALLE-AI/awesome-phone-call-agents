@@ -183,6 +183,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Apps
 
 
+- [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
 - [MacroDial](apps/typescript/macrodial/) - No-call playbook review app using MacroDial's deployed CALL-E task compiler and outcome-to-state resolver, with synthetic persistence and a hosted-product workflow guide.
 - [DockBrief](apps/typescript/dockbrief/) - One authorized CALL-E receiving-dock call becomes an evidence-linked physical unloading checklist with reported mismatches and unresolved facts; offline synthetic examples are the default.
 - [DueCall](https://github.com/omkz/duecall) - Autonomous accounts-receivable workflow that uses CALL-E to follow up on overdue invoices, turn phone conversations into structured payment outcomes, and schedule guarded retries with business-hours, duplicate-call, and human-handoff controls.
