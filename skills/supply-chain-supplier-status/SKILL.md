@@ -64,7 +64,7 @@ The CALL-E Calls API does not provide an endpoint to cancel, recall, or interrup
 
 ## CALL-E Telephony API Dispatch Contract
 
-CALL-E does not provide an official standalone Python SDK or define a supported application API contract. Telephony integrations interact with CALL-E via its standard HTTPS REST API:
+This reference describes a direct HTTPS REST integration. For the supported API contract and official Python or TypeScript SDKs, consult the [CALL-E integration documentation](https://github.com/CALLE-AI/call-e-integrations) before adapting these requests:
 
 ```http
 POST https://api.heycall-e.com/v1/calls
