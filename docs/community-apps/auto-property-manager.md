@@ -1,7 +1,7 @@
 # Auto Property Manager
 
 A hosted short-term-rental management platform that uses CALL-E for two
-production workflows: alerting a property owner by phone when a guest has an
+author-described workflows: alerting a property owner by phone when a guest has an
 urgent access issue, and calling (or emailing) a contractor about a
 guest-reported property issue.
 
@@ -9,7 +9,9 @@ guest-reported property issue.
 - License: Proprietary (closed source); this entry documents the hosted app only.
 
 Auto Property Manager is hosted in its own private repository. It is not a
-CALL-E SDK and does not define a supported application API.
+CALL-E SDK and does not define a supported application API. The behavior and
+safeguards below are author-described and not independently verified against
+the private implementation; this reference is not production certification.
 
 ## Overview
 
@@ -57,10 +59,15 @@ saved contact — never the guest. Every dispatch is tied to one guest issue
 and one approval-gated activity record, and is bounded by cooldowns, a
 rolling per-account allowance, and an idempotency key.
 
-## Safe testing path with no calls
+## Read-only evaluation and optional real-call rehearsal
+
+For a no-send review, inspect the documentation and existing fictional screens
+without entering a destination or authorizing a send. The separate **Find
+businesses — no contact** panel performs lookup only, according to the author.
+Do not confuse either inspection path with the rehearsal actions below.
 
 The **Safe Call & Email Tests** page (`/communication-test`) is a dedicated,
-consent-gated rehearsal surface:
+consent-gated **real-send** rehearsal surface, not an offline/no-call demo:
 
 1. Save your own phone/email as the test destination and confirm you own/
    consent to being contacted at that number/address.
