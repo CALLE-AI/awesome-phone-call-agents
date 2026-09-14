@@ -20,7 +20,8 @@ export interface StartRequest {
 
 export type Simulation =
   | { kind: "passenger"; booking: Booking; quote: Quote }
-  | { kind: "airline_desk"; booking: Booking; option: MoveOption };
+  | { kind: "airline_desk"; booking: Booking; option: MoveOption }
+  | { kind: "result_callback"; booking: Booking };
 
 export type StartResult =
   | { kind: "started"; callId: string }
@@ -104,7 +105,9 @@ export class DryRunGateway implements CallGateway {
       };
     }
     const sim = call.request.simulation;
-    return sim.kind === "passenger" ? scriptedOutcome(sim.booking, sim.quote) : scriptedAirlineDesk(sim.booking, sim.option);
+    if (sim.kind === "passenger") return scriptedOutcome(sim.booking, sim.quote);
+    if (sim.kind === "airline_desk") return scriptedAirlineDesk(sim.booking, sim.option);
+    return scriptedCallback(sim.booking);
   }
 }
 
@@ -292,6 +295,32 @@ function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome 
     },
     summary: "The Nusantara Air desk asked for a call back later.",
     transcript: [...opening, { speaker: "user", text: "Our system is down, please call back in an hour.", offsetSeconds: 12 }],
+  };
+}
+
+function scriptedCallback(booking: Booking): CallOutcome {
+  const name = booking.passenger.split(" ")[0];
+  return {
+    state: "completed",
+    providerStatus: "completed",
+    taskCompleted: true,
+    confidence: { score: 0.9, label: "high" },
+    result: null,
+    structured: {
+      reached_passenger: "yes",
+      acknowledged: "yes",
+      follow_up_requested: "no",
+      reason: "Passenger said: Got it, thanks for letting me know.",
+    },
+    summary: `${name} heard the result of their request and understood it.`,
+    transcript: [
+      { speaker: "bot", text: `Hi, this is an AI assistant calling for TripKita. May I speak with ${booking.passenger}?`, offsetSeconds: 0 },
+      { speaker: "user", text: "Speaking.", offsetSeconds: 3 },
+      { speaker: "bot", text: "I'm calling with the result of the change you asked for.", offsetSeconds: 6 },
+      { speaker: "user", text: "Got it, thanks for letting me know.", offsetSeconds: 20 },
+    ],
+    failureCode: null,
+    failureMessage: null,
   };
 }
 

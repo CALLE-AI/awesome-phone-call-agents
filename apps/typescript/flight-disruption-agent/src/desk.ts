@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { CallGateway } from "./calle.ts";
 import { findBooking, findFlight, type Catalog } from "./data.ts";
 import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "./airline.ts";
+import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
 import { FakeGds, type Gds } from "./gds.ts";
@@ -110,7 +111,7 @@ export class Desk {
   reset(): void {
     const inFlight =
       Object.values(this.state.ledger).some((e) => e.status === "in_progress" || e.status === "submitted") ||
-      Object.values(this.state.requests).some((r) => r.status === "airline_call_in_progress");
+      Object.values(this.state.requests).some((r) => r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
     if (inFlight && this.gateway.live) {
       throw new DeskError("A live call is still in progress. Wait for it to finish before resetting.", 409);
     }
@@ -323,6 +324,7 @@ export class Desk {
     }
     for (const entry of Object.values(this.state.requests)) {
       if (entry.status === "airline_call_in_progress") await this.refreshRequest(entry.request.id);
+      if (entry.callback?.status === "in_progress") await this.refreshCallback(entry.request.id);
     }
   }
 
@@ -400,6 +402,8 @@ export class Desk {
       airlineCall: null,
       reviewReasons: [],
       applied: null,
+      callback: null,
+      callbackVerdict: null,
     };
     this.state.requests[id] = entry;
     this.save();
@@ -599,6 +603,103 @@ export class Desk {
     const text = note.trim();
     if (text) this.state.bookings[entry.request.pnr]?.notes.push(`Agent note: ${text}`);
     entry.status = "resolved_by_human";
+    this.save();
+    return entry;
+  }
+
+  private callbackContext(id: string) {
+    const entry = this.requestEntry(id);
+    if (!["completed", "resolved_by_human"].includes(entry.status)) {
+      throw new DeskError("Call the passenger back only after the request is finished.", 409);
+    }
+    const booking = findBooking(this.catalog, entry.request.pnr);
+    const state = this.state.bookings[booking.pnr];
+    if (!state) throw new DeskError(`No booking state for ${booking.pnr}`);
+    const destination = this.route(booking.phone);
+    const task = buildCallbackTask(this.catalog, booking, state, entry);
+    return { entry, booking, destination, task };
+  }
+
+  previewCallback(id: string) {
+    const { entry, destination, task } = this.callbackContext(id);
+    const route = routeFor(destination.phone);
+    return {
+      id,
+      mode: this.gateway.mode,
+      live: this.gateway.live,
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      blockedReason: route.ok ? null : route.reason,
+      task,
+      resultSchema: buildCallbackResultSchema(),
+      existing: entry.callback,
+      liveBudgetLeft: this.options.liveCallBudget - this.state.liveCallsUsed,
+    };
+  }
+
+  /** Optional: one call telling the passenger how their request ended. Changes nothing. */
+  async callPassengerWithResult(id: string, confirmLast4?: string): Promise<RequestEntry> {
+    const { entry, booking, destination, task } = this.callbackContext(id);
+    if (entry.callback && entry.callback.status !== "failed_to_submit") {
+      throw new DeskError(`The passenger was already called back for this request (${entry.callback.status}).`, 409);
+    }
+    const route = routeFor(destination.phone);
+    if (!route.ok) throw new DeskError(route.reason);
+    this.guardLiveCall(destination.phone, confirmLast4);
+
+    const idempotencyKey = `fda-${id}-callback`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const call: AirlineCall = {
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      idempotencyKey,
+      task,
+      callId: null,
+      status: "submitted",
+      submittedAt: new Date(this.now()).toISOString(),
+      nextPollAt: new Date(this.now()).toISOString(),
+      outcome: null,
+      error: null,
+    };
+    entry.callback = call;
+    entry.callbackVerdict = null;
+    this.save();
+
+    const result = await this.gateway.start({
+      task,
+      phone: destination.phone,
+      region: route.region,
+      locale: route.locale,
+      resultSchema: buildCallbackResultSchema(),
+      metadata: { request_id: id, pnr: booking.pnr, purpose: "request_result_callback" },
+      idempotencyKey,
+      simulation: { kind: "result_callback", booking },
+    });
+    if (result.kind === "started") {
+      call.callId = result.callId;
+      call.status = "in_progress";
+      call.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
+    } else {
+      call.status = result.kind === "uncertain" ? "uncertain" : "failed_to_submit";
+      call.error = result.message;
+    }
+    if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
+    this.save();
+    return entry;
+  }
+
+  async refreshCallback(id: string): Promise<RequestEntry> {
+    const entry = this.requestEntry(id);
+    const call = entry.callback;
+    if (!call?.callId || call.status !== "in_progress") return entry;
+    if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
+    const outcome = await this.gateway.get(call.callId);
+    call.outcome = outcome;
+    if (outcome.state === "in_progress") {
+      call.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
+    } else {
+      call.status = "finished";
+      entry.callbackVerdict = decideCallback(outcome);
+    }
     this.save();
     return entry;
   }

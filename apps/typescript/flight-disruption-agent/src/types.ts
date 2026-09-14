@@ -250,4 +250,7 @@ export interface RequestEntry {
   airlineCall: AirlineCall | null;
   reviewReasons: string[];
   applied: string | null;
+  /** Optional call telling the passenger how the request ended. */
+  callback: AirlineCall | null;
+  callbackVerdict: { kind: "delivered" } | { kind: "follow_up"; reasons: string[] } | null;
 }

@@ -93,3 +93,28 @@ test("the airline desk is only called for a rejected reissue", async () => {
   desk.confirmRequest(entry.request.id, 30_000);
   await assert.rejects(desk.callAirlineDesk(entry.request.id), /Only a reissue the portal refused/);
 });
+
+test("the passenger can be called back once with the final result, which changes nothing", async () => {
+  const desk = dryDesk();
+  const id = await rejectedReissue(desk, "P3X9GA", 415_000);
+  await assert.rejects(desk.callPassengerWithResult(id), /only after the request is finished/);
+  await desk.callAirlineDesk(id);
+  await desk.refreshRequest(id);
+  const preview = desk.previewCallback(id);
+  assert.match(preview.task, /New booking code: Q 3 X 9 G Z/);
+  assert.match(preview.task, /Amount charged for the change: 415,000 rupiah/);
+  assert.match(preview.task, /only reports a result/);
+  await desk.callPassengerWithResult(id);
+  await assert.rejects(desk.callPassengerWithResult(id), /already called back/);
+  const entry = await desk.refreshCallback(id);
+  assert.deepEqual(entry.callbackVerdict, { kind: "delivered" });
+  assert.equal(entry.status, "completed");
+});
+
+test("a callback that did not reach the passenger asks for written follow-up", async () => {
+  const { decideCallback } = await import("../src/callback.ts");
+  const base = { state: "completed" as const, providerStatus: "completed", taskCompleted: true, confidence: null, result: null, summary: null, transcript: [], failureCode: null, failureMessage: null };
+  assert.equal(decideCallback({ ...base, structured: { reached_passenger: "no", acknowledged: "unknown", follow_up_requested: "unknown", reason: "" } }).kind, "follow_up");
+  assert.equal(decideCallback({ ...base, structured: { reached_passenger: "yes", acknowledged: "yes", follow_up_requested: "yes", reason: "wants a person" } }).kind, "follow_up");
+  assert.equal(decideCallback({ ...base, state: "failed", structured: null, failureCode: "no_answer" }).kind, "follow_up");
+});
