@@ -81,6 +81,13 @@
 </head>
 <body>
     <div class="container">
+        <!-- Shown by apps.js only when config.js is missing or still has
+             placeholder values — lets anyone preview the UI without needing
+             real CALL-E credentials. -->
+        <div id="previewBanner" style="display: none; background: #fff3cd; border: 1px solid #e0a800; color: #7a5b00; border-radius: 6px; padding: 8px; margin-bottom: 12px; font-size: 12px; font-family: sans-serif; text-align: left;">
+            ⚠ Preview mode — no CALL-E credentials configured. The UI works, but dialing is disabled until <code>config.js</code> is set up.
+        </div>
+
         <!-- SCREEN 1: MAIN MENU -->
         <div id="mainMenuScreen">
             <h2>Co runner</h2>
@@ -99,7 +106,6 @@
             <select id="targetLanguage" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px;">
                 <option value="English">🇮🇳 English (India)</option>
                 <option value="Hindi">🇮🇳 Hindi (भारत)</option>
-                <option value="Tamil">🇮🇳 Tamil (தமிழ்)</option>
                 <option value="German">🇩🇪 German (Deutschland)</option>
                 <option value="Spanish">🇪🇸 Spanish (España)</option>
                 <option value="French">🇫🇷 French (France)</option>
@@ -127,7 +133,7 @@
         <!-- SCREEN 3: REVIEW CALL HISTORY -->
         <div id="historyScreen" style="display: none;">
             <h2>Call History</h2>
-            <p style="color: gray; font-size: 13px; margin-bottom: 15px;">Logs stored locally on your device. Tap a call to see its reply:</p>
+            <p style="color: gray; font-size: 13px; margin-bottom: 15px;">Stored in this browser's local storage only (not encrypted, not synced). Phone numbers are partially masked below. Tap a call to see its reply:</p>
             <div id="historyList" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;"></div>
             <div id="replyLogBox" style="display: none; background: #eef9ff; border: 1px solid #00acc1; border-radius: 6px; padding: 12px; margin-bottom: 15px; text-align: left; font-family: sans-serif; font-size: 13px;">
                 <b>Reply Log:</b>
