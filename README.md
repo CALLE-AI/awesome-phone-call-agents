@@ -243,6 +243,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/last-crate`](apps/typescript/last-crate/) | TypeScript / Node.js | Two-call surplus-bread handoff: verifies the donor offer, matches full-capacity collectors, and issues an expiring pickup ticket from a bounded commitment; no-call fixtures by default. |
 | [`apps/typescript/wever-callback`](apps/typescript/wever-callback/) | TypeScript / Node.js | Consignment-boutique callback inbox with customer requests, approved CALL-E interviews, saved conversations and staff-confirmed next steps; local no-call mode by default. |
 | [`apps/typescript/medroute`](apps/typescript/medroute/) | TypeScript | Consent-first pharmacy availability workbench with a safe demo mode, structured CALL-E results, and downloadable call transcripts. |
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
