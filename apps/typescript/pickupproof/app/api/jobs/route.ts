@@ -42,7 +42,9 @@ function auth(req: Request) {
 }
 async function response(req: Request, id?: string) {
   return Response.json({
-    jobs: (await list()).filter((j) => j.mode === 'practice' || auth(req)),
+    jobs: JSON.parse(JSON.stringify(
+      (await list()).filter((j) => j.mode === 'practice' || auth(req)),
+    ).replace(/\+[1-9][0-9]{7,14}/g, (phone) => `+••••${phone.slice(-4)}`)),
     id,
     live: live(),
   });
