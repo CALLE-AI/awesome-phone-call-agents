@@ -1,0 +1,25 @@
+{
+  "version": "5.3.6",
+  "passed": 15,
+  "checks": [
+    "Reproduced exhausted contacts, supervisor follow-up, approval, then exact incomplete callback",
+    "Saved report opens with one recovery action and one closed Details section; no misleading progress controls",
+    "Recovery action is in the first viewport and reflows at 320, 390, 640 and 1440 pixels",
+    "Previously opened technical panels do not spill onto the new default screen; refresh does not call",
+    "The callback reply is available before the technical log, with no extra calls from viewing it",
+    "Keyboard opening/cancellation makes no call and returns focus to recovery",
+    "A practice outcome must be selected; the app does not manufacture agreement on opening",
+    "Pending retry shows real processing activity then stays unconfirmed; reduced-motion status remains readable",
+    "Rejected requests show an actionable dialog error without adding an attempt",
+    "Successful retry verifies a new no-charge confirmation, preserves history and original approval, and advances to progress",
+    "Confirmed state has one relevant progress control, no phase checklist and no instruction wall",
+    "Polling neither redials nor assumes travel, arrival or completion",
+    "Recovered report proceeds through witnessed updates to explicit safe closure; it does not get stuck again",
+    "Live rendering separates real-call consent from practice outcomes; fixture dialog cancelled, no live request",
+    "Unresolved provider status blocks retry rather than offering an unsafe redial"
+  ],
+  "javascript_errors": [],
+  "http_bridge": true,
+  "live_calls": false,
+  "external_model_inference": false
+}
