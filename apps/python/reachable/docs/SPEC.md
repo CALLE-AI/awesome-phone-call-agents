@@ -395,8 +395,8 @@ Ivy's contacts, in the school's own `contact_order`:
 | Order | `contact_id` | Name | Number | Fate |
 | --- | --- | --- | --- | --- |
 | 1 | `C-2089` | Daniel Fry | `+447700900377` | Number has changed hands — wrong person, flagged |
-| 2 | `C-2090` | Marie Dunn | `+447700900218` | Answers: illness, plus a bus-fare barrier |
-| 3 | `C-2088` | Janet Okoro | `+447700900142` | Verified in the termly contact check; never reached in the cascade, which stops at Marie |
+| 2 | `C-2090` | Martin Dunn | `+447700900218` | Answers: illness, plus a bus-fare barrier |
+| 3 | `C-2088` | Janet Okoro | `+447700900142` | Verified in the termly contact check; never reached in the cascade, which stops at Martin |
 
 Sam's contact: `C-2301`, Paul Adeyemi, `+447700900455` — the contact who did not
 know Sam was absent.

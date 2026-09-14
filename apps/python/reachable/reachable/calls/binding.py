@@ -112,7 +112,7 @@ def identity_supported_by_transcript(
     """Does a turn the recipient spoke support an identity confirmation?
 
     Returns (supported, quote). Only ``speaker == "user"`` turns are considered:
-    the bot asking "Am I speaking to Marie Dunn?" is not Marie Dunn answering,
+    the bot asking "Am I speaking to Martin Dunn?" is not Martin Dunn answering,
     and an ``unknown`` speaker is exactly the ambiguity this rule exists for.
     """
     for turn in recipient_turns(attempt):

@@ -195,7 +195,7 @@ def test_a_wrong_number_flags_the_contact_and_advances_the_cascade(live, fake_st
     assert health_of(live, "C-2089") == ContactHealth.WRONG_PERSON.value
     case = live.store.case(IVY_CASE)
     assert case["state"] == PatternState.PF_CASCADE_READY.value
-    assert case["contact_id"] == "C-2090"  # Marie Dunn, the next in order
+    assert case["contact_id"] == "C-2090"  # Martin Dunn, the next in order
 
 
 def test_a_dead_number_also_flags_and_advances(live, fake_state):

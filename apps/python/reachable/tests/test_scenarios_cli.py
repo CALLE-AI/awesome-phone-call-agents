@@ -112,7 +112,7 @@ def write_contacts(tmp_path: Path) -> Path:
     (tmp_path / "contacts.csv").write_text(
         "contact_id,pupil_id,contact_order,contact_name,relationship,phone_e164,"
         "language,is_emergency_contact,do_not_call\n"
-        "C-2090,P-1041,2,Marie Dunn,Grandmother,+447700900218,English,Y,N\n",
+        "C-2090,P-1041,2,Martin Dunn,Grandfather,+447700900218,English,Y,N\n",
         encoding="utf-8",
     )
     return tmp_path

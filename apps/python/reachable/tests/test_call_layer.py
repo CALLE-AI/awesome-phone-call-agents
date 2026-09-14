@@ -24,7 +24,7 @@ DEST = "+447700900218"
 
 CONTACT_VALUES = {
     "school_name": "Fernhollow Primary School",
-    "contact_name": "Marie Dunn",
+    "contact_name": "Martin Dunn",
     "pupil_first_name": "Ivy",
 }
 PATTERN_VALUES = {**CONTACT_VALUES, "attendance_officer_name": "Mrs Adeola Hart"}

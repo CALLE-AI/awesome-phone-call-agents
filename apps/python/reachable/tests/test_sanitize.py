@@ -83,7 +83,7 @@ def test_strip_control_characters_keeps_accents_and_punctuation():
 def test_transcript_turns_are_normalised():
     turns = clean_transcript_turns(
         [
-            {"offset_seconds": 0, "speaker": "bot", "text": "Am I speaking to Marie?"},
+            {"offset_seconds": 0, "speaker": "bot", "text": "Am I speaking to Martin?"},
             {"offset_seconds": 4, "speaker": "user", "text": "Speaking,\nyes."},
         ]
     )
