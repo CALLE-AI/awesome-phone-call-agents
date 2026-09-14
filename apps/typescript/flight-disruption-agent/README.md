@@ -147,7 +147,7 @@ flowchart LR
     D -- "accepted" --> E["Booking updated"]
     D -- "reissue or refund refused" --> F["CALL-E calls the<br/>airline service desk"]
     F -- "reissued or refund approved" --> E
-    F -- "refused / call back / unclear" --> I
+    F -- "refused / call back / unclear" --> I["Human review queue"]
     E -.-> G["Update pushed to the channel,<br/>optional result call"]
 ```
 
@@ -288,7 +288,7 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 ## Limitations
 
 - **Fictional data.** The airline, distributors, OTA, bookings, and fares are fictional. There is no real GDS or airline integration; the portal is scripted, and the "apply" step changes a local in-memory booking.
-- **No real chat bot, web form, or IVR.** The desk exposes the channel webhook and pushes updates, but ships no chat bot, web form, or IVR; `send-channel` and `fake-channel` stand in for them. Identity is booking code plus last name, as on airline manage-booking pages, not a login.
+- **No real chat bot, web form, or IVR.** The desk exposes the channel webhook and pushes updates; `send-channel` and `fake-channel` stand in for the channels themselves. Identity is booking code plus last name, as on airline manage-booking pages, not a login.
 - **One disruption at a time per flight.** Only a worse disruption replaces the current one automatically; a flight that gets better (a shorter delay, a reinstated flight) is left for a person.
 - **Feed format is fixed.** The pull feed expects the cursor format above; another airline API needs an adapter in `src/feed.ts`.
 - **No mid-call lookups.** CALL-E cannot call out to other systems during a call, so prices are fixed before dialing. If seats sell out between the call and the apply step, the result goes to review.
