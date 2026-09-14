@@ -148,7 +148,7 @@ function forEachSelectedRow_(fn) {
   for (let r = startRow; r < startRow + numRows; r++) {
     const rowValues = sheet.getRange(r, 1, 1, sheet.getLastColumn()).getValues()[0];
     try {
-      fn(sheet, header, r, rowValues);
+      if (fn(sheet, header, r, rowValues) === false) break;
     } catch (err) {
       // One row's bad recipient or a transient fetch failure shouldn't abort every other
       // selected row — report it on that row and keep going.
@@ -215,7 +215,7 @@ function placeCallsForSelectedRows() {
       sheet.getRange(r, statusCol).setValue("UNKNOWN");
       sheet.getRange(r, outcomeCol).setValue(
         "UNKNOWN — " + redactText_(err.message, 120) + ". Do not rerun; reconcile against the audit log first.");
-      return;
+      return false; // Stop the selected-row batch until the operator reconciles this call.
     }
 
     if (!ok) {
@@ -231,7 +231,7 @@ function placeCallsForSelectedRows() {
       } else {
         sheet.getRange(r, outcomeCol).setValue(redactText_(JSON.stringify(body), 200));
       }
-      return;
+      return code === 409; // Only a definite gate refusal permits later rows to continue.
     }
     sheet.getRange(r, statusCol).setValue("CLEARED");
     sheet.getRange(r, outcomeCol).setValue(redactText_(`${body.status} — ${body.summary || body.error || ""}`, 160));
