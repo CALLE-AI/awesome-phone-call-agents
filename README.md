@@ -191,6 +191,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
@@ -257,6 +258,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/dineline-calle-edition`](apps/typescript/dineline-calle-edition/) | TypeScript / Node | Two-agent restaurant concierge that collects dining preferences, supports a grounded Google Places choice in n8n, binds the diner's exact approval, and verifies Agent Jake's CALL-E booking result; fixture-only public mode by default. |
 | [`apps/typescript/readycheck`](apps/typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
 | [`apps/python/rebuttal-dispute-call`](apps/python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
 | [`apps/typescript/last-crate`](apps/typescript/last-crate/) | TypeScript / Node.js | Two-call surplus-bread handoff: verifies the donor offer, matches full-capacity collectors, and issues an expiring pickup ticket from a bounded commitment; no-call fixtures by default. |

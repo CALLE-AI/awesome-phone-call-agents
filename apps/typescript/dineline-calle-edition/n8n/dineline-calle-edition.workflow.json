@@ -1,0 +1,635 @@
+{
+  "id": "DLECalleEdition01",
+  "name": "DineLine CALL-E Edition - Native Two Agent",
+  "nodes": [
+    {
+      "id": "StartCALLEDinnerPlan",
+      "name": "Start CALL-E Dinner Plan",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        -320
+      ],
+      "webhookId": "StartCALLEDinnerPlan-sanitized",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dineline-calle-plan",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "ValidatePlanningRequest",
+      "name": "Validate Planning Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst phone = String(body.phone || '').trim();\nconst sessionId = String(body.sessionId || '').trim();\nconst explicitConsent = body.explicitConsent === true;\nconst missing = [];\nif (!/^\\+[1-9]\\d{7,14}$/.test(phone)) missing.push('phone_e164');\nif (!/^[a-zA-Z0-9-]{8,80}$/.test(sessionId)) missing.push('session_id');\nif (!explicitConsent) missing.push('explicit_consent');\nif (missing.length) throw new Error('Planning call blocked. Missing: ' + missing.join(', '));\nreturn [{ json: {\n  request: { phone, sessionId, explicitConsent: true },\n  scenario: body.fixtureScenario || 'complete',\n  source: {\n    n8nExecutionId: String($execution.id),\n    sourceCallId: 'planning:' + sessionId,\n    toolCallId: null\n  }\n} }];"
+      }
+    },
+    {
+      "id": "PreviewCALLEIntakeRequest",
+      "name": "Preview CALL-E Intake Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        -320
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/intake/preview",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.request }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "BindCALLEIntakeApproval",
+      "name": "Bind CALL-E Intake Approval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "const source = $('Validate Planning Request').first().json;\nconst preview = $json.preview;\nif (!preview?.requestId || !preview?.correlationId) throw new Error('Intake preview did not return binding IDs.');\nreturn [{ json: {\n  request: source.request,\n  approvedRequestId: preview.requestId,\n  correlationId: preview.correlationId,\n  source: source.source,\n  scenario: source.scenario\n} }];"
+      }
+    },
+    {
+      "id": "DispatchCALLEPreferenceAgent",
+      "name": "Dispatch CALL-E Preference Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        -320
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/n8n/intake/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 330000
+        }
+      }
+    },
+    {
+      "id": "SwitchPreferencesReady",
+      "name": "Switch Preferences Ready",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        32,
+        -320
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.planningResult.usableForSearch }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ready"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "GooglePlacesTextSearch",
+      "name": "Google Places Text Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        -416
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "={{ $vars.GOOGLE_PLACES_API_KEY }}"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.priceLevel,places.types,places.primaryTypeDisplayName,places.googleMapsUri,places.websiteUri,places.businessStatus"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { textQuery: (($json.planningResult.preferences.cuisine || 'restaurant') + ' restaurants in ' + $json.planningResult.preferences.location), includedType: 'restaurant', strictTypeFiltering: false, maxResultCount: 10, languageCode: 'en', regionCode: 'US' } }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "NormalizeGooglePlaces",
+      "name": "Normalize Google Places",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -416
+      ],
+      "parameters": {
+        "jsCode": "function textValue(value) {\n  if (!value) return null;\n  return typeof value === 'string' ? value : value.text || null;\n}\nfunction normalizePhone(value) {\n  if (!value) return null;\n  const raw = String(value).trim();\n  if (/^\\+[1-9]\\d{7,14}$/.test(raw)) return raw;\n  const digits = raw.replace(/\\D/g, '');\n  if (digits.length === 10) return '+1' + digits;\n  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;\n  return null;\n}\nconst businesses = ($json.places || [])\n  .filter((place) => place.businessStatus !== 'CLOSED_PERMANENTLY')\n  .map((place) => ({\n    id: place.id,\n    name: textValue(place.displayName) || '',\n    rating: place.rating || 0,\n    review_count: place.userRatingCount || 0,\n    phone: normalizePhone(place.internationalPhoneNumber || place.nationalPhoneNumber),\n    address: place.formattedAddress || place.shortFormattedAddress || '',\n    categories: [textValue(place.primaryTypeDisplayName), ...(place.types || [])]\n      .filter(Boolean).slice(0, 4),\n    price: place.priceLevel || null,\n    url: place.googleMapsUri || place.websiteUri || null,\n    provider: 'google_places'\n  }))\n  .filter((business) => business.name && business.address && business.phone);\nreturn [{ json: { businesses } }];"
+      }
+    },
+    {
+      "id": "RankRestaurantOptions",
+      "name": "Rank Restaurant Options",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -416
+      ],
+      "parameters": {
+        "jsCode": "const intake = $('Dispatch CALL-E Preference Agent').first().json;\nconst top = ($json.businesses || [])\n  .filter((business) => business.rating >= 4 && business.review_count >= 25)\n  .sort((left, right) => (right.rating - left.rating) || (right.review_count - left.review_count))\n  .slice(0, 5)\n  .map((business, index) => ({ ...business, option_number: index + 1 }));\nconst cache = $getWorkflowStaticData('global');\ncache.restaurantOptionsByPlan = cache.restaurantOptionsByPlan || {};\ncache.restaurantOptionsByPlan[intake.requestId] = {\n  savedAt: new Date().toISOString(),\n  preferences: intake.planningResult.preferences,\n  options: top\n};\nreturn [{ json: {\n  planningRequestId: intake.requestId,\n  correlationId: intake.correlationId,\n  preferences: intake.planningResult.preferences,\n  restaurantOptions: top,\n  message: top.length\n    ? 'Five restaurant options are ready for review.'\n    : 'No bookable match was found. Widen the area or try another cuisine.',\n  requiresUserSelection: true,\n  requiresExplicitBookingApproval: true\n} }];"
+      }
+    },
+    {
+      "id": "ReturnRestaurantOptions",
+      "name": "Return Restaurant Options",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1056,
+        -416
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "FormatMissingPreferences",
+      "name": "Format Missing Preferences",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -208
+      ],
+      "parameters": {
+        "jsCode": "const response = $json;\nreturn [{ json: {\n  planningRequestId: response.requestId,\n  correlationId: response.correlationId,\n  preferences: response.planningResult.preferences,\n  restaurantOptions: [],\n  missingFields: response.planningResult.missingFields,\n  message: response.planningResult.messageToUser,\n  requiresUserInput: true,\n  automaticRetryAllowed: false\n} }];"
+      }
+    },
+    {
+      "id": "ReturnPlanningFollowup",
+      "name": "Return Planning Follow-up",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        544,
+        -208
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "SubmitApprovedRestaurant",
+      "name": "Submit Approved Restaurant",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        176
+      ],
+      "webhookId": "SubmitApprovedRestaurant-sanitized",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dineline-calle-book",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "BuildApprovedBookingDraft",
+      "name": "Build Approved Booking Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        176
+      ],
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst planningRequestId = String(body.planningRequestId || '');\nconst selectedOptionId = String(body.selectedOptionId || body.optionId || '');\nconst explicitApproval = body.explicitApproval === true;\nconst cache = $getWorkflowStaticData('global');\nconst plan = cache.restaurantOptionsByPlan?.[planningRequestId] || null;\nconst selected = plan?.options?.find((option) => String(option.id) === selectedOptionId) || null;\nconst reservationInput = body.reservation || {};\nconst reservation = {\n  date: String(reservationInput.date || plan?.preferences?.date || ''),\n  time: String(reservationInput.time || plan?.preferences?.time || ''),\n  timeZone: String(reservationInput.timeZone || plan?.preferences?.timeZone || 'America/New_York'),\n  partySize: Number(reservationInput.partySize || plan?.preferences?.partySize || 0),\n  guestName: String(reservationInput.guestName || body.guestName || ''),\n  specialRequests: String(reservationInput.specialRequests || plan?.preferences?.atmosphere || '')\n};\nconst missing = [];\nif (!plan) missing.push('planning_request');\nif (!selected) missing.push('selected_google_place');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(reservation.date)) missing.push('date_yyyy_mm_dd');\nif (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(reservation.time)) missing.push('time_24_hour');\nif (!Number.isInteger(reservation.partySize) || reservation.partySize < 1 || reservation.partySize > 20) missing.push('party_size');\nif (!reservation.guestName) missing.push('guest_name');\nif (!explicitApproval) missing.push('explicit_approval');\nreturn [{ json: {\n  ready: missing.length === 0,\n  planningRequestId,\n  draft: {\n    restaurant: {\n      name: selected?.name || '',\n      address: selected?.address || '',\n      phone: selected?.phone || ''\n    },\n    reservation,\n    policy: { acceptAlternativeTime: false, leaveVoicemail: false, discloseAiCaller: true }\n  },\n  explicitApproval,\n  source: {\n    n8nExecutionId: String($execution.id),\n    sourceCallId: planningRequestId ? 'plan:' + planningRequestId.slice(0, 24) : null,\n    toolCallId: null\n  },\n  scenario: body.fixtureScenario || 'confirmed',\n  preflightMessage: missing.length\n    ? 'Booking call blocked. Still needed: ' + missing.join(', ') + '.'\n    : null\n} }];"
+      }
+    },
+    {
+      "id": "SwitchBookingReady",
+      "name": "Switch Booking Ready",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -480,
+        176
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ready }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ready"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "PreviewCALLEContract",
+      "name": "Preview CALL-E Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        96
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/preview",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.draft }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "BindApprovedFingerprint",
+      "name": "Bind Approved Fingerprint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const source = $('Build Approved Booking Draft').first().json;\nconst preview = $json.preview;\nif (!source.ready || source.explicitApproval !== true) throw new Error('Booking approval was not explicit.');\nif (!preview?.contractId || !preview?.correlationId) throw new Error('Booking preview did not return binding IDs.');\nreturn [{ json: {\n  draft: source.draft,\n  approvedContractId: preview.contractId,\n  correlationId: preview.correlationId,\n  explicitApproval: true,\n  source: source.source,\n  scenario: source.scenario\n} }];"
+      }
+    },
+    {
+      "id": "DispatchCALLEBooking",
+      "name": "Dispatch CALL-E Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        96
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/n8n/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 330000
+        }
+      }
+    },
+    {
+      "id": "FormatVerifiedBookingResult",
+      "name": "Format Verified Booking Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const source = $('Build Approved Booking Draft').first().json;\nconst sent = $('Bind Approved Fingerprint').first().json;\nconst response = $json;\nif (response.correlationId !== sent.correlationId) {\n  throw new Error('CALL-E booking correlation ID changed during the n8n round trip.');\n}\nreturn [{ json: {\n  planningRequestId: source.planningRequestId,\n  bookingResult: response.bookingResult,\n  trace: {\n    correlationId: response.correlationId,\n    contractId: response.contractId,\n    n8nExecutionId: response.source.n8nExecutionId,\n    providerCallId: response.provider.callId,\n    journalState: response.state,\n    automaticRetryAllowed: response.retryPolicy.automaticRetryAllowed\n  }\n} }];"
+      }
+    },
+    {
+      "id": "FormatBookingPreflight",
+      "name": "Format Booking Preflight",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        256
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: {\n  planningRequestId: $json.planningRequestId,\n  bookingResult: {\n    status: 'missing_or_unapproved',\n    messageToUser: $json.preflightMessage,\n    needsHumanReview: false\n  }\n} }];"
+      }
+    },
+    {
+      "id": "ReturnBookingResult",
+      "name": "Return Booking Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        176
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start CALL-E Dinner Plan": {
+      "main": [
+        [
+          {
+            "node": "Validate Planning Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Planning Request": {
+      "main": [
+        [
+          {
+            "node": "Preview CALL-E Intake Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview CALL-E Intake Request": {
+      "main": [
+        [
+          {
+            "node": "Bind CALL-E Intake Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind CALL-E Intake Approval": {
+      "main": [
+        [
+          {
+            "node": "Dispatch CALL-E Preference Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch CALL-E Preference Agent": {
+      "main": [
+        [
+          {
+            "node": "Switch Preferences Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Preferences Ready": {
+      "main": [
+        [
+          {
+            "node": "Google Places Text Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Missing Preferences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Places Text Search": {
+      "main": [
+        [
+          {
+            "node": "Normalize Google Places",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Google Places": {
+      "main": [
+        [
+          {
+            "node": "Rank Restaurant Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank Restaurant Options": {
+      "main": [
+        [
+          {
+            "node": "Return Restaurant Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Missing Preferences": {
+      "main": [
+        [
+          {
+            "node": "Return Planning Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Approved Restaurant": {
+      "main": [
+        [
+          {
+            "node": "Build Approved Booking Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approved Booking Draft": {
+      "main": [
+        [
+          {
+            "node": "Switch Booking Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Booking Ready": {
+      "main": [
+        [
+          {
+            "node": "Preview CALL-E Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Booking Preflight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview CALL-E Contract": {
+      "main": [
+        [
+          {
+            "node": "Bind Approved Fingerprint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind Approved Fingerprint": {
+      "main": [
+        [
+          {
+            "node": "Dispatch CALL-E Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch CALL-E Booking": {
+      "main": [
+        [
+          {
+            "node": "Format Verified Booking Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Verified Booking Result": {
+      "main": [
+        [
+          {
+            "node": "Return Booking Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Booking Preflight": {
+      "main": [
+        [
+          {
+            "node": "Return Booking Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
