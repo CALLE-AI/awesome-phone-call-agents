@@ -1,0 +1,76 @@
+{
+ "id": "train-human-015",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Yeah, hello.",
+   "offset_seconds": 1.09
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'm calling to move Taylor Kim's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 2.71
+  },
+  {
+   "speaker": "user",
+   "text": "Let me check the book. Okay, Thursday ten a.m., done.",
+   "offset_seconds": 10.83
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 15.07
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 16.44
+  },
+  {
+   "speaker": "user",
+   "text": "let me see, Mm-hmm.",
+   "offset_seconds": 18.33
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 21.04
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's fine.",
+   "offset_seconds": 22.68
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 24.59
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 26.08
+  },
+  {
+   "speaker": "user",
+   "text": "Mm-hmm.",
+   "offset_seconds": 29.55
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 31.01
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye hmm, now.",
+   "offset_seconds": 35.17
+  }
+ ]
+}

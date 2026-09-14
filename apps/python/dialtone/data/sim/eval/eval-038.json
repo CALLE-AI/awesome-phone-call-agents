@@ -1,0 +1,60 @@
+{
+  "id": "eval-038",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Pharmacy DTMF tree; prescription number entry, system reads back ready status; bot replays the message and it repeats verbatim.",
+  "task": "Check whether Linda Park's prescription refill is ready for pickup.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "system read-back: Rx ending 173 ready, held until Sept 20",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Wellspring Pharmacy, store number four one two. if you are a doctor's office, press 9. for prescription refills and status, press 1. for store hours and directions, press 2. for all other questions, press 0.",
+      "offset_seconds": 0.5
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 20.34
+    },
+    {
+      "speaker": "user",
+      "text": "please enter your seven digit prescription number, followed by the pound sign.",
+      "offset_seconds": 21.46
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 4 8 2 0 1 7 3 #]",
+      "offset_seconds": 27.54
+    },
+    {
+      "speaker": "user",
+      "text": "you entered. four. eight. two. zero. one. seven. three. if this is correct, press 1. to re-enter, press 2.",
+      "offset_seconds": 30.64
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 43.16
+    },
+    {
+      "speaker": "user",
+      "text": "prescription number ending in one seven three is ready for pickup. it will be held until. september. twentieth. to hear this again, press star. to return to the main menu, press 0. otherwise, you may hang up.",
+      "offset_seconds": 44.31
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF *]",
+      "offset_seconds": 63.81
+    },
+    {
+      "speaker": "user",
+      "text": "prescription number ending in one seven three is ready for pickup. it will be held until. september. twentieth. to hear this again, press star. to return to the main menu, press 0. otherwise, you may hang up.",
+      "offset_seconds": 64.95
+    }
+  ]
+}

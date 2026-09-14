@@ -1,0 +1,248 @@
+/* Opening animation shared by every page. See splash.js. */
+
+.splash-on body {
+  overflow: hidden;
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: 24px;
+  background: radial-gradient(90% 70% at 50% 40%, #1b2030 0%, #0e1014 70%);
+  color: #fff;
+  font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: transform 0.7s cubic-bezier(0.7, 0, 0.2, 1), opacity 0.7s ease;
+}
+
+.splash.leaving {
+  transform: translateY(-100%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.splash .splash-mark {
+  background: #d7f35a;
+  color: #0e1014;
+  border-radius: 18px;
+  padding: 11px 14px;
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  animation: splash-pop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.splash svg {
+  width: min(420px, 86vw);
+  height: auto;
+  overflow: visible;
+}
+
+.splash .route-ghost {
+  fill: none;
+  stroke: #2c3342;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.012 0.02;
+}
+
+.splash .route-line {
+  fill: none;
+  stroke: #d7f35a;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: splash-draw 1.5s 0.35s cubic-bezier(0.45, 0, 0.25, 1) forwards;
+}
+
+.splash .pin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: splash-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.splash .pin rect {
+  fill: #fff;
+}
+
+.splash .pin text {
+  fill: #0e1014;
+  font: 800 12px "Plus Jakarta Sans", system-ui, sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.splash .pin.hub rect {
+  fill: #d7f35a;
+}
+
+.splash .p1 {
+  animation-delay: 0.55s;
+}
+
+.splash .p2 {
+  animation-delay: 0.8s;
+}
+
+.splash .p3 {
+  animation-delay: 1.05s;
+}
+
+.splash .p2 .done {
+  fill: #d7f35a;
+  opacity: 0;
+  animation: splash-fade 0.25s 1.75s forwards;
+}
+
+.splash .ring {
+  fill: none;
+  stroke: #d7f35a;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: splash-ring 0.9s 0.95s ease-out 2;
+}
+
+.splash .ring.second {
+  animation-delay: 1.2s;
+}
+
+.splash .chip {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.splash .chip rect {
+  fill: #fff;
+}
+
+.splash .chip text {
+  fill: #0e1014;
+  font: 800 11px "Plus Jakarta Sans", system-ui, sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.splash .chip.calling {
+  animation: splash-chip-in 0.3s 0.95s ease-out forwards, splash-fade-out 0.2s 1.7s forwards;
+}
+
+.splash .chip.ready rect {
+  fill: #d7f35a;
+}
+
+.splash .chip.ready {
+  animation: splash-chip-in 0.3s 1.75s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
+}
+
+.splash .scooter {
+  opacity: 0;
+  animation: splash-fade 0.01s 0.35s forwards;
+}
+
+.splash .tagline {
+  margin: 0;
+  font-size: clamp(18px, 3.4vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-align: center;
+  animation: splash-rise 0.6s 0.5s ease-out both;
+}
+
+.splash .powered {
+  margin: -8px 0 0;
+  color: #8c93a0;
+  font-size: 13px;
+  font-weight: 600;
+  animation: splash-rise 0.6s 0.8s ease-out both;
+}
+
+.splash .skip {
+  position: absolute;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  color: #5d6472;
+  font-size: 12px;
+  animation: splash-fade 0.4s 1.2s both;
+}
+
+.splash.reduced *,
+.splash.reduced {
+  animation-duration: 0.01s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.3s;
+}
+
+.splash.reduced .route-line {
+  stroke-dashoffset: 0;
+}
+
+@keyframes splash-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes splash-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes splash-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes splash-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes splash-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes splash-ring {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes splash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
