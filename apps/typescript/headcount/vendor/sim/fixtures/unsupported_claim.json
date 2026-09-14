@@ -1,0 +1,35 @@
+{
+  "id": "unsupported_claim",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.71, "label": "medium" },
+  "disposition": "answered_confirmed",
+  "evidence": [
+    "The model asserted that the household has electricity. The transcript does not contain that claim."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "safety_status": "safe",
+    "evacuation": "sheltering_in_place",
+    "has_power": "yes",
+    "has_water": "yes",
+    "medication": "none_needed",
+    "household": "all_accounted",
+    "needs_human": "no"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management." },
+    { "offset_seconds": 7, "speaker": "user", "text": "Hi." },
+    { "offset_seconds": 9, "speaker": "bot", "text": "Is everyone in the household safe and accounted for?" },
+    { "offset_seconds": 13, "speaker": "user", "text": "Yes, we are all safe and we are staying here." },
+    { "offset_seconds": 18, "speaker": "bot", "text": "Do you have electricity right now? Running water?" },
+    { "offset_seconds": 23, "speaker": "user", "text": "The water is on. I am not sure about the rest." },
+    { "offset_seconds": 28, "speaker": "bot", "text": "Does anyone need prescription medication you cannot get?" },
+    { "offset_seconds": 32, "speaker": "user", "text": "No medication issues." }
+  ]
+}

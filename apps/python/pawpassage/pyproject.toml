@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pawpassage"
+version = "0.1.1"
+description = "Approval-gated CALL-E evidence checks for cross-border pet journeys"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "PawPassage contributors" }]
+dependencies = ["calle-ai==0.7.0"]
+
+[project.scripts]
+pawpassage = "pawpassage.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pawpassage = ["data/*.json"]

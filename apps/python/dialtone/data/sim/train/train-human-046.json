@@ -1,0 +1,56 @@
+{
+ "id": "train-human-046",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Bloom Florists, this is Chloe.",
+   "offset_seconds": 0.88
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 3.51
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday we're open ten to four.",
+   "offset_seconds": 14.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 17.37
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 18.34
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 20.41
+  },
+  {
+   "speaker": "user",
+   "text": "Sure, yeah, confirmed.",
+   "offset_seconds": 23.53
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 25.81
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care. care.",
+   "offset_seconds": 29.22
+  }
+ ]
+}

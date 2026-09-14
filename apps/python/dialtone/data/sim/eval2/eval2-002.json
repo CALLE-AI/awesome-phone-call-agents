@@ -1,0 +1,80 @@
+{
+  "id": "eval2-002",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Classic DTMF utility phone tree: outage menu, account lookup by phone number, reads back affected area, restoration estimate and a reference number twice.",
+  "task": "Report a power outage at the customer's home and get a reference number.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "none",
+    "confirmation_artifact": "outage reference 4771903",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Ridgeline Power and Light. For English, press 1. Para español, oprima el número 2.",
+      "offset_seconds": 0.5
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 9.22
+    },
+    {
+      "speaker": "user",
+      "text": "If you are calling to report a power outage, press 1. To pay your bill, press 2. For billing questions, press 3. To start, stop, or move service, press 4. For all other inquiries, press 0.",
+      "offset_seconds": 10.61
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 26.01
+    },
+    {
+      "speaker": "user",
+      "text": "If there is a downed power line or you smell gas, hang up and call 911. Please enter the ten-digit phone number associated with your account, followed by the pound sign.",
+      "offset_seconds": 27.36
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 5550192834#]",
+      "offset_seconds": 41.2
+    },
+    {
+      "speaker": "user",
+      "text": "You entered 5 5 5, 0 1 9, 2 8 3 4. If this is correct, press 1. To re-enter, press 2.",
+      "offset_seconds": 45.33
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 55.1
+    },
+    {
+      "speaker": "user",
+      "text": "We have located an account at 88 Cobbler Lane. We are aware of an outage affecting your area. Approximately 1,240 customers are affected. The estimated restoration time is 6:30 PM. To add your address to this outage report, press 1.",
+      "offset_seconds": 56.44
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 74.03
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. Your outage has been recorded. Your reference number is 4 7 7 1 9 0 3. Again, your reference number is 4 7 7 1 9 0 3. To receive text updates about this outage, press 1. Otherwise, you may hang up.",
+      "offset_seconds": 75.38
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 93.79
+    },
+    {
+      "speaker": "user",
+      "text": "Text updates have been enabled for the number ending in 2 8 3 4. Thank you for calling Ridgeline Power and Light. Goodbye.",
+      "offset_seconds": 95.18
+    }
+  ]
+}

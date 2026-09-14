@@ -1,0 +1,15 @@
+{
+  "_comment": "Third-party code that ships to a reader. Every entry names where it came from, which version, and the digest of the exact bytes in this directory, so a file that changed without a version change fails the suite rather than reaching a browser. Vendored rather than loaded from a CDN because the page's Content-Security-Policy is derived from its own bytes and a third origin in the path of a page about children is a dependency nobody here can revoke.",
+  "assets": [
+    {
+      "file": "lottie_light.min.js",
+      "package": "lottie-web",
+      "version": "5.13.0",
+      "url": "https://unpkg.com/lottie-web@5.13.0/build/player/lottie_light.min.js",
+      "licence": "MIT",
+      "sha256": "9588432bec30c8ef8200bac4a67d8aaad881047bc2a6c9fa624d90ec96402410",
+      "why": "Plays the figure in act 03, which is authored as Lottie by tools/make_figure.py. The light build is the svg renderer only: no canvas, no expressions, no effects.",
+      "fetched": "2026-09-06"
+    }
+  ]
+}

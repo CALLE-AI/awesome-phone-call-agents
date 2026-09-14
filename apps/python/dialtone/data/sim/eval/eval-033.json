@@ -1,0 +1,65 @@
+{
+  "id": "eval-033",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Solo dog groomer answers mid-groom with dryer noise and promises to text the customer later; nothing booked.",
+  "task": "Book a full groom next week for Megan Tully's goldendoodle.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hello?",
+      "offset_seconds": 2.2
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, is this Pampered Paws grooming?",
+      "offset_seconds": 3.44
+    },
+    {
+      "speaker": "user",
+      "text": "yeah, sorry, I've got the dryer going. what's up?",
+      "offset_seconds": 5.91
+    },
+    {
+      "speaker": "bot",
+      "text": "no problem. I'm an AI assistant calling for Megan Tully. she'd like to book a full groom for her goldendoodle, Waffles, sometime next week.",
+      "offset_seconds": 10.01
+    },
+    {
+      "speaker": "user",
+      "text": "oh okay, um, next week I'm, honestly I don't have my calendar in front of me, I'm mid groom right now.",
+      "offset_seconds": 18.59
+    },
+    {
+      "speaker": "bot",
+      "text": "understood. would there be a good time to call back, or could you text Megan at 555-0142?",
+      "offset_seconds": 27.41
+    },
+    {
+      "speaker": "user",
+      "text": "yeah I'll text her tonight when I'm done. five five five oh one four two?",
+      "offset_seconds": 35.8
+    },
+    {
+      "speaker": "bot",
+      "text": "that's right, five five five, oh one four two.",
+      "offset_seconds": 42.19
+    },
+    {
+      "speaker": "user",
+      "text": "okay. got it. I gotta go, the dog's jumping.",
+      "offset_seconds": 45.49
+    },
+    {
+      "speaker": "bot",
+      "text": "of course, thank you.",
+      "offset_seconds": 49.66
+    }
+  ]
+}

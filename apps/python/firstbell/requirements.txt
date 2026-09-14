@@ -1,0 +1,4 @@
+# Runtime. Both are needed even for the offline default: the app always speaks through
+# the real CALL-E client, and httpx is the transport the local double is mounted on.
+calle-ai==0.7.0
+httpx==0.28.1

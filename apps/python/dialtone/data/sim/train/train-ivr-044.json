@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-044",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Summit Fitness. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.52
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 9.94
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 11.05
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 18.25
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 19.31
+  },
+  {
+   "speaker": "bot",
+   "text": "Appointments.",
+   "offset_seconds": 26.51
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 27.58
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 34.78
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 36.25
+  }
+ ]
+}
