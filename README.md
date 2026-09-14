@@ -163,6 +163,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`pharmacy-cash-price`](skills/pharmacy-cash-price/) - Asks one retail pharmacy for a cash price with no insurance and returns a structured quote, a refusal, or an explicit unknown, with the disclosure and the medical boundary written into the call.
 - [`logistics-exception`](skills/logistics-exception/) - Resolves a missed dock window by calling the driver and receiving dock concurrently with one strict CALL-E result schema, reconciling terminal results by event id and re-fetch, combining only reached-contact facts into a recovery card, and gating any dock-changing follow-up call behind explicit human approval.
 - [`otherend-task-test`](skills/otherend-task-test/) - Rehearses a CALL-E task text and result schema against a programmable receptionist line the operator owns, reads the deterministic grade (manifest, self-report, fabrication, disclosure, confidence calibration), and turns each failing check into a task-text edit before the task reaches real people.
+- [`supply-chain-supplier-status`](skills/supply-chain-supplier-status/) - Autonomous outbound phone calls to suppliers to verify purchase order fulfillment, capture delay causes, calculate financial risk, and sync procurement records.
 
 ### Apps
 
@@ -192,6 +193,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Post-Discharge Check](docs/post-discharge-check/) - External, synthetic care-team interface simulation illustrating CALL-E check-in transcripts, advisory flags, and a local escalation inbox; not a clinical workflow implementation or verified live integration.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
+- [Supply Chain Supplier Status Agent](https://github.com/mohSadiq90/call-e-hackathon) - Autonomous enterprise phone agent for supplier purchase order fulfillment verification, root cause delay capture, penalty estimation, and ERP dashboard sync with zero-credit mock simulation.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
 
