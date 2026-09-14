@@ -14,7 +14,8 @@ Live: <https://deskhelp.onrender.com> · Source:
 <https://www.youtube.com/watch?v=bN7Rh2KrZKo>
 
 This directory is a catalogue entry. The application lives in the repository
-above under MIT, and runs from a clone with nothing installed.
+above under MIT. The server has no runtime package dependencies; checks and the
+web interface require the development dependencies installed below.
 
 ---
 
@@ -22,15 +23,15 @@ above under MIT, and runs from a clone with nothing installed.
 
 Placed from the product to a handset the author owns, playing the part of a
 parent, in the mix of Hindi and English families actually use on the phone.
-The parent asked for a discount mid-call:
+The parent asked for a discount mid-call. English translation of the
+author-reported role-play example:
 
-> **Parent:** कुछ डिस्काउंट मिल सकता है क्या इस महीने मेरे को?
+> **Parent:** Could I get a discount this month?
 >
-> **DeskHelp:** Discount ya concession ke baare mein mujhe yahan koi jaankari
-> nahi hai. Yeh cheez office hi confirm kar sakta hai.
+> **DeskHelp:** I do not have information about discounts or concessions.
+> Only the office can confirm that.
 >
-> **DeskHelp:** Wapas apne sawaal par aate hain — aap sochte hain ki payment
-> kab tak ho jayegi?
+> **DeskHelp:** Returning to the question: when do you expect to make the payment?
 
 It declined, and then went back to its own question rather than following the
 parent away from it. Asked next whether two months could be paid together, it
@@ -67,8 +68,9 @@ meeting slots, end-of-term feedback, next-term re-enrolment, approved
 announcements, staff absence, and finding cover for a class. Writing the
 fifteenth, for any office at all, is a config object rather than a module.
 
-Every workflow ships switched off. Installing DeskHelp is never the same thing
-as starting to ring people.
+The synthetic demo seed enables four workflows for rehearsal. Calling still
+defaults to fixture transport; live use requires the configuration and
+operator-authorized destinations described below.
 
 ---
 
@@ -152,10 +154,10 @@ A real call requires both:
 2. The destination present on the institute's allow list, which an operator
    types in Settings. There is no wildcard.
 
-One gate can be left on by accident in a shell profile. Two cannot, because the
-second is a list of specific numbers somebody had to enter. Everything else
-runs against the fixture transport: the demo, the whole test suite, and a
-reviewer's first run all take the path that dials nobody.
+These two gates require deliberate configuration, but both can remain enabled;
+they do not make accidental live use impossible. Operators must review them
+before each live run. Without live configuration the demo, test suite, and
+reviewer's first run use fixture transport and dial nobody.
 
 Behind the demo sign-in sit seeded synthetic families in the reserved
 `NXX-555-01XX` range, so a visitor can open every workflow, read the exact
@@ -195,10 +197,10 @@ denominator.
 Answering and hanging up is `declined` and is never retried. A phone that rang
 out is `unreached` and may be tried once more, four hours later. Collapsing the
 two means the more clearly somebody refuses, the more often they are rung. An
-attempt whose start and finish are the same instant never rang anybody, so it
-is a connection failure rather than a statement about the recipient, so it
-reaches a person instead. Anything unrecognised reaches a person, per
-[`docs/adr/0006-a-refusal-is-not-a-missed-call.md`](../../../docs/adr/0006-a-refusal-is-not-a-missed-call.md).
+attempt whose start and finish are the same instant is treated conservatively
+as uncertain and reaches a person; identical timestamps do not prove that no
+phone rang. Anything unrecognised reaches a person, per
+[`docs/adr/0006-a-refusal-is-not-a-missed-call.md`](https://github.com/vickysharma-prog/DeskHelp.ai/blob/main/docs/adr/0006-a-refusal-is-not-a-missed-call.md).
 
 ---
 
@@ -223,6 +225,7 @@ A submitted call cannot be recalled, and closing the page does not stop it.
 ```bash
 git clone https://github.com/vickysharma-prog/DeskHelp.ai.git
 cd DeskHelp.ai
+npm install        # install development/UI dependencies
 npm run demo       # the whole loop on scripted calls, no network, no account
 npm run check      # typecheck and 174 tests
 ```
@@ -237,8 +240,9 @@ npm start          # http://127.0.0.1:4321
 A fresh database seeds an institute with 124 synthetic families, approved
 wording, four workflows switched on and a review queue with questions in it.
 
-Node 22.5 or later. The server has no runtime dependencies and Node runs the
-TypeScript directly; `npm install` builds the web interface and nothing else.
+Node 22.18+ or a supported Node 24+ release is required for direct TypeScript
+execution. The server has no runtime package dependencies; development tools
+and the UI require `npm install`, followed by the build command above.
 `node:sqlite` ships with Node, so there is no native build on any platform.
 
 The test suite is weighted towards the refusals: unusable timezones, malformed
@@ -292,11 +296,11 @@ a good one:
 {
   "identity_confirmed": "yes",
   "opt_out_requested": "no",
-  "unanswered_questions": [{ "quote": "Scholarship milti hai kya?" }],
+  "unanswered_questions": [{ "quote": "Is a scholarship available?" }],
   "aware_of_due_date": "yes",
   "intends_to_pay_by_date": "no",
   "preferred_channel": "portal",
-  "evidence_quotes": { "intends_to_pay_by_date": "nahi ho paayega due date se pehle" }
+  "evidence_quotes": { "intends_to_pay_by_date": "I will not be able to pay before the due date." }
 }
 ```
 
@@ -311,7 +315,7 @@ on a live call.
 ## Example, with fictional contacts
 
 A fee reminder to a guardian in the `NXX-555-01XX` reserved range, rendered by
-`npm run live -- --action fee-reminder`, which dials nobody:
+`npm run live -- --action fee-reminder`, which dials nobody (English translation):
 
 ```
 SAY THIS FIRST, before anything else:
@@ -320,9 +324,9 @@ instalment that is due shortly. This is only a reminder; no payment is
 taken on this call."
 
 WHAT YOU MAY SAY IF ASKED — these exact statements and no others:
-- fee-due-date: "Doosri kist is mahine ki 15 taarikh tak deni hai."
-- office-hours: "Office somvaar se shanivaar, subah 9 se shaam 5 baje tak khula hai."
-- payment-channels: "Fees office counter par ya online portal par jama hoti hai."
+- fee-due-date: "The second instalment is due by the 15th of this month."
+- office-hours: "The office is open Monday to Saturday, from 9am to 5pm."
+- payment-channels: "Fees can be paid at the office counter or through the online portal."
 
 WHAT YOU MUST NOT DO
 - Do not answer anything that is not in the approved statements above,
