@@ -194,7 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
-- [ScamShield](https://github.com/rimsha21-source/Scamshield-ui) - AI-powered real-time voice phishing and social engineering defense platform with live scenario analysis and fraud scoring.
+- [ScamShield](https://github.com/rimsha21-source/Scamshield-ui) - Experimental scripted anti-scam conversation simulator with fixed demonstration transcripts/scores and a placeholder CALL-E live adapter; it is not validated real-time fraud protection.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
