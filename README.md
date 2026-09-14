@@ -394,6 +394,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
 | [`plugins/slack-calle-bridge`](plugins/slack-calle-bridge/) | Slack | Signed slash-command bridge for previewing and explicitly confirming one CALL-E phone task, with masked structured results and deterministic retry protection. |
+| [`plugins/google-sheets-callguardian`](plugins/google-sheets-callguardian/) | Google Sheets | Apps Script menu that gates CALL-E behind consent, call-window, do-not-call, and attempt-cap checks plus live in-call opt-out detection, with every decision written to a tamper-evident, hash-chained audit log — run directly from a spreadsheet. |
 
 ### Safety patterns
 
