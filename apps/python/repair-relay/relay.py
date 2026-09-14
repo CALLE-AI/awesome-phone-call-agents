@@ -24,12 +24,28 @@ SCHEMA = {
 }
 
 
+def display_value(value):
+    """Mask phone-like free text in output copies, leaving private evidence intact."""
+    if isinstance(value, str):
+        return re.sub(r"(?<![\w])\+?[0-9](?:[0-9 ().-]{6,}[0-9])", "[phone redacted]", value)
+    if isinstance(value, list):
+        return [display_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: display_value(item) for key, item in value.items()}
+    return value
+
+
+class NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def validate_case(case):
     for key in ("case_id", "organization", "repair", "contact", "windows"):
         if not case.get(key):
             raise ValueError(f"Missing {key}")
     contact = case["contact"]
-    if not re.fullmatch(r"\+1[2-9]\d{9}", contact.get("phone", "")):
+    if not re.fullmatch(r"\+1[2-9][0-9]{9}", contact.get("phone", "")):
         raise ValueError("This prototype supports US E.164 numbers only")
     if contact.get("consent") is not True:
         raise ValueError("Contact consent must be recorded before preparing outreach")
@@ -92,8 +108,11 @@ def api(method, path, body=None, digest=None):
         data=json.dumps(body).encode() if body is not None else None,
         headers=headers, method=method,
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    try:
+        with urllib.request.build_opener(NoCredentialRedirect()).open(request, timeout=30) as response:
+            return json.load(response)
+    except OSError:
+        raise RuntimeError("Provider request failed or was ambiguous; inspect the saved call state before any new intent.") from None
 
 
 def send(db, case, approval, transport=api):
@@ -264,9 +283,9 @@ def main():
                     output = handoff(db, args.window_id, args.capacity)
                 else:
                     output = decide(db, args.digest, args.decision, args.reason)
-        print(json.dumps(output, indent=2))
+        print(json.dumps(display_value(output), indent=2))
     except (ValueError, RuntimeError, sqlite3.IntegrityError, OSError) as exc:
-        parser.exit(1, f"{exc}\n")
+        parser.exit(1, f"{display_value(str(exc))}\n")
 
 
 if __name__ == "__main__":

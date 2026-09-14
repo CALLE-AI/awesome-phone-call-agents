@@ -5,7 +5,7 @@ import json
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from relay import assess, connect, decide, handoff
+from relay import assess, connect, decide, handoff, display_value
 
 ROOT = Path(__file__).parent
 
@@ -62,7 +62,7 @@ def make_handler(db_path):
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'")
             self.end_headers()
-            self.wfile.write(value if isinstance(value, bytes) else json.dumps(value).encode())
+            self.wfile.write(value if isinstance(value, bytes) else json.dumps(display_value(value)).encode())
 
         def allowed(self, mutation=False):
             origin = f'http://127.0.0.1:{self.server.server_port}'
