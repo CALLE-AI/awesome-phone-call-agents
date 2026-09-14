@@ -1,0 +1,33 @@
+{
+  "note": "All distributors are fictional. Real E.164 numbers are never stored in this repository; live mode reads each number from the environment variable named in phoneEnv. Everything printed, logged, or rendered uses maskedPhone.",
+  "distributors": [
+    {
+      "id": "D1",
+      "name": "Meridian Infotech Distribution",
+      "city": "Mumbai",
+      "phoneEnv": "QUOTEDESK_PHONE_D1",
+      "maskedPhone": "+91 98*** **412"
+    },
+    {
+      "id": "D2",
+      "name": "Cascade Components Pvt Ltd",
+      "city": "Delhi",
+      "phoneEnv": "QUOTEDESK_PHONE_D2",
+      "maskedPhone": "+91 99*** **087"
+    },
+    {
+      "id": "D3",
+      "name": "Southline Computer Traders",
+      "city": "Chennai",
+      "phoneEnv": "QUOTEDESK_PHONE_D3",
+      "maskedPhone": "+91 96*** **530"
+    },
+    {
+      "id": "D4",
+      "name": "Everest Micro Supplies",
+      "city": "Kolkata",
+      "phoneEnv": "QUOTEDESK_PHONE_D4",
+      "maskedPhone": "+91 97*** **951"
+    }
+  ]
+}
