@@ -72,6 +72,7 @@ Current apps:
 
 - [OneReach service follow-up](typescript/onereach-service-followup/) - Standalone Node.js CALL-E appointment workflow with a no-call default, validated outcomes, and signed webhook handling.
 | [`python/otherend`](python/otherend/) | Python | Task pre-flight for a CALL-E task: CALL-E dials a programmable line you own that answers as a receptionist with a chosen adversity profile, or as a scripted person for tasks that call people, then a deterministic grader scores what CALL-E reported against what the line actually said. Replays nine synthetic rows (in-process simulation, no calls) with no keys by default, including another entry's task text run verbatim; one real call per row only behind `--yes` and an allow-list. |
+| [`python/opscall-sentinel`](python/opscall-sentinel/) | Python / FastAPI | Autonomous enterprise SRE incident ownership engine with multi-tier voice escalation, PIN verification, DTMF fallback, SHA-256 audit seal, and zero-credit replay. |
 
 Suggested grouping:
 

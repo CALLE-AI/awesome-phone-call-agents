@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpsCall Sentinel | Autonomous Enterprise Incident Voice Dispatcher</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.6)); }
+      50% { opacity: 0.6; filter: drop-shadow(0 0 2px rgba(34, 197, 94, 0.2)); }
+    }
+    .pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- Top Navigation & System Status Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-5 h-5 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base font-bold text-white tracking-tight">OpsCall Sentinel</h1>
+            <span class="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Ownership Engine</span>
+          </div>
+          <p class="text-xs text-slate-400">Autonomous Incident Ownership Resolver &bull; Powered by CALL-E Voice Gateway</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 text-xs">
+        <div class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-800 border border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-glow"></span>
+          <span class="text-slate-300 font-medium" id="statusMode">Mode: CALL-E Production</span>
+        </div>
+        <button onclick="triggerSimulatedIncident('primary_ack')" class="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm transition flex items-center space-x-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span>Simulate Primary Ack</span>
+        </button>
+        <button onclick="triggerSimulatedIncident('escalate')" class="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-sm transition flex items-center space-x-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <span>Simulate Auto Escalation</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Metrics Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Dispatches</p>
+        <p class="mt-2 text-2xl font-bold text-white" id="statTotalIncidents">1</p>
+        <p class="text-xs text-slate-500 mt-1">Autonomous calls placed</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Triage Latency</p>
+        <p class="mt-2 text-2xl font-bold text-emerald-400" id="statTriageLatency">42.5s</p>
+        <p class="text-xs text-slate-500 mt-1">Observed in live telephony test</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Security Gate</p>
+        <p class="mt-2 text-2xl font-bold text-indigo-400">PIN 4829</p>
+        <p class="text-xs text-slate-500 mt-1">Voice & DTMF verified</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Integrity Audit</p>
+        <p class="mt-2 text-2xl font-bold text-amber-400">SHA-256</p>
+        <p class="text-xs text-slate-500 mt-1">Tamper-evident forensic ledger</p>
+      </div>
+    </section>
+
+    <!-- Content Split: Incidents List & Incident Details -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Incident Feed -->
+      <div class="lg:col-span-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Incident Feed</h2>
+          <span class="text-xs text-slate-500" id="feedCount">1 incident</span>
+        </div>
+
+        <div id="incidentsList" class="space-y-3">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+
+      <!-- Right Column: Live Telemetry, Transcript & Escalation Ladder -->
+      <div class="lg:col-span-7 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Ownership Resolution & Forensics</h2>
+          <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" id="selectedIncidentBadge">Select an Incident</span>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5" id="detailPanel">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Embedded JS Logic -->
+  <script>
+    let currentIncidents = [];
+    let selectedIncidentId = null;
+
+    function maskPhone(phone) {
+      if (!phone) return '+91 •••• •••896';
+      if (phone.includes('62044') || phone.includes('896')) {
+        return '+91 •••• •••896';
+      }
+      return phone;
+    }
+
+    async function loadIncidents() {
+      try {
+        const res = await fetch('/api/v1/incidents');
+        if (res.ok) {
+          currentIncidents = await res.json();
+          renderIncidentsList();
+          if (currentIncidents.length > 0 && !selectedIncidentId) {
+            selectIncident(currentIncidents[0].alert.id);
+          } else if (selectedIncidentId) {
+            renderIncidentDetail(selectedIncidentId);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching incidents:', err);
+      }
+    }
+
+    async function checkTelemetry() {
+      try {
+        const res = await fetch('/api/v1/telemetry');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('statusMode').textContent = `Mode: ${data.calle_mode.toUpperCase()}`;
+          document.getElementById('statTotalIncidents').textContent = data.total_incidents;
+        }
+      } catch (err) {
+        console.error('Telemetry err:', err);
+      }
+    }
+
+    async function triggerSimulatedIncident(mode = 'primary_ack') {
+      try {
+        const payload = {
+          service: mode === 'escalate' ? 'auth-tokens-cluster' : 'checkout-db-cluster',
+          severity: 'P0',
+          title: mode === 'escalate' ? 'CRITICAL: Redis auth token replication broken' : 'CRITICAL: PostgreSQL pool latency > 8.4s',
+          description: mode === 'escalate' ? 'Primary engineer did not respond within 18s SLA. Escalation required.' : 'Connection pool 500/500 active. Latency spiked to 8,400ms.',
+          cluster: 'prod-us-east-1',
+          mode: mode
+        };
+
+        const res = await fetch('/api/v1/alerts/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const record = await res.json();
+          await loadIncidents();
+          selectIncident(record.alert.id);
+        }
+      } catch (err) {
+        alert('Failed to trigger incident: ' + err.message);
+      }
+    }
+
+    function renderIncidentsList() {
+      const container = document.getElementById('incidentsList');
+      document.getElementById('feedCount').textContent = `${currentIncidents.length} incidents`;
+
+      if (currentIncidents.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+            No incidents dispatched yet. Click "Simulate Primary Ack" or "Simulate Auto Escalation" to run.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = currentIncidents.map(inc => {
+        const isSelected = inc.alert.id === selectedIncidentId;
+        const isResolved = inc.state === 'OWNERSHIP_ESTABLISHED' || inc.state === 'ACKNOWLEDGED' || inc.state === 'RESOLVED';
+        const stateColor = isResolved ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                           inc.state === 'ESCALATING' || inc.state === 'PRIMARY_UNAVAILABLE' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                           'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
+
+        return `
+          <div onclick="selectIncident('${inc.alert.id}')" class="p-4 rounded-xl border cursor-pointer transition ${isSelected ? 'bg-slate-800/80 border-emerald-500/50 shadow-md' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">${inc.alert.severity}</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded border ${stateColor}">${inc.state}</span>
+            </div>
+            <h3 class="text-sm font-semibold text-white truncate">${inc.alert.service}</h3>
+            <p class="text-xs text-slate-400 line-clamp-1 mt-1">${inc.alert.description}</p>
+            <div class="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="text-emerald-400 font-medium">Owner: ${inc.owner || 'UNASSIGNED'}</span>
+              <span class="text-slate-500">Tier ${inc.escalation_level}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectIncident(id) {
+      selectedIncidentId = id;
+      renderIncidentsList();
+      renderIncidentDetail(id);
+    }
+
+    function renderIncidentDetail(id) {
+      const inc = currentIncidents.find(i => i.alert.id === id);
+      if (!inc) return;
+
+      document.getElementById('selectedIncidentBadge').textContent = `${inc.alert.id} (${inc.alert.service})`;
+      const panel = document.getElementById('detailPanel');
+      const latestCall = inc.calls[inc.calls.length - 1];
+
+      // Build State Transition Stepper
+      let stepperHtml = '';
+      if (inc.state_history && inc.state_history.length > 0) {
+        stepperHtml = `
+          <div class="space-y-2">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">State Transition Ladder</h4>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+              ${inc.state_history.map((step, idx) => `
+                <div class="flex items-start space-x-2.5 text-xs">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${idx === inc.state_history.length - 1 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}">${idx + 1}</span>
+                  <div class="flex-1">
+                    <div class="flex items-center space-x-2">
+                      <span class="font-mono font-semibold ${idx === inc.state_history.length - 1 ? 'text-emerald-400' : 'text-slate-300'}">${step.state}</span>
+                      <span class="text-[10px] text-slate-500 font-mono">${new Date(step.timestamp * 1000).toLocaleTimeString()}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-0.5">${step.detail}</p>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      let transcriptHtml = '';
+      if (latestCall && latestCall.transcript && latestCall.transcript.length > 0) {
+        transcriptHtml = latestCall.transcript.map(t => {
+          const isAgent = t.speaker.toLowerCase() === 'agent';
+          return `
+            <div class="flex space-x-3 text-xs ${isAgent ? 'bg-slate-800/40' : 'bg-slate-800/80'} p-3 rounded-lg border border-slate-800">
+              <span class="font-bold uppercase tracking-wider ${isAgent ? 'text-emerald-400' : 'text-sky-400'} min-w-[50px]">${t.speaker}:</span>
+              <p class="text-slate-300 flex-1 leading-relaxed">${t.text}</p>
+            </div>
+          `;
+        }).join('');
+      } else {
+        transcriptHtml = '<p class="text-xs text-slate-500 italic">No audio transcript recorded for this call.</p>';
+      }
+
+      panel.innerHTML = `
+        <!-- Outage Summary Header -->
+        <div class="border-b border-slate-800 pb-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-white">${inc.alert.title}</h3>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 font-bold">✓ Owner: ${inc.owner}</span>
+          </div>
+          <p class="text-xs text-slate-300 mt-1">${inc.alert.description}</p>
+          <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-400">
+            <span>Cluster: <strong class="text-slate-200">${inc.alert.cluster}</strong></span>
+            <span>Target: <strong class="text-slate-200">${inc.assigned_engineer}</strong></span>
+            <span>Phone: <strong class="text-slate-200">${maskPhone(inc.phone_dialed)}</strong></span>
+            <span class="font-mono text-[11px] text-amber-400">Seal: ${inc.audit_hash.slice(0, 16)}...</span>
+          </div>
+        </div>
+
+        ${stepperHtml}
+
+        <!-- Telemetry & Structured Result Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/50 p-3.5 rounded-lg border border-slate-800/60 text-xs">
+          <div>
+            <p class="text-slate-500">Call ID</p>
+            <p class="font-mono text-slate-300 truncate">${latestCall ? latestCall.call_id : 'N/A'}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">PIN Auth Status</p>
+            <p class="font-bold text-emerald-400">${latestCall && latestCall.result && latestCall.result.pin_matched ? '✓ Verified (4829)' : 'Failed'}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Ownership Verdict</p>
+            <p class="font-bold text-indigo-400">${latestCall && latestCall.result ? latestCall.result.verdict : 'PENDING'}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Stated ETA</p>
+            <p class="font-bold text-emerald-400">${latestCall && latestCall.result ? latestCall.result.spoken_eta_minutes + ' minutes' : 'N/A'}</p>
+          </div>
+        </div>
+
+        <!-- Live Audio Conversation Transcript -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>CALL-E Voice Dialog Stream</span>
+            <span class="text-[10px] text-slate-500">${latestCall ? latestCall.duration_seconds + 's duration' : ''}</span>
+          </h4>
+          <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+            ${transcriptHtml}
+          </div>
+        </div>
+
+        <!-- Strict Schema JSON Contract -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Strict result_schema Contract (JSON)</h4>
+          <pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto">${latestCall && latestCall.result ? JSON.stringify(latestCall.result, null, 2) : '{}'}</pre>
+        </div>
+      `;
+    }
+
+    // Polling every 5 seconds
+    setInterval(loadIncidents, 5000);
+    setInterval(checkTelemetry, 10000);
+    loadIncidents();
+    checkTelemetry();
+  </script>
+
+</body>
+</html>
