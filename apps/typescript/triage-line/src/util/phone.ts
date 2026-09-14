@@ -46,11 +46,10 @@ export function assertValidE164(
 export function maskPhone(phone: string | undefined | null): string {
   const p = (phone ?? "").trim();
   if (!p) return "";
-  if (!/^\+?\d+$/.test(p) || p.replace(/\D/g, "").length < 4) {
-    return "•••";
-  }
-  const plus = p.startsWith("+") ? "+" : "";
   const digits = p.replace(/\D/g, "");
+  // Too few digits to be a phone number: hide entirely.
+  if (digits.length < 4) return "•••";
+  const plus = p.trimStart().startsWith("+") ? "+" : "";
   const cc = digits.slice(0, 1);
   const last2 = digits.slice(-2);
   const hidden = "•".repeat(Math.max(3, digits.length - 3));
@@ -58,9 +57,23 @@ export function maskPhone(phone: string | undefined | null): string {
 }
 
 /**
- * Redact any E.164-looking substrings inside an arbitrary string (transcripts,
- * debug blobs, free text) by masking them in place.
+ * Redact phone-number-looking substrings inside an arbitrary string
+ * (transcripts, debug blobs, free text) by masking them in place.
+ *
+ * Matches both E.164 (+14155550188) and common human-written formats a
+ * transcript may contain (e.g. 415-555-0142, (415) 555 0188, +1 415 555 0142).
+ * The pattern requires enough grouped digits that it won't match incidental
+ * numbers like a confidence score (0.42) or a short reference.
  */
+const PHONE_LIKE =
+  /(?:\+?\d[\d\s().-]{7,}\d)/g;
+
 export function redactPhones(text: string): string {
-  return text.replace(/\+[1-9]\d{6,14}/g, (m) => maskPhone(m));
+  if (!text) return text;
+  return text.replace(PHONE_LIKE, (m) => {
+    // Only redact if it actually contains at least 7 digits (real phone-ish).
+    const digitCount = (m.match(/\d/g) ?? []).length;
+    if (digitCount < 7) return m;
+    return maskPhone(m);
+  });
 }
