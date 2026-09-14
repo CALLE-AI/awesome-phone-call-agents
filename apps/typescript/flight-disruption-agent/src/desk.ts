@@ -3,14 +3,15 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import type { CallGateway } from "./calle.ts";
 import { findBooking, findFlight, type Catalog } from "./data.ts";
+import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "./airline.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
 import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
-import { quoteFor, voluntaryQuoteFor } from "./rules.ts";
+import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, BookingState, Disruption, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, Disruption, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -107,7 +108,9 @@ export class Desk {
   }
 
   reset(): void {
-    const inFlight = Object.values(this.state.ledger).some((e) => e.status === "in_progress" || e.status === "submitted");
+    const inFlight =
+      Object.values(this.state.ledger).some((e) => e.status === "in_progress" || e.status === "submitted") ||
+      Object.values(this.state.requests).some((r) => r.status === "airline_call_in_progress");
     if (inFlight && this.gateway.live) {
       throw new DeskError("A live call is still in progress. Wait for it to finish before resetting.", 409);
     }
@@ -172,9 +175,24 @@ export class Desk {
   // ------------------------------------------------------------ calls
 
   private destinationFor(pnr: string): { phone: string; redirected: boolean } {
-    const booking = findBooking(this.catalog, pnr);
+    return this.route(findBooking(this.catalog, pnr).phone);
+  }
+
+  /** Live modes send every call, passenger or airline desk, to the one demo number. */
+  private route(fixturePhone: string): { phone: string; redirected: boolean } {
     if (this.gateway.live) return { phone: this.options.liveDemoPhone as string, redirected: true };
-    return { phone: booking.phone, redirected: false };
+    return { phone: fixturePhone, redirected: false };
+  }
+
+  /** Typed confirmation and budget checks shared by every live call. */
+  private guardLiveCall(phone: string, confirmLast4?: string): void {
+    if (!this.gateway.live) return;
+    if (confirmLast4 !== phone.slice(-4)) {
+      throw new DeskError("Type the last 4 digits of the destination number to confirm this real call.");
+    }
+    if (this.state.liveCallsUsed >= this.options.liveCallBudget) {
+      throw new DeskError(`Live call budget of ${this.options.liveCallBudget} is used up for this server run.`, 429);
+    }
   }
 
   preview(disruptionId: string, pnr: string) {
@@ -213,14 +231,7 @@ export class Desk {
     const { phone, redirected } = this.destinationFor(pnr);
     const route = routeFor(phone);
     if (!route.ok) throw new DeskError(route.reason);
-    if (this.gateway.live) {
-      if (confirmLast4 !== phone.slice(-4)) {
-        throw new DeskError("Type the last 4 digits of the destination number to confirm this real call.");
-      }
-      if (this.state.liveCallsUsed >= this.options.liveCallBudget) {
-        throw new DeskError(`Live call budget of ${this.options.liveCallBudget} is used up for this server run.`, 429);
-      }
-    }
+    this.guardLiveCall(phone, confirmLast4);
 
     const quote = quoteFor(this.view(), booking, disruption);
     const task = buildTask(this.catalog, booking, disruption, quote);
@@ -309,6 +320,9 @@ export class Desk {
   async refreshAll(): Promise<void> {
     for (const entry of Object.values(this.state.ledger)) {
       if (entry.status === "in_progress") await this.refresh(entry.key);
+    }
+    for (const entry of Object.values(this.state.requests)) {
+      if (entry.status === "airline_call_in_progress") await this.refreshRequest(entry.request.id);
     }
   }
 
@@ -435,6 +449,156 @@ export class Desk {
     const entry = this.requestEntry(id);
     if (entry.status !== "quoted") throw new DeskError(`This request is ${entry.status}; only quoted requests can be declined.`, 409);
     entry.status = "declined";
+    this.save();
+    return entry;
+  }
+
+  private airlineDesk(id: string) {
+    const entry = this.requestEntry(id);
+    const booking = findBooking(this.catalog, entry.request.pnr);
+    const option = entry.action?.kind === "move" ? entry.quote.moves.find((m) => m.id === (entry.action as { optionId: string }).optionId) : undefined;
+    if (!option || entry.portal?.kind !== "rejected") throw new DeskError("Only a reissue the portal refused needs the airline desk.", 409);
+    const airline = airlineOf(this.catalog, booking).rules;
+    const destination = this.route(airline.supportPhone);
+    const task = buildAirlineTask(this.catalog, {
+      booking,
+      option,
+      rejectionCode: entry.portal.code,
+      rejectionMessage: entry.portal.message,
+    });
+    return { entry, booking, option, airline, destination, task };
+  }
+
+  previewAirlineCall(id: string) {
+    const { entry, airline, destination, task } = this.airlineDesk(id);
+    const route = routeFor(destination.phone);
+    return {
+      id,
+      mode: this.gateway.mode,
+      live: this.gateway.live,
+      airline: airline.name,
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      blockedReason: route.ok ? null : route.reason,
+      task,
+      resultSchema: buildAirlineResultSchema(),
+      existing: entry.airlineCall,
+      liveBudgetLeft: this.options.liveCallBudget - this.state.liveCallsUsed,
+    };
+  }
+
+  /** Step 5: the portal refused the reissue, so ask the airline desk to force it. One call per request. */
+  async callAirlineDesk(id: string, confirmLast4?: string): Promise<RequestEntry> {
+    const { entry, booking, option, destination, task } = this.airlineDesk(id);
+    if (entry.status !== "portal_rejected") {
+      throw new DeskError(`This request is ${entry.status}; the airline desk is called at most once per request.`, 409);
+    }
+    if (entry.airlineCall && entry.airlineCall.status !== "failed_to_submit") {
+      throw new DeskError(`The airline desk was already called for this request (${entry.airlineCall.status}).`, 409);
+    }
+    const route = routeFor(destination.phone);
+    if (!route.ok) throw new DeskError(route.reason);
+    this.guardLiveCall(destination.phone, confirmLast4);
+
+    const idempotencyKey = `fda-${id}-airline`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const call: AirlineCall = {
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      idempotencyKey,
+      task,
+      callId: null,
+      status: "submitted",
+      submittedAt: new Date(this.now()).toISOString(),
+      nextPollAt: new Date(this.now()).toISOString(),
+      outcome: null,
+      error: null,
+    };
+    // Record intent before dialing, as with passenger calls.
+    entry.airlineCall = call;
+    entry.status = "airline_call_in_progress";
+    this.save();
+
+    const result = await this.gateway.start({
+      task,
+      phone: destination.phone,
+      region: route.region,
+      locale: route.locale,
+      resultSchema: buildAirlineResultSchema(),
+      metadata: { request_id: id, pnr: booking.pnr, purpose: "airline_forced_reissue" },
+      idempotencyKey,
+      simulation: { kind: "airline_desk", booking, option },
+    });
+    if (result.kind === "started") {
+      call.callId = result.callId;
+      call.status = "in_progress";
+      call.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
+    } else if (result.kind === "uncertain") {
+      call.status = "uncertain";
+      call.error = result.message;
+      entry.status = "needs_review";
+      entry.reviewReasons = [`CALL-E may or may not have called the airline desk: ${result.message} It will not be redialed.`];
+    } else {
+      call.status = "failed_to_submit";
+      call.error = result.message;
+      entry.status = "portal_rejected";
+    }
+    if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
+    this.save();
+    return entry;
+  }
+
+  /** Polls the airline desk call if it is due, then applies a confirmed reissue or asks a person. */
+  async refreshRequest(id: string): Promise<RequestEntry> {
+    const entry = this.requestEntry(id);
+    const call = entry.airlineCall;
+    if (entry.status !== "airline_call_in_progress" || !call?.callId || call.status !== "in_progress") return entry;
+    if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
+
+    const outcome = await this.gateway.get(call.callId);
+    call.outcome = outcome;
+    if (outcome.state === "in_progress") {
+      call.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
+      this.save();
+      return entry;
+    }
+    call.status = "finished";
+    const decision = decideAirline(outcome);
+    if (decision.kind === "reissued" && entry.action) {
+      try {
+        entry.applied = `${this.applyChange(entry.request.pnr, entry.quote, entry.action, { pnr: decision.newPnr, ticket: decision.ticket })} Reissued by the airline desk${decision.reference ? `, reference ${decision.reference}` : ""}.`;
+        entry.status = "completed";
+      } catch (error) {
+        entry.status = "needs_review";
+        entry.reviewReasons = [error instanceof Error ? error.message : String(error)];
+      }
+    } else {
+      entry.status = "needs_review";
+      entry.reviewReasons = decision.kind === "review" ? decision.reasons : ["The request has no action to apply."];
+    }
+    this.save();
+    return entry;
+  }
+
+  /** A person closes a request in review: apply the confirmed change by hand, or close it unchanged. */
+  resolveRequest(id: string, applyChange: boolean, note: string, reissue?: { pnr: string; ticket: string }): RequestEntry {
+    const entry = this.requestEntry(id);
+    if (entry.status !== "needs_review") throw new DeskError(`This request is ${entry.status}; only review items can be resolved.`, 409);
+    if (applyChange) {
+      if (!entry.action) throw new DeskError("This request has no confirmed change to apply.");
+      if (reissue && (!/^[A-Z0-9]{6}$/.test(reissue.pnr) || !/^\d{3}-\d{10}$/.test(reissue.ticket))) {
+        throw new DeskError("Booking code must be 6 letters or digits and the ticket must look like 000-0000000000.");
+      }
+      try {
+        entry.applied = this.applyChange(entry.request.pnr, entry.quote, entry.action, reissue);
+      } catch (error) {
+        throw new DeskError(error instanceof Error ? error.message : String(error), 409);
+      }
+    } else {
+      entry.applied = "Closed without changing the booking.";
+    }
+    const text = note.trim();
+    if (text) this.state.bookings[entry.request.pnr]?.notes.push(`Agent note: ${text}`);
+    entry.status = "resolved_by_human";
     this.save();
     return entry;
   }
