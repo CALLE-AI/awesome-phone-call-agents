@@ -62,6 +62,41 @@ class PriorAuthRequest(BaseModel):
     member_id_masked: str = Field(default="MBR-***-8492")
 
 
+ALLOWED_RESULT_KEYS = {
+    "status",
+    "task_completed",
+    "recipient_masked",
+    "completion_confidence",
+    "evidence",
+    "structured_result",
+    "dry_run",
+    "created_at",
+}
+
+
+def sanitize_call_result(res: Any) -> Dict[str, Any]:
+    """
+    Sanitizes raw CALL-E execution results by enforcing an explicit key allowlist
+    and scrubbing unmasked phone numbers from textual evidence.
+    """
+    if not isinstance(res, dict):
+        return {"status": "completed" if getattr(res, "status", None) == "completed" else str(res)}
+
+    sanitized = {k: v for k, v in res.items() if k in ALLOWED_RESULT_KEYS}
+
+    if "recipient" in res and "recipient_masked" not in sanitized:
+        sanitized["recipient_masked"] = mask_phone(str(res["recipient"]))
+
+    if "evidence" in sanitized and isinstance(sanitized["evidence"], list):
+        import re
+        sanitized["evidence"] = [
+            re.sub(r"\+?[1-9]\d{9,14}", lambda m: mask_phone(m.group(0)), str(item))
+            for item in sanitized["evidence"]
+        ]
+
+    return sanitized
+
+
 @app.get("/health")
 def health():
     return {
@@ -81,7 +116,11 @@ def dispatch_confirmation(req: ConfirmationRequest, _auth: str = Depends(verify_
             appointment_time=req.appointment_time,
             idempotency_key=req.appointment_id,
         )
-        return {"success": True, "recipient": mask_phone(req.phone_number), "call_result": res}
+        return {
+            "success": True,
+            "recipient": res.get("recipient_masked") or mask_phone(req.phone_number),
+            "call_result": sanitize_call_result(res),
+        }
     except (ValueError, PermissionError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -94,7 +133,11 @@ def dispatch_noshow(req: NoShowRequest, _auth: str = Depends(verify_api_key)):
             patient_name=req.patient_name,
             missed_time=req.missed_appointment_time,
         )
-        return {"success": True, "recipient": mask_phone(req.phone_number), "call_result": res}
+        return {
+            "success": True,
+            "recipient": res.get("recipient_masked") or mask_phone(req.phone_number),
+            "call_result": sanitize_call_result(res),
+        }
     except (ValueError, PermissionError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -108,7 +151,12 @@ def dispatch_prior_auth(req: PriorAuthRequest, _auth: str = Depends(verify_api_k
             cpt_code=req.cpt_code,
             member_id_masked=req.member_id_masked,
         )
-        return {"success": True, "payor": req.payor_name, "call_result": res}
+        return {
+            "success": True,
+            "payor": req.payor_name,
+            "recipient": res.get("recipient_masked") or mask_phone(req.payor_phone),
+            "call_result": sanitize_call_result(res),
+        }
     except (ValueError, PermissionError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 

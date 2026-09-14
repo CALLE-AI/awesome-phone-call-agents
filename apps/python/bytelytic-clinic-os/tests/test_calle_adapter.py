@@ -121,3 +121,11 @@ def test_survey_custom_visit_date():
     res = adapter.dispatch_survey_call(phone="+15550192834", visit_date="Monday, August 25th")
     assert res["status"] == "completed"
     assert "structured_result" in res
+
+
+def test_fictional_recipients_not_authorized_in_live_mode():
+    cfg = ClinicConfig(dry_run=False, app_api_key="operator_secret_12345")
+    assert cfg.authorized_recipients == []
+    adapter = CalleAdapter(cfg)
+    with pytest.raises(PermissionError):
+        adapter.dispatch_confirmation_call(phone="+15550192834")

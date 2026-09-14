@@ -14,7 +14,10 @@ class ClinicConfig:
     dry_run: bool = field(default_factory=lambda: os.environ.get("DRY_RUN", "true").lower() in ("1", "true", "yes"))
     app_api_key: str = field(default_factory=lambda: os.environ.get("APP_API_KEY", "bytelytic_demo_key_2026"))
     authorized_recipients: List[str] = field(default_factory=lambda: [
-        r.strip() for r in os.environ.get("AUTHORIZED_RECIPIENTS", "+15550192834,+15550192835").split(",") if r.strip()
+        r.strip() for r in os.environ.get(
+            "AUTHORIZED_RECIPIENTS",
+            "+15550192834,+15550192835" if os.environ.get("DRY_RUN", "true").lower() in ("1", "true", "yes") else ""
+        ).split(",") if r.strip()
     ])
     clinic_name: str = field(default_factory=lambda: os.environ.get("CLINIC_NAME", "Oakridge Wellness Clinic"))
     clinic_phone: str = field(default_factory=lambda: os.environ.get("CLINIC_PHONE", "+15550192834"))
@@ -22,11 +25,16 @@ class ClinicConfig:
     timezone: str = field(default_factory=lambda: os.environ.get("TIMEZONE", "America/Chicago"))
 
     def __post_init__(self):
-        if not self.dry_run and self.app_api_key == "bytelytic_demo_key_2026":
-            raise RuntimeError(
-                "APP_API_KEY must be set to a private operator secret when DRY_RUN=false. "
-                "The public demo key 'bytelytic_demo_key_2026' is not permitted in live mode."
-            )
+        if not self.dry_run:
+            if self.app_api_key == "bytelytic_demo_key_2026":
+                raise RuntimeError(
+                    "APP_API_KEY must be set to a private operator secret when DRY_RUN=false. "
+                    "The public demo key 'bytelytic_demo_key_2026' is not permitted in live mode."
+                )
+            # Never treat shipped fictional recipients as authorized live defaults
+            fictional_defaults = {"+15550192834", "+15550192835"}
+            if "AUTHORIZED_RECIPIENTS" not in os.environ and set(self.authorized_recipients).issubset(fictional_defaults):
+                self.authorized_recipients = []
 
 
 config = ClinicConfig()

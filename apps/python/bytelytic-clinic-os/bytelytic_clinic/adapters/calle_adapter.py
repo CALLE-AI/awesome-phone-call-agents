@@ -154,13 +154,18 @@ class CalleAdapter:
             action="calle.dispatch_prior_auth",
             resource_type="prior_auth",
             resource_id=cpt_code,
-            details={"payor": payor_name, "dry_run": self.cfg.dry_run},
+            details={
+                "payor": payor_name,
+                "recipient": mask_phone(valid_phone),
+                "dry_run": self.cfg.dry_run,
+            },
         )
 
         if self.cfg.dry_run:
             return {
                 "status": "completed",
                 "task_completed": True,
+                "recipient_masked": mask_phone(valid_phone),
                 "completion_confidence": {"score": 0.98, "label": "high"},
                 "evidence": [f"Representative confirmed CPT {cpt_code} approved under auth #AUTH-882194."],
                 "structured_result": {

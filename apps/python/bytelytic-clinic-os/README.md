@@ -1,12 +1,12 @@
 # Bytelytic Clinic OS — Autonomous Healthcare Phone Desk
 
-[![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen)](tests/)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](pyproject.toml)
 [![CALL-E SDK](https://img.shields.io/badge/CALL--E%20SDK-%3E%3D0.2.0-blueviolet)](https://heycall-e.com)
 [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 [![Dry-Run Safe](https://img.shields.io/badge/dry--run-safe%20by%20default-orange)](bytelytic_clinic/config.py)
 
-Autonomous healthcare clinic operating system powered by CALL-E for outpatient medical practices. Replaces manual phone staff for appointment confirmations, no-show recovery, patient recalls, satisfaction surveys, and insurance prior authorization IVR navigation.
+Bounded-prototype autonomous clinic operating system demonstrating CALL-E voice workflows for outpatient medical practices. Automates patient appointment confirmations, 2-hour no-show recovery, patient recalls, satisfaction surveys, and insurance prior authorization IVR navigation with fail-closed operator gating.
 
 ---
 
@@ -147,7 +147,7 @@ See [`examples/curl_quickstart.sh`](examples/curl_quickstart.sh) for cURL API ex
 
 ## Tests
 
-**74 unit and integration tests** across all modules:
+**78 unit and integration tests** across all modules:
 
 ```bash
 pytest tests/ -v
@@ -184,7 +184,7 @@ bytelytic-clinic-os/
 │       └── audit_ledger.py    # SHA-256 tamper-evident audit ledger
 ├── server.py                  # FastAPI server with API key auth
 ├── cli.py                     # CLI dispatcher
-├── tests/                     # 66 pytest tests
+├── tests/                     # 78 pytest tests
 ├── examples/                  # JSON request/response examples + cURL scripts
 ├── fixtures/                  # Dry-run response fixtures (all 5 campaigns)
 ├── app.py                     # Top-level entrypoint

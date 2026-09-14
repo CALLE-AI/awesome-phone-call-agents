@@ -103,3 +103,38 @@ def test_server_rejects_malformed_phone_input(client):
         headers={"X-API-Key": "bytelytic_demo_key_2026"},
     )
     assert res.status_code == 400
+
+
+def test_prior_auth_response_sanitization(client):
+    res = client.post(
+        "/calls/prior-auth",
+        json={"cpt_code": "99213", "payor_phone": "1-800-676-2583"},
+        headers={"X-API-Key": "bytelytic_demo_key_2026"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["payor"] == "Blue Cross Blue Shield"
+    assert data["recipient"] == "+1800***2583"
+    assert "call_result" in data
+    assert "status" in data["call_result"]
+    assert "structured_result" in data["call_result"]
+
+
+def test_sanitize_call_result_helper():
+    from bytelytic_clinic.server import sanitize_call_result
+    raw = {
+        "status": "completed",
+        "task_completed": True,
+        "raw_carrier_data": "secret_debug_headers",
+        "internal_call_id": "call-xyz-999",
+        "recipient": "+15550192834",
+        "evidence": ["Dialed +15550192834 successfully and confirmed approval."],
+        "structured_result": {"auth_status": "approved"},
+    }
+    cleaned = sanitize_call_result(raw)
+    assert "raw_carrier_data" not in cleaned
+    assert "internal_call_id" not in cleaned
+    assert cleaned["recipient_masked"] == "+1555***2834"
+    assert cleaned["evidence"][0] == "Dialed +1555***2834 successfully and confirmed approval."
+    assert cleaned["structured_result"]["auth_status"] == "approved"
