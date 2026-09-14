@@ -147,6 +147,8 @@ export function GoalComposer({
       </button>
       <p className="mt-2 text-center text-xs text-muted-foreground">
         The agent discloses it is calling on your behalf. Demo runs on a mocked call; no real number is dialed.
+        On the live path, once a call is accepted it runs to completion on CALL-E&apos;s side even if you close this
+        page — there is no cancel from here.
       </p>
     </form>
   );

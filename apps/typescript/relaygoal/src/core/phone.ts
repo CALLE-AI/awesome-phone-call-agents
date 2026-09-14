@@ -33,6 +33,18 @@ export function maskPhone(input: string): string {
   return `${plus}${country}${"*".repeat(Math.max(hiddenCount, 0))}${last2}`;
 }
 
+/**
+ * Mask any phone-shaped substring inside free text (transcript turns, evidence, result
+ * values, summaries). Defense in depth: even after verification, a real number spoken on
+ * the call must never leave the server in the clear. Matches E.164 (+ and 7-15 digits) and
+ * NANP-formatted numbers (XXX-XXX-XXXX with separators); leaves times, prices and dates alone.
+ */
+const PHONE_IN_TEXT = /\+\d{7,15}|\(?\d{3}\)?[\s.‑-]\d{3}[\s.‑-]\d{4}/g;
+export function maskPhonesInText(text: string): string {
+  if (!text) return text;
+  return text.replace(PHONE_IN_TEXT, (m) => maskPhone(m.replace(/[^\d+]/g, "")));
+}
+
 export class InvalidPhoneNumberError extends Error {
   constructor(raw: string) {
     // Never echo the raw invalid value verbatim — mask it.

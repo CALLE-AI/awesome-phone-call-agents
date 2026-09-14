@@ -99,9 +99,12 @@ Two verticals run on the one core with only a schema and framing swapped: the ac
 
 | Requirement | Where |
 |---|---|
-| Explicit per-run intent | `RELAYGOAL_LIVE=1` + `CALLE_API_KEY` double opt-in (`selectCalleClient`); default is the credential-free dry run |
+| Canned destinations are fake-only | the browser routes (`app/api/call`, `app/api/batch`) **always** run `FakeCalle` and never dial, regardless of env — their presets are reserved-fictional 555 numbers |
+| Real calling needs an authorized recipient | live dialing lives only in the server-side opt-in path (`selectCalleClient` / `loadLiveCalle`, exercised by `test/live-smoke.test.ts`), which requires `RELAYGOAL_LIVE=1` + `CALLE_API_KEY` and targets an explicitly authorized recipient; it is not reachable from the public unauthenticated routes |
+| Credentials only to approved HTTPS | `assertApprovedBaseUrl` refuses to construct the client unless `CALLE_BASE_URL` is HTTPS on an approved CALL-E host (`api.heycall-e.com` / `test-api.heycall-e.com`) |
 | Strict E.164 before any dial | `assertE164` runs first in `runVerifiedGoal` and for every batch recipient |
-| Masked phone output | `maskPhone` in every response, card, preview and error |
+| Masked phone output | `maskPhone` on every recipient number **and** `maskPhonesInText` over transcript / evidence / result / summary text after verification (`maskVerifiedOutcome` at the route boundary) |
+| Calls continue after you leave | once a call is accepted it runs to completion on CALL-E's side even if the request times out or the browser closes; the UI does not cancel it (stated in the composer) |
 | Duplicate / ambiguous-outcome stopping | payload-bound idempotency key in SDK request options; no dial retry on client timeout; ambiguous → not confirmed |
 | Fail-closed | failed / canceled / no answer / empty transcript / ungrounded → not confirmed with "call them yourself" |
 | AI disclosure | mandated in the task template and **checked against the transcript** on every card |

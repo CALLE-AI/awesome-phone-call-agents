@@ -1,14 +1,15 @@
 import { runVerifiedGoal } from "@/src/core/runGoal";
 import { FakeCalle } from "@/src/core/fakecalle";
-import { selectCalleClient } from "@/src/core/livecalle";
 import { maskPhone } from "@/src/core/phone";
+import { maskVerifiedOutcome } from "@/src/core/mask-output";
 import { findPreset } from "@/src/goals";
 import { scenarios } from "@/src/scenarios";
 
-// Runs a CALL-E call through the real verified-phone-outcome core. Default is the
-// credential-free FakeCalle dry-run path; when RELAYGOAL_LIVE=1 and CALLE_API_KEY is
-// set, selectCalleClient returns the live @call-e/calle adapter instead — the core
-// (validate → one call → verify → fail-closed) is byte-for-byte the same either way.
+// The browser demo route is FAKE-ONLY: its destinations are canned presets (reserved-fictional
+// 555 numbers), so it always runs the credential-free FakeCalle stub and never dials — regardless
+// of any environment flags. Real calling is a separate, server-side opt-in path (see
+// src/core/livecalle.ts + test/live-smoke.test.ts) that requires an explicitly authorized
+// recipient; it is intentionally not reachable from this public, unauthenticated route.
 export async function POST(req: Request) {
   let body: { verticalId?: string; presetId?: string; goal?: string };
   try {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "no mock scenario for this goal" }, { status: 500 });
   }
 
-  const { client, live } = await selectCalleClient(new FakeCalle(scenario));
+  const client = new FakeCalle(scenario);
   const goalText = (goal && goal.trim()) || preset.goalText;
 
   const outcome = await runVerifiedGoal(client, {
@@ -44,10 +45,10 @@ export async function POST(req: Request) {
   });
 
   return Response.json({
-    outcome,
+    outcome: maskVerifiedOutcome(outcome),
     goalText,
     presetLabel: preset.label,
     phoneMasked: maskPhone(preset.phone),
-    mocked: !live,
+    mocked: true,
   });
 }

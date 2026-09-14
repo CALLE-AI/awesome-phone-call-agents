@@ -159,6 +159,31 @@ export interface LoadLiveCalleOptions {
 }
 
 /**
+ * Credentials only ever travel to an approved CALL-E host over HTTPS. A misconfigured or
+ * hostile CALLE_BASE_URL (http://, or some other host) must never receive the API key, so we
+ * refuse to construct the client rather than leak the credential. The SDK's own default
+ * (api.heycall-e.com) needs no override; the test host is allowed for the opt-in smoke test.
+ */
+const APPROVED_CALLE_HOSTS = new Set(["api.heycall-e.com", "test-api.heycall-e.com"]);
+export function assertApprovedBaseUrl(baseUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error("CALLE_BASE_URL is not a valid URL; refusing to send credentials.");
+  }
+  if (url.protocol !== "https:") {
+    throw new Error("CALLE_BASE_URL must use https; refusing to send credentials over a non-HTTPS URL.");
+  }
+  if (!APPROVED_CALLE_HOSTS.has(url.hostname)) {
+    throw new Error(
+      `CALLE_BASE_URL host "${url.hostname}" is not an approved CALL-E host; refusing to send credentials.`,
+    );
+  }
+  return baseUrl;
+}
+
+/**
  * Load the optional @call-e/calle SDK and return a live CalleLike. Throws a clear, actionable
  * error if the package is not installed (it is an optional peer dependency). The specifier is a
  * variable on purpose so TypeScript/bundlers do not require the package to be present to compile.
@@ -177,6 +202,7 @@ export async function loadLiveCalle(opts: LoadLiveCalleOptions): Promise<CalleLi
       { cause },
     );
   }
+  if (opts.baseUrl !== undefined) assertApprovedBaseUrl(opts.baseUrl);
   const client = new mod.CalleClient(
     opts.baseUrl !== undefined ? { apiKey: opts.apiKey, baseUrl: opts.baseUrl } : { apiKey: opts.apiKey },
   );

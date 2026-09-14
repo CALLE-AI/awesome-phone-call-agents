@@ -1,14 +1,14 @@
 import { runVerifiedBatch } from "@/src/core/batch";
 import { FakeCalle } from "@/src/core/fakecalle";
-import { selectCalleClient } from "@/src/core/livecalle";
 import { maskPhone } from "@/src/core/phone";
+import { maskBatchOutcome } from "@/src/core/mask-output";
 import { findBatchPreset } from "@/src/goals";
 import { batchScenarios } from "@/src/scenarios";
 import type { CreateCallInput } from "@/src/core/types";
 
-// Batch "compare across N places": one canned scenario per recipient phone (dry-run default),
-// run through the real runVerifiedBatch reconciler. When RELAYGOAL_LIVE=1 + CALLE_API_KEY is set,
-// selectCalleClient returns the live adapter and the same reconciler places real calls per place.
+// Batch "compare across N places": FAKE-ONLY, like the single-call route. Its recipients are canned
+// reserved-fictional 555 presets, so it always runs the FakeCalle stub and never dials, regardless of
+// environment flags. Real calling lives only in the server-side opt-in path with authorized recipients.
 export async function POST(req: Request) {
   let body: { presetId?: string };
   try {
@@ -27,9 +27,7 @@ export async function POST(req: Request) {
     if (!scenario) throw new Error(`no mock scenario for ${maskPhone(input.phone)}`);
     return scenario;
   });
-  const { client, live } = await selectCalleClient(fake);
-
-  const outcome = await runVerifiedBatch(client, {
+  const raw = await runVerifiedBatch(fake, {
     task: preset.task,
     recipients: preset.recipients.map(({ id, label, phone }) => ({ id, label, phone })),
     resultSchema: preset.resultSchema,
@@ -37,11 +35,12 @@ export async function POST(req: Request) {
     rank: preset.rank,
   });
 
-  // Mask every recipient number before it leaves the server.
+  // Mask phone-bearing transcript/evidence/result text, then the recipient numbers themselves.
+  const outcome = maskBatchOutcome(raw);
   outcome.items = outcome.items.map((it) => ({
     ...it,
     recipient: { ...it.recipient, phone: maskPhone(it.recipient.phone) },
   }));
 
-  return Response.json({ outcome, presetLabel: preset.label, mocked: !live });
+  return Response.json({ outcome, presetLabel: preset.label, mocked: true });
 }
