@@ -906,7 +906,7 @@ function renderThreadSwarm(results) {
       if (r.status === 'in-call' || r.status === 'in-progress' || r.status === 'analyzing') {
         // Active negotiation state
         return `
-          <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs" onclick="selectVendor('${escapeHtml(name)}')">
+          <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs vendor-card-item" data-vendor-name="${encodeURIComponent(name)}">
             <div class="flex items-center gap-3">
               <span class="w-2 h-2 rounded-full bg-black shrink-0"></span>
               <div>
@@ -931,7 +931,7 @@ function renderThreadSwarm(results) {
       if (r.status === 'ringing') {
         // Connecting & Ringing state
         return `
-          <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs" onclick="selectVendor('${escapeHtml(name)}')">
+          <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs vendor-card-item" data-vendor-name="${encodeURIComponent(name)}">
             <div class="flex items-center gap-3">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
               <div>
@@ -948,7 +948,7 @@ function renderThreadSwarm(results) {
 
       // Dialing / Initializing
       return `
-        <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs" onclick="selectVendor('${escapeHtml(name)}')">
+        <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} flex items-center justify-between transition-all cursor-pointer shadow-xs vendor-card-item" data-vendor-name="${encodeURIComponent(name)}">
           <div class="flex items-center gap-3">
             <span class="w-3 h-3 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin shrink-0"></span>
             <div>
@@ -967,7 +967,7 @@ function renderThreadSwarm(results) {
       // Completed with valid quote
       const quoteText = formatDisplayPrice(r.quote);
       return `
-        <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} opacity-95 flex items-center justify-between cursor-pointer hover:bg-gray-50/70 transition-all shadow-2xs" onclick="selectVendor('${escapeHtml(name)}')">
+        <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} opacity-95 flex items-center justify-between cursor-pointer hover:bg-gray-50/70 transition-all shadow-2xs vendor-card-item" data-vendor-name="${encodeURIComponent(name)}">
           <div class="flex items-center gap-3 min-w-0 pr-2">
             <span class="material-symbols-outlined text-gray-400 text-[18px] shrink-0 font-light">check_circle</span>
             <div class="min-w-0">
@@ -983,7 +983,7 @@ function renderThreadSwarm(results) {
               <p class="text-[11px] text-gray-400 mt-0.5 font-normal truncate">Completed • <span class="text-emerald-700 font-semibold font-mono">${escapeHtml(quoteText)}</span></p>
             </div>
           </div>
-          <button type="button" class="text-[11px] font-medium text-gray-500 hover:text-gray-900 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="event.stopPropagation(); selectVendor('${escapeHtml(name)}')">
+          <button type="button" class="text-[11px] font-medium text-gray-500 hover:text-gray-900 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer" data-vendor-name="${encodeURIComponent(name)}">
             Details →
           </button>
         </div>`;
@@ -992,7 +992,7 @@ function renderThreadSwarm(results) {
     // Declined / Unanswered / Failed / No Quote
     const failReason = r.providerNotes || r.summary || (r.status === 'refused' ? 'Call Declined' : 'Call Unanswered');
     return `
-      <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} opacity-75 flex items-center justify-between cursor-pointer hover:bg-gray-50/70 transition-all shadow-2xs" onclick="selectVendor('${escapeHtml(name)}')">
+      <div class="bg-white p-3.5 rounded-xl border ${selectedClasses} opacity-75 flex items-center justify-between cursor-pointer hover:bg-gray-50/70 transition-all shadow-2xs vendor-card-item" data-vendor-name="${encodeURIComponent(name)}">
         <div class="flex items-center gap-3 min-w-0 pr-2">
           <span class="material-symbols-outlined text-gray-400 text-[18px] shrink-0 font-light">phone_disabled</span>
           <div class="min-w-0">
@@ -1000,21 +1000,33 @@ function renderThreadSwarm(results) {
             <p class="text-[11px] text-gray-400 mt-0.5 truncate max-w-[200px]">${escapeHtml(failReason)}</p>
           </div>
         </div>
-        <button type="button" class="text-[11px] font-medium text-gray-400 hover:text-gray-700 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="event.stopPropagation(); selectVendor('${escapeHtml(name)}')">
+        <button type="button" class="text-[11px] font-medium text-gray-400 hover:text-gray-700 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer" data-vendor-name="${encodeURIComponent(name)}">
           Details →
         </button>
       </div>`;
   }).join('');
 
+  if (!threadSwarmList.dataset.clickBound) {
+    threadSwarmList.dataset.clickBound = 'true';
+    threadSwarmList.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-vendor-name]');
+      if (card && card.dataset.vendorName) {
+        const vName = decodeURIComponent(card.dataset.vendorName);
+        selectVendor(vName);
+      }
+    });
+  }
+
   renderVendorDetail(selectedVendorName, results, bestVendorName);
 }
 
-window.selectVendor = function (vendorName) {
+function selectVendor(vendorName) {
   selectedVendorName = vendorName;
   if (activeThread) {
     renderThreadSwarm(activeThread.results);
   }
-};
+}
+window.selectVendor = selectVendor;
 
 /* ─── Inline Vendor Detail Panel Renderer (Right Section) ───────────── */
 function renderVendorDetail(vendorName, results, bestVendorName) {
@@ -2171,6 +2183,7 @@ async function executeLaunchCampaign(promptText) {
         description: promptText,
         vendors: activeVendors,
         mode: 'live',
+        authorizedLiveIntent: true,
       }),
     });
 

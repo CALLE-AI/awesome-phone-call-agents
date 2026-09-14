@@ -16,9 +16,9 @@ The QuoteHunter skill initiates phone inquiries to trade providers to gather com
 
 ## Phone numbers and verification
 
-- All recipient phone numbers must be formatted in valid E.164 notation.
+- All recipient phone numbers must be formatted in valid E.164 notation with unique destinations per swarm execution.
 - In test environments and documentation, reserved fictional numbers (such as `+1-555-0100` through `+1-555-0199`) must be used.
-- Recipient phone numbers remain masked in the operator interface until the human operator authorizes reveal or closing actions.
+- Real recipient phone numbers are masked in backend logs, diagnostics, and frontend views (e.g. `+91 ***** **367`) to protect PII.
 
 ## Bounded decision authority
 
@@ -30,7 +30,13 @@ The QuoteHunter skill initiates phone inquiries to trade providers to gather com
 
 - The assistant reports verbatim quotes and extracted data directly from CALL-E call logs and audio evidence.
 - If a vendor is unreachable, declines to quote, or provides vague estimates, the outcome is marked as `no` or `unknown`.
-- Never hallucinate, extrapolate, or fabricate price quotes or availability.
+- Never hallucinate, extrapolate, or fabricate price quotes or availability. Low-confidence fallback extractions are explicitly flagged as advisory.
+
+## Extraction, cancellation, and timing limits
+
+- **Advisory Extractions:** All extracted quotes, turnaround estimates, and condition terms represent advisory extractions subject to audio transcription quality and vendor phrasing. They do not constitute binding price quotes or legal guarantees.
+- **Speculative Cancellation Limits:** Call abort and cancellation requests dispatched to carriers terminate client-side tracking and dispatch cancellation signals to the provider API. However, carrier-level disconnect is subject to telecommunication network propagation latency; the system does not claim instantaneous carrier hangup.
+- **Timing and Latency Disclaimers:** Reported turn latencies, completion durations, and provider response times are empirical approximations from network logs, not SLA guarantees.
 
 ## Credential safety
 

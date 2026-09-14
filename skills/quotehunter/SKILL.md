@@ -134,11 +134,14 @@ When all vendor calls conclude, QuoteHunter renders an executive comparison doss
 | **Urban Shield Painters** | `+1-555-0101` | ✅ Provided | ₹11,200 | Monday | *"Can do ₹11,200 all inclusive"* |
 | **Rapid Touch Paints** | `+1-555-0102` | ❌ Declined | Not Provided | N/A | *"Currently fully booked for the month"* |
 
-## Fail-Closed & Zero-Fabrication Design
+## Fail-Closed & Advisory Extraction Design
 
+- **Simulation Default**: All documented evaluation workflows default to simulation mode. Live carrier calls require explicit operator authorization, unique destination numbers, and loopback/authenticated remote access.
 - **Unanswered & Busy Calls**: If a provider does not pick up, the call disconnects after 0 seconds, or the carrier reports `failed`/`no-answer`, the outcome is strictly marked `status: "no-answer"` with `price_estimate: "not_provided"`.
 - **Refused Quotes**: If a provider refuses to give a price estimate without inspecting, `quote_provided` is set to `"no"`.
-- **Zero Hallucination**: QuoteHunter never infers, estimates, or hallucinates numerical prices. If no unambiguous number was spoken by the vendor, `price_numeric` defaults to `0`.
+- **Advisory Extraction & Verification**: QuoteHunter extracts price data verbatim from call audio and transcripts. If no unambiguous number was spoken by the vendor, `price_numeric` defaults to `0`. Secondary extractions from unstructured summaries are flagged as low-confidence advisory estimates for human review.
+- **Carrier Disconnect & Cancellation Limits**: Call cancellation requests terminate client polling and dispatch abort signals to the telephony API. Carrier-level audio disconnect is subject to telecom network latency, and the system reports cancellation as requested rather than assuming instantaneous carrier cut-off.
+- **Timing Disclaimers**: Turn latencies and hunt durations are empirical network observations and do not represent contractual SLA guarantees.
 
 ## Human-in-the-Loop Decision Authority
 

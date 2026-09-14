@@ -32,14 +32,23 @@ QuoteHunter automates this procurement workflow. By leveraging the CALL-E teleph
 - Tracks granular carrier milestones: Provisioning, Carrier Routing, Phone Ringing, Active Conversation, Transcript Analysis, and Quote Finalization.
 - Displays dynamic elapsed-time counters and per-vendor progress indicators in real time.
 
-### Structured Schema Extraction and Arithmetic Reconciliation
+### Structured Schema Extraction and Advisory Reconciliation
 - Enforces strict JSON Schema validation on CALL-E call outputs.
 - Extracts key contractual parameters: numeric price, availability timeline, warranty coverage, and material conditions.
-- Anchors every data point to verbatim spoken quotes from the vendor, eliminating AI hallucination.
+- Anchors data points to verbatim spoken quotes from the vendor with fail-closed advisory extraction.
 - Employs an arithmetic reconciliation engine (`reconcileItemizedQuote`) that cross-checks itemized subcomponents (labor vs. materials vs. discounts) against spoken evidence to correct LLM calculation errors.
+- Clearly distinguishes structured quotes from low-confidence unstructured summary fallback extractions.
+
+### Execution Workflow & Simulation Default
+- **Simulation by Default**: All documented evaluation workflows default to safe simulation mode.
+- **Authorized Live Calling**: Disagreeing with simulated testing to place real carrier telephone calls requires:
+  1. Explicit operator confirmation (`authorizedLiveIntent: true`).
+  2. Unique destination phone numbers across target vendors.
+  3. Loopback-only operation (localhost) or authenticated remote access via the `x-quotehunter-auth` header.
+- **Carrier Disconnect & Cancellation Limits**: Dispatched cancellation requests terminate polling loops and send abort signals to the provider. Carrier-level disconnect is subject to telecom propagation latency; the system reports cancellation as requested rather than assuming instantaneous carrier cut-off.
 
 ### Human-in-the-Loop Deal Dossier
-- Telephone numbers remain masked during negotiation to safeguard privacy.
+- Telephone numbers remain masked (`+91 ***** **367`) during negotiation to safeguard privacy.
 - Unmasks verified numbers upon operator selection and generates an executive closing sheet.
 - Provides one-click native actions: direct cellular dial (`tel:`), pre-filled WhatsApp confirmation messages, and clipboard export.
 
@@ -307,7 +316,7 @@ Render free-tier instances enter standby mode after 15 minutes of inactivity. Qu
    - Smoothly dissolves and reveals the swarm dashboard the moment all services are operational.
 2. **Automatic 9-Minute Inactivity Keepalive:**
    - While any operator has QuoteHunter open in their browser, a background heartbeat pings `/api/status` every 9 minutes.
-   - This automatically resets Render's 15-minute inactivity counter, guaranteeing the container never sleeps during active usage.
+   - This resets Render's 15-minute inactivity counter to keep the container active during browser sessions.
 3. **Instant Tab Re-Wake:**
    - If an operator returns to a dormant tab, the `visibilitychange` listener immediately dispatches a wake ping to warm the instance before user action.
 

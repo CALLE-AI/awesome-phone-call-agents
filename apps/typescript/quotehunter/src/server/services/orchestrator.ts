@@ -220,8 +220,8 @@ export class QuoteOrchestrator {
       if (['pending', 'initializing', 'dialing', 'ringing', 'in-call', 'analyzing'].includes(v.status)) {
         quoteStore.updateVendor(jobId, v.id, {
           status: 'failed',
-          transcriptSummary: 'Call was canceled by user.',
-          providerNotes: 'Call stopped by user request.',
+          transcriptSummary: 'Call cancellation requested by user.',
+          providerNotes: 'Job canceled by user request. In-flight carrier disconnect is advisory.',
         });
       }
     });

@@ -24,6 +24,27 @@ export interface CalleApiResponse {
   completed_at?: string | null;
 }
 
+export function maskPhoneNumber(phone?: string | null): string {
+  if (!phone) return '';
+  const cleaned = phone.trim();
+  if (cleaned.length <= 5) return '***';
+  const start = cleaned.slice(0, 3);
+  const end = cleaned.slice(-3);
+  const maskedLength = Math.max(cleaned.length - 6, 3);
+  return `${start}${'*'.repeat(maskedLength)}${end}`;
+}
+
+export function maskSensitiveText(text?: string | null): string {
+  if (!text) return '';
+  return text.replace(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/g, (match) => {
+    const digits = match.replace(/\D/g, '');
+    if (digits.length >= 7) {
+      return maskPhoneNumber(match);
+    }
+    return match;
+  });
+}
+
 export class CalleService {
   private apiKey: string | null = null;
   private baseUrl: string = 'https://api.heycall-e.com';
@@ -47,10 +68,12 @@ export class CalleService {
   }
 
   /**
-   * Cancel and terminate all in-flight live calls and polling operations for a given job
+   * Cancel and terminate all in-flight live calls and polling operations for a given job.
+   * Note: Dispatched cancellation requests signal the provider/carrier, but instantaneous
+   * carrier-level disconnect cannot be guaranteed due to telecom propagation latency.
    */
   async cancelJobCalls(jobId: string): Promise<void> {
-    console.log(`🛑 [CALL-E Live] Terminating all active operations for job ${jobId}...`);
+    console.log(`🛑 [CALL-E Live] Canceling active operations for job ${jobId}...`);
 
     // 1. Abort all polling loops and pending fetch operations
     const controller = this.activeJobAbortControllers.get(jobId);
@@ -64,17 +87,19 @@ export class CalleService {
     if (callIds && callIds.size > 0 && this.apiKey) {
       const cancelPromises = Array.from(callIds).map(async (callId) => {
         try {
-          console.log(`🛑 [CALL-E Live] Requesting immediate carrier hangup for call ${callId}...`);
-          await fetch(`${this.baseUrl}/v1/calls/${callId}/cancel`, {
+          console.log(`🛑 [CALL-E Live] Sending cancellation signal for call ${callId} (carrier disconnect is subject to propagation latency)...`);
+          const res = await fetch(`${this.baseUrl}/v1/calls/${callId}/cancel`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${this.apiKey}` },
-          }).catch(() => {});
-          await fetch(`${this.baseUrl}/v1/calls/${callId}/abort`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${this.apiKey}` },
-          }).catch(() => {});
-        } catch (err) {
-          console.warn(`Could not cancel call ${callId}:`, err);
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            console.log(`ℹ️ [CALL-E Live] Cancellation signal acknowledged by provider for call ${callId}`);
+          } else {
+            console.log(`ℹ️ [CALL-E Live] Cancellation request dispatched for call ${callId}; carrier-level termination is advisory`);
+          }
+        } catch (err: any) {
+          console.warn(`Could not dispatch cancellation request for call ${callId}:`, err?.message || 'Network error');
         }
       });
       await Promise.allSettled(cancelPromises);
@@ -482,8 +507,11 @@ Compliance & Safety:
     const structured = call.structured_result || call.recipients?.[0]?.structured_result;
     const summary = call.summary || call.recipients?.[0]?.summary || call.transcript;
     const summaryLower = (summary || '').toLowerCase();
-    const confidenceLabel = ((call as any).completion_confidence?.label as 'high' | 'medium' | 'low') || 'high';
-    const confidenceScore = (call as any).completion_confidence?.score || 0.95;
+    
+    // Do not invent high-confidence fallback scores; use provider-supplied or conservative defaults
+    const providerConfidence = (call as any).completion_confidence;
+    const confidenceLabel: 'high' | 'medium' | 'low' = providerConfidence?.label || (structured?.quote_provided === 'yes' ? 'medium' : 'low');
+    const confidenceScore: number = typeof providerConfidence?.score === 'number' ? providerConfidence.score : (structured?.quote_provided === 'yes' ? 0.7 : 0.3);
 
     // STEP 1: Strict Check for Declined, Rejected, Refused, or Unanswered Calls FIRST
     const isExplicitNoQuote = structured?.quote_provided === 'no' || 
@@ -537,9 +565,9 @@ Compliance & Safety:
         priceEstimate: undefined,
         priceNumeric: undefined,
         availability: 'Not Discussed',
-        providerNotes: structured?.provider_notes || summary || 'Call was declined by recipient.',
-        evidenceSnippet: structured?.evidence || summary,
-        transcriptSummary: summary || 'Contractor declined or rejected the call.',
+        providerNotes: maskSensitiveText(structured?.provider_notes || summary || 'Call was declined by recipient.'),
+        evidenceSnippet: maskSensitiveText(structured?.evidence || summary),
+        transcriptSummary: maskSensitiveText(summary || 'Contractor declined or rejected the call.'),
         confidence: 'low',
         confidenceScore: 0.2,
       });
@@ -559,8 +587,8 @@ Compliance & Safety:
         priceEstimate: undefined,
         priceNumeric: undefined,
         availability: 'Not Discussed',
-        providerNotes: failReason,
-        transcriptSummary: summary || `Call could not be completed: ${failReason}`,
+        providerNotes: maskSensitiveText(failReason),
+        transcriptSummary: maskSensitiveText(summary || `Call could not be completed: ${failReason}`),
         confidence: 'low',
         confidenceScore: 0.3,
       });
@@ -586,7 +614,7 @@ Compliance & Safety:
         ? structured.availability 
         : 'Available';
 
-      const providerNotes = [structured.provider_notes || summary, reconciled.notesSupplement].filter(Boolean).join(' • ') || 'Quote received from vendor.';
+      const providerNotes = maskSensitiveText([structured.provider_notes || summary, reconciled.notesSupplement].filter(Boolean).join(' • ') || 'Quote received from vendor.');
 
       const meta = this.buildTurnsAndMetadata(vendor, call, priceEstimate, availability, summary, false);
 
@@ -602,8 +630,8 @@ Compliance & Safety:
         availability,
         additionalConditions: structured.additional_conditions,
         providerNotes,
-        evidenceSnippet: evidence,
-        transcriptSummary: summary || 'Quote successfully received.',
+        evidenceSnippet: maskSensitiveText(evidence),
+        transcriptSummary: maskSensitiveText(summary || 'Quote successfully received.'),
         confidence: confidenceLabel,
         confidenceScore,
         createdAt: call.created_at || new Date().toISOString(),
@@ -629,11 +657,11 @@ Compliance & Safety:
           priceEstimate: fallbackPrice,
           priceNumeric,
           availability: 'As discussed on call',
-          providerNotes: summary,
-          evidenceSnippet: `"${summary}"`,
-          transcriptSummary: summary,
-          confidence: 'medium',
-          confidenceScore: 0.75,
+          providerNotes: `Advisory quote extracted from call summary: "${maskSensitiveText(summary)}"`,
+          evidenceSnippet: `"${maskSensitiveText(summary)}"`,
+          transcriptSummary: maskSensitiveText(summary),
+          confidence: 'low',
+          confidenceScore: 0.5,
         });
         return;
       }
@@ -651,11 +679,11 @@ Compliance & Safety:
       priceEstimate: undefined,
       priceNumeric: undefined,
       availability: 'Not Discussed',
-      providerNotes: structured?.provider_notes || summary || 'No price quote provided.',
-      evidenceSnippet: structured?.evidence || summary,
-      transcriptSummary: summary || 'Provider did not offer a quote.',
-      confidence: 'medium',
-      confidenceScore: 0.5,
+      providerNotes: maskSensitiveText(structured?.provider_notes || summary || 'No price quote provided.'),
+      evidenceSnippet: maskSensitiveText(structured?.evidence || summary),
+      transcriptSummary: maskSensitiveText(summary || 'Provider did not offer a quote.'),
+      confidence: 'low',
+      confidenceScore: 0.2,
     });
   }
 
@@ -676,8 +704,8 @@ Compliance & Safety:
       completed_at: call.completed_at,
       recording_url: rawCall.recording_url || rawCall.audio_url || rawCall.recipients?.[0]?.recording_url,
       transcript_len: (call.transcript || rawCall.recipients?.[0]?.transcript || '').length,
-      evidence: call.structured_result?.evidence || rawCall.recipients?.[0]?.structured_result?.evidence,
-      summary: summary || call.summary,
+      evidence: maskSensitiveText(call.structured_result?.evidence || rawCall.recipients?.[0]?.structured_result?.evidence),
+      summary: maskSensitiveText(summary || call.summary),
     }, null, 2));
 
     const callHash = call.id ? (call.id.startsWith('call_') ? call.id.replace('call_', '') : call.id) : `aff5e5c8652440d0af3b55c7bba121d1`;
@@ -791,10 +819,10 @@ Compliance & Safety:
       let termsQuote: string | null = null;
 
       if (quotes.length === 1) {
-        // Only one single quote provided: use it for price/primary quote and sensible defaults for timeline/terms
+        // Only one single quote provided: use it for price/primary quote
         priceQuote = quotes[0];
-        timelineQuote = availability ? `I can start ${availability} and it will take around 2 days.` : `I can start soon and finish in 2-3 days.`;
-        termsQuote = 'Standard emulsion with ceiling primer coat. Free touch-up included.';
+        timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
+        termsQuote = 'Standard service terms discussed on call.';
       } else if (quotes.length >= 2) {
         // Find timeline quote (starts, days, dates)
         timelineQuote = quotes.find(q => (q.toLowerCase().includes('start') || q.toLowerCase().includes('day') || q.toLowerCase().includes('august') || q.toLowerCase().includes('week') || q.toLowerCase().includes('timeline')) && !q.includes('$') && !q.includes('₹')) || quotes[0];
@@ -803,19 +831,19 @@ Compliance & Safety:
         priceQuote = quotes.find(q => q !== timelineQuote && (q.includes('$') || q.includes('₹') || q.toLowerCase().includes('cost') || q.toLowerCase().includes('labour') || q.toLowerCase().includes('price'))) || quotes[1] || (priceEstimate ? `It will cost ${priceEstimate} total.` : null);
 
         // Find terms quote (material, discount, warranty, extra, hidden)
-        termsQuote = quotes.find(q => q !== timelineQuote && q !== priceQuote && (q.toLowerCase().includes('discount') || q.toLowerCase().includes('material') || q.toLowerCase().includes('warranty') || q.toLowerCase().includes('hidden') || q.toLowerCase().includes('extra'))) || quotes[2] || 'No hidden charges. Standard materials and warranty included.';
+        termsQuote = quotes.find(q => q !== timelineQuote && q !== priceQuote && (q.toLowerCase().includes('discount') || q.toLowerCase().includes('material') || q.toLowerCase().includes('warranty') || q.toLowerCase().includes('hidden') || q.toLowerCase().includes('extra'))) || quotes[2] || 'Standard service terms discussed on call.';
       }
 
-      if (!timelineQuote) timelineQuote = availability ? `I can start ${availability}.` : `I can start soon and it will take around 2 days.`;
-      if (!priceQuote) priceQuote = priceEstimate ? `It will cost around ${priceEstimate}.` : `The estimated total cost is $600.`;
-      if (!termsQuote) termsQuote = 'Standard quality guarantee with no hidden fees.';
+      if (!timelineQuote) timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
+      if (!priceQuote) priceQuote = priceEstimate ? `Estimated price: ${priceEstimate}.` : `Price estimate was not specified during call.`;
+      if (!termsQuote) termsQuote = 'Standard service terms discussed on call.';
 
       // Deduplication safeguard: if any two quotes are identical, provide clean natural phrasing
       if (priceQuote === timelineQuote) {
-        timelineQuote = availability ? `I can start ${availability}.` : `We are available to start immediately and finish within 2 days.`;
+        timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
       }
       if (termsQuote === priceQuote || termsQuote === timelineQuote) {
-        termsQuote = 'Materials and standard warranty are included in the price.';
+        termsQuote = 'Standard service terms discussed on call.';
       }
 
       const synthesized: Array<{ role: 'agent' | 'user'; text: string }> = [
