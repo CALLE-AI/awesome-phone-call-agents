@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 66 tests, no credentials, no network
+python3 -m pytest -q                       # 74 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -212,7 +212,7 @@ must not stop the rest of the course.
 Per patient the app builds one `task`, one constrained `result_schema`, and a
 stable `idempotency_key` derived from course, patient, action and attempt, then
 calls `client.calls.create(...)` and `client.calls.wait_for_result(...)` against
-`calle-ai==0.2.0`.
+`calle-ai==0.7.0`.
 
 The conversation belongs to CALL-E and its model is not selectable, so the two
 levers this app has are used narrowly on purpose: the goal string, and the
@@ -328,10 +328,20 @@ is recorded here, not written into a clinic system; a human still confirms it.
 
 ## Limits, and what has not been tested
 
-- **No live call has been placed with this code.** The CALL-E path is written
-  against the `calle-ai==0.2.0` surface used by the other Python apps in this
-  repository and exercised through an injected port in tests, but the live path
-  is unverified against a real call. Treat it as unproven until you run it.
+- **Seven live calls were placed during development**, 5-9 September 2026,
+  against `calle-ai==0.7.0`, all to a consenting participant's own number. They
+  found eight faults no fixture could have surfaced, each now a regression. The
+  concession ladder has fired live once; the full decline-and-descend path
+  through every tier is covered by fixtures and tests but has not run end to end
+  on a real call.
+- **An interruption cannot recall a call the provider has already accepted.** The
+  call id is fsynced to a checkpoint file *before* polling starts, so an
+  interrupted poll is recoverable with `recover --call-id`. That recovers the
+  *result*; it does not undo the call. If a create or poll fails ambiguously the
+  run stops rather than continuing to the next patient — a request can reach the
+  provider while its response is lost, and treating that as "not called" is how
+  the same person gets dialled twice. Reconcile the checkpoint against the CALL-E
+  dashboard before re-running a course.
 - Thresholds — the lapse window, the call cap, the cooldown, "three attended"
   for a light rebook — are **defaults chosen for a demonstration, not clinical
   guidance.** They belong to whoever runs the clinic.

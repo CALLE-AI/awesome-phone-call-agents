@@ -12,7 +12,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+# ASCII only. \d matches Arabic-Indic, Devanagari and other Unicode digits, so an
+# unanchored \d would accept "+١٢٣..." as a valid number — it would pass
+# validation here and be rejected or misdialled by the provider.
+E164 = re.compile(r"^\+[1-9][0-9]{7,14}$", re.ASCII)
 
 SESSION_STATUSES = {"attended", "missed", "cancelled_with_notice", "rescheduled"}
 
@@ -29,6 +32,7 @@ CONTACT_OUTCOMES = {
     "refused_contact",
     "symptom_reported",
     "identity_unconfirmed",
+    "unknown_possibly_placed",
     "undecided",
 }
 

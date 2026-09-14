@@ -213,7 +213,14 @@ def test_render_shows_the_no_call_banner(course_file: CourseFile) -> None:
     assert "ESCALATED TO CLINICIAN" in text, "Rosa's symptom must be visible in the report"
 
 
-def test_a_failing_call_does_not_end_the_course(course_file: CourseFile) -> None:
+def test_an_ambiguous_outcome_stops_the_run(course_file: CourseFile) -> None:
+    """A create or poll that raised may still have placed a call — the request can
+    reach the provider and the response be lost.
+
+    The first version recorded called=False and moved to the next patient, which
+    is how the same person gets dialled twice. An ambiguous outcome now retains
+    "unknown", keeps called true, escalates, and stops the run.
+    """
     class Exploding:
         def __init__(self) -> None:
             self.calls = 0
@@ -221,18 +228,67 @@ def test_a_failing_call_does_not_end_the_course(course_file: CourseFile) -> None
         def place(self, arguments, *, patient_id):
             self.calls += 1
             if patient_id == "p_ivy":
-                raise RuntimeError("provider unreachable")
-            return {"status": "VOICEMAIL", "structured_result": None, "call_id": None, "simulated": True}
+                raise RuntimeError("connection reset after POST /v1/calls")
+            return {"status": "VOICEMAIL", "structured_result": None, "call_id": None,
+                    "simulated": True}
 
     port = Exploding()
     rows = run(course_file, TODAY, port)
-    failed = [row for row in rows if row.outcome == "call_failed"]
-    assert len(failed) == 1
-    assert "provider unreachable" in (failed[0].note or "")
-    assert port.calls > 1, "the run must continue past the failure"
+
+    ambiguous = [r for r in rows if r.outcome == "unknown_possibly_placed"]
+    assert len(ambiguous) == 1
+    row = ambiguous[0]
+    assert row.called is True, "the call may have happened; do not record it as not placed"
+    assert row.escalate_to_clinician is True
+    assert "reconcile" in (row.recommendation or "").lower()
+    assert port.calls == 1, "the run must stop, not dial the next patient"
 
 
-# --- transcripts ----------------------------------------------------------------
+def test_an_ambiguous_outcome_does_not_leak_the_raw_error(course_file: CourseFile) -> None:
+    """Provider errors quote the request back, so a raw exception can carry the
+    recipient's number or the API key into the ledger."""
+    class Leaky:
+        @staticmethod
+        def place(arguments, *, patient_id):
+            raise RuntimeError(
+                "400 from api.heycall-e.com: recipient +15550101001 rejected "
+                "(key iams_live_abcdefgh12345678)"
+            )
+
+    rows = run(course_file, TODAY, Leaky())
+    note = next(r.note for r in rows if r.outcome == "unknown_possibly_placed")
+    assert "5550101001" not in note
+    assert "iams_live_abcdefgh12345678" not in note
+    assert "[phone-redacted]" in note and "[secret-redacted]" in note
+
+
+def test_an_api_key_is_only_sent_to_an_approved_origin() -> None:
+    """--base-url is operator input. Pointing it elsewhere would hand a live
+    credential to an arbitrary host."""
+    from rehab_adherence.calle import check_base_url
+
+    assert check_base_url("https://api.heycall-e.com") == "https://api.heycall-e.com"
+    for bad in (
+        "http://api.heycall-e.com",
+        "https://evil.example.com",
+        "https://user:pass@api.heycall-e.com",
+        "https://api.heycall-e.com/path",
+        "https://api.heycall-e.com?x=1",
+        "api.heycall-e.com",
+        "https://api.heycall-e.com.evil.example",
+    ):
+        with pytest.raises(ValueError):
+            check_base_url(bad)
+
+
+def test_e164_validation_is_ascii_only() -> None:
+    """\\d matches Arabic-Indic and Devanagari digits. A non-ASCII number would
+    pass validation here and be rejected or misdialled by the provider."""
+    from rehab_adherence.model import E164
+
+    assert E164.fullmatch("+15550101001")
+    assert not E164.fullmatch("+١٥٥٥٠١٠١٠٠١")
+    assert not E164.fullmatch("+١٢٣٤٥٦٧٨٩")
 
 
 def test_transcript_read_from_the_documented_api_path() -> None:

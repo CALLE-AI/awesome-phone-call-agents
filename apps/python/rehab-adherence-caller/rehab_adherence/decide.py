@@ -376,6 +376,9 @@ def recommend(
     """
     if outcome == "symptom_reported":
         return "clinician to call back today about a volunteered health concern; do not rebook until reviewed"
+    if outcome == "unknown_possibly_placed":
+        return ("reconcile the checkpointed call id against the CALL-E dashboard before "
+                "any further automated call to this patient")
     if outcome == "identity_unconfirmed":
         return "verify with the patient directly before treating the slot as booked"
     if trajectory == "broken_promise":

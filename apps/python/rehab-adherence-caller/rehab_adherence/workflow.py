@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
 
-from .calle import CallPort
+from .calle import CallPort, safe_error
 from .decide import Decision, Interpretation, decide, interpret, recommend
 from .goal import build_result_schema, build_task, idempotency_key, reference
 from .model import CourseFile, mask_phone
@@ -118,19 +118,34 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
         arguments = build_call_arguments(course_file, decision.patient_id, decision)
         try:
             result = port.place(arguments, patient_id=decision.patient_id)
-        except Exception as exc:  # noqa: BLE001 - one patient must not end the course
+        except Exception as exc:  # noqa: BLE001 - the outcome is unknown, not failed
+            # A create or poll that raised may still have placed a call: the
+            # request can reach the provider and the response be lost. Recording
+            # called=False and moving on is how the same person gets dialled
+            # twice, so an ambiguous outcome retains "unknown", keeps called
+            # true, and stops the run. An interruption cannot recall a call that
+            # was already accepted -- only a human reconciling the checkpoint
+            # against the dashboard can establish what actually happened.
             rows.append(
                 Row(
                     **{
                         **row.to_dict(),
                         "blockers": tuple(row.blockers),
-                        "called": False,
-                        "outcome": "call_failed",
-                        "note": f"{type(exc).__name__}: {exc}",
+                        "called": True,
+                        "outcome": "unknown_possibly_placed",
+                        "escalate_to_clinician": True,
+                        "note": (
+                            f"{safe_error(exc)} during create or poll — a call may have been "
+                            "placed. Reconcile the checkpoint file against the CALL-E dashboard "
+                            "before running this course again."
+                        ),
+                        "recommendation": (
+                            "stop: reconcile this patient by hand before any further automated call"
+                        ),
                     }
                 )
             )
-            continue
+            break
 
         reading: Interpretation = interpret(
             result.get("status") or "",

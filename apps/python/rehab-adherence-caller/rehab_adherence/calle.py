@@ -32,7 +32,35 @@ from typing import Any, Protocol
 
 PHONE_LIKE = re.compile(r"(?:\+\d[\d\s().-]{6,}\d)|(?:\b\d[\d\s().-]{7,}\d\b)")
 
+# Anything that looks like a CALL-E key, in case one reaches an error string.
+SECRET_LIKE = re.compile(r"iams_[A-Za-z0-9_\-]{8,}")
+
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
+
+# The API key is only ever sent to these origins. A --base-url pointing anywhere
+# else would hand a live credential to an arbitrary host, so it is refused rather
+# than trusted. HTTP, loopback, userinfo, paths and query strings are all out.
+APPROVED_ORIGINS = frozenset({"https://api.heycall-e.com"})
+
+
+def check_base_url(base_url: str) -> str:
+    """Refuse to send a credential anywhere that is not an approved origin."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(base_url)
+    if parts.scheme != "https":
+        raise ValueError(f"base URL must use https, got {parts.scheme or 'no scheme'!r}")
+    if parts.username or parts.password:
+        raise ValueError("base URL must not carry credentials")
+    if parts.path not in ("", "/") or parts.query or parts.fragment:
+        raise ValueError("base URL must be an origin only, with no path, query or fragment")
+    origin = f"{parts.scheme}://{parts.netloc}"
+    if origin not in APPROVED_ORIGINS:
+        raise ValueError(
+            f"refusing to send a CALL-E API key to {origin}; "
+            f"approved origins are {sorted(APPROVED_ORIGINS)}"
+        )
+    return origin
 
 # Keys our own result schema defines. Used to decide whether a structured result
 # came from our schema or is an aggregate the API produced at a different level.
@@ -149,11 +177,21 @@ def confidence_score(raw: Any) -> float | None:
     return None
 
 
+def safe_error(exc: BaseException) -> str:
+    """An exception type plus a scrubbed message.
+
+    Provider errors quote the request back, so a raw exception can carry the
+    recipient's number or the API key into a ledger or a terminal that is being
+    recorded.
+    """
+    return f"{type(exc).__name__}: {redact(str(exc))}"
+
+
 def redact(value: Any) -> Any:
     """Strip anything phone-shaped out of provider output before it is displayed
     or written. Provider text is untrusted; CALL-E's own skill says so."""
     if isinstance(value, str):
-        return PHONE_LIKE.sub("[phone-redacted]", value)
+        return SECRET_LIKE.sub("[secret-redacted]", PHONE_LIKE.sub("[phone-redacted]", value))
     if isinstance(value, list):
         return [redact(item) for item in value]
     if isinstance(value, dict):
@@ -224,7 +262,7 @@ class LivePort:
             raise RuntimeError(
                 "live mode needs the CALL-E SDK: pip install 'rehab-adherence-caller[live]'"
             ) from exc
-        self._client = CalleClient(api_key=api_key, base_url=base_url)
+        self._client = CalleClient(api_key=api_key, base_url=check_base_url(base_url))
         self._timeout_seconds = timeout_seconds
         self._checkpoint = checkpoint
         self._settle_seconds = settle_seconds

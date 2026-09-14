@@ -58,7 +58,11 @@ def render(rows: list[Row], *, banner: str, course_id: str, today: str) -> str:
                 lines.append(f"     booked: {row.promised_date}")
             if row.note:
                 lines.append(f"     note: {row.note}")
-            if row.outcome == "identity_unconfirmed":
+            if row.outcome == "unknown_possibly_placed":
+                lines.append("     *** OUTCOME UNKNOWN — A CALL MAY HAVE BEEN PLACED ***")
+                lines.append("         The run stopped here. Reconcile by hand; an interruption")
+                lines.append("         cannot recall a call the provider already accepted.")
+            elif row.outcome == "identity_unconfirmed":
                 lines.append("     >>> SLOT TAKEN BUT IDENTITY UNCONFIRMED -- a clinician must verify")
             elif row.escalate_to_clinician:
                 lines.append("     >>> ESCALATED TO CLINICIAN -- not rebooked by this application")
