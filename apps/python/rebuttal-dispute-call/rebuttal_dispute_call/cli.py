@@ -36,13 +36,12 @@ LABELS = {
     rules.SECOND_CALL: "one call per dispute",
 }
 _DISPUTE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_PHONE_LIKE = re.compile(r"\+?\d[\d\s().-]{5,}\d")
 _SMART = {"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-"}
 
 
 def say(line: Any = "") -> None:
-    """Every line leaves as ASCII."""
-    text = str(line)
+    """Every displayed line leaves phone-masked and as ASCII."""
+    text = scrub(str(line))
     for fancy, plain in _SMART.items():
         text = text.replace(fancy, plain)
     print(text.encode("ascii", "replace").decode("ascii"))
@@ -50,10 +49,7 @@ def say(line: Any = "") -> None:
 
 def scrub(text: str | None) -> str:
     """Mask anything shaped like a phone number in words that came back from a call."""
-    def hide(m: re.Match) -> str:
-        digits = re.sub(r"\D", "", m.group(0))
-        return call.mask("+" + digits) if len(digits) >= 7 else m.group(0)
-    return _PHONE_LIKE.sub(hide, text or "")
+    return call.scrub(text)
 
 
 def decision(g: call.Grounding) -> str:
@@ -141,7 +137,7 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
 
 def _preview(args, template, task, on_record, environ, now) -> int:
     say()
-    say("task text (sent verbatim)")
+    say("task text (phone-masked preview; private original is sent verbatim)")
     for line in textwrap.wrap(task, 96):
         say(f"  {line}")
     blocked = rules.check_call(dispute_id=args.dispute, phone=args.to, on_record=on_record, task=task,

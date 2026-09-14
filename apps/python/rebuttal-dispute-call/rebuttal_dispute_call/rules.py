@@ -35,7 +35,7 @@ BASE_URLS = ("https://api.heycall-e.com", "https://test-api.heycall-e.com")
 
 
 def destination_e164(phone: str | None) -> str | None:
-    return None if E164.match(phone or "") else NOT_E164
+    return None if E164.fullmatch(phone or "") else NOT_E164
 
 
 def number_on_record(phone: str | None, on_record: str | None) -> str | None:

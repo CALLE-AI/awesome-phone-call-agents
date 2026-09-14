@@ -170,11 +170,12 @@ the follow failed and a call may exist, `130` stopped following.
   transcript lines are masked too.
 - **Evidence document:** `out/dry-run/<dispute>-<scenario>.pdf` or `out/live/<dispute>.pdf`, with the
   merchant, order, dispute, call id, masked recipient, times, completion confidence, the accepted
-  answers, every check with its quote and offset, and the transcript as CALL-E returned it.
+  answers, every check with its quote and offset, and a phone-masked rendering of the transcript.
 - A live document contains the customer's words. Treat it as personal data: keep it
   access-controlled, apply a retention policy, and never commit it (`out/` is gitignored). The
-  recipient number is masked in the document; anything the customer said aloud is reproduced as
-  transcribed. The live document is also the only record that a dispute was called, which is how
+  recipient and phone-shaped digit runs in all displayed text are masked. Other personal details
+  may remain; masking is not full anonymization. Grounding uses the unchanged private transcript.
+  The live document is also the only record that a dispute was called, which is how
   `live` refuses a second call.
 
 ## Side effects and safety
@@ -222,7 +223,7 @@ the follow failed and a call may exist, `130` stopped following.
 
 ```
 rebuttal_dispute_call/
-  call.py    vendored verbatim from Rebuttal: script, schema, place, follow, ground, evidence PDF
+  call.py    adapted from Rebuttal: script, schema, place, follow, ground, phone-masked evidence PDF
   rules.py   the calling rules as pure functions, and check_call()
   fake.py    local CALL-E stand-in with six scripted scenarios and idempotency
   cli.py     preview, dry-run and live

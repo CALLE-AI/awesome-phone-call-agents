@@ -13,8 +13,8 @@ a yes needs the customer's words, a no only needs to be possible.
 Depends on nothing but the standard library (and reportlab for the PDF), so it can be lifted into
 any other agent unchanged.
 
-Vendored from Rebuttal (https://github.com/N-45div/Rebuttal, rebuttal/call.py). Only this docstring
-differs from that file.
+Adapted from Rebuttal (https://github.com/N-45div/Rebuttal, rebuttal/call.py), with
+strict destination validation and display-only phone masking for this reference demo.
 """
 from __future__ import annotations
 
@@ -28,7 +28,8 @@ from typing import Any, Callable
 TEMPLATE_VERSION = "confirm-receipt-v2"
 MIN_CONFIDENCE = 0.8
 TERMINAL = {"completed", "failed", "canceled", "cancelled"}
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+E164 = re.compile(r"^\+[1-9][0-9]{7,14}\Z")
+_PHONE_LIKE = re.compile(r"\+?\d[\d\s().-]{5,}\d")
 
 RESULT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -81,6 +82,14 @@ def mask(phone: str | None) -> str:
     if len(phone) <= 7:
         return "*" * len(phone)
     return phone[:3] + "*" * (len(phone) - 7) + phone[-4:]
+
+
+def scrub(text: str | None) -> str:
+    """Mask phone-shaped digit runs for display, without altering grounding inputs."""
+    def hide(m: re.Match) -> str:
+        digits = re.sub(r"\D", "", m.group(0))
+        return mask("+" + digits) if len(digits) >= 7 else m.group(0)
+    return _PHONE_LIKE.sub(hide, text or "")
 
 
 _ZONES: list[tuple[str, tuple[str, ...]]] = sorted([
@@ -157,7 +166,7 @@ class CallRecord:
 def place(client: Any, *, dispute_id: str, phone: str, merchant: str, order_id: str, items: str, amount: str,
           run_id: str = "", webhook_url: str | None = None) -> dict[str, Any]:
     """Create exactly one call for this dispute. A retry with the same dispute id returns the same call."""
-    if not E164.match(phone or ""):
+    if not E164.fullmatch(phone or ""):
         raise ValueError("destination must be an E.164 number")
     kwargs: dict[str, Any] = {
         "task": build_task(merchant=merchant, order_id=order_id, items=items, amount=amount),
@@ -373,7 +382,7 @@ def evidence_pdf(rec: CallRecord, g: Grounding, *, merchant: str, order_id: str,
 
     def write(text: str, size: float = 10, font: str = "Helvetica", gap: float = 4) -> None:
         nonlocal y
-        for part in simpleSplit(_latin1(text), font, size, width - 2 * left):
+        for part in simpleSplit(_latin1(scrub(text)), font, size, width - 2 * left):
             if y < 60:
                 pdf.showPage()
                 y = height - 60
@@ -402,7 +411,7 @@ def evidence_pdf(rec: CallRecord, g: Grounding, *, merchant: str, order_id: str,
         who = "Caller" if _is_caller(t) else "Customer"
         write(f"{_clock(t.get('offset_seconds'))}  {who}: {t.get('text', '')}", 9, gap=3)
     y -= 10
-    write("Generated from the transcript returned by CALL-E for this call. Phone numbers are masked. "
+    write("Generated from the transcript returned by CALL-E for this call. Phone-shaped digit runs are masked for display. "
           "Fields are reported only when the customer's own words support them.", 8, "Helvetica-Oblique")
     pdf.save()
     return buf.getvalue()
