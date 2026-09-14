@@ -1,6 +1,6 @@
 # PagerZero
 
-Autonomous SRE incident remediation pager that auto-resolves routine outages while on-call engineers sleep, and uses CALL-E for zero-trust spoken PIN voice authorization on high-impact production runbooks.
+Experimental SRE/voice-approval hackathon demo. The current implementation uses an in-memory `ClusterSimulator`, not production infrastructure. Its spoken PIN is a visible/configurable demo value, not zero-trust or multi-factor authentication.
 
 - Repository: [https://github.com/adamm285-dev/pagerzeropro](https://github.com/adamm285-dev/pagerzeropro)
 - Live Application: [https://pagerzero.pro](https://pagerzero.pro)
@@ -10,7 +10,7 @@ PagerZero is hosted in its own repository. It is not a CALL-E SDK and does not d
 
 ## Overview
 
-PagerZero eliminates 3:00 AM on-call pager fatigue by introducing a multi-tier autonomy gate for production incidents:
+PagerZero illustrates a multi-tier policy for simulated incidents. All runbook and recovery effects described below concern synthetic cluster state; no production remediation or security guarantee is established:
 
 - **Tier 1 (Safe Autonomous Remediation — Zero Wakeup):** For low-risk, idempotent operational runbooks (e.g. log disk pruning, expired Redis cache purging), PagerZero executes the remediation autonomously, verifies health recovery through a canary window, and logs the post-mortem to Discord. **The on-call engineer stays asleep.**
 - **Tier 2 (CALL-E Voice Authorization with Security PIN — Stay in Bed):** For high-impact actions with production blast radius (e.g. database connection pool cycling, container cluster bounce), PagerZero dials the engineer's phone via CALL-E. The engineer hears a 15-second diagnostic briefing and speaks their approval with a 4-digit security PIN (e.g., *"Approve 1234"*). PagerZero verifies the PIN, executes the runbook, confirms recovery on the phone, and closes the alert.
@@ -44,7 +44,7 @@ npm install
 # Build server and client
 npm run build
 
-# Start local server (defaults to safe Voice Simulator mode)
+# Start with no CALL-E key or Discord webhook credentials; inspect simulator mode
 npm start
 ```
 
@@ -62,7 +62,7 @@ PagerZero integrates with CALL-E using the official `@call-e/calle` TypeScript s
 Key architectural components:
 1. **Dynamic Task Prompting:** Compiles live Prometheus/chaos telemetry into a concise operational briefing for the voice AI actor.
 2. **Structured Result Validation:** Enforces a JSON schema requiring `approval_status` (`approved`, `rejected`, `escalate`, `snooze`), `spoken_notes`, and confidence scores.
-3. **Dual-Factor PIN Extraction:** Spoken digits (e.g., `1234`) are extracted on the server via phonetic pattern matching (`extractSpokenPin`) to ensure security without triggering anti-phishing keyword filters in the prompt.
+3. **Demo PIN Extraction:** Spoken digits (e.g., `1234`) are parsed via `extractSpokenPin`. This visible/configurable demo PIN illustrates a flow; it does not authenticate a production operator.
 4. **Real-Time Carrier Telephony Event Streaming:** Polls CALL-E's `client.calls.listEvents` API every 2 seconds and broadcasts carrier lifecycle events (`botlab create bot`, `calling resolve robot id`, `Call is ringing`, `Call connected`) live over WebSockets to the web dashboard.
 5. **ChatOps Mirroring:** Automatically mirrors root-cause diagnoses, CALL-E spoken approval notes, and post-mortems to Discord webhooks.
 
@@ -78,7 +78,7 @@ Every outbound call:
 
 ## Safe testing path with no calls
 
-PagerZero provides a complete, high-fidelity **Voice Simulator** mode enabled by default:
+For evaluation, leave `CALLE_API_KEY` and `DISCORD_WEBHOOK_URL` unset and explicitly select **Voice Simulator**. An ambient CALL-E key can select live mode, so the no-call default is conditional on credential-free configuration. Review only synthetic incidents; the external live integration is not certified for unattended production use.
 - Uses browser Web Speech synthesis and recognition.
 - Renders the full telephony drawer, speaks the diagnostic briefing aloud via local male speech synthesis, and listens for the engineer's verbal *"Approve 1234"* command.
 - Runs the full diagnostic, remediation, canary verification, and post-mortem pipeline with **zero outbound phone calls placed** and **zero API costs**.
@@ -86,13 +86,13 @@ PagerZero provides a complete, high-fidelity **Voice Simulator** mode enabled by
 
 ## Confirmation for the submitted build
 
-The submitted build deployed at `https://pagerzero.pro` has live CALL-E credentials configured securely on Google Cloud Run. Visitors can try either:
+The author reports that the hosted build has live CALL-E credentials configured on Google Cloud Run; that configuration and its security are not independently verified. Hosted actions can place real calls. For no-call evaluation use the credential-free local simulator above. The reported hosted options are:
 1. **Live CALL-E Telephony:** Enter their own mobile phone number in Settings and trigger a Tier 2 chaos scenario to receive a real phone call.
 2. **Offline Simulator:** Toggle Call Mode to "Voice Simulator" in Settings to test the complete voice authorization flow directly in the browser with zero external calls.
 
 ## Credential handling
 
-All CALL-E API keys and Discord webhook URLs are stored strictly server-side in Cloud Run environment variables (`CALLE_API_KEY`, `DISCORD_WEBHOOK_URL`). They are never bundled into client-side code, never exposed in HTTP responses, and never logged in plain text.
+The author describes server-side environment storage for `CALLE_API_KEY` and `DISCORD_WEBHOOK_URL`. This reference does not establish universal no-exposure guarantees. Do not supply live credentials for simulator evaluation or treat the demo PIN as a secret protecting real infrastructure.
 
 ## Cancellation and duplicate-call protections
 

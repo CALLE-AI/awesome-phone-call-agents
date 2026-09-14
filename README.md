@@ -291,7 +291,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
-- [PagerZero](https://pagerzero.pro) - Autonomous SRE incident remediation console built on CALL-E that auto-resolves routine outages and enforces zero-trust voice PIN authorization before executing high-impact production runbooks. See the [integration notes](docs/community-apps/pagerzero.md) and [GitHub](https://github.com/adamm285-dev/pagerzeropro).
+- [PagerZero](https://pagerzero.pro) - Experimental SRE voice-approval demo using in-memory simulated infrastructure and a demo PIN, not production remediation or zero-trust authentication; use credential-free simulator mode, since configured CALL-E keys can enable real calls. See the [integration notes](docs/community-apps/pagerzero.md) and [GitHub](https://github.com/adamm285-dev/pagerzeropro).
 
 ### Plugins
 
