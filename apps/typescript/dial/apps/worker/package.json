@@ -1,0 +1,21 @@
+{
+  "name": "@dial/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@dial/config": "*",
+    "@dial/database": "*",
+    "@dial/orchestrator": "*",
+    "@dial/calle": "*",
+    "@dial/observability": "*"
+  },
+  "devDependencies": { "tsx": "^4.19.1", "@types/node": "^22.7.5" }
+}
