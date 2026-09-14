@@ -82,6 +82,6 @@ We also learned that field-level evidence is essential for numeric answers such 
 ## Links
 
 - Pull request: `<ADD_AFTER_APPROVAL>`
-- Public demo: `<ADD_AFTER_DEPLOYMENT>`
+- Public demo: <https://utpal-kalita.github.io/tinyslot-demo/>
 - Demo video: `<ADD_AFTER_UPLOAD>`
 - Source path: `apps/typescript/tinyslot/`

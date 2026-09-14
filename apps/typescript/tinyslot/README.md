@@ -4,6 +4,8 @@ TinySlot is an adaptive childcare-vacancy search desk powered by CALL-E. It call
 
 The app is a hackathon reference implementation, not a childcare placement, licensing, or safety-certification service. Availability and prices are time-stamped staff reports, not guarantees.
 
+[Public demo](https://utpal-kalita.github.io/tinyslot-demo/) (static, synthetic, and incapable of placing calls)
+
 ## Why phone calls
 
 Childcare websites and directory listings often do not expose current age-band openings, exact weekday combinations, operating-hour fit, current tuition, or tour availability. Those details are frequently answered only by staff over the phone. TinySlot turns those conversations into comparable structured results while preserving unanswered questions as unknown.

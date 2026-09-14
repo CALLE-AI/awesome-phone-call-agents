@@ -18,12 +18,12 @@
 - [x] Three-minute demo script prepared
 - [x] CALL-E feedback draft prepared
 - [x] Devpost description prepared
+- [x] Public demo deployed without live credentials
 
 ## Requires Maintainer Approval or Account Access
 
 - [ ] Approve pushing the branch to the public fork
 - [ ] Approve opening the pull request
-- [ ] Authenticate a deployment provider and deploy the demo without live secrets
 - [ ] Record the screen walkthrough using `docs/demo-script.md`
 - [ ] Upload the video publicly to YouTube or Vimeo
 - [ ] Add the pull request, demo, and video URLs to `docs/devpost-draft.md`

@@ -166,7 +166,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [TinySlot](apps/typescript/tinyslot/) - Adaptive childcare-vacancy search that calls approved centers in bounded waves, verifies openings against a privacy-minimized care brief, stops when enough evidence-backed matches are found, and gates a tour request behind separate parent approval.
+- [TinySlot](apps/typescript/tinyslot/) - Adaptive childcare-vacancy search that calls approved centers in bounded waves, verifies openings against a privacy-minimized care brief, stops when enough evidence-backed matches are found, and gates a tour request behind separate parent approval. [Demo](https://utpal-kalita.github.io/tinyslot-demo/)
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
 - [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
