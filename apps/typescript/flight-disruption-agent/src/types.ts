@@ -274,3 +274,16 @@ export interface RequestEntry {
   callback: AirlineCall | null;
   callbackVerdict: { kind: "delivered" } | { kind: "follow_up"; reasons: string[] } | null;
 }
+
+/** One webhook delivery from the airline or OTA operations system, kept for dedupe and audit. */
+export interface OpsEventRecord {
+  eventId: string;
+  type: string;
+  flightId: string | null;
+  receivedAt: string;
+  occurredAt: string | null;
+  /** created: a disruption was recorded. conflict: the flight already had one, so a person must look. */
+  status: "created" | "conflict" | "rejected";
+  disruptionId: string | null;
+  message: string;
+}

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { DryRunGateway } from "../src/calle.ts";
 import { loadCatalog } from "../src/data.ts";
+import { Desk } from "../src/desk.ts";
 import { OpsEventError, parseOpsEvent, signPayload, verifySignature } from "../src/events.ts";
 
 const catalog = loadCatalog();
@@ -48,4 +50,61 @@ test("malformed events are refused with a reason", () => {
   assert.throws(() => parseOpsEvent(catalog, { ...ok, delay_minutes: "soon" }), /delay_minutes/);
   assert.throws(() => parseOpsEvent(catalog, { ...ok, cause: "strike" }), /cause/);
   assert.throws(() => parseOpsEvent(catalog, [ok]), /JSON object/);
+});
+
+function dryDesk() {
+  return new Desk(loadCatalog(), new DryRunGateway(0), { statePath: null, liveCallBudget: 0, now: () => NOW });
+}
+
+const cancelEvent = () =>
+  parseOpsEvent(catalog, {
+    id: "ops-100",
+    type: "flight.cancelled",
+    occurred_at: "2026-09-19T07:55:00+07:00",
+    flight: { id: "NA721-2026-09-20" },
+    cause: "force_majeure",
+    reason: "volcanic ash on the route",
+  });
+
+test("an ops event records a disruption once, and a retried delivery changes nothing", () => {
+  const desk = dryDesk();
+  const first = desk.receiveOpsEvent(cancelEvent());
+  assert.equal(first.duplicate, false);
+  assert.equal(first.record.status, "created");
+  assert.equal(first.record.disruptionId, "evt_NA721-2026-09-20_fm_cancelled");
+  const retry = desk.receiveOpsEvent(cancelEvent());
+  assert.equal(retry.duplicate, true);
+  assert.deepEqual(retry.record, first.record);
+  const snap = desk.snapshot();
+  assert.equal(snap.disruptions.length, 1);
+  assert.deepEqual(snap.disruptions[0]?.source, { kind: "airline_webhook", eventId: "ops-100", receivedAt: new Date(NOW).toISOString() });
+  assert.equal(snap.opsEvents.length, 1);
+  assert.equal(snap.disruptions[0]?.bookings.every((b) => b.entry === null), true, "events never start calls");
+});
+
+test("a different event for an already disrupted flight is flagged, not applied", () => {
+  const desk = dryDesk();
+  desk.reportDelay("NA721-2026-09-20", 240, "a late inbound aircraft");
+  const { record } = desk.receiveOpsEvent(cancelEvent());
+  assert.equal(record.status, "conflict");
+  assert.match(record.message, /not applied automatically/);
+  assert.equal(desk.snapshot().disruptions[0]?.kind, "delay");
+});
+
+test("an event the desk cannot record is kept as rejected with the reason", () => {
+  const desk = dryDesk();
+  const tooShort = parseOpsEvent(catalog, { id: "ops-101", type: "flight.delayed", occurred_at: "2026-09-19T07:55:00Z", flight: { id: "NA721-2026-09-20" }, delay_minutes: 5 });
+  const { record } = desk.receiveOpsEvent(tooShort);
+  assert.equal(record.status, "rejected");
+  assert.match(record.message, /between 15 and 1440/);
+  const noPax = parseOpsEvent(catalog, { id: "ops-102", type: "flight.cancelled", occurred_at: "2026-09-19T07:55:00Z", flight: { id: "NA816-2026-09-20" } });
+  assert.match(desk.receiveOpsEvent(noPax).record.message, /no bookings/);
+});
+
+test("live modes never accept the published dry-run webhook secret", async () => {
+  const { webhookSecretFromEnv } = await import("../src/config.ts");
+  assert.deepEqual(webhookSecretFromEnv(false, {}), { secret: "dry-run-webhook-secret", demo: true });
+  assert.deepEqual(webhookSecretFromEnv(true, {}), { secret: null, demo: false });
+  assert.deepEqual(webhookSecretFromEnv(true, { AIRLINE_WEBHOOK_SECRET: "dry-run-webhook-secret" }), { secret: null, demo: false });
+  assert.deepEqual(webhookSecretFromEnv(true, { AIRLINE_WEBHOOK_SECRET: "real" }), { secret: "real", demo: false });
 });

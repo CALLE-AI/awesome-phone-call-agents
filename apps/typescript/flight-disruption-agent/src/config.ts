@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CliGateway, DryRunGateway, SdkGateway, type CallGateway } from "./calle.ts";
+import { DRY_RUN_WEBHOOK_SECRET } from "./events.ts";
 
 export const APP_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -27,4 +28,17 @@ export function gatewayFromEnv(env = process.env): CallGateway {
   }
   if (mode === "cli") return new CliGateway(env.CALLE_CLI?.trim() || "calle");
   throw new Error(`Unknown CALLE_MODE "${mode}". Use dry-run, sdk, or cli.`);
+}
+
+/**
+ * Shared secret for the airline ops webhook. Dry run falls back to a published demo
+ * secret so the feed works out of the box; live modes refuse to start the webhook without one.
+ */
+export function webhookSecretFromEnv(live: boolean, env = process.env): { secret: string | null; demo: boolean } {
+  const secret = env.AIRLINE_WEBHOOK_SECRET?.trim();
+  if (secret) {
+    if (secret === DRY_RUN_WEBHOOK_SECRET && live) return { secret: null, demo: false };
+    return { secret, demo: secret === DRY_RUN_WEBHOOK_SECRET };
+  }
+  return live ? { secret: null, demo: false } : { secret: DRY_RUN_WEBHOOK_SECRET, demo: true };
 }

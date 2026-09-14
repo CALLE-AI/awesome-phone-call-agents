@@ -11,6 +11,7 @@
     "start": "node --import tsx src/server.ts",
     "demo": "node --import tsx src/demo.ts",
     "demo:requests": "node --import tsx src/demo-requests.ts",
+    "send-event": "node --import tsx src/send-event.ts",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts"
   },

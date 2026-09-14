@@ -7,17 +7,20 @@ import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "./air
 import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
+import type { OpsEvent } from "./events.ts";
 import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
   ledger: Record<string, LedgerEntry>;
   requests: Record<string, RequestEntry>;
+  /** Airline ops webhook deliveries by event id. */
+  opsEvents: Record<string, OpsEventRecord>;
   bookings: Record<string, BookingState>;
   seats: Record<string, number>;
   liveCallsUsed: number;
@@ -98,7 +101,7 @@ export class Desk {
     }
     const seats: Record<string, number> = {};
     for (const f of this.catalog.flights) seats[f.id] = f.seatsAvailable;
-    return { disruptions: [], ledger: {}, requests: {}, bookings, seats, liveCallsUsed: 0 };
+    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, bookings, seats, liveCallsUsed: 0 };
   }
 
   private load(): DeskState | null {
@@ -106,6 +109,7 @@ export class Desk {
     if (!path || !existsSync(path)) return null;
     const state = JSON.parse(readFileSync(path, "utf8")) as DeskState;
     state.requests ??= {};
+    state.opsEvents ??= {};
     // State saved before cancellations existed only held operator-reported delays.
     for (const d of state.disruptions) {
       d.kind ??= "delay";
@@ -200,6 +204,55 @@ export class Desk {
     this.state.disruptions.push(disruption);
     this.save();
     return disruption;
+  }
+
+  /**
+   * Records a disruption pushed by the airline ops system. Each event id is processed
+   * once: a retried delivery returns the first result and changes nothing. Events never
+   * start calls; an operator still reviews the priced options and calls passengers.
+   */
+  receiveOpsEvent(event: OpsEvent): { record: OpsEventRecord; duplicate: boolean } {
+    const seen = this.state.opsEvents[event.eventId];
+    if (seen) return { record: seen, duplicate: true };
+
+    const record: OpsEventRecord = {
+      eventId: event.eventId,
+      type: event.type,
+      flightId: event.flightId,
+      receivedAt: new Date(this.now()).toISOString(),
+      occurredAt: event.occurredAt,
+      status: "created",
+      disruptionId: null,
+      message: "",
+    };
+    const existing = this.state.disruptions.find((d) => d.flightId === event.flightId);
+    if (existing) {
+      const same = existing.kind === event.kind && existing.cause === event.cause && existing.delayMinutes === event.delayMinutes;
+      record.status = "conflict";
+      record.disruptionId = existing.id;
+      record.message = same
+        ? `Same ${existing.kind} as ${existing.id}, already recorded. Nothing changed.`
+        : `Flight already has ${existing.id} (${existing.kind}). This ${event.kind} was not applied automatically: calls may already quote the earlier options. Check with the airline, then handle affected passengers by hand.`;
+    } else {
+      try {
+        const disruption = this.reportDisruption({
+          flightId: event.flightId,
+          kind: event.kind,
+          cause: event.cause,
+          delayMinutes: event.delayMinutes,
+          reason: event.reason,
+          source: { kind: "airline_webhook", eventId: event.eventId, receivedAt: record.receivedAt },
+        });
+        record.disruptionId = disruption.id;
+        record.message = `Recorded ${disruption.id}.`;
+      } catch (error) {
+        record.status = "rejected";
+        record.message = error instanceof Error ? error.message : String(error);
+      }
+    }
+    this.state.opsEvents[event.eventId] = record;
+    this.save();
+    return { record, duplicate: false };
   }
 
   quote(disruptionId: string, pnr: string): Quote {
@@ -800,6 +853,7 @@ export class Desk {
       live: this.gateway.live,
       liveDemoPhone: this.options.liveDemoPhone && this.gateway.live ? maskPhone(this.options.liveDemoPhone) : null,
       liveBudget: { used: this.state.liveCallsUsed, limit: this.options.liveCallBudget },
+      opsEvents: Object.values(this.state.opsEvents).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
       polling: { firstSeconds: this.gateway.firstPollSeconds, everySeconds: this.gateway.pollSeconds },
       flights: catalog.flights.map((f) => ({
         ...f,

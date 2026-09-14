@@ -1,15 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
-import { APP_ROOT, gatewayFromEnv, loadEnvFile } from "./config.ts";
+import { APP_ROOT, gatewayFromEnv, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
+import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
 import type { Action, DisruptionCause, DisruptionKind, RequestChannel, RequestKind } from "./types.ts";
 
 loadEnvFile();
 
 const gateway = gatewayFromEnv();
-const desk = new Desk(loadCatalog(), gateway, {
+const catalog = loadCatalog();
+const webhook = webhookSecretFromEnv(gateway.live);
+const desk = new Desk(catalog, gateway, {
   // Live runs persist call ids so polling can resume after a restart. Dry runs start fresh.
   statePath: gateway.live ? join(APP_ROOT, ".data", `state-${gateway.mode}.json`) : null,
   liveDemoPhone: process.env.LIVE_DEMO_PHONE?.trim() || undefined,
@@ -31,12 +34,17 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readRaw(req: IncomingMessage): Promise<string> {
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
     if (raw.length > 64_000) throw new DeskError("Request body too large.", 413);
   }
+  return raw;
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const raw = await readRaw(req);
   if (!raw) return {};
   try {
     return JSON.parse(raw) as Record<string, unknown>;
@@ -63,6 +71,31 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
   if (req.method === "POST") {
     const origin = req.headers.origin;
     if (origin && origin !== `http://${req.headers.host}`) throw new DeskError("Cross-origin request refused.", 403);
+  }
+
+  // Server-to-server: authenticated by signature, not by the browser Origin check above.
+  if (req.method === "POST" && path === "/api/webhooks/airline-ops") {
+    if (!webhook.secret) throw new DeskError("Airline ops webhook is disabled: set AIRLINE_WEBHOOK_SECRET.", 503);
+    const raw = await readRaw(req);
+    const header = req.headers[SIGNATURE_HEADER];
+    const check = verifySignature(webhook.secret, raw, Array.isArray(header) ? header[0] : header, Date.now());
+    if (!check.ok) throw new DeskError(check.reason, 401);
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      throw new DeskError("Request body must be JSON.");
+    }
+    let event;
+    try {
+      event = parseOpsEvent(catalog, body);
+    } catch (error) {
+      if (error instanceof OpsEventError) throw new DeskError(error.message, 422);
+      throw error;
+    }
+    const { record, duplicate } = desk.receiveOpsEvent(event);
+    const status = duplicate ? 200 : record.status === "created" ? 201 : record.status === "conflict" ? 409 : 422;
+    return send(res, status, { duplicate, ...record });
   }
 
   if (req.method === "GET" && path === "/api/state") {
@@ -169,4 +202,6 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const live = gateway.live ? `LIVE (${gateway.mode}) - real calls go to LIVE_DEMO_PHONE only` : "dry-run - no calls are placed";
   console.log(`Flight disruption desk on http://${HOST}:${PORT}  [${live}]`);
+  if (!webhook.secret) console.log("Airline ops webhook disabled: set AIRLINE_WEBHOOK_SECRET to enable POST /api/webhooks/airline-ops.");
+  else if (webhook.demo) console.log("Airline ops webhook uses the dry-run demo secret. Set AIRLINE_WEBHOOK_SECRET before exposing it anywhere.");
 });
