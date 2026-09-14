@@ -11,12 +11,12 @@ under a real delegated-authority tier, and the specific named person that
 decision was made *in the name of* deserves a real chance to confirm it or
 veto it — not a notification they might never open.
 
-It does not invent a decision-application mechanism. It drives the runnable
-[`authority-signoff-call`](../../apps/python/authority-signoff-call/) app,
-which places one CALL-E call to the accountable person's own pre-registered
-number, reads the decision out loud, and returns a structured `confirm` or
-`override` you feed into whatever function your system already uses to apply
-a human decision to that record.
+It does not invent a decision-application mechanism. It places one CALL-E
+call to the accountable person's own pre-registered number, reads the
+decision out loud, and returns a structured `confirm` or `override` you feed
+into whatever function your system already uses to apply a human decision to
+that record. Two integration surfaces are documented below — use whichever
+matches where the decision to place the call is actually happening.
 
 ## When to use
 
@@ -49,33 +49,67 @@ a human decision to that record.
 - You want a second attempt at a different answer after one call already
   resolved. One call, one attributable answer.
 
-## How it works
+## Shared call context
 
-1. Build the call context: who the decision was authorized as (the
-   `authority_name`), a one-line situation summary (`context`), exactly what
-   was auto-authorized (`decision_summary`), the real tier it was authorized
-   under (`authorizing_tier`), and an amount/value if there is one.
-2. Preview first — always. `python cli.py preview ...` builds and prints the
-   exact call script with no call placed and no credentials needed. Read it
-   before ever running `request`.
-3. Run live only with `CALLE_API_KEY`, `CALLE_SIGNOFF_PHONE` (the
-   accountable person's own E.164 number — nobody else's), and
-   `CALLE_SIGNOFF_ENABLED=true` all set. Any one of those missing means the
-   app returns a dry-run result and places no call — this is the
+Either surface below needs the same four facts plus a phone number, always
+pulled from your system's own record of the decision, never guessed:
+`authority_name` (who it was authorized as), `context` (one-line situation
+summary), `decision_summary` (exactly what was auto-authorized),
+`authorizing_tier` (the real tier it was authorized under), and an optional
+`amount`. The call always ends by asking the person to **CONFIRM** the
+decision as-is or **OVERRIDE** (reject) it, and records `unclear` if they're
+unavailable or the answer isn't clean.
+
+## Surface 1 — from an interactive agent (this skill installed via MCP)
+
+Use this when you (the agent) have the `calle` skill/MCP installed — see the
+[install guide](https://open.heycall-e.com/document/mcp-archive/CALL-E-installation-guide.md) —
+and are acting on a decision a *separate* system already auto-authorized
+(e.g. a user pastes in an approval record and asks you to get sign-off on
+it). Call the three MCP tools directly, no script needed:
+
+1. `plan_call` with `to_phones: [<the accountable person's own number>]` and
+   `goal` built from the shared call context above (see
+   [`references/examples.md`](references/examples.md) for the exact
+   wording). Show the user the returned `confirm_summary` and get their
+   explicit go-ahead before continuing — never call `run_call` without it.
+2. `run_call` with the `confirm_token` from step 1, exactly once per
+   decision.
+3. Poll `get_call_run` until a terminal status, then read `confirm` /
+   `override` / `unclear` back from the structured result / transcript the
+   same way [`references/result-schema.json`](references/result-schema.json)
+   defines it.
+4. Feed the outcome into whatever your user's system uses to apply a human
+   decision — this skill does not invent that mechanism, see "Rules" below.
+
+## Surface 2 — from a backend service (no agent host in the loop at call time)
+
+Use this when the call needs to fire autonomously from your own running
+system — nobody's coding agent is watching at that moment, which is the
+normal case for the decisions this skill targets. Use the runnable
+[`authority-signoff-call`](../../apps/python/authority-signoff-call/) app
+directly with the CALL-E SDK:
+
+1. Preview first — always. `python cli.py preview ...` builds and prints the
+   exact call script with no call placed and no credentials needed.
+2. Run live only with `CALLE_API_KEY` (from the CALL-E dashboard),
+   `CALLE_SIGNOFF_PHONE` (the accountable person's own E.164 number —
+   nobody else's), and `CALLE_SIGNOFF_ENABLED=true` all set. Any one missing
+   means the app returns a dry-run result and places no call — the
    safe-by-default path, not an error mode to route around.
-4. Read the exit code / `decision` field. `confirm` means the original
-   auto-authorization stands, do nothing further. `override` means unwind it
-   the exact same way your system already unwinds a decision a person
-   rejected through any other channel — this skill is a second way to reach
-   that same function, not a new one. `unclear` (no answer, dry run, call
-   error) means nothing has changed; the original decision still stands
-   until someone reaches the authority some other way.
-5. Pass a stable `idempotency_key` derived from the decision's own ID — never
-   regenerate a call for the same decision on retry; that risks a duplicate
-   dial to a real phone.
+3. Read the exit code / `decision` field the same way as Surface 1 —
+   `confirm` (stands, do nothing), `override` (unwind it through your
+   system's existing decision-application function), `unclear` (nothing has
+   changed).
+4. Pass a stable `idempotency_key` derived from the decision's own ID —
+   never regenerate one for the same decision on retry; that risks a
+   duplicate dial to a real phone.
 
 See the app's [README](../../apps/python/authority-signoff-call/README.md)
-for exact commands and the full exit-code table.
+for exact commands and the full exit-code table. This is the surface
+[GovOS](references/govos-reference-implementation.md) actually uses in
+production: its incident engine fires the call as a background task the
+moment a DDMA-tier approval is created.
 
 ## Rules you must follow
 

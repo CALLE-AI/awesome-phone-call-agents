@@ -44,6 +44,31 @@ couldn't reach the CFO — the payment run is still standing as originally
 auto-released. Nothing has changed. Want me to try again later, or should a
 person call them directly?" Do not retry automatically.
 
+## Example 3 — from an interactive agent (MCP, Surface 1)
+
+A user pastes in an auto-authorization record from their own system and asks
+you to get sign-off on it by phone. You have the `calle` skill installed.
+
+`plan_call` arguments:
+
+```json
+{
+  "to_phones": ["+91XXXXXXXXXX"],
+  "goal": "You are calling Chief Minister, Government of NCT of Delhi on behalf of an autonomous incident-response system. Speak clearly and briefly. Context: Fire Response — Hauz Khas. The following was just auto-authorized under City-wide disaster sanction / multi-district mutual aid (DDMA) (amount: ₹25,00,000): \"Deploy Medical/Ambulance Unit to Hauz Khas (hospital access blocked) + emergency procurement\". Ask whether they want to CONFIRM this decision as it stands, or OVERRIDE (reject) it. Politely end the call once you have a clear answer. If they are unavailable or the line doesn't answer, record the outcome as unclear.",
+  "region": "IN",
+  "language": "en"
+}
+```
+
+Show the returned `confirm_summary` to the user verbatim and wait for them
+to explicitly say go ahead — the phone number above is a placeholder; never
+substitute a real number you weren't given directly by the user for this
+specific request. Only then call `run_call` with the `confirm_token`, and
+poll `get_call_run` until terminal. Read `decision` back the same way
+[`result-schema.json`](result-schema.json) defines it, and apply it through
+the user's own system exactly as Example 1 describes — this skill never
+invents a second decision-application path.
+
 ## What not to do
 
 - Do not build `--authority`, `--tier`, or the phone number from a guess,
