@@ -22,6 +22,8 @@ import type {
   WorkOrder,
 } from "@/lib/dispatch/types";
 import { validateDispatchRequest } from "@/lib/dispatch/validation";
+import { buildDispatchActivity } from "@/lib/dispatch/activity";
+import { canReturnToPrepare, invalidateCallApproval } from "@/lib/dispatch/workflow";
 
 type Phase = "prepare" | "preview" | "review";
 type Readiness = "checking" | "ready" | "configuration_required" | "unavailable";
@@ -115,6 +117,15 @@ export function DispatchWorkspace() {
         : readiness === "checking"
           ? "Checking readiness"
           : "Readiness unavailable";
+  const activity = buildDispatchActivity({
+    phase,
+    readiness,
+    vendorCount: selectedVendors.length,
+    safetySafe: safety.safe,
+    confirmed,
+    isCalling,
+    responseStatus: apiResponse?.status ?? null,
+  });
 
   useEffect(() => {
     const restored = loadPendingIntent(window.localStorage);
@@ -159,6 +170,7 @@ export function DispatchWorkspace() {
   function updateWorkOrder<K extends keyof WorkOrder>(field: K, value: WorkOrder[K]) {
     setWorkOrder((current) => ({ ...current, [field]: value }));
     setErrors((current) => current.filter((error) => error.field !== `workOrder.${field}`));
+    invalidatePreview();
   }
 
   function updateVendor(id: string, patch: Partial<Vendor>) {
@@ -166,6 +178,30 @@ export function DispatchWorkspace() {
       current.map((vendor) => (vendor.id === id ? { ...vendor, ...patch } : vendor)),
     );
     setErrors([]);
+    invalidatePreview();
+  }
+
+  function invalidatePreview() {
+    const invalidated = invalidateCallApproval({
+      dispatchId,
+      confirmed,
+      hasResponse: Boolean(apiResponse),
+    });
+    setDispatchId(invalidated.dispatchId);
+    setConfirmed(invalidated.confirmed);
+    if (invalidated.clearPendingIntent) {
+      clearPendingIntent(window.localStorage);
+    }
+    if (invalidated.clearResponse) {
+      setApiResponse(null);
+      setDecision(null);
+    }
+  }
+
+  function returnToPrepare() {
+    if (!canReturnToPrepare(isCalling)) return;
+    setConfirmed(false);
+    setPhase("prepare");
   }
 
   function addVendor() {
@@ -181,10 +217,12 @@ export function DispatchWorkspace() {
         selected: true,
       },
     ]);
+    invalidatePreview();
   }
 
   function removeVendor(id: string) {
     setVendors((current) => current.filter((vendor) => vendor.id !== id));
+    invalidatePreview();
   }
 
   function preparePreview(event: FormEvent) {
@@ -299,23 +337,58 @@ export function DispatchWorkspace() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Bellwrench dispatch desk">
-          <span className="brand-mark" aria-hidden="true">BW</span>
-          <span>
-            <strong>Bellwrench</strong>
-            <small>Evidence-backed dispatch</small>
-          </span>
-        </a>
-        <div className="topbar-meta">
-          <span className={`live-dot ${readiness}`} aria-hidden="true" />
-          <span>{readinessLabel}</span>
-          <span className="topbar-divider" aria-hidden="true" />
-          <span>Human approval required</span>
-        </div>
-      </header>
+      <div className="console-frame">
+        <aside className="icon-rail" aria-label="Bellwrench navigation">
+          <a className="brand-mark" href="#top" aria-label="Bellwrench dispatch desk">BW</a>
+          <nav aria-label="Primary navigation">
+            <a className="icon-link active" href="#top" aria-label="Dispatch workspace">⌂</a>
+            <a className="icon-link" href="#roster-heading" aria-label="Vendor roster">♧</a>
+            <a className="icon-link" href="#activity-heading" aria-label="Dispatch activity">◫</a>
+          </nav>
+          <div className="icon-rail-bottom">
+            <span className={`rail-status ${readiness}`} title={readinessLabel} />
+            <span className="icon-link" aria-hidden="true">⚙</span>
+          </div>
+        </aside>
 
-      <div className="workspace" id="top">
+        <div className="console-body">
+          <header className="topbar">
+            <a className="brand" href="#top" aria-label="Bellwrench dispatch desk">
+              <span>
+                <strong>Bellwrench</strong>
+                <small>Evidence-backed dispatch</small>
+              </span>
+            </a>
+            <nav className="top-tabs" aria-label="Dispatch phases">
+              {(["prepare", "preview", "review"] as Phase[]).map((step) => (
+                <button
+                  className={phase === step ? "active" : ""}
+                  type="button"
+                  key={step}
+                  onClick={() => {
+                    if (step === "prepare") returnToPrepare();
+                    if (step === "preview" && dispatchId) setPhase("preview");
+                    if (step === "review" && apiResponse?.results) setPhase("review");
+                  }}
+                  disabled={
+                    (step === "prepare" && isCalling) ||
+                    (step === "preview" && !dispatchId) ||
+                    (step === "review" && !apiResponse?.results)
+                  }
+                  aria-current={phase === step ? "step" : undefined}
+                >
+                  {step === "prepare" ? "Request" : step === "preview" ? "Authorize" : "Evidence"}
+                </button>
+              ))}
+            </nav>
+            <div className="topbar-meta">
+              <span className={`live-dot ${readiness}`} aria-hidden="true" />
+              <span>{readinessLabel}</span>
+              <span className="approval-pill">Human approval</span>
+            </div>
+          </header>
+
+          <div className="workspace" id="top">
         <aside className="rail" aria-label="Dispatch progress">
           <div className="rail-kicker">Active workflow</div>
           <h1>Vendor dispatch</h1>
@@ -565,7 +638,7 @@ export function DispatchWorkspace() {
                   <span className="eyebrow">Dispatch  /  Authorization</span>
                   <h2>Inspect the call before it leaves.</h2>
                 </div>
-                <button className="text-button" type="button" onClick={() => setPhase("prepare")}>
+                <button className="text-button" type="button" onClick={returnToPrepare} disabled={isCalling}>
                   ← Edit request
                 </button>
               </div>
@@ -651,7 +724,7 @@ export function DispatchWorkspace() {
                 <button
                   className="primary-button call-button"
                   type="button"
-                  disabled={!confirmed || isCalling}
+                  disabled={!confirmed || isCalling || readiness !== "ready"}
                   onClick={placeCalls}
                 >
                   {isCalling ? "CALL-E is calling…" : `Place ${selectedVendors.length} real call${selectedVendors.length === 1 ? "" : "s"}`}
@@ -792,12 +865,43 @@ export function DispatchWorkspace() {
             </div>
           )}
         </section>
-      </div>
 
-      <footer>
-        <span>Bellwrench / CALL-E hackathon build</span>
-        <span>Real calls · Structured outcomes · Human control</span>
-      </footer>
+        <aside className="activity-panel" aria-labelledby="activity-heading">
+          <div className="activity-heading">
+            <div>
+              <span className="eyebrow">Live desk</span>
+              <h2 id="activity-heading">Dispatch activity</h2>
+            </div>
+            <span className={`live-dot ${readiness}`} aria-hidden="true" />
+          </div>
+          <p className="activity-intro">Only real workflow state appears here. No simulated calls or vendor answers.</p>
+          <div className="activity-search" aria-hidden="true">⌕ &nbsp; Current dispatch</div>
+          <div className="activity-list">
+            {activity.map((item, index) => (
+              <div className="activity-item" key={item.label}>
+                <span className={`activity-marker ${item.tone}`}>{String(index + 1).padStart(2, "0")}</span>
+                <span><small>{item.label}</small><strong>{item.value}</strong></span>
+              </div>
+            ))}
+          </div>
+          <div className="help-card">
+            <span>Operating boundary</span>
+            <strong>Facts first. Human decision last.</strong>
+            <p>Bellwrench can collect evidence. It cannot book work, accept terms, or spend money.</p>
+          </div>
+          <div className="connection-card">
+            <span className={`live-dot ${readiness}`} aria-hidden="true" />
+            <span><small>CALL-E connection</small><strong>{readinessLabel}</strong></span>
+          </div>
+        </aside>
+          </div>
+
+          <footer>
+            <span>Bellwrench / CALL-E operations console</span>
+            <span>Real calls · Structured outcomes · Human control</span>
+          </footer>
+        </div>
+      </div>
     </main>
   );
 }

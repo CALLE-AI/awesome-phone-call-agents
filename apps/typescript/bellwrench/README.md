@@ -18,7 +18,7 @@ Bellwrench is a consent-first maintenance vendor dispatch desk powered by CALL-E
 - Ranked verified evidence with no automatic booking, spend, or vendor assignment.
 - A browser-local operator decision record that permits only verified vendors or an explicit no-dispatch outcome and always records `not_booked`.
 - A credential-safe `GET /api/health` readiness endpoint.
-- One hundred automated tests covering safety, validation, task construction, SDK contracts, identity, reconciliation, API behavior, recovery, result verification, decisions, and ranking.
+- One hundred and six automated tests covering safety, validation, task construction, SDK contracts, identity, reconciliation, API behavior, recovery, approval invalidation, activity state, result verification, decisions, and ranking.
 
 ## Run locally
 
